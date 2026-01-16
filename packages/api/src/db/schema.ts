@@ -85,9 +85,10 @@ export const frames = pgTable('frames', {
 
 /**
  * Users Table
+ * Note: Using text ID to accommodate Better Auth's ID generation
  */
 export const users = pgTable('users', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  id: varchar('id', { length: 255 }).primaryKey(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   name: varchar('name', { length: 100 }).notNull(),
   phone: varchar('phone', { length: 20 }),
@@ -124,7 +125,7 @@ export const users = pgTable('users', {
  */
 export const addresses = pgTable('addresses', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   fullName: varchar('full_name', { length: 100 }).notNull(),
   phone: varchar('phone', { length: 20 }).notNull(),
   addressLine1: varchar('address_line1', { length: 200 }).notNull(),
@@ -139,13 +140,37 @@ export const addresses = pgTable('addresses', {
 
 /**
  * Sessions Table
+ * Note: Using varchar ID to accommodate Better Auth's ID generation
  */
 export const sessions = pgTable('sessions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  id: varchar('id', { length: 255 }).primaryKey(),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   token: varchar('token', { length: 500 }).notNull().unique(),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+/**
+ * Accounts Table (for OAuth/Social login and password-based auth)
+ * Note: Using varchar ID to accommodate Better Auth's ID generation
+ * Schema based on Better Auth requirements
+ */
+export const accounts = pgTable('accounts', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  accountId: varchar('accountId', { length: 255 }).notNull().unique(),
+  providerId: varchar('providerId', { length: 255 }).notNull(),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  provider: varchar('provider', { length: 100 }).notNull(),
+  providerAccountId: varchar('provider_account_id', { length: 255 }).notNull(),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  expiresAt: timestamp('expires_at'),
+  tokenType: varchar('token_type', { length: 50 }),
+  scope: text('scope'),
+  idToken: text('id_token'),
+  password: varchar('password', { length: 255 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 /**
@@ -154,7 +179,7 @@ export const sessions = pgTable('sessions', {
 export const orders = pgTable('orders', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderNumber: varchar('order_number', { length: 50 }).notNull().unique(),
-  userId: uuid('user_id').notNull().references(() => users.id),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id),
   status: orderStatusEnum('status').notNull().default('pending'),
   shippingAddress: json('shipping_address').$type<{
     id: string;
@@ -238,7 +263,7 @@ export const orderItems = pgTable('order_items', {
  */
 export const cartItems = pgTable('cart_items', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   productId: uuid('product_id').notNull().references(() => products.id),
   variantId: uuid('variant_id').notNull().references(() => productVariants.id),
   frameId: uuid('frame_id').references(() => frames.id),
@@ -251,7 +276,7 @@ export const cartItems = pgTable('cart_items', {
  */
 export const aiGenerations = pgTable('ai_generations', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull().references(() => users.id),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id),
   prompt: text('prompt').notNull(),
   enhancedPrompt: text('enhanced_prompt'),
   stylePreset: stylePresetEnum('style_preset').notNull(),

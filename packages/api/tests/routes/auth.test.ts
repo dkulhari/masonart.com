@@ -30,6 +30,7 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
   await sql`DROP TABLE IF EXISTS cart_items CASCADE`;
   await sql`DROP TABLE IF EXISTS order_items CASCADE`;
   await sql`DROP TABLE IF EXISTS orders CASCADE`;
+  await sql`DROP TABLE IF EXISTS accounts CASCADE`;
   await sql`DROP TABLE IF EXISTS sessions CASCADE`;
   await sql`DROP TABLE IF EXISTS addresses CASCADE`;
   await sql`DROP TABLE IF EXISTS frames CASCADE`;
@@ -69,10 +70,10 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
     `);
   }
 
-  // Create users table
+  // Create users table (using VARCHAR for ID to accommodate Better Auth)
   await sql`
     CREATE TABLE IF NOT EXISTS users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      id VARCHAR(255) PRIMARY KEY,
       email VARCHAR(255) NOT NULL UNIQUE,
       name VARCHAR(100) NOT NULL,
       phone VARCHAR(20),
@@ -89,14 +90,36 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
     )
   `;
 
-  // Create sessions table for Better Auth
+  // Create sessions table for Better Auth (using VARCHAR for IDs)
   await sql`
     CREATE TABLE IF NOT EXISTS sessions (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      token VARCHAR(255) NOT NULL UNIQUE,
+      id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token VARCHAR(500) NOT NULL UNIQUE,
       expires_at TIMESTAMP NOT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  // Create accounts table for OAuth/Social login and password-based auth (using VARCHAR for IDs)
+  await sql`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id VARCHAR(255) PRIMARY KEY,
+      "accountId" VARCHAR(255) NOT NULL UNIQUE,
+      "providerId" VARCHAR(255) NOT NULL,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      provider VARCHAR(100) NOT NULL,
+      provider_account_id VARCHAR(255) NOT NULL,
+      access_token TEXT,
+      refresh_token TEXT,
+      expires_at TIMESTAMP,
+      token_type VARCHAR(50),
+      scope TEXT,
+      id_token TEXT,
+      password VARCHAR(255),
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE(provider, provider_account_id)
     )
   `;
 }

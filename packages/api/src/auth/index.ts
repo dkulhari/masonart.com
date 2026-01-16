@@ -50,6 +50,7 @@ export const auth = betterAuth({
     schema: {
       user: schema.users,
       session: schema.sessions,
+      account: schema.accounts,
     },
   }),
 
@@ -95,7 +96,6 @@ export const auth = betterAuth({
     crossSubDomainCookies: {
       enabled: false,
     },
-    generateId: false, // Use database-generated UUIDs
   },
 
   // Trust proxy headers (for production behind reverse proxy)
