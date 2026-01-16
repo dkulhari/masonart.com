@@ -8,6 +8,7 @@
     "test:coverage": "vitest --coverage"
   },
   "devDependencies": {
+    "@types/ioredis": "^5.0.0",
     "@types/node": "^25.0.9",
     "@types/supertest": "^6.0.3",
     "@vitest/coverage-v8": "^4.0.17",
@@ -15,8 +16,11 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.970.0",
+    "@aws-sdk/s3-request-presigner": "^3.970.0",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.4",
+    "ioredis": "^5.9.2",
     "postgres": "^3.4.8"
   }
 }
