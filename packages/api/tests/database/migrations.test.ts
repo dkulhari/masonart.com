@@ -16,6 +16,18 @@ let client: ReturnType<typeof postgres>;
  * This simulates what a real migration system would do
  */
 async function runMigrations(sql: ReturnType<typeof postgres>) {
+  // Drop all tables in the correct order (to handle foreign key constraints)
+  await sql`DROP TABLE IF EXISTS ai_generations CASCADE`;
+  await sql`DROP TABLE IF EXISTS cart_items CASCADE`;
+  await sql`DROP TABLE IF EXISTS order_items CASCADE`;
+  await sql`DROP TABLE IF EXISTS orders CASCADE`;
+  await sql`DROP TABLE IF EXISTS sessions CASCADE`;
+  await sql`DROP TABLE IF EXISTS addresses CASCADE`;
+  await sql`DROP TABLE IF EXISTS frames CASCADE`;
+  await sql`DROP TABLE IF EXISTS product_variants CASCADE`;
+  await sql`DROP TABLE IF EXISTS products CASCADE`;
+  await sql`DROP TABLE IF EXISTS users CASCADE`;
+
   // Enable UUID extension
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
@@ -60,7 +72,9 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
       email_verified BOOLEAN NOT NULL DEFAULT false,
       phone_verified BOOLEAN NOT NULL DEFAULT false,
       avatar_url TEXT,
-      preferences JSONB,
+      preferences JSONB NOT NULL DEFAULT '{"emailNotifications": true, "smsNotifications": false, "marketingEmails": true, "orderUpdates": true, "aiGenerationNotifications": true}'::jsonb,
+      trade_account_status trade_account_status,
+      trade_business JSONB,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
@@ -118,17 +132,16 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
     CREATE TABLE IF NOT EXISTS addresses (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      type address_type NOT NULL DEFAULT 'home',
       full_name VARCHAR(100) NOT NULL,
       phone VARCHAR(20) NOT NULL,
       address_line1 VARCHAR(200) NOT NULL,
       address_line2 VARCHAR(200),
       city VARCHAR(100) NOT NULL,
       state VARCHAR(100) NOT NULL,
-      postal_code VARCHAR(20) NOT NULL,
+      pincode VARCHAR(20) NOT NULL,
       country VARCHAR(100) NOT NULL,
       is_default BOOLEAN NOT NULL DEFAULT false,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      type address_type NOT NULL DEFAULT 'home'
     )
   `;
 
@@ -145,28 +158,29 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
   await sql`
     CREATE TABLE IF NOT EXISTS orders (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       order_number VARCHAR(50) NOT NULL UNIQUE,
+      user_id UUID NOT NULL REFERENCES users(id),
       status order_status NOT NULL DEFAULT 'pending',
+      shipping_address JSONB NOT NULL,
+      billing_address JSONB,
+      payment_method payment_method NOT NULL,
+      payment_status payment_status NOT NULL DEFAULT 'pending',
+      payment_id VARCHAR(255),
       subtotal DECIMAL(10, 2) NOT NULL,
-      tax DECIMAL(10, 2) NOT NULL,
       shipping_cost DECIMAL(10, 2) NOT NULL,
+      tax DECIMAL(10, 2) NOT NULL,
       discount DECIMAL(10, 2) NOT NULL DEFAULT 0,
       total DECIMAL(10, 2) NOT NULL,
-      payment_status payment_status NOT NULL DEFAULT 'pending',
-      payment_method payment_method,
-      payment_transaction_id VARCHAR(255),
-      razorpay_order_id VARCHAR(255),
-      razorpay_payment_id VARCHAR(255),
-      shipping_address_id UUID NOT NULL REFERENCES addresses(id),
-      billing_address_id UUID NOT NULL REFERENCES addresses(id),
-      shipping_tracking_number VARCHAR(255),
+      tracking_number VARCHAR(100),
       shipping_carrier VARCHAR(100),
-      shipped_at TIMESTAMP,
-      delivered_at TIMESTAMP,
+      estimated_delivery TIMESTAMP,
       notes TEXT,
+      internal_notes TEXT,
+      photo_approval JSONB,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      cancelled_at TIMESTAMP,
+      delivered_at TIMESTAMP
     )
   `;
 
@@ -175,58 +189,57 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
       product_id UUID NOT NULL REFERENCES products(id),
-      product_variant_id UUID REFERENCES product_variants(id),
+      variant_id UUID NOT NULL REFERENCES product_variants(id),
       frame_id UUID REFERENCES frames(id),
+      product_title VARCHAR(200) NOT NULL,
+      product_sku VARCHAR(100) NOT NULL,
+      size_label VARCHAR(50) NOT NULL,
+      frame_type VARCHAR(50),
       quantity INTEGER NOT NULL,
       unit_price DECIMAL(10, 2) NOT NULL,
-      frame_price DECIMAL(10, 2) NOT NULL DEFAULT 0,
-      total DECIMAL(10, 2) NOT NULL,
-      upload_your_own_url TEXT,
-      photo_approval_status photo_approval_status,
-      photo_approval_url TEXT,
-      photo_approval_sent_at TIMESTAMP,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      subtotal DECIMAL(10, 2) NOT NULL,
+      image_url TEXT NOT NULL,
+      customizations JSONB
     )
   `;
 
   await sql`
     CREATE TABLE IF NOT EXISTS cart_items (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-      guest_id VARCHAR(255),
-      product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-      product_variant_id UUID REFERENCES product_variants(id),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_id UUID NOT NULL REFERENCES products(id),
+      variant_id UUID NOT NULL REFERENCES product_variants(id),
       frame_id UUID REFERENCES frames(id),
-      quantity INTEGER NOT NULL DEFAULT 1,
-      upload_your_own_url TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      quantity INTEGER NOT NULL,
+      added_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `;
 
   await sql`
     CREATE TABLE IF NOT EXISTS ai_generations (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-      guest_id VARCHAR(255),
+      user_id UUID NOT NULL REFERENCES users(id),
       prompt TEXT NOT NULL,
-      negative_prompt TEXT,
+      enhanced_prompt TEXT,
+      style_preset style_preset NOT NULL,
+      aspect_ratio aspect_ratio NOT NULL,
       model ai_model NOT NULL DEFAULT 'sdxl',
+      parameters JSONB,
       status ai_generation_status NOT NULL DEFAULT 'pending',
-      aspect_ratio aspect_ratio NOT NULL DEFAULT '1:1',
-      style_preset style_preset,
-      steps INTEGER,
-      cfg_scale DECIMAL(4, 2),
-      seed INTEGER,
-      generated_images JSONB,
+      images JSONB NOT NULL DEFAULT '[]'::jsonb,
+      selected_image_id VARCHAR(255),
       moderation_status moderation_status NOT NULL DEFAULT 'pending',
-      moderation_flags JSONB,
-      total_generation_time INTEGER,
-      cost DECIMAL(10, 4),
-      credits_used INTEGER,
-      queue_job_id VARCHAR(255),
+      moderation_notes TEXT,
+      moderated_by UUID REFERENCES users(id),
+      moderated_at TIMESTAMP,
       error_message TEXT,
+      processing_time_ms INTEGER,
+      credits_used INTEGER,
+      is_public BOOLEAN NOT NULL DEFAULT false,
+      likes INTEGER NOT NULL DEFAULT 0,
+      views INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       completed_at TIMESTAMP
     )
   `;
@@ -618,9 +631,9 @@ describe('Database Migrations', () => {
       expect(columns).toContain('total');
       expect(columns).toContain('payment_status');
       expect(columns).toContain('payment_method');
-      expect(columns).toContain('payment_transaction_id');
-      expect(columns).toContain('shipping_address_id');
-      expect(columns).toContain('billing_address_id');
+      expect(columns).toContain('payment_id');
+      expect(columns).toContain('shipping_address');
+      expect(columns).toContain('billing_address');
     });
 
     it('should have unique constraint on order_number', async () => {

@@ -27,6 +27,11 @@ beforeAll(async () => {
   client = postgres(databaseUrl, { max: 1 });
   db = drizzle(client);
 
+  // Drop tables to ensure clean state
+  await client`DROP TABLE IF EXISTS product_variants CASCADE`;
+  await client`DROP TABLE IF EXISTS frames CASCADE`;
+  await client`DROP TABLE IF EXISTS products CASCADE`;
+
   // Create tables (in real app, this would be done via migrations)
   await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
