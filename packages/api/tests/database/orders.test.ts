@@ -26,6 +26,14 @@ beforeAll(async () => {
   client = postgres(databaseUrl, { max: 1 });
   db = drizzle(client);
 
+  // Drop tables to ensure clean state
+  await client`DROP TABLE IF EXISTS order_items CASCADE`;
+  await client`DROP TABLE IF EXISTS orders CASCADE`;
+  await client`DROP TABLE IF EXISTS product_variants CASCADE`;
+  await client`DROP TABLE IF EXISTS frames CASCADE`;
+  await client`DROP TABLE IF EXISTS products CASCADE`;
+  await client`DROP TABLE IF EXISTS users CASCADE`;
+
   await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
   // Create enums

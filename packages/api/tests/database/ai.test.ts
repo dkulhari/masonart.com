@@ -22,6 +22,10 @@ beforeAll(async () => {
   client = postgres(databaseUrl, { max: 1 });
   db = drizzle(client);
 
+  // Drop tables to ensure clean state
+  await client`DROP TABLE IF EXISTS ai_generations CASCADE`;
+  await client`DROP TABLE IF EXISTS users CASCADE`;
+
   await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
   // Drop existing enums if they exist (for clean test state)
