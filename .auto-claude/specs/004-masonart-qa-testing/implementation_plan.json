@@ -1,0 +1,1596 @@
+{
+  "task_id": "004-masonart-qa-testing",
+  "title": "MasonArt QA Testing Strategy Implementation",
+  "description": "Comprehensive QA testing for MasonArt e-commerce platform covering automated E2E tests with Playwright, unit/integration tests with Vitest, and manual browser testing documentation",
+  "created_at": "2026-01-16T13:00:03.032Z",
+  "updated_at": "2026-01-16T13:34:06.500Z",
+  "status": "in_progress",
+  "planStatus": "in_progress",
+  "phases": [
+    {
+      "phase_id": "phase-1",
+      "title": "Setup & Configuration",
+      "description": "Install testing frameworks and create configuration files",
+      "subtasks": [
+        {
+          "subtask_id": "1.1",
+          "title": "Install Playwright and dependencies",
+          "description": "Install Playwright at root level and run browser installation",
+          "status": "completed",
+          "dependencies": [],
+          "files": [
+            "package.json"
+          ],
+          "tests": [],
+          "notes": "Successfully installed @playwright/test v1.57.0 at root level. Created package.json with workspace configuration and test scripts. Playwright browsers have been installed and verified."
+        },
+        {
+          "subtask_id": "1.2",
+          "title": "Install Vitest for API package",
+          "description": "Install Vitest and testing utilities for API package (vitest, @vitest/coverage-v8, supertest, @types/supertest)",
+          "status": "completed",
+          "dependencies": [],
+          "files": [
+            "packages/api/package.json"
+          ],
+          "tests": [],
+          "notes": "Successfully installed vitest@4.0.17, @vitest/coverage-v8@4.0.17, supertest@7.2.2, and @types/supertest@6.0.3 in packages/api. Created packages/api directory with package.json including test scripts."
+        },
+        {
+          "subtask_id": "1.3",
+          "title": "Install Vitest for web package",
+          "description": "Install Vitest and React testing utilities for web package (vitest, @vitest/coverage-v8, @testing-library/react, @testing-library/jest-dom, jsdom)",
+          "status": "completed",
+          "dependencies": [],
+          "files": [
+            "packages/web/package.json"
+          ],
+          "tests": [],
+          "notes": "Successfully installed vitest@4.0.17, @vitest/coverage-v8@4.0.17, @testing-library/react@16.3.1, @testing-library/jest-dom@6.9.1, and jsdom@27.4.0 in packages/web. Created packages/web directory with package.json including test scripts."
+        },
+        {
+          "subtask_id": "1.4",
+          "title": "Create Playwright configuration",
+          "description": "Create playwright.config.ts at root with browser configs, baseURL, and webServer settings",
+          "status": "pending",
+          "dependencies": [
+            "1.1"
+          ],
+          "files": [
+            "playwright.config.ts"
+          ],
+          "tests": [],
+          "notes": ""
+        },
+        {
+          "subtask_id": "1.5",
+          "title": "Create Vitest configurations",
+          "description": "Create vitest.config.ts files for root, packages/api, and packages/web",
+          "status": "pending",
+          "dependencies": [
+            "1.2",
+            "1.3"
+          ],
+          "files": [
+            "vitest.config.ts",
+            "packages/api/vitest.config.ts",
+            "packages/web/vitest.config.ts"
+          ],
+          "tests": [],
+          "notes": ""
+        },
+        {
+          "subtask_id": "1.6",
+          "title": "Create test directory structure",
+          "description": "Create directory structure for tests (tests/e2e, tests/setup, tests/integration, tests/fixtures, packages/*/tests/)",
+          "status": "pending",
+          "dependencies": [],
+          "files": [],
+          "tests": [],
+          "notes": ""
+        },
+        {
+          "subtask_id": "1.7",
+          "title": "Create test fixtures",
+          "description": "Create reusable test fixtures for products, users, and orders",
+          "status": "pending",
+          "dependencies": [
+            "1.6"
+          ],
+          "files": [
+            "tests/fixtures/products.ts",
+            "tests/fixtures/users.ts",
+            "tests/fixtures/orders.ts"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-2",
+      "title": "Infrastructure Tests (Phase 1)",
+      "description": "Test infrastructure setup: workspaces, Docker, environment variables",
+      "subtasks": [
+        {
+          "subtask_id": "2.1",
+          "title": "Create workspace configuration test",
+          "description": "Write test to verify Bun workspaces are properly configured",
+          "status": "pending",
+          "dependencies": [
+            "1.5",
+            "1.6"
+          ],
+          "files": [
+            "tests/setup/workspaces.test.ts"
+          ],
+          "tests": [
+            "tests/setup/workspaces.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "2.2",
+          "title": "Create Docker services test",
+          "description": "Write test to verify Docker Compose services (PostgreSQL, Redis) are running",
+          "status": "pending",
+          "dependencies": [
+            "1.5",
+            "1.6"
+          ],
+          "files": [
+            "tests/setup/docker.test.ts"
+          ],
+          "tests": [
+            "tests/setup/docker.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "2.3",
+          "title": "Create environment variables test",
+          "description": "Write test to verify required environment variables are set",
+          "status": "pending",
+          "dependencies": [
+            "1.5",
+            "1.6"
+          ],
+          "files": [
+            "tests/setup/env.test.ts"
+          ],
+          "tests": [
+            "tests/setup/env.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "2.4",
+          "title": "Run infrastructure tests",
+          "description": "Execute infrastructure tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "2.1",
+            "2.2",
+            "2.3"
+          ],
+          "files": [],
+          "tests": [
+            "tests/setup/*.test.ts"
+          ],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-3",
+      "title": "Shared Package Tests (Phase 2)",
+      "description": "Test shared package schemas, constants, and build process",
+      "subtasks": [
+        {
+          "subtask_id": "3.1",
+          "title": "Create shared package build test",
+          "description": "Write test to verify shared package builds correctly",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/shared/tests/build.test.ts"
+          ],
+          "tests": [
+            "packages/shared/tests/build.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "3.2",
+          "title": "Create product schema tests",
+          "description": "Write tests to verify product schemas validation",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/shared/tests/schemas/product.test.ts"
+          ],
+          "tests": [
+            "packages/shared/tests/schemas/product.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "3.3",
+          "title": "Create order and user schema tests",
+          "description": "Write tests for order, user, and AI schemas",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/shared/tests/schemas/order.test.ts",
+            "packages/shared/tests/schemas/user.test.ts",
+            "packages/shared/tests/schemas/ai.test.ts"
+          ],
+          "tests": [
+            "packages/shared/tests/schemas/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "3.4",
+          "title": "Create business constants tests",
+          "description": "Write tests for sizes, frames, and style constants",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/shared/tests/constants/sizes.test.ts",
+            "packages/shared/tests/constants/frames.test.ts",
+            "packages/shared/tests/constants/styles.test.ts"
+          ],
+          "tests": [
+            "packages/shared/tests/constants/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "3.5",
+          "title": "Run shared package tests",
+          "description": "Execute shared package tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "3.1",
+            "3.2",
+            "3.3",
+            "3.4"
+          ],
+          "files": [],
+          "tests": [
+            "packages/shared/tests/**/*.test.ts"
+          ],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-4",
+      "title": "Database Tests (Phase 3)",
+      "description": "Test database schemas, connections, and migrations",
+      "subtasks": [
+        {
+          "subtask_id": "4.1",
+          "title": "Create server startup test",
+          "description": "Write test to verify Hono server starts correctly",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/server.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/server.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "4.2",
+          "title": "Create database connection test",
+          "description": "Write test to verify Drizzle ORM connects to PostgreSQL",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/database/connection.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/database/connection.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "4.3",
+          "title": "Create database schema tests",
+          "description": "Write tests for products, users, orders, cart, and AI generations schemas",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/database/products.test.ts",
+            "packages/api/tests/database/users.test.ts",
+            "packages/api/tests/database/orders.test.ts",
+            "packages/api/tests/database/cart.test.ts",
+            "packages/api/tests/database/ai.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/database/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "4.4",
+          "title": "Create migrations test",
+          "description": "Write test to verify database migrations run successfully",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/database/migrations.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/database/migrations.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "4.5",
+          "title": "Run database tests",
+          "description": "Execute database tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "4.1",
+            "4.2",
+            "4.3",
+            "4.4"
+          ],
+          "files": [],
+          "tests": [
+            "packages/api/tests/database/**/*.test.ts",
+            "packages/api/tests/server.test.ts"
+          ],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-5",
+      "title": "Authentication Tests (Phase 4)",
+      "description": "Test Better Auth configuration, middleware, and routes",
+      "subtasks": [
+        {
+          "subtask_id": "5.1",
+          "title": "Create auth configuration test",
+          "description": "Write test to verify Better Auth is configured correctly",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/auth/config.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/auth/config.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "5.2",
+          "title": "Create auth middleware test",
+          "description": "Write test to verify auth middleware works correctly",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/middleware/auth.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/middleware/auth.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "5.3",
+          "title": "Create auth routes test",
+          "description": "Write test to verify login, register, and logout routes",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/routes/auth.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/routes/auth.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "5.4",
+          "title": "Run authentication tests",
+          "description": "Execute authentication tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "5.1",
+            "5.2",
+            "5.3"
+          ],
+          "files": [],
+          "tests": [
+            "packages/api/tests/auth/**/*.test.ts",
+            "packages/api/tests/middleware/auth.test.ts",
+            "packages/api/tests/routes/auth.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "5.5",
+          "title": "Create manual auth routes test doc",
+          "description": "Create manual test documentation for auth routes",
+          "status": "pending",
+          "dependencies": [
+            "5.4"
+          ],
+          "files": [
+            "docs/manual-tests/auth-routes.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-6",
+      "title": "Backend API Tests (Phase 5)",
+      "description": "Test backend API routes for products, cart, orders, and health",
+      "subtasks": [
+        {
+          "subtask_id": "6.1",
+          "title": "Create utility library tests",
+          "description": "Write tests for Redis and storage utilities",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/lib/redis.test.ts",
+            "packages/api/tests/lib/storage.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/lib/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "6.2",
+          "title": "Create products API tests",
+          "description": "Write tests for products CRUD endpoints",
+          "status": "pending",
+          "dependencies": [
+            "1.5",
+            "1.7"
+          ],
+          "files": [
+            "packages/api/tests/routes/products.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/routes/products.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "6.3",
+          "title": "Create cart API tests",
+          "description": "Write tests for cart management endpoints",
+          "status": "pending",
+          "dependencies": [
+            "1.5",
+            "1.7"
+          ],
+          "files": [
+            "packages/api/tests/routes/cart.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/routes/cart.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "6.4",
+          "title": "Create orders API tests",
+          "description": "Write tests for orders management endpoints",
+          "status": "pending",
+          "dependencies": [
+            "1.5",
+            "1.7"
+          ],
+          "files": [
+            "packages/api/tests/routes/orders.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/routes/orders.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "6.5",
+          "title": "Create health endpoint test",
+          "description": "Write test for health check endpoint",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/routes/health.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/routes/health.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "6.6",
+          "title": "Run backend API tests",
+          "description": "Execute backend API tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "6.1",
+            "6.2",
+            "6.3",
+            "6.4",
+            "6.5"
+          ],
+          "files": [],
+          "tests": [
+            "packages/api/tests/routes/*.test.ts",
+            "packages/api/tests/lib/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "6.7",
+          "title": "Create manual API test docs",
+          "description": "Create manual test documentation for products, cart, orders, and health APIs",
+          "status": "pending",
+          "dependencies": [
+            "6.6"
+          ],
+          "files": [
+            "docs/manual-tests/products-api.md",
+            "docs/manual-tests/cart-api.md",
+            "docs/manual-tests/orders-api.md",
+            "docs/manual-tests/health-check.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-7",
+      "title": "Frontend Core Tests (Phase 6)",
+      "description": "Test frontend build, styles, layout, API client, and state stores",
+      "subtasks": [
+        {
+          "subtask_id": "7.1",
+          "title": "Create build test for web package",
+          "description": "Write test to verify TanStack Start builds correctly",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/web/tests/build.test.ts"
+          ],
+          "tests": [
+            "packages/web/tests/build.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "7.2",
+          "title": "Create styles test",
+          "description": "Write test to verify Tailwind CSS and PostCSS configuration",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/web/tests/styles.test.ts"
+          ],
+          "tests": [
+            "packages/web/tests/styles.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "7.3",
+          "title": "Create API client tests",
+          "description": "Write tests for API client utility functions",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/web/tests/lib/api.test.ts"
+          ],
+          "tests": [
+            "packages/web/tests/lib/api.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "7.4",
+          "title": "Create cart store tests",
+          "description": "Write tests for Zustand cart store",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/web/tests/stores/cart.test.ts"
+          ],
+          "tests": [
+            "packages/web/tests/stores/cart.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "7.5",
+          "title": "Create layout E2E test",
+          "description": "Write Playwright test for root layout (header, footer, navigation)",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/layout.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/layout.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "7.6",
+          "title": "Run frontend core tests",
+          "description": "Execute frontend core tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "7.1",
+            "7.2",
+            "7.3",
+            "7.4",
+            "7.5"
+          ],
+          "files": [],
+          "tests": [
+            "packages/web/tests/**/*.test.ts",
+            "tests/e2e/layout.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "7.7",
+          "title": "Create manual frontend core test docs",
+          "description": "Create manual test documentation for styles, layout, and cart store",
+          "status": "pending",
+          "dependencies": [
+            "7.6"
+          ],
+          "files": [
+            "docs/manual-tests/styles.md",
+            "docs/manual-tests/layout.md",
+            "docs/manual-tests/cart-store.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-8",
+      "title": "Frontend Pages Tests (Phase 7)",
+      "description": "Test frontend pages: home, product listing, product detail, cart",
+      "subtasks": [
+        {
+          "subtask_id": "8.1",
+          "title": "Create TanStack Query hooks tests",
+          "description": "Write tests for useProducts, useCart, and other query hooks",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/web/tests/hooks/useProducts.test.ts",
+            "packages/web/tests/hooks/useCart.test.ts"
+          ],
+          "tests": [
+            "packages/web/tests/hooks/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "8.2",
+          "title": "Create home page E2E test",
+          "description": "Write Playwright test for home page",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/home.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/home.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "8.3",
+          "title": "Create product listing E2E test",
+          "description": "Write Playwright test for product listing page with filters",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/product-listing.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/product-listing.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "8.4",
+          "title": "Create product detail E2E test",
+          "description": "Write Playwright test for product detail page",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/product-detail.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/product-detail.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "8.5",
+          "title": "Create cart page E2E test",
+          "description": "Write Playwright test for cart page",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/cart.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/cart.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "8.6",
+          "title": "Run frontend pages tests",
+          "description": "Execute frontend pages tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "8.1",
+            "8.2",
+            "8.3",
+            "8.4",
+            "8.5"
+          ],
+          "files": [],
+          "tests": [
+            "tests/e2e/home.spec.ts",
+            "tests/e2e/product-*.spec.ts",
+            "tests/e2e/cart.spec.ts",
+            "packages/web/tests/hooks/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "8.7",
+          "title": "Create manual pages test docs",
+          "description": "Create manual test documentation for home, product listing, product detail, and cart pages",
+          "status": "pending",
+          "dependencies": [
+            "8.6"
+          ],
+          "files": [
+            "docs/manual-tests/home-page.md",
+            "docs/manual-tests/product-listing.md",
+            "docs/manual-tests/product-detail.md",
+            "docs/manual-tests/cart-page.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-9",
+      "title": "AI Generation Tests (Phase 8)",
+      "description": "Test AI poster generation: queue, presets, API, and UI",
+      "subtasks": [
+        {
+          "subtask_id": "9.1",
+          "title": "Create BullMQ queue tests",
+          "description": "Write tests for AI generation queue processing",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/queues/ai.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/queues/ai.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "9.2",
+          "title": "Create style presets tests",
+          "description": "Write tests for AI style presets validation",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/ai/presets.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/ai/presets.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "9.3",
+          "title": "Create AI API tests",
+          "description": "Write tests for AI generation API routes",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/routes/ai.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/routes/ai.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "9.4",
+          "title": "Create AI generator page E2E test",
+          "description": "Write Playwright test for AI poster generator page",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/ai-generator.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/ai-generator.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "9.5",
+          "title": "Run AI generation tests",
+          "description": "Execute AI generation tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "9.1",
+            "9.2",
+            "9.3",
+            "9.4"
+          ],
+          "files": [],
+          "tests": [
+            "packages/api/tests/queues/ai.test.ts",
+            "packages/api/tests/ai/*.test.ts",
+            "packages/api/tests/routes/ai.test.ts",
+            "tests/e2e/ai-generator.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "9.6",
+          "title": "Create manual AI test docs",
+          "description": "Create manual test documentation for AI API and generator page",
+          "status": "pending",
+          "dependencies": [
+            "9.5"
+          ],
+          "files": [
+            "docs/manual-tests/ai-api.md",
+            "docs/manual-tests/ai-generator.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-10",
+      "title": "Checkout & Payments Tests (Phase 9)",
+      "description": "Test checkout flow, Razorpay integration, and order confirmation",
+      "subtasks": [
+        {
+          "subtask_id": "10.1",
+          "title": "Create Razorpay backend tests",
+          "description": "Write tests for Razorpay payment integration utilities",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/lib/razorpay.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/lib/razorpay.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "10.2",
+          "title": "Create checkout page E2E test",
+          "description": "Write Playwright test for checkout page",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/checkout.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/checkout.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "10.3",
+          "title": "Create payment flow E2E test",
+          "description": "Write Playwright test for payment processing flow",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/payment.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/payment.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "10.4",
+          "title": "Create order confirmation E2E test",
+          "description": "Write Playwright test for order confirmation page",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/order-confirmation.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/order-confirmation.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "10.5",
+          "title": "Run checkout tests",
+          "description": "Execute checkout and payment tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "10.1",
+            "10.2",
+            "10.3",
+            "10.4"
+          ],
+          "files": [],
+          "tests": [
+            "packages/api/tests/lib/razorpay.test.ts",
+            "tests/e2e/checkout.spec.ts",
+            "tests/e2e/payment.spec.ts",
+            "tests/e2e/order-confirmation.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "10.6",
+          "title": "Create manual checkout test docs",
+          "description": "Create manual test documentation for checkout, payment, and order confirmation",
+          "status": "pending",
+          "dependencies": [
+            "10.5"
+          ],
+          "files": [
+            "docs/manual-tests/checkout.md",
+            "docs/manual-tests/payment.md",
+            "docs/manual-tests/order-confirmation.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-11",
+      "title": "User Account Tests (Phase 10)",
+      "description": "Test user authentication UI, account dashboard, and AI history",
+      "subtasks": [
+        {
+          "subtask_id": "11.1",
+          "title": "Create auth pages E2E test",
+          "description": "Write Playwright test for login and register pages",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/auth.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/auth.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "11.2",
+          "title": "Create account dashboard E2E test",
+          "description": "Write Playwright test for user account dashboard",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/account.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/account.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "11.3",
+          "title": "Create AI history E2E test",
+          "description": "Write Playwright test for AI creations history page",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/ai-history.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/ai-history.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "11.4",
+          "title": "Run user account tests",
+          "description": "Execute user account tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "11.1",
+            "11.2",
+            "11.3"
+          ],
+          "files": [],
+          "tests": [
+            "tests/e2e/auth.spec.ts",
+            "tests/e2e/account.spec.ts",
+            "tests/e2e/ai-history.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "11.5",
+          "title": "Create manual account test docs",
+          "description": "Create manual test documentation for auth pages, account dashboard, and AI history",
+          "status": "pending",
+          "dependencies": [
+            "11.4"
+          ],
+          "files": [
+            "docs/manual-tests/auth-pages.md",
+            "docs/manual-tests/account.md",
+            "docs/manual-tests/ai-history.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-12",
+      "title": "Admin Panel Tests (Phase 11)",
+      "description": "Test admin authentication, dashboard, products, and orders management",
+      "subtasks": [
+        {
+          "subtask_id": "12.1",
+          "title": "Create admin API tests",
+          "description": "Write tests for admin products and orders API routes",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "packages/api/tests/routes/admin/products.test.ts",
+            "packages/api/tests/routes/admin/orders.test.ts"
+          ],
+          "tests": [
+            "packages/api/tests/routes/admin/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "12.2",
+          "title": "Create admin auth E2E test",
+          "description": "Write Playwright test for admin authentication and access control",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/admin-auth.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/admin-auth.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "12.3",
+          "title": "Create admin dashboard E2E test",
+          "description": "Write Playwright test for admin dashboard",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/admin-dashboard.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/admin-dashboard.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "12.4",
+          "title": "Create admin products E2E test",
+          "description": "Write Playwright test for admin products management (CRUD)",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/admin-products.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/admin-products.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "12.5",
+          "title": "Create admin orders E2E test",
+          "description": "Write Playwright test for admin orders management",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/admin-orders.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/admin-orders.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "12.6",
+          "title": "Run admin panel tests",
+          "description": "Execute admin panel tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "12.1",
+            "12.2",
+            "12.3",
+            "12.4",
+            "12.5"
+          ],
+          "files": [],
+          "tests": [
+            "packages/api/tests/routes/admin/*.test.ts",
+            "tests/e2e/admin-*.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "12.7",
+          "title": "Create manual admin test docs",
+          "description": "Create manual test documentation for admin API, auth, dashboard, products, and orders",
+          "status": "pending",
+          "dependencies": [
+            "12.6"
+          ],
+          "files": [
+            "docs/manual-tests/admin-api.md",
+            "docs/manual-tests/admin-auth.md",
+            "docs/manual-tests/admin-dashboard.md",
+            "docs/manual-tests/admin-products.md",
+            "docs/manual-tests/admin-orders.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-13",
+      "title": "SEO & Performance Tests (Phase 12)",
+      "description": "Test SEO meta tags, JSON-LD, sitemap, and robots.txt",
+      "subtasks": [
+        {
+          "subtask_id": "13.1",
+          "title": "Create meta tags E2E test",
+          "description": "Write Playwright test to verify meta tags on all pages",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/seo-meta.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/seo-meta.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "13.2",
+          "title": "Create JSON-LD E2E test",
+          "description": "Write Playwright test to verify structured data (JSON-LD)",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/seo-jsonld.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/seo-jsonld.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "13.3",
+          "title": "Create sitemap E2E test",
+          "description": "Write Playwright test to verify sitemap.xml generation",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/sitemap.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/sitemap.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "13.4",
+          "title": "Create robots.txt E2E test",
+          "description": "Write Playwright test to verify robots.txt exists and is correct",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6"
+          ],
+          "files": [
+            "tests/e2e/robots.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/robots.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "13.5",
+          "title": "Run SEO tests",
+          "description": "Execute SEO tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "13.1",
+            "13.2",
+            "13.3",
+            "13.4"
+          ],
+          "files": [],
+          "tests": [
+            "tests/e2e/seo-*.spec.ts",
+            "tests/e2e/sitemap.spec.ts",
+            "tests/e2e/robots.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "13.6",
+          "title": "Create manual SEO test docs",
+          "description": "Create manual test documentation for SEO meta tags, JSON-LD, sitemap, and robots.txt",
+          "status": "pending",
+          "dependencies": [
+            "13.5"
+          ],
+          "files": [
+            "docs/manual-tests/seo-meta.md",
+            "docs/manual-tests/seo-jsonld.md",
+            "docs/manual-tests/sitemap.md",
+            "docs/manual-tests/robots.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-14",
+      "title": "Integration Flow Tests (Phase 13)",
+      "description": "Test complete user journeys across the application",
+      "subtasks": [
+        {
+          "subtask_id": "14.1",
+          "title": "Create database seeding test",
+          "description": "Write test to verify database can be seeded with test data",
+          "status": "pending",
+          "dependencies": [
+            "1.5"
+          ],
+          "files": [
+            "tests/integration/seed.test.ts"
+          ],
+          "tests": [
+            "tests/integration/seed.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "14.2",
+          "title": "Create product catalog flow test",
+          "description": "Write end-to-end test for browsing catalog, filtering, and viewing products",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6",
+            "1.7"
+          ],
+          "files": [
+            "tests/e2e/flows/catalog.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/flows/catalog.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "14.3",
+          "title": "Create cart/checkout flow test",
+          "description": "Write end-to-end test for adding to cart, checkout, and payment",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6",
+            "1.7"
+          ],
+          "files": [
+            "tests/e2e/flows/checkout.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/flows/checkout.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "14.4",
+          "title": "Create authentication flow test",
+          "description": "Write end-to-end test for registration, login, and account management",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6",
+            "1.7"
+          ],
+          "files": [
+            "tests/e2e/flows/auth.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/flows/auth.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "14.5",
+          "title": "Create admin CRUD flow test",
+          "description": "Write end-to-end test for admin product and order management",
+          "status": "pending",
+          "dependencies": [
+            "1.4",
+            "1.6",
+            "1.7"
+          ],
+          "files": [
+            "tests/e2e/flows/admin.spec.ts"
+          ],
+          "tests": [
+            "tests/e2e/flows/admin.spec.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "14.6",
+          "title": "Run integration flow tests",
+          "description": "Execute integration flow tests and fix any failures",
+          "status": "pending",
+          "dependencies": [
+            "14.1",
+            "14.2",
+            "14.3",
+            "14.4",
+            "14.5"
+          ],
+          "files": [],
+          "tests": [
+            "tests/e2e/flows/*.spec.ts",
+            "tests/integration/*.test.ts"
+          ],
+          "notes": ""
+        },
+        {
+          "subtask_id": "14.7",
+          "title": "Create manual flow test docs",
+          "description": "Create manual test documentation for catalog, checkout, auth, and admin flows",
+          "status": "pending",
+          "dependencies": [
+            "14.6"
+          ],
+          "files": [
+            "docs/manual-tests/flow-catalog.md",
+            "docs/manual-tests/flow-checkout.md",
+            "docs/manual-tests/flow-auth.md",
+            "docs/manual-tests/flow-admin.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-15",
+      "title": "CI/CD Setup",
+      "description": "Set up continuous integration for automated testing",
+      "subtasks": [
+        {
+          "subtask_id": "15.1",
+          "title": "Create GitHub Actions workflow",
+          "description": "Create workflow file for running tests in CI with PostgreSQL and Redis services",
+          "status": "pending",
+          "dependencies": [],
+          "files": [
+            ".github/workflows/test.yml"
+          ],
+          "tests": [],
+          "notes": ""
+        },
+        {
+          "subtask_id": "15.2",
+          "title": "Verify CI pipeline",
+          "description": "Push changes and verify GitHub Actions runs all tests successfully",
+          "status": "pending",
+          "dependencies": [
+            "15.1"
+          ],
+          "files": [],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "phase_id": "phase-16",
+      "title": "Documentation & Finalization",
+      "description": "Create comprehensive test documentation and summary",
+      "subtasks": [
+        {
+          "subtask_id": "16.1",
+          "title": "Create test execution summary",
+          "description": "Document test coverage, results, and any known issues",
+          "status": "pending",
+          "dependencies": [],
+          "files": [
+            "docs/test-summary.md"
+          ],
+          "tests": [],
+          "notes": ""
+        },
+        {
+          "subtask_id": "16.2",
+          "title": "Update README with testing instructions",
+          "description": "Add testing section to README with instructions for running tests",
+          "status": "pending",
+          "dependencies": [],
+          "files": [
+            "README.md"
+          ],
+          "tests": [],
+          "notes": ""
+        },
+        {
+          "subtask_id": "16.3",
+          "title": "Create test maintenance guide",
+          "description": "Document how to maintain and update tests as features evolve",
+          "status": "pending",
+          "dependencies": [],
+          "files": [
+            "docs/test-maintenance.md"
+          ],
+          "tests": [],
+          "notes": ""
+        }
+      ]
+    }
+  ],
+  "qa_signoff": {
+    "status": "pending",
+    "issues": "",
+    "tests_passed": ""
+  }
+}
