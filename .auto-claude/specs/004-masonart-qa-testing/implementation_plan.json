@@ -241,7 +241,7 @@
           "subtask_id": "3.4",
           "title": "Create business constants tests",
           "description": "Write tests for sizes, frames, and style constants",
-          "status": "pending",
+          "status": "completed",
           "dependencies": [
             "1.5"
           ],
@@ -253,7 +253,7 @@
           "tests": [
             "packages/shared/tests/constants/*.test.ts"
           ],
-          "notes": ""
+          "notes": "Successfully created comprehensive business constants for sizes, frames, and styles with 212 tests passing. Created constants: sizes.ts (19 poster sizes with conversion helpers), frames.ts (9 materials, 8 types, 6 finishes with price calculation), styles.ts (10 AI style presets with generation parameters). Implemented helper functions for lookups, filtering, validation, and calculations. All 212 tests passing with 1781 assertions. Package builds successfully. Committed in ccfcca2."
         },
         {
           "subtask_id": "3.5",

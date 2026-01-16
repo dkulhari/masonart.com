@@ -14,7 +14,10 @@ import { execSync } from 'child_process';
  * - Package exports configuration
  */
 describe('Shared Package Build', () => {
-  const packageDir = join(process.cwd(), 'packages', 'shared');
+  // Detect if we're running from the shared package directory or from root
+  const cwd = process.cwd();
+  const isInSharedDir = cwd.endsWith('packages/shared') || cwd.endsWith('packages\\shared');
+  const packageDir = isInSharedDir ? cwd : join(cwd, 'packages', 'shared');
   const packageJsonPath = join(packageDir, 'package.json');
   const tsconfigPath = join(packageDir, 'tsconfig.json');
   const srcDir = join(packageDir, 'src');
@@ -325,7 +328,9 @@ describe('Shared Package Build', () => {
 
     it('should be a workspace package', () => {
       // Verify this is part of the monorepo workspace
-      const rootPackageJsonPath = join(process.cwd(), 'package.json');
+      const rootPackageJsonPath = isInSharedDir
+        ? join(packageDir, '..', '..', 'package.json')
+        : join(process.cwd(), 'package.json');
       const rootPackageJson = JSON.parse(readFileSync(rootPackageJsonPath, 'utf-8'));
 
       expect(rootPackageJson.workspaces).toBeDefined();
