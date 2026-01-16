@@ -162,10 +162,10 @@ describe('Products API Routes', () => {
   let app: Hono;
 
   beforeAll(async () => {
-    // Set up database connection - use dev database for tests
-    const connectionString = 'postgres://poster_app:dev_password@localhost:5433/poster_app_dev';
+    // Set up database connection - use test database
+    const connectionString = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
     sql = postgres(connectionString);
-    const dbInstance = createDatabase();
+    const dbInstance = createDatabase(connectionString);
     db = dbInstance.db;
 
     // Run migrations
