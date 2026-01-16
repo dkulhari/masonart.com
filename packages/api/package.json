@@ -8,9 +8,13 @@
     "test:coverage": "vitest --coverage"
   },
   "devDependencies": {
+    "@types/node": "^25.0.9",
     "@types/supertest": "^6.0.3",
     "@vitest/coverage-v8": "^4.0.17",
     "supertest": "^7.2.2",
     "vitest": "^4.0.17"
+  },
+  "dependencies": {
+    "hono": "^4.11.4"
   }
 }
