@@ -24,13 +24,20 @@ beforeAll(async () => {
 
   await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
+  // Drop existing enums if they exist (for clean test state)
+  await client`DROP TYPE IF EXISTS ai_generation_status CASCADE`;
+  await client`DROP TYPE IF EXISTS ai_model CASCADE`;
+  await client`DROP TYPE IF EXISTS aspect_ratio CASCADE`;
+  await client`DROP TYPE IF EXISTS style_preset CASCADE`;
+  await client`DROP TYPE IF EXISTS moderation_status CASCADE`;
+
   // Create enums
   await client`DO $$ BEGIN CREATE TYPE user_role AS ENUM ('admin', 'customer', 'trade'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
-  await client`DO $$ BEGIN CREATE TYPE ai_generation_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
-  await client`DO $$ BEGIN CREATE TYPE ai_model AS ENUM ('sdxl', 'sd-2-1', 'dalle-3', 'midjourney', 'stable-diffusion-xl-lightning'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
-  await client`DO $$ BEGIN CREATE TYPE aspect_ratio AS ENUM ('1:1', '4:5', '3:4', '2:3', '4:3', '16:9', '21:9'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
-  await client`DO $$ BEGIN CREATE TYPE style_preset AS ENUM ('wabi-sabi', 'abstract-expression', 'botanical', 'vintage-poster', 'minimalist', 'geometric', 'watercolor', 'line-art', 'pop-art', 'surrealism'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
-  await client`DO $$ BEGIN CREATE TYPE moderation_status AS ENUM ('pending', 'approved', 'rejected', 'flagged'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
+  await client`CREATE TYPE ai_generation_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled')`;
+  await client`CREATE TYPE ai_model AS ENUM ('sdxl', 'sd-2-1', 'dalle-3', 'midjourney', 'stable-diffusion-xl-lightning')`;
+  await client`CREATE TYPE aspect_ratio AS ENUM ('1:1', '4:5', '3:4', '2:3', '4:3', '16:9', '21:9')`;
+  await client`CREATE TYPE style_preset AS ENUM ('wabi-sabi', 'abstract-expression', 'botanical', 'vintage-poster', 'minimalist', 'geometric', 'watercolor', 'line-art', 'pop-art', 'surrealism')`;
+  await client`CREATE TYPE moderation_status AS ENUM ('pending', 'approved', 'rejected', 'flagged')`;
 
   // Create tables
   await client`
@@ -85,6 +92,11 @@ beforeAll(async () => {
 afterAll(async () => {
   await client`DROP TABLE IF EXISTS ai_generations CASCADE`;
   await client`DROP TABLE IF EXISTS users CASCADE`;
+  await client`DROP TYPE IF EXISTS ai_generation_status CASCADE`;
+  await client`DROP TYPE IF EXISTS ai_model CASCADE`;
+  await client`DROP TYPE IF EXISTS aspect_ratio CASCADE`;
+  await client`DROP TYPE IF EXISTS style_preset CASCADE`;
+  await client`DROP TYPE IF EXISTS moderation_status CASCADE`;
   await client.end();
 });
 

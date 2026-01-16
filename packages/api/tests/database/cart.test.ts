@@ -522,7 +522,7 @@ describe('Cart Items Table Schema', () => {
 
   describe('Cart Item Timestamps', () => {
     it('should set added_at timestamp automatically', async () => {
-      const before = new Date();
+      const before = new Date(Date.now() - 1000); // 1 second before
 
       const [result] = await db.insert(cartItems).values({
         userId: testUserId,
@@ -531,9 +531,10 @@ describe('Cart Items Table Schema', () => {
         quantity: 1,
       }).returning();
 
-      const after = new Date();
+      const after = new Date(Date.now() + 1000); // 1 second after
 
       expect(result.addedAt).toBeDefined();
+      expect(result.addedAt instanceof Date).toBe(true);
       expect(result.addedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
       expect(result.addedAt.getTime()).toBeLessThanOrEqual(after.getTime());
     });
