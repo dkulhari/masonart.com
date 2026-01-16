@@ -8,5 +8,7 @@
  * - AI generation schemas
  */
 
-// Placeholder - schemas will be implemented in subsequent tasks
 export const SCHEMAS_VERSION = '1.0.0';
+
+// Product schemas
+export * from './product';
