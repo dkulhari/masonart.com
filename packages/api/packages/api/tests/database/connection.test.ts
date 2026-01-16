@@ -31,7 +31,8 @@ describe('Database Connection', () => {
 
     it('should have valid PostgreSQL connection string format', () => {
       const url = getDatabaseUrl();
-      expect(url).toMatch(/^postgresql:\/\//);
+      // Accept both postgres:// and postgresql:// (both are valid)
+      expect(url).toMatch(/^(postgres|postgresql):\/\//);
     });
 
     it('should contain database credentials', () => {
