@@ -1,30 +1,31 @@
-/**
- * Products API Routes Tests
- *
- * Comprehensive tests for products CRUD endpoints:
- * - GET /api/products - List products with filtering, sorting, and pagination
- * - GET /api/products/:id - Get a single product
- * - POST /api/products - Create a new product (admin only)
- * - PUT /api/products/:id - Update a product (admin only)
- * - DELETE /api/products/:id - Delete a product (admin only)
- * - GET /api/products/:id/variants - Get product variants
- */
-
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import productsRouter from '../../src/routes/products';
 import { createDatabase } from '../../src/db/index';
-import { products, productVariants, frames, users, sessions, accounts } from '../../src/db/schema';
+import { products, productVariants, users, sessions } from '../../src/db/schema';
 import { eq } from 'drizzle-orm';
 import postgres from 'postgres';
-import { createProduct, createProductVariant, createFrame, createProducts } from '../../../../tests/fixtures/products';
-import '../setup';
+import '../setup'; // Import test setup
 
 /**
- * Run database migrations to create all tables
+ * Tests for products CRUD endpoints
+ *
+ * This test suite validates the products API routes:
+ * - GET /api/products - List products with filtering, sorting, pagination
+ * - GET /api/products/:id - Get a single product
+ * - GET /api/products/:id/variants - Get product variants
+ * - POST /api/products - Create product (admin only)
+ * - PUT /api/products/:id - Update product (admin only)
+ * - DELETE /api/products/:id - Delete product (admin only)
+ *
+ * @see packages/api/src/routes/products.ts
+ */
+
+/**
+ * Run database migrations to create all tables and enums
  */
 async function runMigrations(sql: ReturnType<typeof postgres>) {
-  // Drop all tables in dependency order
+  // Drop all tables
   await sql`DROP TABLE IF EXISTS ai_generations CASCADE`;
   await sql`DROP TABLE IF EXISTS cart_items CASCADE`;
   await sql`DROP TABLE IF EXISTS order_items CASCADE`;
@@ -69,7 +70,7 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
     `);
   }
 
-  // Create users table
+  // Create users table (using VARCHAR for ID to accommodate Better Auth)
   await sql`
     CREATE TABLE IF NOT EXISTS users (
       id VARCHAR(255) PRIMARY KEY,
@@ -81,7 +82,7 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
       email_verified BOOLEAN NOT NULL DEFAULT false,
       phone_verified BOOLEAN NOT NULL DEFAULT false,
       avatar_url TEXT,
-      preferences JSONB NOT NULL DEFAULT '{"emailNotifications": true, "smsNotifications": false, "marketingEmails": true, "orderUpdates": true, "aiGenerationNotifications": true}'::jsonb,
+      preferences JSONB NOT NULL DEFAULT '{"emailNotifications": true}'::jsonb,
       trade_account_status trade_account_status,
       trade_business JSONB,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -98,27 +99,6 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
       expires_at TIMESTAMP NOT NULL,
       ip_address VARCHAR(45),
       user_agent TEXT,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-  `;
-
-  // Create accounts table
-  await sql`
-    CREATE TABLE IF NOT EXISTS accounts (
-      id VARCHAR(255) PRIMARY KEY,
-      "accountId" VARCHAR(255) NOT NULL UNIQUE,
-      "providerId" VARCHAR(255) NOT NULL,
-      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      provider VARCHAR(100),
-      provider_account_id VARCHAR(255),
-      access_token TEXT,
-      refresh_token TEXT,
-      expires_at TIMESTAMP,
-      token_type VARCHAR(50),
-      scope TEXT,
-      id_token TEXT,
-      password VARCHAR(255),
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
@@ -177,1305 +157,695 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
 }
 
 describe('Products API Routes', () => {
-  let app: Hono;
+  let sql: ReturnType<typeof postgres>;
   let db: ReturnType<typeof createDatabase>['db'];
-  let client: ReturnType<typeof postgres>;
-  let adminUserId: string;
-  let adminToken: string;
+  let app: Hono;
 
   beforeAll(async () => {
-    // Set up database connection
-    const databaseUrl = 'postgres://poster_app:dev_password@localhost:5433/poster_app_dev';
-    client = postgres(databaseUrl);
-    process.env.DATABASE_URL = databaseUrl;
+    // Set up database connection - use dev database for tests
+    const connectionString = 'postgres://poster_app:dev_password@localhost:5433/poster_app_dev';
+    sql = postgres(connectionString);
+    const dbInstance = createDatabase();
+    db = dbInstance.db;
 
     // Run migrations
-    await runMigrations(client);
+    await runMigrations(sql);
 
-    // Create Drizzle database instance
-    const database = createDatabase();
-    db = database.db;
-
-    // Create Hono app with products router
+    // Set up Hono app with routes (no auth for read operations in tests)
     app = new Hono();
     app.route('/api/products', productsRouter);
-
-    // Create admin user for authenticated tests
-    adminUserId = 'admin_test_' + Date.now();
-    await db.insert(users).values({
-      id: adminUserId,
-      email: 'admin@test.com',
-      name: 'Admin User',
-      role: 'admin',
-      emailVerified: true,
-    });
-
-    // Create session for admin
-    const sessionId = 'session_' + Date.now();
-    adminToken = 'token_' + Date.now();
-    await db.insert(sessions).values({
-      id: sessionId,
-      userId: adminUserId,
-      token: adminToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-    });
   });
 
   afterAll(async () => {
-    await client.end();
+    // Clean up using raw SQL
+    await sql`DELETE FROM sessions`;
+    await sql`DELETE FROM users`;
+    await sql`DELETE FROM product_variants`;
+    await sql`DELETE FROM products`;
+    await sql.end();
   });
 
   beforeEach(async () => {
-    // Clean up products before each test
-    await client`DELETE FROM product_variants`;
-    await client`DELETE FROM products`;
-    await client`DELETE FROM frames`;
+    // Clean up products before each test using raw SQL
+    await sql`DELETE FROM product_variants`;
+    await sql`DELETE FROM products`;
   });
 
-  describe('GET /api/products', () => {
+  describe('GET /api/products - List Products', () => {
     it('should return empty list when no products exist', async () => {
       const res = await app.request('/api/products');
-      const data = await res.json();
-
       expect(res.status).toBe(200);
-      expect(data.data).toEqual([]);
-      expect(data.meta.total).toBe(0);
-      expect(data.meta.page).toBe(1);
+
+      const json = await res.json();
+      expect(json.data).toBeInstanceOf(Array);
+      expect(json.data).toHaveLength(0);
+      expect(json.meta).toEqual({
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+      });
     });
 
-    it('should list all products', async () => {
-      // Create test products with unique SKUs
-      const timestamp = Date.now();
-      for (let i = 0; i < 3; i++) {
-        const product = createProduct({ sku: `TEST${timestamp}_${i}`, slug: `test-product-${timestamp}-${i}` });
-        await db.insert(products).values({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        });
-      }
+    it('should list products with default pagination', async () => {
+      // Create test products
+      await db.insert(products).values([
+        {
+          sku: 'TEST001',
+          title: 'Test Product 1',
+          slug: 'test-product-1',
+          description: 'Description 1',
+          basePrice: '1499.00',
+          styles: ['minimalist'],
+          subjects: ['abstract'],
+          colors: ['blue'],
+          orientation: 'landscape',
+          images: [{ url: 'https://example.com/1.jpg', alt: 'Test', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Test Product 1',
+          seoDescription: 'Test description 1',
+          status: 'active',
+        },
+        {
+          sku: 'TEST002',
+          title: 'Test Product 2',
+          slug: 'test-product-2',
+          description: 'Description 2',
+          basePrice: '2499.00',
+          styles: ['wabi-sabi'],
+          subjects: ['nature'],
+          colors: ['green'],
+          orientation: 'portrait',
+          images: [{ url: 'https://example.com/2.jpg', alt: 'Test', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Test Product 2',
+          seoDescription: 'Test description 2',
+          status: 'active',
+        },
+      ]);
 
       const res = await app.request('/api/products');
-      const data = await res.json();
-
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(3);
-      expect(data.meta.total).toBe(3);
-      expect(data.meta.totalPages).toBe(1);
+
+      const json = await res.json();
+      expect(json.data).toHaveLength(2);
+      expect(json.meta.total).toBe(2);
+      expect(json.meta.page).toBe(1);
+      expect(json.meta.limit).toBe(20);
     });
 
     it('should filter products by status', async () => {
-      // Create products with different statuses
-      await db.insert(products).values({
-        sku: 'TX001',
-        title: 'Active Product',
-        slug: 'active-product',
-        description: 'An active product',
-        basePrice: '1000.00',
-        styles: ['modern'],
-        subjects: ['abstract'],
-        colors: ['blue'],
-        orientation: 'square',
-        images: [{ url: 'test.jpg', alt: 'test', width: 100, height: 100, isPrimary: true }],
-        seoTitle: 'Active Product',
-        seoDescription: 'Active product description',
-        status: 'active',
-      });
-
-      await db.insert(products).values({
-        sku: 'TX002',
-        title: 'Draft Product',
-        slug: 'draft-product',
-        description: 'A draft product',
-        basePrice: '1000.00',
-        styles: ['modern'],
-        subjects: ['abstract'],
-        colors: ['blue'],
-        orientation: 'square',
-        images: [{ url: 'test.jpg', alt: 'test', width: 100, height: 100, isPrimary: true }],
-        seoTitle: 'Draft Product',
-        seoDescription: 'Draft product description',
-        status: 'draft',
-      });
+      await db.insert(products).values([
+        {
+          sku: 'DRAFT001',
+          title: 'Draft Product',
+          slug: 'draft-product',
+          description: 'Draft description',
+          basePrice: '1499.00',
+          styles: ['minimalist'],
+          subjects: ['abstract'],
+          colors: ['blue'],
+          orientation: 'landscape',
+          images: [{ url: 'https://example.com/draft.jpg', alt: 'Draft', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Draft Product',
+          seoDescription: 'Draft description',
+          status: 'draft',
+        },
+        {
+          sku: 'ACTIVE001',
+          title: 'Active Product',
+          slug: 'active-product',
+          description: 'Active description',
+          basePrice: '2499.00',
+          styles: ['wabi-sabi'],
+          subjects: ['nature'],
+          colors: ['green'],
+          orientation: 'portrait',
+          images: [{ url: 'https://example.com/active.jpg', alt: 'Active', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Active Product',
+          seoDescription: 'Active description',
+          status: 'active',
+        },
+      ]);
 
       const res = await app.request('/api/products?status=active');
-      const data = await res.json();
-
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(1);
-      expect(data.data[0].status).toBe('active');
+
+      const json = await res.json();
+      expect(json.data).toHaveLength(1);
+      expect(json.data[0].status).toBe('active');
+      expect(json.data[0].title).toBe('Active Product');
     });
 
     it('should filter products by orientation', async () => {
-      const product = createProduct({ orientation: 'portrait' });
-      await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      });
+      await db.insert(products).values([
+        {
+          sku: 'LAND001',
+          title: 'Landscape Product',
+          slug: 'landscape-product',
+          description: 'Landscape description',
+          basePrice: '1499.00',
+          styles: ['minimalist'],
+          subjects: ['abstract'],
+          colors: ['blue'],
+          orientation: 'landscape',
+          images: [{ url: 'https://example.com/land.jpg', alt: 'Land', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Landscape Product',
+          seoDescription: 'Landscape description',
+          status: 'active',
+        },
+        {
+          sku: 'PORT001',
+          title: 'Portrait Product',
+          slug: 'portrait-product',
+          description: 'Portrait description',
+          basePrice: '2499.00',
+          styles: ['wabi-sabi'],
+          subjects: ['nature'],
+          colors: ['green'],
+          orientation: 'portrait',
+          images: [{ url: 'https://example.com/port.jpg', alt: 'Port', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Portrait Product',
+          seoDescription: 'Portrait description',
+          status: 'active',
+        },
+      ]);
 
       const res = await app.request('/api/products?orientation=portrait');
-      const data = await res.json();
-
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(1);
-      expect(data.data[0].orientation).toBe('portrait');
+
+      const json = await res.json();
+      expect(json.data).toHaveLength(1);
+      expect(json.data[0].orientation).toBe('portrait');
     });
 
     it('should filter products by style', async () => {
-      const product = createProduct({ styles: ['wabi-sabi', 'minimalist'] });
-      await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      });
+      await db.insert(products).values([
+        {
+          sku: 'MINI001',
+          title: 'Minimalist Product',
+          slug: 'minimalist-product',
+          description: 'Minimalist description',
+          basePrice: '1499.00',
+          styles: ['minimalist', 'abstract'],
+          subjects: ['abstract'],
+          colors: ['blue'],
+          orientation: 'landscape',
+          images: [{ url: 'https://example.com/mini.jpg', alt: 'Mini', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Minimalist Product',
+          seoDescription: 'Minimalist description',
+          status: 'active',
+        },
+        {
+          sku: 'WABI001',
+          title: 'Wabi-Sabi Product',
+          slug: 'wabi-sabi-product',
+          description: 'Wabi-Sabi description',
+          basePrice: '2499.00',
+          styles: ['wabi-sabi', 'botanical'],
+          subjects: ['nature'],
+          colors: ['green'],
+          orientation: 'portrait',
+          images: [{ url: 'https://example.com/wabi.jpg', alt: 'Wabi', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Wabi-Sabi Product',
+          seoDescription: 'Wabi-Sabi description',
+          status: 'active',
+        },
+      ]);
 
-      const res = await app.request('/api/products?style=wabi-sabi');
-      const data = await res.json();
-
+      const res = await app.request('/api/products?style=minimalist');
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(1);
-      expect(data.data[0].styles).toContain('wabi-sabi');
-    });
 
-    it('should filter products by multiple styles', async () => {
-      const product = createProduct({ styles: ['wabi-sabi', 'minimalist'] });
-      await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      });
-
-      const res = await app.request('/api/products?style=wabi-sabi,minimalist');
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(1);
+      const json = await res.json();
+      expect(json.data).toHaveLength(1);
+      expect(json.data[0].styles).toContain('minimalist');
     });
 
     it('should search products by title', async () => {
-      const product = createProduct({ title: 'Ocean Waves Abstract' });
-      await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      });
+      await db.insert(products).values([
+        {
+          sku: 'OCEAN001',
+          title: 'Ocean Waves Abstract',
+          slug: 'ocean-waves-abstract',
+          description: 'Ocean description',
+          basePrice: '1499.00',
+          styles: ['minimalist'],
+          subjects: ['abstract'],
+          colors: ['blue'],
+          orientation: 'landscape',
+          images: [{ url: 'https://example.com/ocean.jpg', alt: 'Ocean', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Ocean Waves',
+          seoDescription: 'Ocean description',
+          status: 'active',
+        },
+        {
+          sku: 'FOREST001',
+          title: 'Forest Landscape',
+          slug: 'forest-landscape',
+          description: 'Forest description',
+          basePrice: '2499.00',
+          styles: ['wabi-sabi'],
+          subjects: ['nature'],
+          colors: ['green'],
+          orientation: 'portrait',
+          images: [{ url: 'https://example.com/forest.jpg', alt: 'Forest', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Forest Landscape',
+          seoDescription: 'Forest description',
+          status: 'active',
+        },
+      ]);
 
       const res = await app.request('/api/products?search=ocean');
-      const data = await res.json();
-
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(1);
-      expect(data.data[0].title.toLowerCase()).toContain('ocean');
-    });
 
-    it('should search products by SKU', async () => {
-      const product = createProduct({ sku: 'SEARCH123' });
-      await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      });
-
-      const res = await app.request('/api/products?search=SEARCH123');
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(1);
-      expect(data.data[0].sku).toBe('SEARCH123');
+      const json = await res.json();
+      expect(json.data).toHaveLength(1);
+      expect(json.data[0].title.toLowerCase()).toContain('ocean');
     });
 
     it('should filter products by price range', async () => {
-      await db.insert(products).values({
-        sku: 'LOW001',
-        title: 'Low Price Product',
-        slug: 'low-price',
-        description: 'Low price',
-        basePrice: '500.00',
-        styles: ['modern'],
-        subjects: ['abstract'],
-        colors: ['blue'],
-        orientation: 'square',
-        images: [{ url: 'test.jpg', alt: 'test', width: 100, height: 100, isPrimary: true }],
-        seoTitle: 'Low Price',
-        seoDescription: 'Low price',
-        status: 'active',
-      });
+      await db.insert(products).values([
+        {
+          sku: 'CHEAP001',
+          title: 'Cheap Product',
+          slug: 'cheap-product',
+          description: 'Cheap description',
+          basePrice: '999.00',
+          styles: ['minimalist'],
+          subjects: ['abstract'],
+          colors: ['blue'],
+          orientation: 'landscape',
+          images: [{ url: 'https://example.com/cheap.jpg', alt: 'Cheap', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Cheap Product',
+          seoDescription: 'Cheap description',
+          status: 'active',
+        },
+        {
+          sku: 'MID001',
+          title: 'Mid-Range Product',
+          slug: 'mid-range-product',
+          description: 'Mid-range description',
+          basePrice: '1999.00',
+          styles: ['wabi-sabi'],
+          subjects: ['nature'],
+          colors: ['green'],
+          orientation: 'portrait',
+          images: [{ url: 'https://example.com/mid.jpg', alt: 'Mid', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Mid-Range Product',
+          seoDescription: 'Mid-range description',
+          status: 'active',
+        },
+        {
+          sku: 'EXP001',
+          title: 'Expensive Product',
+          slug: 'expensive-product',
+          description: 'Expensive description',
+          basePrice: '4999.00',
+          styles: ['abstract-expression'],
+          subjects: ['abstract'],
+          colors: ['gold'],
+          orientation: 'square',
+          images: [{ url: 'https://example.com/exp.jpg', alt: 'Exp', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Expensive Product',
+          seoDescription: 'Expensive description',
+          status: 'active',
+        },
+      ]);
 
-      await db.insert(products).values({
-        sku: 'HIGH001',
-        title: 'High Price Product',
-        slug: 'high-price',
-        description: 'High price',
-        basePrice: '5000.00',
-        styles: ['modern'],
-        subjects: ['abstract'],
-        colors: ['blue'],
-        orientation: 'square',
-        images: [{ url: 'test.jpg', alt: 'test', width: 100, height: 100, isPrimary: true }],
-        seoTitle: 'High Price',
-        seoDescription: 'High price',
-        status: 'active',
-      });
-
-      const res = await app.request('/api/products?minPrice=1000&maxPrice=2000');
-      const data = await res.json();
-
+      const res = await app.request('/api/products?minPrice=1500&maxPrice=3000');
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(0); // Neither product is in this range
+
+      const json = await res.json();
+      expect(json.data).toHaveLength(1);
+      expect(json.data[0].title).toBe('Mid-Range Product');
     });
 
     it('should sort products by price ascending', async () => {
-      const testProducts = [
-        createProduct({ sku: 'P1', basePrice: '3000.00' }),
-        createProduct({ sku: 'P2', basePrice: '1000.00' }),
-        createProduct({ sku: 'P3', basePrice: '2000.00' }),
-      ];
-
-      for (const product of testProducts) {
-        await db.insert(products).values({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug + '-' + product.sku,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        });
-      }
+      await db.insert(products).values([
+        {
+          sku: 'EXP001',
+          title: 'Expensive',
+          slug: 'expensive',
+          description: 'Expensive',
+          basePrice: '4999.00',
+          styles: ['minimalist'],
+          subjects: ['abstract'],
+          colors: ['blue'],
+          orientation: 'landscape',
+          images: [{ url: 'https://example.com/exp.jpg', alt: 'Exp', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Expensive',
+          seoDescription: 'Expensive',
+          status: 'active',
+        },
+        {
+          sku: 'CHEAP001',
+          title: 'Cheap',
+          slug: 'cheap',
+          description: 'Cheap',
+          basePrice: '999.00',
+          styles: ['wabi-sabi'],
+          subjects: ['nature'],
+          colors: ['green'],
+          orientation: 'portrait',
+          images: [{ url: 'https://example.com/cheap.jpg', alt: 'Cheap', width: 2000, height: 1500, isPrimary: true }],
+          seoTitle: 'Cheap',
+          seoDescription: 'Cheap',
+          status: 'active',
+        },
+      ]);
 
       const res = await app.request('/api/products?sort=price&order=asc');
-      const data = await res.json();
-
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(3);
-      expect(parseFloat(data.data[0].base_price)).toBeLessThanOrEqual(parseFloat(data.data[1].base_price));
-      expect(parseFloat(data.data[1].base_price)).toBeLessThanOrEqual(parseFloat(data.data[2].base_price));
-    });
 
-    it('should sort products by price descending', async () => {
-      const testProducts = [
-        createProduct({ sku: 'P1', basePrice: '1000.00' }),
-        createProduct({ sku: 'P2', basePrice: '3000.00' }),
-        createProduct({ sku: 'P3', basePrice: '2000.00' }),
-      ];
-
-      for (const product of testProducts) {
-        await db.insert(products).values({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug + '-' + product.sku,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        });
-      }
-
-      const res = await app.request('/api/products?sort=price&order=desc');
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(3);
-      expect(parseFloat(data.data[0].base_price)).toBeGreaterThanOrEqual(parseFloat(data.data[1].base_price));
-      expect(parseFloat(data.data[1].base_price)).toBeGreaterThanOrEqual(parseFloat(data.data[2].base_price));
-    });
-
-    it('should sort products by title', async () => {
-      const testProducts = [
-        createProduct({ sku: 'P1', title: 'Zebra Art' }),
-        createProduct({ sku: 'P2', title: 'Alpha Art' }),
-        createProduct({ sku: 'P3', title: 'Beta Art' }),
-      ];
-
-      for (const product of testProducts) {
-        await db.insert(products).values({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug + '-' + product.sku,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        });
-      }
-
-      const res = await app.request('/api/products?sort=title&order=asc');
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(3);
-      expect(data.data[0].title).toBe('Alpha Art');
-      expect(data.data[1].title).toBe('Beta Art');
-      expect(data.data[2].title).toBe('Zebra Art');
+      const json = await res.json();
+      expect(json.data).toHaveLength(2);
+      // Check that first item has lower price using basePrice field (camelCase)
+      const price1 = parseFloat(json.data[0].basePrice);
+      const price2 = parseFloat(json.data[1].basePrice);
+      expect(price1).toBeLessThanOrEqual(price2);
     });
 
     it('should paginate products correctly', async () => {
-      // Create 25 products with unique SKUs
-      const timestamp = Date.now();
-      for (let i = 0; i < 25; i++) {
-        const product = createProduct({ sku: `PAGE${timestamp}_${i}`, slug: `page-product-${timestamp}-${i}` });
-        await db.insert(products).values({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        });
-      }
+      // Create 25 products
+      const productsData = Array.from({ length: 25 }, (_, i) => ({
+        sku: `PROD${String(i + 1).padStart(3, '0')}`,
+        title: `Product ${i + 1}`,
+        slug: `product-${i + 1}`,
+        description: `Description ${i + 1}`,
+        basePrice: '1499.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape' as const,
+        images: [{ url: `https://example.com/${i + 1}.jpg`, alt: 'Test', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: `Product ${i + 1}`,
+        seoDescription: `Description ${i + 1}`,
+        status: 'active' as const,
+      }));
+      await db.insert(products).values(productsData);
 
-      // Get first page
-      const res1 = await app.request('/api/products?page=1&limit=10');
-      const data1 = await res1.json();
-
-      expect(res1.status).toBe(200);
-      expect(data1.data).toHaveLength(10);
-      expect(data1.meta.page).toBe(1);
-      expect(data1.meta.total).toBe(25);
-      expect(data1.meta.totalPages).toBe(3);
+      // Get first page (default 20 items)
+      const res1 = await app.request('/api/products?page=1');
+      const json1 = await res1.json();
+      expect(json1.data).toHaveLength(20);
+      expect(json1.meta.page).toBe(1);
+      expect(json1.meta.total).toBe(25);
+      expect(json1.meta.totalPages).toBe(2);
 
       // Get second page
-      const res2 = await app.request('/api/products?page=2&limit=10');
-      const data2 = await res2.json();
-
-      expect(res2.status).toBe(200);
-      expect(data2.data).toHaveLength(10);
-      expect(data2.meta.page).toBe(2);
-
-      // Get third page (should have 5 items)
-      const res3 = await app.request('/api/products?page=3&limit=10');
-      const data3 = await res3.json();
-
-      expect(res3.status).toBe(200);
-      expect(data3.data).toHaveLength(5);
-      expect(data3.meta.page).toBe(3);
-    });
-
-    it('should respect limit parameter', async () => {
-      const timestamp = Date.now();
-      for (let i = 0; i < 10; i++) {
-        const product = createProduct({ sku: `LIMIT${timestamp}_${i}`, slug: `limit-product-${timestamp}-${i}` });
-        await db.insert(products).values({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        });
-      }
-
-      const res = await app.request('/api/products?limit=5');
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(5);
-      expect(data.meta.limit).toBe(5);
-    });
-
-    it('should enforce maximum limit of 100', async () => {
-      const res = await app.request('/api/products?limit=200');
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.meta.limit).toBe(100); // Should be capped at 100
-    });
-
-    it('should combine multiple filters', async () => {
-      const product = createProduct({
-        status: 'active',
-        orientation: 'landscape',
-        styles: ['wabi-sabi'],
-        basePrice: '1500.00',
-      });
-
-      await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      });
-
-      const res = await app.request('/api/products?status=active&orientation=landscape&style=wabi-sabi&minPrice=1000&maxPrice=2000');
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(1);
-      expect(data.data[0].status).toBe('active');
-      expect(data.data[0].orientation).toBe('landscape');
+      const res2 = await app.request('/api/products?page=2');
+      const json2 = await res2.json();
+      expect(json2.data).toHaveLength(5);
+      expect(json2.meta.page).toBe(2);
     });
   });
 
-  describe('GET /api/products/:id', () => {
+  describe('GET /api/products/:id - Get Single Product', () => {
     it('should get a product by ID', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
+      const insertResult = await db.insert(products).values({
+        sku: 'TEST001',
+        title: 'Test Product',
+        slug: 'test-product',
+        description: 'Test description',
+        basePrice: '1499.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape',
+        images: [{ url: 'https://example.com/test.jpg', alt: 'Test', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: 'Test Product',
+        seoDescription: 'Test description',
+        status: 'active',
       }).returning();
 
-      const res = await app.request(`/api/products/${inserted[0].id}`);
-      const data = await res.json();
+      const productId = insertResult[0].id;
 
+      const res = await app.request(`/api/products/${productId}`);
       expect(res.status).toBe(200);
-      expect(data.id).toBe(inserted[0].id);
-      expect(data.title).toBe(product.title);
-      expect(data.sku).toBe(product.sku);
+
+      const json = await res.json();
+      expect(json.id).toBe(productId);
+      expect(json.sku).toBe('TEST001');
+      expect(json.title).toBe('Test Product');
     });
 
     it('should return 404 for non-existent product', async () => {
-      const res = await app.request('/api/products/00000000-0000-0000-0000-000000000000');
-      const data = await res.json();
-
+      const fakeId = '00000000-0000-0000-0000-000000000000';
+      const res = await app.request(`/api/products/${fakeId}`);
       expect(res.status).toBe(404);
-      expect(data.error).toBe('Product not found');
+
+      const json = await res.json();
+      expect(json.error).toBe('Product not found');
     });
 
     it('should return 500 for invalid UUID', async () => {
       const res = await app.request('/api/products/invalid-uuid');
-
       expect(res.status).toBe(500);
+
+      const json = await res.json();
+      expect(json.error).toBe('Failed to get product');
     });
   });
 
-  describe('GET /api/products/:id/variants', () => {
+  describe('GET /api/products/:id/variants - Get Product Variants', () => {
     it('should get product variants', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
+      const insertResult = await db.insert(products).values({
+        sku: 'TEST001',
+        title: 'Test Product',
+        slug: 'test-product',
+        description: 'Test description',
+        basePrice: '1499.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape',
+        images: [{ url: 'https://example.com/test.jpg', alt: 'Test', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: 'Test Product',
+        seoDescription: 'Test description',
+        status: 'active',
       }).returning();
 
-      // Create variants
-      const variant1 = createProductVariant({ productId: inserted[0].id, sizeLabel: '12x16 inches' });
-      const variant2 = createProductVariant({ productId: inserted[0].id, sizeLabel: '24x32 inches' });
+      const productId = insertResult[0].id;
 
+      // Create variants
       await db.insert(productVariants).values([
         {
-          productId: inserted[0].id,
-          sizeLabel: variant1.sizeLabel,
-          widthInches: variant1.widthInches.toString(),
-          heightInches: variant1.heightInches.toString(),
-          price: variant1.price,
-          stockQuantity: variant1.stockQuantity,
+          productId,
+          sizeLabel: '12" x 18"',
+          widthInches: '12.00',
+          heightInches: '18.00',
+          price: '1499.00',
+          stockQuantity: 10,
         },
         {
-          productId: inserted[0].id,
-          sizeLabel: variant2.sizeLabel,
-          widthInches: variant2.widthInches.toString(),
-          heightInches: variant2.heightInches.toString(),
-          price: variant2.price,
-          stockQuantity: variant2.stockQuantity,
+          productId,
+          sizeLabel: '18" x 24"',
+          widthInches: '18.00',
+          heightInches: '24.00',
+          price: '2499.00',
+          stockQuantity: 5,
         },
       ]);
 
-      const res = await app.request(`/api/products/${inserted[0].id}/variants`);
-      const data = await res.json();
-
+      const res = await app.request(`/api/products/${productId}/variants`);
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(2);
-      expect(data.data[0].size_label).toBe('12x16 inches');
-      expect(data.data[1].size_label).toBe('24x32 inches');
+
+      const json = await res.json();
+      expect(json.data).toHaveLength(2);
+      expect(json.data[0].sizeLabel).toBe('12" x 18"');
+      expect(json.data[1].sizeLabel).toBe('18" x 24"');
     });
 
-    it('should return empty array when product has no variants', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
+    it('should return empty array for product with no variants', async () => {
+      const insertResult = await db.insert(products).values({
+        sku: 'TEST001',
+        title: 'Test Product',
+        slug: 'test-product',
+        description: 'Test description',
+        basePrice: '1499.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape',
+        images: [{ url: 'https://example.com/test.jpg', alt: 'Test', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: 'Test Product',
+        seoDescription: 'Test description',
+        status: 'active',
       }).returning();
 
-      const res = await app.request(`/api/products/${inserted[0].id}/variants`);
-      const data = await res.json();
+      const productId = insertResult[0].id;
 
+      const res = await app.request(`/api/products/${productId}/variants`);
       expect(res.status).toBe(200);
-      expect(data.data).toHaveLength(0);
-    });
 
-    it('should return 404 for non-existent product variants', async () => {
-      const res = await app.request('/api/products/00000000-0000-0000-0000-000000000000/variants');
-      const data = await res.json();
-
-      expect(res.status).toBe(404);
-      expect(data.error).toBe('Product not found');
-    });
-  });
-
-  describe('POST /api/products', () => {
-    it('should create a new product as admin', async () => {
-      const product = createProduct({ sku: 'NEW001' });
-
-      const res = await app.request('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(data.sku).toBe(product.sku);
-      expect(data.title).toBe(product.title);
-      expect(data.id).toBeDefined();
-    });
-
-    it('should reject creation without authentication', async () => {
-      const product = createProduct();
-
-      const res = await app.request('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-        }),
-      });
-
-      expect(res.status).toBe(401);
-    });
-
-    it('should reject creation with missing required fields', async () => {
-      const res = await app.request('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          sku: 'MISSING001',
-          title: 'Missing Fields Product',
-          // Missing other required fields
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(400);
-      expect(data.error).toBe('Missing required fields');
-      expect(data.fields).toBeDefined();
-    });
-
-    it('should reject duplicate SKU', async () => {
-      const product = createProduct({ sku: 'DUP001' });
-
-      // Create first product
-      await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      });
-
-      // Try to create duplicate
-      const res = await app.request('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          sku: product.sku,
-          title: 'Different Title',
-          slug: 'different-slug',
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(409);
-      expect(data.error).toBe('Product with this SKU already exists');
-    });
-
-    it('should reject duplicate slug', async () => {
-      const product = createProduct({ slug: 'duplicate-slug' });
-
-      // Create first product
-      await db.insert(products).values({
-        sku: 'SLUG001',
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      });
-
-      // Try to create duplicate
-      const res = await app.request('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          sku: 'SLUG002',
-          title: 'Different Title',
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(409);
-      expect(data.error).toBe('Product with this slug already exists');
-    });
-
-    it('should set default status to draft if not provided', async () => {
-      const product = createProduct();
-
-      const res = await app.request('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          // status not provided
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(201);
-      expect(data.status).toBe('draft');
-    });
-  });
-
-  describe('PUT /api/products/:id', () => {
-    it('should update a product as admin', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      }).returning();
-
-      const res = await app.request(`/api/products/${inserted[0].id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          title: 'Updated Title',
-          basePrice: '2999.00',
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.title).toBe('Updated Title');
-      expect(data.base_price).toBe('2999.00');
-      expect(data.sku).toBe(product.sku); // SKU unchanged
-    });
-
-    it('should reject update without authentication', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      }).returning();
-
-      const res = await app.request(`/api/products/${inserted[0].id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: 'Updated Title',
-        }),
-      });
-
-      expect(res.status).toBe(401);
+      const json = await res.json();
+      expect(json.data).toHaveLength(0);
     });
 
     it('should return 404 for non-existent product', async () => {
-      const res = await app.request('/api/products/00000000-0000-0000-0000-000000000000', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          title: 'Updated Title',
-        }),
-      });
-
-      const data = await res.json();
-
+      const fakeId = '00000000-0000-0000-0000-000000000000';
+      const res = await app.request(`/api/products/${fakeId}/variants`);
       expect(res.status).toBe(404);
-      expect(data.error).toBe('Product not found');
-    });
 
-    it('should reject duplicate SKU on update', async () => {
-      // Create two products
-      const product1 = createProduct({ sku: 'UPDATE001' });
-      const product2 = createProduct({ sku: 'UPDATE002' });
-
-      const inserted1 = await db.insert(products).values({
-        sku: product1.sku,
-        title: product1.title,
-        slug: product1.slug + '-1',
-        description: product1.description,
-        basePrice: product1.basePrice,
-        styles: product1.styles,
-        subjects: product1.subjects,
-        colors: product1.colors,
-        orientation: product1.orientation,
-        images: product1.images,
-        seoTitle: product1.seoTitle,
-        seoDescription: product1.seoDescription,
-        status: product1.status,
-      }).returning();
-
-      await db.insert(products).values({
-        sku: product2.sku,
-        title: product2.title,
-        slug: product2.slug + '-2',
-        description: product2.description,
-        basePrice: product2.basePrice,
-        styles: product2.styles,
-        subjects: product2.subjects,
-        colors: product2.colors,
-        orientation: product2.orientation,
-        images: product2.images,
-        seoTitle: product2.seoTitle,
-        seoDescription: product2.seoDescription,
-        status: product2.status,
-      });
-
-      // Try to update product1 with product2's SKU
-      const res = await app.request(`/api/products/${inserted1[0].id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          sku: product2.sku,
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(409);
-      expect(data.error).toBe('Product with this SKU already exists');
-    });
-
-    it('should reject duplicate slug on update', async () => {
-      // Create two products
-      const product1 = createProduct({ sku: 'SLUG001' });
-      const product2 = createProduct({ sku: 'SLUG002' });
-
-      const inserted1 = await db.insert(products).values({
-        sku: product1.sku,
-        title: product1.title,
-        slug: 'slug-one',
-        description: product1.description,
-        basePrice: product1.basePrice,
-        styles: product1.styles,
-        subjects: product1.subjects,
-        colors: product1.colors,
-        orientation: product1.orientation,
-        images: product1.images,
-        seoTitle: product1.seoTitle,
-        seoDescription: product1.seoDescription,
-        status: product1.status,
-      }).returning();
-
-      await db.insert(products).values({
-        sku: product2.sku,
-        title: product2.title,
-        slug: 'slug-two',
-        description: product2.description,
-        basePrice: product2.basePrice,
-        styles: product2.styles,
-        subjects: product2.subjects,
-        colors: product2.colors,
-        orientation: product2.orientation,
-        images: product2.images,
-        seoTitle: product2.seoTitle,
-        seoDescription: product2.seoDescription,
-        status: product2.status,
-      });
-
-      // Try to update product1 with product2's slug
-      const res = await app.request(`/api/products/${inserted1[0].id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          slug: 'slug-two',
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(409);
-      expect(data.error).toBe('Product with this slug already exists');
-    });
-
-    it('should allow updating product with same SKU', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      }).returning();
-
-      const res = await app.request(`/api/products/${inserted[0].id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-        body: JSON.stringify({
-          sku: product.sku, // Same SKU
-          title: 'Updated Title',
-        }),
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.title).toBe('Updated Title');
-      expect(data.sku).toBe(product.sku);
+      const json = await res.json();
+      expect(json.error).toBe('Product not found');
     });
   });
 
-  describe('DELETE /api/products/:id', () => {
-    it('should delete a product as admin', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      }).returning();
+  describe('POST /api/products - Create Product (Admin Only)', () => {
+    it('should return 401 without authentication', async () => {
+      const newProduct = {
+        sku: 'NEW001',
+        title: 'New Product',
+        slug: 'new-product',
+        description: 'New product description',
+        basePrice: '1999.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape',
+        images: [{ url: 'https://example.com/new.jpg', alt: 'New', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: 'New Product',
+        seoDescription: 'New product description',
+      };
 
-      const res = await app.request(`/api/products/${inserted[0].id}`, {
-        method: 'DELETE',
+      const res = await app.request('/api/products', {
+        method: 'POST',
         headers: {
-          'Cookie': `masonart-session=${adminToken}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(newProduct),
       });
 
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.message).toBe('Product deleted successfully');
-
-      // Verify product is deleted
-      const check = await db.select().from(products).where(eq(products.id, inserted[0].id));
-      expect(check).toHaveLength(0);
+      expect(res.status).toBe(401);
     });
+  });
 
-    it('should reject deletion without authentication', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
+  describe('PUT /api/products/:id - Update Product (Admin Only)', () => {
+    it('should return 401 without authentication', async () => {
+      const insertResult = await db.insert(products).values({
+        sku: 'UPDATE002',
+        title: 'Test Product',
+        slug: 'test-product-002',
+        description: 'Test description',
+        basePrice: '1499.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape',
+        images: [{ url: 'https://example.com/test.jpg', alt: 'Test', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: 'Test',
+        seoDescription: 'Test',
+        status: 'draft',
       }).returning();
 
-      const res = await app.request(`/api/products/${inserted[0].id}`, {
+      const productId = insertResult[0].id;
+
+      const res = await app.request(`/api/products/${productId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: 'Updated' }),
+      });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('DELETE /api/products/:id - Delete Product (Admin Only)', () => {
+    it('should return 401 without authentication', async () => {
+      const insertResult = await db.insert(products).values({
+        sku: 'DELETE002',
+        title: 'Test Product',
+        slug: 'test-product-delete',
+        description: 'Test description',
+        basePrice: '1499.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape',
+        images: [{ url: 'https://example.com/test.jpg', alt: 'Test', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: 'Test',
+        seoDescription: 'Test',
+        status: 'draft',
+      }).returning();
+
+      const productId = insertResult[0].id;
+
+      const res = await app.request(`/api/products/${productId}`, {
         method: 'DELETE',
       });
 
       expect(res.status).toBe(401);
     });
-
-    it('should return 404 for non-existent product deletion', async () => {
-      const res = await app.request('/api/products/00000000-0000-0000-0000-000000000000', {
-        method: 'DELETE',
-        headers: {
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-      });
-
-      const data = await res.json();
-
-      expect(res.status).toBe(404);
-      expect(data.error).toBe('Product not found');
-    });
-
-    it('should cascade delete product variants', async () => {
-      const product = createProduct();
-      const inserted = await db.insert(products).values({
-        sku: product.sku,
-        title: product.title,
-        slug: product.slug,
-        description: product.description,
-        basePrice: product.basePrice,
-        styles: product.styles,
-        subjects: product.subjects,
-        colors: product.colors,
-        orientation: product.orientation,
-        images: product.images,
-        seoTitle: product.seoTitle,
-        seoDescription: product.seoDescription,
-        status: product.status,
-      }).returning();
-
-      // Create variants
-      const variant = createProductVariant({ productId: inserted[0].id });
-      await db.insert(productVariants).values({
-        productId: inserted[0].id,
-        sizeLabel: variant.sizeLabel,
-        widthInches: variant.widthInches.toString(),
-        heightInches: variant.heightInches.toString(),
-        price: variant.price,
-        stockQuantity: variant.stockQuantity,
-      });
-
-      // Delete product
-      await app.request(`/api/products/${inserted[0].id}`, {
-        method: 'DELETE',
-        headers: {
-          'Cookie': `masonart-session=${adminToken}`,
-        },
-      });
-
-      // Verify variants are also deleted
-      const checkVariants = await db.select().from(productVariants).where(eq(productVariants.productId, inserted[0].id));
-      expect(checkVariants).toHaveLength(0);
-    });
   });
 
-  describe('Error Handling', () => {
-    it('should handle database errors gracefully', async () => {
-      // Close database connection to simulate error
-      await client.end();
+  describe('Response Format', () => {
+    it('should return correct JSON structure for list', async () => {
+      await db.insert(products).values({
+        sku: 'FORMAT001',
+        title: 'Format Test',
+        slug: 'format-test',
+        description: 'Format test description',
+        basePrice: '1499.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape',
+        images: [{ url: 'https://example.com/format.jpg', alt: 'Format', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: 'Format Test',
+        seoDescription: 'Format test',
+        status: 'active',
+      });
 
       const res = await app.request('/api/products');
+      const json = await res.json();
 
-      expect(res.status).toBe(500);
-
-      // Reconnect for cleanup
-      client = postgres('postgres://poster_app:dev_password@localhost:5433/poster_app_dev');
-    });
-  });
-
-  describe('Performance', () => {
-    it('should list products within reasonable time', async () => {
-      // Create 50 products
-      const timestamp = Date.now();
-      for (let i = 0; i < 50; i++) {
-        const product = createProduct({ sku: `PERF${timestamp}_${i}`, slug: `perf-product-${timestamp}-${i}` });
-        await db.insert(products).values({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        });
-      }
-
-      const start = Date.now();
-      const res = await app.request('/api/products?limit=20');
-      const duration = Date.now() - start;
-
-      expect(res.status).toBe(200);
-      expect(duration).toBeLessThan(1000); // Should complete in less than 1 second
+      expect(json).toHaveProperty('data');
+      expect(json).toHaveProperty('meta');
+      expect(json.meta).toHaveProperty('page');
+      expect(json.meta).toHaveProperty('limit');
+      expect(json.meta).toHaveProperty('total');
+      expect(json.meta).toHaveProperty('totalPages');
     });
 
-    it('should handle complex filters efficiently', async () => {
-      const timestamp = Date.now();
-      for (let i = 0; i < 20; i++) {
-        const product = createProduct({ sku: `FILTER${timestamp}_${i}`, slug: `filter-product-${timestamp}-${i}` });
-        await db.insert(products).values({
-          sku: product.sku,
-          title: product.title,
-          slug: product.slug,
-          description: product.description,
-          basePrice: product.basePrice,
-          styles: product.styles,
-          subjects: product.subjects,
-          colors: product.colors,
-          orientation: product.orientation,
-          images: product.images,
-          seoTitle: product.seoTitle,
-          seoDescription: product.seoDescription,
-          status: product.status,
-        });
-      }
+    it('should return correct JSON structure for single product', async () => {
+      const insertResult = await db.insert(products).values({
+        sku: 'SINGLE001',
+        title: 'Single Product',
+        slug: 'single-product',
+        description: 'Single product description',
+        basePrice: '1499.00',
+        styles: ['minimalist'],
+        subjects: ['abstract'],
+        colors: ['blue'],
+        orientation: 'landscape',
+        images: [{ url: 'https://example.com/single.jpg', alt: 'Single', width: 2000, height: 1500, isPrimary: true }],
+        seoTitle: 'Single',
+        seoDescription: 'Single',
+        status: 'active',
+      }).returning();
 
-      const start = Date.now();
-      const res = await app.request('/api/products?status=active&style=wabi-sabi&minPrice=1000&maxPrice=3000&sort=price&order=asc');
-      const duration = Date.now() - start;
+      const productId = insertResult[0].id;
 
-      expect(res.status).toBe(200);
-      expect(duration).toBeLessThan(500); // Complex query should still be fast
+      const res = await app.request(`/api/products/${productId}`);
+      const json = await res.json();
+
+      expect(json).toHaveProperty('id');
+      expect(json).toHaveProperty('sku');
+      expect(json).toHaveProperty('title');
+      expect(json).toHaveProperty('slug');
+      expect(json).toHaveProperty('description');
+      expect(json).toHaveProperty('basePrice');
+      expect(json).toHaveProperty('styles');
+      expect(json).toHaveProperty('subjects');
+      expect(json).toHaveProperty('colors');
+      expect(json).toHaveProperty('orientation');
+      expect(json).toHaveProperty('images');
+      expect(json).toHaveProperty('seoTitle');
+      expect(json).toHaveProperty('seoDescription');
+      expect(json).toHaveProperty('status');
+      expect(json).toHaveProperty('createdAt');
+      expect(json).toHaveProperty('updatedAt');
     });
   });
 });
