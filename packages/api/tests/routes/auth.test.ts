@@ -97,19 +97,23 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
       user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       token VARCHAR(500) NOT NULL UNIQUE,
       expires_at TIMESTAMP NOT NULL,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      ip_address VARCHAR(45),
+      user_agent TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `;
 
   // Create accounts table for OAuth/Social login and password-based auth (using VARCHAR for IDs)
+  // Note: provider and provider_account_id are nullable to support credential-based auth
   await sql`
     CREATE TABLE IF NOT EXISTS accounts (
       id VARCHAR(255) PRIMARY KEY,
       "accountId" VARCHAR(255) NOT NULL UNIQUE,
       "providerId" VARCHAR(255) NOT NULL,
       user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      provider VARCHAR(100) NOT NULL,
-      provider_account_id VARCHAR(255) NOT NULL,
+      provider VARCHAR(100),
+      provider_account_id VARCHAR(255),
       access_token TEXT,
       refresh_token TEXT,
       expires_at TIMESTAMP,
@@ -118,8 +122,7 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
       id_token TEXT,
       password VARCHAR(255),
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      UNIQUE(provider, provider_account_id)
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `;
 }

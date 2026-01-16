@@ -141,27 +141,34 @@ export const addresses = pgTable('addresses', {
 /**
  * Sessions Table
  * Note: Using varchar ID to accommodate Better Auth's ID generation
+ * Better Auth tracks IP address and user agent for security
  */
 export const sessions = pgTable('sessions', {
   id: varchar('id', { length: 255 }).primaryKey(),
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   token: varchar('token', { length: 500 }).notNull().unique(),
   expiresAt: timestamp('expires_at').notNull(),
+  ipAddress: varchar('ip_address', { length: 45 }), // IPv6 max length
+  userAgent: text('user_agent'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 /**
  * Accounts Table (for OAuth/Social login and password-based auth)
  * Note: Using varchar ID to accommodate Better Auth's ID generation
  * Schema based on Better Auth requirements
+ *
+ * Note: provider and providerAccountId are nullable to support credential-based auth
+ * where these fields aren't used (Better Auth uses defaults)
  */
 export const accounts = pgTable('accounts', {
   id: varchar('id', { length: 255 }).primaryKey(),
   accountId: varchar('accountId', { length: 255 }).notNull().unique(),
   providerId: varchar('providerId', { length: 255 }).notNull(),
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
-  provider: varchar('provider', { length: 100 }).notNull(),
-  providerAccountId: varchar('provider_account_id', { length: 255 }).notNull(),
+  provider: varchar('provider', { length: 100 }),
+  providerAccountId: varchar('provider_account_id', { length: 255 }),
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
   expiresAt: timestamp('expires_at'),
