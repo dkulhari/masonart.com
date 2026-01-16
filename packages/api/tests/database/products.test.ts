@@ -384,8 +384,9 @@ describe('Products Table Schema', () => {
       });
 
       // Attempt to insert duplicate SKU should fail
-      await expect(
-        db.insert(products).values({
+      let error;
+      try {
+        await db.insert(products).values({
           sku: 'UNIQUE-SKU',
           title: 'Second Product',
           slug: 'second-product',
@@ -405,8 +406,13 @@ describe('Products Table Schema', () => {
           seoTitle: 'Second Product',
           seoDescription: 'Testing SKU uniqueness',
           status: 'active',
-        })
-      ).rejects.toThrow();
+        }).execute();
+      } catch (e: any) {
+        error = e;
+      }
+      expect(error).toBeDefined();
+      // PostgreSQL unique violation error - should fail due to duplicate SKU
+      expect(error.message).toContain('unique');
     });
   });
 });

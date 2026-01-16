@@ -335,13 +335,19 @@ describe('Users Table Schema', () => {
         role: 'customer',
       });
 
-      await expect(
-        db.insert(users).values({
+      let error;
+      try {
+        await db.insert(users).values({
           email: 'unique@example.com',
           name: 'User Two',
           role: 'customer',
-        })
-      ).rejects.toThrow();
+        }).execute();
+      } catch (e: any) {
+        error = e;
+      }
+      expect(error).toBeDefined();
+      // PostgreSQL unique violation error - should fail due to duplicate email
+      expect(error.message).toContain('unique');
     });
   });
 });
@@ -651,13 +657,19 @@ describe('Sessions Table Schema', () => {
         expiresAt,
       });
 
-      await expect(
-        db.insert(sessions).values({
+      let error;
+      try {
+        await db.insert(sessions).values({
           userId: testUserId,
           token: 'unique-token',
           expiresAt,
-        })
-      ).rejects.toThrow();
+        }).execute();
+      } catch (e: any) {
+        error = e;
+      }
+      expect(error).toBeDefined();
+      // PostgreSQL unique violation error - should fail due to duplicate token
+      expect(error.message).toContain('unique');
     });
   });
 });
