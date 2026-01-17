@@ -1,0 +1,25 @@
+{
+  "active": true,
+  "spec": "001-take-a-look-at-docs-directory-and-start-implementi",
+  "state": "complete",
+  "subtasks": {
+    "completed": 58,
+    "total": 58,
+    "in_progress": 0,
+    "failed": 0
+  },
+  "phase": {
+    "current": "Integration & Testing",
+    "id": null,
+    "total": 5
+  },
+  "workers": {
+    "active": 0,
+    "max": 1
+  },
+  "session": {
+    "number": 31,
+    "started_at": "2026-01-15T01:07:59.856933"
+  },
+  "last_update": "2026-01-15T03:54:40.840630"
+}

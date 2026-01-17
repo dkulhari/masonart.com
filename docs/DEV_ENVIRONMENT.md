@@ -1,220 +1,134 @@
-# Development Environment Setup Guide
+# MasonArt Development Environment Setup
 
-This guide provides step-by-step instructions for setting up and starting the development environment for the Poster & Frame E-Commerce Platform.
-
----
+This guide explains how to set up and run the MasonArt e-commerce platform locally.
 
 ## Prerequisites
 
-Before starting, ensure you have the following installed:
-
-### Required Software
-
-| Software | Version | Installation |
-|----------|---------|--------------|
-| **Bun** | ^1.1.x | [bun.sh](https://bun.sh) |
-| **Docker** | Latest | [docker.com](https://docs.docker.com/get-docker/) |
-| **Docker Compose** | Latest | Included with Docker Desktop |
-| **Git** | Latest | [git-scm.com](https://git-scm.com/) |
-
-### Verify Installation
-
-```bash
-# Check Bun version (should be 1.1.x or higher)
-bun --version
-
-# Check Docker version
-docker --version
-
-# Check Docker Compose version
-docker compose version
-```
-
----
+- [Bun](https://bun.sh/) v1.1.x or later
+- [Docker](https://www.docker.com/) and Docker Compose
+- Git
 
 ## Quick Start
 
-For experienced developers, here's the TL;DR:
-
 ```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd poster-app
+# 1. Navigate to the project directory
+cd /path/to/masonart.com
 
-# 2. Start Docker services
-docker compose up -d
+# 2. Start Docker services (PostgreSQL, Redis, MinIO)
+cd docker && docker compose up -d && cd ..
 
 # 3. Install dependencies
 bun install
 
-# 4. Set up environment variables
-cp .env.example .env
+# 4. Push database schema
+cd packages/api
+DATABASE_URL="postgresql://poster_app:dev_password@localhost:5433/poster_app_dev" bunx drizzle-kit push --force
+cd ..
 
-# 5. Run database migrations
-bun run db:migrate
+# 5. Seed the database with sample data
+cd packages/api && bun run seed && cd ..
 
-# 6. Start development servers
+# 6. Start the development server
 bun run dev
 ```
 
----
+## Service URLs
 
-## Step-by-Step Setup
-
-### Step 1: Clone the Repository
-
-```bash
-git clone <repository-url>
-cd poster-app
-```
-
-### Step 2: Start Docker Services
-
-The project uses Docker for local development services. Start PostgreSQL, Redis, and MinIO:
-
-```bash
-# Start all services in detached mode
-docker compose up -d
-
-# Verify services are running
-docker compose ps
-```
-
-**Expected Output:**
-```
-NAME                COMMAND                  SERVICE     STATUS
-poster-app-postgres ...                      postgres    running
-poster-app-redis    ...                      redis       running
-poster-app-minio    ...                      minio       running
-```
-
-### Step 3: Install Dependencies
-
-Install all project dependencies using Bun:
-
-```bash
-bun install
-```
-
-This installs dependencies for all packages in the monorepo:
-- `packages/api` - Hono API server
-- `packages/web` - TanStack Start frontend
-- `packages/shared` - Shared types and schemas
-
-### Step 4: Configure Environment Variables
-
-Copy the example environment file and configure your local settings:
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and review the settings. For local development, the defaults should work:
-
-```bash
-# Database (PostgreSQL)
-DATABASE_URL=postgresql://poster_app:dev_password@localhost:5432/poster_app_dev
-
-# Cache/Queue (Redis)
-REDIS_URL=redis://localhost:6379
-
-# Object Storage (MinIO - S3 compatible)
-S3_ENDPOINT=http://localhost:9000
-S3_ACCESS_KEY=minioadmin
-S3_SECRET_KEY=minioadmin
-S3_BUCKET=poster-app-dev
-
-# API
-API_PORT=3000
-
-# Web
-WEB_PORT=3001
-VITE_API_URL=http://localhost:3000
-```
-
-### Step 5: Run Database Migrations
-
-Initialize the database schema:
-
-```bash
-bun run db:migrate
-```
-
-Optionally, seed the database with sample data:
-
-```bash
-bun run db:seed
-```
-
-### Step 6: Start Development Servers
-
-Start all development servers (API + Web):
-
-```bash
-bun run dev
-```
-
-This starts:
-- **API Server** at `http://localhost:3000`
-- **Web App** at `http://localhost:3001`
-
----
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Web App** | http://localhost:3001 | Main frontend (TanStack Start) |
+| **API Server** | http://localhost:3000 | Backend API (Hono) |
+| **API Health** | http://localhost:3000/api/health | Health check endpoint |
+| **MinIO Console** | http://localhost:9001 | Object storage admin |
+| **Drizzle Studio** | http://localhost:4983 | Database explorer (run `bun run db:studio` in packages/api) |
 
 ## Docker Services
 
-### Service Details
+| Service | Host Port | Container Port | Description |
+|---------|-----------|----------------|-------------|
+| PostgreSQL | 5433 | 5432 | Database |
+| Redis | 6380 | 6379 | Cache & Queue |
+| MinIO API | 9000 | 9000 | S3-compatible storage |
+| MinIO Console | 9001 | 9001 | Storage admin UI |
 
-| Service | Image | Port(s) | Purpose |
-|---------|-------|---------|---------|
-| **PostgreSQL** | postgres:16 | 5432 | Primary database |
-| **Redis** | redis:7-alpine | 6379 | Caching, sessions, job queues |
-| **MinIO** | minio/minio | 9000, 9001 | S3-compatible object storage |
+### MinIO Credentials
+- **Username**: `minioadmin`
+- **Password**: `minioadmin`
 
-### Docker Compose Configuration
+## Key Application Pages
 
-The `docker/docker-compose.yml` file defines the development services:
+| Page | URL | Description |
+|------|-----|-------------|
+| Homepage | http://localhost:3001/ | Landing page with featured products |
+| Product Catalog | http://localhost:3001/posters | Browse all products with filters |
+| Product Detail | http://localhost:3001/posters/abstract/cosmic-harmony | Example product page |
+| Cart | http://localhost:3001/cart | Shopping cart |
+| Checkout | http://localhost:3001/checkout | Checkout flow |
+| Login | http://localhost:3001/auth/login | User login |
+| Register | http://localhost:3001/auth/register | User registration |
+| Account | http://localhost:3001/account | User dashboard (requires login) |
+| AI Generator | http://localhost:3001/create | AI poster generation |
+| Admin Panel | http://localhost:3001/admin | Admin dashboard (requires admin role) |
 
-```yaml
-services:
-  postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: poster_app
-      POSTGRES_PASSWORD: dev_password
-      POSTGRES_DB: poster_app_dev
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+## Environment Variables
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-
-volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
-```
-
-### Docker Commands
+The `.env` file in the project root contains all configuration. Key variables:
 
 ```bash
+# Database
+DATABASE_URL=postgresql://poster_app:dev_password@localhost:5433/poster_app_dev
+
+# Redis
+REDIS_URL=redis://localhost:6380
+
+# Authentication
+BETTER_AUTH_SECRET=dev-secret-change-in-production
+
+# Storage (MinIO)
+R2_ENDPOINT=http://localhost:9000
+R2_ACCESS_KEY=minioadmin
+R2_SECRET_KEY=minioadmin
+R2_BUCKET=poster-app-dev
+
+# Frontend
+VITE_API_URL=http://localhost:3000
+```
+
+## Useful Commands
+
+### Development
+```bash
+# Start all services
+bun run dev
+
+# Start only API
+cd packages/api && bun run dev
+
+# Start only Web
+cd packages/web && bun run dev
+```
+
+### Database
+```bash
+cd packages/api
+
+# Push schema changes to database
+DATABASE_URL="postgresql://poster_app:dev_password@localhost:5433/poster_app_dev" bunx drizzle-kit push --force
+
+# Generate migrations
+bun run db:generate
+
+# Open Drizzle Studio (database explorer)
+bun run db:studio
+
+# Seed database with sample data
+bun run seed
+```
+
+### Docker
+```bash
+cd docker
+
 # Start services
 docker compose up -d
 
@@ -224,155 +138,123 @@ docker compose down
 # View logs
 docker compose logs -f
 
-# View logs for specific service
-docker compose logs -f postgres
+# Check service status
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep poster-app
 
-# Restart a specific service
-docker compose restart redis
-
-# Remove volumes (reset data)
+# Reset volumes (delete all data)
 docker compose down -v
 ```
 
----
+### Type Checking & Build
+```bash
+# Type check all packages
+bun run typecheck
 
-## Development Commands
+# Build all packages
+bun run build
 
-### Root Level (Turborepo)
+# Clean build artifacts
+bun run clean
+```
 
-| Command | Description |
-|---------|-------------|
-| `bun install` | Install all dependencies |
-| `bun run dev` | Start all services (API + Web) |
-| `bun run build` | Build all packages |
-| `bun run lint` | Lint all packages |
-| `bun run typecheck` | TypeScript check all packages |
-| `bun run test` | Run tests across all packages |
+## Sample Data
 
-### API Server (packages/api)
+After running `bun run seed`, the database contains:
 
-| Command | Description |
-|---------|-------------|
-| `bun run dev` | Start API server (port 3000) |
-| `bun run db:generate` | Generate migrations from schema |
-| `bun run db:migrate` | Run pending migrations |
-| `bun run db:studio` | Open Drizzle Studio (database GUI) |
-| `bun run db:seed` | Seed database with sample data |
-| `bun run test` | Run API tests |
+- **12 Products** across various styles:
+  - Abstract: Cosmic Harmony, Golden Flow
+  - Nature: Serene Waves, Mountain Majesty, Forest Whispers, Desert Bloom
+  - Botanical: Monstera Dreams, Eucalyptus Study
+  - Geometric: Circle of Zen, Linear Horizons
+  - Typography: Stay Curious, Dream Big
 
-### Web App (packages/web)
+- **48 Variants** (4 sizes per product):
+  - Small (8x10")
+  - Medium (12x16")
+  - Large (18x24")
+  - Extra Large (24x36")
 
-| Command | Description |
-|---------|-------------|
-| `bun run dev` | Start TanStack Start (port 3001) |
-| `bun run build` | Production build |
-| `bun run start` | Start production server |
-| `bun run lint` | Run ESLint |
-
----
-
-## Service Endpoints
-
-### Development URLs
-
-| Service | URL | Description |
-|---------|-----|-------------|
-| **Web App** | http://localhost:3001 | Frontend application |
-| **API Server** | http://localhost:3000 | Backend API |
-| **API Docs** | http://localhost:3000/docs | Swagger/OpenAPI documentation |
-| **MinIO Console** | http://localhost:9001 | Object storage admin UI |
-| **Drizzle Studio** | http://localhost:4983 | Database GUI (run `bun run db:studio`) |
-
-### Default Credentials
-
-| Service | Username | Password |
-|---------|----------|----------|
-| PostgreSQL | poster_app | dev_password |
-| MinIO | minioadmin | minioadmin |
-
----
+- **8 Frames**:
+  - None, Black, White, Wood, Walnut, Oak, Gold, Silver
 
 ## Troubleshooting
 
 ### Port Conflicts
 
-If you see port conflicts, check which services are using the ports:
+If ports 5432 or 6379 are already in use by other projects, the docker-compose.yml uses alternate ports:
+- PostgreSQL: 5433 (instead of 5432)
+- Redis: 6380 (instead of 6379)
 
-```bash
-# Check what's using a specific port
-lsof -i :5432  # PostgreSQL
-lsof -i :6379  # Redis
-lsof -i :3000  # API
-lsof -i :3001  # Web
-```
-
-To resolve, either stop the conflicting service or modify the port in `.env`.
-
-### Docker Issues
-
-```bash
-# Reset Docker services (removes all data)
-docker compose down -v
-docker compose up -d
-
-# Rebuild containers
-docker compose up -d --build
-
-# Check container health
-docker compose ps
-```
+Make sure your `.env` file reflects these ports.
 
 ### Database Connection Issues
 
-1. Verify PostgreSQL is running:
+1. Verify Docker containers are running:
    ```bash
-   docker compose ps postgres
+   docker ps | grep poster-app
    ```
 
-2. Check the connection string in `.env`:
+2. Test database connection:
    ```bash
-   DATABASE_URL=postgresql://poster_app:dev_password@localhost:5432/poster_app_dev
+   docker exec -it poster-app-postgres psql -U poster_app -d poster_app_dev -c "SELECT 1"
    ```
-
-3. Test connection:
-   ```bash
-   docker compose exec postgres psql -U poster_app -d poster_app_dev -c "SELECT 1"
-   ```
-
-### Bun/Node Module Issues
-
-```bash
-# Clear Bun cache and reinstall
-rm -rf node_modules
-rm bun.lockb
-bun install
-```
 
 ### Redis Connection Issues
 
-1. Verify Redis is running:
+Redis is optional in development. The API will gracefully handle missing Redis connections.
+
+### Frontend Not Loading
+
+1. Check if API is running: http://localhost:3000/api/health
+2. Verify VITE_API_URL in `.env` matches API port
+3. Check browser console for errors
+
+## Project Structure
+
+```
+masonart/
+├── docker/
+│   └── docker-compose.yml    # Docker services config
+├── docs/
+│   ├── DEV_ENVIRONMENT.md    # This file
+│   ├── Requirement.md        # Product requirements
+│   └── poster-app-tech-stack.md  # Tech stack details
+├── packages/
+│   ├── api/                  # Hono API server
+│   │   ├── src/
+│   │   │   ├── auth/         # Better Auth config
+│   │   │   ├── database/     # Drizzle schema & seed
+│   │   │   ├── lib/          # Utilities (redis, storage)
+│   │   │   ├── middleware/   # Auth middleware
+│   │   │   ├── queues/       # BullMQ workers
+│   │   │   └── routes/       # API routes
+│   │   └── drizzle.config.ts
+│   ├── shared/               # Shared types & schemas
+│   │   └── src/
+│   │       ├── constants/    # Business constants
+│   │       ├── schemas/      # Zod schemas
+│   │       └── types/        # TypeScript types
+│   └── web/                  # TanStack Start frontend
+│       └── app/
+│           ├── components/   # React components
+│           ├── hooks/        # Custom hooks
+│           ├── lib/          # API client, utilities
+│           ├── routes/       # File-based routing
+│           └── stores/       # Zustand stores
+├── .env                      # Environment variables
+├── .env.example              # Environment template
+├── package.json              # Root workspace config
+└── turbo.json                # Turborepo config
+```
+
+## Creating an Admin User
+
+To access the admin panel, you need to create an admin user:
+
+1. Register a new user at http://localhost:3001/auth/register
+2. Update the user role in the database:
    ```bash
-   docker compose ps redis
+   docker exec -it poster-app-postgres psql -U poster_app -d poster_app_dev -c \
+     "UPDATE \"user\" SET role = 'admin' WHERE email = 'your-email@example.com'"
    ```
-
-2. Test connection:
-   ```bash
-   docker compose exec redis redis-cli ping
-   # Expected: PONG
-   ```
-
----
-
-## Next Steps
-
-Once your development environment is running:
-
-1. **Explore the API** - Visit http://localhost:3000/docs for API documentation
-2. **View the Web App** - Open http://localhost:3001 in your browser
-3. **Check the Database** - Run `bun run db:studio` to explore the schema
-4. **Run Tests** - Execute `bun run test` to verify everything works
-
-For more information, see:
-- [Technical Stack Document](./poster-app-tech-stack.md)
-- [API Documentation](./API.md)
-- [Deployment Guide](./DEPLOYMENT.md)
+3. Log in and access http://localhost:3001/admin
