@@ -1,0 +1,38 @@
+# robots.txt for MasonArt.com
+# Poster & Frame E-Commerce Platform
+
+# Allow all search engines
+User-agent: *
+
+# Allow crawling of public pages
+Allow: /
+Allow: /posters
+Allow: /posters/
+Allow: /create
+Allow: /gallery
+
+# Disallow private/sensitive areas
+Disallow: /admin
+Disallow: /admin/
+Disallow: /account
+Disallow: /account/
+Disallow: /cart
+Disallow: /cart/
+Disallow: /checkout
+Disallow: /checkout/
+Disallow: /auth
+Disallow: /auth/
+Disallow: /api
+Disallow: /api/
+
+# Disallow search result pages with filters (prevent duplicate content)
+Disallow: /*?page=
+Disallow: /*?sort=
+Disallow: /*&page=
+Disallow: /*&sort=
+
+# Crawl-delay for politeness (optional, in seconds)
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://masonart.com/sitemap.xml

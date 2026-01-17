@@ -1,319 +1,520 @@
 /**
  * Frame Constants for MasonArt Platform
  *
- * Frame types, materials, and pricing information
- * Used for frame selection and price calculations
+ * Defines all frame options, mat options, and glass options
+ * with their pricing based on the requirements specification (Section 5).
  */
 
-export interface FrameMaterial {
-  id: string;
-  name: string;
-  description: string;
-  priceModifier: number; // Multiplier for base price (e.g., 1.20 = 20% markup)
-  isPopular: boolean;
-  displayOrder: number;
-}
+import type {
+  FrameOption,
+  FrameType,
+  MatOptionConfig,
+  MatOption,
+  GlassOptionConfig,
+  GlassOption,
+  PriceModifier,
+} from '../types/product';
 
-export interface FrameType {
-  id: string;
-  name: string;
-  type: string; // Kebab-case identifier
-  description: string;
-  materials: readonly string[]; // Material IDs
-  imageUrl: string;
-  isActive: boolean;
-  displayOrder: number;
-}
-
-export interface FrameFinish {
-  id: string;
-  name: string;
-  description: string;
-  additionalCost: number; // Fixed cost in currency units
-}
+// ============================================================================
+// Price Modifier Helpers
+// ============================================================================
 
 /**
- * Frame materials with pricing modifiers
+ * Creates a percentage-based price modifier
  */
-export const FRAME_MATERIALS: readonly FrameMaterial[] = [
-  {
-    id: 'wood-oak',
-    name: 'Oak Wood',
-    description: 'Natural oak wood with visible grain patterns',
-    priceModifier: 1.4, // 40% markup
-    isPopular: true,
-    displayOrder: 1,
-  },
-  {
-    id: 'wood-walnut',
-    name: 'Walnut Wood',
-    description: 'Rich dark walnut wood with elegant finish',
-    priceModifier: 1.6, // 60% markup
-    isPopular: true,
-    displayOrder: 2,
-  },
-  {
-    id: 'wood-maple',
-    name: 'Maple Wood',
-    description: 'Light maple wood with smooth texture',
-    priceModifier: 1.5, // 50% markup
-    isPopular: false,
-    displayOrder: 3,
-  },
-  {
-    id: 'wood-bamboo',
-    name: 'Bamboo',
-    description: 'Sustainable bamboo with natural texture',
-    priceModifier: 1.3, // 30% markup
-    isPopular: false,
-    displayOrder: 4,
-  },
-  {
-    id: 'metal-aluminum',
-    name: 'Aluminum',
-    description: 'Sleek aluminum frame in various colors',
-    priceModifier: 1.35, // 35% markup
-    isPopular: true,
-    displayOrder: 5,
-  },
-  {
-    id: 'metal-brass',
-    name: 'Brass',
-    description: 'Premium brass frame with vintage appeal',
-    priceModifier: 1.8, // 80% markup
-    isPopular: false,
-    displayOrder: 6,
-  },
-  {
-    id: 'metal-steel',
-    name: 'Steel',
-    description: 'Industrial steel frame with modern look',
-    priceModifier: 1.4, // 40% markup
-    isPopular: false,
-    displayOrder: 7,
-  },
-  {
-    id: 'composite-mdf',
-    name: 'MDF',
-    description: 'Durable MDF composite with painted finish',
-    priceModifier: 1.2, // 20% markup
-    isPopular: true,
-    displayOrder: 8,
-  },
-  {
-    id: 'acrylic-clear',
-    name: 'Clear Acrylic',
-    description: 'Modern frameless acrylic with edge polish',
-    priceModifier: 1.5, // 50% markup
-    isPopular: true,
-    displayOrder: 9,
-  },
+const percentageModifier = (percentage: number): PriceModifier => ({
+  type: 'percentage',
+  value: percentage,
+});
+
+/**
+ * Creates a fixed-price modifier in INR (stored in paise)
+ */
+const fixedModifierINR = (amountInRupees: number): PriceModifier => ({
+  type: 'fixed',
+  value: amountInRupees * 100, // Convert to paise
+  currency: 'INR',
+});
+
+/**
+ * Base modifier (no additional cost)
+ */
+const baseModifier = (): PriceModifier => ({
+  type: 'percentage',
+  value: 0,
+});
+
+// ============================================================================
+// Frame Options
+// ============================================================================
+
+/**
+ * Poster only option (rolled in protective tube)
+ */
+export const POSTER_ONLY_FRAME: FrameOption = {
+  id: 'frame-poster-only',
+  type: 'poster-only',
+  name: 'Poster Only (Rolled)',
+  description: 'Shipped in a protective tube, ready to be framed by you',
+  priceModifier: baseModifier(),
+  material: 'Premium poster paper',
+  isAvailable: true,
+};
+
+/**
+ * Stretched canvas (frameless, gallery-wrapped)
+ */
+export const STRETCHED_CANVAS_FRAME: FrameOption = {
+  id: 'frame-stretched-canvas',
+  type: 'stretched-canvas',
+  name: 'Stretched Canvas',
+  description: 'Gallery-wrapped canvas, ready to hang with no frame needed',
+  priceModifier: percentageModifier(30),
+  material: 'Premium canvas with wooden stretcher bars',
+  isAvailable: true,
+};
+
+/**
+ * Black frame option
+ */
+export const BLACK_FRAME: FrameOption = {
+  id: 'frame-black',
+  type: 'black-frame',
+  name: 'Black Frame',
+  description: 'Classic matte black frame, timeless and versatile',
+  priceModifier: percentageModifier(40),
+  availableColors: ['matte-black'],
+  material: 'Solid wood with matte finish',
+  isAvailable: true,
+};
+
+/**
+ * White frame option
+ */
+export const WHITE_FRAME: FrameOption = {
+  id: 'frame-white',
+  type: 'white-frame',
+  name: 'White Frame',
+  description: 'Clean modern white frame, perfect for contemporary spaces',
+  priceModifier: percentageModifier(40),
+  availableColors: ['pure-white', 'off-white'],
+  material: 'Solid wood with satin finish',
+  isAvailable: true,
+};
+
+/**
+ * Natural wood frame option
+ */
+export const NATURAL_WOOD_FRAME: FrameOption = {
+  id: 'frame-natural-wood',
+  type: 'natural-wood-frame',
+  name: 'Natural Wood Frame',
+  description: 'Light oak finish, brings warmth and natural beauty',
+  priceModifier: percentageModifier(45),
+  availableColors: ['light-oak', 'honey-oak'],
+  material: 'Natural oak wood with protective sealant',
+  isAvailable: true,
+};
+
+/**
+ * Dark wood frame option
+ */
+export const DARK_WOOD_FRAME: FrameOption = {
+  id: 'frame-dark-wood',
+  type: 'dark-wood-frame',
+  name: 'Dark Wood Frame',
+  description: 'Rich walnut/espresso finish, elegant and sophisticated',
+  priceModifier: percentageModifier(45),
+  availableColors: ['walnut', 'espresso', 'mahogany'],
+  material: 'Premium hardwood with rich stain finish',
+  isAvailable: true,
+};
+
+/**
+ * Gold frame option
+ */
+export const GOLD_FRAME: FrameOption = {
+  id: 'frame-gold',
+  type: 'gold-frame',
+  name: 'Gold Frame',
+  description: 'Brushed gold metallic finish, luxurious and eye-catching',
+  priceModifier: percentageModifier(50),
+  availableColors: ['brushed-gold', 'antique-gold'],
+  material: 'Aluminum with premium gold finish',
+  isAvailable: true,
+};
+
+/**
+ * Silver frame option
+ */
+export const SILVER_FRAME: FrameOption = {
+  id: 'frame-silver',
+  type: 'silver-frame',
+  name: 'Silver Frame',
+  description: 'Brushed silver metallic finish, sleek and modern',
+  priceModifier: percentageModifier(50),
+  availableColors: ['brushed-silver', 'chrome'],
+  material: 'Aluminum with premium silver finish',
+  isAvailable: true,
+};
+
+/**
+ * Floating frame option
+ */
+export const FLOATING_FRAME: FrameOption = {
+  id: 'frame-floating',
+  type: 'floating-frame',
+  name: 'Floating Frame',
+  description: 'Modern floating effect with visible gap around artwork',
+  priceModifier: percentageModifier(55),
+  availableColors: ['black', 'white', 'natural-wood'],
+  material: 'Premium wood with shadow box design',
+  isAvailable: true,
+};
+
+/**
+ * All frame options
+ */
+export const ALL_FRAME_OPTIONS: readonly FrameOption[] = [
+  POSTER_ONLY_FRAME,
+  STRETCHED_CANVAS_FRAME,
+  BLACK_FRAME,
+  WHITE_FRAME,
+  NATURAL_WOOD_FRAME,
+  DARK_WOOD_FRAME,
+  GOLD_FRAME,
+  SILVER_FRAME,
+  FLOATING_FRAME,
 ] as const;
 
 /**
- * Frame types with descriptions
+ * Frame options that are actual frames (not poster-only or canvas)
  */
-export const FRAME_TYPES: readonly FrameType[] = [
-  {
-    id: 'frame-classic',
-    name: 'Classic Frame',
-    type: 'classic',
-    description: 'Traditional frame with 1-2 inch border',
-    materials: ['wood-oak', 'wood-walnut', 'wood-maple'],
-    imageUrl: 'https://cdn.masonart.com/frames/classic.jpg',
-    isActive: true,
-    displayOrder: 1,
-  },
-  {
-    id: 'frame-modern',
-    name: 'Modern Frame',
-    type: 'modern',
-    description: 'Sleek contemporary frame with minimal profile',
-    materials: ['metal-aluminum', 'metal-steel', 'composite-mdf'],
-    imageUrl: 'https://cdn.masonart.com/frames/modern.jpg',
-    isActive: true,
-    displayOrder: 2,
-  },
-  {
-    id: 'frame-rustic',
-    name: 'Rustic Frame',
-    type: 'rustic',
-    description: 'Distressed wood frame with vintage character',
-    materials: ['wood-oak', 'wood-walnut', 'wood-bamboo'],
-    imageUrl: 'https://cdn.masonart.com/frames/rustic.jpg',
-    isActive: true,
-    displayOrder: 3,
-  },
-  {
-    id: 'frame-floating',
-    name: 'Floating Frame',
-    type: 'floating',
-    description: 'Creates illusion of artwork floating in the frame',
-    materials: ['wood-oak', 'wood-walnut', 'metal-aluminum'],
-    imageUrl: 'https://cdn.masonart.com/frames/floating.jpg',
-    isActive: true,
-    displayOrder: 4,
-  },
-  {
-    id: 'frame-gallery',
-    name: 'Gallery Frame',
-    type: 'gallery',
-    description: 'Museum-quality frame with wide mat border',
-    materials: ['wood-oak', 'wood-walnut', 'wood-maple', 'metal-brass'],
-    imageUrl: 'https://cdn.masonart.com/frames/gallery.jpg',
-    isActive: true,
-    displayOrder: 5,
-  },
-  {
-    id: 'frame-shadow-box',
-    name: 'Shadow Box',
-    type: 'shadow-box',
-    description: 'Deep frame creating 3D shadow effect',
-    materials: ['wood-oak', 'wood-walnut', 'composite-mdf'],
-    imageUrl: 'https://cdn.masonart.com/frames/shadow-box.jpg',
-    isActive: true,
-    displayOrder: 6,
-  },
-  {
-    id: 'frame-acrylic',
-    name: 'Acrylic Frame',
-    type: 'acrylic',
-    description: 'Frameless modern acrylic display',
-    materials: ['acrylic-clear'],
-    imageUrl: 'https://cdn.masonart.com/frames/acrylic.jpg',
-    isActive: true,
-    displayOrder: 7,
-  },
-  {
-    id: 'frame-ornate',
-    name: 'Ornate Frame',
-    type: 'ornate',
-    description: 'Decorative frame with detailed molding',
-    materials: ['wood-walnut', 'metal-brass'],
-    imageUrl: 'https://cdn.masonart.com/frames/ornate.jpg',
-    isActive: true,
-    displayOrder: 8,
-  },
+export const ACTUAL_FRAME_OPTIONS: readonly FrameOption[] = ALL_FRAME_OPTIONS.filter(
+  (frame) => frame.type !== 'poster-only' && frame.type !== 'stretched-canvas'
+);
+
+// ============================================================================
+// Mat/Mount Options
+// ============================================================================
+
+/**
+ * No mat option
+ */
+export const NO_MAT: MatOptionConfig = {
+  id: 'mat-none',
+  type: 'no-mat',
+  name: 'No Mat',
+  description: 'Frame edge to edge, no matting',
+  borderWidth: 0,
+  priceModifier: baseModifier(),
+  isAvailable: true,
+};
+
+/**
+ * White mat option
+ */
+export const WHITE_MAT: MatOptionConfig = {
+  id: 'mat-white',
+  type: 'white-mat',
+  name: 'White Mat',
+  description: '2" white border, classic and clean',
+  borderWidth: 2,
+  priceModifier: fixedModifierINR(500),
+  isAvailable: true,
+};
+
+/**
+ * Off-white/cream mat option
+ */
+export const OFF_WHITE_MAT: MatOptionConfig = {
+  id: 'mat-off-white',
+  type: 'off-white-mat',
+  name: 'Off-White Mat',
+  description: '2" cream border, warm and elegant',
+  borderWidth: 2,
+  priceModifier: fixedModifierINR(500),
+  isAvailable: true,
+};
+
+/**
+ * Black mat option
+ */
+export const BLACK_MAT: MatOptionConfig = {
+  id: 'mat-black',
+  type: 'black-mat',
+  name: 'Black Mat',
+  description: '2" black border, dramatic and sophisticated',
+  borderWidth: 2,
+  priceModifier: fixedModifierINR(500),
+  isAvailable: true,
+};
+
+/**
+ * Double mat option
+ */
+export const DOUBLE_MAT: MatOptionConfig = {
+  id: 'mat-double',
+  type: 'double-mat',
+  name: 'Double Mat',
+  description: 'Two-layer mat effect, adds depth and dimension',
+  borderWidth: 2.5,
+  priceModifier: fixedModifierINR(800),
+  isAvailable: true,
+};
+
+/**
+ * All mat options
+ */
+export const ALL_MAT_OPTIONS: readonly MatOptionConfig[] = [
+  NO_MAT,
+  WHITE_MAT,
+  OFF_WHITE_MAT,
+  BLACK_MAT,
+  DOUBLE_MAT,
 ] as const;
 
 /**
- * Frame finishes and treatments
+ * Mat options that add a mat (excluding no-mat)
  */
-export const FRAME_FINISHES: readonly FrameFinish[] = [
-  {
-    id: 'finish-natural',
-    name: 'Natural',
-    description: 'Natural wood finish with protective coating',
-    additionalCost: 0,
-  },
-  {
-    id: 'finish-stained',
-    name: 'Stained',
-    description: 'Custom stained finish in various colors',
-    additionalCost: 15,
-  },
-  {
-    id: 'finish-painted-white',
-    name: 'Painted White',
-    description: 'Clean white painted finish',
-    additionalCost: 10,
-  },
-  {
-    id: 'finish-painted-black',
-    name: 'Painted Black',
-    description: 'Classic black painted finish',
-    additionalCost: 10,
-  },
-  {
-    id: 'finish-distressed',
-    name: 'Distressed',
-    description: 'Weathered distressed finish for vintage look',
-    additionalCost: 20,
-  },
-  {
-    id: 'finish-metallic',
-    name: 'Metallic',
-    description: 'Metallic paint finish (gold, silver, bronze)',
-    additionalCost: 25,
-  },
+export const ACTUAL_MAT_OPTIONS: readonly MatOptionConfig[] = ALL_MAT_OPTIONS.filter(
+  (mat) => mat.type !== 'no-mat'
+);
+
+// ============================================================================
+// Glass/Acrylic Options
+// ============================================================================
+
+/**
+ * Standard glass option
+ */
+export const STANDARD_GLASS: GlassOptionConfig = {
+  id: 'glass-standard',
+  type: 'standard-glass',
+  name: 'Standard Glass',
+  description: 'Regular picture glass, clear and protective',
+  priceModifier: baseModifier(),
+  hasUVProtection: false,
+  isAntiReflective: false,
+  isAvailable: true,
+};
+
+/**
+ * Non-glare glass option
+ */
+export const NON_GLARE_GLASS: GlassOptionConfig = {
+  id: 'glass-non-glare',
+  type: 'non-glare-glass',
+  name: 'Non-Glare Glass',
+  description: 'Reduced reflections for better visibility in bright spaces',
+  priceModifier: fixedModifierINR(400),
+  hasUVProtection: false,
+  isAntiReflective: true,
+  isAvailable: true,
+};
+
+/**
+ * Acrylic/Plexiglass option
+ */
+export const ACRYLIC_GLASS: GlassOptionConfig = {
+  id: 'glass-acrylic',
+  type: 'acrylic',
+  name: 'Acrylic/Plexiglass',
+  description: 'Shatter-resistant and lightweight, ideal for large pieces',
+  priceModifier: fixedModifierINR(600),
+  hasUVProtection: true,
+  isAntiReflective: false,
+  isAvailable: true,
+};
+
+/**
+ * Museum glass option
+ */
+export const MUSEUM_GLASS: GlassOptionConfig = {
+  id: 'glass-museum',
+  type: 'museum-glass',
+  name: 'Museum Glass',
+  description: 'Premium UV protection and anti-reflective coating',
+  priceModifier: fixedModifierINR(1200),
+  hasUVProtection: true,
+  isAntiReflective: true,
+  isAvailable: true,
+};
+
+/**
+ * All glass options
+ */
+export const ALL_GLASS_OPTIONS: readonly GlassOptionConfig[] = [
+  STANDARD_GLASS,
+  NON_GLARE_GLASS,
+  ACRYLIC_GLASS,
+  MUSEUM_GLASS,
 ] as const;
 
-/**
- * Helper function to get frame material by ID
- */
-export function getFrameMaterialById(id: string): FrameMaterial | undefined {
-  return FRAME_MATERIALS.find((material) => material.id === id);
-}
+// ============================================================================
+// Lookup Maps
+// ============================================================================
 
 /**
- * Helper function to get frame type by ID
+ * Map of frame option IDs to FrameOption objects
  */
-export function getFrameTypeById(id: string): FrameType | undefined {
-  return FRAME_TYPES.find((frame) => frame.id === id);
-}
+export const FRAME_BY_ID: ReadonlyMap<string, FrameOption> = new Map(
+  ALL_FRAME_OPTIONS.map((frame) => [frame.id, frame])
+);
 
 /**
- * Helper function to get frame finish by ID
+ * Map of frame types to FrameOption objects
  */
-export function getFrameFinishById(id: string): FrameFinish | undefined {
-  return FRAME_FINISHES.find((finish) => finish.id === id);
-}
+export const FRAME_BY_TYPE: ReadonlyMap<FrameType, FrameOption> = new Map(
+  ALL_FRAME_OPTIONS.map((frame) => [frame.type, frame])
+);
 
 /**
- * Helper function to get popular frame materials
+ * Map of mat option IDs to MatOptionConfig objects
  */
-export function getPopularFrameMaterials(): readonly FrameMaterial[] {
-  return FRAME_MATERIALS.filter((material) => material.isPopular);
-}
+export const MAT_BY_ID: ReadonlyMap<string, MatOptionConfig> = new Map(
+  ALL_MAT_OPTIONS.map((mat) => [mat.id, mat])
+);
 
 /**
- * Helper function to get active frame types
+ * Map of mat types to MatOptionConfig objects
  */
-export function getActiveFrameTypes(): readonly FrameType[] {
-  return FRAME_TYPES.filter((frame) => frame.isActive);
-}
+export const MAT_BY_TYPE: ReadonlyMap<MatOption, MatOptionConfig> = new Map(
+  ALL_MAT_OPTIONS.map((mat) => [mat.type, mat])
+);
 
 /**
- * Helper function to get materials for a specific frame type
+ * Map of glass option IDs to GlassOptionConfig objects
  */
-export function getMaterialsForFrameType(frameTypeId: string): readonly FrameMaterial[] {
-  const frameType = getFrameTypeById(frameTypeId);
-  if (!frameType) return [];
-
-  return FRAME_MATERIALS.filter((material) =>
-    frameType.materials.includes(material.id)
-  );
-}
+export const GLASS_BY_ID: ReadonlyMap<string, GlassOptionConfig> = new Map(
+  ALL_GLASS_OPTIONS.map((glass) => [glass.id, glass])
+);
 
 /**
- * Helper function to calculate frame price
+ * Map of glass types to GlassOptionConfig objects
  */
-export function calculateFramePrice(
-  basePrice: number,
-  materialId: string,
-  finishId?: string
-): number {
-  const material = getFrameMaterialById(materialId);
-  if (!material) return basePrice;
+export const GLASS_BY_TYPE: ReadonlyMap<GlassOption, GlassOptionConfig> = new Map(
+  ALL_GLASS_OPTIONS.map((glass) => [glass.type, glass])
+);
 
-  let price = basePrice * material.priceModifier;
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
-  if (finishId) {
-    const finish = getFrameFinishById(finishId);
-    if (finish) {
-      price += finish.additionalCost;
-    }
+/**
+ * Get a frame option by ID
+ */
+export const getFrameById = (id: string): FrameOption | undefined => {
+  return FRAME_BY_ID.get(id);
+};
+
+/**
+ * Get a frame option by type
+ */
+export const getFrameByType = (type: FrameType): FrameOption | undefined => {
+  return FRAME_BY_TYPE.get(type);
+};
+
+/**
+ * Get a mat option by ID
+ */
+export const getMatById = (id: string): MatOptionConfig | undefined => {
+  return MAT_BY_ID.get(id);
+};
+
+/**
+ * Get a mat option by type
+ */
+export const getMatByType = (type: MatOption): MatOptionConfig | undefined => {
+  return MAT_BY_TYPE.get(type);
+};
+
+/**
+ * Get a glass option by ID
+ */
+export const getGlassById = (id: string): GlassOptionConfig | undefined => {
+  return GLASS_BY_ID.get(id);
+};
+
+/**
+ * Get a glass option by type
+ */
+export const getGlassByType = (type: GlassOption): GlassOptionConfig | undefined => {
+  return GLASS_BY_TYPE.get(type);
+};
+
+/**
+ * Check if a frame option requires glass
+ */
+export const frameRequiresGlass = (frame: FrameOption): boolean => {
+  // Poster only and stretched canvas don't use glass
+  return frame.type !== 'poster-only' && frame.type !== 'stretched-canvas';
+};
+
+/**
+ * Check if a frame option can have a mat
+ */
+export const frameCanHaveMat = (frame: FrameOption): boolean => {
+  // Only actual frames can have mats, not poster-only or stretched canvas
+  return frame.type !== 'poster-only' && frame.type !== 'stretched-canvas';
+};
+
+/**
+ * Get available glass options for a frame type
+ */
+export const getGlassOptionsForFrame = (frame: FrameOption): readonly GlassOptionConfig[] => {
+  if (!frameRequiresGlass(frame)) {
+    return [];
   }
-
-  return Math.round(price * 100) / 100; // Round to 2 decimal places
-}
+  return ALL_GLASS_OPTIONS;
+};
 
 /**
- * Frame pricing constraints
+ * Get available mat options for a frame type
  */
-export const FRAME_CONSTRAINTS = {
-  MIN_PRICE_MODIFIER: 1.0,
-  MAX_PRICE_MODIFIER: 3.0,
-  MIN_ADDITIONAL_COST: 0,
-  MAX_ADDITIONAL_COST: 100,
+export const getMatOptionsForFrame = (frame: FrameOption): readonly MatOptionConfig[] => {
+  if (!frameCanHaveMat(frame)) {
+    return [];
+  }
+  return ALL_MAT_OPTIONS;
+};
+
+// ============================================================================
+// Default Values
+// ============================================================================
+
+/**
+ * Default frame option (poster only)
+ */
+export const DEFAULT_FRAME = POSTER_ONLY_FRAME;
+
+/**
+ * Default mat option (no mat)
+ */
+export const DEFAULT_MAT = NO_MAT;
+
+/**
+ * Default glass option (standard glass)
+ */
+export const DEFAULT_GLASS = STANDARD_GLASS;
+
+// ============================================================================
+// Gift Wrap Option
+// ============================================================================
+
+/**
+ * Gift wrap price in INR (stored in paise)
+ */
+export const GIFT_WRAP_PRICE_INR = 25000; // 250 rupees in paise
+
+/**
+ * Gift wrap option configuration
+ */
+export const GIFT_WRAP_CONFIG = {
+  id: 'gift-wrap',
+  name: 'Gift Wrapping',
+  description: 'Premium gift wrapping with ribbon and personalized message card',
+  price: GIFT_WRAP_PRICE_INR,
+  currency: 'INR',
+  isAvailable: true,
 } as const;

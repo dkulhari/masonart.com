@@ -1,407 +1,594 @@
 /**
  * Products API Routes
  *
- * RESTful API endpoints for product management:
- * - GET /api/products - List products with filtering, sorting, and pagination
- * - GET /api/products/:id - Get a single product by ID
- * - POST /api/products - Create a new product (admin only)
- * - PUT /api/products/:id - Update a product (admin only)
- * - DELETE /api/products/:id - Delete a product (admin only)
- * - GET /api/products/:id/variants - Get product variants
+ * Provides public API endpoints for product catalog:
+ * - GET /api/products - List products with filters and pagination
+ * - GET /api/products/search - Search products by query
+ * - GET /api/products/featured - Get featured products
+ * - GET /api/products/:slug - Get product by slug
+ *
+ * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { Hono } from 'hono';
-import { createDatabase } from '../db/index';
-import { products, productVariants, frames } from '../db/schema';
-import { eq, and, or, ilike, sql, desc, asc, SQL } from 'drizzle-orm';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { eq, and, or, ilike, desc, asc, sql, inArray } from "drizzle-orm";
 
-const app = new Hono();
-const { db } = createDatabase();
+import { db } from "../database";
+import { products, productVariants, frames } from "../database/schema/products";
+import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
+import { getCached, setCached, CacheKeys } from "../lib/redis";
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_PAGE_SIZE = 24;
+const MAX_PAGE_SIZE = 100;
+const CACHE_TTL_PRODUCTS = 300; // 5 minutes
+const CACHE_TTL_PRODUCT_DETAIL = 600; // 10 minutes
+const CACHE_TTL_FEATURED = 900; // 15 minutes
+
+// ============================================================================
+// Validation Schemas
+// ============================================================================
 
 /**
- * GET /api/products
- * List products with filtering, sorting, and pagination
- *
- * Query Parameters:
- * - status: Filter by status (draft, active, archived)
- * - orientation: Filter by orientation (square, portrait, landscape, panoramic, round)
- * - style: Filter by style (comma-separated)
- * - subject: Filter by subject (comma-separated)
- * - color: Filter by color (comma-separated)
- * - search: Search in title and description
- * - minPrice: Minimum price filter
- * - maxPrice: Maximum price filter
- * - sort: Sort field (price, createdAt, title, featuredOrder)
- * - order: Sort order (asc, desc)
- * - page: Page number (default: 1)
- * - limit: Items per page (default: 20, max: 100)
+ * Query parameters for product listing
  */
-app.get('/', async (c) => {
-  try {
-    const query = c.req.query();
+const listProductsQuerySchema = z.object({
+  // Pagination
+  page: z.coerce.number().int().positive().optional().default(1),
+  pageSize: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional().default(DEFAULT_PAGE_SIZE),
 
-    // Parse query parameters
-    const status = query.status as 'draft' | 'active' | 'archived' | undefined;
-    const orientation = query.orientation as 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round' | undefined;
-    const styles = query.style ? query.style.split(',') : undefined;
-    const subjects = query.subject ? query.subject.split(',') : undefined;
-    const colors = query.color ? query.color.split(',') : undefined;
-    const search = query.search;
-    const minPrice = query.minPrice ? parseFloat(query.minPrice) : undefined;
-    const maxPrice = query.maxPrice ? parseFloat(query.maxPrice) : undefined;
-    const sortField = query.sort || 'createdAt';
-    const sortOrder = query.order || 'desc';
-    const page = parseInt(query.page || '1', 10);
-    const limit = Math.min(parseInt(query.limit || '20', 10), 100);
-    const offset = (page - 1) * limit;
+  // Filters
+  styles: z.string().optional(), // comma-separated list
+  subjects: z.string().optional(), // comma-separated list
+  colors: z.string().optional(), // comma-separated list
+  rooms: z.string().optional(), // comma-separated list
+  orientation: z.enum(["square", "portrait", "landscape", "panoramic", "round"]).optional(),
+  priceMin: z.coerce.number().nonnegative().optional(),
+  priceMax: z.coerce.number().nonnegative().optional(),
+  isFeatured: z.coerce.boolean().optional(),
+  isAiGenerated: z.coerce.boolean().optional(),
 
-    // Build where conditions
-    const conditions: SQL[] = [];
+  // Sorting
+  sortBy: z.enum(["createdAt", "updatedAt", "title", "basePrice", "featuredOrder"]).optional().default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+});
 
-    if (status) {
-      conditions.push(eq(products.status, status));
+/**
+ * Search query parameters
+ */
+const searchProductsQuerySchema = z.object({
+  q: z.string().min(1).max(200),
+  page: z.coerce.number().int().positive().optional().default(1),
+  pageSize: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional().default(DEFAULT_PAGE_SIZE),
+});
+
+/**
+ * Featured products query parameters
+ */
+const featuredProductsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(50).optional().default(12),
+});
+
+// ============================================================================
+// Route Handler
+// ============================================================================
+
+const productsApp = new Hono<{ Variables: OptionalAuthVariables }>();
+
+// Apply optional auth to all routes
+productsApp.use("*", optionalAuth);
+
+// ============================================================================
+// GET /api/products - List Products
+// ============================================================================
+
+productsApp.get(
+  "/",
+  zValidator("query", listProductsQuerySchema),
+  async (c) => {
+    const query = c.req.valid("query");
+    const {
+      page,
+      pageSize,
+      styles,
+      subjects,
+      colors,
+      rooms,
+      orientation,
+      priceMin,
+      priceMax,
+      isFeatured,
+      isAiGenerated,
+      sortBy,
+      sortOrder,
+    } = query;
+
+    // Build cache key from query params
+    const cacheKey = `${CacheKeys.PRODUCT_LIST}${JSON.stringify(query)}`;
+
+    // Try to get from cache
+    const cached = await getCached<{ items: unknown[]; total: number }>(cacheKey);
+    if (cached) {
+      return c.json({
+        ...cached,
+        page,
+        pageSize,
+        totalPages: Math.ceil(cached.total / pageSize),
+        hasNextPage: page * pageSize < cached.total,
+        hasPreviousPage: page > 1,
+        fromCache: true,
+      });
     }
 
+    // Build where conditions
+    const conditions: ReturnType<typeof eq>[] = [];
+
+    // Only show active products
+    conditions.push(eq(products.status, "active"));
+
+    // Filter by orientation
     if (orientation) {
       conditions.push(eq(products.orientation, orientation));
     }
 
-    if (search) {
-      conditions.push(
-        or(
-          ilike(products.title, `%${search}%`),
-          ilike(products.description, `%${search}%`),
-          ilike(products.sku, `%${search}%`)
-        )!
-      );
+    // Filter by featured status
+    if (isFeatured !== undefined) {
+      conditions.push(eq(products.isFeatured, isFeatured));
     }
 
-    if (minPrice !== undefined) {
-      conditions.push(sql`${products.basePrice}::decimal >= ${minPrice}`);
+    // Filter by AI generated
+    if (isAiGenerated !== undefined) {
+      conditions.push(eq(products.isAiGenerated, isAiGenerated));
     }
 
-    if (maxPrice !== undefined) {
-      conditions.push(sql`${products.basePrice}::decimal <= ${maxPrice}`);
+    // Filter by price range (base price)
+    if (priceMin !== undefined) {
+      conditions.push(sql`${products.basePrice}::numeric >= ${priceMin}`);
+    }
+    if (priceMax !== undefined) {
+      conditions.push(sql`${products.basePrice}::numeric <= ${priceMax}`);
     }
 
-    // Array filters (styles, subjects, colors)
-    if (styles && styles.length > 0) {
-      conditions.push(sql`${products.styles}::jsonb ?| array[${sql.join(styles.map(s => sql`${s}`), sql`, `)}]`);
+    // Filter by array fields (styles, subjects, colors, rooms)
+    // Using array overlap operator
+    if (styles) {
+      const styleList = styles.split(",").map(s => s.trim());
+      conditions.push(sql`${products.styles} && ${styleList}`);
+    }
+    if (subjects) {
+      const subjectList = subjects.split(",").map(s => s.trim());
+      conditions.push(sql`${products.subjects} && ${subjectList}`);
+    }
+    if (colors) {
+      const colorList = colors.split(",").map(s => s.trim());
+      conditions.push(sql`${products.colors} && ${colorList}`);
+    }
+    if (rooms) {
+      const roomList = rooms.split(",").map(s => s.trim());
+      conditions.push(sql`${products.rooms} && ${roomList}`);
     }
 
-    if (subjects && subjects.length > 0) {
-      conditions.push(sql`${products.subjects}::jsonb ?| array[${sql.join(subjects.map(s => sql`${s}`), sql`, `)}]`);
-    }
+    // Build sort order
+    const orderByColumn = {
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      title: products.title,
+      basePrice: products.basePrice,
+      featuredOrder: products.featuredOrder,
+    }[sortBy];
 
-    if (colors && colors.length > 0) {
-      conditions.push(sql`${products.colors}::jsonb ?| array[${sql.join(colors.map(c => sql`${c}`), sql`, `)}]`);
-    }
+    const orderByDirection = sortOrder === "asc" ? asc : desc;
 
-    // Build order by clause
-    let orderBy: SQL;
-    switch (sortField) {
-      case 'price':
-        orderBy = sortOrder === 'asc' ? asc(products.basePrice) : desc(products.basePrice);
-        break;
-      case 'title':
-        orderBy = sortOrder === 'asc' ? asc(products.title) : desc(products.title);
-        break;
-      case 'featuredOrder':
-        orderBy = sortOrder === 'asc' ? asc(products.featuredOrder) : desc(products.featuredOrder);
-        break;
-      case 'createdAt':
-      default:
-        orderBy = sortOrder === 'asc' ? asc(products.createdAt) : desc(products.createdAt);
-        break;
-    }
+    // Calculate offset
+    const offset = (page - 1) * pageSize;
 
-    // Execute query
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const [productsList, countResult] = await Promise.all([
-      db
-        .select()
+    try {
+      // Get total count
+      const countResult = await db
+        .select({ count: sql<number>`count(*)::int` })
         .from(products)
-        .where(whereClause)
-        .orderBy(orderBy)
-        .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`count(*)` })
+        .where(and(...conditions));
+
+      const total = countResult[0]?.count ?? 0;
+
+      // Get products
+      const productList = await db
+        .select({
+          id: products.id,
+          sku: products.sku,
+          title: products.title,
+          slug: products.slug,
+          description: products.description,
+          basePrice: products.basePrice,
+          styles: products.styles,
+          subjects: products.subjects,
+          colors: products.colors,
+          orientation: products.orientation,
+          images: products.images,
+          isFeatured: products.isFeatured,
+          isAiGenerated: products.isAiGenerated,
+          featuredOrder: products.featuredOrder,
+          createdAt: products.createdAt,
+        })
         .from(products)
-        .where(whereClause),
-    ]);
+        .where(and(...conditions))
+        .orderBy(orderByDirection(orderByColumn))
+        .limit(pageSize)
+        .offset(offset);
 
-    const total = Number(countResult[0]?.count || 0);
-    const totalPages = Math.ceil(total / limit);
-
-    return c.json({
-      data: productsList,
-      meta: {
-        page,
-        limit,
+      const result = {
+        items: productList,
         total,
-        totalPages,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+        hasNextPage: page * pageSize < total,
+        hasPreviousPage: page > 1,
+      };
+
+      // Cache the result
+      await setCached(cacheKey, { items: productList, total }, CACHE_TTL_PRODUCTS);
+
+      return c.json(result);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      return c.json({ error: "Failed to fetch products" }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/products/search - Search Products
+// ============================================================================
+
+productsApp.get(
+  "/search",
+  zValidator("query", searchProductsQuerySchema),
+  async (c) => {
+    const { q, page, pageSize } = c.req.valid("query");
+
+    const offset = (page - 1) * pageSize;
+
+    // Build search pattern for ILIKE
+    const searchPattern = `%${q}%`;
+
+    try {
+      // Search in title, description, tags, and SKU
+      const searchConditions = or(
+        ilike(products.title, searchPattern),
+        ilike(products.description, searchPattern),
+        ilike(products.sku, searchPattern),
+        sql`array_to_string(${products.tags}, ' ') ILIKE ${searchPattern}`,
+        sql`array_to_string(${products.styles}, ' ') ILIKE ${searchPattern}`,
+        sql`array_to_string(${products.subjects}, ' ') ILIKE ${searchPattern}`
+      );
+
+      const whereCondition = and(
+        eq(products.status, "active"),
+        searchConditions
+      );
+
+      // Get total count
+      const countResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(products)
+        .where(whereCondition);
+
+      const total = countResult[0]?.count ?? 0;
+
+      // Get matching products
+      const productList = await db
+        .select({
+          id: products.id,
+          sku: products.sku,
+          title: products.title,
+          slug: products.slug,
+          description: products.description,
+          basePrice: products.basePrice,
+          styles: products.styles,
+          subjects: products.subjects,
+          colors: products.colors,
+          orientation: products.orientation,
+          images: products.images,
+          isFeatured: products.isFeatured,
+          isAiGenerated: products.isAiGenerated,
+          createdAt: products.createdAt,
+        })
+        .from(products)
+        .where(whereCondition)
+        .orderBy(desc(products.isFeatured), desc(products.createdAt))
+        .limit(pageSize)
+        .offset(offset);
+
+      return c.json({
+        query: q,
+        items: productList,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+        hasNextPage: page * pageSize < total,
+        hasPreviousPage: page > 1,
+      });
+    } catch (error) {
+      console.error("Error searching products:", error);
+      return c.json({ error: "Failed to search products" }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/products/featured - Get Featured Products
+// ============================================================================
+
+productsApp.get(
+  "/featured",
+  zValidator("query", featuredProductsQuerySchema),
+  async (c) => {
+    const { limit } = c.req.valid("query");
+
+    // Check cache
+    const cacheKey = `${CacheKeys.PRODUCT}featured:${limit}`;
+    const cached = await getCached<unknown[]>(cacheKey);
+    if (cached) {
+      return c.json({ items: cached, fromCache: true });
+    }
+
+    try {
+      const featuredProducts = await db
+        .select({
+          id: products.id,
+          sku: products.sku,
+          title: products.title,
+          slug: products.slug,
+          description: products.description,
+          basePrice: products.basePrice,
+          styles: products.styles,
+          subjects: products.subjects,
+          colors: products.colors,
+          orientation: products.orientation,
+          images: products.images,
+          isFeatured: products.isFeatured,
+          isAiGenerated: products.isAiGenerated,
+          featuredOrder: products.featuredOrder,
+        })
+        .from(products)
+        .where(
+          and(
+            eq(products.status, "active"),
+            eq(products.isFeatured, true)
+          )
+        )
+        .orderBy(asc(products.featuredOrder), desc(products.createdAt))
+        .limit(limit);
+
+      // Cache the result
+      await setCached(cacheKey, featuredProducts, CACHE_TTL_FEATURED);
+
+      return c.json({ items: featuredProducts });
+    } catch (error) {
+      console.error("Error fetching featured products:", error);
+      return c.json({ error: "Failed to fetch featured products" }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/products/frames - Get Available Frames
+// ============================================================================
+
+productsApp.get("/frames", async (c) => {
+  // Check cache
+  const cacheKey = `${CacheKeys.PRODUCT}frames`;
+  const cached = await getCached<unknown[]>(cacheKey);
+  if (cached) {
+    return c.json({ items: cached, fromCache: true });
+  }
+
+  try {
+    const frameList = await db
+      .select({
+        id: frames.id,
+        name: frames.name,
+        type: frames.type,
+        description: frames.description,
+        material: frames.material,
+        thickness: frames.thickness,
+        color: frames.color,
+        priceModifier: frames.priceModifier,
+        priceAddition: frames.priceAddition,
+        imageUrl: frames.imageUrl,
+        thumbnailUrl: frames.thumbnailUrl,
+        availableSizes: frames.availableSizes,
+        sortOrder: frames.sortOrder,
+      })
+      .from(frames)
+      .where(eq(frames.isActive, true))
+      .orderBy(asc(frames.sortOrder));
+
+    // Cache for 15 minutes (frames don't change often)
+    await setCached(cacheKey, frameList, CACHE_TTL_FEATURED);
+
+    return c.json({ items: frameList });
+  } catch (error) {
+    console.error("Error fetching frames:", error);
+    return c.json({ error: "Failed to fetch frames" }, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/products/:slug - Get Product by Slug
+// ============================================================================
+
+productsApp.get("/:slug", async (c) => {
+  const { slug } = c.req.param();
+
+  // Validate slug format
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    return c.json({ error: "Invalid slug format" }, 400);
+  }
+
+  // Check cache
+  const cacheKey = `${CacheKeys.PRODUCT}${slug}`;
+  const cached = await getCached<object>(cacheKey);
+  if (cached) {
+    return c.json({ ...cached, fromCache: true });
+  }
+
+  try {
+    // Get product with variants using query
+    const product = await db.query.products.findFirst({
+      where: eq(products.slug, slug),
+      with: {
+        variants: {
+          where: eq(productVariants.isActive, true),
+          orderBy: asc(productVariants.sortOrder),
+        },
       },
     });
+
+    if (!product) {
+      return c.json({ error: "Product not found" }, 404);
+    }
+
+    // Only return active products for public API
+    if (product.status !== "active") {
+      return c.json({ error: "Product not found" }, 404);
+    }
+
+    // Get available frames
+    const availableFrames = await db
+      .select({
+        id: frames.id,
+        name: frames.name,
+        type: frames.type,
+        description: frames.description,
+        material: frames.material,
+        priceModifier: frames.priceModifier,
+        priceAddition: frames.priceAddition,
+        imageUrl: frames.imageUrl,
+        thumbnailUrl: frames.thumbnailUrl,
+      })
+      .from(frames)
+      .where(eq(frames.isActive, true))
+      .orderBy(asc(frames.sortOrder));
+
+    const result = {
+      ...product,
+      frames: availableFrames,
+    };
+
+    // Cache the result
+    await setCached(cacheKey, result, CACHE_TTL_PRODUCT_DETAIL);
+
+    return c.json(result);
   } catch (error) {
-    console.error('Error listing products:', error);
-    return c.json({ error: 'Failed to list products' }, 500);
+    console.error("Error fetching product:", error);
+    return c.json({ error: "Failed to fetch product" }, 500);
   }
 });
 
-/**
- * GET /api/products/:id
- * Get a single product by ID
- */
-app.get('/:id', async (c) => {
-  try {
-    const id = c.req.param('id');
+// ============================================================================
+// GET /api/products/:slug/variants - Get Product Variants
+// ============================================================================
 
-    const product = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, id))
-      .limit(1);
+productsApp.get("/:slug/variants", async (c) => {
+  const { slug } = c.req.param();
 
-    if (!product || product.length === 0) {
-      return c.json({ error: 'Product not found' }, 404);
-    }
-
-    return c.json(product[0]);
-  } catch (error) {
-    console.error('Error getting product:', error);
-    return c.json({ error: 'Failed to get product' }, 500);
+  // Validate slug format
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+    return c.json({ error: "Invalid slug format" }, 400);
   }
-});
 
-/**
- * GET /api/products/:id/variants
- * Get product variants (sizes) for a specific product
- */
-app.get('/:id/variants', async (c) => {
   try {
-    const id = c.req.param('id');
-
-    // Check if product exists
+    // First get the product to get its ID
     const product = await db
-      .select()
+      .select({ id: products.id, status: products.status })
       .from(products)
-      .where(eq(products.id, id))
+      .where(eq(products.slug, slug))
       .limit(1);
 
-    if (!product || product.length === 0) {
-      return c.json({ error: 'Product not found' }, 404);
+    if (!product[0] || product[0].status !== "active") {
+      return c.json({ error: "Product not found" }, 404);
     }
 
-    // Get variants
+    // Get all active variants for this product
     const variants = await db
-      .select()
+      .select({
+        id: productVariants.id,
+        sizeLabel: productVariants.sizeLabel,
+        widthInches: productVariants.widthInches,
+        heightInches: productVariants.heightInches,
+        widthCm: productVariants.widthCm,
+        heightCm: productVariants.heightCm,
+        price: productVariants.price,
+        stockQuantity: productVariants.stockQuantity,
+        isInStock: productVariants.isInStock,
+        variantSku: productVariants.variantSku,
+        sortOrder: productVariants.sortOrder,
+      })
       .from(productVariants)
-      .where(eq(productVariants.productId, id));
+      .where(
+        and(
+          eq(productVariants.productId, product[0].id),
+          eq(productVariants.isActive, true)
+        )
+      )
+      .orderBy(asc(productVariants.sortOrder));
 
-    return c.json({ data: variants });
+    return c.json({ items: variants });
   } catch (error) {
-    console.error('Error getting product variants:', error);
-    return c.json({ error: 'Failed to get product variants' }, 500);
+    console.error("Error fetching product variants:", error);
+    return c.json({ error: "Failed to fetch product variants" }, 500);
   }
 });
 
-/**
- * POST /api/products
- * Create a new product (admin only)
- *
- * Request Body:
- * {
- *   sku: string,
- *   title: string,
- *   slug: string,
- *   description: string,
- *   basePrice: string,
- *   styles: string[],
- *   subjects: string[],
- *   colors: string[],
- *   orientation: 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round',
- *   images: Array<{ url, alt, width, height, isPrimary }>,
- *   seoTitle: string,
- *   seoDescription: string,
- *   status?: 'draft' | 'active' | 'archived',
- *   featuredOrder?: number,
- *   artistId?: string
- * }
- */
-app.post('/', requireAuth, requireRole(['admin']), async (c) => {
-  try {
-    const body = await c.req.json();
+// ============================================================================
+// GET /api/products/by-ids - Get Products by IDs
+// ============================================================================
 
-    // Validate required fields
-    const requiredFields = [
-      'sku', 'title', 'slug', 'description', 'basePrice',
-      'styles', 'subjects', 'colors', 'orientation',
-      'images', 'seoTitle', 'seoDescription'
-    ];
+productsApp.post(
+  "/by-ids",
+  zValidator("json", z.object({ ids: z.array(z.string().uuid()).max(50) })),
+  async (c) => {
+    const { ids } = c.req.valid("json");
 
-    const missingFields = requiredFields.filter(field => !(field in body));
-    if (missingFields.length > 0) {
-      return c.json({
-        error: 'Missing required fields',
-        fields: missingFields,
-      }, 400);
+    if (ids.length === 0) {
+      return c.json({ items: [] });
     }
 
-    // Check if SKU already exists
-    const existingProduct = await db
-      .select()
-      .from(products)
-      .where(eq(products.sku, body.sku))
-      .limit(1);
-
-    if (existingProduct.length > 0) {
-      return c.json({ error: 'Product with this SKU already exists' }, 409);
-    }
-
-    // Check if slug already exists
-    const existingSlug = await db
-      .select()
-      .from(products)
-      .where(eq(products.slug, body.slug))
-      .limit(1);
-
-    if (existingSlug.length > 0) {
-      return c.json({ error: 'Product with this slug already exists' }, 409);
-    }
-
-    // Create product
-    const newProduct = await db
-      .insert(products)
-      .values({
-        sku: body.sku,
-        title: body.title,
-        slug: body.slug,
-        description: body.description,
-        basePrice: body.basePrice,
-        styles: body.styles,
-        subjects: body.subjects,
-        colors: body.colors,
-        orientation: body.orientation,
-        images: body.images,
-        seoTitle: body.seoTitle,
-        seoDescription: body.seoDescription,
-        status: body.status || 'draft',
-        featuredOrder: body.featuredOrder,
-        artistId: body.artistId,
-      })
-      .returning();
-
-    return c.json(newProduct[0], 201);
-  } catch (error) {
-    console.error('Error creating product:', error);
-    return c.json({ error: 'Failed to create product' }, 500);
-  }
-});
-
-/**
- * PUT /api/products/:id
- * Update a product (admin only)
- *
- * Request Body: Same as POST, all fields optional
- */
-app.put('/:id', requireAuth, requireRole(['admin']), async (c) => {
-  try {
-    const id = c.req.param('id');
-    const body = await c.req.json();
-
-    // Check if product exists
-    const existingProduct = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, id))
-      .limit(1);
-
-    if (!existingProduct || existingProduct.length === 0) {
-      return c.json({ error: 'Product not found' }, 404);
-    }
-
-    // If updating SKU, check uniqueness
-    if (body.sku && body.sku !== existingProduct[0].sku) {
-      const skuExists = await db
-        .select()
+    try {
+      const productList = await db
+        .select({
+          id: products.id,
+          sku: products.sku,
+          title: products.title,
+          slug: products.slug,
+          basePrice: products.basePrice,
+          images: products.images,
+          orientation: products.orientation,
+        })
         .from(products)
-        .where(and(
-          eq(products.sku, body.sku),
-          sql`${products.id} != ${id}`
-        ))
-        .limit(1);
+        .where(
+          and(
+            eq(products.status, "active"),
+            inArray(products.id, ids)
+          )
+        );
 
-      if (skuExists.length > 0) {
-        return c.json({ error: 'Product with this SKU already exists' }, 409);
-      }
+      return c.json({ items: productList });
+    } catch (error) {
+      console.error("Error fetching products by IDs:", error);
+      return c.json({ error: "Failed to fetch products" }, 500);
     }
-
-    // If updating slug, check uniqueness
-    if (body.slug && body.slug !== existingProduct[0].slug) {
-      const slugExists = await db
-        .select()
-        .from(products)
-        .where(and(
-          eq(products.slug, body.slug),
-          sql`${products.id} != ${id}`
-        ))
-        .limit(1);
-
-      if (slugExists.length > 0) {
-        return c.json({ error: 'Product with this slug already exists' }, 409);
-      }
-    }
-
-    // Update product
-    const updatedProduct = await db
-      .update(products)
-      .set({
-        ...body,
-        updatedAt: new Date(),
-      })
-      .where(eq(products.id, id))
-      .returning();
-
-    return c.json(updatedProduct[0]);
-  } catch (error) {
-    console.error('Error updating product:', error);
-    return c.json({ error: 'Failed to update product' }, 500);
   }
-});
+);
 
-/**
- * DELETE /api/products/:id
- * Delete a product (admin only)
- * Note: This will cascade delete variants and frames
- */
-app.delete('/:id', requireAuth, requireRole(['admin']), async (c) => {
-  try {
-    const id = c.req.param('id');
-
-    // Check if product exists
-    const existingProduct = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, id))
-      .limit(1);
-
-    if (!existingProduct || existingProduct.length === 0) {
-      return c.json({ error: 'Product not found' }, 404);
-    }
-
-    // Delete product (cascade will handle variants)
-    await db
-      .delete(products)
-      .where(eq(products.id, id));
-
-    return c.json({ message: 'Product deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting product:', error);
-    return c.json({ error: 'Failed to delete product' }, 500);
-  }
-});
-
-export default app;
+// Export the router
+export { productsApp };
+export default productsApp;

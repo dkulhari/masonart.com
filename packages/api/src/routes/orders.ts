@@ -1,372 +1,775 @@
-import { Hono } from 'hono';
-import { createDatabase } from '../db/index';
-import {
-  orders,
-  orderItems,
-  cartItems,
-  products,
-  productVariants,
-  frames
-} from '../db/schema';
-import { eq, desc, and } from 'drizzle-orm';
-
 /**
  * Orders API Routes
  *
- * Handles order management for the MasonArt e-commerce platform:
- * - GET /api/orders - List all orders for authenticated user (with pagination and filtering)
- * - GET /api/orders/:id - Get single order with details
- * - POST /api/orders - Create order from cart
- * - PUT /api/orders/:id - Update order (admin only - for status/tracking updates)
- * - PUT /api/orders/:id/cancel - Cancel order (user or admin)
+ * Provides API endpoints for order management:
+ * - POST /api/orders - Create a new order from cart
+ * - GET /api/orders - List user's orders with pagination
+ * - GET /api/orders/:id - Get order by ID or order number
+ * - POST /api/orders/:id/payment - Initiate payment for an order
+ * - POST /api/orders/:id/payment/verify - Verify payment after checkout
+ *
+ * Requires authentication for all endpoints.
+ * Following patterns from docs/poster-app-tech-stack.md
  */
 
-type Variables = {
-  user: {
-    id: string;
-    email: string;
-    role: 'admin' | 'customer' | 'trade';
-  };
-};
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { eq, and, desc, sql } from "drizzle-orm";
 
-const app = new Hono<{ Variables: Variables }>();
-const { db } = createDatabase();
+import { db } from "../database";
+import {
+  orders,
+  orderItems,
+  type OrderShippingAddress,
+  type OrderItemSnapshot,
+  type OrderPaymentDetails,
+} from "../database/schema/orders";
+import { carts, cartItems } from "../database/schema/cart";
+import { requireAuth, type AuthVariables } from "../middleware/auth";
+import {
+  createRazorpayOrder,
+  verifyPaymentSignature,
+  getRazorpayKeyId,
+  toPaise,
+  isRazorpayConfigured,
+  RazorpayError,
+} from "../lib/razorpay";
 
-// Middleware to require authentication
-app.use('*', async (c, next) => {
-  const user = c.get('user');
-  if (!user) {
-    return c.json({ error: 'Authentication required' }, 401);
-  }
-  await next();
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_PAGE_SIZE = 10;
+const MAX_PAGE_SIZE = 50;
+const ORDER_NUMBER_PREFIX = "MA";
+
+// ============================================================================
+// Validation Schemas
+// ============================================================================
+
+/**
+ * Schema for shipping address in order creation
+ */
+const shippingAddressSchema = z.object({
+  fullName: z.string().min(1).max(100),
+  phone: z.string().min(10).max(15),
+  addressLine1: z.string().min(1).max(200),
+  addressLine2: z.string().max(200).optional(),
+  landmark: z.string().max(200).optional(),
+  city: z.string().min(1).max(100),
+  state: z.string().min(1).max(100),
+  postalCode: z.string().min(5).max(10),
+  countryCode: z.string().length(2).default("IN"),
 });
 
 /**
- * GET /api/orders
- * List all orders for authenticated user with pagination and filtering
+ * Schema for creating a new order
  */
-app.get('/', async (c) => {
-  const user = c.get('user');
-  const page = parseInt(c.req.query('page') || '1');
-  const limit = parseInt(c.req.query('limit') || '10');
-  const status = c.req.query('status'); // Filter by order status
+const createOrderSchema = z.object({
+  shippingAddress: shippingAddressSchema,
+  shippingMethod: z.enum(["standard", "express"]).optional().default("standard"),
+  customerNotes: z.string().max(500).optional(),
+  couponCode: z.string().max(50).optional(),
+});
 
-  const offset = (page - 1) * limit;
+/**
+ * Query parameters for listing orders
+ */
+const listOrdersQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PAGE_SIZE)
+    .optional()
+    .default(DEFAULT_PAGE_SIZE),
+  status: z
+    .enum([
+      "pending",
+      "pending_payment",
+      "confirmed",
+      "processing",
+      "shipped",
+      "out_for_delivery",
+      "delivered",
+      "cancelled",
+      "refund_requested",
+      "refunded",
+      "failed",
+    ])
+    .optional(),
+});
 
-  try {
-    // Build query conditions
-    const conditions = [eq(orders.userId, user.id)];
-    if (status) {
-      conditions.push(eq(orders.status, status as any));
+/**
+ * Schema for payment verification
+ */
+const verifyPaymentSchema = z.object({
+  razorpayOrderId: z.string().min(1),
+  razorpayPaymentId: z.string().min(1),
+  razorpaySignature: z.string().min(1),
+});
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Generate a unique order number
+ * Format: MA-YYYY-NNNNNN (e.g., MA-2024-000123)
+ */
+async function generateOrderNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `${ORDER_NUMBER_PREFIX}-${year}-`;
+
+  // Get the count of orders this year for sequential numbering
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(orders)
+    .where(sql`${orders.orderNumber} LIKE ${prefix + "%"}`);
+
+  const count = (result[0]?.count ?? 0) + 1;
+  const sequenceNumber = count.toString().padStart(6, "0");
+
+  return `${prefix}${sequenceNumber}`;
+}
+
+/**
+ * Calculate shipping cost based on method and subtotal
+ */
+function calculateShippingCost(
+  method: string,
+  subtotal: string
+): string {
+  const subtotalNum = parseFloat(subtotal);
+
+  // Free shipping for orders over 2000 INR
+  if (subtotalNum >= 2000) {
+    return "0.00";
+  }
+
+  // Express shipping costs more
+  if (method === "express") {
+    return "199.00";
+  }
+
+  // Standard shipping
+  return "99.00";
+}
+
+/**
+ * Create order item snapshot from product data
+ */
+function createItemSnapshot(
+  product: { title: string; sku: string; images: unknown },
+  variant: {
+    sizeLabel: string;
+    widthInches: number;
+    heightInches: number;
+  },
+  frame?: { name: string; type: string } | null
+): OrderItemSnapshot {
+  const images = product.images as Array<{ url?: string }> | null;
+  const imageUrl = images?.[0]?.url;
+
+  return {
+    title: product.title,
+    sku: product.sku,
+    sizeLabel: variant.sizeLabel,
+    widthInches: variant.widthInches,
+    heightInches: variant.heightInches,
+    frameName: frame?.name,
+    frameType: frame?.type,
+    imageUrl,
+  };
+}
+
+// ============================================================================
+// Route Handler
+// ============================================================================
+
+const ordersApp = new Hono<{ Variables: AuthVariables }>();
+
+// Apply authentication to all routes
+ordersApp.use("*", requireAuth);
+
+// ============================================================================
+// POST /api/orders - Create Order
+// ============================================================================
+
+ordersApp.post(
+  "/",
+  zValidator("json", createOrderSchema),
+  async (c) => {
+    const user = c.get("user");
+    const input = c.req.valid("json");
+
+    try {
+      // Get user's active cart with items
+      const userCart = await db.query.carts.findFirst({
+        where: and(eq(carts.userId, user.id), eq(carts.isActive, true)),
+        with: {
+          items: {
+            where: eq(cartItems.isSavedForLater, false),
+            with: {
+              product: true,
+              variant: true,
+              frame: true,
+            },
+          },
+        },
+      });
+
+      if (!userCart) {
+        return c.json({ error: "No active cart found" }, 404);
+      }
+
+      const activeItems = userCart.items.filter((item) => !item.isSavedForLater);
+
+      if (activeItems.length === 0) {
+        return c.json({ error: "Cart is empty" }, 400);
+      }
+
+      // Validate all items are still available
+      for (const item of activeItems) {
+        if (!item.product || item.product.status !== "active") {
+          return c.json(
+            { error: `Product "${item.product?.title || "Unknown"}" is no longer available` },
+            400
+          );
+        }
+        if (!item.variant || !item.variant.isInStock) {
+          return c.json(
+            { error: `Selected size for "${item.product?.title}" is out of stock` },
+            400
+          );
+        }
+      }
+
+      // Calculate totals
+      const subtotal = activeItems.reduce((sum, item) => {
+        return sum + parseFloat(item.lineTotal);
+      }, 0);
+
+      const subtotalStr = subtotal.toFixed(2);
+      const shippingCost = calculateShippingCost(input.shippingMethod, subtotalStr);
+      const discount = "0.00"; // TODO: Apply coupon if provided
+      const tax = "0.00"; // TODO: Calculate tax based on location
+      const total = (
+        subtotal +
+        parseFloat(shippingCost) -
+        parseFloat(discount) +
+        parseFloat(tax)
+      ).toFixed(2);
+
+      // Generate order number
+      const orderNumber = await generateOrderNumber();
+
+      // Create order in a transaction
+      const newOrder = await db.transaction(async (tx) => {
+        // Create the order
+        const insertedOrders = await tx
+          .insert(orders)
+          .values({
+            orderNumber,
+            userId: user.id,
+            status: "pending",
+            paymentStatus: "pending",
+            orderType: activeItems.some((i) => i.isAiGenerated) ? "ai_generated" : "regular",
+            shippingAddress: input.shippingAddress as OrderShippingAddress,
+            shippingMethod: input.shippingMethod,
+            shippingCost,
+            subtotal: subtotalStr,
+            discount,
+            tax,
+            total,
+            couponCode: input.couponCode || null,
+            couponDiscount: "0.00",
+            itemCount: activeItems.reduce((sum, item) => sum + item.quantity, 0),
+            customerNotes: input.customerNotes || null,
+            currency: "INR",
+          })
+          .returning();
+
+        const createdOrder = insertedOrders[0];
+        if (!createdOrder) {
+          throw new Error("Failed to create order");
+        }
+
+        // Create order items
+        const orderItemsToInsert = activeItems.map((item) => ({
+          orderId: createdOrder.id,
+          productId: item.productId,
+          variantId: item.variantId,
+          frameId: item.frameId,
+          snapshot: createItemSnapshot(
+            item.product!,
+            item.variant!,
+            item.frame
+          ),
+          unitPrice: item.unitPrice,
+          framePrice: item.framePrice,
+          quantity: item.quantity,
+          lineTotal: item.lineTotal,
+          isAiGenerated: item.isAiGenerated,
+          aiGenerationId: item.aiGenerationId,
+          customizations: item.customizations as Record<string, unknown> | null,
+        }));
+
+        await tx.insert(orderItems).values(orderItemsToInsert);
+
+        // Clear cart items (but keep saved for later items)
+        await tx
+          .delete(cartItems)
+          .where(
+            and(
+              eq(cartItems.cartId, userCart.id),
+              eq(cartItems.isSavedForLater, false)
+            )
+          );
+
+        // Update cart totals
+        await tx
+          .update(carts)
+          .set({
+            itemCount: 0,
+            subtotal: "0.00",
+            lastActivityAt: new Date(),
+          })
+          .where(eq(carts.id, userCart.id));
+
+        return createdOrder;
+      });
+
+      // Return created order
+      return c.json(
+        {
+          message: "Order created successfully",
+          order: {
+            id: newOrder.id,
+            orderNumber: newOrder.orderNumber,
+            status: newOrder.status,
+            paymentStatus: newOrder.paymentStatus,
+            subtotal: newOrder.subtotal,
+            shippingCost: newOrder.shippingCost,
+            discount: newOrder.discount,
+            tax: newOrder.tax,
+            total: newOrder.total,
+            itemCount: newOrder.itemCount,
+            currency: newOrder.currency,
+            createdAt: newOrder.createdAt,
+          },
+        },
+        201
+      );
+    } catch (error) {
+      console.error("Error creating order:", error);
+      return c.json({ error: "Failed to create order" }, 500);
     }
+  }
+);
 
-    // Get orders with pagination
-    const ordersResult = await db
-      .select()
-      .from(orders)
-      .where(and(...conditions))
-      .orderBy(desc(orders.createdAt))
-      .limit(limit)
-      .offset(offset);
+// ============================================================================
+// GET /api/orders - List User Orders
+// ============================================================================
 
-    // Get total count for pagination
-    const totalResult = await db
-      .select()
-      .from(orders)
-      .where(and(...conditions));
-    const total = totalResult.length;
+ordersApp.get(
+  "/",
+  zValidator("query", listOrdersQuerySchema),
+  async (c) => {
+    const user = c.get("user");
+    const { page, pageSize, status } = c.req.valid("query");
 
-    return c.json({
-      data: ordersResult,
-      meta: {
+    try {
+      // Build where conditions
+      const conditions = [eq(orders.userId, user.id)];
+
+      if (status) {
+        conditions.push(eq(orders.status, status));
+      }
+
+      // Calculate offset
+      const offset = (page - 1) * pageSize;
+
+      // Get total count
+      const countResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(orders)
+        .where(and(...conditions));
+
+      const total = countResult[0]?.count ?? 0;
+
+      // Get orders with basic info
+      const orderList = await db
+        .select({
+          id: orders.id,
+          orderNumber: orders.orderNumber,
+          status: orders.status,
+          paymentStatus: orders.paymentStatus,
+          orderType: orders.orderType,
+          subtotal: orders.subtotal,
+          shippingCost: orders.shippingCost,
+          discount: orders.discount,
+          total: orders.total,
+          itemCount: orders.itemCount,
+          currency: orders.currency,
+          shippingMethod: orders.shippingMethod,
+          createdAt: orders.createdAt,
+          paidAt: orders.paidAt,
+          shippedAt: orders.shippedAt,
+          deliveredAt: orders.deliveredAt,
+        })
+        .from(orders)
+        .where(and(...conditions))
+        .orderBy(desc(orders.createdAt))
+        .limit(pageSize)
+        .offset(offset);
+
+      return c.json({
+        items: orderList,
         total,
         page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching orders:', error);
-    return c.json({ error: 'Failed to fetch orders' }, 500);
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+        hasNextPage: page * pageSize < total,
+        hasPreviousPage: page > 1,
+      });
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      return c.json({ error: "Failed to fetch orders" }, 500);
+    }
   }
-});
+);
 
-/**
- * GET /api/orders/:id
- * Get single order with details (including order items)
- */
-app.get('/:id', async (c) => {
-  const user = c.get('user');
-  const orderId = c.req.param('id');
+// ============================================================================
+// GET /api/orders/:id - Get Order by ID or Order Number
+// ============================================================================
+
+ordersApp.get("/:id", async (c) => {
+  const user = c.get("user");
+  const { id } = c.req.param();
 
   try {
-    // Get order
-    const orderResult = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
+    // Determine if ID is UUID or order number
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (orderResult.length === 0) {
-      return c.json({ error: 'Order not found' }, 404);
+    if (!isUUID && !isOrderNumber) {
+      return c.json({ error: "Invalid order ID format" }, 400);
     }
 
-    const order = orderResult[0];
+    // Build where condition
+    const whereCondition = isUUID
+      ? and(eq(orders.id, id), eq(orders.userId, user.id))
+      : and(eq(orders.orderNumber, id), eq(orders.userId, user.id));
 
-    // Check permission (user can only view their own orders, admins can view all)
-    if (order.userId !== user.id && user.role !== 'admin') {
-      return c.json({ error: 'You do not have permission to view this order' }, 403);
+    // Get order with items
+    const order = await db.query.orders.findFirst({
+      where: whereCondition,
+      with: {
+        items: {
+          with: {
+            product: {
+              columns: {
+                id: true,
+                slug: true,
+                title: true,
+                images: true,
+              },
+            },
+            variant: {
+              columns: {
+                id: true,
+                sizeLabel: true,
+                widthInches: true,
+                heightInches: true,
+              },
+            },
+            frame: {
+              columns: {
+                id: true,
+                name: true,
+                type: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return c.json({ error: "Order not found" }, 404);
     }
 
-    // Get order items
-    const items = await db
-      .select()
-      .from(orderItems)
-      .where(eq(orderItems.orderId, orderId));
-
+    // Return full order details
     return c.json({
-      ...order,
-      items,
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      orderType: order.orderType,
+      shippingAddress: order.shippingAddress,
+      shippingDetails: order.shippingDetails,
+      shippingMethod: order.shippingMethod,
+      shippingCost: order.shippingCost,
+      subtotal: order.subtotal,
+      discount: order.discount,
+      tax: order.tax,
+      total: order.total,
+      couponCode: order.couponCode,
+      couponDiscount: order.couponDiscount,
+      itemCount: order.itemCount,
+      currency: order.currency,
+      customerNotes: order.customerNotes,
+      items: order.items.map((item) => ({
+        id: item.id,
+        snapshot: item.snapshot,
+        unitPrice: item.unitPrice,
+        framePrice: item.framePrice,
+        quantity: item.quantity,
+        lineTotal: item.lineTotal,
+        isAiGenerated: item.isAiGenerated,
+        customizations: item.customizations,
+        isFulfilled: item.isFulfilled,
+        product: item.product
+          ? {
+              id: item.product.id,
+              slug: item.product.slug,
+              title: item.product.title,
+              images: item.product.images,
+            }
+          : null,
+        variant: item.variant
+          ? {
+              id: item.variant.id,
+              sizeLabel: item.variant.sizeLabel,
+            }
+          : null,
+        frame: item.frame
+          ? {
+              id: item.frame.id,
+              name: item.frame.name,
+              type: item.frame.type,
+            }
+          : null,
+      })),
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      paidAt: order.paidAt,
+      shippedAt: order.shippedAt,
+      deliveredAt: order.deliveredAt,
+      cancelledAt: order.cancelledAt,
     });
   } catch (error) {
-    console.error('Error fetching order:', error);
-    return c.json({ error: 'Failed to fetch order' }, 500);
+    console.error("Error fetching order:", error);
+    return c.json({ error: "Failed to fetch order" }, 500);
   }
 });
 
-/**
- * POST /api/orders
- * Create order from cart items
- */
-app.post('/', async (c) => {
-  const user = c.get('user');
+// ============================================================================
+// POST /api/orders/:id/payment - Initiate Payment
+// ============================================================================
 
-  try {
-    const body = await c.req.json();
-    const { shippingAddress, billingAddress, paymentMethod } = body;
+ordersApp.post("/:id/payment", async (c) => {
+  const user = c.get("user");
+  const { id } = c.req.param();
 
-    // Validate required fields
-    if (!shippingAddress) {
-      return c.json({ error: 'shippingAddress is required' }, 400);
-    }
-    if (!paymentMethod) {
-      return c.json({ error: 'paymentMethod is required' }, 400);
-    }
-
-    // Validate payment method
-    const validPaymentMethods = ['razorpay', 'stripe', 'cod', 'upi'];
-    if (!validPaymentMethods.includes(paymentMethod)) {
-      return c.json({ error: 'Invalid paymentMethod' }, 400);
-    }
-
-    // Get cart items with product and variant details
-    const cartItemsResult = await db
-      .select({
-        cartItem: cartItems,
-        product: products,
-        variant: productVariants,
-        frame: frames,
-      })
-      .from(cartItems)
-      .leftJoin(products, eq(cartItems.productId, products.id))
-      .leftJoin(productVariants, eq(cartItems.variantId, productVariants.id))
-      .leftJoin(frames, eq(cartItems.frameId, frames.id))
-      .where(eq(cartItems.userId, user.id));
-
-    if (cartItemsResult.length === 0) {
-      return c.json({ error: 'Cart is empty' }, 400);
-    }
-
-    // Calculate order totals
-    let subtotal = 0;
-    const items = cartItemsResult.map((item) => {
-      const variantPrice = parseFloat(item.variant?.price || '0');
-      const framePrice = item.frame ? parseFloat(item.frame.priceModifier) : 0;
-      const unitPrice = variantPrice + framePrice;
-      const itemSubtotal = unitPrice * item.cartItem.quantity;
-      subtotal += itemSubtotal;
-
-      return {
-        productId: item.cartItem.productId,
-        variantId: item.cartItem.variantId,
-        frameId: item.cartItem.frameId,
-        productTitle: item.product?.title || '',
-        productSku: item.product?.sku || '',
-        sizeLabel: item.variant?.sizeLabel || '',
-        frameType: item.frame?.name,
-        quantity: item.cartItem.quantity,
-        unitPrice: unitPrice.toFixed(2),
-        subtotal: itemSubtotal.toFixed(2),
-        imageUrl: item.product?.images?.[0]?.url || '',
-      };
-    });
-
-    const shippingCost = 0; // Free shipping
-    const tax = subtotal * 0.18; // 18% GST
-    const discount = 0;
-    const total = subtotal + shippingCost + tax - discount;
-
-    // Generate unique order number
-    const orderNumber = 'ORD-' + Date.now().toString().slice(-8).toUpperCase();
-
-    // Create order
-    const newOrder = await db.insert(orders).values({
-      orderNumber,
-      userId: user.id,
-      status: 'pending',
-      shippingAddress,
-      billingAddress,
-      paymentMethod,
-      paymentStatus: 'pending',
-      subtotal: subtotal.toFixed(2),
-      shippingCost: shippingCost.toFixed(2),
-      tax: tax.toFixed(2),
-      discount: discount.toFixed(2),
-      total: total.toFixed(2),
-    }).returning();
-
-    const order = newOrder[0];
-
-    // Create order items
-    const orderItemsData = items.map((item) => ({
-      orderId: order.id,
-      ...item,
-    }));
-
-    const createdItems = await db.insert(orderItems).values(orderItemsData).returning();
-
-    // Clear cart
-    await db.delete(cartItems).where(eq(cartItems.userId, user.id));
-
-    return c.json(
-      {
-        ...order,
-        items: createdItems,
-      },
-      201
-    );
-  } catch (error) {
-    console.error('Error creating order:', error);
-    return c.json({ error: 'Failed to create order' }, 500);
-  }
-});
-
-/**
- * PUT /api/orders/:id
- * Update order (admin only - for status/tracking updates)
- */
-app.put('/:id', async (c) => {
-  const user = c.get('user');
-  const orderId = c.req.param('id');
-
-  // Only admins can update orders
-  if (user.role !== 'admin') {
-    return c.json({ error: 'Only admins can update orders' }, 403);
+  // Check if Razorpay is configured
+  if (!isRazorpayConfigured()) {
+    return c.json({ error: "Payment gateway not configured" }, 503);
   }
 
   try {
-    const body = await c.req.json();
-    const { status, trackingNumber, shippingCarrier, paymentStatus, paymentId, internalNotes } = body;
+    // Determine if ID is UUID or order number
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    // Validate status if provided
-    if (status) {
-      const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
-      if (!validStatuses.includes(status)) {
-        return c.json({ error: 'Invalid status' }, 400);
-      }
+    if (!isUUID && !isOrderNumber) {
+      return c.json({ error: "Invalid order ID format" }, 400);
     }
 
-    // Build update object
-    const updateData: any = {
-      updatedAt: new Date(),
-    };
-
-    if (status !== undefined) updateData.status = status;
-    if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
-    if (shippingCarrier !== undefined) updateData.shippingCarrier = shippingCarrier;
-    if (paymentStatus !== undefined) updateData.paymentStatus = paymentStatus;
-    if (paymentId !== undefined) updateData.paymentId = paymentId;
-    if (internalNotes !== undefined) updateData.internalNotes = internalNotes;
-
-    // Set deliveredAt timestamp if status is delivered
-    if (status === 'delivered') {
-      updateData.deliveredAt = new Date();
-    }
-
-    // Update order
-    const updatedOrder = await db
-      .update(orders)
-      .set(updateData)
-      .where(eq(orders.id, orderId))
-      .returning();
-
-    if (updatedOrder.length === 0) {
-      return c.json({ error: 'Order not found' }, 404);
-    }
-
-    return c.json(updatedOrder[0]);
-  } catch (error) {
-    console.error('Error updating order:', error);
-    return c.json({ error: 'Failed to update order' }, 500);
-  }
-});
-
-/**
- * PUT /api/orders/:id/cancel
- * Cancel order (user or admin)
- */
-app.put('/:id/cancel', async (c) => {
-  const user = c.get('user');
-  const orderId = c.req.param('id');
-
-  try {
-    const body = await c.req.json();
-    const { reason } = body;
+    // Build where condition
+    const whereCondition = isUUID
+      ? and(eq(orders.id, id), eq(orders.userId, user.id))
+      : and(eq(orders.orderNumber, id), eq(orders.userId, user.id));
 
     // Get order
-    const orderResult = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
+    const order = await db.query.orders.findFirst({
+      where: whereCondition,
+    });
 
-    if (orderResult.length === 0) {
-      return c.json({ error: 'Order not found' }, 404);
+    if (!order) {
+      return c.json({ error: "Order not found" }, 404);
     }
 
-    const order = orderResult[0];
-
-    // Check permission (user can cancel their own orders, admins can cancel any)
-    if (order.userId !== user.id && user.role !== 'admin') {
-      return c.json({ error: 'You do not have permission to cancel this order' }, 403);
+    // Check order status - only allow payment for pending orders
+    if (order.paymentStatus === "paid") {
+      return c.json({ error: "Order has already been paid" }, 400);
     }
 
-    // Check if order can be cancelled
-    if (order.status === 'cancelled') {
-      return c.json({ error: 'Order is already cancelled' }, 400);
-    }
-    if (order.status === 'delivered') {
-      return c.json({ error: 'Delivered orders cannot be cancelled' }, 400);
+    if (order.status === "cancelled") {
+      return c.json({ error: "Cannot pay for a cancelled order" }, 400);
     }
 
-    // Update order
-    const updatedOrder = await db
+    // Check if there's an existing Razorpay order that's still valid
+    const existingPaymentDetails = order.paymentDetails as OrderPaymentDetails | null;
+    if (existingPaymentDetails?.orderId) {
+      // Return existing Razorpay order if payment is still pending
+      return c.json({
+        razorpayOrderId: existingPaymentDetails.orderId,
+        razorpayKeyId: getRazorpayKeyId(),
+        amount: toPaise(order.total),
+        currency: order.currency,
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+        prefill: {
+          email: user.email || undefined,
+          name: user.name || undefined,
+        },
+      });
+    }
+
+    // Create a new Razorpay order
+    const razorpayOrder = await createRazorpayOrder({
+      amount: toPaise(order.total),
+      currency: order.currency,
+      receipt: order.id,
+      notes: {
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+      },
+    });
+
+    // Update order with Razorpay order ID
+    await db
       .update(orders)
       .set({
-        status: 'cancelled',
-        paymentStatus: 'refunded',
-        cancelledAt: new Date(),
-        notes: reason || 'Order cancelled by user',
+        status: "pending_payment",
+        paymentDetails: {
+          provider: "razorpay",
+          orderId: razorpayOrder.id,
+        } as OrderPaymentDetails,
         updatedAt: new Date(),
       })
-      .where(eq(orders.id, orderId))
-      .returning();
+      .where(eq(orders.id, order.id));
 
-    return c.json(updatedOrder[0]);
+    // Return payment details for frontend
+    return c.json({
+      razorpayOrderId: razorpayOrder.id,
+      razorpayKeyId: getRazorpayKeyId(),
+      amount: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      orderNumber: order.orderNumber,
+      orderId: order.id,
+      prefill: {
+        email: user.email || undefined,
+        name: user.name || undefined,
+      },
+    });
   } catch (error) {
-    console.error('Error cancelling order:', error);
-    return c.json({ error: 'Failed to cancel order' }, 500);
+    if (error instanceof RazorpayError) {
+      return c.json({ error: `Payment initiation failed: ${error.message}` }, 500);
+    }
+    return c.json({ error: "Failed to initiate payment" }, 500);
   }
 });
 
-export default app;
+// ============================================================================
+// POST /api/orders/:id/payment/verify - Verify Payment
+// ============================================================================
+
+ordersApp.post(
+  "/:id/payment/verify",
+  zValidator("json", verifyPaymentSchema),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.param();
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = c.req.valid("json");
+
+    try {
+      // Determine if ID is UUID or order number
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
+
+      if (!isUUID && !isOrderNumber) {
+        return c.json({ error: "Invalid order ID format" }, 400);
+      }
+
+      // Build where condition
+      const whereCondition = isUUID
+        ? and(eq(orders.id, id), eq(orders.userId, user.id))
+        : and(eq(orders.orderNumber, id), eq(orders.userId, user.id));
+
+      // Get order
+      const order = await db.query.orders.findFirst({
+        where: whereCondition,
+      });
+
+      if (!order) {
+        return c.json({ error: "Order not found" }, 404);
+      }
+
+      // Verify the Razorpay order ID matches
+      const paymentDetails = order.paymentDetails as OrderPaymentDetails | null;
+      if (paymentDetails?.orderId !== razorpayOrderId) {
+        return c.json({ error: "Invalid payment order ID" }, 400);
+      }
+
+      // Verify payment signature
+      const isValid = verifyPaymentSignature({
+        razorpayOrderId,
+        razorpayPaymentId,
+        razorpaySignature,
+      });
+
+      if (!isValid) {
+        // Update order with failed payment
+        await db
+          .update(orders)
+          .set({
+            paymentStatus: "failed",
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, order.id));
+
+        return c.json({ error: "Payment verification failed" }, 400);
+      }
+
+      // Update order to confirmed/paid status
+      // Note: The webhook will also update this, but we update here for immediate response
+      await db
+        .update(orders)
+        .set({
+          status: "confirmed",
+          paymentStatus: "paid",
+          paymentDetails: {
+            ...paymentDetails,
+            paymentId: razorpayPaymentId,
+            transactionId: razorpayPaymentId,
+            capturedAt: new Date().toISOString(),
+          } as OrderPaymentDetails,
+          paidAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, order.id));
+
+      return c.json({
+        success: true,
+        message: "Payment verified successfully",
+        order: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          status: "confirmed",
+          paymentStatus: "paid",
+        },
+      });
+    } catch (error) {
+      return c.json({ error: "Failed to verify payment" }, 500);
+    }
+  }
+);
+
+// Export the router
+export { ordersApp };
+export default ordersApp;
