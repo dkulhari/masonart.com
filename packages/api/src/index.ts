@@ -1,0 +1,118 @@
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
+
+import { auth } from "./auth";
+import { productsApp } from "./routes/products";
+import { cartApp } from "./routes/cart";
+import { ordersApp } from "./routes/orders";
+import { aiApp } from "./routes/ai";
+import { razorpayWebhooksApp } from "./routes/webhooks/razorpay";
+import { adminProductsApp } from "./routes/admin/products";
+import { adminOrdersApp } from "./routes/admin/orders";
+import { sitemapApp } from "./routes/sitemap";
+
+const app = new Hono();
+
+// Global middleware
+app.use("*", logger());
+app.use("*", secureHeaders());
+app.use(
+  "*",
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:3001",
+    credentials: true,
+  })
+);
+
+// ============================================================================
+// Auth Routes (Better Auth)
+// ============================================================================
+// Mount Better Auth handler for all auth endpoints
+// Handles: /api/auth/sign-in, /api/auth/sign-up, /api/auth/sign-out,
+//          /api/auth/session, /api/auth/callback/:provider, etc.
+app.on(["POST", "GET"], "/api/auth/*", (c) => {
+  return auth.handler(c.req.raw);
+});
+
+// ============================================================================
+// API Routes
+// ============================================================================
+
+// Products API - list, search, get by slug
+app.route("/api/products", productsApp);
+
+// Cart API - get, add item, update, remove
+app.route("/api/cart", cartApp);
+
+// Orders API - create, get, list user orders
+app.route("/api/orders", ordersApp);
+
+// AI API - generate, list generations, gallery
+app.route("/api/ai", aiApp);
+
+// ============================================================================
+// Admin API Routes (Protected with role-based access)
+// ============================================================================
+
+// Admin Products API - CRUD for products
+app.route("/api/admin/products", adminProductsApp);
+
+// Admin Orders API - order management
+app.route("/api/admin/orders", adminOrdersApp);
+
+// ============================================================================
+// Webhook Routes (External Service Callbacks)
+// ============================================================================
+
+// Razorpay payment webhooks
+app.route("/api/webhooks/razorpay", razorpayWebhooksApp);
+
+// ============================================================================
+// SEO Routes
+// ============================================================================
+
+// Sitemap XML generation for SEO crawlers
+app.route("/sitemap.xml", sitemapApp);
+
+// ============================================================================
+// Health & Status Endpoints
+// ============================================================================
+
+// Health check endpoints
+app.get("/health", (c) => {
+  return c.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// API health check (for API prefix consistency)
+app.get("/api/health", (c) => {
+  return c.json({
+    status: "ok",
+    service: "masonart-api",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// API root
+app.get("/", (c) => {
+  return c.json({
+    name: "MasonArt API",
+    version: "0.0.1",
+    documentation: "/docs",
+  });
+});
+
+// Export app type for Hono client type inference
+export type AppType = typeof app;
+
+// Start server
+const port = parseInt(process.env.PORT || "3000", 10);
+
+export default {
+  port,
+  fetch: app.fetch,
+};
