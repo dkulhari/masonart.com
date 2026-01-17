@@ -1,0 +1,44 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(/Users/dhruv/work/masonart.com/.worktrees/001-take-a-look-at-docs-directory-and-start-implementi/**)",
+      "Write(/Users/dhruv/work/masonart.com/.worktrees/001-take-a-look-at-docs-directory-and-start-implementi/**)",
+      "Edit(/Users/dhruv/work/masonart.com/.worktrees/001-take-a-look-at-docs-directory-and-start-implementi/**)",
+      "Glob(/Users/dhruv/work/masonart.com/.worktrees/001-take-a-look-at-docs-directory-and-start-implementi/**)",
+      "Grep(/Users/dhruv/work/masonart.com/.worktrees/001-take-a-look-at-docs-directory-and-start-implementi/**)",
+      "Read(/Users/dhruv/work/masonart.com/.worktrees/001-take-a-look-at-docs-directory-and-start-implementi/.auto-claude/specs/001-take-a-look-at-docs-directory-and-start-implementi/**)",
+      "Write(/Users/dhruv/work/masonart.com/.worktrees/001-take-a-look-at-docs-directory-and-start-implementi/.auto-claude/specs/001-take-a-look-at-docs-directory-and-start-implementi/**)",
+      "Edit(/Users/dhruv/work/masonart.com/.worktrees/001-take-a-look-at-docs-directory-and-start-implementi/.auto-claude/specs/001-take-a-look-at-docs-directory-and-start-implementi/**)",
+      "Read(/Users/dhruv/work/masonart.com/.auto-claude/**)",
+      "Write(/Users/dhruv/work/masonart.com/.auto-claude/**)",
+      "Edit(/Users/dhruv/work/masonart.com/.auto-claude/**)",
+      "Glob(/Users/dhruv/work/masonart.com/.auto-claude/**)",
+      "Grep(/Users/dhruv/work/masonart.com/.auto-claude/**)",
+      "Read(/Users/dhruv/work/masonart.com/.worktrees/**)",
+      "Write(/Users/dhruv/work/masonart.com/.worktrees/**)",
+      "Edit(/Users/dhruv/work/masonart.com/.worktrees/**)",
+      "Glob(/Users/dhruv/work/masonart.com/.worktrees/**)",
+      "Grep(/Users/dhruv/work/masonart.com/.worktrees/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}
