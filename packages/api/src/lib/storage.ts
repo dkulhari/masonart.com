@@ -1,13 +1,8 @@
 /**
- * Storage Utility Library
+ * Storage Module (S3/R2 Compatible)
  *
- * Provides S3-compatible storage utilities for Cloudflare R2:
- * - File upload/download
- * - Presigned URLs
- * - File management
- * - CDN integration
- *
- * Uses AWS SDK v3 for S3-compatible operations.
+ * Provides utilities for storing and retrieving files from S3-compatible storage.
+ * Works with AWS S3, Cloudflare R2, or MinIO (local development).
  */
 
 import {
@@ -17,293 +12,426 @@ import {
   DeleteObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
+  CopyObjectCommand,
   type PutObjectCommandInput,
-  type GetObjectCommandInput,
-  type DeleteObjectCommandInput,
-  type HeadObjectCommandInput,
-  type ListObjectsV2CommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+// ============================================================================
+// S3 Client Configuration
+// ============================================================================
+
 /**
- * Storage configuration
+ * S3-compatible storage client
+ * Works with AWS S3, Cloudflare R2, and MinIO
  */
-export interface StorageConfig {
-  endpoint: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  bucket: string;
-  region?: string;
-  cdnUrl?: string;
+const s3 = new S3Client({
+  region: 'auto',
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY!,
+    secretAccessKey: process.env.R2_SECRET_KEY!,
+  },
+  forcePathStyle: true, // Required for MinIO and some S3-compatible services
+});
+
+const BUCKET = process.env.R2_BUCKET || 'poster-app-dev';
+const CDN_URL = process.env.CDN_URL || '';
+
+// ============================================================================
+// Storage Paths
+// ============================================================================
+
+/**
+ * Storage path prefixes for different content types
+ */
+export const StoragePaths = {
+  PRODUCTS: 'products/',
+  AI_GENERATIONS: 'ai-generations/',
+  USER_UPLOADS: 'user-uploads/',
+  AVATARS: 'avatars/',
+  FRAMES: 'frames/',
+  TEMP: 'temp/',
+} as const;
+
+/**
+ * Generate a unique file key
+ */
+function generateFileKey(
+  prefix: string,
+  filename: string,
+  userId?: string
+): string {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+
+  if (userId) {
+    return `${prefix}${userId}/${timestamp}-${random}-${sanitizedFilename}`;
+  }
+  return `${prefix}${timestamp}-${random}-${sanitizedFilename}`;
+}
+
+// ============================================================================
+// Upload Functions
+// ============================================================================
+
+/**
+ * Upload options for file uploads
+ */
+export interface UploadOptions {
+  contentType: string;
+  metadata?: Record<string, string>;
+  cacheControl?: string;
+  isPublic?: boolean;
 }
 
 /**
- * Get storage configuration from environment variables
+ * Upload result with URL and key
  */
-export function getStorageConfig(): StorageConfig {
-  const endpoint = process.env.R2_ENDPOINT;
-  const accessKeyId = process.env.R2_ACCESS_KEY;
-  const secretAccessKey = process.env.R2_SECRET_KEY;
-  const bucket = process.env.R2_BUCKET;
-  const cdnUrl = process.env.CDN_URL;
+export interface UploadResult {
+  url: string;
+  key: string;
+  bucket: string;
+}
 
-  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) {
-    throw new Error('Missing required storage configuration. Ensure R2_ENDPOINT, R2_ACCESS_KEY, R2_SECRET_KEY, and R2_BUCKET are set.');
-  }
+/**
+ * Upload a file buffer to storage
+ */
+export async function uploadFile(
+  buffer: Buffer,
+  key: string,
+  options: UploadOptions
+): Promise<UploadResult> {
+  const command: PutObjectCommandInput = {
+    Bucket: BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: options.contentType,
+    Metadata: options.metadata,
+    CacheControl: options.cacheControl || 'public, max-age=31536000', // 1 year
+  };
+
+  await s3.send(new PutObjectCommand(command));
 
   return {
-    endpoint,
-    accessKeyId,
-    secretAccessKey,
-    bucket,
-    region: 'auto', // Cloudflare R2 uses 'auto' region
-    cdnUrl,
+    url: getPublicUrl(key),
+    key,
+    bucket: BUCKET,
   };
 }
 
 /**
- * Validate storage configuration
+ * Upload an image with automatic key generation
  */
-export function validateStorageConfig(config: Partial<StorageConfig>): boolean {
-  return !!(
-    config.endpoint &&
-    config.accessKeyId &&
-    config.secretAccessKey &&
-    config.bucket
-  );
+export async function uploadImage(
+  buffer: Buffer,
+  filename: string,
+  contentType: string,
+  options?: {
+    prefix?: string;
+    userId?: string;
+    metadata?: Record<string, string>;
+  }
+): Promise<UploadResult> {
+  const prefix = options?.prefix || StoragePaths.PRODUCTS;
+  const key = generateFileKey(prefix, filename, options?.userId);
+
+  return uploadFile(buffer, key, {
+    contentType,
+    metadata: options?.metadata,
+  });
 }
 
 /**
- * Create S3 client for R2
+ * Upload an AI-generated image
  */
-export function createStorageClient(config?: StorageConfig): S3Client {
-  const storageConfig = config || getStorageConfig();
+export async function uploadAIGeneration(
+  buffer: Buffer,
+  userId: string,
+  generationId: string,
+  index: number
+): Promise<UploadResult> {
+  const key = `${StoragePaths.AI_GENERATIONS}${userId}/${generationId}/${index}.png`;
 
-  return new S3Client({
-    endpoint: storageConfig.endpoint,
-    region: storageConfig.region || 'auto',
-    credentials: {
-      accessKeyId: storageConfig.accessKeyId,
-      secretAccessKey: storageConfig.secretAccessKey,
+  return uploadFile(buffer, key, {
+    contentType: 'image/png',
+    metadata: {
+      generationId,
+      userId,
+      index: String(index),
     },
   });
 }
 
 /**
- * Storage class for file operations
+ * Upload user avatar
  */
-export class Storage {
-  private client: S3Client;
-  private bucket: string;
-  private cdnUrl?: string;
+export async function uploadAvatar(
+  buffer: Buffer,
+  userId: string,
+  contentType: string
+): Promise<UploadResult> {
+  const extension = contentType.split('/')[1] || 'jpg';
+  const key = `${StoragePaths.AVATARS}${userId}/avatar.${extension}`;
 
-  constructor(config?: StorageConfig) {
-    const storageConfig = config || getStorageConfig();
-    this.client = createStorageClient(storageConfig);
-    this.bucket = storageConfig.bucket;
-    this.cdnUrl = storageConfig.cdnUrl;
-  }
+  return uploadFile(buffer, key, {
+    contentType,
+    cacheControl: 'public, max-age=86400', // 1 day (avatars may change)
+  });
+}
 
-  /**
-   * Upload file to storage
-   */
-  async upload(
-    key: string,
-    data: Buffer | Uint8Array | string,
-    options?: {
-      contentType?: string;
-      metadata?: Record<string, string>;
-      cacheControl?: string;
-    }
-  ): Promise<{ key: string; url: string }> {
-    const input: PutObjectCommandInput = {
-      Bucket: this.bucket,
-      Key: key,
-      Body: data,
-      ContentType: options?.contentType || 'application/octet-stream',
-      Metadata: options?.metadata,
-      CacheControl: options?.cacheControl,
-    };
+// ============================================================================
+// Download Functions
+// ============================================================================
 
-    const command = new PutObjectCommand(input);
-    await this.client.send(command);
+/**
+ * Get an object from storage
+ */
+export async function getFile(key: string): Promise<Buffer | null> {
+  try {
+    const response = await s3.send(
+      new GetObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+      })
+    );
 
-    return {
-      key,
-      url: this.getPublicUrl(key),
-    };
-  }
-
-  /**
-   * Download file from storage
-   */
-  async download(key: string): Promise<Buffer> {
-    const input: GetObjectCommandInput = {
-      Bucket: this.bucket,
-      Key: key,
-    };
-
-    const command = new GetObjectCommand(input);
-    const response = await this.client.send(command);
-
-    if (!response.Body) {
-      throw new Error('File not found or empty');
-    }
+    if (!response.Body) return null;
 
     // Convert stream to buffer
     const chunks: Uint8Array[] = [];
-    for await (const chunk of response.Body as any) {
+    const stream = response.Body as AsyncIterable<Uint8Array>;
+    for await (const chunk of stream) {
       chunks.push(chunk);
     }
 
     return Buffer.concat(chunks);
+  } catch {
+    return null;
   }
+}
 
-  /**
-   * Delete file from storage
-   */
-  async delete(key: string): Promise<void> {
-    const input: DeleteObjectCommandInput = {
-      Bucket: this.bucket,
-      Key: key,
-    };
-
-    const command = new DeleteObjectCommand(input);
-    await this.client.send(command);
-  }
-
-  /**
-   * Check if file exists
-   */
-  async exists(key: string): Promise<boolean> {
-    try {
-      const input: HeadObjectCommandInput = {
-        Bucket: this.bucket,
+/**
+ * Check if a file exists
+ */
+export async function fileExists(key: string): Promise<boolean> {
+  try {
+    await s3.send(
+      new HeadObjectCommand({
+        Bucket: BUCKET,
         Key: key,
-      };
-
-      const command = new HeadObjectCommand(input);
-      await this.client.send(command);
-      return true;
-    } catch (error: any) {
-      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
-        return false;
-      }
-      throw error;
-    }
+      })
+    );
+    return true;
+  } catch {
+    return false;
   }
+}
 
-  /**
-   * Get file metadata
-   */
-  async getMetadata(key: string): Promise<{
-    size: number;
-    contentType?: string;
-    lastModified?: Date;
-    metadata?: Record<string, string>;
-  }> {
-    const input: HeadObjectCommandInput = {
-      Bucket: this.bucket,
+// ============================================================================
+// Delete Functions
+// ============================================================================
+
+/**
+ * Delete a file from storage
+ */
+export async function deleteFile(key: string): Promise<void> {
+  await s3.send(
+    new DeleteObjectCommand({
+      Bucket: BUCKET,
       Key: key,
-    };
+    })
+  );
+}
 
-    const command = new HeadObjectCommand(input);
-    const response = await this.client.send(command);
+/**
+ * Delete multiple files by prefix
+ */
+export async function deleteByPrefix(prefix: string): Promise<number> {
+  let deletedCount = 0;
+  let continuationToken: string | undefined;
 
-    return {
-      size: response.ContentLength || 0,
-      contentType: response.ContentType,
-      lastModified: response.LastModified,
-      metadata: response.Metadata,
-    };
-  }
+  do {
+    const listResponse = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: BUCKET,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
 
-  /**
-   * List files with optional prefix
-   */
-  async list(
-    prefix?: string,
-    options?: {
-      maxKeys?: number;
-      continuationToken?: string;
+    if (listResponse.Contents) {
+      for (const object of listResponse.Contents) {
+        if (object.Key) {
+          await deleteFile(object.Key);
+          deletedCount++;
+        }
+      }
     }
-  ): Promise<{
-    files: Array<{ key: string; size: number; lastModified?: Date }>;
-    continuationToken?: string;
-  }> {
-    const input: ListObjectsV2CommandInput = {
-      Bucket: this.bucket,
+
+    continuationToken = listResponse.NextContinuationToken;
+  } while (continuationToken);
+
+  return deletedCount;
+}
+
+// ============================================================================
+// URL Functions
+// ============================================================================
+
+/**
+ * Get the public URL for a file
+ */
+export function getPublicUrl(key: string): string {
+  if (CDN_URL) {
+    return `${CDN_URL}/${key}`;
+  }
+  // Fallback to direct S3 URL
+  return `${process.env.R2_ENDPOINT}/${BUCKET}/${key}`;
+}
+
+/**
+ * Generate a pre-signed URL for direct upload
+ * Useful for client-side uploads
+ */
+export async function getPresignedUploadUrl(
+  key: string,
+  contentType: string,
+  expiresInSeconds: number = 3600
+): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
+}
+
+/**
+ * Generate a pre-signed URL for download
+ * Useful for private files or temporary access
+ */
+export async function getPresignedDownloadUrl(
+  key: string,
+  expiresInSeconds: number = 3600
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+  });
+
+  return getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
+}
+
+// ============================================================================
+// Copy/Move Functions
+// ============================================================================
+
+/**
+ * Copy a file to a new location
+ */
+export async function copyFile(
+  sourceKey: string,
+  destinationKey: string
+): Promise<UploadResult> {
+  await s3.send(
+    new CopyObjectCommand({
+      Bucket: BUCKET,
+      CopySource: `${BUCKET}/${sourceKey}`,
+      Key: destinationKey,
+    })
+  );
+
+  return {
+    url: getPublicUrl(destinationKey),
+    key: destinationKey,
+    bucket: BUCKET,
+  };
+}
+
+/**
+ * Move a file to a new location (copy + delete)
+ */
+export async function moveFile(
+  sourceKey: string,
+  destinationKey: string
+): Promise<UploadResult> {
+  const result = await copyFile(sourceKey, destinationKey);
+  await deleteFile(sourceKey);
+  return result;
+}
+
+// ============================================================================
+// List Functions
+// ============================================================================
+
+/**
+ * List files in a directory
+ */
+export async function listFiles(
+  prefix: string,
+  maxKeys: number = 100
+): Promise<Array<{ key: string; size: number; lastModified: Date }>> {
+  const response = await s3.send(
+    new ListObjectsV2Command({
+      Bucket: BUCKET,
       Prefix: prefix,
-      MaxKeys: options?.maxKeys || 1000,
-      ContinuationToken: options?.continuationToken,
-    };
+      MaxKeys: maxKeys,
+    })
+  );
 
-    const command = new ListObjectsV2Command(input);
-    const response = await this.client.send(command);
-
-    const files = (response.Contents || []).map((item) => ({
+  return (
+    response.Contents?.map((item) => ({
       key: item.Key!,
       size: item.Size || 0,
-      lastModified: item.LastModified,
-    }));
-
-    return {
-      files,
-      continuationToken: response.NextContinuationToken,
-    };
-  }
-
-  /**
-   * Generate presigned URL for temporary access
-   */
-  async getPresignedUrl(
-    key: string,
-    options?: {
-      expiresIn?: number; // seconds
-      operation?: 'get' | 'put';
-    }
-  ): Promise<string> {
-    const operation = options?.operation || 'get';
-    const expiresIn = options?.expiresIn || 3600; // 1 hour default
-
-    const command =
-      operation === 'get'
-        ? new GetObjectCommand({ Bucket: this.bucket, Key: key })
-        : new PutObjectCommand({ Bucket: this.bucket, Key: key });
-
-    return await getSignedUrl(this.client, command, { expiresIn });
-  }
-
-  /**
-   * Get public URL for a file
-   */
-  getPublicUrl(key: string): string {
-    if (this.cdnUrl) {
-      return `${this.cdnUrl}/${key}`;
-    }
-
-    // Fallback to R2 public URL format
-    return `https://${this.bucket}.r2.dev/${key}`;
-  }
-
-  /**
-   * Generate unique file key with timestamp
-   */
-  generateKey(filename: string, prefix?: string): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    const sanitized = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const parts = [prefix, `${timestamp}-${random}`, sanitized].filter(Boolean);
-    return parts.join('/');
-  }
+      lastModified: item.LastModified || new Date(),
+    })) || []
+  );
 }
 
-// Create default storage instance (singleton)
-let defaultStorage: Storage | null = null;
+// ============================================================================
+// Image Processing Helpers
+// ============================================================================
 
-export function getDefaultStorage(): Storage {
-  if (!defaultStorage) {
-    defaultStorage = new Storage();
-  }
-  return defaultStorage;
+/**
+ * Validate image file type
+ */
+export function isValidImageType(contentType: string): boolean {
+  const validTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+  ];
+  return validTypes.includes(contentType.toLowerCase());
 }
+
+/**
+ * Get file extension from content type
+ */
+export function getExtensionFromContentType(contentType: string): string {
+  const map: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+  };
+  return map[contentType.toLowerCase()] || 'jpg';
+}
+
+/**
+ * Validate file size
+ */
+export function isValidFileSize(
+  sizeBytes: number,
+  maxSizeMB: number = 10
+): boolean {
+  return sizeBytes <= maxSizeMB * 1024 * 1024;
+}
+
+// Export the S3 client for advanced usage
+export { s3 };

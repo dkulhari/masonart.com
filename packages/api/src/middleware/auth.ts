@@ -1,249 +1,450 @@
-import { Context, Next } from 'hono';
-import { createMiddleware } from 'hono/factory';
-import { auth, getSession } from '../auth/index.js';
-
 /**
- * Authentication Middleware
+ * Auth Middleware for Protected Routes
  *
- * Provides middleware functions for protecting routes with authentication.
- * Integrates with Better Auth to verify user sessions and enforce authorization.
+ * This module provides Hono middleware for authentication and authorization:
+ * - requireAuth: Requires a valid session
+ * - requireRole: Requires specific user role(s)
+ * - optionalAuth: Attaches user if authenticated, but doesn't require it
+ * - requirePermission: Requires specific permission(s) based on RBAC
  *
- * Available middleware:
- * - requireAuth: Requires authentication, returns 401 if not authenticated
- * - optionalAuth: Attaches session to context if available (optional)
- * - requireRole: Requires specific role (e.g., admin)
- * - requireAdmin: Requires admin role
+ * Following patterns from docs/poster-app-tech-stack.md
  */
 
+import { createMiddleware } from "hono/factory";
+import { HTTPException } from "hono/http-exception";
+import { auth, type UserRole } from "../auth";
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
 /**
- * Extended context type with session
+ * Session user type with all Better Auth and custom fields
  */
-export interface AuthContext {
-  user: {
-    id: string;
-    email: string;
-    name?: string;
-    role?: string;
-    emailVerified?: boolean;
-    image?: string;
-    createdAt?: Date;
-    updatedAt?: Date;
-  };
-  session: {
-    id: string;
-    userId: string;
-    expiresAt: Date;
-    token?: string;
-    ipAddress?: string;
-    userAgent?: string;
-  };
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  role: UserRole;
+  // Custom MasonArt fields
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  phoneVerified?: boolean;
+  status?: string;
+  tradeStatus?: string;
+  aiCreditsRemaining?: number;
+  aiSubscriptionTier?: string;
 }
 
 /**
- * Middleware that requires authentication
- * Returns 401 Unauthorized if no valid session exists
+ * Session type from Better Auth
+ */
+export interface AuthSession {
+  id: string;
+  token: string;
+  userId: string;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
+
+/**
+ * Variables added to Hono context by auth middleware
+ */
+export interface AuthVariables {
+  user: AuthUser;
+  session: AuthSession;
+}
+
+/**
+ * Optional auth variables (user and session may be null)
+ */
+export interface OptionalAuthVariables {
+  user: AuthUser | null;
+  session: AuthSession | null;
+}
+
+// ============================================================================
+// Error Helpers
+// ============================================================================
+
+/**
+ * Create a standardized 401 Unauthorized error
+ */
+function createUnauthorizedError(message = "Unauthorized"): HTTPException {
+  return new HTTPException(401, {
+    message,
+    res: new Response(
+      JSON.stringify({
+        error: "Unauthorized",
+        message,
+        code: "UNAUTHORIZED",
+      }),
+      {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      }
+    ),
+  });
+}
+
+/**
+ * Create a standardized 403 Forbidden error
+ */
+function createForbiddenError(message = "Forbidden"): HTTPException {
+  return new HTTPException(403, {
+    message,
+    res: new Response(
+      JSON.stringify({
+        error: "Forbidden",
+        message,
+        code: "FORBIDDEN",
+      }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }
+    ),
+  });
+}
+
+// ============================================================================
+// Middleware Functions
+// ============================================================================
+
+/**
+ * Require authenticated session
+ *
+ * This middleware:
+ * 1. Gets session from Better Auth using request headers
+ * 2. Throws 401 if no valid session exists
+ * 3. Sets user and session on context for downstream handlers
  *
  * @example
- * app.get('/api/profile', requireAuth, (c) => {
- *   const { user, session } = c.get('auth');
+ * ```typescript
+ * app.get('/api/profile', requireAuth, async (c) => {
+ *   const user = c.get('user');
  *   return c.json({ user });
  * });
+ * ```
  */
-export const requireAuth = createMiddleware(async (c: Context, next: Next) => {
+export const requireAuth = createMiddleware<{
+  Variables: AuthVariables;
+}>(async (c, next) => {
   try {
-    const request = c.req.raw;
-    const session = await getSession(request);
-
-    if (!session || !session.user) {
-      return c.json(
-        {
-          error: 'Unauthorized',
-          message: 'Authentication required',
-        },
-        401
-      );
-    }
-
-    // Attach auth info to context
-    c.set('auth', {
-      user: session.user,
-      session: session.session,
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
     });
 
+    if (!session || !session.user) {
+      throw createUnauthorizedError("Authentication required");
+    }
+
+    // Check if user is active
+    const userStatus = (session.user as AuthUser).status;
+    if (userStatus && userStatus !== "active") {
+      throw createForbiddenError(`Account is ${userStatus}`);
+    }
+
+    // Set user and session on context
+    c.set("user", session.user as AuthUser);
+    c.set("session", session.session as AuthSession);
+
     await next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    return c.json(
-      {
-        error: 'Unauthorized',
-        message: 'Invalid or expired session',
-      },
-      401
-    );
+    // Re-throw HTTPException as-is
+    if (error instanceof HTTPException) {
+      throw error;
+    }
+
+    // Handle other errors (e.g., database issues)
+    throw createUnauthorizedError("Invalid or expired session");
   }
 });
 
 /**
- * Middleware that optionally attaches authentication
- * Does not block the request if user is not authenticated
+ * Optional authentication
+ *
+ * Similar to requireAuth but doesn't throw if no session exists.
+ * Useful for routes that work with or without authentication.
  *
  * @example
- * app.get('/api/products', optionalAuth, (c) => {
- *   const auth = c.get('auth');
- *   const isAuthenticated = !!auth;
- *   return c.json({ isAuthenticated });
+ * ```typescript
+ * app.get('/api/products', optionalAuth, async (c) => {
+ *   const user = c.get('user'); // May be null
+ *   // Show personalized content if logged in
  * });
+ * ```
  */
-export const optionalAuth = createMiddleware(async (c: Context, next: Next) => {
+export const optionalAuth = createMiddleware<{
+  Variables: OptionalAuthVariables;
+}>(async (c, next) => {
   try {
-    const request = c.req.raw;
-    const session = await getSession(request);
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers,
+    });
 
-    if (session && session.user) {
-      c.set('auth', {
-        user: session.user,
-        session: session.session,
-      });
+    if (session?.user) {
+      c.set("user", session.user as AuthUser);
+      c.set("session", session.session as AuthSession);
     } else {
-      c.set('auth', null);
+      c.set("user", null);
+      c.set("session", null);
     }
-
-    await next();
-  } catch (error) {
-    console.error('Optional auth middleware error:', error);
-    c.set('auth', null);
-    await next();
+  } catch {
+    // Silently ignore auth errors for optional auth
+    c.set("user", null);
+    c.set("session", null);
   }
+
+  await next();
 });
 
 /**
- * Middleware that requires a specific role
- * Returns 403 Forbidden if user doesn't have required role
+ * Require specific role(s)
  *
- * @param role - Required role (e.g., 'admin', 'moderator')
+ * Must be used after requireAuth middleware.
+ * Checks if the authenticated user has one of the specified roles.
+ *
+ * @param roles - Single role or array of allowed roles
  *
  * @example
- * app.delete('/api/products/:id', requireRole('admin'), (c) => {
- *   // Only admins can delete products
- * });
+ * ```typescript
+ * // Single role
+ * app.get('/api/admin/users', requireAuth, requireRole('admin'), handler);
+ *
+ * // Multiple roles
+ * app.get('/api/admin/dashboard', requireAuth, requireRole(['admin', 'super-admin']), handler);
+ * ```
  */
-export const requireRole = (role: string) => {
-  return createMiddleware(async (c: Context, next: Next) => {
-    // First ensure user is authenticated
-    const auth = c.get('auth') as AuthContext | null;
+export function requireRole(roles: UserRole | UserRole[]) {
+  const allowedRoles = Array.isArray(roles) ? roles : [roles];
 
-    if (!auth || !auth.user) {
-      return c.json(
-        {
-          error: 'Unauthorized',
-          message: 'Authentication required',
-        },
-        401
-      );
+  return createMiddleware<{
+    Variables: AuthVariables;
+  }>(async (c, next) => {
+    const user = c.get("user");
+
+    if (!user) {
+      throw createUnauthorizedError("Authentication required");
     }
 
-    // Check if user has required role
-    const userRole = auth.user.role || 'customer';
-    if (userRole !== role) {
-      return c.json(
-        {
-          error: 'Forbidden',
-          message: `Access denied. Required role: ${role}`,
-        },
-        403
+    const userRole = user.role;
+
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      throw createForbiddenError(
+        `Access denied. Required role: ${allowedRoles.join(" or ")}`
       );
     }
 
     await next();
   });
-};
+}
 
 /**
- * Middleware that requires admin role
- * Convenience function for requireRole('admin')
+ * Require admin role (admin or super-admin)
+ *
+ * Convenience middleware for admin-only routes.
+ * Must be used after requireAuth middleware.
  *
  * @example
- * app.get('/api/admin/dashboard', requireAdmin, (c) => {
- *   return c.json({ message: 'Admin dashboard' });
- * });
+ * ```typescript
+ * app.use('/api/admin/*', requireAuth, requireAdmin);
+ * ```
  */
-export const requireAdmin = createMiddleware(async (c: Context, next: Next) => {
-  const auth = c.get('auth') as AuthContext | null;
+export const requireAdmin = requireRole(["admin", "super-admin"]);
 
-  if (!auth || !auth.user) {
-    return c.json(
-      {
-        error: 'Unauthorized',
-        message: 'Authentication required',
-      },
-      401
-    );
+/**
+ * Require trade program access
+ *
+ * Checks if user has trade role OR admin role.
+ * Must be used after requireAuth middleware.
+ *
+ * @example
+ * ```typescript
+ * app.get('/api/trade/pricing', requireAuth, requireTrade, handler);
+ * ```
+ */
+export const requireTrade = createMiddleware<{
+  Variables: AuthVariables;
+}>(async (c, next) => {
+  const user = c.get("user");
+
+  if (!user) {
+    throw createUnauthorizedError("Authentication required");
   }
 
-  const userRole = auth.user.role || 'customer';
-  if (userRole !== 'admin') {
-    return c.json(
-      {
-        error: 'Forbidden',
-        message: 'Admin access required',
-      },
-      403
-    );
+  const hasTradeAccess =
+    user.role === "trade" ||
+    user.role === "admin" ||
+    user.role === "super-admin" ||
+    user.tradeStatus === "approved";
+
+  if (!hasTradeAccess) {
+    throw createForbiddenError("Trade program access required");
   }
 
   await next();
 });
 
 /**
- * Middleware that checks if user's email is verified
- * Returns 403 Forbidden if email is not verified
+ * Require email verification
+ *
+ * Ensures the user's email is verified.
+ * Must be used after requireAuth middleware.
  *
  * @example
- * app.post('/api/orders', requireAuth, requireEmailVerified, (c) => {
- *   // Only users with verified emails can create orders
- * });
+ * ```typescript
+ * app.post('/api/orders', requireAuth, requireVerified, handler);
+ * ```
  */
-export const requireEmailVerified = createMiddleware(async (c: Context, next: Next) => {
-  const auth = c.get('auth') as AuthContext | null;
+export const requireVerified = createMiddleware<{
+  Variables: AuthVariables;
+}>(async (c, next) => {
+  const user = c.get("user");
 
-  if (!auth || !auth.user) {
-    return c.json(
-      {
-        error: 'Unauthorized',
-        message: 'Authentication required',
-      },
-      401
-    );
+  if (!user) {
+    throw createUnauthorizedError("Authentication required");
   }
 
-  if (!auth.user.emailVerified) {
-    return c.json(
-      {
-        error: 'Forbidden',
-        message: 'Email verification required',
-      },
-      403
-    );
+  if (!user.emailVerified) {
+    throw createForbiddenError("Email verification required");
   }
 
   await next();
 });
 
 /**
- * Export auth handler for mounting on /api/auth
- * This handles all Better Auth routes (sign-in, sign-up, callback, etc.)
+ * Check AI credits availability
+ *
+ * Ensures the user has available AI generation credits.
+ * Must be used after requireAuth middleware.
+ *
+ * @param creditsRequired - Number of credits needed (default: 1)
+ *
+ * @example
+ * ```typescript
+ * app.post('/api/ai/generate', requireAuth, requireAICredits(1), handler);
+ * ```
  */
-export const authHandler = async (c: Context) => {
-  const request = c.req.raw;
-  const response = await auth.handler(request);
-  return response;
-};
+export function requireAICredits(creditsRequired = 1) {
+  return createMiddleware<{
+    Variables: AuthVariables;
+  }>(async (c, next) => {
+    const user = c.get("user");
 
-export default {
-  requireAuth,
-  optionalAuth,
-  requireRole,
-  requireAdmin,
-  requireEmailVerified,
-  authHandler,
-};
+    if (!user) {
+      throw createUnauthorizedError("Authentication required");
+    }
+
+    const credits = user.aiCreditsRemaining ?? 0;
+
+    // Unlimited tier always has access
+    if (user.aiSubscriptionTier === "unlimited") {
+      await next();
+      return;
+    }
+
+    if (credits < creditsRequired) {
+      throw createForbiddenError(
+        `Insufficient AI credits. Required: ${creditsRequired}, Available: ${credits}`
+      );
+    }
+
+    await next();
+  });
+}
+
+/**
+ * Rate limit by user
+ *
+ * Helper to get user ID for rate limiting.
+ * Falls back to IP address for unauthenticated requests.
+ *
+ * @example
+ * ```typescript
+ * import { rateLimiter } from 'hono-rate-limiter';
+ *
+ * app.use('/api/ai/*', rateLimiter({
+ *   keyGenerator: (c) => getUserRateLimitKey(c),
+ *   limit: 10,
+ *   windowMs: 60000,
+ * }));
+ * ```
+ */
+export function getUserRateLimitKey(c: {
+  get: (key: "user") => AuthUser | null | undefined;
+  req: { header: (name: string) => string | undefined };
+}): string {
+  const user = c.get("user");
+  if (user?.id) {
+    return `user:${user.id}`;
+  }
+
+  // Fall back to IP for unauthenticated requests
+  const ip =
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
+    c.req.header("x-real-ip") ||
+    "unknown";
+
+  return `ip:${ip}`;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Check if user has specific role
+ */
+export function hasRole(user: AuthUser | null, role: UserRole): boolean {
+  return user?.role === role;
+}
+
+/**
+ * Check if user has any of the specified roles
+ */
+export function hasAnyRole(
+  user: AuthUser | null,
+  roles: UserRole[]
+): boolean {
+  return user?.role ? roles.includes(user.role) : false;
+}
+
+/**
+ * Check if user is admin (admin or super-admin)
+ */
+export function isAdmin(user: AuthUser | null): boolean {
+  return hasAnyRole(user, ["admin", "super-admin"]);
+}
+
+/**
+ * Check if user can access resource
+ *
+ * Useful for checking ownership or admin access
+ *
+ * @example
+ * ```typescript
+ * const order = await getOrder(orderId);
+ * if (!canAccess(user, order.userId)) {
+ *   throw new Error('Access denied');
+ * }
+ * ```
+ */
+export function canAccess(
+  user: AuthUser | null,
+  resourceOwnerId: string
+): boolean {
+  if (!user) return false;
+  // Admins can access everything
+  if (isAdmin(user)) return true;
+  // Users can only access their own resources
+  return user.id === resourceOwnerId;
+}

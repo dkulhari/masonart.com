@@ -1,221 +1,274 @@
 /**
- * Redis Utility Library
+ * Redis Client Module
  *
- * Provides Redis client configuration and utility functions for:
- * - Caching
- * - Session management
- * - Rate limiting
- * - Queue support
- *
- * Uses ioredis for Redis client with connection pooling and error handling.
+ * Provides Redis connection for caching, sessions, and BullMQ job queues.
+ * Uses ioredis for full Redis functionality and BullMQ compatibility.
  */
 
-import Redis, { type RedisOptions } from 'ioredis';
+import Redis from 'ioredis';
+
+// Redis connection URL from environment
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
 /**
- * Get Redis URL from environment variable with fallback
+ * Redis client singleton for general-purpose caching
  */
-export function getRedisUrl(): string {
-  return process.env.REDIS_URL || 'redis://localhost:6380';
-}
-
-/**
- * Parse Redis URL into connection options
- */
-export function parseRedisUrl(url: string): RedisOptions {
-  const urlObj = new URL(url);
-
-  return {
-    host: urlObj.hostname,
-    port: parseInt(urlObj.port) || 6379,
-    password: urlObj.password || undefined,
-    db: urlObj.pathname ? parseInt(urlObj.pathname.slice(1)) || 0 : 0,
-    retryStrategy: (times: number) => {
-      const delay = Math.min(times * 50, 2000);
-      return delay;
-    },
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: true,
-    lazyConnect: false,
-  };
-}
-
-/**
- * Create Redis client instance
- */
-export function createRedisClient(url?: string): Redis {
-  const redisUrl = url || getRedisUrl();
-  const options = parseRedisUrl(redisUrl);
-
-  const client = new Redis(options);
-
-  client.on('error', (err) => {
-    console.error('Redis client error:', err);
-  });
-
-  client.on('connect', () => {
-    console.log('Redis client connected');
-  });
-
-  return client;
-}
-
-/**
- * Test Redis connection
- */
-export async function testRedisConnection(client: Redis): Promise<boolean> {
-  try {
-    const result = await client.ping();
-    return result === 'PONG';
-  } catch (error) {
-    console.error('Redis connection test failed:', error);
-    return false;
-  }
-}
-
-/**
- * Get Redis server info
- */
-export async function getRedisInfo(client: Redis): Promise<Record<string, string>> {
-  const info = await client.info();
-  const lines = info.split('\r\n');
-  const result: Record<string, string> = {};
-
-  for (const line of lines) {
-    if (line && !line.startsWith('#') && line.includes(':')) {
-      const [key, value] = line.split(':');
-      result[key] = value;
+export const redis = new Redis(REDIS_URL, {
+  maxRetriesPerRequest: null, // Required for BullMQ compatibility
+  enableReadyCheck: false,
+  lazyConnect: true,
+  retryStrategy: (times) => {
+    // In development, don't retry if Redis is not available
+    if (process.env.NODE_ENV === 'development' && times > 3) {
+      return null; // Stop retrying
     }
-  }
+    return Math.min(times * 100, 3000);
+  },
+});
 
-  return result;
+// Suppress Redis connection errors in development
+redis.on('error', (err) => {
+  if (process.env.NODE_ENV === 'development') {
+    // Silently ignore connection errors in development
+    return;
+  }
+  console.error('Redis connection error:', err);
+});
+
+/**
+ * Create a new Redis connection for BullMQ workers
+ * Each worker should have its own connection
+ */
+export function createRedisConnection(): Redis {
+  return new Redis(REDIS_URL, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
 }
 
 /**
- * Cache utility functions
+ * Redis connection options for BullMQ queues and workers
  */
-export class RedisCache {
-  constructor(private client: Redis, private prefix: string = 'cache:') {}
+export const redisConnectionOptions = {
+  connection: redis,
+};
 
-  /**
-   * Get value from cache
-   */
-  async get<T>(key: string): Promise<T | null> {
-    const value = await this.client.get(this.prefix + key);
+// ============================================================================
+// Cache Utilities
+// ============================================================================
+
+/**
+ * Default cache TTL (1 hour)
+ */
+const DEFAULT_TTL = 3600;
+
+/**
+ * Cache key prefixes for different data types
+ */
+export const CacheKeys = {
+  PRODUCT: 'product:',
+  PRODUCT_LIST: 'product-list:',
+  CART: 'cart:',
+  SESSION: 'session:',
+  USER: 'user:',
+  AI_GENERATION: 'ai-gen:',
+  RATE_LIMIT: 'rate-limit:',
+} as const;
+
+/**
+ * Get a cached value
+ */
+export async function getCached<T>(key: string): Promise<T | null> {
+  try {
+    if (redis.status !== 'ready') return null;
+    const value = await redis.get(key);
     if (!value) return null;
 
     try {
       return JSON.parse(value) as T;
     } catch {
-      return value as T;
+      return value as unknown as T;
     }
+  } catch {
+    // Redis not available - return null to skip cache
+    return null;
   }
+}
 
-  /**
-   * Set value in cache with optional TTL (in seconds)
-   */
-  async set(key: string, value: any, ttl?: number): Promise<void> {
+/**
+ * Set a cached value with optional TTL
+ */
+export async function setCached<T>(
+  key: string,
+  value: T,
+  ttlSeconds: number = DEFAULT_TTL
+): Promise<void> {
+  try {
+    if (redis.status !== 'ready') return;
     const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-
-    if (ttl) {
-      await this.client.setex(this.prefix + key, ttl, serialized);
-    } else {
-      await this.client.set(this.prefix + key, serialized);
-    }
+    await redis.setex(key, ttlSeconds, serialized);
+  } catch {
+    // Redis not available - skip caching silently
   }
+}
 
-  /**
-   * Delete value from cache
-   */
-  async del(key: string): Promise<void> {
-    await this.client.del(this.prefix + key);
+/**
+ * Delete a cached value
+ */
+export async function deleteCached(key: string): Promise<void> {
+  try {
+    if (redis.status !== 'ready') return;
+    await redis.del(key);
+  } catch {
+    // Redis not available - skip silently
   }
+}
 
-  /**
-   * Check if key exists
-   */
-  async exists(key: string): Promise<boolean> {
-    const result = await this.client.exists(this.prefix + key);
-    return result === 1;
-  }
-
-  /**
-   * Get TTL for a key (in seconds)
-   */
-  async ttl(key: string): Promise<number> {
-    return await this.client.ttl(this.prefix + key);
-  }
-
-  /**
-   * Clear all keys with this prefix
-   */
-  async clear(): Promise<void> {
-    const keys = await this.client.keys(this.prefix + '*');
+/**
+ * Delete all cached values matching a pattern
+ */
+export async function deleteCachedPattern(pattern: string): Promise<void> {
+  try {
+    if (redis.status !== 'ready') return;
+    const keys = await redis.keys(pattern);
     if (keys.length > 0) {
-      await this.client.del(...keys);
+      await redis.del(...keys);
+    }
+  } catch {
+    // Redis not available - skip silently
+  }
+}
+
+// ============================================================================
+// Rate Limiting Utilities
+// ============================================================================
+
+/**
+ * Rate limit result
+ */
+export interface RateLimitResult {
+  success: boolean;
+  remaining: number;
+  resetIn: number; // seconds
+}
+
+/**
+ * Check and increment rate limit for a key
+ * Uses sliding window algorithm
+ */
+export async function checkRateLimit(
+  key: string,
+  limit: number,
+  windowSeconds: number
+): Promise<RateLimitResult> {
+  const now = Date.now();
+  const windowStart = now - windowSeconds * 1000;
+  const rateLimitKey = `${CacheKeys.RATE_LIMIT}${key}`;
+
+  // Remove old entries outside the window
+  await redis.zremrangebyscore(rateLimitKey, 0, windowStart);
+
+  // Count current entries
+  const count = await redis.zcard(rateLimitKey);
+
+  if (count >= limit) {
+    // Get the oldest entry to calculate reset time
+    const oldest = await redis.zrange(rateLimitKey, 0, 0, 'WITHSCORES');
+    const oldestTimestamp = oldest[1];
+    const resetIn = oldest.length >= 2 && oldestTimestamp !== undefined
+      ? Math.ceil((parseInt(oldestTimestamp) + windowSeconds * 1000 - now) / 1000)
+      : windowSeconds;
+
+    return {
+      success: false,
+      remaining: 0,
+      resetIn,
+    };
+  }
+
+  // Add new entry
+  await redis.zadd(rateLimitKey, now, `${now}-${Math.random()}`);
+  await redis.expire(rateLimitKey, windowSeconds);
+
+  return {
+    success: true,
+    remaining: limit - count - 1,
+    resetIn: windowSeconds,
+  };
+}
+
+// ============================================================================
+// Session Utilities
+// ============================================================================
+
+/**
+ * Store session data in Redis
+ */
+export async function setSession(
+  sessionId: string,
+  data: Record<string, unknown>,
+  ttlSeconds: number = 7 * 24 * 60 * 60 // 7 days default
+): Promise<void> {
+  const key = `${CacheKeys.SESSION}${sessionId}`;
+  await setCached(key, data, ttlSeconds);
+}
+
+/**
+ * Get session data from Redis
+ */
+export async function getSession(
+  sessionId: string
+): Promise<Record<string, unknown> | null> {
+  const key = `${CacheKeys.SESSION}${sessionId}`;
+  return getCached(key);
+}
+
+/**
+ * Delete session from Redis
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const key = `${CacheKeys.SESSION}${sessionId}`;
+  await deleteCached(key);
+}
+
+// ============================================================================
+// Connection Management
+// ============================================================================
+
+/**
+ * Initialize Redis connection
+ * Call this on server startup
+ */
+export async function initRedis(): Promise<void> {
+  if (redis.status === 'ready') return;
+
+  try {
+    await redis.connect();
+  } catch (error) {
+    // Connection failed, but ioredis will auto-reconnect
+    // This is fine for development when Redis might not be running
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Redis connection failed, will retry automatically:', error);
+    } else {
+      throw error;
     }
   }
 }
 
 /**
- * Rate limiter using Redis
+ * Close Redis connections gracefully
+ * Call this on server shutdown
  */
-export class RedisRateLimiter {
-  constructor(
-    private client: Redis,
-    private prefix: string = 'ratelimit:',
-    private maxRequests: number = 100,
-    private windowSeconds: number = 60
-  ) {}
-
-  /**
-   * Check if request is allowed and increment counter
-   * Returns remaining requests or -1 if limit exceeded
-   */
-  async checkLimit(identifier: string): Promise<{ allowed: boolean; remaining: number }> {
-    const key = this.prefix + identifier;
-    const current = await this.client.incr(key);
-
-    if (current === 1) {
-      await this.client.expire(key, this.windowSeconds);
-    }
-
-    const allowed = current <= this.maxRequests;
-    const remaining = Math.max(0, this.maxRequests - current);
-
-    return { allowed, remaining };
-  }
-
-  /**
-   * Get current count for identifier
-   */
-  async getCount(identifier: string): Promise<number> {
-    const key = this.prefix + identifier;
-    const count = await this.client.get(key);
-    return count ? parseInt(count) : 0;
-  }
-
-  /**
-   * Reset limit for identifier
-   */
-  async reset(identifier: string): Promise<void> {
-    await this.client.del(this.prefix + identifier);
-  }
+export async function closeRedis(): Promise<void> {
+  await redis.quit();
 }
 
-// Create default Redis client instance (singleton)
-let defaultClient: Redis | null = null;
-
-export function getDefaultRedisClient(): Redis {
-  if (!defaultClient) {
-    defaultClient = createRedisClient();
-  }
-  return defaultClient;
+/**
+ * Check if Redis is connected
+ */
+export function isRedisConnected(): boolean {
+  return redis.status === 'ready';
 }
 
-export async function closeDefaultRedisClient(): Promise<void> {
-  if (defaultClient) {
-    await defaultClient.quit();
-    defaultClient = null;
-  }
-}
+// Export default redis instance
+export default redis;
