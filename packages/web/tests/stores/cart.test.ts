@@ -10,7 +10,8 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useCartStore, CartItem } from '../../src/stores/cart';
 import * as cartApi from '../../src/lib/api';
 
-// Mock the API module
+// Mock only the cart export from the API module
+// This test file only needs cart.* functions mocked for testing the cart store
 vi.mock('../../src/lib/api', () => ({
   cart: {
     get: vi.fn(),
