@@ -1508,3 +1508,70 @@ SKIP_E2E_SERVER=true npx playwright test tests/e2e/flows/ --list
 - ✅ E2E flow tests properly structured and list without errors
 - ✅ All test files follow AAA pattern and use proper mocking
 - ✅ Tests cover complete user journeys: catalog browsing, checkout flow, authentication, admin management
+
+---
+
+## Subtask 16.1 - Create Test Execution Summary
+**Status:** COMPLETED
+**Date:** 2026-01-19
+**Commit:** d15ec1a
+
+### Summary
+Created comprehensive test coverage documentation at docs/TEST-COVERAGE.md documenting all test coverage, results, and known issues across the MasonArt platform.
+
+### Documentation Overview
+
+#### Test Coverage Summary
+| Category | Test Files | Test Cases | Status |
+|----------|-----------|------------|--------|
+| Unit Tests (Shared) | 8 | 813 | ✅ All Pass |
+| Unit Tests (API) | 20 | 2,100+ | ✅ All Pass |
+| Unit Tests (Web) | 6 | 618 | ✅ All Pass |
+| Integration Tests | 4 | 178 | ✅ All Pass |
+| E2E Tests (Playwright) | 24 | 1,700+ unique | ✅ Structured |
+| Manual Test Docs | 34 | 500+ | ✅ Complete |
+
+**Total Automated Tests:** ~4,700+ test cases
+**Total E2E Configurations:** ~8,500 (tests × 5 browsers)
+
+#### Documentation Sections
+1. **Executive Summary** - Overall test counts and status
+2. **Test Coverage by Package** - Detailed breakdown per package
+   - Shared Package: 8 test files, 813 tests
+   - API Package: 20 test files, 2,100+ tests
+   - Web Package: 6 test files, 618 tests
+3. **Root-Level Tests** - Setup and integration tests
+4. **E2E Tests (Playwright)** - 24 test files across page, admin, SEO, and flow categories
+5. **Manual Test Documentation** - 34 documents covering all features
+6. **CI/CD Pipeline** - 7 GitHub Actions jobs
+7. **Known Issues and Considerations**
+   - Database-dependent tests (graceful skip)
+   - Redis-dependent tests (graceful skip)
+   - Docker-dependent tests (config always runs)
+   - E2E test requirements (dev server)
+   - Test isolation in web package
+   - BullMQ queue test handling
+   - Playwright/Vitest conflict workaround
+8. **Test Coverage Gaps** - Not tested and future recommendations
+9. **Running All Tests** - Quick start and full test suite commands
+10. **Test Fixtures** - Fixture file documentation
+
+### File Created
+- `docs/TEST-COVERAGE.md` - 439 lines of comprehensive documentation
+
+### Run Commands
+```bash
+# View the test coverage documentation
+cat docs/TEST-COVERAGE.md
+
+# Run all tests following the documented commands
+bun run test  # Unit tests
+npx playwright test --project=chromium  # E2E tests
+```
+
+### Key Insights
+- Tests gracefully handle unavailable services
+- Configuration tests always run
+- Runtime tests skip with informative messages
+- All tests follow AAA pattern (Arrange, Act, Assert)
+- E2E tests use API mocking for reliability
