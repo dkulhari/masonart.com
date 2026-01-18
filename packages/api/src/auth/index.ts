@@ -329,3 +329,86 @@ export type Session = typeof auth.$Infer.Session;
  * User type from Better Auth
  */
 export type User = typeof auth.$Infer.Session.user;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Validation result type for auth configuration
+ */
+export interface AuthConfigValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Validate auth configuration
+ * Checks that all required environment variables are set
+ * and validates their format
+ */
+export function validateAuthConfig(): AuthConfigValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Check required environment variables
+  if (!process.env.BETTER_AUTH_SECRET) {
+    errors.push("BETTER_AUTH_SECRET is required");
+  } else if (process.env.BETTER_AUTH_SECRET.length < 32) {
+    errors.push("BETTER_AUTH_SECRET must be at least 32 characters");
+  }
+
+  if (!process.env.DATABASE_URL) {
+    errors.push("DATABASE_URL is required for auth");
+  }
+
+  // Check Google OAuth configuration
+  const hasGoogleClientId = !!process.env.GOOGLE_CLIENT_ID;
+  const hasGoogleClientSecret = !!process.env.GOOGLE_CLIENT_SECRET;
+
+  if (hasGoogleClientId !== hasGoogleClientSecret) {
+    warnings.push(
+      "Google OAuth partially configured - both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET should be set"
+    );
+  }
+
+  // Check base URL format
+  const baseURL = process.env.BETTER_AUTH_URL;
+  if (baseURL && !baseURL.match(/^https?:\/\//)) {
+    warnings.push("BETTER_AUTH_URL should start with http:// or https://");
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+/**
+ * Get the current session from a request
+ * Returns null if no valid session exists
+ */
+export async function getSession(request: Request): Promise<Session | null> {
+  try {
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Require authentication for a request
+ * Throws an error if no valid session exists
+ */
+export async function requireAuth(request: Request): Promise<Session> {
+  const session = await getSession(request);
+  if (!session) {
+    throw new Error("Authentication required");
+  }
+  return session;
+}
