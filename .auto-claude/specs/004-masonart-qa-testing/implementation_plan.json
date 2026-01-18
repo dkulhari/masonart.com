@@ -3,7 +3,7 @@
   "title": "MasonArt QA Testing Strategy Implementation",
   "description": "Comprehensive QA testing for MasonArt e-commerce platform covering automated E2E tests with Playwright, unit/integration tests with Vitest, and manual browser testing documentation",
   "created_at": "2026-01-16T13:00:03.032Z",
-  "updated_at": "2026-01-18T21:03:20.038Z",
+  "updated_at": "2026-01-18T21:11:19.769Z",
   "status": "in_progress",
   "planStatus": "in_progress",
   "phases": [
@@ -1163,7 +1163,7 @@
           "subtask_id": "12.1",
           "title": "Create admin API tests",
           "description": "Write tests for admin products and orders API routes",
-          "status": "pending",
+          "status": "completed",
           "dependencies": [
             "1.5"
           ],
@@ -1174,7 +1174,7 @@
           "tests": [
             "packages/api/tests/routes/admin/*.test.ts"
           ],
-          "notes": ""
+          "notes": "Created comprehensive tests: products.test.ts (117 tests) covers GET/POST/PATCH/DELETE for products and variants with auth, query validation, create validation, variant validation, HTTP methods, response headers, error formats, runtime tests, performance tests. orders.test.ts (132 tests) covers GET/PATCH/POST for orders with auth, query validation, order ID validation, update/status/shipping/refund validation. All 249 tests pass. Committed in 32925a9."
         },
         {
           "subtask_id": "12.2",
