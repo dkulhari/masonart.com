@@ -847,3 +847,58 @@ npx playwright test tests/e2e/ai-generator.spec.ts
 ```
 
 ---
+
+## Subtask 11.3 - Create AI History E2E Test
+**Status:** COMPLETED
+**Date:** 2026-01-19
+**Commit:** eb60623
+
+### Summary
+Created comprehensive Playwright E2E test suite for AI creations history page (tests/e2e/ai-history.spec.ts) with 55+ test cases.
+
+### Test Coverage
+
+| Section | Tests | Description |
+|---------|-------|-------------|
+| Authentication | 2 | Redirect unauthenticated users, preserve redirect URL |
+| Loading State | 2 | Spinner while auth checking, Loader2 spinner |
+| Page Header | 10 | Title, Sparkles icon, Back to Account link, Create New button, HTML title, robots noindex, meta description |
+| Empty State | 5 | Message, description, CTA, Sparkles icon, create artwork text |
+| Creations List with Data | 11 | Count display, prompt text, style badges, status badges (completed/processing/queued), image count, Add to Cart button, Delete button, detail links |
+| Status Display | 2 | Failed/Cancelled statuses |
+| Error State | 2 | Error message and icon |
+| Filter Sidebar Desktop | 10 | Status/Style sections with all filter options |
+| Filter Interactions | 5 | URL updates for filters, active badges, clear all |
+| Mobile Filters | 4 | Filter button, panel display, close button, badge count |
+| Pagination | 6 | Buttons, page numbers, disabled states, navigation |
+| Navigation | 3 | Back link, create button, empty state CTA |
+| Responsive Design | 4 | Mobile, tablet, desktop layouts |
+| Accessibility | 4 | Heading hierarchy, semantic HTML, keyboard nav, aria labels |
+| Performance | 2 | Load time, no JS errors |
+| Loading Skeleton | 1 | Loading skeleton display |
+| Delete Actions | 2 | Delete button visibility based on purchase status |
+
+### Test Runs
+- **5 browser projects**: Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5), Mobile Safari (iPhone 12)
+- **275+ total test configurations** (55 tests × 5 browsers)
+
+### Run Commands
+```bash
+# List AI history E2E tests
+npx playwright test tests/e2e/ai-history.spec.ts --list
+
+# Run AI history E2E tests (requires dev server at localhost:3001)
+npx playwright test tests/e2e/ai-history.spec.ts
+```
+
+### Key Implementation Details
+- Tests based on actual AI creations history page implementation in packages/web/app/routes/account/ai-creations.tsx
+- AICreationsList component from packages/web/app/components/account/AICreationsList.tsx
+- Uses API mocking for authentication (/api/auth/get-session) and AI creations API (/api/ai/creations)
+- Tests all filter states (status, style) and URL query parameters
+- Tests all creation statuses: completed, processing, queued, failed, cancelled
+- Pagination tests with mock data for 36 items across 3 pages
+- Responsive design tests across mobile (375px), tablet (768px), and desktop (1280px) viewports
+- Follows AAA pattern (Arrange, Act, Assert) consistent with other E2E tests
+
+---
