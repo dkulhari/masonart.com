@@ -3,15 +3,17 @@
 ## Test Environment
 - **Browser**: Chrome (latest)
 - **Viewport**: Desktop (1920x1080) and Mobile (375x667)
-- **Date**: 2026-01-16
-- **Tester**: Manual QA Testing
-- **API Base URL**: http://localhost:3000/api
+- **Date**: 2026-01-18
+- **Tester**: Manual QA Testing / Claude Chrome Extension
+- **API Base URL**: http://localhost:3000/api (Backend) / http://localhost:3001 (Frontend)
+- **Auth Framework**: Better Auth v1.x
 
 ## Prerequisites
-- [ ] Dev server running at http://localhost:3000
-- [ ] Database migrations applied
-- [ ] Docker services (PostgreSQL, Redis) running
+- [ ] Dev server running at http://localhost:3000 (API) and http://localhost:3001 (Frontend)
+- [ ] Database migrations applied (`bun run db:push`)
+- [ ] Docker services (PostgreSQL, Redis) running (`docker compose up -d`)
 - [ ] API testing tool ready (Postman, Insomnia, cURL, or browser DevTools)
+- [ ] Google OAuth credentials configured (for OAuth tests only)
 
 ## Overview
 This document covers manual testing of Better Auth integration routes:
@@ -504,7 +506,7 @@ invalid json{
 
 **Expected Result**:
 - `Set-Cookie` header present
-- Cookie name matches session cookie (e.g., `masonart_session`)
+- Cookie name matches session cookie (e.g., `masonart.session`)
 - Cookie has secure flags (HttpOnly, SameSite)
 - Cookie has expiration date
 
@@ -812,7 +814,7 @@ invalid json{
 
 **Steps**:
 1. Send logout request with invalid session cookie
-2. Use cookie: `masonart_session=invalid-token-12345`
+2. Use cookie: `masonart.session=invalid-token-12345`
 3. Check response status
 
 **Expected Result**:
@@ -942,7 +944,7 @@ invalid json{
 **Endpoint**: `GET /api/auth/session`
 
 **Steps**:
-1. Send request with invalid cookie: `masonart_session=invalid-token`
+1. Send request with invalid cookie: `masonart.session=invalid-token`
 2. Check response
 
 **Expected Result**:
@@ -1260,6 +1262,398 @@ invalid json{
 
 ---
 
+## Google OAuth Testing
+
+### TC-051: Initiate Google OAuth Flow
+
+**Description**: Verify Google OAuth sign-in initiation
+
+**Endpoint**: `POST /api/auth/sign-in/social`
+
+**Request Body**:
+```json
+{
+  "provider": "google",
+  "callbackURL": "http://localhost:3001/auth/callback"
+}
+```
+
+**Steps**:
+1. Send POST request to `/api/auth/sign-in/social`
+2. Include provider and callbackURL
+3. Check response for redirect URL
+
+**Expected Result**:
+- Status: 200-302
+- Returns Google OAuth authorization URL
+- URL contains client_id and redirect_uri
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Redirect URL: _______________
+
+---
+
+### TC-052: Handle Google OAuth Callback
+
+**Description**: Verify OAuth callback handling
+
+**Endpoint**: `GET /api/auth/callback/google`
+
+**Steps**:
+1. Navigate to Google OAuth authorization URL
+2. Complete Google sign-in
+3. Observe callback handling
+4. Check if user is created/logged in
+
+**Expected Result**:
+- User redirected back to app
+- Session cookie set
+- User account created or linked
+- Redirect to callbackURL
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- User Created: _______________
+
+---
+
+### TC-053: OAuth Account Linking
+
+**Description**: Verify OAuth accounts can be linked to existing email accounts
+
+**Steps**:
+1. Register user with email `test@gmail.com`
+2. Sign out
+3. Sign in with Google using same email
+4. Verify account is linked
+
+**Expected Result**:
+- Accounts are linked successfully
+- Single user record with multiple accounts
+- Both sign-in methods work
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Account Linked: _______________
+
+---
+
+### TC-054: OAuth Error Handling - Missing Code
+
+**Description**: Verify handling of OAuth callback without code
+
+**Endpoint**: `GET /api/auth/callback/google`
+
+**Steps**:
+1. Send GET request to callback without code parameter
+2. Check response
+
+**Expected Result**:
+- Status: 400-499
+- Error message indicates missing code
+- User not authenticated
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Status: _______________
+
+---
+
+## Email Verification Testing
+
+### TC-055: Registration Sends Verification Email
+
+**Description**: Verify email verification is sent on registration
+
+**Endpoint**: `POST /api/auth/sign-up/email`
+
+**Steps**:
+1. Register new user with valid email
+2. Check server logs for verification URL (in dev mode)
+3. Verify email contains verification link
+
+**Expected Result**:
+- Registration succeeds
+- Verification email/log generated
+- Contains valid verification URL with token
+- Token expires in 24 hours
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Verification URL: _______________
+
+---
+
+### TC-056: Verify Email Address
+
+**Description**: Verify email verification flow
+
+**Endpoint**: `GET /api/auth/verify-email` (with token)
+
+**Steps**:
+1. Register new user
+2. Get verification token from email/logs
+3. Navigate to verification URL
+4. Check if email is marked as verified
+
+**Expected Result**:
+- Email marked as verified
+- User auto-signed in (per config)
+- Redirect to success page
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Email Verified: _______________
+
+---
+
+### TC-057: Reject Expired Verification Token
+
+**Description**: Verify expired tokens are rejected
+
+**Steps**:
+1. Use an expired verification token (>24 hours old)
+2. Attempt to verify email
+3. Check response
+
+**Expected Result**:
+- Status: 400-499
+- Error indicates token expired
+- Email not verified
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Status: _______________
+
+---
+
+### TC-058: Reject Invalid Verification Token
+
+**Description**: Verify invalid tokens are rejected
+
+**Steps**:
+1. Send request with invalid/tampered token
+2. Check response
+
+**Expected Result**:
+- Status: 400-499
+- Error indicates invalid token
+- Email not verified
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Status: _______________
+
+---
+
+## User Role Testing (RBAC)
+
+### TC-059: Default Role Assignment
+
+**Description**: Verify new users get default customer role
+
+**Steps**:
+1. Register new user
+2. Check session data for role
+3. Verify role is "customer"
+
+**Expected Result**:
+- Role field present in user data
+- Default role is "customer"
+- AI credits set to 5 (default)
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Role: _______________
+- AI Credits: _______________
+
+---
+
+### TC-060: Session Contains User Role
+
+**Description**: Verify session endpoint returns user role
+
+**Endpoint**: `GET /api/auth/get-session`
+
+**Steps**:
+1. Login as user
+2. Check session endpoint
+3. Verify role is included
+
+**Expected Result**:
+- Session includes user.role
+- Role matches database value
+- Additional fields present (firstName, lastName, etc.)
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- User Role: _______________
+
+---
+
+### TC-061: Admin Role Properties
+
+**Description**: Verify admin users have correct role
+
+**Steps**:
+1. Create admin user (via database or admin panel)
+2. Login as admin
+3. Check session for role
+
+**Expected Result**:
+- Role is "admin" or "super-admin"
+- Admin permissions available
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Admin Role: _______________
+
+---
+
+### TC-062: Trade Role Properties
+
+**Description**: Verify trade users have correct role
+
+**Steps**:
+1. Create trade user or upgrade existing user
+2. Login as trade user
+3. Check session for role and trade status
+
+**Expected Result**:
+- Role is "trade"
+- tradeStatus is "approved"
+- Trade permissions available
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Trade Role: _______________
+- Trade Status: _______________
+
+---
+
+## Additional User Fields Testing
+
+### TC-063: Registration with Additional Fields
+
+**Description**: Verify additional user fields can be set on registration
+
+**Endpoint**: `POST /api/auth/sign-up/email`
+
+**Request Body**:
+```json
+{
+  "email": "fulluser@example.com",
+  "password": "TestPassword123!",
+  "name": "Full Name",
+  "firstName": "First",
+  "lastName": "Last",
+  "phone": "+1234567890"
+}
+```
+
+**Steps**:
+1. Register with all optional fields
+2. Check session for field values
+
+**Expected Result**:
+- All fields stored correctly
+- Fields returned in session
+- Phone verified defaults to false
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Fields Present: _______________
+
+---
+
+### TC-064: Update User Profile
+
+**Description**: Verify user can update their profile
+
+**Steps**:
+1. Login as user
+2. Update profile via API
+3. Verify changes persist
+
+**Expected Result**:
+- Profile updates successfully
+- Changes reflected in session
+- Email change triggers verification
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Updated Fields: _______________
+
+---
+
+## Session Cookie Configuration
+
+### TC-065: Cookie Configuration - Secure Flags
+
+**Description**: Verify session cookie has correct configuration
+
+**Endpoint**: `POST /api/auth/sign-in/email`
+
+**Steps**:
+1. Login successfully
+2. Inspect `Set-Cookie` header
+3. Verify cookie attributes
+
+**Expected Result**:
+- Cookie name: `masonart.session`
+- HttpOnly: true
+- SameSite: Lax or Strict
+- Secure: true (in production)
+- Max-Age or Expires set (7 days)
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Cookie Name: _______________
+- Flags: _______________
+
+---
+
+### TC-066: Session Expiry
+
+**Description**: Verify session expires after configured time
+
+**Steps**:
+1. Login and get session
+2. Note session expiry time
+3. Verify expiry matches config (7 days)
+
+**Expected Result**:
+- Session has expiry timestamp
+- Expiry is approximately 7 days from login
+- Session update age is 24 hours
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Expiry Time: _______________
+
+---
+
+### TC-067: Session Cookie Caching
+
+**Description**: Verify session cookie caching behavior
+
+**Steps**:
+1. Login and get session
+2. Make multiple session checks
+3. Observe response times
+
+**Expected Result**:
+- Session is cached (5 minute max-age per config)
+- Subsequent requests faster
+- Cache invalidated on logout
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Cache Working: _______________
+
+---
+
 ## Issues Found
 
 | ID | Description | Severity | Status |
@@ -1268,7 +1662,7 @@ invalid json{
 
 ## Summary
 
-- **Total Test Cases**: 50
+- **Total Test Cases**: 67
 - **Passed**: _______________
 - **Failed**: _______________
 - **Blocked**: _______________
