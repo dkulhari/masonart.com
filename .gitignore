@@ -23,6 +23,8 @@ bun.lockb
 # Testing
 coverage/
 *.lcov
+playwright-report/
+test-results/
 
 # TypeScript
 *.tsbuildinfo
