@@ -1575,3 +1575,48 @@ npx playwright test --project=chromium  # E2E tests
 - Runtime tests skip with informative messages
 - All tests follow AAA pattern (Arrange, Act, Assert)
 - E2E tests use API mocking for reliability
+
+---
+
+## Subtask 16.2 - Add Testing Section to README
+**Status:** COMPLETED
+**Date:** 2026-01-19
+**Commit:** ebe3250
+
+### Summary
+Created comprehensive README.md with a dedicated testing section providing complete instructions for running all types of tests across the MasonArt platform.
+
+### File Created/Updated
+- `README.md` - 363 lines of documentation
+
+### README Sections
+1. **Project Overview** - Tech stack, project structure
+2. **Prerequisites** - Required software (Bun, Node.js, Docker, Playwright)
+3. **Getting Started** - Setup instructions
+4. **Available Scripts** - Root-level npm/bun scripts
+5. **Testing Section** (comprehensive)
+   - Quick Start commands
+   - E2E Tests (Playwright) with environment variables
+   - API Tests (Vitest)
+   - Web Tests (Vitest + Testing Library)
+   - Integration Tests
+   - Infrastructure Tests
+   - Test Coverage generation
+   - E2E Test Configuration documentation
+   - Test Directory Structure
+   - Writing Tests with code examples
+   - Manual Testing documentation
+   - CI/CD Integration
+6. **Database Management** - Drizzle commands
+
+### Testing Documentation Highlights
+- **Quick Start**: `bun run test`, `bun run test:e2e`, `bun run test:integration`
+- **E2E Commands**: Full Playwright command reference with --ui, --project, and environment variables
+- **Environment Variables**: `SKIP_E2E_SERVER`, `E2E_BASE_URL`, `CI`
+- **Code Examples**: E2E test, API test, and Component test examples
+- **Directory Structure**: Complete test file organization diagram
+
+### Verification
+- README.md created with 363 lines
+- All test commands documented and accurate
+- Follows project patterns and conventions
