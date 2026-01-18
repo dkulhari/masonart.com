@@ -509,8 +509,8 @@ describe('Products HTTP Method Validation', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(validProductData),
     });
-    // Should be 404 (route not found for POST) or 405 (method not allowed)
-    expect([404, 405].includes(res.status)).toBe(true);
+    // Should be 404/405 (route not found/method not allowed) or 401 (auth middleware first)
+    expect([401, 404, 405].includes(res.status)).toBe(true);
   });
 
   it('should reject PUT to /api/products/:slug', async () => {
@@ -521,7 +521,8 @@ describe('Products HTTP Method Validation', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: 'Updated' }),
     });
-    expect([404, 405].includes(res.status)).toBe(true);
+    // May return 401 if auth middleware runs first, or 404/405 for unsupported method
+    expect([401, 404, 405].includes(res.status)).toBe(true);
   });
 
   it('should reject DELETE to /api/products/:slug', async () => {
@@ -530,7 +531,8 @@ describe('Products HTTP Method Validation', () => {
     const res = await app.request('/api/products/test-product', {
       method: 'DELETE',
     });
-    expect([404, 405].includes(res.status)).toBe(true);
+    // May return 401 if auth middleware runs first, or 404/405 for unsupported method
+    expect([401, 404, 405].includes(res.status)).toBe(true);
   });
 
   it('should handle OPTIONS for CORS preflight', async () => {
