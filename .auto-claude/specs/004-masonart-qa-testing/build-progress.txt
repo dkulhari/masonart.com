@@ -524,3 +524,114 @@ bun run playwright test tests/e2e/layout.spec.ts --list
 # Run E2E tests (requires dev server running at localhost:3001)
 bun run playwright test tests/e2e/layout.spec.ts
 ```
+
+---
+
+## Subtask 8.2 - Create Home Page E2E Test
+**Status:** COMPLETED
+**Date:** 2026-01-19
+**Commit:** 499017d
+
+### Summary
+Created comprehensive Playwright E2E test suite for the MasonArt home page (tests/e2e/home.spec.ts).
+
+### Test Coverage - 90 Test Cases
+
+| Section | Tests | Description |
+|---------|-------|-------------|
+| Hero Section | 11 | Badge, headline, subheadline, CTAs, trust indicators (rating, shipping, returns), navigation |
+| Featured Products Section | 8 | Section header, description, View all links, products grid, placeholder fallback |
+| Product Cards | 5 | Images, titles, prices, Featured badges, navigation to detail |
+| Categories Section | 10 | Shop by Style header, 4 category cards (Abstract, Nature, Minimalist, Typography), hover states, navigation |
+| AI Generator Section | 9 | Section content, 3 features (Easy to use, Multiple styles, Print ready), CTA, gradient background |
+| Value Propositions Section | 8 | Why Choose MasonArt header, 4 value props (Premium Quality, Free Shipping, 30-Day Returns, AI-Powered) |
+| Newsletter Section | 8 | Stay Inspired header, email input, Subscribe button, privacy disclaimer, form validation |
+| SEO Meta Tags | 6 | Page title, meta description, Open Graph (title, description, type), Twitter card |
+| Responsive Design | 6 | Mobile CTAs, categories grid, value props, newsletter form, tablet/desktop sections |
+| Accessibility | 6 | Heading hierarchy, accessible links, form elements, keyboard navigation, color contrast, section structure |
+| Performance | 4 | Page load time, hero render time, lazy loading, layout stability on scroll |
+| Navigation | 4 | Multiple paths to posters/create pages, category navigation, scroll position |
+| Content | 4 | Trust indicators, Indian Rupee currency, category count, value prop count |
+| Error Handling | 2 | Missing products graceful fallback, JavaScript error detection |
+
+### Test Runs
+- **5 browser projects**: Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5), Mobile Safari (iPhone 12)
+- **450 total test configurations** (90 tests × 5 browsers)
+
+### Run Commands
+```bash
+# List home page E2E tests
+npx playwright test tests/e2e/home.spec.ts --list
+
+# Run home page E2E tests (requires dev server at localhost:3001)
+npx playwright test tests/e2e/home.spec.ts
+```
+
+### Key Implementation Details
+- Tests based on actual home page implementation in packages/web/app/routes/index.tsx
+- Follows AAA pattern (Arrange, Act, Assert)
+- Handles both populated and empty product states gracefully
+- Tests all interactive elements and navigation paths
+- Validates SEO meta tags from route head configuration
+- Responsive design tests across mobile, tablet, and desktop viewports
+
+---
+
+## Subtask 8.5 - Create Cart Page E2E Test
+**Status:** COMPLETED
+**Date:** 2026-01-19
+**Commit:** 8deaa40
+
+### Summary
+Created comprehensive Playwright E2E test suite for the MasonArt cart page (tests/e2e/cart.spec.ts).
+
+### Test Coverage - 80+ Test Cases
+
+| Section | Tests | Description |
+|---------|-------|-------------|
+| Page Header | 3 | Title display, meta title, noindex robots tag |
+| Empty Cart State | 12 | Empty message, shopping bag icon, descriptive text, Browse Posters/Create with AI CTAs, Recommended section, View Featured Collection link, no item count/clear button/order summary |
+| Cart with Items | 7 | Item count display, cart items, product title, size label, Clear Cart button, Continue Shopping link, navigation |
+| Quantity Controls | 6 | Decrease/increase buttons, quantity display, plus/minus click behavior, disable at quantity 1, item count update |
+| Remove Items | 2 | Remove button display, remove item functionality |
+| Clear Cart | 2 | Clear all items, localStorage clearing |
+| Order Summary | 6 | Heading, subtotal, shipping line, tax note, estimated total, INR price format |
+| Free Shipping Progress | 4 | Progress when under ₹999 threshold, ₹99 shipping fee, FREE shipping when over, no progress bar when over |
+| Checkout Button | 2 | Button display, navigation to /checkout |
+| Trust Badges | 3 | Free shipping over ₹999, secure checkout, 30-day returns |
+| Payment Methods | 5 | Section display, Visa, Mastercard, Razorpay, UPI |
+| Item with Frame | 2 | Frame name display, frame price in total |
+| AI Generated Item | 1 | AI badge display on AI-generated items |
+| Multiple Items | 3 | All items displayed, correct total item count, each product title |
+| Product Links | 2 | Title links to product page, navigation on click |
+| Responsive Design | 5 | Mobile display, column stacking, tablet display, desktop side-by-side layout, sticky order summary |
+| Accessibility | 5 | Heading hierarchy, ARIA labels on buttons, keyboard navigation, accessible images |
+| Cart Persistence | 2 | Persist across reloads, persist quantity changes |
+| Performance | 2 | Load time under 5s, no JavaScript errors |
+| Navigation | 2 | Navigate to cart from header, browser back button |
+| Error Handling | 2 | Handle corrupted localStorage, handle empty localStorage |
+
+### Test Runs
+- **5 browser projects**: Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5), Mobile Safari (iPhone 12)
+- **400+ total test configurations** (80 tests × 5 browsers)
+
+### Run Commands
+```bash
+# List cart page E2E tests
+npx playwright test tests/e2e/cart.spec.ts --list
+
+# Run cart page E2E tests (requires dev server at localhost:3001)
+npx playwright test tests/e2e/cart.spec.ts
+```
+
+### Key Implementation Details
+- Tests based on actual cart page implementation in packages/web/app/routes/cart/index.tsx
+- CartItem component from packages/web/app/components/cart/CartItem.tsx
+- Cart store from packages/web/app/stores/cart.ts (Zustand with localStorage persistence)
+- Helper function to add items to cart via localStorage for testing cart with items
+- Tests all interactive elements including quantity controls, remove/clear buttons
+- Validates free shipping progress bar and threshold behavior (₹999)
+- Tests all trust badges and payment method displays
+- Handles special item types: framed items and AI-generated items
+- Responsive design tests across mobile, tablet, and desktop viewports
+- Cart persistence tests verify localStorage behavior across page reloads
