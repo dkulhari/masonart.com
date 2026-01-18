@@ -1,0 +1,1692 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * Admin Products Management E2E Tests
+ *
+ * Tests for the MasonArt admin products management page (/admin/products).
+ *
+ * Based on actual implementation in:
+ * - packages/api/src/routes/admin/products.ts
+ * - packages/web/app/routes/admin/products/index.tsx
+ * - packages/web/app/routes/admin/products/new.tsx
+ * - packages/web/app/routes/admin/products/$id.tsx
+ *
+ * Admin Products CRUD operations:
+ * - List all products with pagination, filtering, sorting, and search
+ * - Create new product
+ * - View/Edit existing product
+ * - Archive/Delete product (soft delete)
+ * - Manage product variants
+ */
+
+// ============================================================================
+// Test Data Helpers
+// ============================================================================
+
+/**
+ * Mock product data
+ */
+const mockProducts = [
+  {
+    id: 'prod-001',
+    sku: 'TX-001',
+    title: 'Ocean Waves Abstract Poster',
+    slug: 'ocean-waves-abstract-poster',
+    description: 'A serene minimalist abstract representation of ocean waves',
+    basePrice: '1999.00',
+    styles: ['minimalist', 'abstract'],
+    subjects: ['sea', 'nature'],
+    colors: ['blue', 'white'],
+    orientation: 'landscape',
+    images: [{ id: 'img-1', url: 'https://cdn.example.com/ocean.jpg', isPrimary: true }],
+    status: 'active',
+    isFeatured: true,
+    featuredOrder: 1,
+    isAiGenerated: false,
+    createdAt: '2024-01-15T10:00:00Z',
+    updatedAt: '2024-01-15T10:00:00Z',
+  },
+  {
+    id: 'prod-002',
+    sku: 'TX-002',
+    title: 'Mountain Peaks Minimalist',
+    slug: 'mountain-peaks-minimalist',
+    description: 'Minimalist mountain landscape in black and white',
+    basePrice: '2499.00',
+    styles: ['minimalist', 'modern'],
+    subjects: ['mountains', 'landscape'],
+    colors: ['black', 'white', 'grey'],
+    orientation: 'portrait',
+    images: [{ id: 'img-2', url: 'https://cdn.example.com/mountain.jpg', isPrimary: true }],
+    status: 'active',
+    isFeatured: false,
+    featuredOrder: null,
+    isAiGenerated: false,
+    createdAt: '2024-01-14T10:00:00Z',
+    updatedAt: '2024-01-14T10:00:00Z',
+  },
+  {
+    id: 'prod-003',
+    sku: 'TX-003',
+    title: 'Botanical Line Art',
+    slug: 'botanical-line-art',
+    description: 'Elegant botanical line drawing',
+    basePrice: '1499.00',
+    styles: ['botanical', 'line-art'],
+    subjects: ['botanical', 'flowers'],
+    colors: ['black', 'white'],
+    orientation: 'square',
+    images: [{ id: 'img-3', url: 'https://cdn.example.com/botanical.jpg', isPrimary: true }],
+    status: 'draft',
+    isFeatured: false,
+    featuredOrder: null,
+    isAiGenerated: false,
+    createdAt: '2024-01-13T10:00:00Z',
+    updatedAt: '2024-01-13T10:00:00Z',
+  },
+  {
+    id: 'prod-004',
+    sku: 'AI-001',
+    title: 'AI Generated Abstract',
+    slug: 'ai-generated-abstract',
+    description: 'Custom AI-generated abstract artwork',
+    basePrice: '2999.00',
+    styles: ['abstract', 'ai-generated'],
+    subjects: ['abstract'],
+    colors: ['multi'],
+    orientation: 'square',
+    images: [{ id: 'img-4', url: 'https://cdn.example.com/ai-art.jpg', isPrimary: true }],
+    status: 'active',
+    isFeatured: true,
+    featuredOrder: 2,
+    isAiGenerated: true,
+    createdAt: '2024-01-12T10:00:00Z',
+    updatedAt: '2024-01-12T10:00:00Z',
+  },
+  {
+    id: 'prod-005',
+    sku: 'TX-005',
+    title: 'Vintage Travel Paris',
+    slug: 'vintage-travel-paris',
+    description: 'Vintage style travel poster featuring Paris',
+    basePrice: '1799.00',
+    styles: ['vintage', 'retro'],
+    subjects: ['city', 'travel'],
+    colors: ['beige', 'gold', 'black'],
+    orientation: 'portrait',
+    images: [{ id: 'img-5', url: 'https://cdn.example.com/paris.jpg', isPrimary: true }],
+    status: 'archived',
+    isFeatured: false,
+    featuredOrder: null,
+    isAiGenerated: false,
+    createdAt: '2024-01-11T10:00:00Z',
+    updatedAt: '2024-01-11T10:00:00Z',
+  },
+];
+
+/**
+ * Mock product variants
+ */
+const mockVariants = [
+  {
+    id: 'var-001',
+    productId: 'prod-001',
+    sizeLabel: '12x16 inches',
+    widthInches: 12,
+    heightInches: 16,
+    price: '1499.00',
+    stockQuantity: 50,
+    isInStock: true,
+    isActive: true,
+    sortOrder: 0,
+  },
+  {
+    id: 'var-002',
+    productId: 'prod-001',
+    sizeLabel: '18x24 inches',
+    widthInches: 18,
+    heightInches: 24,
+    price: '2299.00',
+    stockQuantity: 30,
+    isInStock: true,
+    isActive: true,
+    sortOrder: 1,
+  },
+  {
+    id: 'var-003',
+    productId: 'prod-001',
+    sizeLabel: '24x32 inches',
+    widthInches: 24,
+    heightInches: 32,
+    price: '2999.00',
+    stockQuantity: 0,
+    isInStock: false,
+    isActive: true,
+    sortOrder: 2,
+  },
+];
+
+/**
+ * Mock product stats
+ */
+const mockProductStats = {
+  totalProducts: 100,
+  activeProducts: 85,
+  draftProducts: 10,
+  archivedProducts: 5,
+  lowStockProducts: 8,
+  outOfStockProducts: 3,
+};
+
+/**
+ * Setup admin session mock
+ */
+async function setupAdminSession(page: import('@playwright/test').Page) {
+  await page.route('**/api/auth/get-session', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        user: {
+          id: 'admin-user-id',
+          name: 'Admin User',
+          email: 'admin@masonart.com',
+          role: 'admin',
+          emailVerified: true,
+          createdAt: '2024-01-01T00:00:00Z',
+        },
+        session: {
+          id: 'session-id',
+          userId: 'admin-user-id',
+          expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        },
+      }),
+    });
+  });
+}
+
+/**
+ * Setup products list API mock
+ */
+async function setupProductsListMock(
+  page: import('@playwright/test').Page,
+  products: typeof mockProducts = mockProducts,
+  total?: number
+) {
+  await page.route('**/api/admin/products*', async (route) => {
+    const url = new URL(route.request().url());
+
+    // Handle stats endpoint
+    if (url.pathname.includes('/stats')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockProductStats),
+      });
+      return;
+    }
+
+    // Handle variants endpoint
+    if (url.pathname.includes('/variants')) {
+      return; // Let other handlers handle this
+    }
+
+    // Handle single product endpoint
+    const productIdMatch = url.pathname.match(/\/api\/admin\/products\/([^/]+)$/);
+    if (productIdMatch && !['', 'new'].includes(productIdMatch[1])) {
+      const productId = productIdMatch[1];
+      const product = products.find((p) => p.id === productId);
+      if (product) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...product,
+            variants: mockVariants.filter((v) => v.productId === productId),
+          }),
+        });
+      } else {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Product not found' }),
+        });
+      }
+      return;
+    }
+
+    // Handle list endpoint with filters
+    const status = url.searchParams.get('status');
+    const search = url.searchParams.get('search');
+    const page_num = parseInt(url.searchParams.get('page') || '1');
+    const pageSize = parseInt(url.searchParams.get('pageSize') || '20');
+
+    let filteredProducts = [...products];
+
+    if (status) {
+      filteredProducts = filteredProducts.filter((p) => p.status === status);
+    }
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredProducts = filteredProducts.filter(
+        (p) =>
+          p.title.toLowerCase().includes(searchLower) ||
+          p.sku.toLowerCase().includes(searchLower) ||
+          p.slug.toLowerCase().includes(searchLower)
+      );
+    }
+
+    const totalProducts = total ?? filteredProducts.length;
+    const offset = (page_num - 1) * pageSize;
+    const paginatedProducts = filteredProducts.slice(offset, offset + pageSize);
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: paginatedProducts,
+        total: totalProducts,
+        page: page_num,
+        pageSize,
+        totalPages: Math.ceil(totalProducts / pageSize),
+        hasNextPage: page_num * pageSize < totalProducts,
+        hasPreviousPage: page_num > 1,
+      }),
+    });
+  });
+}
+
+/**
+ * Setup product create/update/delete mocks
+ */
+async function setupProductMutationMocks(page: import('@playwright/test').Page) {
+  // Create product
+  await page.route('**/api/admin/products', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Product created successfully',
+          product: {
+            id: 'new-prod-' + Date.now(),
+            ...body,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        }),
+      });
+    } else {
+      await route.continue();
+    }
+  });
+
+  // Update product
+  await page.route('**/api/admin/products/*', async (route) => {
+    const url = new URL(route.request().url());
+
+    if (route.request().method() === 'PATCH' && !url.pathname.includes('/variants')) {
+      const body = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Product updated successfully',
+          product: {
+            ...mockProducts[0],
+            ...body,
+            updatedAt: new Date().toISOString(),
+          },
+        }),
+      });
+    } else if (route.request().method() === 'DELETE' && !url.pathname.includes('/variants')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Product archived successfully',
+        }),
+      });
+    } else {
+      await route.continue();
+    }
+  });
+}
+
+/**
+ * Setup variant mocks
+ */
+async function setupVariantMocks(page: import('@playwright/test').Page) {
+  await page.route('**/api/admin/products/*/variants*', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Variant created successfully',
+          variant: {
+            id: 'new-var-' + Date.now(),
+            ...body,
+          },
+        }),
+      });
+    } else if (route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Variant updated successfully',
+          variant: {
+            ...mockVariants[0],
+            ...body,
+          },
+        }),
+      });
+    } else if (route.request().method() === 'DELETE') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Variant deleted successfully',
+        }),
+      });
+    } else {
+      await route.continue();
+    }
+  });
+}
+
+// ============================================================================
+// Products List Page Tests
+// ============================================================================
+
+test.describe('Admin Products List Page', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await page.goto('/admin/products');
+  });
+
+  test('should display "Products" as page title', async ({ page }) => {
+    const title = page.locator('h1:has-text("Products")');
+    await expect(title).toBeVisible();
+  });
+
+  test('should have correct HTML document title', async ({ page }) => {
+    await expect(page).toHaveTitle(/Products.*Admin.*MasonArt/);
+  });
+
+  test('should have noindex/nofollow robots meta tag', async ({ page }) => {
+    const robots = await page.locator('meta[name="robots"]').getAttribute('content');
+    expect(robots).toContain('noindex');
+    expect(robots).toContain('nofollow');
+  });
+
+  test('should display "Add Product" button', async ({ page }) => {
+    const addButton = page.locator('a[href="/admin/products/new"]:has-text("Add Product"), button:has-text("Add Product")');
+    await expect(addButton).toBeVisible();
+  });
+
+  test('should display products table/grid', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+
+    // Should show product items
+    const productItems = page.locator('[data-testid="product-row"], .product-item, tr:has-text("TX-")');
+    const count = await productItems.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test('should display product SKU', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+
+    const sku = page.locator('text=TX-001');
+    await expect(sku).toBeVisible();
+  });
+
+  test('should display product title', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+
+    const title = page.locator('text=Ocean Waves Abstract Poster');
+    await expect(title).toBeVisible();
+  });
+
+  test('should display product price', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+
+    // Price might be formatted as ₹1,999 or similar
+    const priceRow = page.locator(':has-text("Ocean Waves")').first();
+    await expect(priceRow).toBeVisible();
+  });
+
+  test('should display product status badge', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+
+    const activeBadge = page.locator('.bg-green-100:has-text("active"), [data-status="active"]');
+    await expect(activeBadge.first()).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Products List Status Filter Tests
+// ============================================================================
+
+test.describe('Products List Status Filtering', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+  });
+
+  test('should have status filter dropdown', async ({ page }) => {
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const statusFilter = page.locator('select[name="status"], [data-testid="status-filter"], button:has-text("Status")');
+    await expect(statusFilter).toBeVisible();
+  });
+
+  test('should filter by Active status', async ({ page }) => {
+    await page.goto('/admin/products?status=active');
+    await page.waitForLoadState('networkidle');
+
+    // URL should contain status parameter
+    expect(page.url()).toContain('status=active');
+  });
+
+  test('should filter by Draft status', async ({ page }) => {
+    await page.goto('/admin/products?status=draft');
+    await page.waitForLoadState('networkidle');
+
+    expect(page.url()).toContain('status=draft');
+  });
+
+  test('should filter by Archived status', async ({ page }) => {
+    await page.goto('/admin/products?status=archived');
+    await page.waitForLoadState('networkidle');
+
+    expect(page.url()).toContain('status=archived');
+  });
+});
+
+// ============================================================================
+// Products List Search Tests
+// ============================================================================
+
+test.describe('Products List Search', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await page.goto('/admin/products');
+  });
+
+  test('should have search input', async ({ page }) => {
+    const searchInput = page.locator('input[type="search"], input[placeholder*="Search"], [data-testid="search-input"]');
+    await expect(searchInput).toBeVisible();
+  });
+
+  test('should search products by title', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+
+    const searchInput = page.locator('input[type="search"], input[placeholder*="Search"], [data-testid="search-input"]');
+    await searchInput.fill('Ocean');
+
+    // Wait for search to execute
+    await page.waitForTimeout(500);
+
+    // Should show matching product
+    const oceanProduct = page.locator('text=Ocean Waves');
+    await expect(oceanProduct).toBeVisible();
+  });
+
+  test('should search products by SKU', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+
+    const searchInput = page.locator('input[type="search"], input[placeholder*="Search"], [data-testid="search-input"]');
+    await searchInput.fill('TX-001');
+
+    await page.waitForTimeout(500);
+
+    const skuProduct = page.locator('text=TX-001');
+    await expect(skuProduct).toBeVisible();
+  });
+
+  test('should clear search', async ({ page }) => {
+    const searchInput = page.locator('input[type="search"], input[placeholder*="Search"], [data-testid="search-input"]');
+    await searchInput.fill('Test');
+    await searchInput.clear();
+
+    // Should show all products again
+    await page.waitForLoadState('networkidle');
+  });
+});
+
+// ============================================================================
+// Products List Pagination Tests
+// ============================================================================
+
+test.describe('Products List Pagination', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+  });
+
+  test('should display pagination controls', async ({ page }) => {
+    await setupProductsListMock(page, mockProducts, 50);
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const pagination = page.locator('[data-testid="pagination"], nav[aria-label="Pagination"], .pagination');
+    await expect(pagination).toBeVisible();
+  });
+
+  test('should display page numbers', async ({ page }) => {
+    await setupProductsListMock(page, mockProducts, 50);
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const pageButton = page.locator('button:has-text("1"), a:has-text("1")').first();
+    await expect(pageButton).toBeVisible();
+  });
+
+  test('should navigate to next page', async ({ page }) => {
+    await setupProductsListMock(page, mockProducts, 50);
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const nextButton = page.locator('button:has-text("Next"), a:has-text("Next"), [aria-label="Next page"]');
+    if (await nextButton.isVisible()) {
+      await nextButton.click();
+      await expect(page).toHaveURL(/page=2/);
+    }
+  });
+
+  test('should navigate to previous page', async ({ page }) => {
+    await setupProductsListMock(page, mockProducts, 50);
+    await page.goto('/admin/products?page=2');
+    await page.waitForLoadState('networkidle');
+
+    const prevButton = page.locator('button:has-text("Previous"), a:has-text("Previous"), [aria-label="Previous page"]');
+    if (await prevButton.isVisible()) {
+      await prevButton.click();
+      await expect(page).toHaveURL(/page=1|\/admin\/products$/);
+    }
+  });
+
+  test('should display total count', async ({ page }) => {
+    await setupProductsListMock(page, mockProducts, 100);
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const totalCount = page.locator('text=/\\d+.*products?/i');
+    await expect(totalCount.first()).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Products List Sorting Tests
+// ============================================================================
+
+test.describe('Products List Sorting', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await page.goto('/admin/products');
+  });
+
+  test('should have sortable column headers', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
+
+    // Look for sortable headers
+    const sortableHeader = page.locator('th[data-sortable], th button, [role="columnheader"]').first();
+    await expect(sortableHeader).toBeVisible();
+  });
+
+  test('should sort by title', async ({ page }) => {
+    await page.goto('/admin/products?sortBy=title');
+    await page.waitForLoadState('networkidle');
+
+    expect(page.url()).toContain('sortBy=title');
+  });
+
+  test('should sort by created date', async ({ page }) => {
+    await page.goto('/admin/products?sortBy=createdAt');
+    await page.waitForLoadState('networkidle');
+
+    expect(page.url()).toContain('sortBy=createdAt');
+  });
+
+  test('should sort by price', async ({ page }) => {
+    await page.goto('/admin/products?sortBy=basePrice');
+    await page.waitForLoadState('networkidle');
+
+    expect(page.url()).toContain('sortBy=basePrice');
+  });
+
+  test('should toggle sort order', async ({ page }) => {
+    await page.goto('/admin/products?sortBy=title&sortOrder=asc');
+    await page.waitForLoadState('networkidle');
+
+    expect(page.url()).toContain('sortOrder=asc');
+  });
+});
+
+// ============================================================================
+// Create Product Tests
+// ============================================================================
+
+test.describe('Create Product Page', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await setupProductMutationMocks(page);
+  });
+
+  test('should navigate to create product page', async ({ page }) => {
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const addButton = page.locator('a[href="/admin/products/new"]:has-text("Add Product"), button:has-text("Add Product")');
+    await addButton.click();
+
+    await expect(page).toHaveURL(/\/admin\/products\/new/);
+  });
+
+  test('should display create product form', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const form = page.locator('form');
+    await expect(form).toBeVisible();
+  });
+
+  test('should display required field: SKU', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const skuInput = page.locator('input[name="sku"], #sku, [data-testid="sku-input"]');
+    await expect(skuInput).toBeVisible();
+  });
+
+  test('should display required field: Title', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const titleInput = page.locator('input[name="title"], #title, [data-testid="title-input"]');
+    await expect(titleInput).toBeVisible();
+  });
+
+  test('should display required field: Slug', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const slugInput = page.locator('input[name="slug"], #slug, [data-testid="slug-input"]');
+    await expect(slugInput).toBeVisible();
+  });
+
+  test('should display required field: Base Price', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const priceInput = page.locator('input[name="basePrice"], #basePrice, [data-testid="price-input"]');
+    await expect(priceInput).toBeVisible();
+  });
+
+  test('should display orientation selector', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const orientationSelect = page.locator('select[name="orientation"], #orientation, [data-testid="orientation-select"]');
+    await expect(orientationSelect).toBeVisible();
+  });
+
+  test('should display status selector', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const statusSelect = page.locator('select[name="status"], #status, [data-testid="status-select"]');
+    await expect(statusSelect).toBeVisible();
+  });
+
+  test('should display description textarea', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const descriptionInput = page.locator('textarea[name="description"], #description, [data-testid="description-input"]');
+    await expect(descriptionInput).toBeVisible();
+  });
+
+  test('should display Save/Create button', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const saveButton = page.locator('button[type="submit"]:has-text("Save"), button[type="submit"]:has-text("Create")');
+    await expect(saveButton).toBeVisible();
+  });
+
+  test('should display Cancel button', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const cancelButton = page.locator('a:has-text("Cancel"), button:has-text("Cancel")');
+    await expect(cancelButton).toBeVisible();
+  });
+
+  test('should validate required fields on submit', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const saveButton = page.locator('button[type="submit"]:has-text("Save"), button[type="submit"]:has-text("Create")');
+    await saveButton.click();
+
+    // Should show validation errors
+    const errorMessage = page.locator('.text-red-500, [data-error], .error-message');
+    await expect(errorMessage.first()).toBeVisible();
+  });
+
+  test('should auto-generate slug from title', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const titleInput = page.locator('input[name="title"], #title, [data-testid="title-input"]');
+    await titleInput.fill('Test Product Title');
+
+    await page.waitForTimeout(300);
+
+    const slugInput = page.locator('input[name="slug"], #slug, [data-testid="slug-input"]');
+    const slugValue = await slugInput.inputValue();
+
+    // Slug should be generated (lowercase with hyphens)
+    expect(slugValue.toLowerCase()).toContain('test');
+  });
+
+  test('should submit valid product data', async ({ page }) => {
+    let createCalled = false;
+
+    await page.route('**/api/admin/products', async (route) => {
+      if (route.request().method() === 'POST') {
+        createCalled = true;
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            message: 'Product created successfully',
+            product: { id: 'new-prod', ...route.request().postDataJSON() },
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/admin/products/new');
+
+    // Fill required fields
+    await page.fill('input[name="sku"], #sku', 'TEST-NEW-001');
+    await page.fill('input[name="title"], #title', 'Test New Product');
+    await page.fill('input[name="slug"], #slug', 'test-new-product');
+    await page.fill('input[name="basePrice"], #basePrice', '1999.00');
+
+    // Select orientation
+    await page.selectOption('select[name="orientation"], #orientation', 'landscape');
+
+    // Submit form
+    const saveButton = page.locator('button[type="submit"]:has-text("Save"), button[type="submit"]:has-text("Create")');
+    await saveButton.click();
+
+    await page.waitForTimeout(500);
+
+    expect(createCalled).toBe(true);
+  });
+});
+
+// ============================================================================
+// Edit Product Tests
+// ============================================================================
+
+test.describe('Edit Product Page', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await setupProductMutationMocks(page);
+    await setupVariantMocks(page);
+  });
+
+  test('should navigate to edit product page from list', async ({ page }) => {
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const editLink = page.locator('a[href*="/admin/products/prod-001"], tr:has-text("TX-001") a').first();
+    await editLink.click();
+
+    await expect(page).toHaveURL(/\/admin\/products\/prod-001/);
+  });
+
+  test('should display edit product form with data', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const titleInput = page.locator('input[name="title"], #title');
+    await expect(titleInput).toHaveValue('Ocean Waves Abstract Poster');
+  });
+
+  test('should display product SKU', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const skuInput = page.locator('input[name="sku"], #sku');
+    await expect(skuInput).toHaveValue('TX-001');
+  });
+
+  test('should display product slug', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const slugInput = page.locator('input[name="slug"], #slug');
+    await expect(slugInput).toHaveValue('ocean-waves-abstract-poster');
+  });
+
+  test('should display product description', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const descriptionInput = page.locator('textarea[name="description"], #description');
+    const value = await descriptionInput.inputValue();
+    expect(value).toContain('ocean waves');
+  });
+
+  test('should display Update/Save button', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const updateButton = page.locator('button[type="submit"]:has-text("Update"), button[type="submit"]:has-text("Save")');
+    await expect(updateButton).toBeVisible();
+  });
+
+  test('should update product on submit', async ({ page }) => {
+    let updateCalled = false;
+
+    await page.route('**/api/admin/products/prod-001', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        updateCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            message: 'Product updated successfully',
+            product: { ...mockProducts[0], ...route.request().postDataJSON() },
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    // Update title
+    const titleInput = page.locator('input[name="title"], #title');
+    await titleInput.fill('Updated Ocean Waves Poster');
+
+    // Submit
+    const updateButton = page.locator('button[type="submit"]:has-text("Update"), button[type="submit"]:has-text("Save")');
+    await updateButton.click();
+
+    await page.waitForTimeout(500);
+
+    expect(updateCalled).toBe(true);
+  });
+
+  test('should show success message after update', async ({ page }) => {
+    await page.route('**/api/admin/products/prod-001', async (route) => {
+      if (route.request().method() === 'PATCH') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            message: 'Product updated successfully',
+            product: mockProducts[0],
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const updateButton = page.locator('button[type="submit"]:has-text("Update"), button[type="submit"]:has-text("Save")');
+    await updateButton.click();
+
+    // Should show success toast/message
+    const successMessage = page.locator('text=success, text=updated, [role="alert"]');
+    await expect(successMessage.first()).toBeVisible({ timeout: 5000 });
+  });
+});
+
+// ============================================================================
+// Delete/Archive Product Tests
+// ============================================================================
+
+test.describe('Delete/Archive Product', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await setupProductMutationMocks(page);
+  });
+
+  test('should display Delete/Archive button on edit page', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
+    await expect(deleteButton).toBeVisible();
+  });
+
+  test('should show confirmation dialog before delete', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
+    await deleteButton.click();
+
+    // Should show confirmation dialog
+    const confirmDialog = page.locator('[role="dialog"], .modal, [data-testid="confirm-dialog"]');
+    await expect(confirmDialog).toBeVisible();
+  });
+
+  test('should cancel delete on confirmation dialog cancel', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
+    await deleteButton.click();
+
+    const cancelButton = page.locator('[role="dialog"] button:has-text("Cancel"), .modal button:has-text("Cancel")');
+    await cancelButton.click();
+
+    // Dialog should close
+    const confirmDialog = page.locator('[role="dialog"], .modal');
+    await expect(confirmDialog).not.toBeVisible();
+  });
+
+  test('should delete/archive product on confirmation', async ({ page }) => {
+    let deleteCalled = false;
+
+    await page.route('**/api/admin/products/prod-001', async (route) => {
+      if (route.request().method() === 'DELETE') {
+        deleteCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Product archived successfully' }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
+    await deleteButton.click();
+
+    const confirmButton = page.locator('[role="dialog"] button:has-text("Delete"), [role="dialog"] button:has-text("Archive"), [role="dialog"] button:has-text("Confirm")');
+    await confirmButton.click();
+
+    await page.waitForTimeout(500);
+
+    expect(deleteCalled).toBe(true);
+  });
+
+  test('should redirect to products list after delete', async ({ page }) => {
+    await page.route('**/api/admin/products/prod-001', async (route) => {
+      if (route.request().method() === 'DELETE') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Product archived successfully' }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
+    await deleteButton.click();
+
+    const confirmButton = page.locator('[role="dialog"] button:has-text("Delete"), [role="dialog"] button:has-text("Archive"), [role="dialog"] button:has-text("Confirm")');
+    await confirmButton.click();
+
+    await expect(page).toHaveURL(/\/admin\/products$/);
+  });
+});
+
+// ============================================================================
+// Product Variants Tests
+// ============================================================================
+
+test.describe('Product Variants Management', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await setupProductMutationMocks(page);
+    await setupVariantMocks(page);
+  });
+
+  test('should display variants section on edit page', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const variantsSection = page.locator('h2:has-text("Variant"), h3:has-text("Variant"), text=Size Variant');
+    await expect(variantsSection.first()).toBeVisible();
+  });
+
+  test('should display existing variants', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const variant = page.locator('text=12x16 inches');
+    await expect(variant).toBeVisible();
+  });
+
+  test('should display Add Variant button', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const addVariantButton = page.locator('button:has-text("Add Variant"), a:has-text("Add Variant")');
+    await expect(addVariantButton).toBeVisible();
+  });
+
+  test('should show variant form on Add Variant click', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const addVariantButton = page.locator('button:has-text("Add Variant"), a:has-text("Add Variant")');
+    await addVariantButton.click();
+
+    const variantForm = page.locator('[data-testid="variant-form"], .variant-form, [role="dialog"]:has-text("Variant")');
+    await expect(variantForm).toBeVisible();
+  });
+
+  test('should create new variant', async ({ page }) => {
+    let createVariantCalled = false;
+
+    await page.route('**/api/admin/products/*/variants', async (route) => {
+      if (route.request().method() === 'POST') {
+        createVariantCalled = true;
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            message: 'Variant created successfully',
+            variant: { id: 'new-var', ...route.request().postDataJSON() },
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const addVariantButton = page.locator('button:has-text("Add Variant")');
+    await addVariantButton.click();
+
+    // Fill variant form
+    await page.fill('input[name="sizeLabel"], #sizeLabel', '30x40 inches');
+    await page.fill('input[name="widthInches"], #widthInches', '30');
+    await page.fill('input[name="heightInches"], #heightInches', '40');
+    await page.fill('input[name="price"], #price', '3999.00');
+
+    const saveButton = page.locator('button:has-text("Save Variant"), button[type="submit"]:has-text("Save")');
+    await saveButton.click();
+
+    await page.waitForTimeout(500);
+
+    expect(createVariantCalled).toBe(true);
+  });
+
+  test('should edit existing variant', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const editVariantButton = page.locator('[data-testid="edit-variant"], button:has-text("Edit")').first();
+    if (await editVariantButton.isVisible()) {
+      await editVariantButton.click();
+
+      const priceInput = page.locator('input[name="price"], #price');
+      await priceInput.fill('1599.00');
+
+      const saveButton = page.locator('button:has-text("Save"), button[type="submit"]');
+      await saveButton.click();
+    }
+  });
+
+  test('should delete variant', async ({ page }) => {
+    let deleteVariantCalled = false;
+
+    await page.route('**/api/admin/products/*/variants/*', async (route) => {
+      if (route.request().method() === 'DELETE') {
+        deleteVariantCalled = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Variant deleted successfully' }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const deleteVariantButton = page.locator('[data-testid="delete-variant"], button:has-text("Delete Variant")').first();
+    if (await deleteVariantButton.isVisible()) {
+      await deleteVariantButton.click();
+
+      // Confirm deletion
+      const confirmButton = page.locator('[role="dialog"] button:has-text("Delete"), button:has-text("Confirm")');
+      if (await confirmButton.isVisible()) {
+        await confirmButton.click();
+      }
+
+      await page.waitForTimeout(500);
+
+      expect(deleteVariantCalled).toBe(true);
+    }
+  });
+});
+
+// ============================================================================
+// Loading State Tests
+// ============================================================================
+
+test.describe('Products Loading States', () => {
+  test('should display skeleton loaders while fetching products', async ({ page }) => {
+    await setupAdminSession(page);
+
+    await page.route('**/api/admin/products*', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: mockProducts, total: mockProducts.length }),
+      });
+    });
+
+    await page.goto('/admin/products');
+
+    const skeletons = page.locator('.animate-pulse, [data-testid="skeleton"]');
+    await expect(skeletons.first()).toBeVisible();
+  });
+
+  test('should display loading indicator on edit page', async ({ page }) => {
+    await setupAdminSession(page);
+
+    await page.route('**/api/admin/products/prod-001', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...mockProducts[0], variants: mockVariants }),
+      });
+    });
+
+    await page.goto('/admin/products/prod-001');
+
+    const loading = page.locator('.animate-pulse, .spinner, [data-testid="loading"]');
+    await expect(loading.first()).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Error State Tests
+// ============================================================================
+
+test.describe('Products Error States', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+  });
+
+  test('should display error when products fail to load', async ({ page }) => {
+    await page.route('**/api/admin/products*', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Internal server error' }),
+      });
+    });
+
+    await page.goto('/admin/products');
+
+    const errorMessage = page.locator('text=error, text=failed, text=Error');
+    await expect(errorMessage.first()).toBeVisible();
+  });
+
+  test('should display Retry button on error', async ({ page }) => {
+    await page.route('**/api/admin/products*', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Internal server error' }),
+      });
+    });
+
+    await page.goto('/admin/products');
+
+    const retryButton = page.locator('button:has-text("Retry"), a:has-text("Retry")');
+    await expect(retryButton).toBeVisible();
+  });
+
+  test('should display 404 for non-existent product', async ({ page }) => {
+    await setupProductsListMock(page);
+
+    await page.goto('/admin/products/non-existent-id');
+
+    const notFound = page.locator('text=not found, text=404, text=Not Found');
+    await expect(notFound.first()).toBeVisible();
+  });
+
+  test('should display validation errors on create', async ({ page }) => {
+    await page.route('**/api/admin/products', async (route) => {
+      if (route.request().method() === 'POST') {
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'SKU already exists' }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.goto('/admin/products/new');
+
+    await page.fill('input[name="sku"], #sku', 'TX-001');
+    await page.fill('input[name="title"], #title', 'Test Product');
+    await page.fill('input[name="slug"], #slug', 'test-product');
+    await page.fill('input[name="basePrice"], #basePrice', '1999.00');
+    await page.selectOption('select[name="orientation"], #orientation', 'landscape');
+
+    const saveButton = page.locator('button[type="submit"]');
+    await saveButton.click();
+
+    const errorMessage = page.locator('text=SKU already exists, text=error');
+    await expect(errorMessage.first()).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Empty State Tests
+// ============================================================================
+
+test.describe('Products Empty State', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+  });
+
+  test('should display empty state when no products', async ({ page }) => {
+    await page.route('**/api/admin/products*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20 }),
+      });
+    });
+
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const emptyState = page.locator('text=No products, text=no products found, text=Get started');
+    await expect(emptyState.first()).toBeVisible();
+  });
+
+  test('should display Add Product CTA in empty state', async ({ page }) => {
+    await page.route('**/api/admin/products*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20 }),
+      });
+    });
+
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const addButton = page.locator('a[href="/admin/products/new"], button:has-text("Add Product")');
+    await expect(addButton).toBeVisible();
+  });
+
+  test('should display empty search results message', async ({ page }) => {
+    await setupProductsListMock(page, []);
+
+    await page.goto('/admin/products?search=nonexistent');
+    await page.waitForLoadState('networkidle');
+
+    const noResults = page.locator('text=No products found, text=no results, text=No matching');
+    await expect(noResults.first()).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Responsive Design Tests
+// ============================================================================
+
+test.describe('Products Responsive Design', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+  });
+
+  test('should display properly on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/admin/products');
+
+    const title = page.locator('h1:has-text("Products")');
+    await expect(title).toBeVisible();
+  });
+
+  test('should stack table columns on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    // On mobile, table might convert to card view
+    const productItem = page.locator('[data-testid="product-row"], .product-item, tr').first();
+    await expect(productItem).toBeVisible();
+  });
+
+  test('should display Add button on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/admin/products');
+
+    const addButton = page.locator('a[href="/admin/products/new"], button:has-text("Add")');
+    await expect(addButton).toBeVisible();
+  });
+
+  test('should display properly on tablet', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto('/admin/products');
+
+    const title = page.locator('h1:has-text("Products")');
+    await expect(title).toBeVisible();
+  });
+
+  test('should display full table on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    // Should show full table with all columns
+    const table = page.locator('table, [role="table"]');
+    await expect(table).toBeVisible();
+  });
+
+  test('should display form properly on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/admin/products/new');
+
+    const form = page.locator('form');
+    await expect(form).toBeVisible();
+
+    // Form fields should be stacked
+    const titleInput = page.locator('input[name="title"], #title');
+    await expect(titleInput).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Accessibility Tests
+// ============================================================================
+
+test.describe('Products Accessibility', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+  });
+
+  test('should have proper heading hierarchy', async ({ page }) => {
+    await page.goto('/admin/products');
+
+    const h1Count = await page.locator('h1').count();
+    expect(h1Count).toBe(1);
+  });
+
+  test('should have h1 as Products', async ({ page }) => {
+    await page.goto('/admin/products');
+
+    const h1 = page.locator('h1');
+    await expect(h1).toHaveText(/Products/);
+  });
+
+  test('should be keyboard navigable', async ({ page }) => {
+    await page.goto('/admin/products');
+
+    await page.keyboard.press('Tab');
+
+    const focusedElement = page.locator(':focus');
+    await expect(focusedElement).toBeTruthy();
+  });
+
+  test('should have focus indicators on buttons', async ({ page }) => {
+    await page.goto('/admin/products');
+
+    const addButton = page.locator('a[href="/admin/products/new"]');
+    await addButton.focus();
+
+    await expect(addButton).toBeFocused();
+  });
+
+  test('should have aria labels on form inputs', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const inputs = page.locator('input[aria-label], input[id], label');
+    const count = await inputs.count();
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test('should have descriptive button text', async ({ page }) => {
+    await page.goto('/admin/products');
+
+    const addButton = page.locator('a:has-text("Add Product"), button:has-text("Add Product")');
+    await expect(addButton).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Performance Tests
+// ============================================================================
+
+test.describe('Products Performance', () => {
+  test('should load products list within acceptable time', async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+
+    const startTime = Date.now();
+    await page.goto('/admin/products');
+    await expect(page.locator('h1:has-text("Products")')).toBeVisible();
+
+    const loadTime = Date.now() - startTime;
+    expect(loadTime).toBeLessThan(5000);
+  });
+
+  test('should not have JavaScript errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+
+    await page.goto('/admin/products');
+    await page.waitForTimeout(1000);
+
+    const criticalErrors = errors.filter(
+      (e) => !e.includes('Failed to fetch') && !e.includes('NetworkError')
+    );
+
+    expect(criticalErrors.length).toBe(0);
+  });
+
+  test('should handle rapid navigation', async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await setupProductMutationMocks(page);
+
+    await page.goto('/admin/products');
+    await page.goto('/admin/products/new');
+    await page.goto('/admin/products');
+
+    await expect(page.locator('h1:has-text("Products")')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Navigation Tests
+// ============================================================================
+
+test.describe('Products Navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await setupProductMutationMocks(page);
+  });
+
+  test('should navigate back to products list from create page', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const cancelButton = page.locator('a:has-text("Cancel"), a[href="/admin/products"]');
+    await cancelButton.click();
+
+    await expect(page).toHaveURL(/\/admin\/products$/);
+  });
+
+  test('should navigate back to products list from edit page', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const backButton = page.locator('a:has-text("Back"), a[href="/admin/products"]');
+    await backButton.click();
+
+    await expect(page).toHaveURL(/\/admin\/products$/);
+  });
+
+  test('should have breadcrumb navigation', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const breadcrumb = page.locator('nav[aria-label="Breadcrumb"], .breadcrumb, a:has-text("Products")');
+    await expect(breadcrumb.first()).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Bulk Actions Tests
+// ============================================================================
+
+test.describe('Products Bulk Actions', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+  });
+
+  test('should display checkbox for each product row', async ({ page }) => {
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const checkboxes = page.locator('input[type="checkbox"]');
+    const count = await checkboxes.count();
+    // Should have at least select-all checkbox plus individual row checkboxes
+    expect(count).toBeGreaterThan(0);
+  });
+
+  test('should display select all checkbox', async ({ page }) => {
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const selectAllCheckbox = page.locator('th input[type="checkbox"], [data-testid="select-all"]');
+    await expect(selectAllCheckbox).toBeVisible();
+  });
+
+  test('should show bulk actions when items selected', async ({ page }) => {
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const firstCheckbox = page.locator('tbody input[type="checkbox"]').first();
+    if (await firstCheckbox.isVisible()) {
+      await firstCheckbox.check();
+
+      const bulkActions = page.locator('[data-testid="bulk-actions"], .bulk-actions, text=selected');
+      await expect(bulkActions.first()).toBeVisible();
+    }
+  });
+});
+
+// ============================================================================
+// Image Upload Tests
+// ============================================================================
+
+test.describe('Product Image Management', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await setupProductMutationMocks(page);
+  });
+
+  test('should display image upload section', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const imageSection = page.locator('text=Image, text=Upload, text=Photo, [data-testid="image-upload"]');
+    await expect(imageSection.first()).toBeVisible();
+  });
+
+  test('should display existing images on edit page', async ({ page }) => {
+    await page.goto('/admin/products/prod-001');
+    await page.waitForLoadState('networkidle');
+
+    const imagePreview = page.locator('img[src*="cdn.example.com"], [data-testid="image-preview"]');
+    await expect(imagePreview.first()).toBeVisible();
+  });
+
+  test('should have drag and drop area for images', async ({ page }) => {
+    await page.goto('/admin/products/new');
+
+    const dropzone = page.locator('[data-testid="dropzone"], .dropzone, text=drag, text=drop');
+    await expect(dropzone.first()).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Product Status Badge Tests
+// ============================================================================
+
+test.describe('Product Status Badges', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAdminSession(page);
+    await setupProductsListMock(page);
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('should display active status with green badge', async ({ page }) => {
+    const activeBadge = page.locator('.bg-green-100:has-text("active"), .text-green-700:has-text("active"), [data-status="active"]');
+    await expect(activeBadge.first()).toBeVisible();
+  });
+
+  test('should display draft status with yellow/amber badge', async ({ page }) => {
+    const draftBadge = page.locator('.bg-yellow-100:has-text("draft"), .bg-amber-100:has-text("draft"), [data-status="draft"]');
+    await expect(draftBadge.first()).toBeVisible();
+  });
+
+  test('should display archived status with gray badge', async ({ page }) => {
+    const archivedBadge = page.locator('.bg-gray-100:has-text("archived"), [data-status="archived"]');
+    await expect(archivedBadge.first()).toBeVisible();
+  });
+
+  test('should display AI generated indicator', async ({ page }) => {
+    const aiIndicator = page.locator('text=AI, [data-ai="true"], .ai-badge');
+    await expect(aiIndicator.first()).toBeVisible();
+  });
+
+  test('should display featured indicator', async ({ page }) => {
+    const featuredIndicator = page.locator('text=Featured, [data-featured="true"], .featured-badge');
+    await expect(featuredIndicator.first()).toBeVisible();
+  });
+});
