@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Checkout Page E2E Tests
@@ -31,7 +31,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Add a test item to cart via localStorage
  */
-async function addItemToCart(page: typeof test.page, itemOverrides?: Partial<{
+async function addItemToCart(page: Page, itemOverrides?: Partial<{
   id: string;
   productTitle: string;
   unitPrice: number;
@@ -67,7 +67,7 @@ async function addItemToCart(page: typeof test.page, itemOverrides?: Partial<{
 /**
  * Fill address form with valid data
  */
-async function fillValidAddressForm(page: typeof test.page) {
+async function fillValidAddressForm(page: Page) {
   await page.fill('#fullName', 'John Doe');
   await page.fill('#email', 'john.doe@example.com');
   await page.fill('#phone', '9876543210');
