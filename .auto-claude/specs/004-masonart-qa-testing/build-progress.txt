@@ -1224,3 +1224,157 @@ SKIP_E2E_SERVER=true npx playwright test tests/e2e/seo*.spec.ts tests/e2e/sitema
 - Playwright config now supports `SKIP_E2E_SERVER=true` for pre-started servers
 
 ---
+
+---
+
+## Subtask 14.4 - Create Authentication Flow Test
+**Status:** COMPLETED
+**Date:** 2026-01-19
+
+### Summary
+Created comprehensive E2E flow test for complete authentication user journey including registration, login, and account management.
+
+### File Created
+- `tests/e2e/flows/auth.spec.ts` - 46 test cases (230 browser configurations across 5 browsers)
+
+### Test Categories
+
+1. **Complete Registration Journey** (4 tests)
+   - Full registration to account access flow
+   - Registration with redirect parameter
+   - Error handling for existing email
+   - Navigation to login page
+
+2. **Complete Login Journey** (5 tests)
+   - Full login to account access flow
+   - Redirect to checkout after login
+   - Redirect to account after login
+   - Invalid credentials error handling
+   - Navigation to registration page
+
+3. **Account Dashboard Access** (6 tests)
+   - Redirect unauthenticated users to login
+   - Authenticated user access
+   - Profile information display
+   - Quick actions visibility
+   - Navigation to orders/AI creations
+
+4. **Sign Out Journey** (2 tests)
+   - Sign out and redirect to home
+   - Session cleared, re-authentication required
+
+5. **Cross-Page Navigation** (3 tests)
+   - Maintain authentication state across pages
+   - Navigation between auth pages
+   - Redirect authenticated users from login
+
+6. **Password Reset** (2 tests)
+   - Forgot password link display
+   - Navigation to forgot password page
+
+7. **Google OAuth** (4 tests)
+   - OAuth button on login/register pages
+   - Dividers between OAuth and email auth
+
+8. **Session Handling** (2 tests)
+   - Expired session handling
+   - Network error handling
+
+9. **Legal Links** (3 tests)
+   - Terms of Service link
+   - Privacy Policy link
+   - Legal agreement text
+
+10. **Responsive Design** (3 tests)
+    - Mobile login flow
+    - Mobile registration flow
+    - Tablet dashboard display
+
+11. **Accessibility** (5 tests)
+    - Heading hierarchy
+    - Form labels
+    - Keyboard navigation
+
+12. **Performance** (3 tests)
+    - Page load times (login, register, account)
+
+13. **Edge Cases** (4 tests)
+    - Special characters in name
+    - Email with plus sign
+    - Form data preservation after errors
+    - Loading state during submission
+
+### Implementation Details
+- Uses API mocking for reliable test execution
+- Mocks Better Auth endpoints (sign-up, sign-in, get-session, sign-out)
+- Tests work with all 5 browser projects (Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari)
+- Follows existing patterns from catalog.spec.ts and checkout.spec.ts
+
+### Verification
+- All 46 tests listed successfully with Playwright
+- Total of 230 test configurations across browsers
+- Committed in 17737ea
+
+---
+
+## Subtask 14.5 - Write End-to-End Test for Admin Product and Order Management
+**Status:** COMPLETED
+**Date:** 2026-01-19
+
+### Summary
+Created comprehensive E2E flow test for admin product and order management user journeys (tests/e2e/flows/admin.spec.ts).
+
+### Test Coverage - 48 Unique Tests (240 Configurations)
+
+| Category | Tests | Description |
+|----------|-------|-------------|
+| Authentication Access | 4 | Redirect unauthenticated users, redirect non-admin users, admin access, navigation menu |
+| Dashboard Overview | 3 | Stats overview, navigate to products, navigate to orders |
+| Products List Management | 5 | Display products, filter by status, search by title, navigate to create, navigate to detail |
+| Create Product | 3 | Display form, create and redirect, validation errors |
+| Edit Product | 3 | Display details, update and success, navigate back |
+| Orders List Management | 5 | Display orders, filter by status, search by order number, navigate to detail, status badges |
+| Order Detail Management | 5 | Display details, display items, update status, add shipping tracking, navigate back |
+| Complete User Journeys | 4 | Dashboard→products→create, dashboard→orders→detail, products→orders cross-navigation, search→view→back |
+| Responsive Design | 3 | Tablet viewport, desktop viewport, mobile navigation |
+| Accessibility | 4 | Heading hierarchy on products, heading hierarchy on orders, keyboard navigation, form labels |
+| Performance | 3 | Products page load time, orders page load time, no JS errors |
+| Error Handling | 3 | Non-existent product, non-existent order, API errors |
+| Bulk Actions | 2 | Select multiple products, select all checkbox |
+| Data Export | 1 | Export option on orders |
+
+### Test Browsers (5 projects)
+1. Chromium (Desktop Chrome)
+2. Firefox (Desktop Firefox)
+3. WebKit (Desktop Safari)
+4. Mobile Chrome (Pixel 5)
+5. Mobile Safari (iPhone 12)
+
+### Key Implementation Details
+- Tests complete admin user journeys across dashboard, products, and orders sections
+- Uses API mocking for admin authentication (admin role verification)
+- Mocks admin API endpoints (/api/admin/products, /api/admin/orders)
+- Tests CRUD operations: create, read, update for products and orders
+- Tests filtering, searching, and pagination flows
+- Tests status updates and shipping tracking for orders
+- Tests cross-navigation between admin sections
+- Tests responsive design across mobile, tablet, and desktop viewports
+- Tests error handling for non-existent resources and API errors
+- Follows AAA pattern (Arrange, Act, Assert) consistent with other flow tests
+
+### Run Commands
+```bash
+# List admin flow E2E tests
+SKIP_E2E_SERVER=true npx playwright test tests/e2e/flows/admin.spec.ts --list
+
+# Run admin flow E2E tests (requires dev server at localhost:3001)
+npx playwright test tests/e2e/flows/admin.spec.ts
+
+# Run on specific browser
+npx playwright test tests/e2e/flows/admin.spec.ts --project=chromium
+```
+
+### Verification
+- All 48 tests listed successfully with Playwright
+- Total of 240 test configurations across 5 browsers (48 × 5)
+- Tests follow existing patterns from auth.spec.ts, checkout.spec.ts, catalog.spec.ts
