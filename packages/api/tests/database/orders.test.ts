@@ -3,6 +3,9 @@
  *
  * Tests for orders and order_items database tables.
  * Validates schema structure, relationships, and CRUD operations.
+ *
+ * These tests require a running PostgreSQL database. When SKIP_DB_RUNTIME_TESTS
+ * is set to 'true', all tests are skipped (useful for CI without database).
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -18,10 +21,20 @@ import {
   orderItems,
 } from '../../src/db/schema';
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle>;
+// Check if we should skip database runtime tests
+const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
+
+console.log('🧪 Starting test suite...');
+if (SKIP_TESTS) {
+  console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
+}
+
+let client: ReturnType<typeof postgres> | null = null;
+let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
+  if (SKIP_TESTS) return;
+
   const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
   client = postgres(databaseUrl, { max: 1 });
   db = drizzle(client);
@@ -162,6 +175,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (SKIP_TESTS || !client) return;
+
   await client`DROP TABLE IF EXISTS order_items CASCADE`;
   await client`DROP TABLE IF EXISTS orders CASCADE`;
   await client`DROP TABLE IF EXISTS frames CASCADE`;
@@ -172,6 +187,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  if (SKIP_TESTS || !client) return;
+
   await client`DELETE FROM order_items`;
   await client`DELETE FROM orders`;
   await client`DELETE FROM product_variants`;
@@ -186,6 +203,8 @@ describe('Orders Table Schema', () => {
   let testVariantId: string;
 
   beforeEach(async () => {
+    if (SKIP_TESTS || !db) return;
+
     const [user] = await db.insert(users).values({
       email: 'order-test@example.com',
       name: 'Order Test User',
@@ -222,16 +241,16 @@ describe('Orders Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it('should have orders table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have orders table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'orders'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have all required columns', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have all required columns', async () => {
+      const result = await client!`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'orders'
         ORDER BY ordinal_position
@@ -249,8 +268,8 @@ describe('Orders Table Schema', () => {
       expect(columnNames).toContain('total');
     });
 
-    it('should have unique constraint on order_number', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have unique constraint on order_number', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'orders' AND constraint_type = 'UNIQUE'
       `;
@@ -259,8 +278,8 @@ describe('Orders Table Schema', () => {
   });
 
   describe('Order CRUD Operations', () => {
-    it('should insert an order', async () => {
-      const [result] = await db.insert(orders).values({
+    it.skipIf(SKIP_TESTS)('should insert an order', async () => {
+      const [result] = await db!.insert(orders).values({
         orderNumber: 'ORD-2024-001',
         userId: testUserId,
         status: 'pending',
@@ -290,8 +309,8 @@ describe('Orders Table Schema', () => {
       expect(result.userId).toBe(testUserId);
     });
 
-    it('should select orders', async () => {
-      await db.insert(orders).values({
+    it.skipIf(SKIP_TESTS)('should select orders', async () => {
+      await db!.insert(orders).values({
         orderNumber: 'ORD-2024-002',
         userId: testUserId,
         status: 'pending',
@@ -316,12 +335,12 @@ describe('Orders Table Schema', () => {
         total: '157.99',
       });
 
-      const result = await db.select().from(orders).where(eq(orders.userId, testUserId));
+      const result = await db!.select().from(orders).where(eq(orders.userId, testUserId));
       expect(result).toHaveLength(1);
     });
 
-    it('should update order status', async () => {
-      const [inserted] = await db.insert(orders).values({
+    it.skipIf(SKIP_TESTS)('should update order status', async () => {
+      const [inserted] = await db!.insert(orders).values({
         orderNumber: 'ORD-2024-003',
         userId: testUserId,
         status: 'pending',
@@ -346,22 +365,22 @@ describe('Orders Table Schema', () => {
         total: '157.99',
       }).returning();
 
-      await db.update(orders)
+      await db!.update(orders)
         .set({ status: 'confirmed', paymentStatus: 'paid' })
         .where(eq(orders.id, inserted.id));
 
-      const [result] = await db.select().from(orders).where(eq(orders.id, inserted.id));
+      const [result] = await db!.select().from(orders).where(eq(orders.id, inserted.id));
       expect(result.status).toBe('confirmed');
       expect(result.paymentStatus).toBe('paid');
     });
   });
 
   describe('Order Status Workflow', () => {
-    it('should support all order statuses', async () => {
+    it.skipIf(SKIP_TESTS)('should support all order statuses', async () => {
       const statuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 
       for (const status of statuses) {
-        const [result] = await db.insert(orders).values({
+        const [result] = await db!.insert(orders).values({
           orderNumber: `ORD-STATUS-${status}`,
           userId: testUserId,
           status: status as any,
@@ -387,17 +406,17 @@ describe('Orders Table Schema', () => {
         }).returning();
 
         expect(result.status).toBe(status);
-        await db.delete(orders).where(eq(orders.id, result.id));
+        await db!.delete(orders).where(eq(orders.id, result.id));
       }
     });
   });
 
   describe('Payment Methods', () => {
-    it('should support all payment methods', async () => {
+    it.skipIf(SKIP_TESTS)('should support all payment methods', async () => {
       const methods = ['razorpay', 'stripe', 'cod', 'upi'];
 
       for (const method of methods) {
-        const [result] = await db.insert(orders).values({
+        const [result] = await db!.insert(orders).values({
           orderNumber: `ORD-PAY-${method}`,
           userId: testUserId,
           status: 'pending',
@@ -423,14 +442,14 @@ describe('Orders Table Schema', () => {
         }).returning();
 
         expect(result.paymentMethod).toBe(method);
-        await db.delete(orders).where(eq(orders.id, result.id));
+        await db!.delete(orders).where(eq(orders.id, result.id));
       }
     });
   });
 
   describe('Photo Approval', () => {
-    it('should store photo approval data', async () => {
-      const [result] = await db.insert(orders).values({
+    it.skipIf(SKIP_TESTS)('should store photo approval data', async () => {
+      const [result] = await db!.insert(orders).values({
         orderNumber: 'ORD-PHOTO-001',
         userId: testUserId,
         status: 'pending',
@@ -474,6 +493,8 @@ describe('Order Items Table Schema', () => {
   let testVariantId: string;
 
   beforeEach(async () => {
+    if (SKIP_TESTS || !db) return;
+
     const [user] = await db.insert(users).values({
       email: 'item-test@example.com',
       name: 'Item Test User',
@@ -536,16 +557,16 @@ describe('Order Items Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it('should have order_items table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have order_items table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'order_items'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have foreign keys', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have foreign keys', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'order_items' AND constraint_type = 'FOREIGN KEY'
       `;
@@ -554,8 +575,8 @@ describe('Order Items Table Schema', () => {
   });
 
   describe('Order Item CRUD Operations', () => {
-    it('should insert an order item', async () => {
-      const [result] = await db.insert(orderItems).values({
+    it.skipIf(SKIP_TESTS)('should insert an order item', async () => {
+      const [result] = await db!.insert(orderItems).values({
         orderId: testOrderId,
         productId: testProductId,
         variantId: testVariantId,
@@ -573,8 +594,8 @@ describe('Order Items Table Schema', () => {
       expect(result.quantity).toBe(2);
     });
 
-    it('should select order items for an order', async () => {
-      await db.insert(orderItems).values([
+    it.skipIf(SKIP_TESTS)('should select order items for an order', async () => {
+      await db!.insert(orderItems).values([
         {
           orderId: testOrderId,
           productId: testProductId,
@@ -601,12 +622,12 @@ describe('Order Items Table Schema', () => {
         },
       ]);
 
-      const result = await db.select().from(orderItems).where(eq(orderItems.orderId, testOrderId));
+      const result = await db!.select().from(orderItems).where(eq(orderItems.orderId, testOrderId));
       expect(result).toHaveLength(2);
     });
 
-    it('should delete order items when order is deleted', async () => {
-      await db.insert(orderItems).values({
+    it.skipIf(SKIP_TESTS)('should delete order items when order is deleted', async () => {
+      await db!.insert(orderItems).values({
         orderId: testOrderId,
         productId: testProductId,
         variantId: testVariantId,
@@ -619,16 +640,16 @@ describe('Order Items Table Schema', () => {
         imageUrl: 'https://example.com/test.jpg',
       });
 
-      await db.delete(orders).where(eq(orders.id, testOrderId));
+      await db!.delete(orders).where(eq(orders.id, testOrderId));
 
-      const result = await db.select().from(orderItems).where(eq(orderItems.orderId, testOrderId));
+      const result = await db!.select().from(orderItems).where(eq(orderItems.orderId, testOrderId));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('Order Item Customizations', () => {
-    it('should store customization data', async () => {
-      const [result] = await db.insert(orderItems).values({
+    it.skipIf(SKIP_TESTS)('should store customization data', async () => {
+      const [result] = await db!.insert(orderItems).values({
         orderId: testOrderId,
         productId: testProductId,
         variantId: testVariantId,
