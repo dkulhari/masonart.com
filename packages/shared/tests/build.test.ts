@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 
@@ -12,6 +12,7 @@ import { execSync } from 'child_process';
  * - Source files structure
  * - Build process and output
  * - Package exports configuration
+ * - Module imports work correctly
  */
 describe('Shared Package Build', () => {
   // Detect if we're running from the shared package directory or from root
@@ -20,11 +21,13 @@ describe('Shared Package Build', () => {
   const packageDir = isInSharedDir ? cwd : join(cwd, 'packages', 'shared');
   const packageJsonPath = join(packageDir, 'package.json');
   const tsconfigPath = join(packageDir, 'tsconfig.json');
+  const rootTsconfigPath = join(packageDir, '..', '..', 'tsconfig.json');
   const srcDir = join(packageDir, 'src');
   const distDir = join(packageDir, 'dist');
 
-  let packageJson: any;
-  let tsconfig: any;
+  let packageJson: Record<string, unknown>;
+  let tsconfig: Record<string, unknown>;
+  let rootTsconfig: Record<string, unknown>;
 
   beforeAll(() => {
     // Load package.json and tsconfig.json once for all tests
@@ -33,6 +36,9 @@ describe('Shared Package Build', () => {
     }
     if (existsSync(tsconfigPath)) {
       tsconfig = JSON.parse(readFileSync(tsconfigPath, 'utf-8'));
+    }
+    if (existsSync(rootTsconfigPath)) {
+      rootTsconfig = JSON.parse(readFileSync(rootTsconfigPath, 'utf-8'));
     }
   });
 
@@ -58,67 +64,107 @@ describe('Shared Package Build', () => {
       expect(packageJson.main).toContain('dist/index.js');
     });
 
+    it('should have module entry point configured', () => {
+      expect(packageJson.module).toBeDefined();
+      expect(packageJson.module).toContain('dist/index.js');
+    });
+
     it('should have types entry point configured', () => {
       expect(packageJson.types).toBeDefined();
       expect(packageJson.types).toContain('dist/index.d.ts');
     });
 
     it('should have proper exports configuration', () => {
-      expect(packageJson.exports).toBeDefined();
-      expect(packageJson.exports['.']).toBeDefined();
-      expect(packageJson.exports['./schemas']).toBeDefined();
-      expect(packageJson.exports['./constants']).toBeDefined();
+      const exports = packageJson.exports as Record<string, unknown>;
+      expect(exports).toBeDefined();
+      expect(exports['.']).toBeDefined();
     });
 
     it('should have root export with types and import fields', () => {
-      expect(packageJson.exports['.']).toHaveProperty('types');
-      expect(packageJson.exports['.']).toHaveProperty('import');
-      expect(packageJson.exports['.'].types).toContain('dist/index.d.ts');
-      expect(packageJson.exports['.'].import).toContain('dist/index.js');
+      const exports = packageJson.exports as Record<string, { types?: string; import?: string }>;
+      expect(exports['.']).toHaveProperty('types');
+      expect(exports['.']).toHaveProperty('import');
+      expect(exports['.'].types).toContain('dist/index.d.ts');
+      expect(exports['.'].import).toContain('dist/index.js');
     });
 
-    it('should have schemas export configured', () => {
-      expect(packageJson.exports['./schemas']).toHaveProperty('types');
-      expect(packageJson.exports['./schemas']).toHaveProperty('import');
-      expect(packageJson.exports['./schemas'].types).toContain('dist/schemas/index.d.ts');
-      expect(packageJson.exports['./schemas'].import).toContain('dist/schemas/index.js');
+    it('should have types wildcard export configured', () => {
+      const exports = packageJson.exports as Record<string, { types?: string; import?: string }>;
+      expect(exports['./types/*']).toBeDefined();
+      expect(exports['./types/*']).toHaveProperty('types');
+      expect(exports['./types/*']).toHaveProperty('import');
     });
 
-    it('should have constants export configured', () => {
-      expect(packageJson.exports['./constants']).toHaveProperty('types');
-      expect(packageJson.exports['./constants']).toHaveProperty('import');
-      expect(packageJson.exports['./constants'].types).toContain('dist/constants/index.d.ts');
-      expect(packageJson.exports['./constants'].import).toContain('dist/constants/index.js');
+    it('should have schemas wildcard export configured', () => {
+      const exports = packageJson.exports as Record<string, { types?: string; import?: string }>;
+      expect(exports['./schemas/*']).toBeDefined();
+      expect(exports['./schemas/*']).toHaveProperty('types');
+      expect(exports['./schemas/*']).toHaveProperty('import');
+    });
+
+    it('should have constants wildcard export configured', () => {
+      const exports = packageJson.exports as Record<string, { types?: string; import?: string }>;
+      expect(exports['./constants/*']).toBeDefined();
+      expect(exports['./constants/*']).toHaveProperty('types');
+      expect(exports['./constants/*']).toHaveProperty('import');
+    });
+
+    it('should have files field configured to include dist', () => {
+      const files = packageJson.files as string[];
+      expect(files).toBeDefined();
+      expect(files).toContain('dist');
     });
   });
 
   describe('Build Scripts', () => {
     it('should have build script configured', () => {
-      expect(packageJson.scripts).toBeDefined();
-      expect(packageJson.scripts.build).toBeDefined();
-      expect(packageJson.scripts.build).toContain('tsc');
+      const scripts = packageJson.scripts as Record<string, string>;
+      expect(scripts).toBeDefined();
+      expect(scripts.build).toBeDefined();
+      expect(scripts.build).toContain('tsc');
     });
 
-    it('should have test scripts configured', () => {
-      expect(packageJson.scripts.test).toBeDefined();
-      expect(packageJson.scripts['test:coverage']).toBeDefined();
+    it('should have dev script for watch mode', () => {
+      const scripts = packageJson.scripts as Record<string, string>;
+      expect(scripts.dev).toBeDefined();
+      expect(scripts.dev).toContain('tsc');
+      expect(scripts.dev).toContain('--watch');
+    });
+
+    it('should have typecheck script', () => {
+      const scripts = packageJson.scripts as Record<string, string>;
+      expect(scripts.typecheck).toBeDefined();
+      expect(scripts.typecheck).toContain('tsc');
+      expect(scripts.typecheck).toContain('--noEmit');
+    });
+
+    it('should have clean script', () => {
+      const scripts = packageJson.scripts as Record<string, string>;
+      expect(scripts.clean).toBeDefined();
     });
   });
 
   describe('Dependencies', () => {
     it('should have Zod as a runtime dependency', () => {
-      expect(packageJson.dependencies).toBeDefined();
-      expect(packageJson.dependencies.zod).toBeDefined();
+      const deps = packageJson.dependencies as Record<string, string>;
+      expect(deps).toBeDefined();
+      expect(deps.zod).toBeDefined();
+    });
+
+    it('should have Zod version ^3.x', () => {
+      const deps = packageJson.dependencies as Record<string, string>;
+      expect(deps.zod).toMatch(/^\^?3\./);
     });
 
     it('should have TypeScript as a dev dependency', () => {
-      expect(packageJson.devDependencies).toBeDefined();
-      expect(packageJson.devDependencies.typescript).toBeDefined();
+      const devDeps = packageJson.devDependencies as Record<string, string>;
+      expect(devDeps).toBeDefined();
+      expect(devDeps.typescript).toBeDefined();
     });
 
-    it('should have Vitest as a dev dependency', () => {
-      expect(packageJson.devDependencies.vitest).toBeDefined();
-      expect(packageJson.devDependencies['@vitest/coverage-v8']).toBeDefined();
+    it('should have TypeScript version ^5.x', () => {
+      const devDeps = packageJson.devDependencies as Record<string, string>;
+      expect(devDeps.typescript).toMatch(/^\^?5\./);
     });
   });
 
@@ -127,49 +173,71 @@ describe('Shared Package Build', () => {
       expect(existsSync(tsconfigPath)).toBe(true);
     });
 
-    it('should target modern JavaScript (ES2022)', () => {
-      expect(tsconfig.compilerOptions.target).toBe('ES2022');
-    });
-
-    it('should use ESNext modules', () => {
-      expect(tsconfig.compilerOptions.module).toBe('ESNext');
+    it('should extend from root tsconfig', () => {
+      expect(tsconfig.extends).toBeDefined();
+      expect(tsconfig.extends).toContain('../../tsconfig.json');
     });
 
     it('should have output directory configured', () => {
-      expect(tsconfig.compilerOptions.outDir).toBeDefined();
-      expect(tsconfig.compilerOptions.outDir).toContain('dist');
+      const compilerOptions = tsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.outDir).toBeDefined();
+      expect(compilerOptions.outDir).toContain('dist');
     });
 
     it('should have root directory configured', () => {
-      expect(tsconfig.compilerOptions.rootDir).toBeDefined();
-      expect(tsconfig.compilerOptions.rootDir).toContain('src');
+      const compilerOptions = tsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.rootDir).toBeDefined();
+      expect(compilerOptions.rootDir).toContain('src');
     });
 
     it('should generate declaration files', () => {
-      expect(tsconfig.compilerOptions.declaration).toBe(true);
+      const compilerOptions = tsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.declaration).toBe(true);
     });
 
     it('should generate declaration maps', () => {
-      expect(tsconfig.compilerOptions.declarationMap).toBe(true);
+      const compilerOptions = tsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.declarationMap).toBe(true);
     });
 
-    it('should generate source maps', () => {
-      expect(tsconfig.compilerOptions.sourceMap).toBe(true);
-    });
-
-    it('should have strict mode enabled', () => {
-      expect(tsconfig.compilerOptions.strict).toBe(true);
+    it('should have composite enabled for project references', () => {
+      const compilerOptions = tsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.composite).toBe(true);
     });
 
     it('should include src directory', () => {
-      expect(tsconfig.include).toBeDefined();
-      expect(tsconfig.include).toContain('src/**/*');
+      const include = tsconfig.include as string[];
+      expect(include).toBeDefined();
+      expect(include.some(pattern => pattern.includes('src'))).toBe(true);
     });
 
     it('should exclude node_modules and dist', () => {
-      expect(tsconfig.exclude).toBeDefined();
-      expect(tsconfig.exclude).toContain('node_modules');
-      expect(tsconfig.exclude).toContain('dist');
+      const exclude = tsconfig.exclude as string[];
+      expect(exclude).toBeDefined();
+      expect(exclude).toContain('node_modules');
+      expect(exclude).toContain('dist');
+    });
+  });
+
+  describe('Root TypeScript Configuration (inherited)', () => {
+    it('should target modern JavaScript (ES2022)', () => {
+      const compilerOptions = rootTsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.target).toBe('ES2022');
+    });
+
+    it('should use ESNext modules', () => {
+      const compilerOptions = rootTsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.module).toBe('ESNext');
+    });
+
+    it('should have strict mode enabled', () => {
+      const compilerOptions = rootTsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.strict).toBe(true);
+    });
+
+    it('should generate source maps', () => {
+      const compilerOptions = rootTsconfig.compilerOptions as Record<string, unknown>;
+      expect(compilerOptions.sourceMap).toBe(true);
     });
   });
 
@@ -183,6 +251,19 @@ describe('Shared Package Build', () => {
       expect(existsSync(indexPath)).toBe(true);
     });
 
+    it('should have types directory', () => {
+      const typesDir = join(srcDir, 'types');
+      expect(existsSync(typesDir)).toBe(true);
+    });
+
+    it('should have type definition files', () => {
+      const typesDir = join(srcDir, 'types');
+      const expectedTypeFiles = ['product.ts', 'order.ts', 'user.ts', 'ai.ts'];
+      expectedTypeFiles.forEach(file => {
+        expect(existsSync(join(typesDir, file))).toBe(true);
+      });
+    });
+
     it('should have schemas directory', () => {
       const schemasDir = join(srcDir, 'schemas');
       expect(existsSync(schemasDir)).toBe(true);
@@ -191,6 +272,14 @@ describe('Shared Package Build', () => {
     it('should have schemas index file', () => {
       const schemasIndexPath = join(srcDir, 'schemas', 'index.ts');
       expect(existsSync(schemasIndexPath)).toBe(true);
+    });
+
+    it('should have schema definition files', () => {
+      const schemasDir = join(srcDir, 'schemas');
+      const expectedSchemaFiles = ['product.ts', 'order.ts', 'user.ts', 'ai.ts'];
+      expectedSchemaFiles.forEach(file => {
+        expect(existsSync(join(schemasDir, file))).toBe(true);
+      });
     });
 
     it('should have constants directory', () => {
@@ -203,14 +292,31 @@ describe('Shared Package Build', () => {
       expect(existsSync(constantsIndexPath)).toBe(true);
     });
 
-    it('should have valid TypeScript in main index', () => {
+    it('should have constant definition files', () => {
+      const constantsDir = join(srcDir, 'constants');
+      const expectedConstantFiles = ['sizes.ts', 'frames.ts', 'styles.ts'];
+      expectedConstantFiles.forEach(file => {
+        expect(existsSync(join(constantsDir, file))).toBe(true);
+      });
+    });
+
+    it('should have valid TypeScript in main index with all exports', () => {
       const indexPath = join(srcDir, 'index.ts');
       const content = readFileSync(indexPath, 'utf-8');
 
-      // Should export from schemas and constants
-      expect(content).toContain('export');
-      expect(content).toContain('schemas');
-      expect(content).toContain('constants');
+      // Should export Zod
+      expect(content).toContain('zod');
+      // Should export types
+      expect(content).toContain('./types/product');
+      expect(content).toContain('./types/order');
+      expect(content).toContain('./types/user');
+      expect(content).toContain('./types/ai');
+      // Should export schemas
+      expect(content).toContain('./schemas/product');
+      // Should export constants
+      expect(content).toContain('./constants/sizes');
+      expect(content).toContain('./constants/frames');
+      expect(content).toContain('./constants/styles');
     });
   });
 
@@ -237,9 +343,9 @@ describe('Shared Package Build', () => {
         });
         // If we reach here, build succeeded
         expect(true).toBe(true);
-      } catch (error: any) {
-        // If build fails, show the error
-        throw new Error(`Build failed: ${error.message}\n${error.stdout}\n${error.stderr}`);
+      } catch (error: unknown) {
+        const err = error as { message: string; stdout?: string; stderr?: string };
+        throw new Error(`Build failed: ${err.message}\n${err.stdout ?? ''}\n${err.stderr ?? ''}`);
       }
     });
 
@@ -257,6 +363,32 @@ describe('Shared Package Build', () => {
       expect(existsSync(mainDtsPath)).toBe(true);
     });
 
+    it('should generate main declaration maps', () => {
+      const mainDtsMapPath = join(distDir, 'index.d.ts.map');
+      expect(existsSync(mainDtsMapPath)).toBe(true);
+    });
+
+    it('should generate types directory in dist', () => {
+      const typesDistDir = join(distDir, 'types');
+      expect(existsSync(typesDistDir)).toBe(true);
+    });
+
+    it('should generate types JavaScript files', () => {
+      const typesDir = join(distDir, 'types');
+      const expectedFiles = ['product.js', 'order.js', 'user.js', 'ai.js'];
+      expectedFiles.forEach(file => {
+        expect(existsSync(join(typesDir, file))).toBe(true);
+      });
+    });
+
+    it('should generate types declaration files', () => {
+      const typesDir = join(distDir, 'types');
+      const expectedFiles = ['product.d.ts', 'order.d.ts', 'user.d.ts', 'ai.d.ts'];
+      expectedFiles.forEach(file => {
+        expect(existsSync(join(typesDir, file))).toBe(true);
+      });
+    });
+
     it('should generate schemas directory in dist', () => {
       const schemasDistDir = join(distDir, 'schemas');
       expect(existsSync(schemasDistDir)).toBe(true);
@@ -270,6 +402,14 @@ describe('Shared Package Build', () => {
     it('should generate schemas type declarations', () => {
       const schemasDtsPath = join(distDir, 'schemas', 'index.d.ts');
       expect(existsSync(schemasDtsPath)).toBe(true);
+    });
+
+    it('should generate schema definition files in dist', () => {
+      const schemasDir = join(distDir, 'schemas');
+      const expectedJsFiles = ['product.js', 'order.js', 'user.js', 'ai.js'];
+      expectedJsFiles.forEach(file => {
+        expect(existsSync(join(schemasDir, file))).toBe(true);
+      });
     });
 
     it('should generate constants directory in dist', () => {
@@ -287,6 +427,14 @@ describe('Shared Package Build', () => {
       expect(existsSync(constantsDtsPath)).toBe(true);
     });
 
+    it('should generate constant definition files in dist', () => {
+      const constantsDir = join(distDir, 'constants');
+      const expectedJsFiles = ['sizes.js', 'frames.js', 'styles.js'];
+      expectedJsFiles.forEach(file => {
+        expect(existsSync(join(constantsDir, file))).toBe(true);
+      });
+    });
+
     it('should generate source maps', () => {
       const mainJsMapPath = join(distDir, 'index.js.map');
       expect(existsSync(mainJsMapPath)).toBe(true);
@@ -298,8 +446,21 @@ describe('Shared Package Build', () => {
         const distIndexPath = join(distDir, 'index.js');
         const module = await import(distIndexPath);
         expect(module).toBeDefined();
-      } catch (error: any) {
-        throw new Error(`Failed to import built package: ${error.message}`);
+      } catch (error: unknown) {
+        const err = error as { message: string };
+        throw new Error(`Failed to import built package: ${err.message}`);
+      }
+    });
+
+    it('should export Zod correctly', async () => {
+      try {
+        const distIndexPath = join(distDir, 'index.js');
+        const module = await import(distIndexPath);
+        expect(module.z).toBeDefined();
+        expect(typeof module.z.string).toBe('function');
+      } catch (error: unknown) {
+        const err = error as { message: string };
+        throw new Error(`Failed to import Zod from package: ${err.message}`);
       }
     });
   });
