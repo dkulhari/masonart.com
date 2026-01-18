@@ -3,7 +3,7 @@
   "title": "MasonArt QA Testing Strategy Implementation",
   "description": "Comprehensive QA testing for MasonArt e-commerce platform covering automated E2E tests with Playwright, unit/integration tests with Vitest, and manual browser testing documentation",
   "created_at": "2026-01-16T13:00:03.032Z",
-  "updated_at": "2026-01-18T16:48:26.601Z",
+  "updated_at": "2026-01-18T16:50:50.530Z",
   "status": "in_progress",
   "planStatus": "in_progress",
   "phases": [
@@ -449,7 +449,7 @@
           "subtask_id": "5.5",
           "title": "Create manual auth routes test doc",
           "description": "Create manual test documentation for auth routes",
-          "status": "pending",
+          "status": "completed",
           "dependencies": [
             "5.4"
           ],
@@ -457,7 +457,7 @@
             "docs/manual-tests/auth-routes.md"
           ],
           "tests": [],
-          "notes": ""
+          "notes": "Enhanced manual test documentation for auth routes (docs/manual-tests/auth-routes.md) from 50 to 67 comprehensive test cases. Added new test sections: Google OAuth Testing (TC-051 to TC-054), Email Verification Testing (TC-055 to TC-058), User Role Testing/RBAC (TC-059 to TC-062), Additional User Fields Testing (TC-063 to TC-064), Session Cookie Configuration (TC-065 to TC-067). Fixed cookie name to match implementation (masonart.session), updated date and environment details. Committed in b24d330."
         }
       ]
     },
