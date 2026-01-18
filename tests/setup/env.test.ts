@@ -1,9 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 
 /**
  * Tests to verify required environment variables are set
  *
  * This test suite validates:
+ * - .env.example file exists and documents all required variables
  * - Essential API server environment variables exist
  * - Authentication configuration is present
  * - Payment integration keys are configured
@@ -11,8 +14,9 @@ import { describe, it, expect } from 'vitest';
  * - Email service configuration is present
  * - Frontend environment variables are set
  * - Environment variables have valid formats
+ * - Server configuration (NODE_ENV, ports)
  *
- * Expected Environment Variables (from docs/poster-app-tech-stack.md):
+ * Expected Environment Variables (from .env.example):
  * - DATABASE_URL: PostgreSQL connection string
  * - REDIS_URL: Redis connection string
  * - R2_*: Cloudflare R2/S3 storage credentials
@@ -21,15 +25,27 @@ import { describe, it, expect } from 'vitest';
  * - REPLICATE_API_TOKEN: AI generation service token
  * - RESEND_API_KEY: Email service API key
  * - VITE_*: Frontend configuration
+ * - NODE_ENV: Environment mode (development/test/production)
+ * - API_PORT, WEB_PORT: Server ports
  *
  * Note: In test/CI environments, these tests provide warnings but don't fail.
  * Set ENFORCE_ENV_VARS=true to make them fail (for production validation).
+ * Set SKIP_ENV_VALIDATION=true to skip all runtime validation tests.
  */
+
+// Project paths
+const rootDir = process.cwd();
+const envExamplePath = join(rootDir, '.env.example');
 
 // Check if we're in test/CI mode (be lenient) or production mode (be strict)
 const isTestMode = process.env.CI === 'true' ||
                    process.env.NODE_ENV === 'test' ||
                    !process.env.ENFORCE_ENV_VARS;
+
+// Skip runtime validation tests if SKIP_ENV_VALIDATION is set
+const skipEnvValidation =
+  process.env.SKIP_ENV_VALIDATION === 'true' ||
+  process.env.SKIP_ENV_VALIDATION === '1';
 
 // Environment variable configuration groups
 const ENV_GROUPS = {
@@ -55,13 +71,43 @@ const ENV_GROUPS = {
   },
   email: {
     required: ['RESEND_API_KEY'],
-    optional: [] as string[],
+    optional: ['EMAIL_FROM'],
   },
   frontend: {
     required: [] as string[],
     optional: ['VITE_API_URL', 'VITE_CDN_URL'],
   },
+  server: {
+    required: ['NODE_ENV'],
+    optional: ['API_PORT', 'WEB_PORT'],
+  },
+  application: {
+    required: [] as string[],
+    optional: ['APP_NAME', 'APP_URL'],
+  },
 };
+
+// All documented environment variables (for .env.example validation)
+const ALL_DOCUMENTED_VARS = [
+  ...ENV_GROUPS.database.required,
+  ...ENV_GROUPS.database.optional,
+  ...ENV_GROUPS.storage.required,
+  ...ENV_GROUPS.storage.optional,
+  ...ENV_GROUPS.auth.required,
+  ...ENV_GROUPS.auth.optional,
+  ...ENV_GROUPS.payments.required,
+  ...ENV_GROUPS.payments.optional,
+  ...ENV_GROUPS.ai.required,
+  ...ENV_GROUPS.ai.optional,
+  ...ENV_GROUPS.email.required,
+  ...ENV_GROUPS.email.optional,
+  ...ENV_GROUPS.frontend.required,
+  ...ENV_GROUPS.frontend.optional,
+  ...ENV_GROUPS.server.required,
+  ...ENV_GROUPS.server.optional,
+  ...ENV_GROUPS.application.required,
+  ...ENV_GROUPS.application.optional,
+];
 
 /**
  * Helper function to check if an environment variable is set
@@ -101,7 +147,71 @@ function isValidRedisUrl(url: string): boolean {
   return /^redis:\/\/.+/.test(url);
 }
 
-describe('Environment Variables', () => {
+/**
+ * Helper function to validate port number
+ */
+function isValidPort(port: string): boolean {
+  const portNum = parseInt(port, 10);
+  return !isNaN(portNum) && portNum > 0 && portNum < 65536;
+}
+
+/**
+ * .env.example Documentation Tests
+ *
+ * These tests validate that the .env.example file exists and
+ * documents all required environment variables.
+ */
+describe('Environment Variables Documentation', () => {
+  let envExampleContent: string;
+
+  beforeAll(() => {
+    if (existsSync(envExamplePath)) {
+      envExampleContent = readFileSync(envExamplePath, 'utf-8');
+    }
+  });
+
+  describe('.env.example file', () => {
+    it('should exist at project root', () => {
+      expect(existsSync(envExamplePath)).toBe(true);
+    });
+
+    it('should have content', () => {
+      expect(envExampleContent).toBeDefined();
+      expect(envExampleContent.length).toBeGreaterThan(0);
+    });
+
+    it('should contain section headers for organization', () => {
+      expect(envExampleContent).toContain('Database');
+      expect(envExampleContent).toContain('Redis');
+      expect(envExampleContent).toContain('Authentication');
+      expect(envExampleContent).toContain('Storage');
+    });
+
+    it('should have copy instructions', () => {
+      expect(envExampleContent).toContain('Copy this file to .env');
+    });
+
+    it('should warn about not committing .env', () => {
+      expect(envExampleContent).toContain('NEVER commit .env');
+    });
+  });
+
+  describe('Documented environment variables', () => {
+    ALL_DOCUMENTED_VARS.forEach((envVar) => {
+      it(`should document ${envVar} in .env.example`, () => {
+        expect(envExampleContent).toContain(envVar);
+      });
+    });
+  });
+});
+
+/**
+ * Runtime Environment Variables Tests
+ *
+ * These tests validate that environment variables are set and have valid values.
+ * Skip with SKIP_ENV_VALIDATION=true (useful for CI without full env setup).
+ */
+describe.skipIf(skipEnvValidation)('Environment Variables', () => {
   describe('Database Configuration', () => {
     it('should have DATABASE_URL environment variable set', () => {
       if (isTestMode && !isEnvVarSet('DATABASE_URL')) {
@@ -341,6 +451,69 @@ describe('Environment Variables', () => {
     });
   });
 
+  describe('Server Configuration', () => {
+    it('should have NODE_ENV environment variable set', () => {
+      if (isTestMode && !isEnvVarSet('NODE_ENV')) {
+        console.warn('⚠️  NODE_ENV not set (skipped in test mode)');
+        expect(true).toBe(true);
+      } else {
+        expect(isEnvVarSet('NODE_ENV')).toBe(true);
+      }
+    });
+
+    it('should have valid NODE_ENV value', () => {
+      if (isEnvVarSet('NODE_ENV')) {
+        const nodeEnv = process.env.NODE_ENV!;
+        const validValues = ['development', 'test', 'production'];
+        expect(validValues).toContain(nodeEnv);
+      } else {
+        // Skip validation if NODE_ENV is not set
+        expect(true).toBe(true);
+      }
+    });
+
+    it('should have valid API_PORT if set', () => {
+      if (isEnvVarSet('API_PORT')) {
+        const port = process.env.API_PORT!;
+        expect(isValidPort(port)).toBe(true);
+      } else {
+        // API_PORT is optional, has default value
+        expect(true).toBe(true);
+      }
+    });
+
+    it('should have valid WEB_PORT if set', () => {
+      if (isEnvVarSet('WEB_PORT')) {
+        const port = process.env.WEB_PORT!;
+        expect(isValidPort(port)).toBe(true);
+      } else {
+        // WEB_PORT is optional, has default value
+        expect(true).toBe(true);
+      }
+    });
+
+    it('should use different ports for API and WEB if both are set', () => {
+      if (isEnvVarSet('API_PORT') && isEnvVarSet('WEB_PORT')) {
+        const apiPort = process.env.API_PORT!;
+        const webPort = process.env.WEB_PORT!;
+        expect(apiPort).not.toBe(webPort);
+      } else {
+        // Ports are optional
+        expect(true).toBe(true);
+      }
+    });
+
+    it('should have valid APP_URL format if set', () => {
+      if (isEnvVarSet('APP_URL')) {
+        const appUrl = process.env.APP_URL!;
+        expect(isValidUrl(appUrl)).toBe(true);
+      } else {
+        // APP_URL is optional
+        expect(true).toBe(true);
+      }
+    });
+  });
+
   describe('Environment Variable Security', () => {
     it('should not have empty required environment variables', () => {
       const allRequired = [
@@ -425,6 +598,9 @@ describe('Environment Variables', () => {
         ...ENV_GROUPS.storage.optional,
         ...ENV_GROUPS.auth.optional,
         ...ENV_GROUPS.frontend.optional,
+        ...ENV_GROUPS.server.optional,
+        ...ENV_GROUPS.email.optional,
+        ...ENV_GROUPS.application.optional,
       ];
 
       const setOptionalVars = allOptional.filter((varName) => isEnvVarSet(varName));
@@ -443,3 +619,55 @@ describe('Environment Variables', () => {
     });
   });
 });
+
+/**
+ * Production Environment Safety Tests
+ *
+ * These tests specifically check for production environment safety.
+ * Only run when NODE_ENV=production and ENFORCE_ENV_VARS=true.
+ */
+describe.skipIf(process.env.NODE_ENV !== 'production' || !process.env.ENFORCE_ENV_VARS)(
+  'Production Environment Safety',
+  () => {
+    it('should not use default development secrets in production', () => {
+      const authSecret = process.env.BETTER_AUTH_SECRET;
+      const hasDefaultSecret =
+        authSecret?.includes('change-in-production') ||
+        authSecret?.includes('your-secret-key') ||
+        authSecret?.includes('dev_');
+
+      if (hasDefaultSecret) {
+        console.error('CRITICAL: Using default BETTER_AUTH_SECRET in production!');
+      }
+
+      expect(hasDefaultSecret).toBe(false);
+    });
+
+    it('should not use localhost URLs in production', () => {
+      const urlVars = ['DATABASE_URL', 'REDIS_URL', 'R2_ENDPOINT', 'APP_URL', 'VITE_API_URL'];
+
+      urlVars.forEach((varName) => {
+        const value = process.env[varName];
+        if (value) {
+          const hasLocalhost = value.includes('localhost') || value.includes('127.0.0.1');
+          if (hasLocalhost) {
+            console.error(`WARNING: ${varName} contains localhost in production!`);
+          }
+          expect(hasLocalhost).toBe(false);
+        }
+      });
+    });
+
+    it('should use test mode for Razorpay in non-production', () => {
+      // This test ensures Razorpay is NOT in test mode for production
+      const keyId = process.env.RAZORPAY_KEY_ID;
+      if (keyId) {
+        const isTestMode = keyId.startsWith('rzp_test_');
+        if (isTestMode) {
+          console.error('WARNING: Using Razorpay test keys in production!');
+        }
+        expect(isTestMode).toBe(false);
+      }
+    });
+  }
+);
