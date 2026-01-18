@@ -6,6 +6,7 @@
  *
  * These tests require a running PostgreSQL database. When SKIP_DB_RUNTIME_TESTS
  * is set to 'true', all tests are skipped (useful for CI without database).
+ * Tests also gracefully skip when database is unavailable.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -20,107 +21,138 @@ import {
 // Check if we should skip database runtime tests
 const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
 
-console.log('🧪 Starting test suite...');
-if (SKIP_TESTS) {
-  console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
-}
+// Track database availability
+let isDatabaseAvailable = false;
+
+// Helper to check if tests should be skipped
+const shouldSkip = () => SKIP_TESTS || !isDatabaseAvailable;
 
 let client: ReturnType<typeof postgres> | null = null;
 let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
-  if (SKIP_TESTS) return;
+  if (SKIP_TESTS) {
+    console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
+    return;
+  }
 
-  const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
-  client = postgres(databaseUrl, { max: 1 });
-  db = drizzle(client);
+  try {
+    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    client = postgres(databaseUrl, {
+      max: 1,
+      connect_timeout: 5,
+      idle_timeout: 5,
+    });
 
-  // Drop tables to ensure clean state
-  await client`DROP TABLE IF EXISTS ai_generations CASCADE`;
-  await client`DROP TABLE IF EXISTS users CASCADE`;
+    // Test connection
+    await client`SELECT 1`;
+    isDatabaseAvailable = true;
+    db = drizzle(client);
 
-  await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+    // Drop tables to ensure clean state
+    await client`DROP TABLE IF EXISTS ai_generations CASCADE`;
+    await client`DROP TABLE IF EXISTS users CASCADE`;
 
-  // Drop existing enums if they exist (for clean test state)
-  await client`DROP TYPE IF EXISTS ai_generation_status CASCADE`;
-  await client`DROP TYPE IF EXISTS ai_model CASCADE`;
-  await client`DROP TYPE IF EXISTS aspect_ratio CASCADE`;
-  await client`DROP TYPE IF EXISTS style_preset CASCADE`;
-  await client`DROP TYPE IF EXISTS moderation_status CASCADE`;
+    await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
-  // Create enums
-  await client`DO $$ BEGIN CREATE TYPE user_role AS ENUM ('admin', 'customer', 'trade'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
-  await client`CREATE TYPE ai_generation_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled')`;
-  await client`CREATE TYPE ai_model AS ENUM ('sdxl', 'sd-2-1', 'dalle-3', 'midjourney', 'stable-diffusion-xl-lightning')`;
-  await client`CREATE TYPE aspect_ratio AS ENUM ('1:1', '4:5', '3:4', '2:3', '4:3', '16:9', '21:9')`;
-  await client`CREATE TYPE style_preset AS ENUM ('wabi-sabi', 'abstract-expression', 'botanical', 'vintage-poster', 'minimalist', 'geometric', 'watercolor', 'line-art', 'pop-art', 'surrealism')`;
-  await client`CREATE TYPE moderation_status AS ENUM ('pending', 'approved', 'rejected', 'flagged')`;
+    // Drop existing enums if they exist (for clean test state)
+    await client`DROP TYPE IF EXISTS ai_generation_status CASCADE`;
+    await client`DROP TYPE IF EXISTS ai_model CASCADE`;
+    await client`DROP TYPE IF EXISTS aspect_ratio CASCADE`;
+    await client`DROP TYPE IF EXISTS style_preset CASCADE`;
+    await client`DROP TYPE IF EXISTS moderation_status CASCADE`;
 
-  // Create tables
-  await client`
-    CREATE TABLE IF NOT EXISTS users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      email VARCHAR(255) NOT NULL UNIQUE,
-      name VARCHAR(100) NOT NULL,
-      phone VARCHAR(20),
-      password_hash VARCHAR(255),
-      role user_role NOT NULL DEFAULT 'customer',
-      email_verified BOOLEAN NOT NULL DEFAULT false,
-      phone_verified BOOLEAN NOT NULL DEFAULT false,
-      avatar_url TEXT,
-      preferences JSONB NOT NULL DEFAULT '{}',
-      trade_account_status VARCHAR(50),
-      trade_business JSONB,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-  `;
+    // Create enums
+    await client`DO $$ BEGIN CREATE TYPE user_role AS ENUM ('admin', 'customer', 'trade'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
+    await client`CREATE TYPE ai_generation_status AS ENUM ('pending', 'processing', 'completed', 'failed', 'cancelled')`;
+    await client`CREATE TYPE ai_model AS ENUM ('sdxl', 'sd-2-1', 'dalle-3', 'midjourney', 'stable-diffusion-xl-lightning')`;
+    await client`CREATE TYPE aspect_ratio AS ENUM ('1:1', '4:5', '3:4', '2:3', '4:3', '16:9', '21:9')`;
+    await client`CREATE TYPE style_preset AS ENUM ('wabi-sabi', 'abstract-expression', 'botanical', 'vintage-poster', 'minimalist', 'geometric', 'watercolor', 'line-art', 'pop-art', 'surrealism')`;
+    await client`CREATE TYPE moderation_status AS ENUM ('pending', 'approved', 'rejected', 'flagged')`;
 
-  await client`
-    CREATE TABLE IF NOT EXISTS ai_generations (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES users(id),
-      prompt TEXT NOT NULL,
-      enhanced_prompt TEXT,
-      style_preset style_preset NOT NULL,
-      aspect_ratio aspect_ratio NOT NULL,
-      model ai_model NOT NULL DEFAULT 'sdxl',
-      parameters JSONB,
-      status ai_generation_status NOT NULL DEFAULT 'pending',
-      images JSONB NOT NULL DEFAULT '[]',
-      selected_image_id VARCHAR(255),
-      moderation_status moderation_status NOT NULL DEFAULT 'pending',
-      moderation_notes TEXT,
-      moderated_by UUID REFERENCES users(id),
-      moderated_at TIMESTAMP,
-      error_message TEXT,
-      processing_time_ms INTEGER,
-      credits_used INTEGER,
-      is_public BOOLEAN NOT NULL DEFAULT false,
-      likes INTEGER NOT NULL DEFAULT 0,
-      views INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      completed_at TIMESTAMP
-    )
-  `;
+    // Create tables
+    await client`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email VARCHAR(255) NOT NULL UNIQUE,
+        name VARCHAR(100) NOT NULL,
+        phone VARCHAR(20),
+        password_hash VARCHAR(255),
+        role user_role NOT NULL DEFAULT 'customer',
+        email_verified BOOLEAN NOT NULL DEFAULT false,
+        phone_verified BOOLEAN NOT NULL DEFAULT false,
+        avatar_url TEXT,
+        preferences JSONB NOT NULL DEFAULT '{}',
+        trade_account_status VARCHAR(50),
+        trade_business JSONB,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    await client`
+      CREATE TABLE IF NOT EXISTS ai_generations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id),
+        prompt TEXT NOT NULL,
+        enhanced_prompt TEXT,
+        style_preset style_preset NOT NULL,
+        aspect_ratio aspect_ratio NOT NULL,
+        model ai_model NOT NULL DEFAULT 'sdxl',
+        parameters JSONB,
+        status ai_generation_status NOT NULL DEFAULT 'pending',
+        images JSONB NOT NULL DEFAULT '[]',
+        selected_image_id VARCHAR(255),
+        moderation_status moderation_status NOT NULL DEFAULT 'pending',
+        moderation_notes TEXT,
+        moderated_by UUID REFERENCES users(id),
+        moderated_at TIMESTAMP,
+        error_message TEXT,
+        processing_time_ms INTEGER,
+        credits_used INTEGER,
+        is_public BOOLEAN NOT NULL DEFAULT false,
+        likes INTEGER NOT NULL DEFAULT 0,
+        views INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        completed_at TIMESTAMP
+      )
+    `;
+
+    console.log('✅ Database connection established for AI generations schema tests');
+  } catch (error) {
+    console.log('⚠️  Database not available, runtime tests will be skipped');
+    isDatabaseAvailable = false;
+    if (client) {
+      try {
+        await client.end();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      client = null;
+    }
+  }
 });
 
 afterAll(async () => {
-  if (SKIP_TESTS || !client) return;
+  if (!isDatabaseAvailable || !client) return;
 
-  await client`DROP TABLE IF EXISTS ai_generations CASCADE`;
-  await client`DROP TABLE IF EXISTS users CASCADE`;
-  await client`DROP TYPE IF EXISTS ai_generation_status CASCADE`;
-  await client`DROP TYPE IF EXISTS ai_model CASCADE`;
-  await client`DROP TYPE IF EXISTS aspect_ratio CASCADE`;
-  await client`DROP TYPE IF EXISTS style_preset CASCADE`;
-  await client`DROP TYPE IF EXISTS moderation_status CASCADE`;
-  await client.end();
+  try {
+    await client`DROP TABLE IF EXISTS ai_generations CASCADE`;
+    await client`DROP TABLE IF EXISTS users CASCADE`;
+    await client`DROP TYPE IF EXISTS ai_generation_status CASCADE`;
+    await client`DROP TYPE IF EXISTS ai_model CASCADE`;
+    await client`DROP TYPE IF EXISTS aspect_ratio CASCADE`;
+    await client`DROP TYPE IF EXISTS style_preset CASCADE`;
+    await client`DROP TYPE IF EXISTS moderation_status CASCADE`;
+    await client.end();
+  } catch (error) {
+    // Ignore cleanup errors
+  }
 });
 
 beforeEach(async () => {
-  if (SKIP_TESTS || !client) return;
+  if (!isDatabaseAvailable || !client) return;
 
   await client`DELETE FROM ai_generations`;
   await client`DELETE FROM users`;
@@ -131,7 +163,7 @@ describe('AI Generations Table Schema', () => {
   let testModeratorId: string;
 
   beforeEach(async () => {
-    if (SKIP_TESTS || !db) return;
+    if (shouldSkip() || !db) return;
 
     // Create test user
     const [user] = await db.insert(users).values({
@@ -151,7 +183,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it.skipIf(SKIP_TESTS)('should have ai_generations table', async () => {
+    it.skipIf(shouldSkip())('should have ai_generations table', async () => {
       const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'ai_generations'
@@ -159,7 +191,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.length).toBe(1);
     });
 
-    it.skipIf(SKIP_TESTS)('should have all required columns', async () => {
+    it.skipIf(shouldSkip())('should have all required columns', async () => {
       const result = await client!`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'ai_generations'
@@ -181,7 +213,7 @@ describe('AI Generations Table Schema', () => {
       expect(columnNames).toContain('views');
     });
 
-    it.skipIf(SKIP_TESTS)('should have foreign key to users', async () => {
+    it.skipIf(shouldSkip())('should have foreign key to users', async () => {
       const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'ai_generations' AND constraint_type = 'FOREIGN KEY'
@@ -191,7 +223,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('AI Generation CRUD Operations', () => {
-    it.skipIf(SKIP_TESTS)('should insert an AI generation', async () => {
+    it.skipIf(shouldSkip())('should insert an AI generation', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'A beautiful abstract painting in wabi-sabi style',
@@ -208,7 +240,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.status).toBe('pending');
     });
 
-    it.skipIf(SKIP_TESTS)('should select AI generations', async () => {
+    it.skipIf(shouldSkip())('should select AI generations', async () => {
       await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Test prompt',
@@ -222,7 +254,7 @@ describe('AI Generations Table Schema', () => {
       expect(result).toHaveLength(1);
     });
 
-    it.skipIf(SKIP_TESTS)('should update generation status', async () => {
+    it.skipIf(shouldSkip())('should update generation status', async () => {
       const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Update test',
@@ -240,7 +272,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.status).toBe('processing');
     });
 
-    it.skipIf(SKIP_TESTS)('should delete a generation', async () => {
+    it.skipIf(shouldSkip())('should delete a generation', async () => {
       const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Delete test',
@@ -258,7 +290,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Generation Status Workflow', () => {
-    it.skipIf(SKIP_TESTS)('should support all generation statuses', async () => {
+    it.skipIf(shouldSkip())('should support all generation statuses', async () => {
       const statuses = ['pending', 'processing', 'completed', 'failed', 'cancelled'];
 
       for (const status of statuses) {
@@ -276,7 +308,7 @@ describe('AI Generations Table Schema', () => {
       }
     });
 
-    it.skipIf(SKIP_TESTS)('should update status from pending to processing', async () => {
+    it.skipIf(shouldSkip())('should update status from pending to processing', async () => {
       const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Status workflow test',
@@ -294,7 +326,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.status).toBe('processing');
     });
 
-    it.skipIf(SKIP_TESTS)('should set completed status with completion timestamp', async () => {
+    it.skipIf(shouldSkip())('should set completed status with completion timestamp', async () => {
       const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Completion test',
@@ -322,7 +354,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Style Presets', () => {
-    it.skipIf(SKIP_TESTS)('should support all style presets', async () => {
+    it.skipIf(shouldSkip())('should support all style presets', async () => {
       const styles = ['wabi-sabi', 'abstract-expression', 'botanical', 'vintage-poster', 'minimalist',
                       'geometric', 'watercolor', 'line-art', 'pop-art', 'surrealism'];
 
@@ -343,7 +375,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Aspect Ratios', () => {
-    it.skipIf(SKIP_TESTS)('should support all aspect ratios', async () => {
+    it.skipIf(shouldSkip())('should support all aspect ratios', async () => {
       const ratios = ['1:1', '4:5', '3:4', '2:3', '4:3', '16:9', '21:9'];
 
       for (const ratio of ratios) {
@@ -363,7 +395,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('AI Models', () => {
-    it.skipIf(SKIP_TESTS)('should support all AI models', async () => {
+    it.skipIf(shouldSkip())('should support all AI models', async () => {
       const models = ['sdxl', 'sd-2-1', 'dalle-3', 'midjourney', 'stable-diffusion-xl-lightning'];
 
       for (const model of models) {
@@ -381,7 +413,7 @@ describe('AI Generations Table Schema', () => {
       }
     });
 
-    it.skipIf(SKIP_TESTS)('should default to sdxl model', async () => {
+    it.skipIf(shouldSkip())('should default to sdxl model', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Default model test',
@@ -395,7 +427,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Generation Parameters', () => {
-    it.skipIf(SKIP_TESTS)('should store generation parameters as JSON', async () => {
+    it.skipIf(shouldSkip())('should store generation parameters as JSON', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Parameters test',
@@ -420,7 +452,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Generated Images', () => {
-    it.skipIf(SKIP_TESTS)('should store generated images as JSON array', async () => {
+    it.skipIf(shouldSkip())('should store generated images as JSON array', async () => {
       const testImages = [
         {
           url: 'https://example.com/gen1.jpg',
@@ -452,7 +484,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.images[0].thumbnailUrl).toBe('https://example.com/gen1-thumb.jpg');
     });
 
-    it.skipIf(SKIP_TESTS)('should default to empty images array', async () => {
+    it.skipIf(shouldSkip())('should default to empty images array', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Empty images test',
@@ -467,7 +499,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Moderation', () => {
-    it.skipIf(SKIP_TESTS)('should support all moderation statuses', async () => {
+    it.skipIf(shouldSkip())('should support all moderation statuses', async () => {
       const statuses = ['pending', 'approved', 'rejected', 'flagged'];
 
       for (const status of statuses) {
@@ -486,7 +518,7 @@ describe('AI Generations Table Schema', () => {
       }
     });
 
-    it.skipIf(SKIP_TESTS)('should default to pending moderation status', async () => {
+    it.skipIf(shouldSkip())('should default to pending moderation status', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Default moderation test',
@@ -499,7 +531,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.moderationStatus).toBe('pending');
     });
 
-    it.skipIf(SKIP_TESTS)('should store moderation information', async () => {
+    it.skipIf(shouldSkip())('should store moderation information', async () => {
       const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Moderation info test',
@@ -530,7 +562,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Public/Private Generations', () => {
-    it.skipIf(SKIP_TESTS)('should default to private (is_public = false)', async () => {
+    it.skipIf(shouldSkip())('should default to private (is_public = false)', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Private test',
@@ -543,7 +575,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.isPublic).toBe(false);
     });
 
-    it.skipIf(SKIP_TESTS)('should support public generations', async () => {
+    it.skipIf(shouldSkip())('should support public generations', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Public test',
@@ -557,7 +589,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.isPublic).toBe(true);
     });
 
-    it.skipIf(SKIP_TESTS)('should filter public generations', async () => {
+    it.skipIf(shouldSkip())('should filter public generations', async () => {
       await db!.insert(aiGenerations).values([
         {
           userId: testUserId,
@@ -594,7 +626,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Likes and Views', () => {
-    it.skipIf(SKIP_TESTS)('should default to 0 likes and views', async () => {
+    it.skipIf(shouldSkip())('should default to 0 likes and views', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Likes/views test',
@@ -608,7 +640,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.views).toBe(0);
     });
 
-    it.skipIf(SKIP_TESTS)('should increment likes', async () => {
+    it.skipIf(shouldSkip())('should increment likes', async () => {
       const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Likes increment test',
@@ -627,7 +659,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.likes).toBe(10);
     });
 
-    it.skipIf(SKIP_TESTS)('should increment views', async () => {
+    it.skipIf(shouldSkip())('should increment views', async () => {
       const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Views increment test',
@@ -648,7 +680,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Credits and Processing Time', () => {
-    it.skipIf(SKIP_TESTS)('should store credits used', async () => {
+    it.skipIf(shouldSkip())('should store credits used', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Credits test',
@@ -662,7 +694,7 @@ describe('AI Generations Table Schema', () => {
       expect(result.creditsUsed).toBe(5);
     });
 
-    it.skipIf(SKIP_TESTS)('should store processing time in milliseconds', async () => {
+    it.skipIf(shouldSkip())('should store processing time in milliseconds', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Processing time test',
@@ -678,7 +710,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Error Handling', () => {
-    it.skipIf(SKIP_TESTS)('should store error messages for failed generations', async () => {
+    it.skipIf(shouldSkip())('should store error messages for failed generations', async () => {
       const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Error test',

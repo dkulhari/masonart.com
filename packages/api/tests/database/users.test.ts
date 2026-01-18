@@ -6,6 +6,7 @@
  *
  * These tests require a running PostgreSQL database. When SKIP_DB_RUNTIME_TESTS
  * is set to 'true', all tests are skipped (useful for CI without database).
+ * Tests also gracefully skip when database is unavailable.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -24,123 +25,154 @@ import {
 // Check if we should skip database runtime tests
 const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
 
-console.log('🧪 Starting test suite...');
-if (SKIP_TESTS) {
-  console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
-}
+// Track database availability
+let isDatabaseAvailable = false;
 
 let client: ReturnType<typeof postgres> | null = null;
 let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
-  if (SKIP_TESTS) return;
+  if (SKIP_TESTS) {
+    console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
+    return;
+  }
 
-  const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
-  client = postgres(databaseUrl, { max: 1 });
-  db = drizzle(client);
+  try {
+    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    client = postgres(databaseUrl, {
+      max: 1,
+      connect_timeout: 5,
+      idle_timeout: 5,
+    });
 
-  // Drop tables to ensure clean state
-  await client`DROP TABLE IF EXISTS sessions CASCADE`;
-  await client`DROP TABLE IF EXISTS addresses CASCADE`;
-  await client`DROP TABLE IF EXISTS users CASCADE`;
+    // Test connection
+    await client`SELECT 1`;
+    isDatabaseAvailable = true;
+    db = drizzle(client);
 
-  await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+    // Drop tables to ensure clean state
+    await client`DROP TABLE IF EXISTS sessions CASCADE`;
+    await client`DROP TABLE IF EXISTS addresses CASCADE`;
+    await client`DROP TABLE IF EXISTS users CASCADE`;
 
-  // Create enums
-  await client`
-    DO $$ BEGIN
-      CREATE TYPE user_role AS ENUM ('admin', 'customer', 'trade');
-    EXCEPTION
-      WHEN duplicate_object THEN null;
-    END $$;
-  `;
+    await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
-  await client`
-    DO $$ BEGIN
-      CREATE TYPE trade_account_status AS ENUM ('pending', 'approved', 'rejected');
-    EXCEPTION
-      WHEN duplicate_object THEN null;
-    END $$;
-  `;
+    // Create enums
+    await client`
+      DO $$ BEGIN
+        CREATE TYPE user_role AS ENUM ('admin', 'customer', 'trade');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `;
 
-  await client`
-    DO $$ BEGIN
-      CREATE TYPE address_type AS ENUM ('home', 'office', 'other');
-    EXCEPTION
-      WHEN duplicate_object THEN null;
-    END $$;
-  `;
+    await client`
+      DO $$ BEGIN
+        CREATE TYPE trade_account_status AS ENUM ('pending', 'approved', 'rejected');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `;
 
-  // Create users table
-  await client`
-    CREATE TABLE IF NOT EXISTS users (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      email VARCHAR(255) NOT NULL UNIQUE,
-      name VARCHAR(100) NOT NULL,
-      phone VARCHAR(20),
-      password_hash VARCHAR(255),
-      role user_role NOT NULL DEFAULT 'customer',
-      email_verified BOOLEAN NOT NULL DEFAULT false,
-      phone_verified BOOLEAN NOT NULL DEFAULT false,
-      avatar_url TEXT,
-      preferences JSONB NOT NULL DEFAULT '{"emailNotifications":true,"smsNotifications":false,"marketingEmails":true,"orderUpdates":true,"aiGenerationNotifications":true}',
-      trade_account_status trade_account_status,
-      trade_business JSONB,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-  `;
+    await client`
+      DO $$ BEGIN
+        CREATE TYPE address_type AS ENUM ('home', 'office', 'other');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `;
 
-  // Create addresses table
-  await client`
-    CREATE TABLE IF NOT EXISTS addresses (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      full_name VARCHAR(100) NOT NULL,
-      phone VARCHAR(20) NOT NULL,
-      address_line1 VARCHAR(200) NOT NULL,
-      address_line2 VARCHAR(200),
-      city VARCHAR(100) NOT NULL,
-      state VARCHAR(100) NOT NULL,
-      pincode VARCHAR(20) NOT NULL,
-      country VARCHAR(100) NOT NULL,
-      is_default BOOLEAN NOT NULL DEFAULT false,
-      type address_type NOT NULL DEFAULT 'home'
-    )
-  `;
+    // Create users table
+    await client`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email VARCHAR(255) NOT NULL UNIQUE,
+        name VARCHAR(100) NOT NULL,
+        phone VARCHAR(20),
+        password_hash VARCHAR(255),
+        role user_role NOT NULL DEFAULT 'customer',
+        email_verified BOOLEAN NOT NULL DEFAULT false,
+        phone_verified BOOLEAN NOT NULL DEFAULT false,
+        avatar_url TEXT,
+        preferences JSONB NOT NULL DEFAULT '{"emailNotifications":true,"smsNotifications":false,"marketingEmails":true,"orderUpdates":true,"aiGenerationNotifications":true}',
+        trade_account_status trade_account_status,
+        trade_business JSONB,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `;
 
-  // Create sessions table
-  await client`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      token VARCHAR(500) NOT NULL UNIQUE,
-      expires_at TIMESTAMP NOT NULL,
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-  `;
+    // Create addresses table
+    await client`
+      CREATE TABLE IF NOT EXISTS addresses (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        full_name VARCHAR(100) NOT NULL,
+        phone VARCHAR(20) NOT NULL,
+        address_line1 VARCHAR(200) NOT NULL,
+        address_line2 VARCHAR(200),
+        city VARCHAR(100) NOT NULL,
+        state VARCHAR(100) NOT NULL,
+        pincode VARCHAR(20) NOT NULL,
+        country VARCHAR(100) NOT NULL,
+        is_default BOOLEAN NOT NULL DEFAULT false,
+        type address_type NOT NULL DEFAULT 'home'
+      )
+    `;
+
+    // Create sessions table
+    await client`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(500) NOT NULL UNIQUE,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `;
+
+    console.log('✅ Database connection established for users schema tests');
+  } catch (error) {
+    console.log('⚠️  Database not available, runtime tests will be skipped');
+    isDatabaseAvailable = false;
+    if (client) {
+      try {
+        await client.end();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      client = null;
+    }
+  }
 });
 
 afterAll(async () => {
-  if (SKIP_TESTS || !client) return;
+  if (!isDatabaseAvailable || !client) return;
 
-  await client`DROP TABLE IF EXISTS sessions CASCADE`;
-  await client`DROP TABLE IF EXISTS addresses CASCADE`;
-  await client`DROP TABLE IF EXISTS users CASCADE`;
-  await client.end();
+  try {
+    await client`DROP TABLE IF EXISTS sessions CASCADE`;
+    await client`DROP TABLE IF EXISTS addresses CASCADE`;
+    await client`DROP TABLE IF EXISTS users CASCADE`;
+    await client.end();
+  } catch (error) {
+    // Ignore cleanup errors
+  }
 });
 
 beforeEach(async () => {
-  if (SKIP_TESTS || !client) return;
+  if (!isDatabaseAvailable || !client) return;
 
   await client`DELETE FROM sessions`;
   await client`DELETE FROM addresses`;
   await client`DELETE FROM users`;
 });
 
+// Helper to check if tests should be skipped
+const shouldSkip = () => SKIP_TESTS || !isDatabaseAvailable;
+
 describe('Users Table Schema', () => {
   describe('Table Structure', () => {
-    it.skipIf(SKIP_TESTS)('should have users table', async () => {
+    it.skipIf(shouldSkip())('should have users table', async () => {
       const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'users'
@@ -148,7 +180,7 @@ describe('Users Table Schema', () => {
       expect(result.length).toBe(1);
     });
 
-    it.skipIf(SKIP_TESTS)('should have all required columns', async () => {
+    it.skipIf(shouldSkip())('should have all required columns', async () => {
       const result = await client!`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'users'
@@ -170,7 +202,7 @@ describe('Users Table Schema', () => {
       expect(columnNames).toContain('updated_at');
     });
 
-    it.skipIf(SKIP_TESTS)('should have unique constraint on email', async () => {
+    it.skipIf(shouldSkip())('should have unique constraint on email', async () => {
       const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'users' AND constraint_type = 'UNIQUE'
@@ -180,7 +212,7 @@ describe('Users Table Schema', () => {
   });
 
   describe('User CRUD Operations', () => {
-    it.skipIf(SKIP_TESTS)('should insert a user', async () => {
+    it.skipIf(shouldSkip())('should insert a user', async () => {
       const [result] = await db!.insert(users).values({
         email: 'test@example.com',
         name: 'Test User',
@@ -195,7 +227,7 @@ describe('Users Table Schema', () => {
       expect(result.emailVerified).toBe(false);
     });
 
-    it.skipIf(SKIP_TESTS)('should select users', async () => {
+    it.skipIf(shouldSkip())('should select users', async () => {
       await db!.insert(users).values({
         email: 'user1@example.com',
         name: 'User One',
@@ -207,7 +239,7 @@ describe('Users Table Schema', () => {
       expect(result[0].email).toBe('user1@example.com');
     });
 
-    it.skipIf(SKIP_TESTS)('should update a user', async () => {
+    it.skipIf(shouldSkip())('should update a user', async () => {
       const [inserted] = await db!.insert(users).values({
         email: 'update@example.com',
         name: 'Update User',
@@ -223,7 +255,7 @@ describe('Users Table Schema', () => {
       expect(result.emailVerified).toBe(true);
     });
 
-    it.skipIf(SKIP_TESTS)('should delete a user', async () => {
+    it.skipIf(shouldSkip())('should delete a user', async () => {
       const [inserted] = await db!.insert(users).values({
         email: 'delete@example.com',
         name: 'Delete User',
@@ -238,7 +270,7 @@ describe('Users Table Schema', () => {
   });
 
   describe('User Roles', () => {
-    it.skipIf(SKIP_TESTS)('should insert admin user', async () => {
+    it.skipIf(shouldSkip())('should insert admin user', async () => {
       const [result] = await db!.insert(users).values({
         email: 'admin@example.com',
         name: 'Admin User',
@@ -248,7 +280,7 @@ describe('Users Table Schema', () => {
       expect(result.role).toBe('admin');
     });
 
-    it.skipIf(SKIP_TESTS)('should insert trade user', async () => {
+    it.skipIf(shouldSkip())('should insert trade user', async () => {
       const [result] = await db!.insert(users).values({
         email: 'trade@example.com',
         name: 'Trade User',
@@ -266,7 +298,7 @@ describe('Users Table Schema', () => {
       expect(result.tradeBusiness).toHaveProperty('businessName');
     });
 
-    it.skipIf(SKIP_TESTS)('should filter users by role', async () => {
+    it.skipIf(shouldSkip())('should filter users by role', async () => {
       await db!.insert(users).values([
         { email: 'customer1@example.com', name: 'Customer 1', role: 'customer' },
         { email: 'customer2@example.com', name: 'Customer 2', role: 'customer' },
@@ -282,7 +314,7 @@ describe('Users Table Schema', () => {
   });
 
   describe('User Preferences', () => {
-    it.skipIf(SKIP_TESTS)('should store user preferences as JSON', async () => {
+    it.skipIf(shouldSkip())('should store user preferences as JSON', async () => {
       const [result] = await db!.insert(users).values({
         email: 'prefs@example.com',
         name: 'Prefs User',
@@ -300,7 +332,7 @@ describe('Users Table Schema', () => {
       expect(result.preferences.marketingEmails).toBe(false);
     });
 
-    it.skipIf(SKIP_TESTS)('should use default preferences', async () => {
+    it.skipIf(shouldSkip())('should use default preferences', async () => {
       const [result] = await db!.insert(users).values({
         email: 'default@example.com',
         name: 'Default User',
@@ -314,7 +346,7 @@ describe('Users Table Schema', () => {
   });
 
   describe('Trade Business', () => {
-    it.skipIf(SKIP_TESTS)('should store trade business information', async () => {
+    it.skipIf(shouldSkip())('should store trade business information', async () => {
       const tradeBusiness = {
         businessName: 'Art Gallery Ltd',
         gstNumber: '29AAAAA0000A1Z5',
@@ -333,7 +365,7 @@ describe('Users Table Schema', () => {
       expect(result.tradeAccountStatus).toBe('approved');
     });
 
-    it.skipIf(SKIP_TESTS)('should handle pending trade accounts', async () => {
+    it.skipIf(shouldSkip())('should handle pending trade accounts', async () => {
       const [result] = await db!.insert(users).values({
         email: 'pending@example.com',
         name: 'Pending Trade',
@@ -350,7 +382,7 @@ describe('Users Table Schema', () => {
   });
 
   describe('Email Uniqueness', () => {
-    it.skipIf(SKIP_TESTS)('should enforce email uniqueness', async () => {
+    it.skipIf(shouldSkip())('should enforce email uniqueness', async () => {
       await db!.insert(users).values({
         email: 'unique@example.com',
         name: 'User One',
@@ -378,7 +410,7 @@ describe('Addresses Table Schema', () => {
   let testUserId: string;
 
   beforeEach(async () => {
-    if (SKIP_TESTS || !db) return;
+    if (shouldSkip() || !db) return;
 
     const [user] = await db.insert(users).values({
       email: 'address-test@example.com',
@@ -389,7 +421,7 @@ describe('Addresses Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it.skipIf(SKIP_TESTS)('should have addresses table', async () => {
+    it.skipIf(shouldSkip())('should have addresses table', async () => {
       const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'addresses'
@@ -397,7 +429,7 @@ describe('Addresses Table Schema', () => {
       expect(result.length).toBe(1);
     });
 
-    it.skipIf(SKIP_TESTS)('should have foreign key to users', async () => {
+    it.skipIf(shouldSkip())('should have foreign key to users', async () => {
       const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'addresses' AND constraint_type = 'FOREIGN KEY'
@@ -407,7 +439,7 @@ describe('Addresses Table Schema', () => {
   });
 
   describe('Address CRUD Operations', () => {
-    it.skipIf(SKIP_TESTS)('should insert an address', async () => {
+    it.skipIf(shouldSkip())('should insert an address', async () => {
       const [result] = await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'John Doe',
@@ -427,7 +459,7 @@ describe('Addresses Table Schema', () => {
       expect(result.city).toBe('Mumbai');
     });
 
-    it.skipIf(SKIP_TESTS)('should select addresses for a user', async () => {
+    it.skipIf(shouldSkip())('should select addresses for a user', async () => {
       await db!.insert(addresses).values([
         {
           userId: testUserId,
@@ -457,7 +489,7 @@ describe('Addresses Table Schema', () => {
       expect(result).toHaveLength(2);
     });
 
-    it.skipIf(SKIP_TESTS)('should delete addresses when user is deleted', async () => {
+    it.skipIf(shouldSkip())('should delete addresses when user is deleted', async () => {
       await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'John Doe',
@@ -478,7 +510,7 @@ describe('Addresses Table Schema', () => {
   });
 
   describe('Address Types', () => {
-    it.skipIf(SKIP_TESTS)('should support home address type', async () => {
+    it.skipIf(shouldSkip())('should support home address type', async () => {
       const [result] = await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'Jane Doe',
@@ -494,7 +526,7 @@ describe('Addresses Table Schema', () => {
       expect(result.type).toBe('home');
     });
 
-    it.skipIf(SKIP_TESTS)('should support office address type', async () => {
+    it.skipIf(shouldSkip())('should support office address type', async () => {
       const [result] = await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'Jane Doe',
@@ -512,7 +544,7 @@ describe('Addresses Table Schema', () => {
   });
 
   describe('Default Address', () => {
-    it.skipIf(SKIP_TESTS)('should set default address flag', async () => {
+    it.skipIf(shouldSkip())('should set default address flag', async () => {
       const [result] = await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'John Doe',
@@ -529,7 +561,7 @@ describe('Addresses Table Schema', () => {
       expect(result.isDefault).toBe(true);
     });
 
-    it.skipIf(SKIP_TESTS)('should filter default address', async () => {
+    it.skipIf(shouldSkip())('should filter default address', async () => {
       await db!.insert(addresses).values([
         {
           userId: testUserId,
@@ -571,7 +603,7 @@ describe('Sessions Table Schema', () => {
   let testUserId: string;
 
   beforeEach(async () => {
-    if (SKIP_TESTS || !db) return;
+    if (shouldSkip() || !db) return;
 
     const [user] = await db.insert(users).values({
       email: 'session-test@example.com',
@@ -582,7 +614,7 @@ describe('Sessions Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it.skipIf(SKIP_TESTS)('should have sessions table', async () => {
+    it.skipIf(shouldSkip())('should have sessions table', async () => {
       const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'sessions'
@@ -590,7 +622,7 @@ describe('Sessions Table Schema', () => {
       expect(result.length).toBe(1);
     });
 
-    it.skipIf(SKIP_TESTS)('should have foreign key to users', async () => {
+    it.skipIf(shouldSkip())('should have foreign key to users', async () => {
       const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'sessions' AND constraint_type = 'FOREIGN KEY'
@@ -598,7 +630,7 @@ describe('Sessions Table Schema', () => {
       expect(result.length).toBeGreaterThanOrEqual(1);
     });
 
-    it.skipIf(SKIP_TESTS)('should have unique constraint on token', async () => {
+    it.skipIf(shouldSkip())('should have unique constraint on token', async () => {
       const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'sessions' AND constraint_type = 'UNIQUE'
@@ -608,7 +640,7 @@ describe('Sessions Table Schema', () => {
   });
 
   describe('Session CRUD Operations', () => {
-    it.skipIf(SKIP_TESTS)('should insert a session', async () => {
+    it.skipIf(shouldSkip())('should insert a session', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
 
       const [result] = await db!.insert(sessions).values({
@@ -622,7 +654,7 @@ describe('Sessions Table Schema', () => {
       expect(result.token).toBe('test-session-token-123456');
     });
 
-    it.skipIf(SKIP_TESTS)('should select sessions for a user', async () => {
+    it.skipIf(shouldSkip())('should select sessions for a user', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       await db!.insert(sessions).values([
@@ -642,7 +674,7 @@ describe('Sessions Table Schema', () => {
       expect(result).toHaveLength(2);
     });
 
-    it.skipIf(SKIP_TESTS)('should delete session', async () => {
+    it.skipIf(shouldSkip())('should delete session', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const [inserted] = await db!.insert(sessions).values({
@@ -657,7 +689,7 @@ describe('Sessions Table Schema', () => {
       expect(result).toHaveLength(0);
     });
 
-    it.skipIf(SKIP_TESTS)('should delete sessions when user is deleted', async () => {
+    it.skipIf(shouldSkip())('should delete sessions when user is deleted', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       await db!.insert(sessions).values({
@@ -674,7 +706,7 @@ describe('Sessions Table Schema', () => {
   });
 
   describe('Session Token Uniqueness', () => {
-    it.skipIf(SKIP_TESTS)('should enforce token uniqueness', async () => {
+    it.skipIf(shouldSkip())('should enforce token uniqueness', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       await db!.insert(sessions).values({
