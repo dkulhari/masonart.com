@@ -3,7 +3,7 @@
   "title": "MasonArt QA Testing Strategy Implementation",
   "description": "Comprehensive QA testing for MasonArt e-commerce platform covering automated E2E tests with Playwright, unit/integration tests with Vitest, and manual browser testing documentation",
   "created_at": "2026-01-16T13:00:03.032Z",
-  "updated_at": "2026-01-18T20:34:44.547Z",
+  "updated_at": "2026-01-18T20:43:04.537Z",
   "status": "in_progress",
   "planStatus": "in_progress",
   "phases": [
@@ -1048,7 +1048,7 @@
           "subtask_id": "10.6",
           "title": "Create manual checkout test docs",
           "description": "Create manual test documentation for checkout, payment, and order confirmation",
-          "status": "pending",
+          "status": "completed",
           "dependencies": [
             "10.5"
           ],
@@ -1058,7 +1058,7 @@
             "docs/manual-tests/order-confirmation.md"
           ],
           "tests": [],
-          "notes": ""
+          "notes": "Created comprehensive manual test documentation for checkout, payment, and order confirmation pages. Total 156 test cases: checkout.md (51 tests - multi-step flow, form validation, delivery options, order summary, trust badges), payment.md (45 tests - Razorpay integration, success/failure flows, error recovery), order-confirmation.md (60 tests - success header, order details, shipping/payment summary, what's next steps). Committed in 54ca593."
         }
       ]
     },
@@ -1071,7 +1071,7 @@
           "subtask_id": "11.1",
           "title": "Create auth pages E2E test",
           "description": "Write Playwright test for login and register pages",
-          "status": "pending",
+          "status": "completed",
           "dependencies": [
             "1.4",
             "1.6"
@@ -1082,7 +1082,7 @@
           "tests": [
             "tests/e2e/auth.spec.ts"
           ],
-          "notes": ""
+          "notes": "Comprehensive Playwright E2E test suite with 140 test cases for login (/auth/login) and register (/auth/register) pages. Login Page: page header/branding (7), Google OAuth (4), email field (6), password field with toggle (10), form validation (7), submit button states (6), navigation links (7), redirect handling (2), success message after registration (3), responsive design (4), accessibility (5), performance (2). Register Page: page header (7), Google OAuth (3), name field (5), email field (4), password field (6), password requirements display with color coding (6), confirm password (5), form validation (10), submit button (6), navigation links (7), redirect handling (2), responsive design (5), accessibility (5), performance (2). Plus cross-page navigation and error handling (5). Total: 140 tests × 5 browsers = 700 configurations. Committed in e00ddc0."
         },
         {
           "subtask_id": "11.2",
