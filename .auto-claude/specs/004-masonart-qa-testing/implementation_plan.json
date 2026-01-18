@@ -3,7 +3,7 @@
   "title": "MasonArt QA Testing Strategy Implementation",
   "description": "Comprehensive QA testing for MasonArt e-commerce platform covering automated E2E tests with Playwright, unit/integration tests with Vitest, and manual browser testing documentation",
   "created_at": "2026-01-16T13:00:03.032Z",
-  "updated_at": "2026-01-18T18:43:17.279Z",
+  "updated_at": "2026-01-18T18:49:19.576Z",
   "status": "in_progress",
   "planStatus": "in_progress",
   "phases": [
@@ -724,18 +724,18 @@
           "subtask_id": "8.1",
           "title": "Create TanStack Query hooks tests",
           "description": "Write tests for useProducts, useCart, and other query hooks",
-          "status": "pending",
+          "status": "completed",
           "dependencies": [
             "1.5"
           ],
           "files": [
-            "packages/web/tests/hooks/useProducts.test.ts",
-            "packages/web/tests/hooks/useCart.test.ts"
+            "packages/web/tests/hooks/useProducts.test.tsx",
+            "packages/web/tests/hooks/useCart.test.tsx"
           ],
           "tests": [
-            "packages/web/tests/hooks/*.test.ts"
+            "packages/web/tests/hooks/*.test.tsx"
           ],
-          "notes": ""
+          "notes": "Completed with 112 tests for TanStack Query hooks (58 for useProducts, 54 for useCart). Tests cover query functionality, mutations with optimistic updates, caching, error handling, prefetching, and cache invalidation. All 618 web package tests pass."
         },
         {
           "subtask_id": "8.2",
