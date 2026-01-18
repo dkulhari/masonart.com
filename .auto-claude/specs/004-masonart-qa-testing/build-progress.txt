@@ -1620,3 +1620,85 @@ Created comprehensive README.md with a dedicated testing section providing compl
 - README.md created with 363 lines
 - All test commands documented and accurate
 - Follows project patterns and conventions
+
+---
+
+## Subtask 16.3 - Create Test Maintenance Guide
+**Status:** COMPLETED
+**Date:** 2026-01-19
+**Commit:** 3494de2
+
+### Summary
+Created comprehensive test maintenance guide (docs/test-maintenance.md) documenting how to maintain and update tests as the MasonArt platform evolves.
+
+### Documentation Sections (775 lines)
+
+1. **When to Update Tests**
+   - Mandatory test updates (new features, bug fixes, API changes, schema changes)
+   - Signs tests need attention
+
+2. **Test File Organization**
+   - Directory structure for all test types
+   - Naming conventions (*.test.ts for Vitest, *.spec.ts for Playwright)
+
+3. **Adding Tests for New Features**
+   - Step-by-step process
+   - Templates for API route tests
+   - Templates for E2E tests
+   - Fixture creation guidance
+
+4. **Updating Tests for Changed Features**
+   - API response format changes
+   - UI component changes
+   - Database schema changes
+   - Validation rule changes
+
+5. **Test Patterns and Conventions**
+   - AAA pattern (Arrange, Act, Assert)
+   - Descriptive test naming
+   - Test grouping patterns
+   - API testing patterns
+   - E2E testing patterns
+
+6. **Fixing Broken Tests**
+   - Diagnostic process
+   - Common fixes (timeouts, selectors, mocks, database)
+
+7. **Test Deprecation and Removal**
+   - When to remove tests
+   - Deprecation process
+   - Removal checklist
+
+8. **Fixtures and Test Data**
+   - Updating fixtures
+   - Database fixtures
+   - E2E test data with API mocking
+
+9. **CI/CD Considerations**
+   - Environment variables table
+   - Test splitting strategies
+   - Handling flaky tests
+
+10. **Common Pitfalls**
+    - Testing implementation details
+    - Hardcoded values
+    - State cleanup issues
+    - Async/await mistakes
+    - Overly specific selectors
+
+11. **Checklist for Test Maintenance**
+    - Adding new tests
+    - Updating existing tests
+    - Before pull request
+    - Periodic maintenance
+
+12. **Quick Reference Commands**
+
+### File Created
+- `docs/test-maintenance.md` - 775 lines
+
+### Verification
+- File created successfully
+- Covers all aspects of test maintenance
+- Includes practical templates and examples
+- References other project documentation (TEST-COVERAGE.md, README.md)
