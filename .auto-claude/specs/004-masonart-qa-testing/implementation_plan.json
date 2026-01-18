@@ -3,7 +3,7 @@
   "title": "MasonArt QA Testing Strategy Implementation",
   "description": "Comprehensive QA testing for MasonArt e-commerce platform covering automated E2E tests with Playwright, unit/integration tests with Vitest, and manual browser testing documentation",
   "created_at": "2026-01-16T13:00:03.032Z",
-  "updated_at": "2026-01-18T18:14:42.618Z",
+  "updated_at": "2026-01-18T18:30:26.742Z",
   "status": "in_progress",
   "planStatus": "in_progress",
   "phases": [
@@ -633,7 +633,7 @@
           "subtask_id": "7.3",
           "title": "Create API client tests",
           "description": "Write tests for API client utility functions",
-          "status": "pending",
+          "status": "completed",
           "dependencies": [
             "1.5"
           ],
@@ -643,13 +643,13 @@
           "tests": [
             "packages/web/tests/lib/api.test.ts"
           ],
-          "notes": ""
+          "notes": "Comprehensive API client test suite with 125 tests covering: API configuration, ApiError class, Request function (all HTTP methods), Products API (list, get, variants, CRUD), Cart API (get, add, update, remove, clear), Orders API (list, get, create, update, cancel), Health check API, Error handling (401/403/404/500/validation), Query parameter building, URL construction, Request body/header handling, Timeout/abort handling, Non-JSON responses, Network errors, TypeScript types, Default/module exports, Integration-style tests. Run individually with: bun test tests/lib/api.test.ts. Committed in af141bf."
         },
         {
           "subtask_id": "7.4",
           "title": "Create cart store tests",
           "description": "Write tests for Zustand cart store",
-          "status": "pending",
+          "status": "completed",
           "dependencies": [
             "1.5"
           ],
@@ -659,7 +659,7 @@
           "tests": [
             "packages/web/tests/stores/cart.test.ts"
           ],
-          "notes": ""
+          "notes": "Comprehensive cart store test suite with 50 tests covering: Store initialization (initial state, required actions, internal actions), fetchCart (fetch items from backend, loading state during fetch, error handling, totals calculation after fetch), addItem (add to cart, optimistic update, frame customization, upload URL, rollback on error, update count and totals), updateItem (quantity update, frame update, optimistic update, rollback on error, recalculate totals), removeItem (remove from cart, optimistic removal, rollback on error, recalculate totals), clearCart (clear all items, optimistic clear, rollback on error, reset totals to zero), calculateTotals (empty cart, variant prices, frame price inclusion, 18% GST tax calculation, free shipping, correct total, item count, multiple items with frames), Internal actions (setItems, setLoading, setError), Edge cases (item without variant, item without frame, zero quantity, large quantities), Loading states (during fetch, after success, after failure), Error handling (clear error on success, preserve items on error, custom error messages, string errors without message property), Performance (rapid state updates, large cart with 100 items). Uses vi.mock for API module mocking. Run with: cd packages/web && bun test tests/stores/cart.test.ts"
         },
         {
           "subtask_id": "7.5",
