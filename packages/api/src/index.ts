@@ -106,7 +106,8 @@ app.get("/", (c) => {
   });
 });
 
-// Export app type for Hono client type inference
+// Export app for testing and type inference
+export { app };
 export type AppType = typeof app;
 
 // Start server
