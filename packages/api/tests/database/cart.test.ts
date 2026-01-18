@@ -3,6 +3,9 @@
  *
  * Tests for cart_items database table.
  * Validates schema structure, relationships, and CRUD operations.
+ *
+ * These tests require a running PostgreSQL database. When SKIP_DB_RUNTIME_TESTS
+ * is set to 'true', all tests are skipped (useful for CI without database).
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -17,10 +20,20 @@ import {
   cartItems,
 } from '../../src/db/schema';
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle>;
+// Check if we should skip database runtime tests
+const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
+
+console.log('🧪 Starting test suite...');
+if (SKIP_TESTS) {
+  console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
+}
+
+let client: ReturnType<typeof postgres> | null = null;
+let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
+  if (SKIP_TESTS) return;
+
   const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
   client = postgres(databaseUrl, { max: 1 });
   db = drizzle(client);
@@ -121,6 +134,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (SKIP_TESTS || !client) return;
+
   await client`DROP TABLE IF EXISTS cart_items CASCADE`;
   await client`DROP TABLE IF EXISTS frames CASCADE`;
   await client`DROP TABLE IF EXISTS product_variants CASCADE`;
@@ -130,6 +145,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  if (SKIP_TESTS || !client) return;
+
   await client`DELETE FROM cart_items`;
   await client`DELETE FROM frames`;
   await client`DELETE FROM product_variants`;
@@ -144,6 +161,8 @@ describe('Cart Items Table Schema', () => {
   let testFrameId: string;
 
   beforeEach(async () => {
+    if (SKIP_TESTS || !db) return;
+
     // Create test user
     const [user] = await db.insert(users).values({
       email: 'cart-test@example.com',
@@ -194,16 +213,16 @@ describe('Cart Items Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it('should have cart_items table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have cart_items table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'cart_items'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have all required columns', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have all required columns', async () => {
+      const result = await client!`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'cart_items'
         ORDER BY ordinal_position
@@ -219,8 +238,8 @@ describe('Cart Items Table Schema', () => {
       expect(columnNames).toContain('added_at');
     });
 
-    it('should have foreign keys', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have foreign keys', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'cart_items' AND constraint_type = 'FOREIGN KEY'
       `;
@@ -229,8 +248,8 @@ describe('Cart Items Table Schema', () => {
   });
 
   describe('Cart Item CRUD Operations', () => {
-    it('should insert a cart item', async () => {
-      const [result] = await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should insert a cart item', async () => {
+      const [result] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
@@ -245,8 +264,8 @@ describe('Cart Items Table Schema', () => {
       expect(result.addedAt).toBeDefined();
     });
 
-    it('should insert cart item with frame', async () => {
-      const [result] = await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should insert cart item with frame', async () => {
+      const [result] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
@@ -257,8 +276,8 @@ describe('Cart Items Table Schema', () => {
       expect(result.frameId).toBe(testFrameId);
     });
 
-    it('should select cart items for a user', async () => {
-      await db.insert(cartItems).values([
+    it.skipIf(SKIP_TESTS)('should select cart items for a user', async () => {
+      await db!.insert(cartItems).values([
         {
           userId: testUserId,
           productId: testProductId,
@@ -274,42 +293,42 @@ describe('Cart Items Table Schema', () => {
         },
       ]);
 
-      const result = await db.select().from(cartItems).where(eq(cartItems.userId, testUserId));
+      const result = await db!.select().from(cartItems).where(eq(cartItems.userId, testUserId));
       expect(result).toHaveLength(2);
     });
 
-    it('should update cart item quantity', async () => {
-      const [inserted] = await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should update cart item quantity', async () => {
+      const [inserted] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
         quantity: 1,
       }).returning();
 
-      await db.update(cartItems)
+      await db!.update(cartItems)
         .set({ quantity: 5 })
         .where(eq(cartItems.id, inserted.id));
 
-      const [result] = await db.select().from(cartItems).where(eq(cartItems.id, inserted.id));
+      const [result] = await db!.select().from(cartItems).where(eq(cartItems.id, inserted.id));
       expect(result.quantity).toBe(5);
     });
 
-    it('should delete cart item', async () => {
-      const [inserted] = await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should delete cart item', async () => {
+      const [inserted] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
         quantity: 1,
       }).returning();
 
-      await db.delete(cartItems).where(eq(cartItems.id, inserted.id));
+      await db!.delete(cartItems).where(eq(cartItems.id, inserted.id));
 
-      const result = await db.select().from(cartItems).where(eq(cartItems.id, inserted.id));
+      const result = await db!.select().from(cartItems).where(eq(cartItems.id, inserted.id));
       expect(result).toHaveLength(0);
     });
 
-    it('should delete all cart items for a user', async () => {
-      await db.insert(cartItems).values([
+    it.skipIf(SKIP_TESTS)('should delete all cart items for a user', async () => {
+      await db!.insert(cartItems).values([
         {
           userId: testUserId,
           productId: testProductId,
@@ -324,40 +343,40 @@ describe('Cart Items Table Schema', () => {
         },
       ]);
 
-      await db.delete(cartItems).where(eq(cartItems.userId, testUserId));
+      await db!.delete(cartItems).where(eq(cartItems.userId, testUserId));
 
-      const result = await db.select().from(cartItems).where(eq(cartItems.userId, testUserId));
+      const result = await db!.select().from(cartItems).where(eq(cartItems.userId, testUserId));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('Cart Item Cascade Deletion', () => {
-    it('should delete cart items when user is deleted', async () => {
-      await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should delete cart items when user is deleted', async () => {
+      await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
         quantity: 1,
       });
 
-      await db.delete(users).where(eq(users.id, testUserId));
+      await db!.delete(users).where(eq(users.id, testUserId));
 
-      const result = await db.select().from(cartItems).where(eq(cartItems.userId, testUserId));
+      const result = await db!.select().from(cartItems).where(eq(cartItems.userId, testUserId));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('Cart Item Filtering', () => {
-    it('should filter cart items by user', async () => {
+    it.skipIf(SKIP_TESTS)('should filter cart items by user', async () => {
       // Create second user
-      const [user2] = await db.insert(users).values({
+      const [user2] = await db!.insert(users).values({
         email: 'cart-test2@example.com',
         name: 'Cart Test User 2',
         role: 'customer',
       }).returning();
 
       // Add items for both users
-      await db.insert(cartItems).values([
+      await db!.insert(cartItems).values([
         {
           userId: testUserId,
           productId: testProductId,
@@ -378,16 +397,16 @@ describe('Cart Items Table Schema', () => {
         },
       ]);
 
-      const user1Items = await db.select().from(cartItems).where(eq(cartItems.userId, testUserId));
-      const user2Items = await db.select().from(cartItems).where(eq(cartItems.userId, user2.id));
+      const user1Items = await db!.select().from(cartItems).where(eq(cartItems.userId, testUserId));
+      const user2Items = await db!.select().from(cartItems).where(eq(cartItems.userId, user2.id));
 
       expect(user1Items).toHaveLength(2);
       expect(user2Items).toHaveLength(1);
     });
 
-    it('should filter cart items by product and variant', async () => {
+    it.skipIf(SKIP_TESTS)('should filter cart items by product and variant', async () => {
       // Create second product and variant
-      const [product2] = await db.insert(products).values({
+      const [product2] = await db!.insert(products).values({
         sku: 'CART-TEST-002',
         title: 'Second Product',
         slug: 'second-product-cart',
@@ -403,7 +422,7 @@ describe('Cart Items Table Schema', () => {
         status: 'active',
       }).returning();
 
-      const [variant2] = await db.insert(productVariants).values({
+      const [variant2] = await db!.insert(productVariants).values({
         productId: product2.id,
         sizeLabel: '16x20 inches',
         widthInches: '16.00',
@@ -413,7 +432,7 @@ describe('Cart Items Table Schema', () => {
       }).returning();
 
       // Add items
-      await db.insert(cartItems).values([
+      await db!.insert(cartItems).values([
         {
           userId: testUserId,
           productId: testProductId,
@@ -428,7 +447,7 @@ describe('Cart Items Table Schema', () => {
         },
       ]);
 
-      const product1Items = await db.select().from(cartItems)
+      const product1Items = await db!.select().from(cartItems)
         .where(and(
           eq(cartItems.userId, testUserId),
           eq(cartItems.productId, testProductId)
@@ -440,8 +459,8 @@ describe('Cart Items Table Schema', () => {
   });
 
   describe('Cart Item with Frames', () => {
-    it('should store cart items with frames', async () => {
-      const [result] = await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should store cart items with frames', async () => {
+      const [result] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
@@ -452,8 +471,8 @@ describe('Cart Items Table Schema', () => {
       expect(result.frameId).toBe(testFrameId);
     });
 
-    it('should store cart items without frames', async () => {
-      const [result] = await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should store cart items without frames', async () => {
+      const [result] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
@@ -463,8 +482,8 @@ describe('Cart Items Table Schema', () => {
       expect(result.frameId).toBeNull();
     });
 
-    it('should filter cart items with frames', async () => {
-      await db.insert(cartItems).values([
+    it.skipIf(SKIP_TESTS)('should filter cart items with frames', async () => {
+      await db!.insert(cartItems).values([
         {
           userId: testUserId,
           productId: testProductId,
@@ -480,7 +499,7 @@ describe('Cart Items Table Schema', () => {
         },
       ]);
 
-      const withFrame = await db.select().from(cartItems)
+      const withFrame = await db!.select().from(cartItems)
         .where(and(
           eq(cartItems.userId, testUserId),
           eq(cartItems.frameId, testFrameId)
@@ -492,11 +511,11 @@ describe('Cart Items Table Schema', () => {
   });
 
   describe('Cart Item Quantities', () => {
-    it('should store quantity correctly', async () => {
+    it.skipIf(SKIP_TESTS)('should store quantity correctly', async () => {
       const quantities = [1, 5, 10, 99];
 
       for (const qty of quantities) {
-        const [result] = await db.insert(cartItems).values({
+        const [result] = await db!.insert(cartItems).values({
           userId: testUserId,
           productId: testProductId,
           variantId: testVariantId,
@@ -506,32 +525,32 @@ describe('Cart Items Table Schema', () => {
         expect(result.quantity).toBe(qty);
 
         // Clean up for next iteration
-        await db.delete(cartItems).where(eq(cartItems.id, result.id));
+        await db!.delete(cartItems).where(eq(cartItems.id, result.id));
       }
     });
 
-    it('should update quantity', async () => {
-      const [inserted] = await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should update quantity', async () => {
+      const [inserted] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
         quantity: 1,
       }).returning();
 
-      await db.update(cartItems)
+      await db!.update(cartItems)
         .set({ quantity: 10 })
         .where(eq(cartItems.id, inserted.id));
 
-      const [result] = await db.select().from(cartItems).where(eq(cartItems.id, inserted.id));
+      const [result] = await db!.select().from(cartItems).where(eq(cartItems.id, inserted.id));
       expect(result.quantity).toBe(10);
     });
   });
 
   describe('Cart Item Timestamps', () => {
-    it('should set added_at timestamp automatically', async () => {
+    it.skipIf(SKIP_TESTS)('should set added_at timestamp automatically', async () => {
       const before = new Date(Date.now() - 1000); // 1 second before
 
-      const [result] = await db.insert(cartItems).values({
+      const [result] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
@@ -546,8 +565,8 @@ describe('Cart Items Table Schema', () => {
       expect(result.addedAt.getTime()).toBeLessThanOrEqual(after.getTime());
     });
 
-    it('should maintain added_at timestamp on updates', async () => {
-      const [inserted] = await db.insert(cartItems).values({
+    it.skipIf(SKIP_TESTS)('should maintain added_at timestamp on updates', async () => {
+      const [inserted] = await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
         variantId: testVariantId,
@@ -559,11 +578,11 @@ describe('Cart Items Table Schema', () => {
       // Wait a bit
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      await db.update(cartItems)
+      await db!.update(cartItems)
         .set({ quantity: 5 })
         .where(eq(cartItems.id, inserted.id));
 
-      const [result] = await db.select().from(cartItems).where(eq(cartItems.id, inserted.id));
+      const [result] = await db!.select().from(cartItems).where(eq(cartItems.id, inserted.id));
 
       // added_at should not change on update
       expect(result.addedAt.getTime()).toBe(originalAddedAt.getTime());

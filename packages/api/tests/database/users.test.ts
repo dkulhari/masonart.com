@@ -3,6 +3,9 @@
  *
  * Tests for users, addresses, and sessions database tables.
  * Validates schema structure, relationships, and CRUD operations.
+ *
+ * These tests require a running PostgreSQL database. When SKIP_DB_RUNTIME_TESTS
+ * is set to 'true', all tests are skipped (useful for CI without database).
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -18,10 +21,20 @@ import {
   type Session,
 } from '../../src/db/schema';
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle>;
+// Check if we should skip database runtime tests
+const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
+
+console.log('🧪 Starting test suite...');
+if (SKIP_TESTS) {
+  console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
+}
+
+let client: ReturnType<typeof postgres> | null = null;
+let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
+  if (SKIP_TESTS) return;
+
   const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
   client = postgres(databaseUrl, { max: 1 });
   db = drizzle(client);
@@ -109,6 +122,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (SKIP_TESTS || !client) return;
+
   await client`DROP TABLE IF EXISTS sessions CASCADE`;
   await client`DROP TABLE IF EXISTS addresses CASCADE`;
   await client`DROP TABLE IF EXISTS users CASCADE`;
@@ -116,6 +131,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  if (SKIP_TESTS || !client) return;
+
   await client`DELETE FROM sessions`;
   await client`DELETE FROM addresses`;
   await client`DELETE FROM users`;
@@ -123,16 +140,16 @@ beforeEach(async () => {
 
 describe('Users Table Schema', () => {
   describe('Table Structure', () => {
-    it('should have users table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have users table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'users'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have all required columns', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have all required columns', async () => {
+      const result = await client!`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'users'
         ORDER BY ordinal_position
@@ -153,8 +170,8 @@ describe('Users Table Schema', () => {
       expect(columnNames).toContain('updated_at');
     });
 
-    it('should have unique constraint on email', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have unique constraint on email', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'users' AND constraint_type = 'UNIQUE'
       `;
@@ -163,8 +180,8 @@ describe('Users Table Schema', () => {
   });
 
   describe('User CRUD Operations', () => {
-    it('should insert a user', async () => {
-      const [result] = await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should insert a user', async () => {
+      const [result] = await db!.insert(users).values({
         email: 'test@example.com',
         name: 'Test User',
         phone: '+919876543210',
@@ -178,51 +195,51 @@ describe('Users Table Schema', () => {
       expect(result.emailVerified).toBe(false);
     });
 
-    it('should select users', async () => {
-      await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should select users', async () => {
+      await db!.insert(users).values({
         email: 'user1@example.com',
         name: 'User One',
         role: 'customer',
       });
 
-      const result = await db.select().from(users);
+      const result = await db!.select().from(users);
       expect(result).toHaveLength(1);
       expect(result[0].email).toBe('user1@example.com');
     });
 
-    it('should update a user', async () => {
-      const [inserted] = await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should update a user', async () => {
+      const [inserted] = await db!.insert(users).values({
         email: 'update@example.com',
         name: 'Update User',
         role: 'customer',
       }).returning();
 
-      await db.update(users)
+      await db!.update(users)
         .set({ name: 'Updated Name', emailVerified: true })
         .where(eq(users.id, inserted.id));
 
-      const [result] = await db.select().from(users).where(eq(users.id, inserted.id));
+      const [result] = await db!.select().from(users).where(eq(users.id, inserted.id));
       expect(result.name).toBe('Updated Name');
       expect(result.emailVerified).toBe(true);
     });
 
-    it('should delete a user', async () => {
-      const [inserted] = await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should delete a user', async () => {
+      const [inserted] = await db!.insert(users).values({
         email: 'delete@example.com',
         name: 'Delete User',
         role: 'customer',
       }).returning();
 
-      await db.delete(users).where(eq(users.id, inserted.id));
+      await db!.delete(users).where(eq(users.id, inserted.id));
 
-      const result = await db.select().from(users).where(eq(users.id, inserted.id));
+      const result = await db!.select().from(users).where(eq(users.id, inserted.id));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('User Roles', () => {
-    it('should insert admin user', async () => {
-      const [result] = await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should insert admin user', async () => {
+      const [result] = await db!.insert(users).values({
         email: 'admin@example.com',
         name: 'Admin User',
         role: 'admin',
@@ -231,8 +248,8 @@ describe('Users Table Schema', () => {
       expect(result.role).toBe('admin');
     });
 
-    it('should insert trade user', async () => {
-      const [result] = await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should insert trade user', async () => {
+      const [result] = await db!.insert(users).values({
         email: 'trade@example.com',
         name: 'Trade User',
         role: 'trade',
@@ -249,15 +266,15 @@ describe('Users Table Schema', () => {
       expect(result.tradeBusiness).toHaveProperty('businessName');
     });
 
-    it('should filter users by role', async () => {
-      await db.insert(users).values([
+    it.skipIf(SKIP_TESTS)('should filter users by role', async () => {
+      await db!.insert(users).values([
         { email: 'customer1@example.com', name: 'Customer 1', role: 'customer' },
         { email: 'customer2@example.com', name: 'Customer 2', role: 'customer' },
         { email: 'admin1@example.com', name: 'Admin 1', role: 'admin' },
       ]);
 
-      const customers = await db.select().from(users).where(eq(users.role, 'customer'));
-      const admins = await db.select().from(users).where(eq(users.role, 'admin'));
+      const customers = await db!.select().from(users).where(eq(users.role, 'customer'));
+      const admins = await db!.select().from(users).where(eq(users.role, 'admin'));
 
       expect(customers).toHaveLength(2);
       expect(admins).toHaveLength(1);
@@ -265,8 +282,8 @@ describe('Users Table Schema', () => {
   });
 
   describe('User Preferences', () => {
-    it('should store user preferences as JSON', async () => {
-      const [result] = await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should store user preferences as JSON', async () => {
+      const [result] = await db!.insert(users).values({
         email: 'prefs@example.com',
         name: 'Prefs User',
         role: 'customer',
@@ -283,8 +300,8 @@ describe('Users Table Schema', () => {
       expect(result.preferences.marketingEmails).toBe(false);
     });
 
-    it('should use default preferences', async () => {
-      const [result] = await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should use default preferences', async () => {
+      const [result] = await db!.insert(users).values({
         email: 'default@example.com',
         name: 'Default User',
         role: 'customer',
@@ -297,14 +314,14 @@ describe('Users Table Schema', () => {
   });
 
   describe('Trade Business', () => {
-    it('should store trade business information', async () => {
+    it.skipIf(SKIP_TESTS)('should store trade business information', async () => {
       const tradeBusiness = {
         businessName: 'Art Gallery Ltd',
         gstNumber: '29AAAAA0000A1Z5',
         businessType: 'Gallery',
       };
 
-      const [result] = await db.insert(users).values({
+      const [result] = await db!.insert(users).values({
         email: 'gallery@example.com',
         name: 'Gallery Owner',
         role: 'trade',
@@ -316,8 +333,8 @@ describe('Users Table Schema', () => {
       expect(result.tradeAccountStatus).toBe('approved');
     });
 
-    it('should handle pending trade accounts', async () => {
-      const [result] = await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should handle pending trade accounts', async () => {
+      const [result] = await db!.insert(users).values({
         email: 'pending@example.com',
         name: 'Pending Trade',
         role: 'trade',
@@ -333,8 +350,8 @@ describe('Users Table Schema', () => {
   });
 
   describe('Email Uniqueness', () => {
-    it('should enforce email uniqueness', async () => {
-      await db.insert(users).values({
+    it.skipIf(SKIP_TESTS)('should enforce email uniqueness', async () => {
+      await db!.insert(users).values({
         email: 'unique@example.com',
         name: 'User One',
         role: 'customer',
@@ -342,7 +359,7 @@ describe('Users Table Schema', () => {
 
       let error;
       try {
-        await db.insert(users).values({
+        await db!.insert(users).values({
           email: 'unique@example.com',
           name: 'User Two',
           role: 'customer',
@@ -361,6 +378,8 @@ describe('Addresses Table Schema', () => {
   let testUserId: string;
 
   beforeEach(async () => {
+    if (SKIP_TESTS || !db) return;
+
     const [user] = await db.insert(users).values({
       email: 'address-test@example.com',
       name: 'Address Test User',
@@ -370,16 +389,16 @@ describe('Addresses Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it('should have addresses table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have addresses table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'addresses'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have foreign key to users', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have foreign key to users', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'addresses' AND constraint_type = 'FOREIGN KEY'
       `;
@@ -388,8 +407,8 @@ describe('Addresses Table Schema', () => {
   });
 
   describe('Address CRUD Operations', () => {
-    it('should insert an address', async () => {
-      const [result] = await db.insert(addresses).values({
+    it.skipIf(SKIP_TESTS)('should insert an address', async () => {
+      const [result] = await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'John Doe',
         phone: '+919876543210',
@@ -408,8 +427,8 @@ describe('Addresses Table Schema', () => {
       expect(result.city).toBe('Mumbai');
     });
 
-    it('should select addresses for a user', async () => {
-      await db.insert(addresses).values([
+    it.skipIf(SKIP_TESTS)('should select addresses for a user', async () => {
+      await db!.insert(addresses).values([
         {
           userId: testUserId,
           fullName: 'John Doe',
@@ -434,12 +453,12 @@ describe('Addresses Table Schema', () => {
         },
       ]);
 
-      const result = await db.select().from(addresses).where(eq(addresses.userId, testUserId));
+      const result = await db!.select().from(addresses).where(eq(addresses.userId, testUserId));
       expect(result).toHaveLength(2);
     });
 
-    it('should delete addresses when user is deleted', async () => {
-      await db.insert(addresses).values({
+    it.skipIf(SKIP_TESTS)('should delete addresses when user is deleted', async () => {
+      await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'John Doe',
         phone: '+919876543210',
@@ -451,16 +470,16 @@ describe('Addresses Table Schema', () => {
         type: 'home',
       });
 
-      await db.delete(users).where(eq(users.id, testUserId));
+      await db!.delete(users).where(eq(users.id, testUserId));
 
-      const result = await db.select().from(addresses).where(eq(addresses.userId, testUserId));
+      const result = await db!.select().from(addresses).where(eq(addresses.userId, testUserId));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('Address Types', () => {
-    it('should support home address type', async () => {
-      const [result] = await db.insert(addresses).values({
+    it.skipIf(SKIP_TESTS)('should support home address type', async () => {
+      const [result] = await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'Jane Doe',
         phone: '+919876543210',
@@ -475,8 +494,8 @@ describe('Addresses Table Schema', () => {
       expect(result.type).toBe('home');
     });
 
-    it('should support office address type', async () => {
-      const [result] = await db.insert(addresses).values({
+    it.skipIf(SKIP_TESTS)('should support office address type', async () => {
+      const [result] = await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'Jane Doe',
         phone: '+919876543210',
@@ -493,8 +512,8 @@ describe('Addresses Table Schema', () => {
   });
 
   describe('Default Address', () => {
-    it('should set default address flag', async () => {
-      const [result] = await db.insert(addresses).values({
+    it.skipIf(SKIP_TESTS)('should set default address flag', async () => {
+      const [result] = await db!.insert(addresses).values({
         userId: testUserId,
         fullName: 'John Doe',
         phone: '+919876543210',
@@ -510,8 +529,8 @@ describe('Addresses Table Schema', () => {
       expect(result.isDefault).toBe(true);
     });
 
-    it('should filter default address', async () => {
-      await db.insert(addresses).values([
+    it.skipIf(SKIP_TESTS)('should filter default address', async () => {
+      await db!.insert(addresses).values([
         {
           userId: testUserId,
           fullName: 'John Doe',
@@ -538,7 +557,7 @@ describe('Addresses Table Schema', () => {
         },
       ]);
 
-      const result = await db.select().from(addresses)
+      const result = await db!.select().from(addresses)
         .where(eq(addresses.userId, testUserId))
         .where(eq(addresses.isDefault, true));
 
@@ -552,6 +571,8 @@ describe('Sessions Table Schema', () => {
   let testUserId: string;
 
   beforeEach(async () => {
+    if (SKIP_TESTS || !db) return;
+
     const [user] = await db.insert(users).values({
       email: 'session-test@example.com',
       name: 'Session Test User',
@@ -561,24 +582,24 @@ describe('Sessions Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it('should have sessions table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have sessions table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'sessions'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have foreign key to users', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have foreign key to users', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'sessions' AND constraint_type = 'FOREIGN KEY'
       `;
       expect(result.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should have unique constraint on token', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have unique constraint on token', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'sessions' AND constraint_type = 'UNIQUE'
       `;
@@ -587,10 +608,10 @@ describe('Sessions Table Schema', () => {
   });
 
   describe('Session CRUD Operations', () => {
-    it('should insert a session', async () => {
+    it.skipIf(SKIP_TESTS)('should insert a session', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
 
-      const [result] = await db.insert(sessions).values({
+      const [result] = await db!.insert(sessions).values({
         userId: testUserId,
         token: 'test-session-token-123456',
         expiresAt,
@@ -601,10 +622,10 @@ describe('Sessions Table Schema', () => {
       expect(result.token).toBe('test-session-token-123456');
     });
 
-    it('should select sessions for a user', async () => {
+    it.skipIf(SKIP_TESTS)('should select sessions for a user', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      await db.insert(sessions).values([
+      await db!.insert(sessions).values([
         {
           userId: testUserId,
           token: 'session-token-1',
@@ -617,46 +638,46 @@ describe('Sessions Table Schema', () => {
         },
       ]);
 
-      const result = await db.select().from(sessions).where(eq(sessions.userId, testUserId));
+      const result = await db!.select().from(sessions).where(eq(sessions.userId, testUserId));
       expect(result).toHaveLength(2);
     });
 
-    it('should delete session', async () => {
+    it.skipIf(SKIP_TESTS)('should delete session', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      const [inserted] = await db.insert(sessions).values({
+      const [inserted] = await db!.insert(sessions).values({
         userId: testUserId,
         token: 'delete-token',
         expiresAt,
       }).returning();
 
-      await db.delete(sessions).where(eq(sessions.id, inserted.id));
+      await db!.delete(sessions).where(eq(sessions.id, inserted.id));
 
-      const result = await db.select().from(sessions).where(eq(sessions.id, inserted.id));
+      const result = await db!.select().from(sessions).where(eq(sessions.id, inserted.id));
       expect(result).toHaveLength(0);
     });
 
-    it('should delete sessions when user is deleted', async () => {
+    it.skipIf(SKIP_TESTS)('should delete sessions when user is deleted', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      await db.insert(sessions).values({
+      await db!.insert(sessions).values({
         userId: testUserId,
         token: 'cascade-test-token',
         expiresAt,
       });
 
-      await db.delete(users).where(eq(users.id, testUserId));
+      await db!.delete(users).where(eq(users.id, testUserId));
 
-      const result = await db.select().from(sessions).where(eq(sessions.userId, testUserId));
+      const result = await db!.select().from(sessions).where(eq(sessions.userId, testUserId));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('Session Token Uniqueness', () => {
-    it('should enforce token uniqueness', async () => {
+    it.skipIf(SKIP_TESTS)('should enforce token uniqueness', async () => {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      await db.insert(sessions).values({
+      await db!.insert(sessions).values({
         userId: testUserId,
         token: 'unique-token',
         expiresAt,
@@ -664,7 +685,7 @@ describe('Sessions Table Schema', () => {
 
       let error;
       try {
-        await db.insert(sessions).values({
+        await db!.insert(sessions).values({
           userId: testUserId,
           token: 'unique-token',
           expiresAt,

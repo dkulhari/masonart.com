@@ -3,6 +3,9 @@
  *
  * Tests for ai_generations database table.
  * Validates schema structure, relationships, and CRUD operations.
+ *
+ * These tests require a running PostgreSQL database. When SKIP_DB_RUNTIME_TESTS
+ * is set to 'true', all tests are skipped (useful for CI without database).
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -14,10 +17,20 @@ import {
   aiGenerations,
 } from '../../src/db/schema';
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle>;
+// Check if we should skip database runtime tests
+const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
+
+console.log('🧪 Starting test suite...');
+if (SKIP_TESTS) {
+  console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
+}
+
+let client: ReturnType<typeof postgres> | null = null;
+let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
+  if (SKIP_TESTS) return;
+
   const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
   client = postgres(databaseUrl, { max: 1 });
   db = drizzle(client);
@@ -94,6 +107,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (SKIP_TESTS || !client) return;
+
   await client`DROP TABLE IF EXISTS ai_generations CASCADE`;
   await client`DROP TABLE IF EXISTS users CASCADE`;
   await client`DROP TYPE IF EXISTS ai_generation_status CASCADE`;
@@ -105,6 +120,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  if (SKIP_TESTS || !client) return;
+
   await client`DELETE FROM ai_generations`;
   await client`DELETE FROM users`;
 });
@@ -114,6 +131,8 @@ describe('AI Generations Table Schema', () => {
   let testModeratorId: string;
 
   beforeEach(async () => {
+    if (SKIP_TESTS || !db) return;
+
     // Create test user
     const [user] = await db.insert(users).values({
       email: 'ai-test@example.com',
@@ -132,16 +151,16 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it('should have ai_generations table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have ai_generations table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'ai_generations'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have all required columns', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have all required columns', async () => {
+      const result = await client!`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'ai_generations'
         ORDER BY ordinal_position
@@ -162,8 +181,8 @@ describe('AI Generations Table Schema', () => {
       expect(columnNames).toContain('views');
     });
 
-    it('should have foreign key to users', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have foreign key to users', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'ai_generations' AND constraint_type = 'FOREIGN KEY'
       `;
@@ -172,8 +191,8 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('AI Generation CRUD Operations', () => {
-    it('should insert an AI generation', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should insert an AI generation', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'A beautiful abstract painting in wabi-sabi style',
         stylePreset: 'wabi-sabi',
@@ -189,8 +208,8 @@ describe('AI Generations Table Schema', () => {
       expect(result.status).toBe('pending');
     });
 
-    it('should select AI generations', async () => {
-      await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should select AI generations', async () => {
+      await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Test prompt',
         stylePreset: 'minimalist',
@@ -199,12 +218,12 @@ describe('AI Generations Table Schema', () => {
         status: 'pending',
       });
 
-      const result = await db.select().from(aiGenerations).where(eq(aiGenerations.userId, testUserId));
+      const result = await db!.select().from(aiGenerations).where(eq(aiGenerations.userId, testUserId));
       expect(result).toHaveLength(1);
     });
 
-    it('should update generation status', async () => {
-      const [inserted] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should update generation status', async () => {
+      const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Update test',
         stylePreset: 'pop-art',
@@ -213,16 +232,16 @@ describe('AI Generations Table Schema', () => {
         status: 'pending',
       }).returning();
 
-      await db.update(aiGenerations)
+      await db!.update(aiGenerations)
         .set({ status: 'processing' })
         .where(eq(aiGenerations.id, inserted.id));
 
-      const [result] = await db.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
+      const [result] = await db!.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
       expect(result.status).toBe('processing');
     });
 
-    it('should delete a generation', async () => {
-      const [inserted] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should delete a generation', async () => {
+      const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Delete test',
         stylePreset: 'watercolor',
@@ -231,19 +250,19 @@ describe('AI Generations Table Schema', () => {
         status: 'pending',
       }).returning();
 
-      await db.delete(aiGenerations).where(eq(aiGenerations.id, inserted.id));
+      await db!.delete(aiGenerations).where(eq(aiGenerations.id, inserted.id));
 
-      const result = await db.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
+      const result = await db!.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('Generation Status Workflow', () => {
-    it('should support all generation statuses', async () => {
+    it.skipIf(SKIP_TESTS)('should support all generation statuses', async () => {
       const statuses = ['pending', 'processing', 'completed', 'failed', 'cancelled'];
 
       for (const status of statuses) {
-        const [result] = await db.insert(aiGenerations).values({
+        const [result] = await db!.insert(aiGenerations).values({
           userId: testUserId,
           prompt: `Test prompt for ${status}`,
           stylePreset: 'minimalist',
@@ -253,12 +272,12 @@ describe('AI Generations Table Schema', () => {
         }).returning();
 
         expect(result.status).toBe(status);
-        await db.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
+        await db!.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
       }
     });
 
-    it('should update status from pending to processing', async () => {
-      const [inserted] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should update status from pending to processing', async () => {
+      const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Status workflow test',
         stylePreset: 'botanical',
@@ -267,16 +286,16 @@ describe('AI Generations Table Schema', () => {
         status: 'pending',
       }).returning();
 
-      await db.update(aiGenerations)
+      await db!.update(aiGenerations)
         .set({ status: 'processing' })
         .where(eq(aiGenerations.id, inserted.id));
 
-      const [result] = await db.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
+      const [result] = await db!.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
       expect(result.status).toBe('processing');
     });
 
-    it('should set completed status with completion timestamp', async () => {
-      const [inserted] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should set completed status with completion timestamp', async () => {
+      const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Completion test',
         stylePreset: 'geometric',
@@ -287,7 +306,7 @@ describe('AI Generations Table Schema', () => {
 
       const completedAt = new Date();
 
-      await db.update(aiGenerations)
+      await db!.update(aiGenerations)
         .set({
           status: 'completed',
           completedAt,
@@ -295,7 +314,7 @@ describe('AI Generations Table Schema', () => {
         })
         .where(eq(aiGenerations.id, inserted.id));
 
-      const [result] = await db.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
+      const [result] = await db!.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
       expect(result.status).toBe('completed');
       expect(result.completedAt).toBeDefined();
       expect(result.processingTimeMs).toBe(5000);
@@ -303,12 +322,12 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Style Presets', () => {
-    it('should support all style presets', async () => {
+    it.skipIf(SKIP_TESTS)('should support all style presets', async () => {
       const styles = ['wabi-sabi', 'abstract-expression', 'botanical', 'vintage-poster', 'minimalist',
                       'geometric', 'watercolor', 'line-art', 'pop-art', 'surrealism'];
 
       for (const style of styles) {
-        const [result] = await db.insert(aiGenerations).values({
+        const [result] = await db!.insert(aiGenerations).values({
           userId: testUserId,
           prompt: `Test prompt in ${style} style`,
           stylePreset: style as any,
@@ -318,17 +337,17 @@ describe('AI Generations Table Schema', () => {
         }).returning();
 
         expect(result.stylePreset).toBe(style);
-        await db.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
+        await db!.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
       }
     });
   });
 
   describe('Aspect Ratios', () => {
-    it('should support all aspect ratios', async () => {
+    it.skipIf(SKIP_TESTS)('should support all aspect ratios', async () => {
       const ratios = ['1:1', '4:5', '3:4', '2:3', '4:3', '16:9', '21:9'];
 
       for (const ratio of ratios) {
-        const [result] = await db.insert(aiGenerations).values({
+        const [result] = await db!.insert(aiGenerations).values({
           userId: testUserId,
           prompt: 'Test prompt',
           stylePreset: 'minimalist',
@@ -338,17 +357,17 @@ describe('AI Generations Table Schema', () => {
         }).returning();
 
         expect(result.aspectRatio).toBe(ratio);
-        await db.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
+        await db!.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
       }
     });
   });
 
   describe('AI Models', () => {
-    it('should support all AI models', async () => {
+    it.skipIf(SKIP_TESTS)('should support all AI models', async () => {
       const models = ['sdxl', 'sd-2-1', 'dalle-3', 'midjourney', 'stable-diffusion-xl-lightning'];
 
       for (const model of models) {
-        const [result] = await db.insert(aiGenerations).values({
+        const [result] = await db!.insert(aiGenerations).values({
           userId: testUserId,
           prompt: `Test prompt for ${model}`,
           stylePreset: 'minimalist',
@@ -358,12 +377,12 @@ describe('AI Generations Table Schema', () => {
         }).returning();
 
         expect(result.model).toBe(model);
-        await db.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
+        await db!.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
       }
     });
 
-    it('should default to sdxl model', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should default to sdxl model', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Default model test',
         stylePreset: 'minimalist',
@@ -376,8 +395,8 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Generation Parameters', () => {
-    it('should store generation parameters as JSON', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should store generation parameters as JSON', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Parameters test',
         stylePreset: 'surrealism',
@@ -401,7 +420,7 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Generated Images', () => {
-    it('should store generated images as JSON array', async () => {
+    it.skipIf(SKIP_TESTS)('should store generated images as JSON array', async () => {
       const testImages = [
         {
           url: 'https://example.com/gen1.jpg',
@@ -418,7 +437,7 @@ describe('AI Generations Table Schema', () => {
         },
       ];
 
-      const [result] = await db.insert(aiGenerations).values({
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Images test',
         stylePreset: 'watercolor',
@@ -433,8 +452,8 @@ describe('AI Generations Table Schema', () => {
       expect(result.images[0].thumbnailUrl).toBe('https://example.com/gen1-thumb.jpg');
     });
 
-    it('should default to empty images array', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should default to empty images array', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Empty images test',
         stylePreset: 'minimalist',
@@ -448,11 +467,11 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Moderation', () => {
-    it('should support all moderation statuses', async () => {
+    it.skipIf(SKIP_TESTS)('should support all moderation statuses', async () => {
       const statuses = ['pending', 'approved', 'rejected', 'flagged'];
 
       for (const status of statuses) {
-        const [result] = await db.insert(aiGenerations).values({
+        const [result] = await db!.insert(aiGenerations).values({
           userId: testUserId,
           prompt: 'Moderation test',
           stylePreset: 'minimalist',
@@ -463,12 +482,12 @@ describe('AI Generations Table Schema', () => {
         }).returning();
 
         expect(result.moderationStatus).toBe(status);
-        await db.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
+        await db!.delete(aiGenerations).where(eq(aiGenerations.id, result.id));
       }
     });
 
-    it('should default to pending moderation status', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should default to pending moderation status', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Default moderation test',
         stylePreset: 'minimalist',
@@ -480,8 +499,8 @@ describe('AI Generations Table Schema', () => {
       expect(result.moderationStatus).toBe('pending');
     });
 
-    it('should store moderation information', async () => {
-      const [inserted] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should store moderation information', async () => {
+      const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Moderation info test',
         stylePreset: 'pop-art',
@@ -493,7 +512,7 @@ describe('AI Generations Table Schema', () => {
 
       const moderatedAt = new Date();
 
-      await db.update(aiGenerations)
+      await db!.update(aiGenerations)
         .set({
           moderationStatus: 'approved',
           moderatedBy: testModeratorId,
@@ -502,7 +521,7 @@ describe('AI Generations Table Schema', () => {
         })
         .where(eq(aiGenerations.id, inserted.id));
 
-      const [result] = await db.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
+      const [result] = await db!.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
       expect(result.moderationStatus).toBe('approved');
       expect(result.moderatedBy).toBe(testModeratorId);
       expect(result.moderatedAt).toBeDefined();
@@ -511,8 +530,8 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Public/Private Generations', () => {
-    it('should default to private (is_public = false)', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should default to private (is_public = false)', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Private test',
         stylePreset: 'minimalist',
@@ -524,8 +543,8 @@ describe('AI Generations Table Schema', () => {
       expect(result.isPublic).toBe(false);
     });
 
-    it('should support public generations', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should support public generations', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Public test',
         stylePreset: 'abstract-expression',
@@ -538,8 +557,8 @@ describe('AI Generations Table Schema', () => {
       expect(result.isPublic).toBe(true);
     });
 
-    it('should filter public generations', async () => {
-      await db.insert(aiGenerations).values([
+    it.skipIf(SKIP_TESTS)('should filter public generations', async () => {
+      await db!.insert(aiGenerations).values([
         {
           userId: testUserId,
           prompt: 'Public 1',
@@ -569,14 +588,14 @@ describe('AI Generations Table Schema', () => {
         },
       ]);
 
-      const publicGens = await db.select().from(aiGenerations).where(eq(aiGenerations.isPublic, true));
+      const publicGens = await db!.select().from(aiGenerations).where(eq(aiGenerations.isPublic, true));
       expect(publicGens).toHaveLength(2);
     });
   });
 
   describe('Likes and Views', () => {
-    it('should default to 0 likes and views', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should default to 0 likes and views', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Likes/views test',
         stylePreset: 'minimalist',
@@ -589,8 +608,8 @@ describe('AI Generations Table Schema', () => {
       expect(result.views).toBe(0);
     });
 
-    it('should increment likes', async () => {
-      const [inserted] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should increment likes', async () => {
+      const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Likes increment test',
         stylePreset: 'botanical',
@@ -600,16 +619,16 @@ describe('AI Generations Table Schema', () => {
         isPublic: true,
       }).returning();
 
-      await db.update(aiGenerations)
+      await db!.update(aiGenerations)
         .set({ likes: 10 })
         .where(eq(aiGenerations.id, inserted.id));
 
-      const [result] = await db.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
+      const [result] = await db!.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
       expect(result.likes).toBe(10);
     });
 
-    it('should increment views', async () => {
-      const [inserted] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should increment views', async () => {
+      const [inserted] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Views increment test',
         stylePreset: 'vintage-poster',
@@ -619,18 +638,18 @@ describe('AI Generations Table Schema', () => {
         isPublic: true,
       }).returning();
 
-      await db.update(aiGenerations)
+      await db!.update(aiGenerations)
         .set({ views: 100 })
         .where(eq(aiGenerations.id, inserted.id));
 
-      const [result] = await db.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
+      const [result] = await db!.select().from(aiGenerations).where(eq(aiGenerations.id, inserted.id));
       expect(result.views).toBe(100);
     });
   });
 
   describe('Credits and Processing Time', () => {
-    it('should store credits used', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should store credits used', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Credits test',
         stylePreset: 'minimalist',
@@ -643,8 +662,8 @@ describe('AI Generations Table Schema', () => {
       expect(result.creditsUsed).toBe(5);
     });
 
-    it('should store processing time in milliseconds', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should store processing time in milliseconds', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Processing time test',
         stylePreset: 'line-art',
@@ -659,8 +678,8 @@ describe('AI Generations Table Schema', () => {
   });
 
   describe('Error Handling', () => {
-    it('should store error messages for failed generations', async () => {
-      const [result] = await db.insert(aiGenerations).values({
+    it.skipIf(SKIP_TESTS)('should store error messages for failed generations', async () => {
+      const [result] = await db!.insert(aiGenerations).values({
         userId: testUserId,
         prompt: 'Error test',
         stylePreset: 'minimalist',

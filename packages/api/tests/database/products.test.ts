@@ -3,6 +3,9 @@
  *
  * Tests for products, product variants, and frames database tables.
  * Validates schema structure, relationships, and CRUD operations.
+ *
+ * These tests require a running PostgreSQL database. When SKIP_DB_RUNTIME_TESTS
+ * is set to 'true', all tests are skipped (useful for CI without database).
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -18,10 +21,20 @@ import {
   type Frame,
 } from '../../src/db/schema';
 
-let client: ReturnType<typeof postgres>;
-let db: ReturnType<typeof drizzle>;
+// Check if we should skip database runtime tests
+const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
+
+console.log('🧪 Starting test suite...');
+if (SKIP_TESTS) {
+  console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
+}
+
+let client: ReturnType<typeof postgres> | null = null;
+let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
+  if (SKIP_TESTS) return;
+
   // Use test database URL or fall back to development
   const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_dev';
   client = postgres(databaseUrl, { max: 1 });
@@ -105,6 +118,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (SKIP_TESTS || !client) return;
+
   // Clean up tables
   await client`DROP TABLE IF EXISTS product_variants CASCADE`;
   await client`DROP TABLE IF EXISTS products CASCADE`;
@@ -113,6 +128,8 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  if (SKIP_TESTS || !client) return;
+
   // Clean up data before each test
   await client`DELETE FROM product_variants`;
   await client`DELETE FROM products`;
@@ -121,16 +138,16 @@ beforeEach(async () => {
 
 describe('Products Table Schema', () => {
   describe('Table Structure', () => {
-    it('should have products table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have products table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'products'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have all required columns', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have all required columns', async () => {
+      const result = await client!`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'products'
         ORDER BY ordinal_position
@@ -155,16 +172,16 @@ describe('Products Table Schema', () => {
       expect(columnNames).toContain('updated_at');
     });
 
-    it('should have id as primary key', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have id as primary key', async () => {
+      const result = await client!`
         SELECT constraint_type FROM information_schema.table_constraints
         WHERE table_name = 'products' AND constraint_type = 'PRIMARY KEY'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have unique constraint on sku', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have unique constraint on sku', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'products' AND constraint_type = 'UNIQUE'
       `;
@@ -173,8 +190,8 @@ describe('Products Table Schema', () => {
   });
 
   describe('Product CRUD Operations', () => {
-    it('should insert a product', async () => {
-      const result = await db.insert(products).values({
+    it.skipIf(SKIP_TESTS)('should insert a product', async () => {
+      const result = await db!.insert(products).values({
         sku: 'TEST-001',
         title: 'Test Product',
         slug: 'test-product',
@@ -202,9 +219,9 @@ describe('Products Table Schema', () => {
       expect(result[0].title).toBe('Test Product');
     });
 
-    it('should select products', async () => {
+    it.skipIf(SKIP_TESTS)('should select products', async () => {
       // Insert a product
-      await db.insert(products).values({
+      await db!.insert(products).values({
         sku: 'TEST-002',
         title: 'Another Product',
         slug: 'another-product',
@@ -226,14 +243,14 @@ describe('Products Table Schema', () => {
         status: 'active',
       });
 
-      const result = await db.select().from(products);
+      const result = await db!.select().from(products);
       expect(result).toHaveLength(1);
       expect(result[0].sku).toBe('TEST-002');
     });
 
-    it('should update a product', async () => {
+    it.skipIf(SKIP_TESTS)('should update a product', async () => {
       // Insert a product
-      const [inserted] = await db.insert(products).values({
+      const [inserted] = await db!.insert(products).values({
         sku: 'TEST-003',
         title: 'Update Test',
         slug: 'update-test',
@@ -256,18 +273,18 @@ describe('Products Table Schema', () => {
       }).returning();
 
       // Update the product
-      await db.update(products)
+      await db!.update(products)
         .set({ title: 'Updated Title', status: 'active' })
         .where(eq(products.id, inserted.id));
 
-      const result = await db.select().from(products).where(eq(products.id, inserted.id));
+      const result = await db!.select().from(products).where(eq(products.id, inserted.id));
       expect(result[0].title).toBe('Updated Title');
       expect(result[0].status).toBe('active');
     });
 
-    it('should delete a product', async () => {
+    it.skipIf(SKIP_TESTS)('should delete a product', async () => {
       // Insert a product
-      const [inserted] = await db.insert(products).values({
+      const [inserted] = await db!.insert(products).values({
         sku: 'TEST-004',
         title: 'Delete Test',
         slug: 'delete-test',
@@ -290,16 +307,16 @@ describe('Products Table Schema', () => {
       }).returning();
 
       // Delete the product
-      await db.delete(products).where(eq(products.id, inserted.id));
+      await db!.delete(products).where(eq(products.id, inserted.id));
 
-      const result = await db.select().from(products).where(eq(products.id, inserted.id));
+      const result = await db!.select().from(products).where(eq(products.id, inserted.id));
       expect(result).toHaveLength(0);
     });
   });
 
   describe('Product Data Validation', () => {
-    it('should store JSON arrays in styles, subjects, colors', async () => {
-      const [result] = await db.insert(products).values({
+    it.skipIf(SKIP_TESTS)('should store JSON arrays in styles, subjects, colors', async () => {
+      const [result] = await db!.insert(products).values({
         sku: 'TEST-005',
         title: 'JSON Test',
         slug: 'json-test',
@@ -326,7 +343,7 @@ describe('Products Table Schema', () => {
       expect(result.colors).toHaveLength(4);
     });
 
-    it('should store product images as JSON', async () => {
+    it.skipIf(SKIP_TESTS)('should store product images as JSON', async () => {
       const testImages = [
         {
           url: 'https://example.com/primary.jpg',
@@ -344,7 +361,7 @@ describe('Products Table Schema', () => {
         },
       ];
 
-      const [result] = await db.insert(products).values({
+      const [result] = await db!.insert(products).values({
         sku: 'TEST-006',
         title: 'Images Test',
         slug: 'images-test',
@@ -365,8 +382,8 @@ describe('Products Table Schema', () => {
       expect(result.images[1].isPrimary).toBe(false);
     });
 
-    it('should enforce SKU uniqueness', async () => {
-      await db.insert(products).values({
+    it.skipIf(SKIP_TESTS)('should enforce SKU uniqueness', async () => {
+      await db!.insert(products).values({
         sku: 'UNIQUE-SKU',
         title: 'First Product',
         slug: 'first-product',
@@ -391,7 +408,7 @@ describe('Products Table Schema', () => {
       // Attempt to insert duplicate SKU should fail
       let error;
       try {
-        await db.insert(products).values({
+        await db!.insert(products).values({
           sku: 'UNIQUE-SKU',
           title: 'Second Product',
           slug: 'second-product',
@@ -426,6 +443,8 @@ describe('Product Variants Table Schema', () => {
   let testProductId: string;
 
   beforeEach(async () => {
+    if (SKIP_TESTS || !db) return;
+
     // Insert a test product
     const [product] = await db.insert(products).values({
       sku: 'TEST-VARIANT',
@@ -452,16 +471,16 @@ describe('Product Variants Table Schema', () => {
   });
 
   describe('Table Structure', () => {
-    it('should have product_variants table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have product_variants table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'product_variants'
       `;
       expect(result.length).toBe(1);
     });
 
-    it('should have foreign key to products', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have foreign key to products', async () => {
+      const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'product_variants' AND constraint_type = 'FOREIGN KEY'
       `;
@@ -470,8 +489,8 @@ describe('Product Variants Table Schema', () => {
   });
 
   describe('Variant CRUD Operations', () => {
-    it('should insert a product variant', async () => {
-      const [result] = await db.insert(productVariants).values({
+    it.skipIf(SKIP_TESTS)('should insert a product variant', async () => {
+      const [result] = await db!.insert(productVariants).values({
         productId: testProductId,
         sizeLabel: '12x16 inches',
         widthInches: '12.00',
@@ -485,9 +504,9 @@ describe('Product Variants Table Schema', () => {
       expect(result.productId).toBe(testProductId);
     });
 
-    it('should select variants for a product', async () => {
+    it.skipIf(SKIP_TESTS)('should select variants for a product', async () => {
       // Insert multiple variants
-      await db.insert(productVariants).values([
+      await db!.insert(productVariants).values([
         {
           productId: testProductId,
           sizeLabel: '8x10 inches',
@@ -506,13 +525,13 @@ describe('Product Variants Table Schema', () => {
         },
       ]);
 
-      const result = await db.select().from(productVariants).where(eq(productVariants.productId, testProductId));
+      const result = await db!.select().from(productVariants).where(eq(productVariants.productId, testProductId));
       expect(result).toHaveLength(2);
     });
 
-    it('should delete variants when product is deleted', async () => {
+    it.skipIf(SKIP_TESTS)('should delete variants when product is deleted', async () => {
       // Insert a variant
-      await db.insert(productVariants).values({
+      await db!.insert(productVariants).values({
         productId: testProductId,
         sizeLabel: '12x16 inches',
         widthInches: '12.00',
@@ -522,10 +541,10 @@ describe('Product Variants Table Schema', () => {
       });
 
       // Delete the product
-      await db.delete(products).where(eq(products.id, testProductId));
+      await db!.delete(products).where(eq(products.id, testProductId));
 
       // Verify variants are also deleted (CASCADE)
-      const result = await db.select().from(productVariants).where(eq(productVariants.productId, testProductId));
+      const result = await db!.select().from(productVariants).where(eq(productVariants.productId, testProductId));
       expect(result).toHaveLength(0);
     });
   });
@@ -533,8 +552,8 @@ describe('Product Variants Table Schema', () => {
 
 describe('Frames Table Schema', () => {
   describe('Table Structure', () => {
-    it('should have frames table', async () => {
-      const result = await client`
+    it.skipIf(SKIP_TESTS)('should have frames table', async () => {
+      const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'frames'
       `;
@@ -543,8 +562,8 @@ describe('Frames Table Schema', () => {
   });
 
   describe('Frame CRUD Operations', () => {
-    it('should insert a frame', async () => {
-      const [result] = await db.insert(frames).values({
+    it.skipIf(SKIP_TESTS)('should insert a frame', async () => {
+      const [result] = await db!.insert(frames).values({
         name: 'Classic Oak Frame',
         type: 'classic',
         material: 'oak',
@@ -558,8 +577,8 @@ describe('Frames Table Schema', () => {
       expect(result.material).toBe('oak');
     });
 
-    it('should select frames', async () => {
-      await db.insert(frames).values([
+    it.skipIf(SKIP_TESTS)('should select frames', async () => {
+      await db!.insert(frames).values([
         {
           name: 'Modern Black Frame',
           type: 'modern',
@@ -578,12 +597,12 @@ describe('Frames Table Schema', () => {
         },
       ]);
 
-      const result = await db.select().from(frames);
+      const result = await db!.select().from(frames);
       expect(result).toHaveLength(2);
     });
 
-    it('should filter active frames', async () => {
-      await db.insert(frames).values([
+    it.skipIf(SKIP_TESTS)('should filter active frames', async () => {
+      await db!.insert(frames).values([
         {
           name: 'Active Frame',
           type: 'modern',
@@ -602,7 +621,7 @@ describe('Frames Table Schema', () => {
         },
       ]);
 
-      const result = await db.select().from(frames).where(eq(frames.isActive, true));
+      const result = await db!.select().from(frames).where(eq(frames.isActive, true));
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Active Frame');
     });
