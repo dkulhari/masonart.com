@@ -527,8 +527,8 @@ test.describe('JSON-LD - BreadcrumbList Schema (Optional)', () => {
       const breadcrumbSchema = await findSchemaByType(page, 'BreadcrumbList');
       if (breadcrumbSchema && breadcrumbSchema.itemListElement) {
         const items = breadcrumbSchema.itemListElement as JsonLdScript[];
-        if (items.length > 0) {
-          const firstItem = items[0];
+        const firstItem = items[0];
+        if (firstItem) {
           expect(firstItem['@type']).toBe('ListItem');
           expect(firstItem.position).toBe(1);
           expect(firstItem.name).toBeTruthy();

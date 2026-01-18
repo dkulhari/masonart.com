@@ -248,8 +248,9 @@ test.describe('Robots.txt - User-Agent', () => {
     const directives = parseRobotsTxt(content!);
 
     // First directive should typically be User-agent
-    if (directives.length > 0) {
-      expect(directives[0].type).toBe('User-agent');
+    const firstDirective = directives[0];
+    if (firstDirective) {
+      expect(firstDirective.type).toBe('User-agent');
     }
   });
 });
