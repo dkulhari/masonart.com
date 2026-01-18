@@ -9,6 +9,8 @@ import { join } from 'path';
  * - Root package.json has workspaces configuration
  * - Workspace packages exist in the expected locations
  * - Each workspace package has proper naming and structure
+ * - Workspace dependencies can be resolved
+ * - Testing infrastructure is properly set up
  */
 describe('Bun Workspaces Configuration', () => {
   const rootDir = process.cwd();
@@ -38,6 +40,13 @@ describe('Bun Workspaces Configuration', () => {
       expect(packageJson.private).toBe(true);
     });
 
+    it('should have Bun as package manager', () => {
+      const packageJson = JSON.parse(readFileSync(rootPackageJsonPath, 'utf-8'));
+
+      expect(packageJson.packageManager).toBeDefined();
+      expect(packageJson.packageManager).toMatch(/^bun@/);
+    });
+
     it('should have test scripts configured', () => {
       const packageJson = JSON.parse(readFileSync(rootPackageJsonPath, 'utf-8'));
 
@@ -65,36 +74,30 @@ describe('Bun Workspaces Configuration', () => {
         });
 
         it('should have package.json', () => {
-          // Note: shared package might not have package.json yet during setup
-          if (packageName === 'shared') {
-            // Skip this check for shared package if it doesn't exist yet
-            if (existsSync(packageJsonPath)) {
-              expect(existsSync(packageJsonPath)).toBe(true);
-            }
-          } else {
-            expect(existsSync(packageJsonPath)).toBe(true);
-          }
+          expect(existsSync(packageJsonPath)).toBe(true);
         });
 
+        it('should have proper scoped name', () => {
+          const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+
+          expect(packageJson.name).toBe(`@masonart/${packageName}`);
+        });
+
+        it('should be marked as private', () => {
+          const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+
+          expect(packageJson.private).toBe(true);
+        });
+
+        it('should have type module', () => {
+          const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+
+          expect(packageJson.type).toBe('module');
+        });
+
+        // Test scripts and vitest are only required for api and web packages
+        // The shared package is a library without its own tests
         if (packageName !== 'shared') {
-          it('should have proper scoped name', () => {
-            const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-
-            expect(packageJson.name).toBe(`@masonart/${packageName}`);
-          });
-
-          it('should be marked as private', () => {
-            const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-
-            expect(packageJson.private).toBe(true);
-          });
-
-          it('should have type module', () => {
-            const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
-
-            expect(packageJson.type).toBe('module');
-          });
-
           it('should have test scripts', () => {
             const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
@@ -114,20 +117,22 @@ describe('Bun Workspaces Configuration', () => {
   });
 
   describe('Workspace resolution', () => {
-    it('should be able to resolve workspace packages', () => {
+    it('should be able to resolve all workspace packages', () => {
       // Check if Bun can resolve workspace dependencies
       // This is a basic check to ensure workspaces are linkable
       const apiPackagePath = join(rootDir, 'packages', 'api', 'package.json');
       const webPackagePath = join(rootDir, 'packages', 'web', 'package.json');
+      const sharedPackagePath = join(rootDir, 'packages', 'shared', 'package.json');
 
       expect(existsSync(apiPackagePath)).toBe(true);
       expect(existsSync(webPackagePath)).toBe(true);
+      expect(existsSync(sharedPackagePath)).toBe(true);
     });
 
     it('should have unique package names', () => {
       const packageNames = new Set<string>();
       const packagesDir = join(rootDir, 'packages');
-      const expectedPackages = ['api', 'web'];
+      const expectedPackages = ['api', 'web', 'shared'];
 
       expectedPackages.forEach((packageName) => {
         const packageJsonPath = join(packagesDir, packageName, 'package.json');
@@ -140,8 +145,17 @@ describe('Bun Workspaces Configuration', () => {
         }
       });
 
-      // Verify we have at least 2 unique package names
-      expect(packageNames.size).toBeGreaterThanOrEqual(2);
+      // Verify we have 3 unique package names (api, web, shared)
+      expect(packageNames.size).toBe(3);
+    });
+
+    it('should have web package depending on shared package', () => {
+      const webPackagePath = join(rootDir, 'packages', 'web', 'package.json');
+      const packageJson = JSON.parse(readFileSync(webPackagePath, 'utf-8'));
+
+      expect(packageJson.dependencies).toBeDefined();
+      expect(packageJson.dependencies).toHaveProperty('@masonart/shared');
+      expect(packageJson.dependencies['@masonart/shared']).toBe('workspace:*');
     });
   });
 
