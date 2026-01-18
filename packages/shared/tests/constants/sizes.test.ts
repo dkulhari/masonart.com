@@ -2,169 +2,363 @@
  * Size Constants Tests
  *
  * Comprehensive tests for poster size constants including:
- * - Poster size definitions
- * - Helper functions
- * - Size constraints
- * - Conversion utilities
+ * - Square, portrait-landscape, and panoramic size arrays
+ * - ALL_SIZES combined array
+ * - Lookup maps (SIZE_BY_ID, SIZES_BY_TIER, SIZES_BY_CATEGORY)
+ * - Helper functions (getSizeById, getSizesByTier, etc.)
+ * - Default values and popular sizes
  */
 
 import { describe, it, expect } from 'vitest';
 import {
-  POSTER_SIZES,
-  SIZE_CONSTRAINTS,
-  INCHES_TO_CM,
+  // Size arrays
+  SQUARE_SIZES,
+  PORTRAIT_LANDSCAPE_SIZES,
+  PANORAMIC_SIZES,
+  ALL_SIZES,
+  // Lookup maps
+  SIZE_BY_ID,
+  SIZES_BY_TIER,
+  SIZES_BY_CATEGORY,
+  // Helper functions
   getSizeById,
-  getPopularSizes,
-  getSizesByAspectRatio,
-  isValidSizeLabel,
-  inchesToCm,
-  cmToInches,
-  type PosterSize,
+  getSizesByTier,
+  getSizesByCategory,
+  isValidSizeId,
+  getAspectRatio,
+  isSquareSize,
+  getSizesForOrientation,
+  // Constants
+  DEFAULT_SIZE_ID,
+  SMALLEST_SIZE,
+  LARGEST_SIZE,
+  POPULAR_SIZES,
 } from '../../src/constants/sizes.js';
 
-describe('POSTER_SIZES constant', () => {
-  it('should have at least 15 poster sizes defined', () => {
-    expect(POSTER_SIZES.length).toBeGreaterThanOrEqual(15);
+// ============================================================================
+// Square Sizes Tests
+// ============================================================================
+
+describe('SQUARE_SIZES constant', () => {
+  it('should have 8 square sizes defined', () => {
+    expect(SQUARE_SIZES.length).toBe(8);
+  });
+
+  it('should have all sizes with equal width and height', () => {
+    SQUARE_SIZES.forEach((size) => {
+      expect(size.widthInches).toBe(size.heightInches);
+    });
   });
 
   it('should have unique IDs for all sizes', () => {
-    const ids = POSTER_SIZES.map((size) => size.id);
+    const ids = SQUARE_SIZES.map((size) => size.id);
     const uniqueIds = new Set(ids);
-    expect(uniqueIds.size).toBe(POSTER_SIZES.length);
+    expect(uniqueIds.size).toBe(SQUARE_SIZES.length);
   });
 
-  it('should have unique labels for all sizes', () => {
-    const labels = POSTER_SIZES.map((size) => size.label);
-    const uniqueLabels = new Set(labels);
-    expect(uniqueLabels.size).toBe(POSTER_SIZES.length);
-  });
-
-  it('should have valid dimensions for all sizes', () => {
-    POSTER_SIZES.forEach((size) => {
-      expect(size.widthInches).toBeGreaterThan(0);
-      expect(size.heightInches).toBeGreaterThan(0);
-      expect(size.widthCm).toBeGreaterThan(0);
-      expect(size.heightCm).toBeGreaterThan(0);
+  it('should have IDs starting with "square-"', () => {
+    SQUARE_SIZES.forEach((size) => {
+      expect(size.id).toMatch(/^square-\d+x\d+$/);
     });
   });
 
-  it('should have consistent display order (no duplicates)', () => {
-    const orders = POSTER_SIZES.map((size) => size.displayOrder);
-    const uniqueOrders = new Set(orders);
-    expect(uniqueOrders.size).toBe(POSTER_SIZES.length);
-  });
-
-  it('should have at least one popular size', () => {
-    const popularSizes = POSTER_SIZES.filter((size) => size.isPopular);
-    expect(popularSizes.length).toBeGreaterThan(0);
-  });
-
-  it('should have valid label format (NxN inches or NxN cm)', () => {
-    POSTER_SIZES.forEach((size) => {
-      expect(size.label).toMatch(/^\d+x\d+\s+(inches|cm)$/);
+  it('should have category set to "square"', () => {
+    SQUARE_SIZES.forEach((size) => {
+      expect(size.category).toBe('square');
     });
   });
 
-  it('should have label matching dimensions', () => {
-    POSTER_SIZES.forEach((size) => {
-      const expectedLabel = `${size.widthInches}x${size.heightInches} inches`;
-      expect(size.label).toBe(expectedLabel);
+  it('should have valid price tiers (1-4)', () => {
+    SQUARE_SIZES.forEach((size) => {
+      expect(size.priceTier).toBeGreaterThanOrEqual(1);
+      expect(size.priceTier).toBeLessThanOrEqual(4);
     });
   });
 
-  it('should have cm dimensions matching inch dimensions (approximately)', () => {
-    POSTER_SIZES.forEach((size) => {
-      const expectedWidthCm = Math.round(size.widthInches * INCHES_TO_CM);
-      const expectedHeightCm = Math.round(size.heightInches * INCHES_TO_CM);
-
-      // Allow 1cm tolerance for rounding
-      expect(Math.abs(size.widthCm - expectedWidthCm)).toBeLessThanOrEqual(1);
-      expect(Math.abs(size.heightCm - expectedHeightCm)).toBeLessThanOrEqual(1);
+  it('should have correct display labels in inches format', () => {
+    SQUARE_SIZES.forEach((size) => {
+      expect(size.displayLabel).toBe(`${size.widthInches}" × ${size.heightInches}"`);
     });
   });
 
-  it('should have aspect ratios defined', () => {
-    POSTER_SIZES.forEach((size) => {
-      expect(size.aspectRatio).toBeTruthy();
-      expect(size.aspectRatio.length).toBeGreaterThan(0);
+  it('should have metric display labels', () => {
+    SQUARE_SIZES.forEach((size) => {
+      expect(size.displayLabelMetric).toMatch(/^\d+ × \d+ cm$/);
+    });
+  });
+
+  it('should have correct cm dimensions (approximately inches * 2.54)', () => {
+    SQUARE_SIZES.forEach((size) => {
+      const expectedCm = Math.round(size.widthInches * 2.54);
+      expect(Math.abs(size.widthCm - expectedCm)).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it('should include standard square sizes', () => {
+    const dimensions = SQUARE_SIZES.map((s) => s.widthInches);
+    expect(dimensions).toContain(12);
+    expect(dimensions).toContain(16);
+    expect(dimensions).toContain(24);
+    expect(dimensions).toContain(36);
+  });
+});
+
+// ============================================================================
+// Portrait/Landscape Sizes Tests
+// ============================================================================
+
+describe('PORTRAIT_LANDSCAPE_SIZES constant', () => {
+  it('should have 8 portrait/landscape sizes defined', () => {
+    expect(PORTRAIT_LANDSCAPE_SIZES.length).toBe(8);
+  });
+
+  it('should have all sizes with width less than height (portrait)', () => {
+    PORTRAIT_LANDSCAPE_SIZES.forEach((size) => {
+      expect(size.widthInches).toBeLessThan(size.heightInches);
+    });
+  });
+
+  it('should have unique IDs for all sizes', () => {
+    const ids = PORTRAIT_LANDSCAPE_SIZES.map((size) => size.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(PORTRAIT_LANDSCAPE_SIZES.length);
+  });
+
+  it('should have IDs starting with "portrait-landscape-"', () => {
+    PORTRAIT_LANDSCAPE_SIZES.forEach((size) => {
+      expect(size.id).toMatch(/^portrait-landscape-\d+x\d+$/);
+    });
+  });
+
+  it('should have category set to "portrait-landscape"', () => {
+    PORTRAIT_LANDSCAPE_SIZES.forEach((size) => {
+      expect(size.category).toBe('portrait-landscape');
+    });
+  });
+
+  it('should have valid price tiers (1-4)', () => {
+    PORTRAIT_LANDSCAPE_SIZES.forEach((size) => {
+      expect(size.priceTier).toBeGreaterThanOrEqual(1);
+      expect(size.priceTier).toBeLessThanOrEqual(4);
+    });
+  });
+
+  it('should include common portrait sizes', () => {
+    const findSize = (w: number, h: number) =>
+      PORTRAIT_LANDSCAPE_SIZES.find((s) => s.widthInches === w && s.heightInches === h);
+
+    expect(findSize(12, 16)).toBeDefined();
+    expect(findSize(16, 20)).toBeDefined();
+    expect(findSize(18, 24)).toBeDefined();
+    expect(findSize(24, 36)).toBeDefined();
+  });
+});
+
+// ============================================================================
+// Panoramic Sizes Tests
+// ============================================================================
+
+describe('PANORAMIC_SIZES constant', () => {
+  it('should have 4 panoramic sizes defined', () => {
+    expect(PANORAMIC_SIZES.length).toBe(4);
+  });
+
+  it('should have very wide aspect ratios (width << height)', () => {
+    PANORAMIC_SIZES.forEach((size) => {
+      // Panoramic sizes have height at least 2x width
+      expect(size.heightInches).toBeGreaterThanOrEqual(size.widthInches * 2);
+    });
+  });
+
+  it('should have unique IDs for all sizes', () => {
+    const ids = PANORAMIC_SIZES.map((size) => size.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(PANORAMIC_SIZES.length);
+  });
+
+  it('should have IDs starting with "panoramic-"', () => {
+    PANORAMIC_SIZES.forEach((size) => {
+      expect(size.id).toMatch(/^panoramic-\d+x\d+$/);
+    });
+  });
+
+  it('should have category set to "panoramic"', () => {
+    PANORAMIC_SIZES.forEach((size) => {
+      expect(size.category).toBe('panoramic');
+    });
+  });
+
+  it('should have valid price tiers (2-4)', () => {
+    PANORAMIC_SIZES.forEach((size) => {
+      expect(size.priceTier).toBeGreaterThanOrEqual(2);
+      expect(size.priceTier).toBeLessThanOrEqual(4);
+    });
+  });
+
+  it('should include expected panoramic sizes', () => {
+    const findSize = (w: number, h: number) =>
+      PANORAMIC_SIZES.find((s) => s.widthInches === w && s.heightInches === h);
+
+    expect(findSize(12, 36)).toBeDefined();
+    expect(findSize(16, 48)).toBeDefined();
+    expect(findSize(24, 72)).toBeDefined();
+  });
+});
+
+// ============================================================================
+// ALL_SIZES Tests
+// ============================================================================
+
+describe('ALL_SIZES constant', () => {
+  it('should combine all size categories', () => {
+    const expectedLength =
+      SQUARE_SIZES.length + PORTRAIT_LANDSCAPE_SIZES.length + PANORAMIC_SIZES.length;
+    expect(ALL_SIZES.length).toBe(expectedLength);
+  });
+
+  it('should have 20 total sizes', () => {
+    expect(ALL_SIZES.length).toBe(20);
+  });
+
+  it('should have unique IDs across all sizes', () => {
+    const ids = ALL_SIZES.map((size) => size.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(ALL_SIZES.length);
+  });
+
+  it('should include all square sizes', () => {
+    SQUARE_SIZES.forEach((squareSize) => {
+      expect(ALL_SIZES).toContainEqual(squareSize);
+    });
+  });
+
+  it('should include all portrait/landscape sizes', () => {
+    PORTRAIT_LANDSCAPE_SIZES.forEach((plSize) => {
+      expect(ALL_SIZES).toContainEqual(plSize);
+    });
+  });
+
+  it('should include all panoramic sizes', () => {
+    PANORAMIC_SIZES.forEach((panoramicSize) => {
+      expect(ALL_SIZES).toContainEqual(panoramicSize);
+    });
+  });
+
+  it('should have all required fields for each size', () => {
+    ALL_SIZES.forEach((size) => {
+      expect(size).toHaveProperty('id');
+      expect(size).toHaveProperty('widthInches');
+      expect(size).toHaveProperty('heightInches');
+      expect(size).toHaveProperty('widthCm');
+      expect(size).toHaveProperty('heightCm');
+      expect(size).toHaveProperty('priceTier');
+      expect(size).toHaveProperty('category');
+      expect(size).toHaveProperty('displayLabel');
+      expect(size).toHaveProperty('displayLabelMetric');
     });
   });
 });
 
-describe('Size categories', () => {
-  it('should have square sizes (equal width and height)', () => {
-    const squareSizes = POSTER_SIZES.filter(
-      (size) => size.widthInches === size.heightInches
-    );
-    expect(squareSizes.length).toBeGreaterThan(0);
+// ============================================================================
+// SIZE_BY_ID Map Tests
+// ============================================================================
 
-    squareSizes.forEach((size) => {
-      expect(size.id).toContain('square');
-      expect(size.aspectRatio).toBe('1:1');
-    });
+describe('SIZE_BY_ID map', () => {
+  it('should be a Map with all sizes', () => {
+    expect(SIZE_BY_ID).toBeInstanceOf(Map);
+    expect(SIZE_BY_ID.size).toBe(ALL_SIZES.length);
   });
 
-  it('should have portrait sizes (height > width)', () => {
-    const portraitSizes = POSTER_SIZES.filter(
-      (size) => size.heightInches > size.widthInches
-    );
-    expect(portraitSizes.length).toBeGreaterThan(0);
-
-    portraitSizes.forEach((size) => {
-      expect(size.id).toContain('portrait');
-    });
+  it('should allow O(1) lookup by ID', () => {
+    const size = SIZE_BY_ID.get('square-16x16');
+    expect(size).toBeDefined();
+    expect(size?.widthInches).toBe(16);
+    expect(size?.heightInches).toBe(16);
   });
 
-  it('should have landscape sizes (width > height)', () => {
-    const landscapeSizes = POSTER_SIZES.filter(
-      (size) => size.widthInches > size.heightInches && !size.id.includes('panoramic')
-    );
-    expect(landscapeSizes.length).toBeGreaterThan(0);
-
-    landscapeSizes.forEach((size) => {
-      expect(size.id).toContain('landscape');
-    });
+  it('should return undefined for invalid IDs', () => {
+    expect(SIZE_BY_ID.get('invalid-id')).toBeUndefined();
+    expect(SIZE_BY_ID.get('')).toBeUndefined();
   });
 
-  it('should have panoramic sizes (very wide aspect ratio)', () => {
-    const panoramicSizes = POSTER_SIZES.filter((size) => size.id.includes('panoramic'));
-    expect(panoramicSizes.length).toBeGreaterThan(0);
-
-    panoramicSizes.forEach((size) => {
-      expect(size.widthInches).toBeGreaterThan(size.heightInches * 1.5);
+  it('should have correct size objects for all entries', () => {
+    SIZE_BY_ID.forEach((size, id) => {
+      expect(size.id).toBe(id);
     });
   });
 });
 
-describe('Popular sizes', () => {
-  it('should have 12x12 inches as a popular size', () => {
-    const size = POSTER_SIZES.find((s) => s.widthInches === 12 && s.heightInches === 12);
-    expect(size?.isPopular).toBe(true);
+// ============================================================================
+// SIZES_BY_TIER Map Tests
+// ============================================================================
+
+describe('SIZES_BY_TIER map', () => {
+  it('should be a Map with 4 tiers', () => {
+    expect(SIZES_BY_TIER).toBeInstanceOf(Map);
+    expect(SIZES_BY_TIER.size).toBe(4);
   });
 
-  it('should have 8x10 inches as a popular size', () => {
-    const size = POSTER_SIZES.find((s) => s.widthInches === 8 && s.heightInches === 10);
-    expect(size?.isPopular).toBe(true);
+  it('should have tiers 1 through 4', () => {
+    expect(SIZES_BY_TIER.has(1)).toBe(true);
+    expect(SIZES_BY_TIER.has(2)).toBe(true);
+    expect(SIZES_BY_TIER.has(3)).toBe(true);
+    expect(SIZES_BY_TIER.has(4)).toBe(true);
   });
 
-  it('should have 16x20 inches as a popular size', () => {
-    const size = POSTER_SIZES.find((s) => s.widthInches === 16 && s.heightInches === 20);
-    expect(size?.isPopular).toBe(true);
+  it('should have sizes in each tier', () => {
+    for (let tier = 1; tier <= 4; tier++) {
+      const tierSizes = SIZES_BY_TIER.get(tier as 1 | 2 | 3 | 4);
+      expect(tierSizes).toBeDefined();
+      expect(tierSizes!.length).toBeGreaterThan(0);
+    }
   });
 
-  it('should have 18x24 inches as a popular size', () => {
-    const size = POSTER_SIZES.find((s) => s.widthInches === 18 && s.heightInches === 24);
-    expect(size?.isPopular).toBe(true);
+  it('should have sizes correctly assigned to tiers', () => {
+    SIZES_BY_TIER.forEach((sizes, tier) => {
+      sizes.forEach((size) => {
+        expect(size.priceTier).toBe(tier);
+      });
+    });
   });
 
-  it('should have 24x36 inches as a popular size', () => {
-    const size = POSTER_SIZES.find((s) => s.widthInches === 24 && s.heightInches === 36);
-    expect(size?.isPopular).toBe(true);
+  it('should include all sizes across all tiers', () => {
+    let totalSizes = 0;
+    SIZES_BY_TIER.forEach((sizes) => {
+      totalSizes += sizes.length;
+    });
+    expect(totalSizes).toBe(ALL_SIZES.length);
   });
 });
+
+// ============================================================================
+// SIZES_BY_CATEGORY Map Tests
+// ============================================================================
+
+describe('SIZES_BY_CATEGORY map', () => {
+  it('should be a Map with 3 categories', () => {
+    expect(SIZES_BY_CATEGORY).toBeInstanceOf(Map);
+    expect(SIZES_BY_CATEGORY.size).toBe(3);
+  });
+
+  it('should have all three categories', () => {
+    expect(SIZES_BY_CATEGORY.has('square')).toBe(true);
+    expect(SIZES_BY_CATEGORY.has('portrait-landscape')).toBe(true);
+    expect(SIZES_BY_CATEGORY.has('panoramic')).toBe(true);
+  });
+
+  it('should map to correct size arrays', () => {
+    expect(SIZES_BY_CATEGORY.get('square')).toBe(SQUARE_SIZES);
+    expect(SIZES_BY_CATEGORY.get('portrait-landscape')).toBe(PORTRAIT_LANDSCAPE_SIZES);
+    expect(SIZES_BY_CATEGORY.get('panoramic')).toBe(PANORAMIC_SIZES);
+  });
+});
+
+// ============================================================================
+// getSizeById Helper Tests
+// ============================================================================
 
 describe('getSizeById helper', () => {
-  it('should return size for valid ID', () => {
+  it('should return size for valid square ID', () => {
     const size = getSizeById('square-12x12');
     expect(size).toBeDefined();
     expect(size?.id).toBe('square-12x12');
@@ -172,11 +366,18 @@ describe('getSizeById helper', () => {
     expect(size?.heightInches).toBe(12);
   });
 
-  it('should return size for portrait-8x10', () => {
-    const size = getSizeById('portrait-8x10');
+  it('should return size for valid portrait-landscape ID', () => {
+    const size = getSizeById('portrait-landscape-16x20');
     expect(size).toBeDefined();
-    expect(size?.widthInches).toBe(8);
-    expect(size?.heightInches).toBe(10);
+    expect(size?.widthInches).toBe(16);
+    expect(size?.heightInches).toBe(20);
+  });
+
+  it('should return size for valid panoramic ID', () => {
+    const size = getSizeById('panoramic-12x36');
+    expect(size).toBeDefined();
+    expect(size?.widthInches).toBe(12);
+    expect(size?.heightInches).toBe(36);
   });
 
   it('should return undefined for invalid ID', () => {
@@ -190,247 +391,344 @@ describe('getSizeById helper', () => {
   });
 });
 
-describe('getPopularSizes helper', () => {
-  it('should return only popular sizes', () => {
-    const popularSizes = getPopularSizes();
-    expect(popularSizes.length).toBeGreaterThan(0);
+// ============================================================================
+// getSizesByTier Helper Tests
+// ============================================================================
 
-    popularSizes.forEach((size) => {
-      expect(size.isPopular).toBe(true);
+describe('getSizesByTier helper', () => {
+  it('should return tier 1 sizes', () => {
+    const tier1Sizes = getSizesByTier(1);
+    expect(tier1Sizes.length).toBeGreaterThan(0);
+    tier1Sizes.forEach((size) => {
+      expect(size.priceTier).toBe(1);
     });
   });
 
-  it('should return at least 5 popular sizes', () => {
-    const popularSizes = getPopularSizes();
-    expect(popularSizes.length).toBeGreaterThanOrEqual(5);
-  });
-
-  it('should include common sizes in popular sizes', () => {
-    const popularSizes = getPopularSizes();
-    const popularIds = popularSizes.map((s) => s.id);
-
-    expect(popularIds).toContain('portrait-18x24');
-    expect(popularIds).toContain('portrait-16x20');
-  });
-});
-
-describe('getSizesByAspectRatio helper', () => {
-  it('should return all square sizes for 1:1 aspect ratio', () => {
-    const squareSizes = getSizesByAspectRatio('1:1');
-    expect(squareSizes.length).toBeGreaterThan(0);
-
-    squareSizes.forEach((size) => {
-      expect(size.aspectRatio).toBe('1:1');
-      expect(size.widthInches).toBe(size.heightInches);
+  it('should return tier 2 sizes', () => {
+    const tier2Sizes = getSizesByTier(2);
+    expect(tier2Sizes.length).toBeGreaterThan(0);
+    tier2Sizes.forEach((size) => {
+      expect(size.priceTier).toBe(2);
     });
   });
 
-  it('should return sizes for 4:5 aspect ratio', () => {
-    const sizes = getSizesByAspectRatio('4:5');
-    expect(sizes.length).toBeGreaterThan(0);
-
-    sizes.forEach((size) => {
-      expect(size.aspectRatio).toBe('4:5');
+  it('should return tier 3 sizes', () => {
+    const tier3Sizes = getSizesByTier(3);
+    expect(tier3Sizes.length).toBeGreaterThan(0);
+    tier3Sizes.forEach((size) => {
+      expect(size.priceTier).toBe(3);
     });
   });
 
-  it('should return sizes for 3:4 aspect ratio', () => {
-    const sizes = getSizesByAspectRatio('3:4');
-    expect(sizes.length).toBeGreaterThan(0);
-
-    sizes.forEach((size) => {
-      expect(size.aspectRatio).toBe('3:4');
+  it('should return tier 4 sizes', () => {
+    const tier4Sizes = getSizesByTier(4);
+    expect(tier4Sizes.length).toBeGreaterThan(0);
+    tier4Sizes.forEach((size) => {
+      expect(size.priceTier).toBe(4);
     });
   });
 
-  it('should return empty array for invalid aspect ratio', () => {
-    const sizes = getSizesByAspectRatio('invalid:ratio');
-    expect(sizes).toEqual([]);
-  });
-
-  it('should return empty array for empty string', () => {
-    const sizes = getSizesByAspectRatio('');
+  it('should return empty array for invalid tier', () => {
+    const sizes = getSizesByTier(5 as 1 | 2 | 3 | 4);
     expect(sizes).toEqual([]);
   });
 });
 
-describe('isValidSizeLabel helper', () => {
-  it('should validate correct inch format', () => {
-    expect(isValidSizeLabel('12x16 inches')).toBe(true);
-    expect(isValidSizeLabel('8x10 inches')).toBe(true);
-    expect(isValidSizeLabel('24x36 inches')).toBe(true);
+// ============================================================================
+// getSizesByCategory Helper Tests
+// ============================================================================
+
+describe('getSizesByCategory helper', () => {
+  it('should return square sizes for "square" category', () => {
+    const sizes = getSizesByCategory('square');
+    expect(sizes.length).toBe(SQUARE_SIZES.length);
+    sizes.forEach((size) => {
+      expect(size.category).toBe('square');
+    });
   });
 
-  it('should validate correct cm format', () => {
-    expect(isValidSizeLabel('30x40 cm')).toBe(true);
-    expect(isValidSizeLabel('20x25 cm')).toBe(true);
-    expect(isValidSizeLabel('61x91 cm')).toBe(true);
+  it('should return portrait-landscape sizes', () => {
+    const sizes = getSizesByCategory('portrait-landscape');
+    expect(sizes.length).toBe(PORTRAIT_LANDSCAPE_SIZES.length);
+    sizes.forEach((size) => {
+      expect(size.category).toBe('portrait-landscape');
+    });
   });
 
-  it('should reject format without space', () => {
-    expect(isValidSizeLabel('12x16inches')).toBe(false);
-    expect(isValidSizeLabel('30x40cm')).toBe(false);
+  it('should return panoramic sizes', () => {
+    const sizes = getSizesByCategory('panoramic');
+    expect(sizes.length).toBe(PANORAMIC_SIZES.length);
+    sizes.forEach((size) => {
+      expect(size.category).toBe('panoramic');
+    });
   });
 
-  it('should reject format with wrong unit', () => {
-    expect(isValidSizeLabel('12x16 mm')).toBe(false);
-    expect(isValidSizeLabel('12x16 meters')).toBe(false);
-  });
-
-  it('should reject format without x separator', () => {
-    expect(isValidSizeLabel('12 16 inches')).toBe(false);
-    expect(isValidSizeLabel('12-16 inches')).toBe(false);
-  });
-
-  it('should reject non-numeric dimensions', () => {
-    expect(isValidSizeLabel('axb inches')).toBe(false);
-    expect(isValidSizeLabel('twelve x sixteen inches')).toBe(false);
-  });
-
-  it('should reject empty string', () => {
-    expect(isValidSizeLabel('')).toBe(false);
-  });
-
-  it('should reject just numbers', () => {
-    expect(isValidSizeLabel('12x16')).toBe(false);
+  it('should return empty array for invalid category', () => {
+    const sizes = getSizesByCategory('invalid' as 'square' | 'portrait-landscape' | 'panoramic');
+    expect(sizes).toEqual([]);
   });
 });
 
-describe('inchesToCm helper', () => {
-  it('should convert inches to cm correctly', () => {
-    expect(inchesToCm(8)).toBe(20);
-    expect(inchesToCm(12)).toBe(30);
-    expect(inchesToCm(16)).toBe(41);
-    expect(inchesToCm(24)).toBe(61);
+// ============================================================================
+// isValidSizeId Helper Tests
+// ============================================================================
+
+describe('isValidSizeId helper', () => {
+  it('should return true for valid square size IDs', () => {
+    expect(isValidSizeId('square-12x12')).toBe(true);
+    expect(isValidSizeId('square-16x16')).toBe(true);
+    expect(isValidSizeId('square-24x24')).toBe(true);
   });
 
-  it('should round to nearest integer', () => {
-    expect(inchesToCm(10)).toBe(25); // 10 * 2.54 = 25.4 -> 25
-    expect(inchesToCm(18)).toBe(46); // 18 * 2.54 = 45.72 -> 46
+  it('should return true for valid portrait-landscape IDs', () => {
+    expect(isValidSizeId('portrait-landscape-16x20')).toBe(true);
+    expect(isValidSizeId('portrait-landscape-18x24')).toBe(true);
+    expect(isValidSizeId('portrait-landscape-24x36')).toBe(true);
   });
 
-  it('should handle zero', () => {
-    expect(inchesToCm(0)).toBe(0);
+  it('should return true for valid panoramic IDs', () => {
+    expect(isValidSizeId('panoramic-12x36')).toBe(true);
+    expect(isValidSizeId('panoramic-16x48')).toBe(true);
   });
 
-  it('should handle decimal inches', () => {
-    expect(inchesToCm(1.5)).toBe(4); // 1.5 * 2.54 = 3.81 -> 4
-    expect(inchesToCm(2.5)).toBe(6); // 2.5 * 2.54 = 6.35 -> 6
-  });
-});
-
-describe('cmToInches helper', () => {
-  it('should convert cm to inches correctly', () => {
-    expect(cmToInches(20)).toBe(7.87);
-    expect(cmToInches(30)).toBe(11.81);
-    expect(cmToInches(41)).toBe(16.14);
-  });
-
-  it('should round to 2 decimal places', () => {
-    expect(cmToInches(25)).toBe(9.84);
-    expect(cmToInches(50)).toBe(19.69);
-  });
-
-  it('should handle zero', () => {
-    expect(cmToInches(0)).toBe(0);
-  });
-
-  it('should handle decimal cm', () => {
-    expect(cmToInches(10.5)).toBe(4.13);
-    expect(cmToInches(15.75)).toBe(6.2);
-  });
-
-  it('should be inverse of inchesToCm (approximately)', () => {
-    const inches = 12;
-    const cm = inchesToCm(inches);
-    const backToInches = cmToInches(cm);
-
-    // Allow small tolerance due to rounding
-    expect(Math.abs(backToInches - inches)).toBeLessThan(0.5);
+  it('should return false for invalid IDs', () => {
+    expect(isValidSizeId('invalid-id')).toBe(false);
+    expect(isValidSizeId('square-100x100')).toBe(false);
+    expect(isValidSizeId('')).toBe(false);
   });
 });
 
-describe('INCHES_TO_CM constant', () => {
-  it('should have correct conversion factor', () => {
-    expect(INCHES_TO_CM).toBe(2.54);
+// ============================================================================
+// getAspectRatio Helper Tests
+// ============================================================================
+
+describe('getAspectRatio helper', () => {
+  it('should return 1 for square sizes', () => {
+    const squareSize = getSizeById('square-16x16');
+    expect(squareSize).toBeDefined();
+    expect(getAspectRatio(squareSize!)).toBe(1);
   });
 
-  it('should be used in conversion functions', () => {
-    const testInches = 10;
-    expect(inchesToCm(testInches)).toBe(Math.round(testInches * INCHES_TO_CM));
-  });
-});
-
-describe('SIZE_CONSTRAINTS constant', () => {
-  it('should have minimum width constraint', () => {
-    expect(SIZE_CONSTRAINTS.MIN_WIDTH_INCHES).toBe(4);
-    expect(SIZE_CONSTRAINTS.MIN_WIDTH_CM).toBe(10);
+  it('should return correct ratio for portrait sizes', () => {
+    const portraitSize = getSizeById('portrait-landscape-16x20');
+    expect(portraitSize).toBeDefined();
+    expect(getAspectRatio(portraitSize!)).toBe(16 / 20);
   });
 
-  it('should have maximum width constraint', () => {
-    expect(SIZE_CONSTRAINTS.MAX_WIDTH_INCHES).toBe(48);
-    expect(SIZE_CONSTRAINTS.MAX_WIDTH_CM).toBe(122);
+  it('should return correct ratio for panoramic sizes', () => {
+    const panoramicSize = getSizeById('panoramic-12x36');
+    expect(panoramicSize).toBeDefined();
+    expect(getAspectRatio(panoramicSize!)).toBe(12 / 36);
   });
 
-  it('should have minimum height constraint', () => {
-    expect(SIZE_CONSTRAINTS.MIN_HEIGHT_INCHES).toBe(4);
-    expect(SIZE_CONSTRAINTS.MIN_HEIGHT_CM).toBe(10);
+  it('should return ratio less than 1 for portrait orientation', () => {
+    PORTRAIT_LANDSCAPE_SIZES.forEach((size) => {
+      expect(getAspectRatio(size)).toBeLessThan(1);
+    });
   });
 
-  it('should have maximum height constraint', () => {
-    expect(SIZE_CONSTRAINTS.MAX_HEIGHT_INCHES).toBe(72);
-    expect(SIZE_CONSTRAINTS.MAX_HEIGHT_CM).toBe(183);
-  });
-
-  it('should have logical constraints (min < max)', () => {
-    expect(SIZE_CONSTRAINTS.MIN_WIDTH_INCHES).toBeLessThan(
-      SIZE_CONSTRAINTS.MAX_WIDTH_INCHES
-    );
-    expect(SIZE_CONSTRAINTS.MIN_HEIGHT_INCHES).toBeLessThan(
-      SIZE_CONSTRAINTS.MAX_HEIGHT_INCHES
-    );
-    expect(SIZE_CONSTRAINTS.MIN_WIDTH_CM).toBeLessThan(SIZE_CONSTRAINTS.MAX_WIDTH_CM);
-    expect(SIZE_CONSTRAINTS.MIN_HEIGHT_CM).toBeLessThan(
-      SIZE_CONSTRAINTS.MAX_HEIGHT_CM
-    );
-  });
-
-  it('should have all sizes within constraints', () => {
-    POSTER_SIZES.forEach((size) => {
-      expect(size.widthInches).toBeGreaterThanOrEqual(SIZE_CONSTRAINTS.MIN_WIDTH_INCHES);
-      expect(size.widthInches).toBeLessThanOrEqual(SIZE_CONSTRAINTS.MAX_WIDTH_INCHES);
-      expect(size.heightInches).toBeGreaterThanOrEqual(SIZE_CONSTRAINTS.MIN_HEIGHT_INCHES);
-      expect(size.heightInches).toBeLessThanOrEqual(SIZE_CONSTRAINTS.MAX_HEIGHT_INCHES);
+  it('should return ratio less than 0.5 for panoramic', () => {
+    PANORAMIC_SIZES.forEach((size) => {
+      expect(getAspectRatio(size)).toBeLessThanOrEqual(0.5);
     });
   });
 });
 
-describe('PosterSize type structure', () => {
-  it('should have all required fields', () => {
-    POSTER_SIZES.forEach((size) => {
-      expect(size).toHaveProperty('id');
-      expect(size).toHaveProperty('label');
-      expect(size).toHaveProperty('widthInches');
-      expect(size).toHaveProperty('heightInches');
-      expect(size).toHaveProperty('widthCm');
-      expect(size).toHaveProperty('heightCm');
-      expect(size).toHaveProperty('aspectRatio');
-      expect(size).toHaveProperty('isPopular');
-      expect(size).toHaveProperty('displayOrder');
+// ============================================================================
+// isSquareSize Helper Tests
+// ============================================================================
+
+describe('isSquareSize helper', () => {
+  it('should return true for all square sizes', () => {
+    SQUARE_SIZES.forEach((size) => {
+      expect(isSquareSize(size)).toBe(true);
     });
   });
 
-  it('should have correct field types', () => {
-    POSTER_SIZES.forEach((size) => {
+  it('should return false for portrait-landscape sizes', () => {
+    PORTRAIT_LANDSCAPE_SIZES.forEach((size) => {
+      expect(isSquareSize(size)).toBe(false);
+    });
+  });
+
+  it('should return false for panoramic sizes', () => {
+    PANORAMIC_SIZES.forEach((size) => {
+      expect(isSquareSize(size)).toBe(false);
+    });
+  });
+});
+
+// ============================================================================
+// getSizesForOrientation Helper Tests
+// ============================================================================
+
+describe('getSizesForOrientation helper', () => {
+  it('should return square sizes for "square" orientation', () => {
+    const sizes = getSizesForOrientation('square');
+    expect(sizes).toBe(SQUARE_SIZES);
+  });
+
+  it('should return portrait-landscape sizes for "portrait" orientation', () => {
+    const sizes = getSizesForOrientation('portrait');
+    expect(sizes).toBe(PORTRAIT_LANDSCAPE_SIZES);
+  });
+
+  it('should return portrait-landscape sizes for "landscape" orientation', () => {
+    const sizes = getSizesForOrientation('landscape');
+    expect(sizes).toBe(PORTRAIT_LANDSCAPE_SIZES);
+  });
+
+  it('should return panoramic sizes for "panoramic" orientation', () => {
+    const sizes = getSizesForOrientation('panoramic');
+    expect(sizes).toBe(PANORAMIC_SIZES);
+  });
+
+  it('should return empty array for invalid orientation', () => {
+    const sizes = getSizesForOrientation('invalid' as 'square' | 'portrait' | 'landscape' | 'panoramic');
+    expect(sizes).toEqual([]);
+  });
+});
+
+// ============================================================================
+// Default Values Tests
+// ============================================================================
+
+describe('DEFAULT_SIZE_ID constant', () => {
+  it('should be a valid size ID', () => {
+    expect(isValidSizeId(DEFAULT_SIZE_ID)).toBe(true);
+  });
+
+  it('should be "portrait-landscape-16x20"', () => {
+    expect(DEFAULT_SIZE_ID).toBe('portrait-landscape-16x20');
+  });
+
+  it('should map to a valid size', () => {
+    const defaultSize = getSizeById(DEFAULT_SIZE_ID);
+    expect(defaultSize).toBeDefined();
+    expect(defaultSize?.widthInches).toBe(16);
+    expect(defaultSize?.heightInches).toBe(20);
+  });
+});
+
+describe('SMALLEST_SIZE constant', () => {
+  it('should be the first square size', () => {
+    expect(SMALLEST_SIZE).toBe(SQUARE_SIZES[0]);
+  });
+
+  it('should be the 12x12 size', () => {
+    expect(SMALLEST_SIZE.widthInches).toBe(12);
+    expect(SMALLEST_SIZE.heightInches).toBe(12);
+  });
+
+  it('should be in price tier 1', () => {
+    expect(SMALLEST_SIZE.priceTier).toBe(1);
+  });
+});
+
+describe('LARGEST_SIZE constant', () => {
+  it('should be the last panoramic size', () => {
+    expect(LARGEST_SIZE).toBe(PANORAMIC_SIZES[PANORAMIC_SIZES.length - 1]);
+  });
+
+  it('should be the 24x72 size', () => {
+    expect(LARGEST_SIZE.widthInches).toBe(24);
+    expect(LARGEST_SIZE.heightInches).toBe(72);
+  });
+
+  it('should be in price tier 4', () => {
+    expect(LARGEST_SIZE.priceTier).toBe(4);
+  });
+});
+
+// ============================================================================
+// POPULAR_SIZES Tests
+// ============================================================================
+
+describe('POPULAR_SIZES constant', () => {
+  it('should have 4 popular size IDs', () => {
+    expect(POPULAR_SIZES.length).toBe(4);
+  });
+
+  it('should contain valid size IDs', () => {
+    POPULAR_SIZES.forEach((id) => {
+      expect(isValidSizeId(id)).toBe(true);
+    });
+  });
+
+  it('should include expected popular sizes', () => {
+    expect(POPULAR_SIZES).toContain('square-16x16');
+    expect(POPULAR_SIZES).toContain('portrait-landscape-16x20');
+    expect(POPULAR_SIZES).toContain('portrait-landscape-24x36');
+    expect(POPULAR_SIZES).toContain('panoramic-16x48');
+  });
+
+  it('should map to actual size objects', () => {
+    POPULAR_SIZES.forEach((id) => {
+      const size = getSizeById(id);
+      expect(size).toBeDefined();
+    });
+  });
+});
+
+// ============================================================================
+// Price Tier Distribution Tests
+// ============================================================================
+
+describe('Price tier distribution', () => {
+  it('should have smaller sizes in lower tiers', () => {
+    const tier1Sizes = getSizesByTier(1);
+    const tier4Sizes = getSizesByTier(4);
+
+    const avgTier1Area =
+      tier1Sizes.reduce((sum, s) => sum + s.widthInches * s.heightInches, 0) / tier1Sizes.length;
+    const avgTier4Area =
+      tier4Sizes.reduce((sum, s) => sum + s.widthInches * s.heightInches, 0) / tier4Sizes.length;
+
+    expect(avgTier1Area).toBeLessThan(avgTier4Area);
+  });
+
+  it('should have tier 1 sizes with smallest dimensions', () => {
+    const tier1Sizes = getSizesByTier(1);
+    tier1Sizes.forEach((size) => {
+      expect(size.widthInches).toBeLessThanOrEqual(20);
+    });
+  });
+
+  it('should have tier 4 sizes with largest dimensions', () => {
+    const tier4Sizes = getSizesByTier(4);
+    tier4Sizes.forEach((size) => {
+      const area = size.widthInches * size.heightInches;
+      // Tier 4 includes large squares and panoramic sizes
+      expect(area).toBeGreaterThanOrEqual(1200);
+    });
+  });
+});
+
+// ============================================================================
+// Type Structure Validation
+// ============================================================================
+
+describe('ProductSize type structure', () => {
+  it('should have all required fields with correct types', () => {
+    ALL_SIZES.forEach((size) => {
       expect(typeof size.id).toBe('string');
-      expect(typeof size.label).toBe('string');
       expect(typeof size.widthInches).toBe('number');
       expect(typeof size.heightInches).toBe('number');
       expect(typeof size.widthCm).toBe('number');
       expect(typeof size.heightCm).toBe('number');
-      expect(typeof size.aspectRatio).toBe('string');
-      expect(typeof size.isPopular).toBe('boolean');
-      expect(typeof size.displayOrder).toBe('number');
+      expect(typeof size.priceTier).toBe('number');
+      expect(typeof size.category).toBe('string');
+      expect(typeof size.displayLabel).toBe('string');
+      expect(typeof size.displayLabelMetric).toBe('string');
+    });
+  });
+
+  it('should have positive dimensions', () => {
+    ALL_SIZES.forEach((size) => {
+      expect(size.widthInches).toBeGreaterThan(0);
+      expect(size.heightInches).toBeGreaterThan(0);
+      expect(size.widthCm).toBeGreaterThan(0);
+      expect(size.heightCm).toBeGreaterThan(0);
     });
   });
 });
