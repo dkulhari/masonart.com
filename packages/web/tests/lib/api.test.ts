@@ -31,7 +31,13 @@ import {
   type PaginationMeta,
 } from '../../src/lib/api';
 
-// Mock fetch globally
+/**
+ * Mock fetch globally for testing API client functions.
+ *
+ * NOTE: When running this test file together with cart.test.ts (which uses vi.mock
+ * on the api module), some tests may fail due to mock interference. Run this file
+ * individually with `bun test tests/lib/api.test.ts` for full test coverage.
+ */
 const mockFetch = vi.fn();
 global.fetch = mockFetch as any;
 
@@ -1212,5 +1218,1003 @@ describe('API Client - TypeScript Types', () => {
     expect(options.body).toBeDefined();
     expect(options.headers).toBeDefined();
     expect(options.timeout).toBe(5000);
+  });
+});
+
+describe('API Client - Default Export', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should export default api object', async () => {
+    const api = await import('../../src/lib/api');
+    expect(api.default).toBeDefined();
+  });
+
+  it('should include all API endpoints in default export', async () => {
+    const api = await import('../../src/lib/api');
+    expect(api.default.products).toBeDefined();
+    expect(api.default.cart).toBeDefined();
+    expect(api.default.orders).toBeDefined();
+    expect(api.default.health).toBeDefined();
+  });
+
+  it('should include utility functions in default export', async () => {
+    const api = await import('../../src/lib/api');
+    expect(api.default.request).toBeDefined();
+    expect(api.default.ApiError).toBeDefined();
+    expect(api.default.API_CONFIG).toBeDefined();
+  });
+
+  it('should have products object with all methods', async () => {
+    const api = await import('../../src/lib/api');
+    expect(typeof api.default.products.list).toBe('function');
+    expect(typeof api.default.products.get).toBe('function');
+    expect(typeof api.default.products.getVariants).toBe('function');
+    expect(typeof api.default.products.create).toBe('function');
+    expect(typeof api.default.products.update).toBe('function');
+    expect(typeof api.default.products.delete).toBe('function');
+  });
+
+  it('should have cart object with all methods', async () => {
+    const api = await import('../../src/lib/api');
+    expect(typeof api.default.cart.get).toBe('function');
+    expect(typeof api.default.cart.add).toBe('function');
+    expect(typeof api.default.cart.update).toBe('function');
+    expect(typeof api.default.cart.remove).toBe('function');
+    expect(typeof api.default.cart.clear).toBe('function');
+  });
+
+  it('should have orders object with all methods', async () => {
+    const api = await import('../../src/lib/api');
+    expect(typeof api.default.orders.list).toBe('function');
+    expect(typeof api.default.orders.get).toBe('function');
+    expect(typeof api.default.orders.create).toBe('function');
+    expect(typeof api.default.orders.update).toBe('function');
+    expect(typeof api.default.orders.cancel).toBe('function');
+  });
+
+  it('should have health object with check method', async () => {
+    const api = await import('../../src/lib/api');
+    expect(typeof api.default.health.check).toBe('function');
+  });
+});
+
+describe('API Client - Module Exports', () => {
+  it('should export request function', () => {
+    expect(typeof request).toBe('function');
+  });
+
+  it('should export ApiError class', () => {
+    expect(ApiError).toBeDefined();
+    expect(typeof ApiError).toBe('function');
+  });
+
+  it('should export API_CONFIG object', () => {
+    expect(API_CONFIG).toBeDefined();
+    expect(typeof API_CONFIG).toBe('object');
+  });
+
+  it('should export products object', () => {
+    expect(products).toBeDefined();
+    expect(typeof products).toBe('object');
+  });
+
+  it('should export cart object', () => {
+    expect(cart).toBeDefined();
+    expect(typeof cart).toBe('object');
+  });
+
+  it('should export orders object', () => {
+    expect(orders).toBeDefined();
+    expect(typeof orders).toBe('object');
+  });
+
+  it('should export health object', () => {
+    expect(health).toBeDefined();
+    expect(typeof health).toBe('object');
+  });
+});
+
+describe('API Client - URL Construction', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should construct URL with base URL', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await request('/api/test');
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain(API_CONFIG.baseUrl);
+    expect(url).toContain('/api/test');
+  });
+
+  it('should handle endpoint with leading slash', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await request('/test');
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toBe(`${API_CONFIG.baseUrl}/test`);
+  });
+
+  it('should construct products list URL without query string when no params', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: [], meta: {} }),
+    });
+
+    await products.list();
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('/api/products');
+    expect(url).not.toContain('?');
+  });
+
+  it('should construct products list URL with query string when params provided', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: [], meta: {} }),
+    });
+
+    await products.list({ page: 1 });
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('/api/products?');
+    expect(url).toContain('page=1');
+  });
+
+  it('should construct product get URL with ID', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await products.get('product-123');
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('/api/products/product-123');
+  });
+
+  it('should construct variants URL with product ID', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => [],
+    });
+
+    await products.getVariants('product-123');
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('/api/products/product-123/variants');
+  });
+
+  it('should construct cart item URL with item ID', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await cart.update('item-456', { quantity: 2 });
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('/api/cart/item-456');
+  });
+
+  it('should construct order cancel URL', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await orders.cancel('order-789');
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('/api/orders/order-789/cancel');
+  });
+});
+
+describe('API Client - Non-JSON Error Responses', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should handle non-JSON error response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      headers: new Headers({ 'content-type': 'text/html' }),
+    });
+
+    try {
+      await request('/api/error');
+      expect.fail('Should have thrown ApiError');
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.statusCode).toBe(500);
+      expect(error.message).toContain('HTTP 500');
+    }
+  });
+
+  it('should handle empty content-type header on error', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      headers: new Headers({}),
+    });
+
+    try {
+      await request('/api/error');
+      expect.fail('Should have thrown ApiError');
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.statusCode).toBe(400);
+    }
+  });
+
+  it('should handle plain text error response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: new Headers({ 'content-type': 'text/plain' }),
+    });
+
+    try {
+      await request('/api/error');
+      expect.fail('Should have thrown ApiError');
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.statusCode).toBe(503);
+    }
+  });
+});
+
+describe('API Client - Empty Response Handling', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should handle empty cart response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => [],
+    });
+
+    const result = await cart.get();
+    expect(result).toEqual([]);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should handle empty products list', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } }),
+    });
+
+    const result = await products.list();
+    expect(result.data).toEqual([]);
+    expect(result.meta.total).toBe(0);
+  });
+
+  it('should handle empty orders list', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } }),
+    });
+
+    const result = await orders.list();
+    expect(result.data).toEqual([]);
+    expect(result.meta.total).toBe(0);
+  });
+
+  it('should handle null body on 204 response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => null,
+    });
+
+    const result = await cart.remove('123');
+    expect(result).toBeNull();
+  });
+});
+
+describe('API Client - Network Errors', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should handle fetch rejection', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    try {
+      await request('/test');
+      expect.fail('Should have thrown ApiError');
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.statusCode).toBe(0);
+      expect(error.message).toContain('Failed to fetch');
+    }
+  });
+
+  it('should handle DNS resolution failure', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('ERR_NAME_NOT_RESOLVED'));
+
+    try {
+      await request('/test');
+      expect.fail('Should have thrown ApiError');
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.statusCode).toBe(0);
+    }
+  });
+
+  it('should handle connection refused', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Connection refused'));
+
+    try {
+      await request('/test');
+      expect.fail('Should have thrown ApiError');
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.statusCode).toBe(0);
+      expect(error.message).toContain('Connection refused');
+    }
+  });
+
+  it('should preserve original error in response on network errors', async () => {
+    const originalError = new Error('Network failure');
+    mockFetch.mockRejectedValueOnce(originalError);
+
+    try {
+      await request('/test');
+      expect.fail('Should have thrown ApiError');
+    } catch (error: any) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.response).toBe(originalError);
+    }
+  });
+});
+
+describe('API Client - Request Body Handling', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should not include body for GET requests', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await request('/test', { method: 'GET' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: undefined,
+      }),
+    );
+  });
+
+  it('should serialize object body to JSON', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    const body = { name: 'Test', value: 123, nested: { key: 'value' } };
+    await request('/test', { method: 'POST', body });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify(body),
+      }),
+    );
+  });
+
+  it('should serialize array body to JSON', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    const body = [{ id: 1 }, { id: 2 }];
+    await request('/test', { method: 'POST', body });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify(body),
+      }),
+    );
+  });
+});
+
+describe('API Client - Header Merging', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should merge custom headers with default headers', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await request('/test', {
+      headers: { 'X-Custom': 'custom-value' },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'X-Custom': 'custom-value',
+        }),
+      }),
+    );
+  });
+
+  it('should allow custom headers to override default headers', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await request('/test', {
+      headers: { 'Content-Type': 'text/plain' },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'text/plain',
+        }),
+      }),
+    );
+  });
+
+  it('should support authorization header', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await request('/test', {
+      headers: { 'Authorization': 'Bearer token123' },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Authorization': 'Bearer token123',
+        }),
+      }),
+    );
+  });
+});
+
+describe('API Client - Products API Edge Cases', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should handle product with special characters in ID', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: 'prod-123_test' }),
+    });
+
+    await products.get('prod-123_test');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/products/prod-123_test'),
+      expect.any(Object),
+    );
+  });
+
+  it('should handle search with special characters', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: [], meta: {} }),
+    });
+
+    await products.list({ search: 'flower & plant' });
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('search=flower');
+  });
+
+  it('should handle multiple color filters', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: [], meta: {} }),
+    });
+
+    await products.list({ color: 'blue,green' });
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('color=blue');
+  });
+
+  it('should handle create with minimal data', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '123' }),
+    });
+
+    await products.create({ title: 'Test' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+  });
+
+  it('should handle update with empty object', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '123' }),
+    });
+
+    await products.update('123', {});
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        method: 'PUT',
+        body: '{}',
+      }),
+    );
+  });
+});
+
+describe('API Client - Cart API Edge Cases', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should handle add with quantity of 1', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '1' }),
+    });
+
+    await cart.add({
+      productId: 'prod-1',
+      variantId: 'var-1',
+      quantity: 1,
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: expect.stringContaining('"quantity":1'),
+      }),
+    );
+  });
+
+  it('should handle add with large quantity', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '1' }),
+    });
+
+    await cart.add({
+      productId: 'prod-1',
+      variantId: 'var-1',
+      quantity: 100,
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: expect.stringContaining('"quantity":100'),
+      }),
+    );
+  });
+
+  it('should handle update with quantity only', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '1', quantity: 5 }),
+    });
+
+    await cart.update('item-1', { quantity: 5 });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: '{"quantity":5}',
+      }),
+    );
+  });
+
+  it('should handle update with frameId only', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '1', frameId: 'frame-oak' }),
+    });
+
+    await cart.update('item-1', { frameId: 'frame-oak' });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: '{"frameId":"frame-oak"}',
+      }),
+    );
+  });
+});
+
+describe('API Client - Orders API Edge Cases', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should handle get order by order number format', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '123', orderNumber: 'ORD-12345678' }),
+    });
+
+    await orders.get('ORD-12345678');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/orders/ORD-12345678'),
+      expect.any(Object),
+    );
+  });
+
+  it('should handle list with all parameters', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ data: [], meta: {} }),
+    });
+
+    await orders.list({ page: 2, limit: 25, status: 'processing' });
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toContain('page=2');
+    expect(url).toContain('limit=25');
+    expect(url).toContain('status=processing');
+  });
+
+  it('should handle create with all optional fields', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '123' }),
+    });
+
+    const orderData = {
+      shippingAddress: { fullName: 'John' },
+      billingAddress: { fullName: 'Jane' },
+      paymentMethod: 'razorpay',
+      notes: 'Gift wrap please',
+    };
+
+    await orders.create(orderData);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify(orderData),
+      }),
+    );
+  });
+
+  it('should handle update with tracking info', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: '123', status: 'shipped' }),
+    });
+
+    const updates = {
+      status: 'shipped',
+      trackingNumber: 'TRACK123456',
+      shippingCarrier: 'BlueDart',
+    };
+
+    await orders.update('123', updates);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify(updates),
+      }),
+    );
+  });
+});
+
+describe('API Client - Integration Style Tests', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should support typical product listing flow', async () => {
+    // First list products
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({
+        data: [{ id: 'prod-1', title: 'Test Product' }],
+        meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      }),
+    });
+
+    const list = await products.list({ page: 1, limit: 10 });
+    expect(list.data).toHaveLength(1);
+
+    // Then get single product
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: 'prod-1', title: 'Test Product', description: 'Full details' }),
+    });
+
+    const product = await products.get(list.data[0].id);
+    expect(product.id).toBe('prod-1');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('should support typical cart flow', async () => {
+    // Add item to cart
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: 'cart-item-1', productId: 'prod-1', quantity: 1 }),
+    });
+
+    const addedItem = await cart.add({
+      productId: 'prod-1',
+      variantId: 'var-1',
+      quantity: 1,
+    });
+    expect(addedItem.id).toBe('cart-item-1');
+
+    // Update quantity
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: 'cart-item-1', quantity: 3 }),
+    });
+
+    const updatedItem = await cart.update(addedItem.id, { quantity: 3 });
+    expect(updatedItem.quantity).toBe(3);
+
+    // Get cart
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => [{ id: 'cart-item-1', productId: 'prod-1', quantity: 3 }],
+    });
+
+    const cartItems = await cart.get();
+    expect(cartItems).toHaveLength(1);
+    expect(cartItems[0].quantity).toBe(3);
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('should support typical order flow', async () => {
+    // Create order
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: 'order-1', orderNumber: 'ORD-12345678', status: 'pending' }),
+    });
+
+    const order = await orders.create({
+      shippingAddress: { fullName: 'John Doe' },
+      paymentMethod: 'razorpay',
+    });
+    expect(order.status).toBe('pending');
+
+    // Get order details
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ id: 'order-1', orderNumber: 'ORD-12345678', status: 'pending', items: [] }),
+    });
+
+    const orderDetails = await orders.get(order.id);
+    expect(orderDetails.orderNumber).toBe('ORD-12345678');
+
+    // List orders
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({
+        data: [{ id: 'order-1', orderNumber: 'ORD-12345678' }],
+        meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      }),
+    });
+
+    const ordersList = await orders.list();
+    expect(ordersList.data).toHaveLength(1);
+
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('API Client - Timeout Configuration', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should use default timeout from config', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    await request('/test');
+
+    // The timeout should be applied via AbortController
+    expect(API_CONFIG.timeout).toBe(30000);
+  });
+
+  it('should allow custom timeout in request options', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({}),
+    });
+
+    // This should not throw even with short timeout if request completes quickly
+    await request('/test', { timeout: 5000 });
+
+    expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('API Client - JSON Parsing', () => {
+  beforeEach(() => {
+    mockFetch.mockClear();
+  });
+
+  it('should handle JSON with nested objects', async () => {
+    const nestedData = {
+      user: {
+        profile: {
+          address: {
+            city: 'Mumbai',
+          },
+        },
+      },
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => nestedData,
+    });
+
+    const result = await request('/test');
+    expect(result.user.profile.address.city).toBe('Mumbai');
+  });
+
+  it('should handle JSON arrays', async () => {
+    const arrayData = [1, 2, 3, 4, 5];
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => arrayData,
+    });
+
+    const result = await request('/test');
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(5);
+  });
+
+  it('should handle JSON with special characters in values', async () => {
+    const specialData = {
+      message: 'Hello "World" & <Goodbye>',
+      emoji: '🎨',
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => specialData,
+    });
+
+    const result = await request('/test');
+    expect(result.message).toBe('Hello "World" & <Goodbye>');
+    expect(result.emoji).toBe('🎨');
   });
 });
