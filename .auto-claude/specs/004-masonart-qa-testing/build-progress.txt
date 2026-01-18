@@ -467,3 +467,60 @@ Auth middleware runs before route handlers, so unauthenticated requests to prote
 ```bash
 cd packages/api && bun run test tests/lib/ tests/routes/products.test.ts tests/routes/cart.test.ts tests/routes/orders.test.ts tests/routes/health.test.ts --run
 ```
+
+---
+
+## Subtask 7.6 - Execute Frontend Core Tests and Fix Any Failures
+**Status:** COMPLETED
+**Date:** 2026-01-19
+
+### Summary
+Executed all frontend core tests (packages/web/tests/**/*.test.ts) and verified E2E test configuration (tests/e2e/layout.spec.ts). All 506 vitest tests pass. E2E tests are properly configured but require a running development server.
+
+### Test Files Executed
+
+| File | Tests | Status |
+|------|-------|--------|
+| tests/build.test.ts | 122 | ✅ All passed |
+| tests/styles.test.ts | 209 | ✅ All passed |
+| tests/lib/api.test.ts | 125 | ✅ All passed |
+| tests/stores/cart.test.ts | 50 | ✅ All passed |
+
+**Total: 506 tests passed**
+
+### E2E Tests (tests/e2e/layout.spec.ts)
+- **62 test cases** covering Header, Footer, Navigation, Responsive Design, Accessibility, Performance, Cart Integration, SEO, and Error States
+- **5 browser projects**: Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5), Mobile Safari (iPhone 12)
+- **310 total test configurations** (62 tests × 5 browsers)
+- Tests are properly structured and can be listed via `bun run playwright test tests/e2e/layout.spec.ts --list`
+- E2E tests require a running development server (`bun run dev`) which is configured in playwright.config.ts
+
+### Important Note
+When running `bun test` directly in packages/web, test isolation issues occur due to `vi.mock` in cart.test.ts affecting api.test.ts. Always use `bun run test` (which runs `vitest run`) for proper test isolation.
+
+### Verification Results
+```
+$ vitest run
+
+ ✓ tests/styles.test.ts (209 tests) 28ms
+ ✓ tests/stores/cart.test.ts (50 tests) 16ms
+ ✓ tests/lib/api.test.ts (125 tests) 33ms
+ ✓ tests/build.test.ts (122 tests) 1727ms
+
+ Test Files  4 passed (4)
+      Tests  506 passed (506)
+   Start at  00:08:32
+   Duration  3.53s
+```
+
+### Run Commands
+```bash
+# Run all frontend vitest tests
+cd packages/web && bun run test
+
+# List E2E tests (requires Playwright)
+bun run playwright test tests/e2e/layout.spec.ts --list
+
+# Run E2E tests (requires dev server running at localhost:3001)
+bun run playwright test tests/e2e/layout.spec.ts
+```
