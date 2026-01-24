@@ -58,9 +58,14 @@ test.describe('Cart Page - Header', () => {
 
 test.describe('Cart Page - Empty Cart State', () => {
   test.beforeEach(async ({ page }) => {
+    // Navigate first, then clear cart data and reload
+    await page.goto('/cart');
     // Clear any existing cart data
     await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
-    await page.goto('/cart');
+    // Reload to show empty cart state
+    await page.reload();
+    // Wait for hydration to complete by checking for the h1 title
+    await expect(page.locator('h1:has-text("Shopping Cart")')).toBeVisible();
   });
 
   test('should display empty cart message', async ({ page }) => {
@@ -85,7 +90,9 @@ test.describe('Cart Page - Empty Cart State', () => {
   });
 
   test('should display Create with AI button', async ({ page }) => {
-    const createButton = page.locator('a[href="/create"]:has-text("Create with AI")');
+    // Scope to main content to avoid matching footer link
+    const mainContent = page.locator('main, [role="main"]').first();
+    const createButton = mainContent.locator('a[href="/create"]:has-text("Create with AI")');
     await expect(createButton).toBeVisible();
   });
 
@@ -96,7 +103,9 @@ test.describe('Cart Page - Empty Cart State', () => {
   });
 
   test('should navigate to create page when clicking Create with AI', async ({ page }) => {
-    const createButton = page.locator('a[href="/create"]:has-text("Create with AI")');
+    // Scope to main content to avoid matching footer link
+    const mainContent = page.locator('main, [role="main"]').first();
+    const createButton = mainContent.locator('a[href="/create"]:has-text("Create with AI")');
     await createButton.click();
     await expect(page).toHaveURL('/create');
   });
@@ -449,9 +458,11 @@ test.describe('Cart Page - Free Shipping Progress', () => {
       quantity: 1,
     });
     await page.reload();
+    // Wait for hydration
+    await expect(page.locator('h1:has-text("Shopping Cart")')).toBeVisible();
 
-    // Should show ₹99 shipping fee
-    const shippingFee = page.locator('text=₹99');
+    // Should show ₹99.00 shipping fee - use exact text to avoid matching ₹999
+    const shippingFee = page.locator('text="₹99.00"');
     await expect(shippingFee).toBeVisible();
   });
 
@@ -460,15 +471,17 @@ test.describe('Cart Page - Free Shipping Progress', () => {
     await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_free_shipping',
-      productTitle: 'Free Shipping Test Poster',
+      productTitle: 'Shipping Test Poster Over', // Avoid "Free" in product name
       unitPrice: 1500, // Over ₹999 threshold
       quantity: 1,
     });
     await page.reload();
+    // Wait for hydration
+    await expect(page.locator('h1:has-text("Shopping Cart")')).toBeVisible();
 
-    // Should show FREE text
-    const freeShipping = page.locator('text=FREE');
-    await expect(freeShipping).toBeVisible();
+    // Should show FREE text in the shipping row - use exact match
+    const shippingRow = page.locator('span.text-green-600:has-text("FREE")');
+    await expect(shippingRow).toBeVisible();
   });
 
   test('should not show progress bar when over threshold', async ({ page }) => {
@@ -640,7 +653,8 @@ test.describe('Cart Page - Item with Frame', () => {
 
   test('should include frame price in total', async ({ page }) => {
     // Item price should be unitPrice + framePrice = 2499 + 999 = 3498
-    const price = page.locator('text=/₹3,?498/');
+    // Use first() since price appears in item, subtotal, and total
+    const price = page.locator('text=/₹3,?498/').first();
     await expect(price).toBeVisible();
   });
 });
@@ -846,6 +860,8 @@ test.describe('Cart Page - Accessibility', () => {
       quantity: 2,
     });
     await page.reload();
+    // Wait for hydration to complete
+    await expect(page.locator('h1:has-text("Shopping Cart")')).toBeVisible();
   });
 
   test('should have proper heading hierarchy', async ({ page }) => {
@@ -976,7 +992,8 @@ test.describe('Cart Page - Performance', () => {
 test.describe('Cart Page - Navigation', () => {
   test('should navigate to cart from header', async ({ page }) => {
     await page.goto('/');
-    const cartIcon = page.locator('[data-testid="cart-icon"], a[href="/cart"]');
+    // Use first() to handle multiple cart icons (desktop/mobile)
+    const cartIcon = page.locator('[data-testid="cart-icon"], a[href="/cart"]').first();
     if (await cartIcon.isVisible()) {
       await cartIcon.click();
       await expect(page).toHaveURL('/cart');
@@ -1012,8 +1029,10 @@ test.describe('Cart Page - Error Handling', () => {
   });
 
   test('should handle empty localStorage gracefully', async ({ page }) => {
-    await page.evaluate(() => localStorage.clear());
+    // Navigate first, then clear localStorage
     await page.goto('/cart');
+    await page.evaluate(() => localStorage.clear());
+    await page.reload();
 
     // Should show empty cart state
     const emptyMessage = page.locator('h2:has-text("Your cart is empty")');

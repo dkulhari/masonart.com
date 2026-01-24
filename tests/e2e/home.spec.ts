@@ -60,8 +60,9 @@ test.describe('Home Page - Hero Section', () => {
   });
 
   test('should display Create with AI CTA button', async ({ page }) => {
-    // Secondary CTA button
-    const createButton = page.locator('a[href="/create"]:has-text("Create with AI")');
+    // Secondary CTA button in hero section
+    const heroSection = page.locator('section').first();
+    const createButton = heroSection.locator('a[href="/create"]:has-text("Create with AI")');
     await expect(createButton).toBeVisible();
   });
 
@@ -83,8 +84,9 @@ test.describe('Home Page - Hero Section', () => {
   });
 
   test('should display 30-day returns trust indicator', async ({ page }) => {
-    // Returns policy indicator
-    const returns = page.locator('text=30-day returns');
+    // Returns policy indicator - use first() to target hero section indicator
+    const heroSection = page.locator('section').first();
+    const returns = heroSection.locator('text=30-day returns');
     await expect(returns).toBeVisible();
   });
 
@@ -95,7 +97,9 @@ test.describe('Home Page - Hero Section', () => {
   });
 
   test('should navigate to create page when clicking Create with AI', async ({ page }) => {
-    const createButton = page.locator('a[href="/create"]:has-text("Create with AI")');
+    // Target hero section button specifically to avoid matching footer link
+    const heroSection = page.locator('section').first();
+    const createButton = heroSection.locator('a[href="/create"]:has-text("Create with AI")');
     await createButton.click();
     await expect(page).toHaveURL('/create');
   });
@@ -493,12 +497,16 @@ test.describe('Home Page - Newsletter Section', () => {
   });
 
   test('should display email input field', async ({ page }) => {
-    const emailInput = page.locator('input[type="email"][placeholder="Enter your email"]');
+    // Scope to newsletter section to avoid matching footer email input
+    const newsletterSection = page.locator('section:has(h2:has-text("Stay Inspired"))');
+    const emailInput = newsletterSection.locator('input[type="email"]');
     await expect(emailInput).toBeVisible();
   });
 
   test('should display Subscribe button', async ({ page }) => {
-    const subscribeButton = page.locator('button[type="submit"]:has-text("Subscribe")');
+    // Scope to newsletter section
+    const newsletterSection = page.locator('section:has(h2:has-text("Stay Inspired"))');
+    const subscribeButton = newsletterSection.locator('button[type="submit"]:has-text("Subscribe")');
     await expect(subscribeButton).toBeVisible();
   });
 
@@ -508,13 +516,17 @@ test.describe('Home Page - Newsletter Section', () => {
   });
 
   test('should accept email input', async ({ page }) => {
-    const emailInput = page.locator('input[type="email"][placeholder="Enter your email"]');
+    // Scope to newsletter section to avoid matching footer email input
+    const newsletterSection = page.locator('section:has(h2:has-text("Stay Inspired"))');
+    const emailInput = newsletterSection.locator('input[type="email"]');
     await emailInput.fill('test@example.com');
     await expect(emailInput).toHaveValue('test@example.com');
   });
 
   test('should require email field', async ({ page }) => {
-    const emailInput = page.locator('input[type="email"][placeholder="Enter your email"]');
+    // Scope to newsletter section
+    const newsletterSection = page.locator('section:has(h2:has-text("Stay Inspired"))');
+    const emailInput = newsletterSection.locator('input[type="email"]');
     const required = await emailInput.getAttribute('required');
     expect(required).not.toBeNull();
   });
@@ -581,8 +593,10 @@ test.describe('Home Page - Responsive Design', () => {
     await page.goto('/');
 
     // CTA buttons should be stacked on mobile (flex-col)
-    const shopButton = page.locator('a[href="/posters"]:has-text("Shop Posters")');
-    const createButton = page.locator('a[href="/create"]:has-text("Create with AI")');
+    // Scope to hero section to avoid matching footer links
+    const heroSection = page.locator('section').first();
+    const shopButton = heroSection.locator('a[href="/posters"]:has-text("Shop Posters")');
+    const createButton = heroSection.locator('a[href="/create"]:has-text("Create with AI")');
 
     await expect(shopButton).toBeVisible();
     await expect(createButton).toBeVisible();
@@ -614,8 +628,10 @@ test.describe('Home Page - Responsive Design', () => {
     await page.goto('/');
 
     // Newsletter form should stack on mobile (flex-col)
-    const emailInput = page.locator('input[type="email"][placeholder="Enter your email"]');
-    const subscribeButton = page.locator('button[type="submit"]:has-text("Subscribe")');
+    // Scope to newsletter section to avoid matching footer email input
+    const newsletterSection = page.locator('section:has(h2:has-text("Stay Inspired"))');
+    const emailInput = newsletterSection.locator('input[type="email"]');
+    const subscribeButton = newsletterSection.locator('button[type="submit"]:has-text("Subscribe")');
 
     await expect(emailInput).toBeVisible();
     await expect(subscribeButton).toBeVisible();
@@ -675,8 +691,10 @@ test.describe('Home Page - Accessibility', () => {
 
   test('should have accessible links with descriptive text', async ({ page }) => {
     // CTAs should have descriptive text
-    const shopButton = page.locator('a[href="/posters"]:has-text("Shop Posters")');
-    const createButton = page.locator('a[href="/create"]:has-text("Create with AI")');
+    // Scope to hero section to avoid matching footer links
+    const heroSection = page.locator('section').first();
+    const shopButton = heroSection.locator('a[href="/posters"]:has-text("Shop Posters")');
+    const createButton = heroSection.locator('a[href="/create"]:has-text("Create with AI")');
 
     await expect(shopButton).toBeVisible();
     await expect(createButton).toBeVisible();
@@ -689,7 +707,9 @@ test.describe('Home Page - Accessibility', () => {
 
   test('should have accessible form elements', async ({ page }) => {
     // Newsletter email input should be accessible
-    const emailInput = page.locator('input[type="email"]');
+    // Scope to newsletter section to avoid matching footer email input
+    const newsletterSection = page.locator('section:has(h2:has-text("Stay Inspired"))');
+    const emailInput = newsletterSection.locator('input[type="email"]');
     await expect(emailInput).toBeVisible();
 
     // Input should have placeholder for guidance
@@ -862,14 +882,17 @@ test.describe('Home Page - Content', () => {
   });
 
   test('should display all trust indicators', async ({ page }) => {
+    // Scope to hero section to avoid matching duplicate elements elsewhere
+    const heroSection = page.locator('section').first();
+
     // Rating
-    await expect(page.locator('text=2,000+ reviews')).toBeVisible();
+    await expect(heroSection.locator('text=2,000+ reviews')).toBeVisible();
 
     // Free shipping
-    await expect(page.locator('text=/Free shipping.*999/')).toBeVisible();
+    await expect(heroSection.locator('text=/Free shipping.*999/')).toBeVisible();
 
     // Returns policy
-    await expect(page.locator('text=30-day returns')).toBeVisible();
+    await expect(heroSection.locator('text=30-day returns')).toBeVisible();
   });
 
   test('should display Indian Rupee currency', async ({ page }) => {
