@@ -20,8 +20,8 @@ import {
   Check,
 } from 'lucide-react'
 import { z } from 'zod'
-import { cn, isValidEmail } from '~/lib/utils'
-import { authApi } from '~/lib/api'
+import { cn, isValidEmail, getApiUrl } from '~/lib/utils'
+import { signUp } from '~/lib/auth-client'
 
 // ============================================================================
 // Route Definition
@@ -185,11 +185,16 @@ function RegisterPage() {
     setErrors({})
 
     try {
-      await authApi.signUp({
+      const result = await signUp.email({
         name: formData.name,
         email: formData.email,
         password: formData.password,
       })
+
+      if (result.error) {
+        setErrors({ general: result.error.message || 'Registration failed' })
+        return
+      }
 
       // Redirect to login with success message
       navigate({
@@ -211,7 +216,8 @@ function RegisterPage() {
   const handleGoogleSignIn = () => {
     setIsGoogleLoading(true)
     // Redirect to Google OAuth - Better Auth handles the flow
-    const googleUrl = authApi.getGoogleSignInUrl()
+    const apiUrl = getApiUrl()
+    const googleUrl = `${apiUrl}/api/auth/sign-in/social?provider=google`
     // Add redirect URL as state parameter
     window.location.href = `${googleUrl}&redirectTo=${encodeURIComponent(redirectUrl)}`
   }

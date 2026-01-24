@@ -3,18 +3,64 @@ import {
   HeadContent,
   Outlet,
   Scripts,
-  createRootRoute,
+  createRootRouteWithContext,
 } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
+import { getRequest } from '@tanstack/react-start/server'
 import type * as React from 'react'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
 import globalsCss from '~/styles/globals.css?url'
+import type { Session } from '~/lib/auth-client'
+
+/**
+ * Router context interface containing authenticated user session
+ */
+interface RouterContext {
+  session: Session | null
+}
+
+/**
+ * Server function to fetch the user session
+ * This runs on the server where we have access to cookies
+ */
+const fetchSession = createServerFn({ method: 'GET' }).handler(async () => {
+  try {
+    const request = getRequest()
+    if (!request) {
+      return null
+    }
+
+    // Make server-side request to the auth API with cookies
+    const apiUrl = process.env.VITE_API_URL || 'http://localhost:3000'
+    const response = await fetch(`${apiUrl}/api/auth/get-session`, {
+      headers: {
+        cookie: request.headers.get('cookie') || '',
+      },
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const session = await response.json()
+    return session as Session
+  } catch (error) {
+    console.error('Failed to fetch session:', error)
+    return null
+  }
+})
 
 /**
  * Root route configuration for the MasonArt e-commerce application.
  * Sets up global SEO metadata, stylesheets, and the main layout structure.
+ * Fetches user session server-side for SSR optimization.
  */
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<RouterContext>()({
+  beforeLoad: async () => {
+    const session = await fetchSession()
+    return { session }
+  },
   head: () => ({
     meta: [
       {
@@ -132,49 +178,47 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 /**
  * 404 Not Found component.
  * Displayed when a route is not found.
+ * Note: This renders inside the root component's Outlet, so we don't wrap in RootDocument.
  */
 function NotFoundComponent() {
   return (
-    <RootDocument>
-      <div className="container-wide flex flex-col items-center justify-center py-20">
-        <h1 className="text-4xl font-bold text-foreground">404</h1>
-        <p className="mt-4 text-lg text-muted-foreground">Page not found</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you&apos;re looking for doesn&apos;t exist or has been moved.
-        </p>
-        <a
-          href="/"
-          className="mt-8 inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Go Home
-        </a>
-      </div>
-    </RootDocument>
+    <div className="container-wide flex flex-col items-center justify-center py-20">
+      <h1 className="text-4xl font-bold text-foreground">404</h1>
+      <p className="mt-4 text-lg text-muted-foreground">Page not found</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        The page you&apos;re looking for doesn&apos;t exist or has been moved.
+      </p>
+      <a
+        href="/"
+        className="mt-8 inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        Go Home
+      </a>
+    </div>
   )
 }
 
 /**
  * Error boundary component.
  * Displayed when an error occurs during rendering.
+ * Note: This renders inside the root component's Outlet, so we don't wrap in RootDocument.
  */
 function ErrorComponent({ error }: { error: Error }) {
   return (
-    <RootDocument>
-      <div className="container-wide flex flex-col items-center justify-center py-20">
-        <h1 className="text-4xl font-bold text-destructive">Error</h1>
-        <p className="mt-4 text-lg text-muted-foreground">
-          Something went wrong
-        </p>
-        <pre className="mt-4 max-w-lg overflow-auto rounded-md bg-muted p-4 text-sm">
-          {error.message}
-        </pre>
-        <a
-          href="/"
-          className="mt-8 inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Go Home
-        </a>
-      </div>
-    </RootDocument>
+    <div className="container-wide flex flex-col items-center justify-center py-20">
+      <h1 className="text-4xl font-bold text-destructive">Error</h1>
+      <p className="mt-4 text-lg text-muted-foreground">
+        Something went wrong
+      </p>
+      <pre className="mt-4 max-w-lg overflow-auto rounded-md bg-muted p-4 text-sm">
+        {error.message}
+      </pre>
+      <a
+        href="/"
+        className="mt-8 inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        Go Home
+      </a>
+    </div>
   )
 }

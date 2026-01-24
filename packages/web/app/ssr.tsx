@@ -4,15 +4,16 @@
  * Server-side rendering entry point for TanStack Start.
  * Creates the start handler with the default stream handler.
  *
- * @see https://tanstack.com/router/latest/docs/framework/react/start/getting-started
+ * @see https://tanstack.com/start/latest/docs/framework/react/guide/server-entry-point
  */
 
-import {
-  createStartHandler,
-  defaultStreamHandler,
-} from '@tanstack/react-start/server'
+import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
 
 /**
  * Create the SSR handler
  */
-export default createStartHandler(defaultStreamHandler)
+export default createServerEntry({
+  fetch(request) {
+    return handler.fetch(request)
+  },
+})

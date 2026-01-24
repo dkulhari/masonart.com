@@ -15,19 +15,19 @@ import {
   LogOut,
   ArrowRight,
   ChevronRight,
-  Loader2,
   Sparkles,
   MapPin,
 } from 'lucide-react'
 import { cn, formatDate, getInitials } from '~/lib/utils'
-import { authApi, ordersApi } from '~/lib/api'
+import { ordersApi } from '~/lib/api'
+import { signOut } from '~/lib/auth-client'
 import { OrderList, type Order } from '~/components/account/OrderList'
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/account/')({
+export const Route = createFileRoute('/_authed/account/')({
   head: () => ({
     meta: [
       { title: 'My Account | MasonArt' },
@@ -45,12 +45,13 @@ export const Route = createFileRoute('/account/')({
 // Types
 // ============================================================================
 
+// User profile type matching the session user from Better Auth
 interface UserProfile {
   id: string
   name: string
   email: string
-  image?: string
-  createdAt: string
+  image?: string | null
+  createdAt: Date
 }
 
 // ============================================================================
@@ -107,44 +108,15 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 function AccountDashboardPage() {
   const navigate = useNavigate()
-  const [user, setUser] = useState<UserProfile | null>(null)
+  // Get user from route context (set by _authed layout's beforeLoad)
+  const { user } = Route.useRouteContext()
   const [orders, setOrders] = useState<Order[]>([])
-  const [isLoadingUser, setIsLoadingUser] = useState(true)
   const [isLoadingOrders, setIsLoadingOrders] = useState(true)
   const [ordersError, setOrdersError] = useState<string | null>(null)
-
-  // Fetch user session
-  useEffect(() => {
-    async function fetchSession() {
-      try {
-        const session = await authApi.getSession()
-        if (!session?.user) {
-          // Redirect to login if not authenticated
-          navigate({
-            to: '/auth/login',
-            search: { redirect: '/account' },
-          })
-          return
-        }
-        setUser(session.user)
-      } catch {
-        navigate({
-          to: '/auth/login',
-          search: { redirect: '/account' },
-        })
-      } finally {
-        setIsLoadingUser(false)
-      }
-    }
-
-    fetchSession()
-  }, [navigate])
 
   // Fetch recent orders
   useEffect(() => {
     async function fetchOrders() {
-      if (!user) return
-
       try {
         const response = await ordersApi.list({ page: 1, pageSize: 3 })
         setOrders(response.items || [])
@@ -155,37 +127,18 @@ function AccountDashboardPage() {
       }
     }
 
-    if (user) {
-      fetchOrders()
-    }
-  }, [user])
+    fetchOrders()
+  }, [])
 
-  // Handle sign out
+  // Handle sign out using Better Auth client
   const handleSignOut = async () => {
     try {
-      await authApi.signOut()
+      await signOut()
       navigate({ to: '/' })
     } catch {
       // Still navigate away on error
       navigate({ to: '/' })
     }
-  }
-
-  // Loading state
-  if (isLoadingUser) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-brand-500 mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading your account...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // User not loaded (shouldn't happen if redirect works)
-  if (!user) {
-    return null
   }
 
   return (

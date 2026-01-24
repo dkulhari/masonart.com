@@ -10,28 +10,34 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PostersIndexRouteImport } from './routes/posters/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout/index'
 import { Route as CartIndexRouteImport } from './routes/cart/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as AccountIndexRouteImport } from './routes/account/index'
+import { Route as PostersSlugRouteImport } from './routes/posters/$slug'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout/success'
 import { Route as AuthRegisterRouteImport } from './routes/auth/register'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
-import { Route as AccountOrdersRouteImport } from './routes/account/orders'
-import { Route as AccountAiCreationsRouteImport } from './routes/account/ai-creations'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
+import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
 import { Route as PostersCategorySlugRouteImport } from './routes/posters/$category.$slug'
 import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
 import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
+import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
+import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
 
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedRoute = AuthedRouteImport.update({
+  id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -64,9 +70,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const AccountIndexRoute = AccountIndexRouteImport.update({
-  id: '/account/',
-  path: '/account/',
+const PostersSlugRoute = PostersSlugRouteImport.update({
+  id: '/posters/$slug',
+  path: '/posters/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
@@ -84,16 +90,6 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
   path: '/auth/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AccountOrdersRoute = AccountOrdersRouteImport.update({
-  id: '/account/orders',
-  path: '/account/orders',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountAiCreationsRoute = AccountAiCreationsRouteImport.update({
-  id: '/account/ai-creations',
-  path: '/account/ai-creations',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminProductsIndexRoute = AdminProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -103,6 +99,11 @@ const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
   id: '/orders/',
   path: '/orders/',
   getParentRoute: () => AdminRoute,
+} as any)
+const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
+  id: '/account/',
+  path: '/account/',
+  getParentRoute: () => AuthedRoute,
 } as any)
 const PostersCategorySlugRoute = PostersCategorySlugRouteImport.update({
   id: '/posters/$category/$slug',
@@ -124,67 +125,82 @@ const AdminOrdersIdRoute = AdminOrdersIdRouteImport.update({
   path: '/orders/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AuthedAccountOrdersRoute = AuthedAccountOrdersRouteImport.update({
+  id: '/account/orders',
+  path: '/account/orders',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAccountAiCreationsRoute =
+  AuthedAccountAiCreationsRouteImport.update({
+    id: '/account/ai-creations',
+    path: '/account/ai-creations',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/account/ai-creations': typeof AccountAiCreationsRoute
-  '/account/orders': typeof AccountOrdersRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
-  '/account': typeof AccountIndexRoute
+  '/posters/$slug': typeof PostersSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/cart': typeof CartIndexRoute
   '/checkout': typeof CheckoutIndexRoute
   '/create': typeof CreateIndexRoute
   '/posters': typeof PostersIndexRoute
+  '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
+  '/account/orders': typeof AuthedAccountOrdersRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/posters/$category/$slug': typeof PostersCategorySlugRoute
+  '/account': typeof AuthedAccountIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/account/ai-creations': typeof AccountAiCreationsRoute
-  '/account/orders': typeof AccountOrdersRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
-  '/account': typeof AccountIndexRoute
+  '/posters/$slug': typeof PostersSlugRoute
   '/admin': typeof AdminIndexRoute
   '/cart': typeof CartIndexRoute
   '/checkout': typeof CheckoutIndexRoute
   '/create': typeof CreateIndexRoute
   '/posters': typeof PostersIndexRoute
+  '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
+  '/account/orders': typeof AuthedAccountOrdersRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/posters/$category/$slug': typeof PostersCategorySlugRoute
+  '/account': typeof AuthedAccountIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authed': typeof AuthedRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
-  '/account/ai-creations': typeof AccountAiCreationsRoute
-  '/account/orders': typeof AccountOrdersRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
-  '/account/': typeof AccountIndexRoute
+  '/posters/$slug': typeof PostersSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/cart/': typeof CartIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/create/': typeof CreateIndexRoute
   '/posters/': typeof PostersIndexRoute
+  '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
+  '/_authed/account/orders': typeof AuthedAccountOrdersRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/posters/$category/$slug': typeof PostersCategorySlugRoute
+  '/_authed/account/': typeof AuthedAccountIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
 }
@@ -193,75 +209,78 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/account/ai-creations'
-    | '/account/orders'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
-    | '/account'
+    | '/posters/$slug'
     | '/admin/'
     | '/cart'
     | '/checkout'
     | '/create'
     | '/posters'
+    | '/account/ai-creations'
+    | '/account/orders'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/posters/$category/$slug'
+    | '/account'
     | '/admin/orders'
     | '/admin/products'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/account/ai-creations'
-    | '/account/orders'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
-    | '/account'
+    | '/posters/$slug'
     | '/admin'
     | '/cart'
     | '/checkout'
     | '/create'
     | '/posters'
+    | '/account/ai-creations'
+    | '/account/orders'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/posters/$category/$slug'
+    | '/account'
     | '/admin/orders'
     | '/admin/products'
   id:
     | '__root__'
     | '/'
+    | '/_authed'
     | '/admin'
-    | '/account/ai-creations'
-    | '/account/orders'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
-    | '/account/'
+    | '/posters/$slug'
     | '/admin/'
     | '/cart/'
     | '/checkout/'
     | '/create/'
     | '/posters/'
+    | '/_authed/account/ai-creations'
+    | '/_authed/account/orders'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/posters/$category/$slug'
+    | '/_authed/account/'
     | '/admin/orders/'
     | '/admin/products/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthedRoute: typeof AuthedRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
-  AccountAiCreationsRoute: typeof AccountAiCreationsRoute
-  AccountOrdersRoute: typeof AccountOrdersRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRegisterRoute: typeof AuthRegisterRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
-  AccountIndexRoute: typeof AccountIndexRoute
+  PostersSlugRoute: typeof PostersSlugRoute
   CartIndexRoute: typeof CartIndexRoute
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
@@ -276,6 +295,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed': {
+      id: '/_authed'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -320,11 +346,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/account/': {
-      id: '/account/'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AccountIndexRouteImport
+    '/posters/$slug': {
+      id: '/posters/$slug'
+      path: '/posters/$slug'
+      fullPath: '/posters/$slug'
+      preLoaderRoute: typeof PostersSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout/success': {
@@ -348,20 +374,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/account/orders': {
-      id: '/account/orders'
-      path: '/account/orders'
-      fullPath: '/account/orders'
-      preLoaderRoute: typeof AccountOrdersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account/ai-creations': {
-      id: '/account/ai-creations'
-      path: '/account/ai-creations'
-      fullPath: '/account/ai-creations'
-      preLoaderRoute: typeof AccountAiCreationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/products/': {
       id: '/admin/products/'
       path: '/products'
@@ -375,6 +387,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/orders'
       preLoaderRoute: typeof AdminOrdersIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/_authed/account/': {
+      id: '/_authed/account/'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AuthedAccountIndexRouteImport
+      parentRoute: typeof AuthedRoute
     }
     '/posters/$category/$slug': {
       id: '/posters/$category/$slug'
@@ -404,8 +423,37 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/_authed/account/orders': {
+      id: '/_authed/account/orders'
+      path: '/account/orders'
+      fullPath: '/account/orders'
+      preLoaderRoute: typeof AuthedAccountOrdersRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/account/ai-creations': {
+      id: '/_authed/account/ai-creations'
+      path: '/account/ai-creations'
+      fullPath: '/account/ai-creations'
+      preLoaderRoute: typeof AuthedAccountAiCreationsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
+
+interface AuthedRouteChildren {
+  AuthedAccountAiCreationsRoute: typeof AuthedAccountAiCreationsRoute
+  AuthedAccountOrdersRoute: typeof AuthedAccountOrdersRoute
+  AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
+}
+
+const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedAccountAiCreationsRoute: AuthedAccountAiCreationsRoute,
+  AuthedAccountOrdersRoute: AuthedAccountOrdersRoute,
+  AuthedAccountIndexRoute: AuthedAccountIndexRoute,
+}
+
+const AuthedRouteWithChildren =
+  AuthedRoute._addFileChildren(AuthedRouteChildren)
 
 interface AdminRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
@@ -429,13 +477,12 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthedRoute: AuthedRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
-  AccountAiCreationsRoute: AccountAiCreationsRoute,
-  AccountOrdersRoute: AccountOrdersRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRegisterRoute: AuthRegisterRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
-  AccountIndexRoute: AccountIndexRoute,
+  PostersSlugRoute: PostersSlugRoute,
   CartIndexRoute: CartIndexRoute,
   CheckoutIndexRoute: CheckoutIndexRoute,
   CreateIndexRoute: CreateIndexRoute,

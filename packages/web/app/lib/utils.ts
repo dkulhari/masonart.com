@@ -211,15 +211,25 @@ export function getAbsoluteUrl(path: string = ""): string {
 
 /**
  * Get API URL for making requests
+ *
+ * In development:
+ * - Server-side: Returns the full API URL (http://localhost:3000)
+ * - Client-side: Returns the full API URL for cross-origin requests
+ *
+ * In production, both should use the same domain or configured API URL.
  */
 export function getApiUrl(): string {
+  // Default API URL for development
+  const defaultApiUrl = "http://localhost:3000";
+
   // In browser, check for environment variable
   if (isClient() && typeof import.meta !== "undefined") {
-    return (import.meta as { env?: { VITE_API_URL?: string } }).env
-      ?.VITE_API_URL || "http://localhost:3000";
+    const envUrl = (import.meta as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL;
+    return envUrl || defaultApiUrl;
   }
-  // On server
-  return process.env.VITE_API_URL || "http://localhost:3000";
+
+  // On server, use environment variable or default
+  return process.env.VITE_API_URL || defaultApiUrl;
 }
 
 /**

@@ -18,8 +18,8 @@ import {
   Loader2,
 } from 'lucide-react'
 import { z } from 'zod'
-import { cn, isValidEmail } from '~/lib/utils'
-import { authApi } from '~/lib/api'
+import { cn, isValidEmail, getApiUrl } from '~/lib/utils'
+import { signIn } from '~/lib/auth-client'
 
 // ============================================================================
 // Route Definition
@@ -145,7 +145,15 @@ function LoginPage() {
     setErrors({})
 
     try {
-      await authApi.signIn(formData.email, formData.password)
+      const result = await signIn.email({
+        email: formData.email,
+        password: formData.password,
+      })
+
+      if (result.error) {
+        setErrors({ general: result.error.message || 'Sign in failed' })
+        return
+      }
 
       // Redirect to intended destination
       navigate({ to: redirectUrl })
@@ -161,7 +169,8 @@ function LoginPage() {
   const handleGoogleSignIn = () => {
     setIsGoogleLoading(true)
     // Redirect to Google OAuth - Better Auth handles the flow
-    const googleUrl = authApi.getGoogleSignInUrl()
+    const apiUrl = getApiUrl()
+    const googleUrl = `${apiUrl}/api/auth/sign-in/social?provider=google`
     // Add redirect URL as state parameter (Better Auth will handle this)
     window.location.href = `${googleUrl}&redirectTo=${encodeURIComponent(redirectUrl)}`
   }

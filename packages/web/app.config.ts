@@ -16,6 +16,6 @@ export type { } from '@tanstack/react-start'
 export const appConfig = {
   name: 'MasonArt',
   description: 'Premium Poster & Frame E-Commerce Platform',
-  apiUrl: process.env.VITE_API_URL ?? 'http://localhost:3000',
+  apiUrl: process.env.VITE_API_URL ?? '', // Empty uses same-origin via vite proxy
   cdnUrl: process.env.VITE_CDN_URL ?? 'http://localhost:9000/poster-app-dev',
 } as const

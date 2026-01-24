@@ -33,7 +33,7 @@ const searchParamsSchema = z.object({
   style: z.string().optional(),
 })
 
-export const Route = createFileRoute('/account/ai-creations')({
+export const Route = createFileRoute('/_authed/account/ai-creations')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
@@ -102,7 +102,7 @@ const PAGE_SIZE = 12
 
 function AICreationsHistoryPage() {
   const navigate = useNavigate()
-  const search = useSearch({ from: '/account/ai-creations' })
+  const search = useSearch({ from: '/_authed/account/ai-creations' })
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [creations, setCreations] = useState<AICreation[]>([])
