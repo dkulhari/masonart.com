@@ -36,14 +36,14 @@ interface ProductApiResponse {
   }>
   variants: Array<{
     id: string
-    sizeId: string
+    sizeId?: string
     sizeLabel: string
     widthInches: number
     heightInches: number
     price: string | number
     stockQuantity: number
-    isAvailable: boolean
-    sku?: string
+    isInStock: boolean
+    variantSku?: string
   }>
   frames?: Array<{
     id: string
@@ -52,15 +52,14 @@ interface ProductApiResponse {
     description: string
     material?: string
     imageUrl?: string
-    priceModifierType: 'percentage' | 'fixed'
-    priceModifierValue: number
-    isAvailable: boolean
+    priceModifier: string
+    priceAddition: string
   }>
   orientation: 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
   styles?: string[]
   subjects?: string[]
   primaryColor?: string
-  roomSuggestions?: string[]
+  rooms?: string[]
   artist?: {
     id: string
     name: string
@@ -111,14 +110,14 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
       })),
       variants: response.variants.map((v): SizeVariant => ({
         id: v.id,
-        sizeId: v.sizeId,
+        sizeId: v.sizeId || v.id,
         sizeLabel: v.sizeLabel,
         widthInches: v.widthInches,
         heightInches: v.heightInches,
         price: v.price,
         stockQuantity: v.stockQuantity,
-        isAvailable: v.isAvailable,
-        sku: v.sku,
+        isAvailable: v.isInStock,
+        sku: v.variantSku,
       })),
       frames: response.frames?.map((f): FrameOptionData => ({
         id: f.id,
@@ -127,15 +126,16 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
         description: f.description,
         material: f.material,
         imageUrl: f.imageUrl,
-        priceModifierType: f.priceModifierType,
-        priceModifierValue: f.priceModifierValue,
-        isAvailable: f.isAvailable,
+        // API returns priceAddition as string in rupees, component expects fixed price in paise
+        priceModifierType: 'fixed',
+        priceModifierValue: parseFloat(f.priceAddition || '0') * 100,
+        isAvailable: true,
       })),
       orientation: response.orientation,
       styles: response.styles,
       subjects: response.subjects,
       primaryColor: response.primaryColor,
-      roomSuggestions: response.roomSuggestions,
+      roomSuggestions: response.rooms,
       artist: response.artist,
       rating: response.rating,
       isFeatured: response.isFeatured,
