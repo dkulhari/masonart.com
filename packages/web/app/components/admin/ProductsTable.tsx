@@ -201,7 +201,7 @@ function ActionMenu({
             )}
 
             <a
-              href={`/posters/${product.styles[0] || 'all'}/${product.slug}`}
+              href={`/posters/${product.slug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"

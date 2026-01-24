@@ -12,7 +12,7 @@ import { test, expect } from '@playwright/test';
  *
  * Based on implementation in:
  * - packages/web/app/components/seo/ProductJsonLd.tsx
- * - packages/web/app/routes/posters/$category.$slug.tsx
+ * - packages/web/app/routes/posters/$slug.tsx
  *
  * Schema.org reference: https://schema.org/Product
  * Google's guidelines: https://developers.google.com/search/docs/appearance/structured-data/product

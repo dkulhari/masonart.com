@@ -24,7 +24,6 @@ import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
-import { Route as PostersCategorySlugRouteImport } from './routes/posters/$category.$slug'
 import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
 import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
@@ -105,11 +104,6 @@ const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
   path: '/account/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const PostersCategorySlugRoute = PostersCategorySlugRouteImport.update({
-  id: '/posters/$category/$slug',
-  path: '/posters/$category/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminProductsNewRoute = AdminProductsNewRouteImport.update({
   id: '/products/new',
   path: '/products/new',
@@ -154,7 +148,6 @@ export interface FileRoutesByFullPath {
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
-  '/posters/$category/$slug': typeof PostersCategorySlugRoute
   '/account': typeof AuthedAccountIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
@@ -175,7 +168,6 @@ export interface FileRoutesByTo {
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
-  '/posters/$category/$slug': typeof PostersCategorySlugRoute
   '/account': typeof AuthedAccountIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
@@ -199,7 +191,6 @@ export interface FileRoutesById {
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
-  '/posters/$category/$slug': typeof PostersCategorySlugRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
@@ -223,7 +214,6 @@ export interface FileRouteTypes {
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
-    | '/posters/$category/$slug'
     | '/account'
     | '/admin/orders'
     | '/admin/products'
@@ -244,7 +234,6 @@ export interface FileRouteTypes {
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
-    | '/posters/$category/$slug'
     | '/account'
     | '/admin/orders'
     | '/admin/products'
@@ -267,7 +256,6 @@ export interface FileRouteTypes {
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
-    | '/posters/$category/$slug'
     | '/_authed/account/'
     | '/admin/orders/'
     | '/admin/products/'
@@ -285,7 +273,6 @@ export interface RootRouteChildren {
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
   PostersIndexRoute: typeof PostersIndexRoute
-  PostersCategorySlugRoute: typeof PostersCategorySlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -395,13 +382,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAccountIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/posters/$category/$slug': {
-      id: '/posters/$category/$slug'
-      path: '/posters/$category/$slug'
-      fullPath: '/posters/$category/$slug'
-      preLoaderRoute: typeof PostersCategorySlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/products/new': {
       id: '/admin/products/new'
       path: '/products/new'
@@ -487,7 +467,6 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutIndexRoute: CheckoutIndexRoute,
   CreateIndexRoute: CreateIndexRoute,
   PostersIndexRoute: PostersIndexRoute,
-  PostersCategorySlugRoute: PostersCategorySlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

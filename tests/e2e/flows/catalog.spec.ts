@@ -15,7 +15,7 @@ import { test, expect } from '@playwright/test';
  * testing the integration between:
  * - packages/web/app/routes/index.tsx (Home)
  * - packages/web/app/routes/posters/index.tsx (Catalog)
- * - packages/web/app/routes/posters/$category.$slug.tsx (Product Detail)
+ * - packages/web/app/routes/posters/$slug.tsx (Product Detail)
  */
 
 // ============================================================================
@@ -545,7 +545,7 @@ test.describe('Catalog Flow - Edge Cases', () => {
 
   test('should handle missing product in detail page', async ({ page }) => {
     // Navigate to non-existent product
-    await page.goto('/posters/category/nonexistent-product-12345');
+    await page.goto('/posters/nonexistent-product-12345');
 
     // Should show not found
     const notFound = page.locator('text=Product Not Found');

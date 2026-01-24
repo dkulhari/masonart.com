@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Product Detail Page E2E Tests
  *
- * Tests for the MasonArt product detail page (/posters/:category/:slug) including:
+ * Tests for the MasonArt product detail page (/posters/:slug) including:
  * - Breadcrumb navigation
  * - Product image gallery with navigation
  * - Product information (title, artist, rating, SKU)
@@ -24,7 +24,7 @@ import { test, expect } from '@playwright/test';
  * - 404/Not Found handling
  *
  * Based on actual implementation in:
- * - packages/web/app/routes/posters/$category.$slug.tsx
+ * - packages/web/app/routes/posters/$slug.tsx
  * - packages/web/app/components/product/ProductDetail.tsx
  * - packages/web/app/components/product/SizeSelector.tsx
  * - packages/web/app/components/product/FrameSelector.tsx
@@ -1319,7 +1319,7 @@ test.describe('Product Detail - Accessibility', () => {
 
 test.describe('Product Detail - Not Found', () => {
   test('should display not found page for invalid product', async ({ page }) => {
-    await page.goto('/posters/category/nonexistent-product-slug-xyz-123');
+    await page.goto('/posters/nonexistent-product-slug-xyz-123');
 
     // Should show not found message
     const notFound = page.locator('text=Product Not Found');
@@ -1327,21 +1327,21 @@ test.describe('Product Detail - Not Found', () => {
   });
 
   test('should display description on not found page', async ({ page }) => {
-    await page.goto('/posters/category/nonexistent-product-slug-xyz-123');
+    await page.goto('/posters/nonexistent-product-slug-xyz-123');
 
     const description = page.locator('text=could not be found');
     await expect(description).toBeVisible();
   });
 
   test('should display Browse All Products link on not found page', async ({ page }) => {
-    await page.goto('/posters/category/nonexistent-product-slug-xyz-123');
+    await page.goto('/posters/nonexistent-product-slug-xyz-123');
 
     const browseLink = page.locator('a[href="/posters"]:has-text("Browse All Products")');
     await expect(browseLink).toBeVisible();
   });
 
   test('should navigate to listing from not found page', async ({ page }) => {
-    await page.goto('/posters/category/nonexistent-product-slug-xyz-123');
+    await page.goto('/posters/nonexistent-product-slug-xyz-123');
 
     const browseLink = page.locator('a[href="/posters"]:has-text("Browse All Products")');
     await browseLink.click();
@@ -1485,7 +1485,7 @@ test.describe('Product Detail - Navigation', () => {
 
 test.describe('Product Detail - Error Handling', () => {
   test('should handle missing product gracefully', async ({ page }) => {
-    await page.goto('/posters/abstract/missing-product-12345');
+    await page.goto('/posters/missing-product-12345');
 
     // Should show not found or error message
     const notFound = page.locator('text=Product Not Found');

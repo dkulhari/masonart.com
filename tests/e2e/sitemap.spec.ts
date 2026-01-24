@@ -407,11 +407,11 @@ test.describe('Sitemap - Public Pages Inclusion', () => {
 
     const urls = parseSitemapUrls(content!);
 
-    // Look for product detail pages (e.g., /posters/category/slug or /products/slug)
+    // Look for product detail pages (e.g., /posters/slug or /products/slug)
     const productPages = urls.filter(
       (u) =>
-        (urlPathMatches(u.loc, '/posters/') && u.loc.split('/').length > 4) ||
-        (urlPathMatches(u.loc, '/products/') && u.loc.split('/').length > 4)
+        (urlPathMatches(u.loc, '/posters/') && u.loc.split('/').length > 3) ||
+        (urlPathMatches(u.loc, '/products/') && u.loc.split('/').length > 3)
     );
 
     // May or may not have product pages depending on data, just validate format if they exist

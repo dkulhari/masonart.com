@@ -387,7 +387,7 @@ export async function prefetchProducts(
  * ```tsx
  * // On link hover
  * <Link
- *   to={`/posters/${category}/${slug}`}
+ *   to={`/posters/${slug}`}
  *   onMouseEnter={() => prefetchProduct(queryClient, slug)}
  * >
  *   {title}

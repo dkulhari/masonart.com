@@ -15,7 +15,7 @@ import { test, expect, type Page } from '@playwright/test';
  *
  * These tests simulate real user journeys across multiple pages,
  * testing the integration between:
- * - packages/web/app/routes/posters/$category.$slug.tsx (Product Detail)
+ * - packages/web/app/routes/posters/$slug.tsx (Product Detail)
  * - packages/web/app/routes/cart/index.tsx (Cart)
  * - packages/web/app/routes/checkout/index.tsx (Checkout)
  * - packages/web/app/components/checkout/PaymentButton.tsx (Payment)

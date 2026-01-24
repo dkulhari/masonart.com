@@ -458,7 +458,7 @@ function EditProductPage() {
           <div className="flex items-center gap-2">
             {/* View in Store */}
             <a
-              href={`/posters/${product.styles[0] || 'all'}/${product.slug}`}
+              href={`/posters/${product.slug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
