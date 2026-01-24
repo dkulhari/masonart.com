@@ -115,5 +115,6 @@ const port = parseInt(process.env.PORT || "3000", 10);
 
 export default {
   port,
+  hostname: "0.0.0.0", // Listen on all network interfaces for LAN access
   fetch: app.fetch,
 };

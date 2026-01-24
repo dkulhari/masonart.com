@@ -184,6 +184,8 @@ export const Route = createFileRoute('/posters/')({
   loader: async ({ deps }) => {
     return fetchPostersData(deps.search)
   },
+  // Force loader to re-run when search params change (fixes client-side navigation)
+  shouldReload: () => true,
   head: ({ loaderData }) => {
     const defaultDescription = 'Browse our collection of premium posters.'
     const defaultTitle = 'Shop Posters | MasonArt'
