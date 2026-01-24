@@ -67,3 +67,7 @@ docker/data/
 
 # Claude mem context files
 CLAUDE.md
+
+# Local config files
+.mcp.json
+docker-compose.ticketrack.yml*
