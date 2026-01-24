@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "001-take-a-look-at-docs-directory-and-start-implementi",
-  "state": "complete",
+  "spec": "004-masonart-qa-testing",
+  "state": "building",
   "subtasks": {
-    "completed": 58,
-    "total": 58,
-    "in_progress": 0,
+    "completed": 1,
+    "total": 89,
+    "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Integration & Testing",
-    "id": null,
-    "total": 5
+    "current": "",
+    "id": 0,
+    "total": 0
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 31,
-    "started_at": "2026-01-15T01:07:59.856933"
+    "number": 89,
+    "started_at": "2026-01-18T19:48:48.497192"
   },
-  "last_update": "2026-01-15T03:54:40.840630"
+  "last_update": "2026-01-19T04:39:33.841058"
 }
