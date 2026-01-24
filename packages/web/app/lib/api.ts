@@ -645,6 +645,14 @@ export interface AIGenerationsListParams {
   stylePreset?: string;
 }
 
+// AI gallery list parameters
+export interface AIGalleryListParams {
+  page?: number;
+  pageSize?: number;
+  stylePreset?: string;
+  sortBy?: "createdAt" | "likes";
+}
+
 /**
  * AI Generation API
  */
@@ -807,6 +815,38 @@ export const aiApi = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || "Failed to delete generation");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get public AI gallery
+   */
+  async gallery(params?: AIGalleryListParams) {
+    const queryParams: Record<string, string> = {};
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams[key] = String(value);
+        }
+      });
+    }
+
+    const queryString = new URLSearchParams(queryParams).toString();
+    const url = queryString ? `/api/ai/gallery?${queryString}` : "/api/ai/gallery";
+
+    const response = await fetch(`${getApiUrl()}${url}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch gallery");
     }
 
     return response.json();

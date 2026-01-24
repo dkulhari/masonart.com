@@ -13,6 +13,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PostersIndexRouteImport } from './routes/posters/index'
+import { Route as GalleryIndexRouteImport } from './routes/gallery/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout/index'
 import { Route as CartIndexRouteImport } from './routes/cart/index'
@@ -47,6 +48,11 @@ const IndexRoute = IndexRouteImport.update({
 const PostersIndexRoute = PostersIndexRouteImport.update({
   id: '/posters/',
   path: '/posters/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GalleryIndexRoute = GalleryIndexRouteImport.update({
+  id: '/gallery/',
+  path: '/gallery/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CreateIndexRoute = CreateIndexRouteImport.update({
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/cart': typeof CartIndexRoute
   '/checkout': typeof CheckoutIndexRoute
   '/create': typeof CreateIndexRoute
+  '/gallery': typeof GalleryIndexRoute
   '/posters': typeof PostersIndexRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/orders': typeof AuthedAccountOrdersRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/cart': typeof CartIndexRoute
   '/checkout': typeof CheckoutIndexRoute
   '/create': typeof CreateIndexRoute
+  '/gallery': typeof GalleryIndexRoute
   '/posters': typeof PostersIndexRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/orders': typeof AuthedAccountOrdersRoute
@@ -185,6 +193,7 @@ export interface FileRoutesById {
   '/cart/': typeof CartIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/create/': typeof CreateIndexRoute
+  '/gallery/': typeof GalleryIndexRoute
   '/posters/': typeof PostersIndexRoute
   '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/_authed/account/orders': typeof AuthedAccountOrdersRoute
@@ -208,6 +217,7 @@ export interface FileRouteTypes {
     | '/cart'
     | '/checkout'
     | '/create'
+    | '/gallery'
     | '/posters'
     | '/account/ai-creations'
     | '/account/orders'
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/cart'
     | '/checkout'
     | '/create'
+    | '/gallery'
     | '/posters'
     | '/account/ai-creations'
     | '/account/orders'
@@ -250,6 +261,7 @@ export interface FileRouteTypes {
     | '/cart/'
     | '/checkout/'
     | '/create/'
+    | '/gallery/'
     | '/posters/'
     | '/_authed/account/ai-creations'
     | '/_authed/account/orders'
@@ -272,6 +284,7 @@ export interface RootRouteChildren {
   CartIndexRoute: typeof CartIndexRoute
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
+  GalleryIndexRoute: typeof GalleryIndexRoute
   PostersIndexRoute: typeof PostersIndexRoute
 }
 
@@ -303,6 +316,13 @@ declare module '@tanstack/react-router' {
       path: '/posters'
       fullPath: '/posters'
       preLoaderRoute: typeof PostersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gallery/': {
+      id: '/gallery/'
+      path: '/gallery'
+      fullPath: '/gallery'
+      preLoaderRoute: typeof GalleryIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/create/': {
@@ -466,6 +486,7 @@ const rootRouteChildren: RootRouteChildren = {
   CartIndexRoute: CartIndexRoute,
   CheckoutIndexRoute: CheckoutIndexRoute,
   CreateIndexRoute: CreateIndexRoute,
+  GalleryIndexRoute: GalleryIndexRoute,
   PostersIndexRoute: PostersIndexRoute,
 }
 export const routeTree = rootRouteImport
