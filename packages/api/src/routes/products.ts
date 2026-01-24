@@ -155,22 +155,27 @@ productsApp.get(
     }
 
     // Filter by array fields (styles, subjects, colors, rooms)
-    // Using array overlap operator
+    // Using array overlap operator with proper PostgreSQL array casting
     if (styles) {
       const styleList = styles.split(",").map(s => s.trim());
-      conditions.push(sql`${products.styles} && ${styleList}`);
+      // Create PostgreSQL array literal: ARRAY['style1', 'style2']::text[]
+      const pgArray = sql.raw(`ARRAY[${styleList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
+      conditions.push(sql`${products.styles} && ${pgArray}`);
     }
     if (subjects) {
       const subjectList = subjects.split(",").map(s => s.trim());
-      conditions.push(sql`${products.subjects} && ${subjectList}`);
+      const pgArray = sql.raw(`ARRAY[${subjectList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
+      conditions.push(sql`${products.subjects} && ${pgArray}`);
     }
     if (colors) {
       const colorList = colors.split(",").map(s => s.trim());
-      conditions.push(sql`${products.colors} && ${colorList}`);
+      const pgArray = sql.raw(`ARRAY[${colorList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
+      conditions.push(sql`${products.colors} && ${pgArray}`);
     }
     if (rooms) {
       const roomList = rooms.split(",").map(s => s.trim());
-      conditions.push(sql`${products.rooms} && ${roomList}`);
+      const pgArray = sql.raw(`ARRAY[${roomList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
+      conditions.push(sql`${products.rooms} && ${pgArray}`);
     }
 
     // Build sort order
