@@ -24,6 +24,7 @@ import {
   useCartItemCount,
   useCartActions,
   useIsCartEmpty,
+  useCartHydration,
 } from '~/stores/cart'
 import { CartItem } from '~/components/cart/CartItem'
 
@@ -51,6 +52,22 @@ export const Route = createFileRoute('/cart/')({
 // ============================================================================
 
 function CartPage() {
+  const isHydrated = useCartHydration()
+
+  // Show loading skeleton until hydration is complete
+  // This prevents store subscription during SSR which causes infinite loops
+  if (!isHydrated) {
+    return <CartSkeleton />
+  }
+
+  return <CartContent />
+}
+
+/**
+ * Cart content component that subscribes to cart store.
+ * Only rendered after hydration to avoid SSR issues with Zustand persist.
+ */
+function CartContent() {
   const items = useCartItems()
   const subtotal = useCartSubtotal()
   const itemCount = useCartItemCount()
@@ -286,6 +303,56 @@ function EmptyCartState() {
           View Featured Collection
           <ChevronRight className="h-4 w-4" />
         </a>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Loading Skeleton
+// ============================================================================
+
+function CartSkeleton() {
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container-wide py-8 lg:py-12">
+        {/* Page Header */}
+        <div className="mb-8">
+          <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+          <div className="mt-2 h-4 w-32 animate-pulse rounded bg-muted" />
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-3 lg:gap-12">
+          {/* Cart Items Column */}
+          <div className="lg:col-span-2 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="flex gap-4 rounded-lg border border-border p-4"
+              >
+                <div className="h-24 w-24 animate-pulse rounded bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-5 w-3/4 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+                  <div className="h-4 w-1/4 animate-pulse rounded bg-muted" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Order Summary Column */}
+          <div className="lg:col-span-1">
+            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+              <div className="h-6 w-32 animate-pulse rounded bg-muted" />
+              <div className="space-y-3">
+                <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                <div className="h-4 w-full animate-pulse rounded bg-muted" />
+                <div className="h-4 w-full animate-pulse rounded bg-muted" />
+              </div>
+              <div className="h-12 w-full animate-pulse rounded-lg bg-muted" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

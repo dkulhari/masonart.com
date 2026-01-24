@@ -7,8 +7,10 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
+import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { useShallow } from "zustand/react/shallow";
 import { generateId } from "~/lib/utils";
 
 // ============================================================================
@@ -353,41 +355,66 @@ export const useCartStore = create<CartStore>()(
 );
 
 // ============================================================================
+// Stable Selectors (defined outside hooks to prevent recreation)
+// ============================================================================
+
+const selectItems = (state: CartStore) => state.items;
+const selectItemCount = (state: CartStore) =>
+  state.items.reduce((sum, item) => sum + item.quantity, 0);
+const selectSubtotal = (state: CartStore) =>
+  state.items.reduce(
+    (sum, item) => sum + (item.unitPrice + item.framePrice) * item.quantity,
+    0
+  );
+const selectIsEmpty = (state: CartStore) => state.items.length === 0;
+const selectActions = (state: CartStore) => ({
+  addItem: state.addItem,
+  updateQuantity: state.updateQuantity,
+  updateFrame: state.updateFrame,
+  removeItem: state.removeItem,
+  clearCart: state.clearCart,
+});
+
+// ============================================================================
 // Selector Hooks (for optimized re-renders)
 // ============================================================================
 
 /**
  * Hook to get cart items
  */
-export const useCartItems = () => useCartStore((state) => state.items);
+export const useCartItems = () => useCartStore(selectItems);
 
 /**
  * Hook to get cart item count
+ * Uses stable selector to prevent unnecessary re-renders
  */
-export const useCartItemCount = () => useCartStore((state) => state.getItemCount());
+export const useCartItemCount = () => useCartStore(selectItemCount);
 
 /**
  * Hook to get cart subtotal
+ * Uses stable selector to prevent unnecessary re-renders
  */
-export const useCartSubtotal = () => useCartStore((state) => state.getSubtotal());
+export const useCartSubtotal = () => useCartStore(selectSubtotal);
 
 /**
  * Hook to get cart actions
+ * Uses shallow comparison since this returns an object
  */
 export const useCartActions = () =>
-  useCartStore((state) => ({
-    addItem: state.addItem,
-    updateQuantity: state.updateQuantity,
-    updateFrame: state.updateFrame,
-    removeItem: state.removeItem,
-    clearCart: state.clearCart,
-  }));
+  useCartStore(
+    useShallow((state) => ({
+      addItem: state.addItem,
+      updateQuantity: state.updateQuantity,
+      updateFrame: state.updateFrame,
+      removeItem: state.removeItem,
+      clearCart: state.clearCart,
+    }))
+  );
 
 /**
  * Hook to check if cart is empty
  */
-export const useIsCartEmpty = () =>
-  useCartStore((state) => state.items.length === 0);
+export const useIsCartEmpty = () => useCartStore(selectIsEmpty);
 
 /**
  * Hook to find if a specific product configuration exists in cart
@@ -405,3 +432,35 @@ export const useIsInCart = (
         item.frameId === frameId
     )
   );
+
+// ============================================================================
+// Hydration Hook for SSR
+// ============================================================================
+
+/**
+ * Hook to check if we're on the client side after hydration
+ * Use this to conditionally render cart-dependent content
+ *
+ * @returns boolean indicating if we're on client and ready to show cart data
+ *
+ * @example
+ * function CartPage() {
+ *   const isClient = useCartHydration();
+ *   const items = useCartItems();
+ *
+ *   if (!isClient) {
+ *     return <CartSkeleton />;
+ *   }
+ *
+ *   return <Cart items={items} />;
+ * }
+ */
+export const useCartHydration = () => {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  return isClient;
+};

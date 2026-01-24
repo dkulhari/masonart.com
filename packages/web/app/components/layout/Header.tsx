@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
 import { useState } from 'react'
-import { useCartItemCount } from '~/stores/cart'
+import { useCartItemCount, useCartHydration } from '~/stores/cart'
 
 /**
  * Header component for the MasonArt e-commerce platform.
@@ -10,7 +10,11 @@ import { useCartItemCount } from '~/stores/cart'
  */
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
+
+  // Only show cart count after hydration to avoid SSR mismatch
+  const displayCartCount = isHydrated ? cartItemCount : 0
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen((prev) => !prev)
@@ -57,12 +61,12 @@ export function Header() {
             <Link
               to="/cart"
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              aria-label={`Shopping cart${cartItemCount > 0 ? `, ${cartItemCount} items` : ''}`}
+              aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ''}`}
             >
               <ShoppingCart className="h-5 w-5" />
-              {cartItemCount > 0 && (
+              {displayCartCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                  {cartItemCount > 99 ? '99+' : cartItemCount}
+                  {displayCartCount > 99 ? '99+' : displayCartCount}
                 </span>
               )}
             </Link>
@@ -80,12 +84,12 @@ export function Header() {
             <Link
               to="/cart"
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              aria-label={`Shopping cart${cartItemCount > 0 ? `, ${cartItemCount} items` : ''}`}
+              aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ''}`}
             >
               <ShoppingCart className="h-5 w-5" />
-              {cartItemCount > 0 && (
+              {displayCartCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                  {cartItemCount > 99 ? '99+' : cartItemCount}
+                  {displayCartCount > 99 ? '99+' : displayCartCount}
                 </span>
               )}
             </Link>
