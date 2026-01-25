@@ -1,4 +1,13 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get directory path for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Path to stored authentication state
+const ADMIN_AUTH = path.join(__dirname, '..', '.auth', 'admin.json');
 
 /**
  * Admin Products Management E2E Tests
@@ -178,32 +187,6 @@ const mockProductStats = {
   outOfStockProducts: 3,
 };
 
-/**
- * Setup admin session mock
- */
-async function setupAdminSession(page: import('@playwright/test').Page) {
-  await page.route('**/api/auth/get-session', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        user: {
-          id: 'admin-user-id',
-          name: 'Admin User',
-          email: 'admin@masonart.com',
-          role: 'admin',
-          emailVerified: true,
-          createdAt: '2024-01-01T00:00:00Z',
-        },
-        session: {
-          id: 'session-id',
-          userId: 'admin-user-id',
-          expiresAt: new Date(Date.now() + 86400000).toISOString(),
-        },
-      }),
-    });
-  });
-}
 
 /**
  * Setup products list API mock
@@ -405,8 +388,10 @@ async function setupVariantMocks(page: import('@playwright/test').Page) {
 // ============================================================================
 
 test.describe('Admin Products List Page', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
+
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await page.goto('/admin/products');
   });
@@ -475,8 +460,9 @@ test.describe('Admin Products List Page', () => {
 // ============================================================================
 
 test.describe('Products List Status Filtering', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
   });
 
@@ -516,8 +502,9 @@ test.describe('Products List Status Filtering', () => {
 // ============================================================================
 
 test.describe('Products List Search', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await page.goto('/admin/products');
   });
@@ -568,8 +555,9 @@ test.describe('Products List Search', () => {
 // ============================================================================
 
 test.describe('Products List Pagination', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
   });
 
   test('should display pagination controls', async ({ page }) => {
@@ -629,8 +617,9 @@ test.describe('Products List Pagination', () => {
 // ============================================================================
 
 test.describe('Products List Sorting', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await page.goto('/admin/products');
   });
@@ -677,8 +666,9 @@ test.describe('Products List Sorting', () => {
 // ============================================================================
 
 test.describe('Create Product Page', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await setupProductMutationMocks(page);
   });
@@ -834,8 +824,9 @@ test.describe('Create Product Page', () => {
 // ============================================================================
 
 test.describe('Edit Product Page', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await setupProductMutationMocks(page);
     await setupVariantMocks(page);
@@ -960,8 +951,9 @@ test.describe('Edit Product Page', () => {
 // ============================================================================
 
 test.describe('Delete/Archive Product', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await setupProductMutationMocks(page);
   });
@@ -1062,8 +1054,9 @@ test.describe('Delete/Archive Product', () => {
 // ============================================================================
 
 test.describe('Product Variants Management', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await setupProductMutationMocks(page);
     await setupVariantMocks(page);
@@ -1200,8 +1193,9 @@ test.describe('Product Variants Management', () => {
 // ============================================================================
 
 test.describe('Products Loading States', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test('should display skeleton loaders while fetching products', async ({ page }) => {
-    await setupAdminSession(page);
 
     await page.route('**/api/admin/products*', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1219,7 +1213,6 @@ test.describe('Products Loading States', () => {
   });
 
   test('should display loading indicator on edit page', async ({ page }) => {
-    await setupAdminSession(page);
 
     await page.route('**/api/admin/products/prod-001', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1242,8 +1235,9 @@ test.describe('Products Loading States', () => {
 // ============================================================================
 
 test.describe('Products Error States', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
   });
 
   test('should display error when products fail to load', async ({ page }) => {
@@ -1319,8 +1313,9 @@ test.describe('Products Error States', () => {
 // ============================================================================
 
 test.describe('Products Empty State', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
   });
 
   test('should display empty state when no products', async ({ page }) => {
@@ -1371,8 +1366,9 @@ test.describe('Products Empty State', () => {
 // ============================================================================
 
 test.describe('Products Responsive Design', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
   });
 
@@ -1438,8 +1434,9 @@ test.describe('Products Responsive Design', () => {
 // ============================================================================
 
 test.describe('Products Accessibility', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
   });
 
@@ -1496,8 +1493,9 @@ test.describe('Products Accessibility', () => {
 // ============================================================================
 
 test.describe('Products Performance', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test('should load products list within acceptable time', async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
 
     const startTime = Date.now();
@@ -1512,7 +1510,6 @@ test.describe('Products Performance', () => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    await setupAdminSession(page);
     await setupProductsListMock(page);
 
     await page.goto('/admin/products');
@@ -1526,7 +1523,6 @@ test.describe('Products Performance', () => {
   });
 
   test('should handle rapid navigation', async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await setupProductMutationMocks(page);
 
@@ -1543,8 +1539,9 @@ test.describe('Products Performance', () => {
 // ============================================================================
 
 test.describe('Products Navigation', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await setupProductMutationMocks(page);
   });
@@ -1582,8 +1579,9 @@ test.describe('Products Navigation', () => {
 // ============================================================================
 
 test.describe('Products Bulk Actions', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
   });
 
@@ -1624,8 +1622,9 @@ test.describe('Products Bulk Actions', () => {
 // ============================================================================
 
 test.describe('Product Image Management', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await setupProductMutationMocks(page);
   });
@@ -1658,8 +1657,9 @@ test.describe('Product Image Management', () => {
 // ============================================================================
 
 test.describe('Product Status Badges', () => {
+  // Use the stored admin authentication state
+  test.use({ storageState: ADMIN_AUTH });
   test.beforeEach(async ({ page }) => {
-    await setupAdminSession(page);
     await setupProductsListMock(page);
     await page.goto('/admin/products');
     await page.waitForLoadState('networkidle');

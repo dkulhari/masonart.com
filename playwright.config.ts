@@ -13,10 +13,20 @@ import { defineConfig, devices } from '@playwright/test';
  * - Normal: npx playwright test
  * - With existing server: SKIP_E2E_SERVER=true npx playwright test
  * - Custom URL: E2E_BASE_URL=http://localhost:5000 npx playwright test
+ *
+ * Project Structure:
+ * - 'setup': Creates authenticated sessions (runs first)
+ * - 'chromium': Regular tests + tests using stored auth state
+ * - 'firefox', 'webkit': Cross-browser testing
+ * - 'Mobile Chrome', 'Mobile Safari': Mobile testing
  */
 
 const skipServer = process.env.SKIP_E2E_SERVER === 'true';
 const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3001';
+
+// Auth storage paths
+const CUSTOMER_STORAGE = 'tests/.auth/customer.json';
+const ADMIN_STORAGE = 'tests/.auth/admin.json';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -31,25 +41,67 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
+    // =========================================================================
+    // Setup Projects - Run first to create authenticated sessions
+    // =========================================================================
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.ts/,
+    },
+
+    // =========================================================================
+    // Desktop Browser Projects
+    // =========================================================================
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
     },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
+      dependencies: ['setup'],
     },
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
+      dependencies: ['setup'],
     },
+
+    // =========================================================================
+    // Mobile Browser Projects
+    // =========================================================================
     {
       name: 'Mobile Chrome',
       use: { ...devices['Pixel 5'] },
+      dependencies: ['setup'],
     },
     {
       name: 'Mobile Safari',
       use: { ...devices['iPhone 12'] },
+      dependencies: ['setup'],
+    },
+
+    // =========================================================================
+    // Authenticated Test Projects (use stored auth state)
+    // =========================================================================
+    {
+      name: 'chromium-customer',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: CUSTOMER_STORAGE,
+      },
+      dependencies: ['setup'],
+      testMatch: /.*\.(customer|account)\.spec\.ts/,
+    },
+    {
+      name: 'chromium-admin',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: ADMIN_STORAGE,
+      },
+      dependencies: ['setup'],
+      testMatch: /.*\.admin.*\.spec\.ts/,
     },
   ],
   // Only start web server if not explicitly skipped

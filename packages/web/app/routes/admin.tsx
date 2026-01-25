@@ -7,30 +7,15 @@
  * - Responsive layout for mobile/desktop
  *
  * This is the parent route for all /admin/* routes.
+ * Uses beforeLoad for SSR-level auth protection (like _authed.tsx).
  *
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState } from 'react'
-import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
-import { Loader2, ShieldAlert } from 'lucide-react'
+import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { ShieldAlert } from 'lucide-react'
 import { cn } from '~/lib/utils'
-import { authApi } from '~/lib/api'
 import { AdminSidebar, MobileAdminHeader } from '~/components/admin/AdminSidebar'
-
-// ============================================================================
-// Route Definition
-// ============================================================================
-
-export const Route = createFileRoute('/admin')({
-  head: () => ({
-    meta: [
-      { title: 'Admin Panel | MasonArt' },
-      { name: 'robots', content: 'noindex, nofollow' },
-    ],
-  }),
-  component: AdminLayout,
-})
 
 // ============================================================================
 // Types
@@ -44,64 +29,57 @@ interface User {
   role?: string
 }
 
-interface SessionResponse {
-  user?: User
-}
+// ============================================================================
+// Route Definition
+// ============================================================================
+
+export const Route = createFileRoute('/admin')({
+  beforeLoad: async ({ context, location }) => {
+    // Check if user is authenticated using session from root context
+    if (!context.session?.user) {
+      // Not logged in - redirect to login with redirect param
+      throw redirect({
+        to: '/auth/login',
+        search: {
+          redirect: location.href,
+        },
+      })
+    }
+
+    const userRole = context.session.user.role?.toLowerCase()
+
+    // Check for admin or super-admin role
+    if (userRole !== 'admin' && userRole !== 'super-admin') {
+      // User is authenticated but not an admin - return flag for component
+      return {
+        user: context.session.user,
+        isUnauthorized: true,
+      }
+    }
+
+    // User is admin - pass to component
+    return {
+      user: context.session.user,
+      isUnauthorized: false,
+    }
+  },
+  head: () => ({
+    meta: [
+      { title: 'Admin Panel | MasonArt' },
+      { name: 'robots', content: 'noindex, nofollow' },
+    ],
+  }),
+  component: AdminLayout,
+})
 
 // ============================================================================
 // Admin Layout Component
 // ============================================================================
 
 function AdminLayout() {
-  const navigate = useNavigate()
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isUnauthorized, setIsUnauthorized] = useState(false)
+  const { user, isUnauthorized } = Route.useRouteContext()
 
-  // Check authentication and admin role
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        const session: SessionResponse | null = await authApi.getSession()
-
-        if (!session?.user) {
-          // Not logged in - redirect to login
-          navigate({
-            to: '/auth/login',
-            search: { redirect: '/admin' },
-          })
-          return
-        }
-
-        const userRole = session.user.role?.toLowerCase()
-
-        // Check for admin or super-admin role
-        if (userRole !== 'admin' && userRole !== 'super-admin') {
-          setIsUnauthorized(true)
-          setIsLoading(false)
-          return
-        }
-
-        setUser(session.user)
-        setIsLoading(false)
-      } catch (error) {
-        // Auth check failed - redirect to login
-        navigate({
-          to: '/auth/login',
-          search: { redirect: '/admin' },
-        })
-      }
-    }
-
-    checkAuth()
-  }, [navigate])
-
-  // Loading state
-  if (isLoading) {
-    return <LoadingScreen />
-  }
-
-  // Unauthorized state
+  // Unauthorized state (non-admin user)
   if (isUnauthorized) {
     return <UnauthorizedScreen />
   }
@@ -140,21 +118,6 @@ function AdminLayout() {
           <Outlet />
         </div>
       </main>
-    </div>
-  )
-}
-
-// ============================================================================
-// Loading Screen Component
-// ============================================================================
-
-function LoadingScreen() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <Loader2 className="mx-auto h-12 w-12 animate-spin text-brand-500" />
-        <p className="mt-4 text-muted-foreground">Loading admin panel...</p>
-      </div>
     </div>
   )
 }
