@@ -26,6 +26,11 @@ import {
 // ============================================================================
 
 /**
+ * FAL.ai model type for model selection
+ */
+export type FalModelType = keyof typeof FAL_MODELS;
+
+/**
  * Input for AI image generation
  */
 export interface AIGenerationInput {
@@ -45,6 +50,8 @@ export interface AIGenerationInput {
   seed?: number;
   /** AI model provider to use */
   provider?: AIModelProvider;
+  /** Specific FAL.ai model to use (when provider is fal-ai) */
+  falModel?: FalModelType;
 }
 
 /**
@@ -133,6 +140,9 @@ export const FAL_MODELS = {
   fluxSchnell: "fal-ai/flux/schnell",
   fluxDev: "fal-ai/flux/dev",
   sdxl: "fal-ai/fast-sdxl",
+  // Nano Banana models (Google Gemini image generation via FAL.ai)
+  nanoBanana: "fal-ai/gemini-flash-image", // Gemini 2.5 Flash - fast, efficient
+  nanoBananaPro: "fal-ai/gemini-pro-image", // Gemini 3 Pro - high quality text rendering
 } as const;
 
 // ============================================================================
@@ -267,13 +277,17 @@ export async function generateImages(
         break;
 
       case "fal-ai":
+        // Auto-select Nano Banana Pro for typography style (superior text rendering)
+        const falModel = input.falModel ||
+          (input.stylePreset === "typography" ? "nanoBananaPro" : "fluxSchnell");
         images = await generateWithFalAI(
           config,
           enhancedPrompt,
           negativePrompt,
           dimensions,
           variationCount,
-          input.seed
+          input.seed,
+          falModel
         );
         break;
 
@@ -520,6 +534,7 @@ function mapToDalleSize(dimensions: { width: number; height: number }): string {
 
 /**
  * Generate images using FAL.ai API
+ * Supports FLUX models and Nano Banana (Gemini) models
  */
 async function generateWithFalAI(
   config: AIProviderConfig,
@@ -527,15 +542,23 @@ async function generateWithFalAI(
   negativePrompt: string,
   dimensions: { width: number; height: number },
   variationCount: number,
-  baseSeed?: number
+  baseSeed?: number,
+  modelType: FalModelType = "fluxSchnell"
 ): Promise<GeneratedImage[]> {
   const images: GeneratedImage[] = [];
+  const modelId = FAL_MODELS[modelType];
+  const isNanoBanana = modelType === "nanoBanana" || modelType === "nanoBananaPro";
 
   // FAL.ai endpoint
-  const endpoint = `https://fal.run/${config.modelId}`;
+  const endpoint = `https://fal.run/${modelId}`;
 
   for (let i = 0; i < variationCount; i++) {
     const seed = baseSeed !== undefined ? baseSeed + i : Math.floor(Math.random() * 2147483647);
+
+    // Build request body based on model type
+    const requestBody = isNanoBanana
+      ? buildNanoBananaRequest(prompt, dimensions, seed)
+      : buildFluxRequest(prompt, negativePrompt, dimensions, seed);
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -543,22 +566,12 @@ async function generateWithFalAI(
         Authorization: `Key ${config.apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        prompt,
-        negative_prompt: negativePrompt,
-        image_size: {
-          width: dimensions.width,
-          height: dimensions.height,
-        },
-        seed,
-        num_images: 1,
-        sync_mode: true,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`FAL.ai API error: ${response.status} - ${errorText}`);
+      throw new Error(`FAL.ai API error (${modelType}): ${response.status} - ${errorText}`);
     }
 
     const result = (await response.json()) as {
@@ -582,6 +595,66 @@ async function generateWithFalAI(
   }
 
   return images;
+}
+
+/**
+ * Build request body for FLUX models
+ */
+function buildFluxRequest(
+  prompt: string,
+  negativePrompt: string,
+  dimensions: { width: number; height: number },
+  seed: number
+): Record<string, unknown> {
+  return {
+    prompt,
+    negative_prompt: negativePrompt,
+    image_size: {
+      width: dimensions.width,
+      height: dimensions.height,
+    },
+    seed,
+    num_images: 1,
+    sync_mode: true,
+  };
+}
+
+/**
+ * Build request body for Nano Banana (Gemini) models
+ * Nano Banana uses different parameters optimized for text rendering
+ */
+function buildNanoBananaRequest(
+  prompt: string,
+  dimensions: { width: number; height: number },
+  seed: number
+): Record<string, unknown> {
+  // Nano Banana supports specific aspect ratios
+  const aspectRatio = getNanoBananaAspectRatio(dimensions);
+
+  return {
+    prompt,
+    aspect_ratio: aspectRatio,
+    seed,
+    num_images: 1,
+    sync_mode: true,
+    // Nano Banana specific options
+    output_format: "png",
+    safety_tolerance: "2", // Moderate safety filtering
+  };
+}
+
+/**
+ * Map dimensions to Nano Banana supported aspect ratios
+ * Nano Banana supports: 1:1, 3:4, 4:3, 9:16, 16:9
+ */
+function getNanoBananaAspectRatio(dimensions: { width: number; height: number }): string {
+  const ratio = dimensions.width / dimensions.height;
+
+  if (ratio > 1.7) return "16:9"; // Panoramic/landscape
+  if (ratio > 1.2) return "4:3"; // Landscape
+  if (ratio > 0.9) return "1:1"; // Square
+  if (ratio > 0.6) return "3:4"; // Portrait
+  return "9:16"; // Tall portrait
 }
 
 // ============================================================================
@@ -671,7 +744,8 @@ export function checkPromptModeration(
  */
 export function estimateGenerationCost(
   provider: AIModelProvider,
-  variationCount: number
+  variationCount: number,
+  falModel?: FalModelType
 ): number {
   // Approximate costs per image in cents
   const costPerImage: Record<AIModelProvider, number> = {
@@ -681,6 +755,18 @@ export function estimateGenerationCost(
     "fal-ai": 1, // ~$0.01 per image (FLUX Schnell)
   };
 
+  // Nano Banana models have different pricing
+  if (provider === "fal-ai" && falModel) {
+    const falModelCosts: Record<FalModelType, number> = {
+      fluxSchnell: 1, // ~$0.01 per image
+      fluxDev: 3, // ~$0.03 per image
+      sdxl: 2, // ~$0.02 per image
+      nanoBanana: 2, // ~$0.02 per image (Gemini Flash)
+      nanoBananaPro: 4, // ~$0.04 per image (Gemini Pro - higher quality)
+    };
+    return (falModelCosts[falModel] || 1) * variationCount;
+  }
+
   return (costPerImage[provider] || 5) * variationCount;
 }
 
@@ -689,7 +775,8 @@ export function estimateGenerationCost(
  */
 export function estimateGenerationTime(
   provider: AIModelProvider,
-  variationCount: number
+  variationCount: number,
+  falModel?: FalModelType
 ): number {
   // Approximate time per image in seconds
   const timePerImage: Record<AIModelProvider, number> = {
@@ -698,6 +785,19 @@ export function estimateGenerationTime(
     midjourney: 30, // ~30s per image
     "fal-ai": 5, // ~5s per image (FLUX Schnell is fast)
   };
+
+  // Nano Banana models have different processing times
+  if (provider === "fal-ai" && falModel) {
+    const falModelTimes: Record<FalModelType, number> = {
+      fluxSchnell: 5, // ~5s per image (fast)
+      fluxDev: 10, // ~10s per image
+      sdxl: 8, // ~8s per image
+      nanoBanana: 6, // ~6s per image (Gemini Flash - optimized for speed)
+      nanoBananaPro: 12, // ~12s per image (Gemini Pro - more processing for quality)
+    };
+    const overhead = 5;
+    return (falModelTimes[falModel] || 5) * variationCount + overhead;
+  }
 
   // Add some overhead time for API calls
   const overhead = 5;

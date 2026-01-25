@@ -335,10 +335,10 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
   typography: {
     id: "typography",
     name: "Typography",
-    description: "Text-focused artistic designs with beautiful letterforms",
+    description: "Text-focused artistic designs with beautiful letterforms. Uses Nano Banana Pro for superior text rendering.",
     keywords: ["typography", "text", "letters", "fonts", "words", "design", "quotes"],
     promptModifiers:
-      "typographic art, beautiful lettering, artistic text layout, font design, decorative typography, creative word arrangement, calligraphic elements, text as art, graphic text design, poster typography",
+      "typographic art, beautiful lettering, artistic text layout, font design, decorative typography, creative word arrangement, calligraphic elements, text as art, graphic text design, poster typography, sharp readable text",
     negativePrompt:
       "blurry text, illegible, distorted letters, messy, chaotic arrangement, low resolution, pixelated text, handwriting errors, misspellings",
     modelParams: {
@@ -347,9 +347,9 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
       sampler: "Euler a",
     },
     qualityEnhancers:
-      "crisp text, print quality, professional typography, graphic design quality",
+      "crisp text, print quality, professional typography, graphic design quality, perfectly rendered text",
     recommendedAspectRatios: ["portrait", "square"],
-    preferredProvider: "stable-diffusion",
+    preferredProvider: "fal-ai", // Uses Nano Banana Pro for superior text rendering
     category: "decorative",
     isPremium: false,
   },
