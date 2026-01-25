@@ -11,12 +11,13 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouteContext } from '@tanstack/react-router'
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Sparkles, Wand2, HelpCircle, Loader2 } from 'lucide-react'
+import { Sparkles, Wand2, HelpCircle, Loader2, Wallet, Gift, AlertCircle } from 'lucide-react'
 
-import { cn } from '~/lib/utils'
-import { aiApi } from '~/lib/api'
+import { cn, formatPrice } from '~/lib/utils'
+import { aiApi, walletApi, type WalletBalance, type CostEstimate } from '~/lib/api'
+import { AddFundsButton } from '~/components/wallet/AddFundsButton'
 import { PromptInput } from '~/components/ai-generator/PromptInput'
 import {
   StyleSelector,
@@ -92,6 +93,11 @@ export const Route = createFileRoute('/create/')({
 // ============================================================================
 
 function CreatePage() {
+  // Get session from route context if available
+  const routeContext = useRouteContext({ from: '__root__' })
+  const session = routeContext?.session
+  const user = session?.user
+
   // Form state
   const [prompt, setPrompt] = useState('')
   const [negativePrompt, setNegativePrompt] = useState('')
@@ -105,6 +111,11 @@ function CreatePage() {
   const [progressMessage, setProgressMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  // Wallet state
+  const [walletBalance, setWalletBalance] = useState<WalletBalance | null>(null)
+  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false)
+
   // Polling reference
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -115,6 +126,39 @@ function CreatePage() {
         clearInterval(pollingIntervalRef.current)
       }
     }
+  }, [])
+
+  // Fetch wallet balance when user is logged in
+  useEffect(() => {
+    if (!user) {
+      setWalletBalance(null)
+      return
+    }
+
+    async function fetchWalletData() {
+      setIsLoadingWallet(true)
+      try {
+        const [balance, cost] = await Promise.all([
+          walletApi.getBalance(),
+          walletApi.estimateCost({ variationCount: 4 }),
+        ])
+        setWalletBalance(balance)
+        setCostEstimate(cost)
+      } catch (err) {
+        console.error('Failed to fetch wallet data:', err)
+      } finally {
+        setIsLoadingWallet(false)
+      }
+    }
+
+    fetchWalletData()
+  }, [user])
+
+  // Refresh wallet balance after successful payment
+  const handleWalletTopUpSuccess = useCallback((newBalance: number) => {
+    setWalletBalance((prev) =>
+      prev ? { ...prev, balancePaise: newBalance } : null
+    )
   }, [])
 
   // Poll for generation status
@@ -148,6 +192,11 @@ function CreatePage() {
               }
             : null
         )
+
+        // Refresh wallet balance after generation
+        if (user) {
+          walletApi.getBalance().then(setWalletBalance).catch(console.error)
+        }
 
         // Stop polling
         if (pollingIntervalRef.current) {
@@ -362,10 +411,57 @@ function CreatePage() {
                 </div>
               )}
 
+              {/* Wallet & Cost Preview */}
+              {user && (
+                <CostPreviewCard
+                  walletBalance={walletBalance}
+                  costEstimate={costEstimate}
+                  isLoading={isLoadingWallet}
+                  onTopUpSuccess={handleWalletTopUpSuccess}
+                  userDetails={{
+                    name: user.name,
+                    email: user.email,
+                  }}
+                />
+              )}
+
+              {/* Insufficient Balance Warning */}
+              {user &&
+                walletBalance &&
+                costEstimate &&
+                !costEstimate.canUseFreeGeneration &&
+                walletBalance.balance.paise < costEstimate.cost.userPricePaise && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800">
+                          Insufficient balance
+                        </p>
+                        <p className="text-xs text-amber-700 mt-1">
+                          You need {formatPrice(costEstimate.cost.userPricePaise - walletBalance.balance.paise)} more to generate.
+                        </p>
+                        <div className="mt-3">
+                          <AddFundsButton
+                            amountPaise={Math.max(10000, costEstimate.cost.userPricePaise - walletBalance.balance.paise)}
+                            label="Add Funds"
+                            onSuccess={handleWalletTopUpSuccess}
+                            userDetails={{
+                              name: user.name,
+                              email: user.email,
+                            }}
+                            variant="compact"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               <button
                 type="button"
                 onClick={handleGenerate}
-                disabled={!isFormValid || isGenerating}
+                disabled={!isFormValid || isGenerating || !!(user && walletBalance && costEstimate && !costEstimate.canUseFreeGeneration && walletBalance.balance.paise < costEstimate.cost.userPricePaise)}
                 className={cn(
                   'flex items-center justify-center gap-2 rounded-lg px-8 py-4 text-base font-semibold transition-all',
                   isFormValid && !isGenerating
@@ -458,6 +554,123 @@ function TipsSection() {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Cost Preview Card Component
+// ============================================================================
+
+interface CostPreviewCardProps {
+  walletBalance: WalletBalance | null
+  costEstimate: CostEstimate | null
+  isLoading: boolean
+  onTopUpSuccess: (newBalance: number) => void
+  userDetails?: {
+    name?: string
+    email?: string
+    phone?: string
+  }
+}
+
+function CostPreviewCard({
+  walletBalance,
+  costEstimate,
+  isLoading,
+  onTopUpSuccess,
+  userDetails,
+}: CostPreviewCardProps) {
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading wallet info...
+        </div>
+      </div>
+    )
+  }
+
+  if (!walletBalance || !costEstimate) {
+    return null
+  }
+
+  // User has free generations
+  if (costEstimate.canUseFreeGeneration) {
+    return (
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Gift className="h-5 w-5 text-emerald-600" />
+            <div>
+              <p className="text-sm font-medium text-emerald-800">
+                Free Generation Available
+              </p>
+              <p className="text-xs text-emerald-700">
+                {walletBalance.freeGenerationsRemaining} of 3 free generations remaining
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+            FREE
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // User will pay from wallet
+  const hasSufficientBalance = walletBalance.balance.paise >= costEstimate.cost.userPricePaise
+
+  return (
+    <div className={cn(
+      'rounded-lg border px-4 py-3',
+      hasSufficientBalance
+        ? 'border-border bg-muted/30'
+        : 'border-amber-200 bg-amber-50'
+    )}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wallet className={cn(
+            'h-5 w-5',
+            hasSufficientBalance ? 'text-muted-foreground' : 'text-amber-600'
+          )} />
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Generation Cost
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Balance: {walletBalance.balance.formatted}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-lg font-semibold text-foreground">
+            {costEstimate.cost.formatted}
+          </p>
+          {costEstimate.cost.markupPercentage > 0 && (
+            <p className="text-xs text-muted-foreground">
+              incl. {costEstimate.cost.markupPercentage}% fee
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Quick top-up if balance is low but not insufficient */}
+      {hasSufficientBalance && walletBalance.balance.paise < costEstimate.cost.userPricePaise * 3 && (
+        <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+          <p className="text-xs text-muted-foreground">Running low? Add funds now</p>
+          <AddFundsButton
+            amountPaise={10000}
+            label="+ ₹100"
+            onSuccess={onTopUpSuccess}
+            userDetails={userDetails}
+            variant="compact"
+            showIcon={false}
+          />
+        </div>
+      )}
     </div>
   )
 }

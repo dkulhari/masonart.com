@@ -970,6 +970,262 @@ export const healthApi = {
 };
 
 // ============================================================================
+// Wallet Types
+// ============================================================================
+
+export interface WalletBalance {
+  balance: {
+    paise: number;
+    rupees: number;
+    formatted: string;
+  };
+  freeGenerationsRemaining: number;
+  stats: {
+    totalTopUpsPaise: number;
+    totalTopUpsRupees: number;
+    totalSpentPaise: number;
+    totalSpentRupees: number;
+  };
+  exchangeRate: {
+    usdToInr: number;
+    source: string;
+    fetchedAt: string;
+  };
+  topUpPresets: Array<{ amountPaise: number; label: string }>;
+  razorpayKeyId: string;
+  isPaymentConfigured: boolean;
+}
+
+export interface WalletTransaction {
+  id: string;
+  type: "credit" | "debit" | "refund" | "bonus" | "adjustment";
+  status: "pending" | "completed" | "failed" | "reversed";
+  amount: {
+    paise: number;
+    rupees: number;
+    formatted: string;
+  };
+  balanceAfter: {
+    paise: number;
+    rupees: number;
+  };
+  description: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface WalletTransactionsParams {
+  page?: number;
+  pageSize?: number;
+  type?: "credit" | "debit" | "refund" | "bonus" | "adjustment";
+  status?: "pending" | "completed" | "failed" | "reversed";
+  fromDate?: string;
+  toDate?: string;
+}
+
+export interface TopUpOrderResponse {
+  orderId: string;
+  amount: {
+    paise: number;
+    rupees: number;
+    formatted: string;
+  };
+  currency: string;
+  keyId: string;
+  prefill: {
+    name?: string;
+    email?: string;
+    contact?: string;
+  };
+  notes: Record<string, string>;
+}
+
+export interface TopUpVerifyResponse {
+  message: string;
+  transaction: {
+    id: string;
+    type: string;
+    status: string;
+    amount: {
+      paise: number;
+      rupees: number;
+      formatted: string;
+    };
+  };
+  balance: {
+    paise: number;
+    rupees: number;
+    formatted: string;
+  };
+}
+
+export interface CostEstimate {
+  cost: {
+    apiCostPaise: number;
+    apiCostRupees: number;
+    markupPercentage: number;
+    userPricePaise: number;
+    userPriceRupees: number;
+    formatted: string;
+  };
+  exchangeRate: number;
+  canUseFreeGeneration: boolean;
+  provider: string;
+  variationCount: number;
+}
+
+export interface CostEstimateParams {
+  provider?: string;
+  variationCount?: number;
+  falModel?: string;
+  stylePreset?: string;
+}
+
+/**
+ * Wallet API
+ */
+export const walletApi = {
+  /**
+   * Get wallet balance and stats
+   */
+  async getBalance(): Promise<WalletBalance> {
+    const response = await fetch(`${getApiUrl()}/api/wallet`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch wallet");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get transaction history
+   */
+  async getTransactions(
+    params?: WalletTransactionsParams
+  ): Promise<PaginatedResponse<WalletTransaction>> {
+    const queryParams: Record<string, string> = {};
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams[key] = String(value);
+        }
+      });
+    }
+
+    const queryString = new URLSearchParams(queryParams).toString();
+    const url = queryString
+      ? `/api/wallet/transactions?${queryString}`
+      : "/api/wallet/transactions";
+
+    const response = await fetch(`${getApiUrl()}${url}`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch transactions");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Create a top-up order
+   */
+  async createTopUp(amountPaise: number): Promise<TopUpOrderResponse> {
+    const response = await fetch(`${getApiUrl()}/api/wallet/topup`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ amountPaise }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to create top-up");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Verify top-up payment
+   */
+  async verifyTopUp(data: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+  }): Promise<TopUpVerifyResponse> {
+    const response = await fetch(`${getApiUrl()}/api/wallet/topup/verify`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to verify payment");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Estimate AI generation cost
+   */
+  async estimateCost(params?: CostEstimateParams): Promise<CostEstimate> {
+    const queryParams: Record<string, string> = {};
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams[key] = String(value);
+        }
+      });
+    }
+
+    const queryString = new URLSearchParams(queryParams).toString();
+    const url = queryString
+      ? `/api/wallet/estimate-cost?${queryString}`
+      : "/api/wallet/estimate-cost";
+
+    const response = await fetch(`${getApiUrl()}${url}`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to estimate cost");
+    }
+
+    return response.json();
+  },
+};
+
+// ============================================================================
 // Combined API Object (for convenience)
 // ============================================================================
 
@@ -995,6 +1251,7 @@ export const api = {
   ai: aiApi,
   auth: authApi,
   health: healthApi,
+  wallet: walletApi,
 };
 
 export default api;

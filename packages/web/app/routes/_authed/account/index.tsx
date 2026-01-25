@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Sparkles,
   MapPin,
+  Wallet,
 } from 'lucide-react'
 import { cn, formatDate, getInitials } from '~/lib/utils'
 import { ordersApi } from '~/lib/api'
@@ -68,6 +69,14 @@ interface QuickAction {
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
+  {
+    title: 'My Wallet',
+    description: 'Add funds for AI generation',
+    icon: Wallet,
+    href: '/account/wallet',
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-100',
+  },
   {
     title: 'My Orders',
     description: 'Track and manage your orders',

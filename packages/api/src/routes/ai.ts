@@ -35,10 +35,14 @@ import {
 import {
   requireAuth,
   optionalAuth,
-  requireAICredits,
   type AuthVariables,
   type OptionalAuthVariables,
 } from "../middleware/auth";
+import {
+  requireSufficientFunds,
+  type WalletVariables,
+} from "../middleware/wallet";
+import { deductFromWallet } from "../services/wallet";
 import { addAIGenerationJob } from "../queues/ai-generation";
 import { getCached, setCached, CacheKeys, redis } from "../lib/redis";
 
@@ -111,7 +115,7 @@ const updateVisibilitySchema = z.object({
 // Route Handler
 // ============================================================================
 
-const aiApp = new Hono<{ Variables: AuthVariables | OptionalAuthVariables }>();
+const aiApp = new Hono<{ Variables: (AuthVariables & Partial<WalletVariables>) | OptionalAuthVariables }>();
 
 // ============================================================================
 // POST /api/ai/generate - Create Generation Request
@@ -120,11 +124,21 @@ const aiApp = new Hono<{ Variables: AuthVariables | OptionalAuthVariables }>();
 aiApp.post(
   "/generate",
   requireAuth,
-  requireAICredits(1),
   zValidator("json", createGenerationSchema),
+  requireSufficientFunds((c) => {
+    const input = c.req.valid("json") as {
+      modelProvider?: AIModelProvider;
+      variationCount?: number;
+    };
+    return {
+      provider: input.modelProvider,
+      variationCount: input.variationCount,
+    };
+  }),
   async (c) => {
     const user = c.get("user") as AuthVariables["user"];
     const input = c.req.valid("json");
+    const generationCost = c.get("generationCost");
 
     try {
       // Create prompt details object
@@ -152,6 +166,8 @@ aiApp.post(
           modelProvider: input.modelProvider as AIModelProvider,
           variationCount: input.variationCount,
           queuedAt: new Date(),
+          // Store cost info
+          estimatedCost: generationCost?.userPricePaise,
         })
         .returning();
 
@@ -159,7 +175,29 @@ aiApp.post(
         return c.json({ error: "Failed to create generation request" }, 500);
       }
 
-      // Add job to queue
+      // Deduct from wallet (or use free generation)
+      let walletTransactionId: string | null = null;
+      let usedFreeGeneration = false;
+
+      if (generationCost) {
+        const deductResult = await deductFromWallet(
+          user.id,
+          generationCost.userPricePaise,
+          generation.id,
+          {
+            provider: input.modelProvider,
+            stylePreset: input.stylePreset,
+            variationCount: input.variationCount,
+            apiCostUsdCents: Math.round(generationCost.apiCostPaise / generationCost.exchangeRate),
+            exchangeRate: generationCost.exchangeRate,
+            markupPercentage: generationCost.markupPercentage,
+          }
+        );
+        walletTransactionId = deductResult.transaction?.id ?? null;
+        usedFreeGeneration = deductResult.usedFreeGeneration;
+      }
+
+      // Add job to queue with wallet transaction info for potential refund
       const job = await addAIGenerationJob({
         generationId: generation.id,
         userId: user.id,
@@ -175,9 +213,6 @@ aiApp.post(
         seed: input.seed,
       });
 
-      // TODO: Decrement user's AI credits (implement in auth/user service)
-      // await decrementUserAICredits(user.id, 1);
-
       return c.json(
         {
           message: "Generation request submitted",
@@ -190,6 +225,11 @@ aiApp.post(
             queuedAt: generation.queuedAt,
           },
           jobId: job.id,
+          payment: {
+            usedFreeGeneration,
+            amountCharged: usedFreeGeneration ? 0 : generationCost?.userPricePaise ?? 0,
+            transactionId: walletTransactionId,
+          },
         },
         201
       );

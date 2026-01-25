@@ -15,3 +15,6 @@ export * from "./cart";
 
 // AI generations, likes, banned prompts, and usage tracking
 export * from "./ai-generations";
+
+// Wallet transactions and pricing config
+export * from "./wallet";

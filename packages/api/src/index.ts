@@ -8,9 +8,12 @@ import { productsApp } from "./routes/products";
 import { cartApp } from "./routes/cart";
 import { ordersApp } from "./routes/orders";
 import { aiApp } from "./routes/ai";
+import { walletApp } from "./routes/wallet";
 import { razorpayWebhooksApp } from "./routes/webhooks/razorpay";
+import { walletWebhookApp } from "./routes/webhooks/wallet";
 import { adminProductsApp } from "./routes/admin/products";
 import { adminOrdersApp } from "./routes/admin/orders";
+import { adminWalletConfigApp } from "./routes/admin/wallet-config";
 import { sitemapApp } from "./routes/sitemap";
 
 const app = new Hono();
@@ -52,6 +55,9 @@ app.route("/api/orders", ordersApp);
 // AI API - generate, list generations, gallery
 app.route("/api/ai", aiApp);
 
+// Wallet API - balance, transactions, top-up
+app.route("/api/wallet", walletApp);
+
 // ============================================================================
 // Admin API Routes (Protected with role-based access)
 // ============================================================================
@@ -62,12 +68,18 @@ app.route("/api/admin/products", adminProductsApp);
 // Admin Orders API - order management
 app.route("/api/admin/orders", adminOrdersApp);
 
+// Admin Wallet Config API - pricing and stats
+app.route("/api/admin/wallet-config", adminWalletConfigApp);
+
 // ============================================================================
 // Webhook Routes (External Service Callbacks)
 // ============================================================================
 
 // Razorpay payment webhooks
 app.route("/api/webhooks/razorpay", razorpayWebhooksApp);
+
+// Wallet top-up webhooks
+app.route("/api/webhooks/wallet", walletWebhookApp);
 
 // ============================================================================
 // SEO Routes

@@ -142,11 +142,23 @@ export const users = pgTable(
     // Trade program
     tradeStatus: tradeStatusEnum("trade_status").default("none").notNull(),
 
-    // AI generation credits
+    // AI generation credits (legacy - use wallet for new payments)
     aiCreditsRemaining: integer("ai_credits_remaining").default(5).notNull(),
     aiSubscriptionTier: aiSubscriptionTierEnum("ai_subscription_tier").default(
       "free"
     ),
+
+    // Wallet system
+    walletBalancePaise: integer("wallet_balance_paise").default(0).notNull(),
+    freeGenerationsRemaining: integer("free_generations_remaining")
+      .default(3)
+      .notNull(),
+    totalWalletTopUpsPaise: integer("total_wallet_top_ups_paise")
+      .default(0)
+      .notNull(),
+    totalWalletSpentPaise: integer("total_wallet_spent_paise")
+      .default(0)
+      .notNull(),
 
     // Notification preferences (stored as JSONB)
     notificationPreferences: jsonb("notification_preferences")

@@ -18,7 +18,8 @@ import {
   type AIStylePreset,
   type AIAspectRatio,
   type AIModelProvider,
-} from "../database/schema/ai-generations";
+} from "../database/schema";
+import { refundToWallet } from "../services/wallet";
 
 // ============================================================================
 // Type Definitions
@@ -224,8 +225,74 @@ async function processAIGenerationJob(
       retryCount: job.attemptsMade,
     });
 
+    // Refund wallet if this was the last retry attempt
+    if (userId && job.attemptsMade >= (job.opts.attempts || 3) - 1) {
+      try {
+        await refundForFailedGeneration(userId, generationId, errorMessage);
+      } catch (refundError) {
+        // Log refund error but don't throw - the main error is more important
+        console.error(
+          `Failed to refund for generation ${generationId}:`,
+          refundError instanceof Error ? refundError.message : refundError
+        );
+      }
+    }
+
     throw error;
   }
+}
+
+/**
+ * Refund wallet for a failed generation
+ */
+async function refundForFailedGeneration(
+  userId: string,
+  generationId: string,
+  reason: string
+): Promise<void> {
+  // Find the debit transaction for this generation
+  const debitTransaction = await db.query.walletTransactions.findFirst({
+    where: (wt, { and, eq }) =>
+      and(
+        eq(wt.userId, userId),
+        eq(wt.aiGenerationId, generationId),
+        eq(wt.type, "debit"),
+        eq(wt.status, "completed")
+      ),
+  });
+
+  if (!debitTransaction) {
+    // No transaction found - likely used free generation
+    return;
+  }
+
+  // Check if already refunded
+  const existingRefund = await db.query.walletTransactions.findFirst({
+    where: (wt, { and, eq }) =>
+      and(
+        eq(wt.userId, userId),
+        eq(wt.aiGenerationId, generationId),
+        eq(wt.type, "refund")
+      ),
+  });
+
+  if (existingRefund) {
+    // Already refunded
+    return;
+  }
+
+  // Process refund
+  await refundToWallet(
+    userId,
+    debitTransaction.amountPaise,
+    `Generation failed: ${reason}`,
+    debitTransaction.id,
+    generationId
+  );
+
+  console.info(
+    `Refunded ${debitTransaction.amountPaise} paise to user ${userId} for failed generation ${generationId}`
+  );
 }
 
 // ============================================================================

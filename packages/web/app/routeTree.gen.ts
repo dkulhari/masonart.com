@@ -28,6 +28,7 @@ import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account
 import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
 import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
+import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
 import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
 import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
 
@@ -125,6 +126,11 @@ const AdminOrdersIdRoute = AdminOrdersIdRouteImport.update({
   path: '/orders/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AuthedAccountWalletRoute = AuthedAccountWalletRouteImport.update({
+  id: '/account/wallet',
+  path: '/account/wallet',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAccountOrdersRoute = AuthedAccountOrdersRouteImport.update({
   id: '/account/orders',
   path: '/account/orders',
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/posters': typeof PostersIndexRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/orders': typeof AuthedAccountOrdersRoute
+  '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByTo {
   '/posters': typeof PostersIndexRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/orders': typeof AuthedAccountOrdersRoute
+  '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/posters/': typeof PostersIndexRoute
   '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/_authed/account/orders': typeof AuthedAccountOrdersRoute
+  '/_authed/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/posters'
     | '/account/ai-creations'
     | '/account/orders'
+    | '/account/wallet'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
@@ -242,6 +252,7 @@ export interface FileRouteTypes {
     | '/posters'
     | '/account/ai-creations'
     | '/account/orders'
+    | '/account/wallet'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/posters/'
     | '/_authed/account/ai-creations'
     | '/_authed/account/orders'
+    | '/_authed/account/wallet'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
@@ -423,6 +435,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/_authed/account/wallet': {
+      id: '/_authed/account/wallet'
+      path: '/account/wallet'
+      fullPath: '/account/wallet'
+      preLoaderRoute: typeof AuthedAccountWalletRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/account/orders': {
       id: '/_authed/account/orders'
       path: '/account/orders'
@@ -443,12 +462,14 @@ declare module '@tanstack/react-router' {
 interface AuthedRouteChildren {
   AuthedAccountAiCreationsRoute: typeof AuthedAccountAiCreationsRoute
   AuthedAccountOrdersRoute: typeof AuthedAccountOrdersRoute
+  AuthedAccountWalletRoute: typeof AuthedAccountWalletRoute
   AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAccountAiCreationsRoute: AuthedAccountAiCreationsRoute,
   AuthedAccountOrdersRoute: AuthedAccountOrdersRoute,
+  AuthedAccountWalletRoute: AuthedAccountWalletRoute,
   AuthedAccountIndexRoute: AuthedAccountIndexRoute,
 }
 
