@@ -13,6 +13,7 @@ A comprehensive guide for maintaining and updating tests as the MasonArt platfor
 | **[TEST-COVERAGE.md](./TEST-COVERAGE.md)** | Comprehensive test coverage report with counts by category |
 | **[TEST-EXECUTION-RESULTS.md](./TEST-EXECUTION-RESULTS.md)** | Latest test execution results and metrics |
 | **[TEST-EXECUTION-REMEDIATION.md](./TEST-EXECUTION-REMEDIATION.md)** | Remediation steps for failing tests |
+| **[ROLES-AND-CAPABILITIES.md](./ROLES-AND-CAPABILITIES.md)** | User roles, permissions, and test coverage by role |
 | **[Manual Tests](./manual-tests/)** | 34 manual test documentation files (500+ test cases) |
 
 ### Manual Test Documents by Category
