@@ -41,7 +41,7 @@ export async function initSuperAdmin(): Promise<{
       .where(eq(users.email, SUPER_ADMIN_EMAIL))
       .limit(1);
 
-    if (existing.length > 0) {
+    if (existing.length > 0 && existing[0]) {
       const user = existing[0];
 
       // Ensure the existing user has super-admin role

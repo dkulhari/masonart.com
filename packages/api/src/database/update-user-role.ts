@@ -11,18 +11,21 @@ import { db, closeDatabase } from "./index";
 import { users } from "./schema";
 import { eq } from "drizzle-orm";
 
-const email = process.argv[2];
-const role = process.argv[3];
+const emailArg = process.argv[2];
+const roleArg = process.argv[3];
 
-if (!email || !role) {
+if (!emailArg || !roleArg) {
   console.error("Usage: bun run update-user-role.ts <email> <role>");
   console.error("Roles: customer, trade, admin, super-admin");
   process.exit(1);
 }
 
+const email: string = emailArg;
+const role: string = roleArg;
+
 const validRoles = ["customer", "trade", "admin", "super-admin"];
-if (!validRoles.includes(role)) {
-  console.error(`Invalid role: ${role}`);
+if (!validRoles.includes(roleArg)) {
+  console.error(`Invalid role: ${roleArg}`);
   console.error(`Valid roles: ${validRoles.join(", ")}`);
   process.exit(1);
 }

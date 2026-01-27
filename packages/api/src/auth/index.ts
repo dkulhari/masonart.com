@@ -147,7 +147,9 @@ export const auth = betterAuth({
    */
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true,
+    // Only require email verification in production
+    // In development/test, allow immediate login after registration
+    requireEmailVerification: process.env.NODE_ENV === "production",
     // Password requirements
     minPasswordLength: 8,
     maxPasswordLength: 128,
