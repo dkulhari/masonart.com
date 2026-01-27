@@ -1,0 +1,98 @@
+ticket_number: 32
+title: 'Frontend - Review Submission Form'
+description: |-
+  Create review submission form with star rating selector following established form patterns.
+
+  ## Implementation Details
+
+  ### Components Location
+  `packages/web/app/components/reviews/`
+
+  ### Components to Create
+
+  **ReviewForm.tsx**
+  - Interactive star rating selector (1-5)
+  - Title input (optional, max 255 chars)
+  - Content textarea (required, min 10 chars, max 5000)
+  - Character counter for content
+  - Submit button with loading state
+  - Success/error feedback
+
+  **InteractiveStarRating.tsx**
+  - NOT CREATED - Used existing StarRating component with interactive prop instead
+
+  ### Form Validation
+  - Client-side validation matching API schema
+  - Real-time feedback on field errors
+  - Disable submit until valid
+
+  ### State Management
+  - Form state with useState
+  - Custom onSubmit handler for API integration
+  - Success and error states
+
+  ### User Flow
+  1. User clicks "Write a Review" button
+  2. Modal or inline form appears
+  3. User selects rating, enters review
+  4. On submit: loading state, API call
+  5. Success: show confirmation, close form
+  6. Error: show error message, keep form open
+
+  ## Acceptance Criteria
+  - [x] Interactive star rating with accessibility
+  - [x] Form validation matching API requirements
+  - [x] Loading and error states handled
+  - [x] Requires authentication to submit (shows login prompt)
+  - [x] Component tests passing (27 tests)
+  - [ ] E2E tests for submission flow (deferred to ticket #35)
+feature: user-reviews
+type: task
+priority: high
+status: done
+assignee: claude
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T03:00:00.000Z'
+resolved: '2026-01-28T03:00:00.000Z'
+time_spent_minutes: 15
+labels:
+  - frontend
+  - forms
+  - react
+acceptance_criteria:
+  - Interactive star rating with accessibility
+  - Form validation matching API requirements
+  - Loading and error states handled
+  - Requires authentication to submit
+  - Component tests passing
+comments:
+  - author: claude
+    timestamp: '2026-01-28T02:50:00.000Z'
+    content: |-
+      Decision: Using existing StarRating component with interactive prop instead of creating
+      separate InteractiveStarRating. StarRating already supports click, keyboard nav,
+      hover preview via the interactive mode added in ticket #31.
+  - author: claude
+    timestamp: '2026-01-28T03:00:00.000Z'
+    content: |-
+      Completed ReviewForm implementation with 27 tests passing:
+      - Star rating integration using existing component
+      - Title input (optional, 255 char limit)
+      - Content textarea (required, 10-5000 chars)
+      - Character counters for both fields
+      - Form validation with touched state
+      - Loading/success/error states
+      - Modal and inline variants
+      - Login prompt for unauthenticated users
+      - ReviewFormSkeleton for loading state
+work_sessions:
+  - date: '2026-01-28'
+    minutes: 15
+    description: Created ReviewForm component and tests
+related_tickets: []
+blocked_by:
+  - 29
+blocks:
+  - 33
+attachments: []
