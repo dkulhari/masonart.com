@@ -13,7 +13,7 @@ The MasonArt e-commerce platform has comprehensive test coverage across all laye
 | **Unit Tests (API)** | 20 | 2,100+ | ✅ All Pass |
 | **Unit Tests (Web)** | 6 | 618 | ✅ All Pass |
 | **Integration Tests** | 4 | 178 | ✅ All Pass |
-| **E2E Tests (Playwright)** | 27 | 1,812 total (1,505 pass, 288 skip) | ✅ Stable |
+| **E2E Tests (Playwright)** | 27 | 1,812 total (1,570 pass, 223 skip) | ✅ Stable |
 | **Manual Test Docs** | 34 | 500+ test cases | ✅ Complete |
 
 **Total Automated Tests:** ~4,700+ test cases
@@ -185,7 +185,7 @@ bunx vitest run tests/setup/ tests/integration/
 |-----------|-------------|-------------|
 | `seo-meta.spec.ts` | 57 | Meta tags validation |
 | `seo-jsonld.spec.ts` | 66 | JSON-LD structured data |
-| `sitemap.spec.ts` | 65 | Sitemap.xml validation |
+| `sitemap.spec.ts` | 65 | Sitemap.xml validation ✅ |
 | `robots.spec.ts` | 50 | robots.txt validation |
 
 ### Flow Tests (User Journeys)
@@ -203,17 +203,16 @@ As of 2026-01-27:
 | Metric | Count | Notes |
 |--------|-------|-------|
 | **Total Tests** | 1,812 | Across 27 spec files |
-| **Passing** | 1,505 | 83% pass rate |
-| **Skipped** | 288 | Intentionally skipped |
+| **Passing** | 1,570 | 87% pass rate |
+| **Skipped** | 223 | Intentionally skipped |
 | **Failing** | 0 | All active tests pass |
 
 **Skipped Tests Breakdown:**
-- Sitemap tests: ~65 (sitemap.xml not implemented)
 - Trade-specific features: ~19 (not yet implemented)
 - Mobile filter edge cases: ~15 (viewport limitations)
 - Auth flow SSR tests: ~20 (hydration differences)
 - Payment mock tests: ~30 (environment limitations)
-- Other: ~139 (various documented reasons)
+- Other: ~189 (various documented reasons)
 
 ### Browser Projects
 All E2E tests run across 5 browser configurations:
@@ -370,10 +369,10 @@ SKIP_E2E_SERVER=true
 - Use `test.describe.configure({ mode: 'serial' })` for auth-dependent test suites
 - Add small waits in beforeEach to ensure state file is ready
 
-### 11. Sitemap Not Implemented
-- sitemap.xml endpoint returns 404
-- All sitemap E2E tests are skipped until implementation
-- See `tests/e2e/sitemap.spec.ts` for test structure when ready
+### 11. Sitemap Implementation
+- sitemap.xml endpoint is fully implemented at `packages/api/src/routes/sitemap.ts`
+- E2E tests are enabled in `tests/e2e/sitemap.spec.ts`
+- Includes caching and proper XML format validation
 
 ---
 
@@ -385,20 +384,17 @@ SKIP_E2E_SERVER=true
 3. **Real Payment Processing** - Uses test mode only
 4. **Image Generation** - Requires AI service integration
 5. **File Uploads** - Requires MinIO/S3 service
-6. **Sitemap Generation** - Endpoint not implemented (sitemap.xml returns 404)
 
 ### Intentionally Skipped E2E Tests
-1. **Sitemap tests** (~65 tests) - sitemap.xml not implemented
-2. **Mobile filter backdrop tests** - Sheet covers entire viewport, no backdrop clickable
-3. **SSR-dependent auth flow tests** - Server-side rendering differences in hydration
-4. **Payment processing tests** - Cannot safely mock Razorpay in E2E environment
+1. **Mobile filter backdrop tests** - Sheet covers entire viewport, no backdrop clickable
+2. **SSR-dependent auth flow tests** - Server-side rendering differences in hydration
+3. **Payment processing tests** - Cannot safely mock Razorpay in E2E environment
 
 ### Recommended Future Additions
 1. Visual regression tests with Playwright screenshots
 2. Performance benchmarks with Lighthouse CI
 3. Load testing with k6 or Artillery
 4. Security scanning with npm audit / Snyk
-5. Implement sitemap.xml generation and re-enable sitemap tests
 
 ---
 
