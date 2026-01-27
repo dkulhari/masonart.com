@@ -16,6 +16,12 @@ import { adminProductsApp } from "./routes/admin/products";
 import { adminOrdersApp } from "./routes/admin/orders";
 import { adminWalletConfigApp } from "./routes/admin/wallet-config";
 import { sitemapApp } from "./routes/sitemap";
+import {
+  productReviewsApp,
+  createReviewApp,
+  reviewsApp,
+  protectedReviewsApp,
+} from "./routes/reviews";
 
 const app = new Hono();
 
@@ -61,6 +67,13 @@ app.route("/api/wallet", walletApp);
 
 // Phone Auth API - SMS OTP login
 app.route("/api/phone-auth", phoneAuthApp);
+
+// Reviews API - product reviews (public read, auth for write)
+// Note: Reviews use nested paths under products and separate /api/reviews
+app.route("/api/products/:productId/reviews", productReviewsApp);
+app.route("/api/products/:productId/reviews", createReviewApp);
+app.route("/api/reviews", reviewsApp);
+app.route("/api/reviews", protectedReviewsApp);
 
 // ============================================================================
 // Admin API Routes (Protected with role-based access)
