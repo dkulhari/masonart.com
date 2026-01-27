@@ -22,6 +22,7 @@ import { Route as PostersSlugRouteImport } from './routes/posters/$slug'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout/success'
 import { Route as AuthRegisterRouteImport } from './routes/auth/register'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
+import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
@@ -96,6 +97,11 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
   path: '/auth/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminReviewsRoute = AdminReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProductsIndexRoute = AdminProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -146,6 +152,7 @@ const AuthedAccountAiCreationsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admin/reviews': typeof AdminReviewsRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/reviews': typeof AdminReviewsRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
+  '/admin/reviews': typeof AdminReviewsRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -218,6 +227,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/admin/reviews'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin/reviews'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
@@ -264,6 +275,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authed'
     | '/admin'
+    | '/admin/reviews'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
@@ -393,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/reviews': {
+      id: '/admin/reviews'
+      path: '/reviews'
+      fullPath: '/admin/reviews'
+      preLoaderRoute: typeof AdminReviewsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/products/': {
       id: '/admin/products/'
       path: '/products'
@@ -477,6 +496,7 @@ const AuthedRouteWithChildren =
   AuthedRoute._addFileChildren(AuthedRouteChildren)
 
 interface AdminRouteChildren {
+  AdminReviewsRoute: typeof AdminReviewsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminOrdersIdRoute: typeof AdminOrdersIdRoute
   AdminProductsIdRoute: typeof AdminProductsIdRoute
@@ -486,6 +506,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminReviewsRoute: AdminReviewsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminOrdersIdRoute: AdminOrdersIdRoute,
   AdminProductsIdRoute: AdminProductsIdRoute,

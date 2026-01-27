@@ -24,6 +24,7 @@ import {
   BarChart3,
   Tags,
   ImageIcon,
+  MessageSquare,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { authApi } from '~/lib/api'
@@ -69,6 +70,11 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Orders',
     href: '/admin/orders',
     icon: ShoppingCart,
+  },
+  {
+    label: 'Reviews',
+    href: '/admin/reviews',
+    icon: MessageSquare,
   },
   {
     label: 'AI Generations',

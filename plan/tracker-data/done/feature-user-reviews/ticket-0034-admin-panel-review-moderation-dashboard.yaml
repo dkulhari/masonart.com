@@ -1,0 +1,109 @@
+ticket_number: 34
+title: 'Admin Panel - Review Moderation Dashboard'
+description: |-
+  Create admin dashboard for review moderation following existing admin panel patterns.
+
+  ## Implementation Details
+
+  ### Route Location
+  `packages/web/app/routes/admin/reviews.tsx`
+
+  ### Components
+
+  **AdminReviewsPage**
+  - Page layout matching other admin pages
+  - Stats cards at top (pending, approved, rejected, today)
+  - Filterable review list below
+  - Bulk actions support
+
+  **ReviewRow (inline component)**
+  - Product name with external link
+  - Author avatar and info
+  - Star rating display
+  - Content preview with expandable details
+  - Status badge
+  - Quick approve/reject buttons
+  - Action menu with delete option
+
+  **Reject Modal**
+  - Moderator notes textarea
+  - Confirm/Cancel buttons
+
+  **AdminReviewFilters (inline)**
+  - Status filter pills (all, pending, approved, rejected)
+  - Search input for product/author
+
+  ### Features Implemented
+  - Stats cards with real-time counts (pending, approved, rejected, today)
+  - Pending count badge on filter pill
+  - Bulk approve/reject selected reviews
+  - Row selection with select all
+  - Expandable rows for full content view
+  - Quick approve/reject on pending reviews
+  - Moderator notes on rejection
+  - Search by product or author
+  - Pagination with prev/next
+  - Delete review functionality
+
+  ### Navigation
+  - Added "Reviews" to admin sidebar with MessageSquare icon
+  - Stats cards link to filtered views
+
+  ## Acceptance Criteria
+  - [x] Admin-only access enforced (via parent /admin route)
+  - [x] Stats dashboard with pending count
+  - [x] Filter and search functionality
+  - [x] Quick approve/reject workflow
+  - [x] Moderator notes tracked
+  - [ ] E2E tests passing (deferred to ticket #35)
+  - [x] Matches existing admin panel styling
+feature: user-reviews
+type: task
+priority: high
+status: done
+assignee: claude
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T03:50:00.000Z'
+resolved: '2026-01-28T03:50:00.000Z'
+time_spent_minutes: 30
+labels:
+  - admin
+  - frontend
+  - moderation
+acceptance_criteria:
+  - Admin-only access enforced
+  - Stats dashboard with pending count
+  - Filter and search functionality
+  - Quick approve/reject workflow
+  - Moderator notes tracked
+  - E2E tests passing
+  - Matches existing admin panel styling
+comments:
+  - author: claude
+    timestamp: '2026-01-28T03:50:00.000Z'
+    content: |-
+      Completed admin reviews moderation dashboard with:
+      - Full page at /admin/reviews with stats cards
+      - Review table with selection, filtering, pagination
+      - Quick approve/reject actions on pending reviews
+      - Expandable rows for full review content
+      - Bulk actions for mass moderation
+      - Moderator notes on rejection
+      - Added "Reviews" link to admin sidebar
+
+      Deferred features to ticket #35:
+      - Keyboard shortcuts (a/r/n)
+      - Date range filter
+      - Author history view
+      - E2E tests
+work_sessions:
+  - date: '2026-01-28'
+    minutes: 30
+    description: Created admin reviews page with moderation features
+related_tickets: []
+blocked_by:
+  - 30
+blocks:
+  - 35
+attachments: []
