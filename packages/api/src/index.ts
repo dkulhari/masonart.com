@@ -15,6 +15,7 @@ import { walletWebhookApp } from "./routes/webhooks/wallet";
 import { adminProductsApp } from "./routes/admin/products";
 import { adminOrdersApp } from "./routes/admin/orders";
 import { adminWalletConfigApp } from "./routes/admin/wallet-config";
+import { adminReviewsApp } from "./routes/admin/reviews";
 import { sitemapApp } from "./routes/sitemap";
 import {
   productReviewsApp,
@@ -87,6 +88,9 @@ app.route("/api/admin/orders", adminOrdersApp);
 
 // Admin Wallet Config API - pricing and stats
 app.route("/api/admin/wallet-config", adminWalletConfigApp);
+
+// Admin Reviews API - moderation
+app.route("/api/admin/reviews", adminReviewsApp);
 
 // ============================================================================
 // Webhook Routes (External Service Callbacks)
