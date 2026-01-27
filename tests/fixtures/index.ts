@@ -111,6 +111,24 @@ export type {
 } from './ai';
 
 // ============================================================================
+// Review fixtures
+// ============================================================================
+export {
+  mockReviews,
+  validReviewContent,
+  invalidReviewContent,
+  generateRandomReview,
+  generateRandomReviews,
+} from './reviews';
+
+export type {
+  Review,
+  ReviewAuthor,
+  ReviewProduct,
+  ReviewStats,
+} from './reviews';
+
+// ============================================================================
 // Playwright E2E test helpers
 // ============================================================================
 export {
