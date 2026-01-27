@@ -438,7 +438,7 @@ canAccess(user, resourceOwnerId) // boolean
 |------|------------|------------|--------|
 | Guest | N/A | Multiple (unauthenticated sections) | ✅ Covered |
 | Customer | `customer.json` | account, wallet, ai-generator, ai-history | ✅ Covered |
-| Trade | ❌ None | ❌ None | ⚠️ **Missing** |
+| Trade | `trade.json` | trade.spec.ts | ✅ Covered |
 | Admin | `admin.json` | admin-auth, admin-dashboard, admin-orders, admin-products | ✅ Covered |
 | Super-Admin | ❌ None | ❌ None | ⚠️ **Not needed yet** |
 
@@ -461,6 +461,12 @@ canAccess(user, resourceOwnerId) // boolean
 - `tests/e2e/checkout.spec.ts` (authenticated checkout)
 - `tests/e2e/admin-auth.spec.ts` (verifies customer cannot access admin)
 
+**Trade:**
+- `tests/e2e/trade.spec.ts` - Tests trade user access to:
+  - Customer features (account, wallet, AI generator, shopping)
+  - Admin restriction (verifies trade cannot access admin)
+  - Placeholder tests for future trade-specific features (skipped)
+
 **Admin:**
 - `tests/e2e/admin-auth.spec.ts`
 - `tests/e2e/admin-dashboard.spec.ts`
@@ -470,12 +476,15 @@ canAccess(user, resourceOwnerId) // boolean
 
 ### Recommended Future Tests
 
-**Trade Role:**
-- Trade application submission
-- Trade application approval flow
-- Wholesale pricing display
-- Trade dashboard access
-- Bulk ordering features
+**Trade Role (when features are implemented):**
+- ~~Trade application submission~~ (placeholder test exists)
+- ~~Trade application approval flow~~ (placeholder test exists)
+- ~~Wholesale pricing display~~ (placeholder test exists)
+- ~~Trade dashboard access~~ (placeholder test exists)
+- ~~Bulk ordering features~~ (placeholder test exists)
+
+Note: `trade.spec.ts` contains skipped placeholder tests for all trade-specific
+features. Remove `.skip` when implementing each feature.
 
 **Super-Admin Role (when differentiated):**
 - User role management
