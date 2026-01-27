@@ -184,6 +184,9 @@ test.describe('Login Page', () => {
     });
 
     test('should toggle password visibility when clicking eye icon', async ({ page }) => {
+      // Wait for hydration before interacting
+      await page.waitForLoadState('networkidle');
+
       const input = page.locator('#password');
       const toggle = page.locator('#password').locator('..').locator('button');
 
@@ -192,11 +195,11 @@ test.describe('Login Page', () => {
 
       // Click toggle
       await toggle.click();
-      await expect(input).toHaveAttribute('type', 'text');
+      await expect(input).toHaveAttribute('type', 'text', { timeout: 5000 });
 
       // Click again to hide
       await toggle.click();
-      await expect(input).toHaveAttribute('type', 'password');
+      await expect(input).toHaveAttribute('type', 'password', { timeout: 5000 });
     });
 
     test('should display Forgot password link', async ({ page }) => {
@@ -213,6 +216,7 @@ test.describe('Login Page', () => {
   test.describe('Form Validation', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/auth/login');
+      await page.waitForLoadState('networkidle');
     });
 
     test('should show error for empty email', async ({ page }) => {
@@ -221,7 +225,7 @@ test.describe('Login Page', () => {
       await input.blur();
 
       const error = page.locator('text=Email is required');
-      await expect(error).toBeVisible();
+      await expect(error).toBeVisible({ timeout: 5000 });
     });
 
     test('should show error for invalid email format', async ({ page }) => {
@@ -294,35 +298,46 @@ test.describe('Login Page', () => {
     });
 
     test('should have arrow icon in button', async ({ page }) => {
-      const button = page.locator('button[type="submit"]');
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
       const icon = button.locator('svg');
       await expect(icon).toBeVisible();
     });
 
     test('should be disabled when form is invalid', async ({ page }) => {
-      const button = page.locator('button[type="submit"]');
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
       await expect(button).toBeDisabled();
     });
 
     test('should be enabled when form is valid', async ({ page }) => {
+      await page.waitForLoadState('networkidle');
+
       await page.fill('#email', 'test@example.com');
       await page.fill('#password', 'password123');
 
-      const button = page.locator('button[type="submit"]');
-      await expect(button).not.toBeDisabled();
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
+      await expect(button).not.toBeDisabled({ timeout: 5000 });
     });
 
     test('should have muted style when disabled', async ({ page }) => {
-      const button = page.locator('button[type="submit"]');
+      await page.waitForLoadState('networkidle');
+
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
       await expect(button).toHaveClass(/bg-muted/);
     });
 
     test('should have brand color when enabled', async ({ page }) => {
+      await page.waitForLoadState('networkidle');
+
       await page.fill('#email', 'test@example.com');
       await page.fill('#password', 'password123');
 
-      const button = page.locator('button[type="submit"]');
-      await expect(button).toHaveClass(/bg-brand-500/);
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
+      await expect(button).toHaveClass(/bg-brand-500/, { timeout: 5000 });
     });
   });
 
@@ -352,19 +367,22 @@ test.describe('Login Page', () => {
     });
 
     test('should display Terms of Service link', async ({ page }) => {
-      const link = page.locator('a[href="/terms"]');
+      const mainContent = page.locator('main');
+      const link = mainContent.locator('a[href="/terms"]');
       await expect(link).toBeVisible();
       await expect(link).toContainText('Terms of Service');
     });
 
     test('should display Privacy Policy link', async ({ page }) => {
-      const link = page.locator('a[href="/privacy"]');
+      const mainContent = page.locator('main');
+      const link = mainContent.locator('a[href="/privacy"]');
       await expect(link).toBeVisible();
       await expect(link).toContainText('Privacy Policy');
     });
 
     test('should display "By signing in" terms text', async ({ page }) => {
-      const text = page.locator('text=By signing in');
+      const mainContent = page.locator('main');
+      const text = mainContent.locator('text=By signing in');
       await expect(text).toBeVisible();
     });
 
@@ -434,7 +452,8 @@ test.describe('Login Page', () => {
       await page.setViewportSize({ width: 375, height: 667 });
       await page.goto('/auth/login');
 
-      const form = page.locator('form');
+      const mainContent = page.locator('main');
+      const form = mainContent.locator('form');
       await expect(form).toBeVisible();
 
       const emailInput = page.locator('#email');
@@ -460,7 +479,8 @@ test.describe('Login Page', () => {
     test('should have centered layout', async ({ page }) => {
       await page.goto('/auth/login');
 
-      const centerContainer = page.locator('.flex.items-center.justify-center');
+      // Look for the specific page container with min-h-screen
+      const centerContainer = page.locator('.min-h-screen.items-center.justify-center');
       await expect(centerContainer).toBeVisible();
     });
   });
@@ -503,12 +523,14 @@ test.describe('Login Page', () => {
     });
 
     test('should show form errors accessibly', async ({ page }) => {
+      await page.waitForLoadState('networkidle');
+
       const input = page.locator('#email');
       await input.focus();
       await input.blur();
 
       const error = page.locator('text=Email is required');
-      await expect(error).toBeVisible();
+      await expect(error).toBeVisible({ timeout: 5000 });
     });
   });
 
@@ -721,16 +743,19 @@ test.describe('Register Page', () => {
     });
 
     test('should toggle password visibility', async ({ page }) => {
+      // Wait for hydration before interacting
+      await page.waitForLoadState('networkidle');
+
       const input = page.locator('#password');
       const toggle = page.locator('#password').locator('..').locator('button');
 
       await expect(input).toHaveAttribute('type', 'password');
 
       await toggle.click();
-      await expect(input).toHaveAttribute('type', 'text');
+      await expect(input).toHaveAttribute('type', 'text', { timeout: 5000 });
 
       await toggle.click();
-      await expect(input).toHaveAttribute('type', 'password');
+      await expect(input).toHaveAttribute('type', 'password', { timeout: 5000 });
     });
   });
 
@@ -741,6 +766,7 @@ test.describe('Register Page', () => {
   test.describe('Password Requirements', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/auth/register');
+      await page.waitForLoadState('networkidle');
     });
 
     test('should not display requirements initially', async ({ page }) => {
@@ -753,7 +779,7 @@ test.describe('Register Page', () => {
       await input.fill('a');
 
       const requirements = page.locator('text=At least 8 characters');
-      await expect(requirements).toBeVisible();
+      await expect(requirements).toBeVisible({ timeout: 5000 });
     });
 
     test('should display all 4 password requirements', async ({ page }) => {
@@ -803,6 +829,7 @@ test.describe('Register Page', () => {
   test.describe('Confirm Password Field', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/auth/register');
+      await page.waitForLoadState('networkidle');
     });
 
     test('should display Confirm Password label', async ({ page }) => {
@@ -844,6 +871,7 @@ test.describe('Register Page', () => {
   test.describe('Form Validation', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/auth/register');
+      await page.waitForLoadState('networkidle');
     });
 
     test('should show error for empty name', async ({ page }) => {
@@ -852,7 +880,7 @@ test.describe('Register Page', () => {
       await input.blur();
 
       const error = page.locator('text=Name is required');
-      await expect(error).toBeVisible();
+      await expect(error).toBeVisible({ timeout: 5000 });
     });
 
     test('should show error for short name', async ({ page }) => {
@@ -954,39 +982,52 @@ test.describe('Register Page', () => {
     });
 
     test('should have arrow icon in button', async ({ page }) => {
-      const button = page.locator('button[type="submit"]');
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
       const icon = button.locator('svg');
       await expect(icon).toBeVisible();
     });
 
     test('should be disabled when form is invalid', async ({ page }) => {
-      const button = page.locator('button[type="submit"]');
+      await page.waitForLoadState('networkidle');
+
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
       await expect(button).toBeDisabled();
     });
 
     test('should be enabled when form is valid', async ({ page }) => {
+      await page.waitForLoadState('networkidle');
+
       await page.fill('#name', 'John Doe');
       await page.fill('#email', 'john@example.com');
       await page.fill('#password', 'Password1');
       await page.fill('#confirmPassword', 'Password1');
 
-      const button = page.locator('button[type="submit"]');
-      await expect(button).not.toBeDisabled();
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
+      await expect(button).not.toBeDisabled({ timeout: 5000 });
     });
 
     test('should have muted style when disabled', async ({ page }) => {
-      const button = page.locator('button[type="submit"]');
+      await page.waitForLoadState('networkidle');
+
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
       await expect(button).toHaveClass(/bg-muted/);
     });
 
     test('should have brand color when enabled', async ({ page }) => {
+      await page.waitForLoadState('networkidle');
+
       await page.fill('#name', 'John Doe');
       await page.fill('#email', 'john@example.com');
       await page.fill('#password', 'Password1');
       await page.fill('#confirmPassword', 'Password1');
 
-      const button = page.locator('button[type="submit"]');
-      await expect(button).toHaveClass(/bg-brand-500/);
+      const mainContent = page.locator('main');
+      const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
+      await expect(button).toHaveClass(/bg-brand-500/, { timeout: 5000 });
     });
   });
 
@@ -1000,7 +1041,8 @@ test.describe('Register Page', () => {
     });
 
     test('should display Sign in link', async ({ page }) => {
-      const link = page.locator('a:has-text("Sign in")');
+      const mainContent = page.locator('main');
+      const link = mainContent.locator('a:has-text("Sign in")');
       await expect(link).toBeVisible();
     });
 
@@ -1016,24 +1058,28 @@ test.describe('Register Page', () => {
     });
 
     test('should display Terms of Service link', async ({ page }) => {
-      const link = page.locator('a[href="/terms"]');
+      const mainContent = page.locator('main');
+      const link = mainContent.locator('a[href="/terms"]');
       await expect(link).toBeVisible();
       await expect(link).toContainText('Terms of Service');
     });
 
     test('should display Privacy Policy link', async ({ page }) => {
-      const link = page.locator('a[href="/privacy"]');
+      const mainContent = page.locator('main');
+      const link = mainContent.locator('a[href="/privacy"]');
       await expect(link).toBeVisible();
       await expect(link).toContainText('Privacy Policy');
     });
 
     test('should display "By creating an account" terms text', async ({ page }) => {
-      const text = page.locator('text=By creating an account');
+      const mainContent = page.locator('main');
+      const text = mainContent.locator('text=By creating an account');
       await expect(text).toBeVisible();
     });
 
     test('should navigate to login page when clicking Sign in', async ({ page }) => {
-      const link = page.locator('a:has-text("Sign in")');
+      const mainContent = page.locator('main');
+      const link = mainContent.locator('a:has-text("Sign in")');
       await link.click();
       await expect(page).toHaveURL(/\/auth\/login/);
     });
@@ -1071,7 +1117,8 @@ test.describe('Register Page', () => {
       await page.setViewportSize({ width: 375, height: 667 });
       await page.goto('/auth/register');
 
-      const form = page.locator('form');
+      const mainContent = page.locator('main');
+      const form = mainContent.locator('form');
       await expect(form).toBeVisible();
 
       const nameInput = page.locator('#name');
@@ -1097,13 +1144,14 @@ test.describe('Register Page', () => {
     test('should have centered layout', async ({ page }) => {
       await page.goto('/auth/register');
 
-      const centerContainer = page.locator('.flex.items-center.justify-center');
+      const centerContainer = page.locator('.min-h-screen.items-center.justify-center');
       await expect(centerContainer).toBeVisible();
     });
 
     test('should handle long password requirements list on mobile', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
       await page.goto('/auth/register');
+      await page.waitForLoadState('networkidle');
 
       await page.fill('#password', 'a');
 
@@ -1119,6 +1167,7 @@ test.describe('Register Page', () => {
   test.describe('Accessibility', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/auth/register');
+      await page.waitForLoadState('networkidle');
     });
 
     test('should have proper heading hierarchy', async ({ page }) => {
@@ -1240,7 +1289,8 @@ test.describe('Auth Error Handling', () => {
     await page.goto('/auth/login');
 
     // Page should load without crashing
-    const form = page.locator('form');
+    const mainContent = page.locator('main');
+    const form = mainContent.locator('form');
     await expect(form).toBeVisible();
   });
 
@@ -1248,7 +1298,8 @@ test.describe('Auth Error Handling', () => {
     await page.goto('/auth/register');
 
     // Page should load without crashing
-    const form = page.locator('form');
+    const mainContent = page.locator('main');
+    const form = mainContent.locator('form');
     await expect(form).toBeVisible();
   });
 });

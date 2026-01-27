@@ -121,11 +121,13 @@ async function mockOrderResponse(page: Page, order: {
 
 /**
  * Mock order API error response
+ * Note: 404 returns null and shows GenericSuccessState
+ * Use 500 to trigger actual error state
  */
 async function mockOrderError(page: Page, errorMessage: string = 'Order not found') {
   await page.route('**/api/orders/**', async (route) => {
     await route.fulfill({
-      status: 404,
+      status: 500,
       contentType: 'application/json',
       body: JSON.stringify({
         success: false,
@@ -170,7 +172,7 @@ test.describe('Order Confirmation - Success Header', () => {
 
   test('should display success check icon', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const successIcon = page.locator('.bg-green-100 svg');
+    const successIcon = page.locator('.bg-green-100 svg').first();
     await expect(successIcon).toBeVisible();
   });
 
@@ -182,19 +184,19 @@ test.describe('Order Confirmation - Success Header', () => {
 
   test('should display thank you message', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const message = page.locator('text=Thank you for your purchase');
+    const message = page.getByText('Thank you for your purchase');
     await expect(message).toBeVisible();
   });
 
   test('should display order number', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const orderNumber = page.locator('text=ORD-20260119-001');
+    const orderNumber = page.getByText('ORD-20260119-001', { exact: true });
     await expect(orderNumber).toBeVisible();
   });
 
   test('should display Order Number label', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const label = page.locator('text=Order Number');
+    const label = page.getByText('Order Number', { exact: true });
     await expect(label).toBeVisible();
   });
 
@@ -207,13 +209,13 @@ test.describe('Order Confirmation - Success Header', () => {
 
   test('should display email confirmation notice', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const emailNotice = page.locator('text=Confirmation email sent to');
+    const emailNotice = page.getByText(/Confirmation email sent to/);
     await expect(emailNotice).toBeVisible();
   });
 
   test('should display user email address', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const email = page.locator('text=john.doe@example.com');
+    const email = page.getByText('john.doe@example.com', { exact: true });
     await expect(email).toBeVisible();
   });
 });
@@ -301,7 +303,7 @@ test.describe('Order Confirmation - Order Items', () => {
 
   test('should display item count in header', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const itemCount = page.locator('text=Order Items (2)');
+    const itemCount = page.getByText('Order Items (2)', { exact: true });
     await expect(itemCount).toBeVisible();
   });
 
@@ -313,31 +315,43 @@ test.describe('Order Confirmation - Order Items', () => {
 
   test('should display product titles', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=Abstract Sunset Poster')).toBeVisible();
-    await expect(page.locator('text=Mountain Landscape Art')).toBeVisible();
+    // Wait for order items to load
+    await expect(page.locator('h2:has-text("Order Items")')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Abstract Sunset Poster', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mountain Landscape Art', { exact: true })).toBeVisible();
   });
 
   test('should display product sizes', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=24x32 inches')).toBeVisible();
-    await expect(page.locator('text=18x24 inches')).toBeVisible();
+    // Wait for order items to load
+    await expect(page.locator('h2:has-text("Order Items")')).toBeVisible({ timeout: 10000 });
+    // Size may be combined with frame name (e.g., "24x32 inches • Black Wood Frame")
+    await expect(page.getByText('24x32 inches').first()).toBeVisible();
+    await expect(page.getByText('18x24 inches').first()).toBeVisible();
   });
 
   test('should display frame name when applicable', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=Black Wood Frame')).toBeVisible();
+    // Wait for order items to load
+    await expect(page.locator('h2:has-text("Order Items")')).toBeVisible({ timeout: 10000 });
+    // Frame name may be combined with size (e.g., "24x32 inches • Black Wood Frame")
+    await expect(page.getByText('Black Wood Frame').first()).toBeVisible();
   });
 
   test('should display quantities', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=Qty: 2')).toBeVisible();
-    await expect(page.locator('text=Qty: 1')).toBeVisible();
+    // Wait for order items to load
+    await expect(page.locator('h2:has-text("Order Items")')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Qty: 2', { exact: true })).toBeVisible();
+    await expect(page.getByText('Qty: 1', { exact: true })).toBeVisible();
   });
 
   test('should display item totals', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    // Items should show their individual totals in INR format
-    const priceElements = page.locator('text=/\u20B9[\\d,]+/');
+    // Wait for order items section to load
+    await expect(page.locator('h2:has-text("Order Items")')).toBeVisible({ timeout: 10000 });
+    // Items should show their individual totals in INR format (include decimal)
+    const priceElements = page.locator('text=/\u20B9[\\d,\\.]+/');
     const count = await priceElements.count();
     expect(count).toBeGreaterThanOrEqual(2);
   });
@@ -360,43 +374,46 @@ test.describe('Order Confirmation - Shipping Details', () => {
 
   test('should display map pin icon', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const shippingSection = page.locator('text=Shipping Details').locator('..');
+    const shippingSection = page.locator('h2:has-text("Shipping Details")').locator('..');
     await expect(shippingSection).toBeVisible();
   });
 
   test('should display recipient name', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=John Doe').first()).toBeVisible();
+    await expect(page.getByText('John Doe', { exact: true }).first()).toBeVisible();
   });
 
   test('should display address line 1', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=123 Test Street, Building A')).toBeVisible();
+    await expect(page.getByText('123 Test Street, Building A', { exact: true })).toBeVisible();
   });
 
   test('should display address line 2 when present', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=Near City Park')).toBeVisible();
+    await expect(page.getByText('Near City Park', { exact: true })).toBeVisible();
   });
 
   test('should display city, state, and postal code', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=Mumbai, Maharashtra - 400001')).toBeVisible();
+    await expect(page.getByText('Mumbai, Maharashtra - 400001', { exact: true })).toBeVisible();
   });
 
   test('should display phone number', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=9876543210')).toBeVisible();
+    await expect(page.getByText('9876543210', { exact: true })).toBeVisible();
   });
 
   test('should display delivery method', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=standard Delivery')).toBeVisible();
+    await expect(page.getByText('standard Delivery', { exact: true })).toBeVisible();
   });
 
   test('should display estimated delivery', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=5-7 business days')).toBeVisible();
+    // Wait for shipping details to load
+    await expect(page.locator('h2:has-text("Shipping Details")')).toBeVisible({ timeout: 10000 });
+    // Estimated delivery is shown as "Est. delivery: 5-7 business days"
+    await expect(page.getByText('5-7 business days').first()).toBeVisible();
   });
 
   test('should display truck icon for delivery method', async ({ page }) => {
@@ -429,19 +446,19 @@ test.describe('Order Confirmation - Payment Summary', () => {
 
   test('should display credit card icon', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const paymentSection = page.locator('text=Payment Summary').locator('..');
+    const paymentSection = page.locator('h2:has-text("Payment Summary")').locator('..');
     await expect(paymentSection).toBeVisible();
   });
 
   test('should display Subtotal', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const subtotal = page.locator('text=Subtotal');
+    const subtotal = page.getByText('Subtotal', { exact: true });
     await expect(subtotal).toBeVisible();
   });
 
   test('should display Discount when applicable', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const discount = page.locator('text=Discount');
+    const discount = page.getByText('Discount', { exact: true });
     await expect(discount).toBeVisible();
   });
 
@@ -453,8 +470,10 @@ test.describe('Order Confirmation - Payment Summary', () => {
 
   test('should display Shipping cost', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const shipping = page.locator('text=Shipping').first();
-    await expect(shipping).toBeVisible();
+    // Wait for Payment Summary section to load
+    await expect(page.locator('h2:has-text("Payment Summary")')).toBeVisible({ timeout: 10000 });
+    // Look for Shipping label in the Payment Summary section
+    await expect(page.getByText('Shipping', { exact: true }).first()).toBeVisible();
   });
 
   test('should display FREE shipping in green when applicable', async ({ page }) => {
@@ -470,13 +489,13 @@ test.describe('Order Confirmation - Payment Summary', () => {
 
   test('should display Total Paid', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const total = page.locator('text=Total Paid');
+    const total = page.getByText('Total Paid', { exact: true });
     await expect(total).toBeVisible();
   });
 
   test('should display payment status badge', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    const badge = page.locator('text=Payment Complete');
+    const badge = page.getByText('Payment Complete', { exact: true });
     await expect(badge).toBeVisible();
   });
 
@@ -524,6 +543,8 @@ test.describe('Order Confirmation - What Happens Next', () => {
 
   test('should display step numbers 1-4', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
+    // Wait for the "What Happens Next" section to load
+    await expect(page.locator('h2:has-text("What Happens Next")')).toBeVisible({ timeout: 10000 });
     const stepNumbers = page.locator('.bg-brand-500.rounded-full');
     const count = await stepNumbers.count();
     expect(count).toBe(4);
@@ -531,14 +552,18 @@ test.describe('Order Confirmation - What Happens Next', () => {
 
   test('should display step descriptions', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-    await expect(page.locator('text=order details and receipt')).toBeVisible();
-    await expect(page.locator('text=prepare your order')).toBeVisible();
-    await expect(page.locator('text=tracking information')).toBeVisible();
-    await expect(page.locator('text=arrive at your doorstep')).toBeVisible();
+    // Wait for the section to load
+    await expect(page.locator('h2:has-text("What Happens Next")')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/order details and receipt/)).toBeVisible();
+    await expect(page.getByText(/prepare your order/)).toBeVisible();
+    await expect(page.getByText(/tracking information/)).toBeVisible();
+    await expect(page.getByText(/arrive at your doorstep/)).toBeVisible();
   });
 
   test('should display step icons', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
+    // Wait for the section to load
+    await expect(page.locator('h2:has-text("What Happens Next")')).toBeVisible({ timeout: 10000 });
     // Steps should have icons in brand-colored circles
     const stepIcons = page.locator('.bg-brand-100');
     const count = await stepIcons.count();
@@ -620,13 +645,14 @@ test.describe('Order Confirmation - Generic Success State', () => {
 
   test('should display generic thank you message', async ({ page }) => {
     await page.goto('/checkout/success');
-    const message = page.locator('text=Thank you for your purchase');
+    // Message is part of a longer sentence
+    const message = page.getByText('Thank you for your purchase');
     await expect(message).toBeVisible();
   });
 
   test('should mention confirmation email', async ({ page }) => {
     await page.goto('/checkout/success');
-    const emailNotice = page.locator('text=confirmation email');
+    const emailNotice = page.getByText(/confirmation email/);
     await expect(emailNotice).toBeVisible();
   });
 
@@ -644,7 +670,8 @@ test.describe('Order Confirmation - Generic Success State', () => {
 
   test('should display Need help contact link', async ({ page }) => {
     await page.goto('/checkout/success');
-    const helpText = page.locator('text=Need help?');
+    // "Need help?" is part of a paragraph with "Contact us" link
+    const helpText = page.getByText('Need help?');
     await expect(helpText).toBeVisible();
   });
 
@@ -672,8 +699,8 @@ test.describe('Order Confirmation - Loading State', () => {
   test('should display loading message', async ({ page }) => {
     await mockSlowOrderResponse(page, 5000);
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
-
-    const loadingText = page.locator('text=Loading your order details');
+    // Actual text is "Loading your order details..." with ellipsis
+    const loadingText = page.getByText('Loading your order details');
     await expect(loadingText).toBeVisible();
   });
 
@@ -714,7 +741,7 @@ test.describe('Order Confirmation - Error State', () => {
     await mockOrderError(page, 'Order not found');
     await page.goto('/checkout/success?orderNumber=INVALID-ORDER');
 
-    const errorMessage = page.locator('text=Order not found');
+    const errorMessage = page.getByText('Order not found', { exact: true });
     await expect(errorMessage).toBeVisible();
   });
 
@@ -766,7 +793,7 @@ test.describe('Order Confirmation - URL Parameters', () => {
     await mockOrderResponse(page, { orderNumber: 'ORD-CUSTOM-123' });
     await page.goto('/checkout/success?orderNumber=ORD-CUSTOM-123');
 
-    const orderNumber = page.locator('text=ORD-CUSTOM-123');
+    const orderNumber = page.getByText('ORD-CUSTOM-123', { exact: true });
     await expect(orderNumber).toBeVisible();
   });
 
@@ -801,7 +828,7 @@ test.describe('Order Confirmation - Responsive Design', () => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
 
     await expect(page.locator('h1:has-text("Order Confirmed")')).toBeVisible();
-    await expect(page.locator('text=Continue Shopping')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Continue Shopping' })).toBeVisible();
   });
 
   test('should stack sections on mobile', async ({ page }) => {
@@ -864,6 +891,8 @@ test.describe('Order Confirmation - Accessibility', () => {
 
   test('should have proper heading hierarchy', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
+    // Wait for content to load
+    await expect(page.locator('h1:has-text("Order Confirmed")')).toBeVisible({ timeout: 10000 });
 
     // Should have one h1
     const h1Count = await page.locator('h1').count();
@@ -876,6 +905,8 @@ test.describe('Order Confirmation - Accessibility', () => {
 
   test('should have accessible button labels', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
+    // Wait for content to load
+    await expect(page.locator('h1:has-text("Order Confirmed")')).toBeVisible({ timeout: 10000 });
 
     const copyButton = page.locator('button[title*="Copy"]');
     await expect(copyButton).toBeVisible();
@@ -884,6 +915,8 @@ test.describe('Order Confirmation - Accessibility', () => {
 
   test('should be keyboard navigable', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
+    // Wait for content to load
+    await expect(page.locator('h1:has-text("Order Confirmed")')).toBeVisible({ timeout: 10000 });
 
     await page.keyboard.press('Tab');
     const focusedElement = page.locator(':focus');
@@ -908,9 +941,11 @@ test.describe('Order Confirmation - Accessibility', () => {
 
   test('should use semantic HTML sections', async ({ page }) => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
+    // Wait for content to load
+    await expect(page.locator('h1:has-text("Order Confirmed")')).toBeVisible({ timeout: 10000 });
 
-    // Content should be in proper containers
-    const container = page.locator('.container-wide');
+    // Content should be in proper containers (use first() as there are multiple)
+    const container = page.locator('.container-wide').first();
     await expect(container).toBeVisible();
   });
 });
@@ -992,7 +1027,7 @@ test.describe('Order Confirmation - Edge Cases', () => {
 
     // Page should still load without email confirmation notice
     await expect(page.locator('h1:has-text("Order Confirmed")')).toBeVisible();
-    await expect(page.locator('text=Confirmation email sent to')).not.toBeVisible();
+    await expect(page.getByText(/Confirmation email sent to/)).not.toBeVisible();
   });
 
   test('should handle missing shipping address gracefully', async ({ page }) => {
@@ -1036,7 +1071,7 @@ test.describe('Order Confirmation - Edge Cases', () => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
 
     // Should display item without frame info
-    await expect(page.locator('text=Unframed Poster')).toBeVisible();
+    await expect(page.getByText('Unframed Poster', { exact: true })).toBeVisible();
   });
 
   test('should handle item without thumbnail', async ({ page }) => {
@@ -1093,9 +1128,9 @@ test.describe('Order Confirmation - Multiple Items', () => {
     });
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
 
-    await expect(page.locator('text=First Poster')).toBeVisible();
-    await expect(page.locator('text=Second Poster')).toBeVisible();
-    await expect(page.locator('text=Third Poster')).toBeVisible();
+    await expect(page.getByText('First Poster', { exact: true })).toBeVisible();
+    await expect(page.getByText('Second Poster', { exact: true })).toBeVisible();
+    await expect(page.getByText('Third Poster', { exact: true })).toBeVisible();
   });
 
   test('should show correct item count', async ({ page }) => {
@@ -1110,7 +1145,7 @@ test.describe('Order Confirmation - Multiple Items', () => {
     });
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
 
-    await expect(page.locator('text=Order Items (5)')).toBeVisible();
+    await expect(page.getByText('Order Items (5)', { exact: true })).toBeVisible();
   });
 });
 
@@ -1125,9 +1160,12 @@ test.describe('Order Confirmation - Express Delivery', () => {
       estimatedDelivery: '2-3 business days',
     });
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
+    // Wait for content to load
+    await expect(page.locator('h2:has-text("Shipping Details")')).toBeVisible({ timeout: 10000 });
 
-    await expect(page.locator('text=express Delivery')).toBeVisible();
-    await expect(page.locator('text=2-3 business days')).toBeVisible();
+    await expect(page.getByText('express Delivery', { exact: true })).toBeVisible();
+    // Estimated delivery shown as "Est. delivery: 2-3 business days"
+    await expect(page.getByText('2-3 business days').first()).toBeVisible();
   });
 });
 

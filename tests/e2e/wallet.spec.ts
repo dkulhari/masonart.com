@@ -55,12 +55,21 @@ test.describe('Wallet Page - Unauthenticated', () => {
 // Authenticated Tests - Wallet Page
 // ============================================================================
 
+// Run authenticated tests serially to avoid race conditions with auth state
+test.describe.configure({ mode: 'serial' });
+
 test.describe('Wallet Page - Authenticated', () => {
   // Use the stored customer authentication state
   test.use({ storageState: CUSTOMER_AUTH });
 
+  // Add beforeEach to ensure page is ready
+  test.beforeEach(async ({ page }) => {
+    // Wait a bit to ensure auth state file is not being written
+    await page.waitForTimeout(100);
+  });
+
   test('should load wallet page without redirect', async ({ page }) => {
-    await page.goto('/account/wallet');
+    await page.goto('/account/wallet', { waitUntil: 'networkidle' });
 
     // Should stay on wallet page
     await page.waitForURL(/\/account\/wallet/, { timeout: 10000 });
@@ -178,8 +187,8 @@ test.describe('Wallet Page - Top-up Flow', () => {
     const addButton = page.locator('button').filter({ hasText: /Add|Top.?up/i }).last();
     await addButton.click();
 
-    // Should show error about minimum amount
-    const errorMessage = page.locator('text=/minimum|₹100|at least/i');
+    // Should show error about minimum amount (target the red error message specifically)
+    const errorMessage = page.locator('.text-red-800, .text-red-600, .text-destructive').filter({ hasText: /minimum/i }).first();
     await expect(errorMessage).toBeVisible({ timeout: 5000 });
   });
 

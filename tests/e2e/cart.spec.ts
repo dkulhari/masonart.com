@@ -801,6 +801,7 @@ test.describe('Cart Page - Responsive Design', () => {
       quantity: 1,
     });
     await page.reload();
+    await page.waitForLoadState('networkidle');
   });
 
   test('should display properly on mobile', async ({ page }) => {

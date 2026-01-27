@@ -83,10 +83,9 @@ test.describe('Account Page - Authenticated', () => {
     await page.goto('/account');
     await page.waitForLoadState('networkidle');
 
-    // Should show some user-related content (email or name)
-    // Test user from auth.setup.ts: test-customer@example.com / Test Customer
-    const userContent = page.locator('text=test-customer@example.com, text=Test Customer').first();
-    await expect(userContent).toBeVisible({ timeout: 10000 });
+    // Should show user email from auth.setup.ts
+    const userEmail = page.getByText('test-customer@example.com');
+    await expect(userEmail).toBeVisible({ timeout: 10000 });
   });
 
   test('should have Sign Out functionality', async ({ page }) => {
