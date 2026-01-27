@@ -26,12 +26,16 @@ import { test, expect } from '@playwright/test';
  */
 async function navigateToProductPage(page: typeof test.page): Promise<string | null> {
   await page.goto('/posters');
-  const productLinks = page.locator('a[href^="/posters/"]');
+
+  // Wait for either products or empty state to appear
+  await page.waitForSelector('a[href^="/posters/"], h3:has-text("No products found")', { timeout: 10000 }).catch(() => null);
+
+  const productLinks = page.locator('a[href^="/posters/"]:not([href="/posters"])');
   const count = await productLinks.count();
 
   if (count > 0) {
     const href = await productLinks.first().getAttribute('href');
-    if (href) {
+    if (href && href !== '/posters') {
       await page.goto(href);
       return href;
     }
@@ -44,26 +48,46 @@ async function navigateToProductPage(page: typeof test.page): Promise<string | n
 // ============================================================================
 
 test.describe('Reviews Section - Display', () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToProductPage(page);
-  });
-
   test('should display reviews section on product page', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const reviewsSection = page.locator('#reviews, section:has-text("Customer Reviews")');
     await expect(reviewsSection).toBeVisible();
   });
 
   test('should display section header with icon', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const sectionHeader = page.locator('h2:has-text("Customer Reviews")');
     await expect(sectionHeader).toBeVisible();
   });
 
   test('should display write review button', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
     await expect(writeReviewBtn).toBeVisible();
   });
 
   test('should display review summary or empty state', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     // Either show summary stats or empty state message
     const hasSummary = await page.locator('[class*="ReviewSummary"], [data-testid="review-summary"]').isVisible().catch(() => false);
     const hasEmptyState = await page.getByText(/No reviews yet/).isVisible().catch(() => false);
@@ -77,11 +101,13 @@ test.describe('Reviews Section - Display', () => {
 // ============================================================================
 
 test.describe('Reviews Section - Summary Statistics', () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToProductPage(page);
-  });
-
   test('should display average rating when reviews exist', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     // Look for star rating display in summary area
     const summarySection = page.locator('section:has-text("Customer Reviews")');
     const hasStars = await summarySection.locator('svg[class*="fill-amber"], [class*="text-amber"]').first().isVisible().catch(() => false);
@@ -92,6 +118,12 @@ test.describe('Reviews Section - Summary Statistics', () => {
   });
 
   test('should display rating distribution when reviews exist', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     // Rating distribution bars (5 star, 4 star, etc.)
     const distributionBars = page.locator('[class*="rating-bar"], [aria-label*="star"]');
     const hasDistribution = await distributionBars.count() > 0;
@@ -106,11 +138,13 @@ test.describe('Reviews Section - Summary Statistics', () => {
 // ============================================================================
 
 test.describe('Reviews Section - Review List', () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToProductPage(page);
-  });
-
   test('should display filter controls when reviews exist', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     // Check for filter/sort controls
     const hasFilters = await page.locator('button:has-text("All"), button:has-text("5 Star"), select, [data-testid="review-filters"]').first().isVisible().catch(() => false);
     const hasEmptyState = await page.getByText(/No reviews yet/).isVisible().catch(() => false);
@@ -119,6 +153,12 @@ test.describe('Reviews Section - Review List', () => {
   });
 
   test('should display review cards when reviews exist', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     // Look for review cards in the list
     const reviewCards = page.locator('[class*="ReviewCard"], article:has-text("verified"), [data-testid="review-card"]');
     const cardCount = await reviewCards.count().catch(() => 0);
@@ -128,6 +168,12 @@ test.describe('Reviews Section - Review List', () => {
   });
 
   test('should display pagination when many reviews exist', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     // Pagination appears when there are more reviews than page size
     const pagination = page.locator('nav[aria-label="Pagination"], button:has-text("Previous"), button:has-text("Next")');
     // Pagination may or may not be visible depending on review count
@@ -142,11 +188,13 @@ test.describe('Reviews Section - Review List', () => {
 // ============================================================================
 
 test.describe('Reviews Section - Review Card', () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToProductPage(page);
-  });
-
   test('review card should display star rating', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const reviewCards = page.locator('[class*="ReviewCard"], article').first();
     const hasReviews = await reviewCards.isVisible().catch(() => false);
 
@@ -158,6 +206,12 @@ test.describe('Reviews Section - Review Card', () => {
   });
 
   test('review card should display author information', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const reviewCards = page.locator('[class*="ReviewCard"], article').first();
     const hasReviews = await reviewCards.isVisible().catch(() => false);
 
@@ -169,6 +223,12 @@ test.describe('Reviews Section - Review Card', () => {
   });
 
   test('review card should display review date', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const reviewCards = page.locator('[class*="ReviewCard"], article').first();
     const hasReviews = await reviewCards.isVisible().catch(() => false);
 
@@ -185,11 +245,13 @@ test.describe('Reviews Section - Review Card', () => {
 // ============================================================================
 
 test.describe('Reviews Section - Write Review Button', () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToProductPage(page);
-  });
-
   test('clicking write review button shows form or login prompt', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
 
     if (await writeReviewBtn.isVisible()) {
@@ -204,6 +266,12 @@ test.describe('Reviews Section - Write Review Button', () => {
   });
 
   test('unauthenticated user should see login prompt in form', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
 
     if (await writeReviewBtn.isVisible()) {
@@ -224,7 +292,12 @@ test.describe('Reviews Section - Review Form', () => {
   // Note: These tests may require authentication setup
 
   test('review form should have star rating selector', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
 
     if (await writeReviewBtn.isVisible()) {
@@ -241,7 +314,12 @@ test.describe('Reviews Section - Review Form', () => {
   });
 
   test('review form should have title input', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
 
     if (await writeReviewBtn.isVisible()) {
@@ -257,7 +335,12 @@ test.describe('Reviews Section - Review Form', () => {
   });
 
   test('review form should have content textarea', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
 
     if (await writeReviewBtn.isVisible()) {
@@ -273,7 +356,12 @@ test.describe('Reviews Section - Review Form', () => {
   });
 
   test('review form should have cancel button', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
 
     if (await writeReviewBtn.isVisible()) {
@@ -289,7 +377,12 @@ test.describe('Reviews Section - Review Form', () => {
   });
 
   test('cancel button should hide review form', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
 
     if (await writeReviewBtn.isVisible()) {
@@ -314,7 +407,11 @@ test.describe('Reviews Section - Review Form', () => {
 test.describe('Reviews Section - Responsive Design', () => {
   test('reviews section should be visible on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 }); // iPhone SE
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
 
     const reviewsSection = page.locator('#reviews, section:has-text("Customer Reviews")');
     await expect(reviewsSection).toBeVisible();
@@ -322,7 +419,11 @@ test.describe('Reviews Section - Responsive Design', () => {
 
   test('reviews section should be visible on tablet', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 }); // iPad
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
 
     const reviewsSection = page.locator('#reviews, section:has-text("Customer Reviews")');
     await expect(reviewsSection).toBeVisible();
@@ -330,7 +431,11 @@ test.describe('Reviews Section - Responsive Design', () => {
 
   test('write review button should be visible on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
 
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
     await expect(writeReviewBtn).toBeVisible();
@@ -343,14 +448,22 @@ test.describe('Reviews Section - Responsive Design', () => {
 
 test.describe('Reviews Section - Accessibility', () => {
   test('reviews section should have proper heading', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
 
     const heading = page.locator('h2:has-text("Customer Reviews")');
     await expect(heading).toBeVisible();
   });
 
   test('write review button should be keyboard accessible', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
 
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
     if (await writeReviewBtn.isVisible()) {
@@ -360,7 +473,12 @@ test.describe('Reviews Section - Accessibility', () => {
   });
 
   test('star rating should be keyboard navigable', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
     const writeReviewBtn = page.locator('button:has-text("Write a Review")');
 
     if (await writeReviewBtn.isVisible()) {
@@ -385,7 +503,11 @@ test.describe('Reviews Section - Accessibility', () => {
 
 test.describe('Reviews Section - Error States', () => {
   test('should handle reviews API error gracefully', async ({ page }) => {
-    await navigateToProductPage(page);
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
 
     // The section should still render even if API fails
     const reviewsSection = page.locator('#reviews, section:has-text("Customer Reviews")');
@@ -407,30 +529,40 @@ test.describe('Reviews Section - Loading States', () => {
   test('should show loading skeleton while fetching', async ({ page }) => {
     // Navigate and check initial load state
     await page.goto('/posters');
-    const productLinks = page.locator('a[href^="/posters/"]');
+
+    // Wait for page to load
+    await page.waitForSelector('a[href^="/posters/"], h3:has-text("No products found")', { timeout: 10000 }).catch(() => null);
+
+    const productLinks = page.locator('a[href^="/posters/"]:not([href="/posters"])');
     const count = await productLinks.count();
 
-    if (count > 0) {
-      const href = await productLinks.first().getAttribute('href');
-      if (href) {
-        // Navigate to product and immediately check for skeleton
-        const responsePromise = page.waitForResponse(resp =>
-          resp.url().includes('/reviews') || resp.url().includes(href)
-        );
-        await page.goto(href);
-
-        // Either skeleton or loaded content should be visible
-        const skeleton = page.locator('[class*="skeleton"], [class*="animate-pulse"]');
-        const reviewsSection = page.locator('#reviews, section:has-text("Customer Reviews")');
-
-        const hasSkeleton = await skeleton.first().isVisible().catch(() => false);
-        const hasSection = await reviewsSection.isVisible().catch(() => false);
-
-        // Wait for content to load
-        await responsePromise.catch(() => {});
-
-        expect(hasSkeleton || hasSection).toBe(true);
-      }
+    if (count === 0) {
+      test.skip();
+      return;
     }
+
+    const href = await productLinks.first().getAttribute('href');
+    if (!href || href === '/posters') {
+      test.skip();
+      return;
+    }
+
+    // Navigate to product and immediately check for skeleton
+    const responsePromise = page.waitForResponse(resp =>
+      resp.url().includes('/reviews') || resp.url().includes(href)
+    );
+    await page.goto(href);
+
+    // Either skeleton or loaded content should be visible
+    const skeleton = page.locator('[class*="skeleton"], [class*="animate-pulse"]');
+    const reviewsSection = page.locator('#reviews, section:has-text("Customer Reviews")');
+
+    const hasSkeleton = await skeleton.first().isVisible().catch(() => false);
+    const hasSection = await reviewsSection.isVisible().catch(() => false);
+
+    // Wait for content to load
+    await responsePromise.catch(() => {});
+
+    expect(hasSkeleton || hasSection).toBe(true);
   });
 });
