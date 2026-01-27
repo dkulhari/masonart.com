@@ -1,0 +1,26 @@
+ticket_number: 25
+title: 'Phase 14: Integration Flow Tests'
+description: 'End-to-end integration tests covering complete user journeys: browse → add to cart → checkout → order confirmation → admin fulfillment.'
+feature: qa-testing
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:33:20.081Z'
+last_updated: '2026-01-27T19:33:51.857Z'
+time_spent_minutes: 0
+labels:
+  - e2e
+  - integration
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:33:51.858Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:33:51.857Z'

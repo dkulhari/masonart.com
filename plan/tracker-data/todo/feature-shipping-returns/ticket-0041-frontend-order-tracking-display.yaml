@@ -1,0 +1,110 @@
+ticket_number: 41
+title: 'Frontend - Order Tracking Display'
+description: |-
+  Create order tracking display components for customer order details page.
+
+  ## Implementation Details
+
+  ### Files to Modify
+  `packages/web/app/routes/_authed/account/orders/$id.tsx`
+  `packages/web/app/components/orders/`
+
+  ### Components to Create
+
+  **OrderTrackingCard.tsx**
+  - Shipment overview card
+  - Shows: carrier, tracking number, current status
+  - "Track Package" button linking to carrier
+  - Estimated/actual delivery date
+
+  **TrackingTimeline.tsx**
+  - Visual timeline of shipment events
+  - States: ordered, shipped, in transit, out for delivery, delivered
+  - Timestamps for each completed step
+  - Current step highlighted
+
+  **TrackingStatusBadge.tsx**
+  - Color-coded status badge
+  - pending: gray
+  - shipped/in_transit: blue
+  - out_for_delivery: yellow
+  - delivered: green
+  - failed: red
+
+  **DeliveryEstimate.tsx**
+  - Shows expected delivery window
+  - Updates based on tracking status
+  - "Delivered on [date]" when complete
+
+  ### Order Details Integration
+  1. Show tracking card after order confirmed
+  2. Multiple shipments if split shipping
+  3. Link to carrier tracking page
+  4. Email notification preferences
+
+  ### Data Fetching
+  - Fetch shipment data with order details
+  - Auto-refresh every 5 minutes when page open
+  - Manual refresh button
+
+  ## Testing Requirements
+
+  ### Component Tests
+
+  **OrderTrackingCard Tests**
+  1. test('displays carrier name')
+  2. test('shows tracking number')
+  3. test('track button links to carrier')
+  4. test('shows delivery estimate')
+
+  **TrackingTimeline Tests**
+  5. test('renders correct number of steps')
+  6. test('current step highlighted')
+  7. test('completed steps show timestamps')
+  8. test('future steps grayed out')
+
+  **TrackingStatusBadge Tests**
+  9. test('correct color for each status')
+  10. test('correct label for each status')
+
+  ### E2E Tests (tests/e2e/orders/tracking.spec.ts)
+  11. test('order page shows tracking section')
+  12. test('tracking timeline visible for shipped order')
+  13. test('track button opens carrier page')
+  14. test('delivered order shows completion')
+  15. test('pending order shows waiting state')
+
+  ## Acceptance Criteria
+  - [ ] Tracking visible on order details
+  - [ ] Visual timeline component
+  - [ ] Link to carrier tracking
+  - [ ] Status badges with correct colors
+  - [ ] Component tests passing
+  - [ ] E2E tests passing
+feature: shipping-returns
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - orders
+  - tracking
+acceptance_criteria:
+  - Tracking visible on order details
+  - Visual timeline component
+  - Link to carrier tracking
+  - Status badges with correct colors
+  - Component and E2E tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 38
+blocks:
+  - 44
+attachments: []

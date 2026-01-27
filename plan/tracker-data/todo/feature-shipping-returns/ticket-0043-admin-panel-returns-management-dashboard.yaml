@@ -1,0 +1,116 @@
+ticket_number: 43
+title: 'Admin Panel - Returns Management Dashboard'
+description: |-
+  Create admin dashboard for managing return requests.
+
+  ## Implementation Details
+
+  ### Route Location
+  `packages/web/app/routes/admin/returns.tsx`
+
+  ### Components
+
+  **AdminReturnsPage**
+  - Stats cards: pending, approved, processing, completed
+  - Return request list with filters
+  - Search by order ID or customer
+
+  **ReturnsTable.tsx**
+  - Columns: Order ID, Customer, Reason, Status, Requested Date, Actions
+  - Sortable columns
+  - Row click for details
+  - Quick action buttons
+
+  **ReturnDetailModal.tsx**
+  - Full order and return details
+  - Customer info and history
+  - Original order items
+  - Return reason and details
+  - Approve/Reject buttons
+  - Process refund section
+  - Admin notes field
+
+  **ReturnFilters.tsx**
+  - Status filter
+  - Date range picker
+  - Reason filter
+  - Search by order/customer
+
+  **RefundProcessor.tsx**
+  - Refund amount input (pre-filled)
+  - Refund type selector (full, partial, store credit)
+  - Confirmation before processing
+  - Integration with payment provider
+
+  ### Features
+  - Bulk actions (approve multiple)
+  - Export to CSV
+  - Email templates for responses
+  - Return label generation (future)
+
+  ### Navigation
+  - Add "Returns" to admin sidebar
+  - Badge showing pending count
+  - Link from order details
+
+  ## Testing Requirements
+
+  ### E2E Tests (tests/e2e/admin/returns.spec.ts)
+
+  **Access Control**
+  1. test('admin can access returns page')
+  2. test('customer cannot access returns page')
+
+  **Display Tests**
+  3. test('stats cards show correct counts')
+  4. test('returns list loads')
+  5. test('filtering by status works')
+  6. test('search by order ID works')
+
+  **Workflow Tests**
+  7. test('clicking row opens detail modal')
+  8. test('approve button changes status')
+  9. test('reject button with reason works')
+  10. test('process refund updates return')
+  11. test('admin notes saved')
+
+  **Integration Tests**
+  12. test('approved return visible to customer')
+  13. test('refund amount shown to customer')
+
+  ## Acceptance Criteria
+  - [ ] Admin-only access
+  - [ ] Stats dashboard
+  - [ ] Filter and search
+  - [ ] Approve/reject workflow
+  - [ ] Refund processing
+  - [ ] E2E tests passing
+  - [ ] Matches admin panel styling
+feature: shipping-returns
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - admin
+  - frontend
+  - returns
+acceptance_criteria:
+  - Admin-only access
+  - Stats dashboard
+  - Filter and search
+  - Approve/reject workflow
+  - Refund processing
+  - E2E tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 39
+blocks:
+  - 44
+attachments: []

@@ -1,0 +1,118 @@
+ticket_number: 35
+title: 'Tests - Unit and E2E Test Suite'
+description: |-
+  Comprehensive test suite for User Reviews feature following TEST-COVERAGE.md guidelines.
+
+  ## Test Structure
+
+  ### Unit Tests Location
+  - `packages/api/tests/schema/reviews.test.ts`
+  - `packages/api/tests/routes/reviews.test.ts`
+  - `packages/api/tests/routes/admin/reviews.test.ts`
+  - `packages/web/tests/components/reviews/*.test.ts`
+
+  ### E2E Tests Location
+  - `tests/e2e/reviews/display.spec.ts`
+  - `tests/e2e/reviews/submit.spec.ts`
+  - `tests/e2e/reviews/product-integration.spec.ts`
+  - `tests/e2e/admin/reviews.spec.ts`
+
+  ## Test Categories
+
+  ### Schema Tests (Unit)
+  1. Table structure validation
+  2. Enum value constraints
+  3. Foreign key relationships
+  4. Index definitions
+
+  ### API Route Tests (Unit)
+  5. Route existence checks
+  6. Request validation
+  7. Response format verification
+  8. Authentication requirements
+  9. Authorization (owner/admin) checks
+  10. Error response codes
+
+  ### Component Tests (Unit)
+  11. StarRating rendering
+  12. ReviewCard display
+  13. ReviewForm validation
+  14. ReviewList states
+
+  ### Integration Tests (E2E)
+  15. Full review submission flow
+  16. Review display on product page
+  17. Admin moderation workflow
+  18. Filter and sort functionality
+
+  ## Test Matrix
+
+  | Area | Unit | Integration | E2E |
+  |------|------|-------------|-----|
+  | Schema | 6 | - | - |
+  | Public API | 15 | 5 | 4 |
+  | Admin API | 12 | 3 | 6 |
+  | Components | 13 | - | - |
+  | Product Page | - | 4 | 8 |
+  | Admin Panel | - | 2 | 8 |
+  | **Total** | **46** | **14** | **26** |
+
+  ## Testing Requirements
+
+  ### Test Documentation
+  - Update docs/TEST-COVERAGE.md with new tests
+  - Document test data fixtures
+  - Add reviews to test user seeding
+
+  ### Test Data Setup
+  ```typescript
+  // tests/fixtures/reviews.ts
+  export const testReviews = [
+    { rating: 5, title: 'Great product', status: 'approved' },
+    { rating: 3, title: 'Average', status: 'approved' },
+    { rating: 1, title: 'Poor quality', status: 'pending' },
+    { rating: 4, title: 'Good value', status: 'rejected' },
+  ];
+  ```
+
+  ### CI Integration
+  - Reviews tests run in parallel
+  - Separate job for E2E auth-dependent tests
+  - Test coverage threshold maintained
+
+  ## Acceptance Criteria
+  - [ ] All unit tests written and passing
+  - [ ] All E2E tests written and passing
+  - [ ] TEST-COVERAGE.md updated
+  - [ ] Test fixtures created
+  - [ ] 80%+ code coverage for reviews feature
+  - [ ] Tests run in CI pipeline
+  - [ ] No flaky tests
+feature: user-reviews
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - unit-tests
+  - e2e
+acceptance_criteria:
+  - All unit tests written and passing
+  - All E2E tests written and passing
+  - TEST-COVERAGE.md updated
+  - Test fixtures created
+  - 80%+ code coverage for reviews feature
+  - Tests run in CI pipeline
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 33
+  - 34
+blocks: []
+attachments: []

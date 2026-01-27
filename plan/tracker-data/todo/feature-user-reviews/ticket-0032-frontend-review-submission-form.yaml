@@ -1,0 +1,102 @@
+ticket_number: 32
+title: 'Frontend - Review Submission Form'
+description: |-
+  Create review submission form with star rating selector following established form patterns.
+
+  ## Implementation Details
+
+  ### Components Location
+  `packages/web/app/components/reviews/`
+
+  ### Components to Create
+
+  **ReviewForm.tsx**
+  - Interactive star rating selector (1-5)
+  - Title input (optional, max 255 chars)
+  - Content textarea (required, min 10 chars, max 5000)
+  - Character counter for content
+  - Submit button with loading state
+  - Success/error feedback
+
+  **InteractiveStarRating.tsx**
+  - Clickable star selector
+  - Hover preview effect
+  - Keyboard accessible (arrow keys)
+  - Clear button to reset
+
+  ### Form Validation
+  - Client-side validation matching API schema
+  - Real-time feedback on field errors
+  - Disable submit until valid
+
+  ### State Management
+  - Form state with react-hook-form or useState
+  - Optimistic update on submission
+  - Refetch reviews list on success
+
+  ### User Flow
+  1. User clicks "Write a Review" button
+  2. Modal or inline form appears
+  3. User selects rating, enters review
+  4. On submit: loading state, API call
+  5. Success: show confirmation, close form
+  6. Error: show error message, keep form open
+
+  ## Testing Requirements
+
+  ### Component Tests (packages/web/tests/components/reviews/)
+
+  **InteractiveStarRating Tests**
+  1. test('clicking star sets rating')
+  2. test('hover shows preview')
+  3. test('keyboard navigation works')
+  4. test('clear button resets rating')
+
+  **ReviewForm Tests**
+  5. test('validates required content field')
+  6. test('shows character count')
+  7. test('disables submit when invalid')
+  8. test('shows loading state on submit')
+  9. test('displays error messages')
+
+  ### E2E Tests (tests/e2e/reviews/submit.spec.ts)
+  10. test('authenticated user can submit review')
+  11. test('unauthenticated user sees login prompt')
+  12. test('form validates before submission')
+  13. test('success message shows after submit')
+  14. test('new review appears in list after approval')
+
+  ## Acceptance Criteria
+  - [ ] Interactive star rating with accessibility
+  - [ ] Form validation matching API requirements
+  - [ ] Loading and error states handled
+  - [ ] Requires authentication to submit
+  - [ ] Component tests passing
+  - [ ] E2E tests for submission flow
+feature: user-reviews
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - forms
+  - react
+acceptance_criteria:
+  - Interactive star rating with accessibility
+  - Form validation matching API requirements
+  - Loading and error states handled
+  - Requires authentication to submit
+  - Component tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 29
+blocks:
+  - 33
+attachments: []

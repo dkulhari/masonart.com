@@ -1,0 +1,148 @@
+ticket_number: 44
+title: 'Tests - Unit and E2E Test Suite'
+description: |-
+  Comprehensive test suite for Shipping & Returns feature following TEST-COVERAGE.md guidelines.
+
+  ## Test Structure
+
+  ### Unit Tests Location
+  - `packages/api/tests/schema/shipping.test.ts`
+  - `packages/api/tests/schema/returns.test.ts`
+  - `packages/api/tests/routes/shipping.test.ts`
+  - `packages/api/tests/routes/shipments.test.ts`
+  - `packages/api/tests/routes/returns.test.ts`
+  - `packages/api/tests/routes/admin/shipping.test.ts`
+  - `packages/api/tests/routes/admin/returns.test.ts`
+  - `packages/web/tests/components/shipping/*.test.ts`
+  - `packages/web/tests/components/returns/*.test.ts`
+
+  ### E2E Tests Location
+  - `tests/e2e/checkout/shipping.spec.ts`
+  - `tests/e2e/orders/tracking.spec.ts`
+  - `tests/e2e/returns/request.spec.ts`
+  - `tests/e2e/admin/shipping.spec.ts`
+  - `tests/e2e/admin/returns.spec.ts`
+
+  ## Test Categories
+
+  ### Schema Tests (Unit)
+  1. shipping_options table structure
+  2. order_shipments table structure
+  3. return_policies table structure
+  4. return_requests table structure
+  5. All enum validations
+  6. Foreign key relationships
+
+  ### Shipping API Tests (Unit)
+  7. Options listing (public)
+  8. Cost estimation
+  9. Admin CRUD operations
+  10. Cache behavior
+
+  ### Shipments API Tests (Unit)
+  11. Shipment creation
+  12. Tracking updates
+  13. Status transitions
+  14. Order status sync
+
+  ### Returns API Tests (Unit)
+  15. Return request creation
+  16. Eligibility validation
+  17. Approval workflow
+  18. Refund processing
+
+  ### Component Tests (Unit)
+  19. ShippingSelector functionality
+  20. TrackingTimeline rendering
+  21. ReturnRequestForm validation
+  22. ReturnStatusCard states
+
+  ### E2E Integration Tests
+  23. Full checkout with shipping
+  24. Order tracking display
+  25. Return request submission
+  26. Admin return management
+  27. End-to-end order lifecycle
+
+  ## Test Matrix
+
+  | Area | Unit | Integration | E2E |
+  |------|------|-------------|-----|
+  | Schema | 8 | - | - |
+  | Shipping API | 11 | 3 | 5 |
+  | Shipments API | 11 | 3 | 5 |
+  | Returns API | 13 | 4 | 6 |
+  | Components | 18 | - | - |
+  | Checkout Flow | - | 3 | 6 |
+  | Order Tracking | - | 2 | 5 |
+  | Admin Dashboards | - | 4 | 13 |
+  | **Total** | **61** | **19** | **40** |
+
+  ## Testing Requirements
+
+  ### Test Documentation
+  - Update docs/TEST-COVERAGE.md
+  - Document shipping test fixtures
+  - Add return request test data
+
+  ### Test Data Setup
+  ```typescript
+  // tests/fixtures/shipping.ts
+  export const testShippingOptions = [
+    { name: 'Standard', carrier: 'USPS', baseCost: 5.99, days: [5, 7] },
+    { name: 'Express', carrier: 'FedEx', baseCost: 14.99, days: [2, 3] },
+    { name: 'Overnight', carrier: 'UPS', baseCost: 29.99, days: [1, 1] },
+  ];
+
+  // tests/fixtures/returns.ts
+  export const testReturnRequests = [
+    { reason: 'defective', status: 'pending' },
+    { reason: 'wrong_item', status: 'approved' },
+    { reason: 'changed_mind', status: 'refunded' },
+  ];
+  ```
+
+  ### CI Integration
+  - Shipping/returns tests in parallel jobs
+  - Mock external carrier APIs
+  - Test refund processing with Stripe test mode
+
+  ## Acceptance Criteria
+  - [ ] All unit tests written and passing
+  - [ ] All E2E tests written and passing
+  - [ ] TEST-COVERAGE.md updated
+  - [ ] Test fixtures created
+  - [ ] 80%+ code coverage
+  - [ ] Tests run in CI pipeline
+  - [ ] No flaky tests
+  - [ ] Carrier API mocks documented
+feature: shipping-returns
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - unit-tests
+  - e2e
+acceptance_criteria:
+  - All unit tests written and passing
+  - All E2E tests written and passing
+  - TEST-COVERAGE.md updated
+  - Test fixtures created
+  - 80%+ code coverage
+  - Tests run in CI pipeline
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 40
+  - 41
+  - 42
+  - 43
+blocks: []
+attachments: []

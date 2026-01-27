@@ -1,0 +1,47 @@
+ticket_number: 11
+title: Add SEO optimization and structured data
+description: |-
+  ## Implementation
+  - Add meta tags and Open Graph data to product pages
+  - Create JSON-LD structured data for products
+  - Build sitemap.xml generation endpoint
+  - Add robots.txt for search engine crawling
+
+  ## Files Created
+  - packages/api/src/routes/sitemap.ts
+  - packages/web/app/components/seo/ProductJsonLd.tsx
+  - packages/web/public/robots.txt
+
+  ## Commit
+  ```
+  feat: SEO
+
+  - Add meta tags and Open Graph data to product pages
+  - Create JSON-LD structured data for products
+  - Build sitemap.xml generation endpoint
+  - Add robots.txt for search engine crawling
+  ```
+feature: seo
+type: story
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:39.616Z'
+last_updated: '2026-01-27T19:26:01.279Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-10
+  - seo
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:26:01.279Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:26:01.279Z'

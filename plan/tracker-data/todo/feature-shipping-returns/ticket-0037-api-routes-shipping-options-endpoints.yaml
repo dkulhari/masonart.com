@@ -1,0 +1,116 @@
+ticket_number: 37
+title: 'API Routes - Shipping Options Endpoints'
+description: |-
+  Create API endpoints for managing shipping options.
+
+  ## Implementation Details
+
+  ### Route Location
+  `packages/api/src/routes/shipping.ts`
+  `packages/api/src/routes/admin/shipping.ts`
+
+  ### Public Endpoints
+
+  **GET /api/shipping/options**
+  - List active shipping options
+  - Returns: sorted by sortOrder
+  - Caching: Redis with 1 hour TTL
+  - Auth: none (public)
+
+  **GET /api/shipping/options/:id**
+  - Get single shipping option details
+  - Auth: none (public)
+
+  **GET /api/shipping/estimate**
+  - Estimate shipping cost for cart
+  - Query: { cartTotal, zipCode? }
+  - Returns: available options with calculated costs
+  - Auth: optionalAuth
+
+  ### Admin Endpoints
+
+  **GET /api/admin/shipping/options**
+  - List all shipping options (including inactive)
+  - Auth: requireAdmin
+
+  **POST /api/admin/shipping/options**
+  - Create new shipping option
+  - Body: { name, carrier, baseCost, estimatedDaysMin, estimatedDaysMax, description }
+  - Auth: requireAdmin
+
+  **PATCH /api/admin/shipping/options/:id**
+  - Update shipping option
+  - Auth: requireAdmin
+
+  **DELETE /api/admin/shipping/options/:id**
+  - Soft delete (set isActive=false)
+  - Auth: requireAdmin
+
+  ### Validation Schemas
+  ```typescript
+  const createShippingOptionSchema = z.object({
+    name: z.string().min(1).max(100),
+    carrier: z.string().min(1).max(100),
+    description: z.string().max(500).optional(),
+    baseCost: z.number().positive(),
+    estimatedDaysMin: z.number().int().positive(),
+    estimatedDaysMax: z.number().int().positive(),
+    sortOrder: z.number().int().default(0),
+  });
+  ```
+
+  ## Testing Requirements
+
+  ### Unit Tests (packages/api/tests/routes/shipping.test.ts)
+
+  **Route Tests**
+  1. test('GET /shipping/options returns active options')
+  2. test('GET /shipping/options sorted by sortOrder')
+  3. test('GET /shipping/estimate calculates costs')
+  4. test('options cached in Redis')
+
+  **Admin Tests**
+  5. test('POST /admin/shipping/options requires admin')
+  6. test('creates shipping option with valid data')
+  7. test('validates required fields')
+  8. test('PATCH updates shipping option')
+  9. test('DELETE soft-deletes option')
+
+  **Runtime Tests**
+  10. test('inactive options not returned publicly')
+  11. test('estimate includes all active options')
+
+  ## Acceptance Criteria
+  - [ ] Public endpoints for fetching options
+  - [ ] Admin CRUD endpoints
+  - [ ] Cost estimation endpoint
+  - [ ] Redis caching implemented
+  - [ ] Unit tests passing
+  - [ ] Cache invalidation on admin updates
+feature: shipping-returns
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - shipping
+  - routes
+acceptance_criteria:
+  - Public endpoints for fetching options
+  - Admin CRUD endpoints
+  - Cost estimation endpoint
+  - Redis caching implemented
+  - Unit tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 36
+blocks:
+  - 40
+attachments: []

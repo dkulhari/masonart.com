@@ -1,0 +1,6 @@
+dependencies:
+  last_updated: '2026-01-27T19:33:23.269Z'
+  features: {}
+metadata:
+  format_version: 1
+  description: Ticket dependency tracking with bidirectional relationships

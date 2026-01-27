@@ -1,0 +1,126 @@
+ticket_number: 36
+title: 'Database Schema - Shipping and Returns Tables'
+description: |-
+  Create database schema for shipping options, order shipments, and return requests.
+
+  ## Implementation Details
+
+  ### Schema Location
+  `packages/api/src/database/schema/shipping.ts`
+  `packages/api/src/database/schema/returns.ts`
+
+  ### Tables to Create
+
+  **shipping_options table:**
+  - id: uuid (primary key)
+  - name: varchar(100) (e.g., "Standard Shipping", "Express")
+  - carrier: varchar(100) (e.g., "USPS", "FedEx", "UPS")
+  - description: text
+  - baseCost: decimal(10, 2)
+  - estimatedDaysMin: integer
+  - estimatedDaysMax: integer
+  - isActive: boolean (default true)
+  - sortOrder: integer
+  - createdAt, updatedAt
+
+  **order_shipments table:**
+  - id: uuid (primary key)
+  - orderId: uuid (FK to orders)
+  - shippingOptionId: uuid (FK to shipping_options)
+  - trackingNumber: varchar(100) (nullable)
+  - carrier: varchar(100)
+  - status: shipment_status enum
+  - shippedAt: timestamp (nullable)
+  - estimatedDeliveryAt: timestamp (nullable)
+  - deliveredAt: timestamp (nullable)
+  - trackingUrl: varchar(500) (nullable)
+  - notes: text (nullable)
+  - createdAt, updatedAt
+
+  **return_policies table:**
+  - id: uuid (primary key)
+  - name: varchar(100)
+  - description: text
+  - daysAllowed: integer (e.g., 30)
+  - conditionRequired: varchar(255) (e.g., "unopened", "unused")
+  - refundType: refund_type enum (full, partial, store_credit)
+  - refundPercentage: integer (1-100)
+  - isActive: boolean
+  - createdAt, updatedAt
+
+  **return_requests table:**
+  - id: uuid (primary key)
+  - orderId: uuid (FK to orders)
+  - userId: uuid (FK to users)
+  - reason: return_reason enum
+  - reasonDetails: text
+  - status: return_status enum
+  - requestedAt: timestamp (defaultNow)
+  - approvedAt: timestamp (nullable)
+  - processedAt: timestamp (nullable)
+  - refundAmount: decimal(10, 2) (nullable)
+  - adminNotes: text (nullable)
+  - createdAt, updatedAt
+
+  ### Enums
+  - shipment_status: 'pending', 'label_created', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'failed'
+  - return_reason: 'defective', 'wrong_item', 'not_as_described', 'changed_mind', 'other'
+  - return_status: 'pending', 'approved', 'rejected', 'shipped_back', 'received', 'refunded', 'closed'
+  - refund_type: 'full', 'partial', 'store_credit'
+
+  ### Indexes
+  - order_shipments_order_id_idx
+  - order_shipments_status_idx
+  - return_requests_order_id_idx
+  - return_requests_user_id_idx
+  - return_requests_status_idx
+
+  ## Testing Requirements
+
+  ### Unit Tests
+  1. test('shipping_options table has correct columns')
+  2. test('order_shipments table has correct columns')
+  3. test('return_policies table has correct columns')
+  4. test('return_requests table has correct columns')
+  5. test('shipment_status enum has all values')
+  6. test('return_reason enum has all values')
+  7. test('return_status enum has all values')
+  8. test('foreign keys reference correct tables')
+
+  ## Acceptance Criteria
+  - [ ] All tables created with proper structure
+  - [ ] All enums defined
+  - [ ] Indexes for common queries
+  - [ ] Relations configured
+  - [ ] Types exported
+  - [ ] Unit tests passing
+  - [ ] Migration tested
+feature: shipping-returns
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+  - drizzle
+acceptance_criteria:
+  - All tables created with proper structure
+  - All enums defined
+  - Indexes for common queries
+  - Relations configured
+  - Types exported
+  - Unit tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks:
+  - 37
+  - 38
+  - 39
+attachments: []

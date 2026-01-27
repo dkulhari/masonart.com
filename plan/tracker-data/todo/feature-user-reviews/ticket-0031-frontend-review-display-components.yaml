@@ -1,0 +1,106 @@
+ticket_number: 31
+title: 'Frontend - Review Display Components'
+description: |-
+  Create React components for displaying product reviews following established UI patterns.
+
+  ## Implementation Details
+
+  ### Components Location
+  `packages/web/app/components/reviews/`
+
+  ### Components to Create
+
+  **StarRating.tsx**
+  - Display star rating (1-5) with filled/empty stars
+  - Props: rating, size, showCount, interactive
+  - Accessible: aria-label for screen readers
+
+  **ReviewCard.tsx**
+  - Individual review display
+  - Shows: author name, date, rating, title, content
+  - Truncate long content with "Read more"
+  - Show "Verified Purchase" badge if applicable
+
+  **ReviewList.tsx**
+  - List of reviews with sorting controls
+  - Infinite scroll or pagination
+  - Empty state when no reviews
+  - Loading skeleton during fetch
+
+  **ReviewSummary.tsx**
+  - Aggregated review statistics
+  - Average rating display
+  - Rating distribution bar chart (5 stars: XX%, 4 stars: XX%, etc.)
+  - Total review count
+
+  **ReviewFilters.tsx**
+  - Filter by rating (1-5 stars, all)
+  - Sort by (newest, highest, lowest rated)
+
+  ### Styling
+  - Follow existing Tailwind patterns
+  - Mobile-responsive design
+  - Dark mode support if applicable
+
+  ## Testing Requirements
+
+  ### Component Tests (packages/web/tests/components/reviews/)
+
+  **StarRating Tests**
+  1. test('renders correct number of filled stars')
+  2. test('displays rating count when showCount=true')
+  3. test('has correct aria-label')
+
+  **ReviewCard Tests**
+  4. test('displays author name and date')
+  5. test('truncates long content')
+  6. test('shows verified badge when applicable')
+
+  **ReviewList Tests**
+  7. test('renders list of reviews')
+  8. test('shows empty state when no reviews')
+  9. test('displays loading skeleton')
+
+  **ReviewSummary Tests**
+  10. test('calculates average rating correctly')
+  11. test('displays rating distribution')
+
+  ### E2E Tests (tests/e2e/reviews/display.spec.ts)
+  12. test('review list loads on product page')
+  13. test('sorting changes review order')
+  14. test('filtering shows only selected ratings')
+
+  ## Acceptance Criteria
+  - [ ] All components created with TypeScript
+  - [ ] Responsive design (mobile/desktop)
+  - [ ] Accessible (ARIA labels, keyboard nav)
+  - [ ] Loading and empty states handled
+  - [ ] Component tests passing
+  - [ ] E2E tests for integration
+feature: user-reviews
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - components
+  - react
+acceptance_criteria:
+  - All components created with TypeScript
+  - Responsive design (mobile/desktop)
+  - Accessible (ARIA labels, keyboard nav)
+  - Loading and empty states handled
+  - Component tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 29
+blocks:
+  - 33
+attachments: []

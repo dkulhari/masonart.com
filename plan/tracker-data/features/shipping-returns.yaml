@@ -1,0 +1,45 @@
+name: shipping-returns
+title: Shipping & Returns
+priority: high
+created: "2026-01-28T00:10:00.000Z"
+assignee: unassigned
+tags:
+  - fulfillment
+  - customer-service
+description: |-
+  ## Overview
+  Comprehensive shipping options and returns management system. Includes configurable shipping methods with carriers and costs, order shipment tracking, return request workflow, and admin management dashboards.
+
+  ## Objectives
+  - Configurable shipping options with carrier integration
+  - Order shipment tracking with status updates
+  - Customer return request workflow
+  - Admin dashboard for returns management
+  - Comprehensive test coverage following TEST-COVERAGE.md guidelines
+objectives:
+  - Shipping option selection at checkout
+  - Order tracking display
+  - Return request submission
+  - Admin returns management
+  - Full test coverage (unit + E2E)
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    "36": "Database Schema - Shipping and Returns Tables"
+    "37": "API Routes - Shipping Options Endpoints"
+    "38": "API Routes - Order Shipments & Tracking"
+    "39": "API Routes - Return Requests"
+    "40": "Frontend - Checkout Shipping Selection"
+    "41": "Frontend - Order Tracking Display"
+    "42": "Frontend - Return Request Flow"
+    "43": "Admin Panel - Returns Management Dashboard"
+    "44": "Tests - Unit and E2E Test Suite"
+  in_progress: {}
+  done: {}
+total_tickets: 9
+completion_percentage: 0
+is_completed: false

@@ -1,0 +1,27 @@
+ticket_number: 24
+title: 'Phase 13: SEO & Performance Tests'
+description: Test meta tags, Open Graph data, structured data markup, and sitemap generation. Validate Core Web Vitals thresholds.
+feature: qa-testing
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:33:19.157Z'
+last_updated: '2026-01-27T19:33:51.149Z'
+time_spent_minutes: 0
+labels:
+  - e2e
+  - seo
+  - performance
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:33:51.150Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:33:51.149Z'

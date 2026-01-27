@@ -1,0 +1,52 @@
+ticket_number: 5
+title: Configure Better Auth with RBAC
+description: |-
+  ## Implementation
+  - Set up Better Auth with Drizzle adapter
+  - Configure role-based access control (customer, trade, admin, super-admin)
+  - Create auth middleware for protected routes
+  - Add user database schema
+  - Build login and registration pages
+
+  ## Files Created
+  - packages/api/src/auth/index.ts
+  - packages/api/src/middleware/auth.ts
+  - packages/api/src/database/schema/users.ts
+  - packages/shared/src/types/user.ts
+  - packages/web/app/routes/auth/login.tsx
+  - packages/web/app/routes/auth/register.tsx
+
+  ## Commit
+  ```
+  feat: Authentication
+
+  - Configure Better Auth with Drizzle adapter and RBAC
+  - Add auth middleware for protected routes
+  - Create user database schema
+  - Build login and registration pages
+  ```
+feature: authentication
+type: story
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:34.182Z'
+last_updated: '2026-01-27T19:25:58.182Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-4
+  - auth
+  - security
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:25:58.183Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:25:58.182Z'

@@ -1,0 +1,38 @@
+name: product-catalog
+title: Product Catalog
+priority: high
+created: "2026-01-27T19:24:44.822Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Product models, listing functionality, search, filtering, product display for poster e-commerce.
+
+  ## Objectives
+  - Create product database schema with variants and frames
+  - Add product API routes (list, get by slug, search)
+  - Build product listing page with filters (SSR)
+  - Add product detail page with size/frame selection
+  - Create reusable product components and hooks
+
+  ## Source
+  Task 001 - MasonArt E-Commerce Platform MVP (Phase 5)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "6": Create product database schema and API
+total_tickets: 1
+completion_percentage: 100
+is_completed: true

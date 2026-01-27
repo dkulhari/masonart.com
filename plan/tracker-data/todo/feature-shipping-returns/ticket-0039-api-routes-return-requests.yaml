@@ -1,0 +1,144 @@
+ticket_number: 39
+title: 'API Routes - Return Requests'
+description: |-
+  Create API endpoints for customer return requests and admin management.
+
+  ## Implementation Details
+
+  ### Route Location
+  `packages/api/src/routes/returns.ts`
+  `packages/api/src/routes/admin/returns.ts`
+
+  ### Public Endpoints
+
+  **GET /api/orders/:orderId/returns**
+  - Get return requests for an order
+  - Auth: requireAuth (order owner only)
+
+  **POST /api/orders/:orderId/returns**
+  - Create return request
+  - Body: { reason, reasonDetails }
+  - Validates: within return window, order delivered
+  - Auth: requireAuth (order owner only)
+
+  **GET /api/returns/:id**
+  - Get return request details
+  - Auth: requireAuth (owner only)
+
+  **DELETE /api/returns/:id**
+  - Cancel pending return request
+  - Only if status is 'pending'
+  - Auth: requireAuth (owner only)
+
+  **GET /api/return-policies**
+  - Get active return policies
+  - Public endpoint for display
+  - Auth: none
+
+  ### Admin Endpoints
+
+  **GET /api/admin/returns**
+  - List all return requests
+  - Query: { status, userId, orderId, dateFrom, dateTo }
+  - Auth: requireAdmin
+
+  **GET /api/admin/returns/stats**
+  - Get return statistics
+  - Returns: { pending, approved, rejected, refunded, byReason }
+  - Auth: requireAdmin
+
+  **PATCH /api/admin/returns/:id**
+  - Update return request
+  - Body: { status, adminNotes, refundAmount? }
+  - Auth: requireAdmin
+
+  **POST /api/admin/returns/:id/approve**
+  - Approve return request
+  - Sets approvedAt timestamp
+  - Auth: requireAdmin
+
+  **POST /api/admin/returns/:id/reject**
+  - Reject return request
+  - Body: { reason }
+  - Auth: requireAdmin
+
+  **POST /api/admin/returns/:id/process-refund**
+  - Process refund for return
+  - Body: { refundAmount, refundType }
+  - Updates order payment status
+  - Auth: requireAdmin
+
+  ### Validation Schemas
+  ```typescript
+  const createReturnSchema = z.object({
+    reason: z.enum(['defective', 'wrong_item', 'not_as_described', 'changed_mind', 'other']),
+    reasonDetails: z.string().min(10).max(2000),
+  });
+
+  const processRefundSchema = z.object({
+    refundAmount: z.number().positive(),
+    refundType: z.enum(['full', 'partial', 'store_credit']),
+  });
+  ```
+
+  ## Testing Requirements
+
+  ### Unit Tests (packages/api/tests/routes/returns.test.ts)
+
+  **Authorization Tests**
+  1. test('POST /orders/:id/returns requires auth')
+  2. test('only order owner can request return')
+  3. test('admin endpoints require admin role')
+
+  **Validation Tests**
+  4. test('validates return reason enum')
+  5. test('requires reason details min 10 chars')
+  6. test('rejects return outside window')
+  7. test('rejects return for undelivered order')
+
+  **Workflow Tests**
+  8. test('creates return with pending status')
+  9. test('approve sets approvedAt')
+  10. test('reject stores reason')
+  11. test('process-refund updates order')
+
+  **Runtime Tests**
+  12. test('return window calculated correctly')
+  13. test('stats return correct counts')
+
+  ## Acceptance Criteria
+  - [ ] Customers can request returns
+  - [ ] Return window validation
+  - [ ] Admin approval workflow
+  - [ ] Refund processing
+  - [ ] Statistics for dashboard
+  - [ ] Unit tests passing
+feature: shipping-returns
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - returns
+  - routes
+acceptance_criteria:
+  - Customers can request returns
+  - Return window validation
+  - Admin approval workflow
+  - Refund processing
+  - Statistics for dashboard
+  - Unit tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 36
+blocks:
+  - 42
+  - 43
+attachments: []

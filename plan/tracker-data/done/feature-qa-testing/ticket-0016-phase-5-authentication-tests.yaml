@@ -1,0 +1,27 @@
+ticket_number: 16
+title: 'Phase 5: Authentication Tests'
+description: Test authentication flows including login, logout, session management, and role-based access control. Cover JWT handling, secure cookie management, and password hashing.
+feature: qa-testing
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:33:10.902Z'
+last_updated: '2026-01-27T19:33:46.067Z'
+time_spent_minutes: 0
+labels:
+  - unit-tests
+  - auth
+  - security
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:33:46.067Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:33:46.067Z'

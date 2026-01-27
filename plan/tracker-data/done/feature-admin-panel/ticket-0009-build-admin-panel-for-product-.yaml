@@ -1,0 +1,54 @@
+ticket_number: 9
+title: Build admin panel for product/order management
+description: |-
+  ## Implementation
+  - Create admin API routes for products and orders
+  - Build admin layout with sidebar navigation
+  - Add role protection for admin routes
+  - Create admin dashboard with key metrics
+  - Build products management with TanStack Table
+  - Add orders management with detail views
+  - Create product form for CRUD operations
+
+  ## Files Created
+  - packages/api/src/routes/admin/products.ts
+  - packages/api/src/routes/admin/orders.ts
+  - packages/web/app/routes/admin.tsx
+  - packages/web/app/routes/admin/index.tsx
+  - packages/web/app/routes/admin/products/*.tsx
+  - packages/web/app/routes/admin/orders/*.tsx
+  - packages/web/app/components/admin/*.tsx (7 components)
+
+  ## Commit
+  ```
+  feat: Admin panel
+
+  - Create admin API routes for products and orders
+  - Build admin layout with navigation and role protection
+  - Add admin dashboard with key metrics
+  - Create products and orders management pages
+  ```
+feature: admin-panel
+type: story
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:37.185Z'
+last_updated: '2026-01-27T19:26:00.115Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-8
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:26:00.115Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:26:00.115Z'

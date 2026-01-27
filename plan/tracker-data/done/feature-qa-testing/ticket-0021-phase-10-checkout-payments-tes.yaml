@@ -1,0 +1,27 @@
+ticket_number: 21
+title: 'Phase 10: Checkout & Payments Tests'
+description: E2E tests for cart management, checkout flow, payment processing, and order confirmation. Test Stripe integration mocks.
+feature: qa-testing
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:33:15.660Z'
+last_updated: '2026-01-27T19:33:49.371Z'
+time_spent_minutes: 0
+labels:
+  - e2e
+  - checkout
+  - payments
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:33:49.371Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:33:49.371Z'

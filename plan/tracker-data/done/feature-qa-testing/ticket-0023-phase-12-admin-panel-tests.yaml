@@ -1,0 +1,26 @@
+ticket_number: 23
+title: 'Phase 12: Admin Panel Tests'
+description: E2E tests for admin dashboard, user management, product CRUD, order management, and analytics views. Test role restrictions.
+feature: qa-testing
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:33:17.667Z'
+last_updated: '2026-01-27T19:33:50.066Z'
+time_spent_minutes: 0
+labels:
+  - e2e
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:33:50.069Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:33:50.066Z'

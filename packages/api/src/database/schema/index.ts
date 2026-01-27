@@ -18,3 +18,6 @@ export * from "./ai-generations";
 
 // Wallet transactions and pricing config
 export * from "./wallet";
+
+// Product reviews and ratings
+export * from "./reviews";

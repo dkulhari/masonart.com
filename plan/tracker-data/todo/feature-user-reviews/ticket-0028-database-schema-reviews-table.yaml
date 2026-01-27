@@ -1,0 +1,133 @@
+ticket_number: 28
+title: 'Database Schema - Reviews Table'
+description: |-
+  Create database schema for product reviews using Drizzle ORM patterns.
+
+  ## Implementation Details
+
+  ### Schema Location
+  `packages/api/src/database/schema/reviews.ts`
+
+  ### Tables to Create
+
+  **reviews table:**
+  - id: uuid (primary key, defaultRandom)
+  - productId: uuid (FK to products, onDelete cascade)
+  - userId: uuid (FK to users, onDelete cascade)
+  - rating: integer (1-5, not null)
+  - title: varchar(255)
+  - content: text
+  - status: review_status enum (pending, approved, rejected)
+  - moderatorId: uuid (FK to users, nullable)
+  - moderatorNotes: text (nullable)
+  - createdAt: timestamp (defaultNow)
+  - updatedAt: timestamp (onUpdate)
+
+  ### Enums
+  - review_status: pgEnum('review_status', ['pending', 'approved', 'rejected'])
+
+  ### Indexes
+  - reviews_product_id_idx (productId)
+  - reviews_user_id_idx (userId)
+  - reviews_status_idx (status)
+  - reviews_created_at_idx (createdAt)
+
+  ### Relations
+  - Review -> Product (many-to-one)
+  - Review -> User as author (many-to-one)
+  - Review -> User as moderator (many-to-one, nullable)
+
+  ### Type Exports
+  - export type Review = typeof reviews.$inferSelect
+  - export type NewReview = typeof reviews.$inferInsert
+  - export type ReviewStatus = 'pending' | 'approved' | 'rejected'
+
+  ## Testing Requirements
+
+  ### Unit Tests (packages/api/tests/schema/reviews.test.ts)
+  - Schema structure validation
+  - Rating constraint (1-5 range)
+  - Status enum values
+  - Foreign key relationships
+  - Index definitions exist
+
+  ### Test Cases
+  1. test('reviews table has correct columns')
+  2. test('review_status enum has correct values')
+  3. test('rating accepts values 1-5')
+  4. test('productId foreign key references products')
+  5. test('userId foreign key references users')
+  6. test('indexes are defined for common queries')
+
+  ## Acceptance Criteria
+  - [ ] Schema file created with proper Drizzle patterns
+  - [ ] Enum for review status defined
+  - [ ] All indexes created for query optimization
+  - [ ] Relations properly configured
+  - [ ] Types exported for use in API
+  - [ ] Unit tests written and passing
+  - [ ] Migration generated and tested
+feature: user-reviews
+type: task
+priority: critical
+status: in_progress
+assignee: claude
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T02:02:00.000Z'
+time_spent_minutes: 30
+labels:
+  - database
+  - schema
+  - drizzle
+acceptance_criteria:
+  - Schema file created with proper Drizzle patterns
+  - Enum for review status defined
+  - All indexes created for query optimization
+  - Relations properly configured
+  - Types exported for use in API
+  - Unit tests written and passing
+  - Migration generated and tested
+comments:
+  - author: claude
+    timestamp: '2026-01-28T01:50:00.000Z'
+    text: |
+      Started implementation. Analyzed existing schema patterns in products.ts and users.ts.
+      Key decision: userId uses text type (not uuid) to match Better Auth's users table.
+  - author: claude
+    timestamp: '2026-01-28T01:55:00.000Z'
+    text: |
+      Created reviews.ts schema with:
+      - reviewStatusEnum: pending, approved, rejected
+      - reviews table with all required columns
+      - 5 indexes including composite index for product+status queries
+      - Relations to products and users (author/moderator)
+      - Type exports: Review, NewReview, ReviewStatus
+  - author: claude
+    timestamp: '2026-01-28T02:00:00.000Z'
+    text: |
+      Created comprehensive test file (21 tests):
+      - Table structure validation
+      - Enum value tests
+      - Rating constraint tests (1-5 range)
+      - Foreign key tests
+      - Index verification
+      - CRUD operations
+      - Cascade delete behavior
+      - Type export tests
+      All 21 tests passing.
+  - author: claude
+    timestamp: '2026-01-28T02:02:00.000Z'
+    text: |
+      Fixed test infrastructure issues:
+      - Updated DATABASE_URL in vitest.config.ts to use poster_app_dev
+      - Updated setup.ts fallback URL
+      - Created dbTest wrapper to handle runtime DB availability checks
+      (vitest's skipIf evaluates at test definition time, not runtime)
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks:
+  - 29
+  - 30
+attachments: []

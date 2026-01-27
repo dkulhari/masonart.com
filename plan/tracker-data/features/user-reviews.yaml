@@ -1,0 +1,43 @@
+name: user-reviews
+title: User Reviews
+priority: high
+created: "2026-01-28T00:10:00.000Z"
+assignee: unassigned
+tags:
+  - customer-experience
+  - social-proof
+description: |-
+  ## Overview
+  Product review system allowing customers to rate and review products. Includes star ratings (1-5), written reviews, moderation workflow for admin approval, and aggregated ratings display on product pages.
+
+  ## Objectives
+  - Enable customers to submit product reviews with star ratings
+  - Implement admin moderation workflow for review approval
+  - Display aggregated ratings and reviews on product pages
+  - Add review management to admin panel
+  - Comprehensive test coverage following TEST-COVERAGE.md guidelines
+objectives:
+  - Customer review submission with ratings
+  - Admin moderation workflow
+  - Product page review display
+  - Full test coverage (unit + E2E)
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    "28": "Database Schema - Reviews Table"
+    "29": "API Routes - Public Review Endpoints"
+    "30": "API Routes - Admin Moderation Endpoints"
+    "31": "Frontend - Review Display Components"
+    "32": "Frontend - Review Submission Form"
+    "33": "Integration - Product Page Reviews"
+    "34": "Admin Panel - Review Moderation Dashboard"
+    "35": "Tests - Unit and E2E Test Suite"
+  in_progress: {}
+  done: {}
+total_tickets: 8
+completion_percentage: 0
+is_completed: false

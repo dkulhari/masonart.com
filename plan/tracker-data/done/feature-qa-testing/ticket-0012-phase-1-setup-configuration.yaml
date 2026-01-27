@@ -1,0 +1,26 @@
+ticket_number: 12
+title: 'Phase 1: Setup & Configuration'
+description: Install and configure test frameworks (Playwright 1.57.0, Vitest 4.0.17). Set up workspace test configurations for monorepo. Configure TypeScript paths, coverage thresholds, and test runner settings.
+feature: qa-testing
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:33:08.263Z'
+last_updated: '2026-01-27T19:33:43.457Z'
+time_spent_minutes: 0
+labels:
+  - setup
+  - infrastructure
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:33:43.457Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:33:43.457Z'

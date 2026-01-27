@@ -1,0 +1,37 @@
+name: seo
+title: Seo
+priority: medium
+created: "2026-01-27T19:24:47.689Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Search engine optimization - meta tags, sitemap generation, crawlability improvements, structured data.
+
+  ## Objectives
+  - Add meta tags and Open Graph data to product pages
+  - Create JSON-LD structured data for products
+  - Build sitemap.xml generation endpoint
+  - Add robots.txt for search engine crawling
+
+  ## Source
+  Task 001 - MasonArt E-Commerce Platform MVP (Phase 10)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "11": Add SEO optimization and structured data
+total_tickets: 1
+completion_percentage: 100
+is_completed: true

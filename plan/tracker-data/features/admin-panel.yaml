@@ -1,0 +1,39 @@
+name: admin-panel
+title: Admin Panel
+priority: medium
+created: "2026-01-27T19:24:46.545Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Administrative interface for product and order management, admin-only features with role protection.
+
+  ## Objectives
+  - Create admin API routes for products and orders
+  - Build admin layout with navigation and role protection
+  - Add admin dashboard with key metrics
+  - Create products management page with TanStack Table
+  - Build orders management page with detail views
+  - Add product form for create/edit operations
+
+  ## Source
+  Task 001 - MasonArt E-Commerce Platform MVP (Phase 8)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "9": Build admin panel for product/order management
+total_tickets: 1
+completion_percentage: 100
+is_completed: true

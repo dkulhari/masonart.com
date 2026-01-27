@@ -1,0 +1,103 @@
+ticket_number: 40
+title: 'Frontend - Checkout Shipping Selection'
+description: |-
+  Integrate shipping option selection into checkout flow.
+
+  ## Implementation Details
+
+  ### Files to Modify
+  `packages/web/app/routes/checkout.tsx`
+  `packages/web/app/components/checkout/`
+
+  ### Components to Create
+
+  **ShippingSelector.tsx**
+  - Radio button list of shipping options
+  - Shows: name, carrier, estimated delivery, cost
+  - Highlights fastest/cheapest options
+  - Updates cart total when selected
+
+  **ShippingOptionCard.tsx**
+  - Individual option display
+  - Icon for carrier (FedEx, UPS, USPS)
+  - Estimated delivery date range
+  - Price display
+
+  **ShippingEstimate.tsx**
+  - Estimated delivery date calculation
+  - Shows "Arrives by [date]" format
+  - Accounts for weekends/holidays (basic)
+
+  ### Checkout Flow Integration
+  1. After address entry, show shipping options
+  2. User selects shipping method
+  3. Cart total updates with shipping cost
+  4. Selected option stored in checkout state
+  5. Shipping shown in order summary
+  6. Passed to order creation API
+
+  ### State Management
+  - Add selectedShippingOption to checkout state
+  - Persist selection during checkout
+  - Clear on cart changes
+
+  ### Validation
+  - Require shipping selection before payment
+  - Show error if no option selected
+
+  ## Testing Requirements
+
+  ### Component Tests
+
+  **ShippingSelector Tests**
+  1. test('renders all shipping options')
+  2. test('selecting option updates state')
+  3. test('shows estimated delivery')
+  4. test('displays pricing correctly')
+
+  **ShippingOptionCard Tests**
+  5. test('shows carrier icon')
+  6. test('formats delivery date range')
+  7. test('highlights selected state')
+
+  ### E2E Tests (tests/e2e/checkout/shipping.spec.ts)
+  8. test('shipping options load after address')
+  9. test('selecting option updates total')
+  10. test('cannot proceed without shipping selection')
+  11. test('shipping shows in order summary')
+  12. test('order created with correct shipping')
+
+  ## Acceptance Criteria
+  - [ ] Shipping options displayed in checkout
+  - [ ] Selection updates cart total
+  - [ ] Estimated delivery shown
+  - [ ] Required before payment step
+  - [ ] Component tests passing
+  - [ ] E2E tests passing
+feature: shipping-returns
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - checkout
+  - components
+acceptance_criteria:
+  - Shipping options displayed in checkout
+  - Selection updates cart total
+  - Estimated delivery shown
+  - Required before payment step
+  - Component and E2E tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 37
+blocks:
+  - 44
+attachments: []

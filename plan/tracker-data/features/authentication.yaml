@@ -1,0 +1,38 @@
+name: authentication
+title: Authentication
+priority: high
+created: "2026-01-27T19:24:44.063Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  User authentication, authorization, session management, auth middleware using Better Auth.
+
+  ## Objectives
+  - Configure Better Auth with Drizzle adapter and RBAC
+  - Add auth middleware for protected routes
+  - Create user database schema
+  - Build login and registration pages
+  - Add user type definitions
+
+  ## Source
+  Task 001 - MasonArt E-Commerce Platform MVP (Phase 4)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "5": Configure Better Auth with RBAC
+total_tickets: 1
+completion_percentage: 100
+is_completed: true

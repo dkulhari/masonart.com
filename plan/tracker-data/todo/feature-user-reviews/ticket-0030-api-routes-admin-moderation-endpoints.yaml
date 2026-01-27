@@ -1,0 +1,111 @@
+ticket_number: 30
+title: 'API Routes - Admin Moderation Endpoints'
+description: |-
+  Create admin API endpoints for review moderation following established patterns.
+
+  ## Implementation Details
+
+  ### Route Location
+  `packages/api/src/routes/admin/reviews.ts`
+
+  ### Endpoints
+
+  **GET /api/admin/reviews**
+  - List all reviews with filters
+  - Query params: status, productId, userId, page, pageSize, sortBy
+  - Returns: reviews with author and product info
+  - Auth: requireAdmin
+
+  **GET /api/admin/reviews/stats**
+  - Get moderation statistics
+  - Returns: { pending: number, approved: number, rejected: number, today: number }
+  - Auth: requireAdmin
+
+  **PATCH /api/admin/reviews/:reviewId**
+  - Moderate review (approve/reject)
+  - Body: { status: 'approved' | 'rejected', moderatorNotes?: string }
+  - Sets moderatorId to current admin
+  - Auth: requireAdmin
+
+  **DELETE /api/admin/reviews/:reviewId**
+  - Admin delete any review
+  - Hard delete with audit log
+  - Auth: requireAdmin
+
+  **GET /api/admin/reviews/:reviewId**
+  - Get full review details including moderation history
+  - Auth: requireAdmin
+
+  ### Validation Schemas
+  ```typescript
+  const listAdminReviewsSchema = z.object({
+    status: z.enum(['pending', 'approved', 'rejected']).optional(),
+    productId: z.string().uuid().optional(),
+    userId: z.string().uuid().optional(),
+    page: z.coerce.number().int().positive().default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+    sortBy: z.enum(['newest', 'oldest', 'rating']).default('newest'),
+  });
+
+  const moderateReviewSchema = z.object({
+    status: z.enum(['approved', 'rejected']),
+    moderatorNotes: z.string().max(1000).optional(),
+  });
+  ```
+
+  ## Testing Requirements
+
+  ### Unit Tests (packages/api/tests/routes/admin/reviews.test.ts)
+
+  **Authorization Tests**
+  1. test('GET /admin/reviews requires admin role')
+  2. test('GET /admin/reviews rejects customer role')
+  3. test('PATCH /admin/reviews/:id requires admin role')
+
+  **Validation Tests**
+  4. test('moderateReviewSchema accepts approved status')
+  5. test('moderateReviewSchema accepts rejected status')
+  6. test('moderateReviewSchema rejects invalid status')
+  7. test('listAdminReviewsSchema validates status filter')
+
+  **Runtime Tests (skipIf DB unavailable)**
+  8. test('lists reviews filtered by status')
+  9. test('approving review sets moderatorId')
+  10. test('rejecting review stores moderatorNotes')
+  11. test('stats returns correct counts')
+  12. test('admin can delete any review')
+
+  ## Acceptance Criteria
+  - [ ] All admin endpoints implemented
+  - [ ] Role-based access control enforced
+  - [ ] Moderator tracking on status changes
+  - [ ] Statistics endpoint for dashboard
+  - [ ] Unit tests written and passing
+  - [ ] Cache invalidation on moderation actions
+feature: user-reviews
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - admin
+  - moderation
+acceptance_criteria:
+  - All admin endpoints implemented
+  - Role-based access control enforced
+  - Moderator tracking on status changes
+  - Statistics endpoint for dashboard
+  - Unit tests written and passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 28
+blocks:
+  - 34
+attachments: []

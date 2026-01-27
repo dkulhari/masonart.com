@@ -1,0 +1,39 @@
+ticket_number: 4
+title: Create shared package with types and schemas
+description: |-
+  ## Implementation
+  - Initialize packages/shared
+  - Add Zod schemas for validation
+  - Create TypeScript type definitions
+  - Add business constants (sizes, frames, styles)
+
+  ## Files Created
+  - packages/shared/package.json
+  - packages/shared/tsconfig.json
+  - packages/shared/src/index.ts
+  - packages/shared/src/constants/frames.ts
+  - packages/shared/src/constants/sizes.ts
+feature: backend-api-database
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:33.577Z'
+last_updated: '2026-01-27T19:25:57.886Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-2
+  - shared
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:25:57.886Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:25:57.886Z'

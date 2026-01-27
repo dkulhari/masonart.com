@@ -1,0 +1,8 @@
+counter:
+  current: 44
+  last_updated: '2026-01-28T00:15:00.000Z'
+  next: 45
+metadata:
+  format_version: 1
+  description: Global ticket counter for unique ticket numbering
+  auto_increment: true

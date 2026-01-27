@@ -1,0 +1,125 @@
+ticket_number: 38
+title: 'API Routes - Order Shipments & Tracking'
+description: |-
+  Create API endpoints for order shipment management and tracking.
+
+  ## Implementation Details
+
+  ### Route Location
+  `packages/api/src/routes/shipments.ts`
+  `packages/api/src/routes/admin/shipments.ts`
+
+  ### Public Endpoints
+
+  **GET /api/orders/:orderId/shipments**
+  - Get shipments for an order
+  - Returns: shipment details with tracking info
+  - Auth: requireAuth (order owner only)
+
+  **GET /api/shipments/:id/track**
+  - Get real-time tracking updates
+  - Returns: tracking events, current status
+  - Auth: requireAuth (order owner only)
+
+  ### Admin Endpoints
+
+  **GET /api/admin/shipments**
+  - List all shipments with filters
+  - Query: { status, orderId, dateFrom, dateTo }
+  - Auth: requireAdmin
+
+  **POST /api/admin/orders/:orderId/ship**
+  - Create shipment for order
+  - Body: { shippingOptionId, trackingNumber?, carrier }
+  - Updates order status to 'processing' or 'shipped'
+  - Auth: requireAdmin
+
+  **PATCH /api/admin/shipments/:id**
+  - Update shipment details
+  - Body: { trackingNumber?, status?, notes?, estimatedDeliveryAt? }
+  - Auth: requireAdmin
+
+  **POST /api/admin/shipments/:id/mark-delivered**
+  - Mark shipment as delivered
+  - Sets deliveredAt timestamp
+  - Updates order status
+  - Auth: requireAdmin
+
+  ### Tracking Integration (Future)
+  - Webhook endpoint for carrier updates
+  - Auto-update status from tracking API
+  - Email notifications on status change
+
+  ### Validation Schemas
+  ```typescript
+  const createShipmentSchema = z.object({
+    shippingOptionId: z.string().uuid(),
+    trackingNumber: z.string().max(100).optional(),
+    carrier: z.string().min(1).max(100),
+  });
+
+  const updateShipmentSchema = z.object({
+    trackingNumber: z.string().max(100).optional(),
+    status: z.enum(['pending', 'shipped', 'in_transit', 'delivered']).optional(),
+    estimatedDeliveryAt: z.string().datetime().optional(),
+    notes: z.string().max(1000).optional(),
+  });
+  ```
+
+  ## Testing Requirements
+
+  ### Unit Tests (packages/api/tests/routes/shipments.test.ts)
+
+  **Authorization Tests**
+  1. test('GET /orders/:id/shipments requires order owner')
+  2. test('admin can view any shipment')
+  3. test('POST /admin/orders/:id/ship requires admin')
+
+  **Shipment Tests**
+  4. test('creates shipment with tracking number')
+  5. test('updates shipment status')
+  6. test('mark-delivered sets timestamp')
+  7. test('order status updated on ship')
+
+  **Tracking Tests**
+  8. test('tracking endpoint returns events')
+  9. test('tracking url generated correctly')
+
+  **Runtime Tests**
+  10. test('shipment creation updates order')
+  11. test('delivered shipment updates order status')
+
+  ## Acceptance Criteria
+  - [ ] Customer can view their shipments
+  - [ ] Admin can create and manage shipments
+  - [ ] Tracking information accessible
+  - [ ] Order status synced with shipment
+  - [ ] Unit tests passing
+  - [ ] Proper authorization checks
+feature: shipping-returns
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - shipping
+  - tracking
+acceptance_criteria:
+  - Customer can view their shipments
+  - Admin can create and manage shipments
+  - Tracking information accessible
+  - Order status synced with shipment
+  - Unit tests passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 36
+blocks:
+  - 41
+attachments: []

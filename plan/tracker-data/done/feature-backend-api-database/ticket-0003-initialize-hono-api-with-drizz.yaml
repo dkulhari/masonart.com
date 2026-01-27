@@ -1,0 +1,54 @@
+ticket_number: 3
+title: Initialize Hono API with Drizzle ORM
+description: |-
+  ## Implementation
+  - Set up packages/api with Hono framework
+  - Configure Drizzle ORM with PostgreSQL
+  - Create database connection and seed utilities
+  - Add Redis caching utilities
+  - Add MinIO storage utilities
+
+  ## Files Created
+  - packages/api/package.json
+  - packages/api/tsconfig.json
+  - packages/api/drizzle.config.ts
+  - packages/api/src/index.ts
+  - packages/api/src/database/index.ts
+  - packages/api/src/database/seed.ts
+  - packages/api/src/database/schema/index.ts
+  - packages/api/src/lib/redis.ts
+  - packages/api/src/lib/storage.ts
+
+  ## Commit
+  ```
+  feat: Backend API & database
+
+  - Initialize Hono API with Drizzle ORM
+  - Create database infrastructure and seed utilities
+  - Set up Redis caching and MinIO storage utilities
+  ```
+feature: backend-api-database
+type: story
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:32.914Z'
+last_updated: '2026-01-27T19:25:57.387Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-2
+  - api
+  - database
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:25:57.388Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:25:57.387Z'

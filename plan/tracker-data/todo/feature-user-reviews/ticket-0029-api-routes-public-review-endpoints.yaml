@@ -1,0 +1,122 @@
+ticket_number: 29
+title: 'API Routes - Public Review Endpoints'
+description: |-
+  Create public API endpoints for product reviews following Hono patterns.
+
+  ## Implementation Details
+
+  ### Route Location
+  `packages/api/src/routes/reviews.ts`
+
+  ### Endpoints
+
+  **GET /api/products/:productId/reviews**
+  - List approved reviews for a product
+  - Query params: page, pageSize, sortBy (newest, highest, lowest)
+  - Returns: reviews array with pagination
+  - Caching: Redis with 5 min TTL
+  - Auth: optionalAuth (for showing user's own pending reviews)
+
+  **POST /api/products/:productId/reviews**
+  - Create new review (requires auth)
+  - Body: { rating: 1-5, title?: string, content: string }
+  - Validation: User must have purchased product (optional enforcement)
+  - Returns: created review with pending status
+  - Auth: requireAuth
+
+  **GET /api/reviews/:reviewId**
+  - Get single review details
+  - Returns: review with author info
+  - Auth: optionalAuth
+
+  **PATCH /api/reviews/:reviewId**
+  - Update own review
+  - Body: { rating?, title?, content? }
+  - Constraint: Only owner can update
+  - Returns: updated review (resets to pending status)
+  - Auth: requireAuth
+
+  **DELETE /api/reviews/:reviewId**
+  - Delete own review
+  - Constraint: Only owner can delete
+  - Auth: requireAuth
+
+  ### Validation Schemas (Zod)
+  ```typescript
+  const createReviewSchema = z.object({
+    rating: z.number().int().min(1).max(5),
+    title: z.string().max(255).optional(),
+    content: z.string().min(10).max(5000),
+  });
+
+  const listReviewsSchema = z.object({
+    page: z.coerce.number().int().positive().default(1),
+    pageSize: z.coerce.number().int().min(1).max(50).default(10),
+    sortBy: z.enum(['newest', 'highest', 'lowest']).default('newest'),
+  });
+  ```
+
+  ## Testing Requirements
+
+  ### Unit Tests (packages/api/tests/routes/reviews.test.ts)
+
+  **Configuration Tests**
+  1. test('GET /products/:productId/reviews route exists')
+  2. test('POST /products/:productId/reviews route exists')
+  3. test('PATCH /reviews/:reviewId route exists')
+  4. test('DELETE /reviews/:reviewId route exists')
+
+  **Validation Tests**
+  5. test('createReviewSchema validates rating 1-5')
+  6. test('createReviewSchema rejects rating outside 1-5')
+  7. test('createReviewSchema requires content min 10 chars')
+  8. test('listReviewsSchema validates sortBy enum')
+
+  **Authorization Tests**
+  9. test('POST requires authentication')
+  10. test('PATCH requires review owner')
+  11. test('DELETE requires review owner')
+
+  **Runtime Tests (skipIf DB unavailable)**
+  12. test('lists only approved reviews')
+  13. test('creates review with pending status')
+  14. test('updates review resets to pending')
+  15. test('pagination returns correct page')
+
+  ## Acceptance Criteria
+  - [ ] All endpoints implemented with proper validation
+  - [ ] Redis caching for list endpoint
+  - [ ] Only approved reviews visible publicly
+  - [ ] Owner-only update/delete enforcement
+  - [ ] Proper error responses (401, 403, 404)
+  - [ ] Unit tests written and passing
+  - [ ] API documentation updated
+feature: user-reviews
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T00:10:00.000Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - hono
+  - routes
+acceptance_criteria:
+  - All endpoints implemented with proper validation
+  - Redis caching for list endpoint
+  - Only approved reviews visible publicly
+  - Owner-only update/delete enforcement
+  - Proper error responses (401, 403, 404)
+  - Unit tests written and passing
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 28
+blocks:
+  - 31
+  - 33
+attachments: []

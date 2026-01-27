@@ -1,0 +1,39 @@
+name: ai-generation
+title: Ai Generation
+priority: high
+created: "2026-01-27T19:24:46.022Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  AI/ML integration for custom poster generation using Replicate, job queue, AI-powered creation capabilities.
+
+  ## Objectives
+  - Create BullMQ queue and worker for AI generation
+  - Add AI style presets and prompt construction
+  - Build AI generation API routes
+  - Create AI generator frontend page with style selector
+  - Add AI creations history page
+  - Set up AI generation database schema
+
+  ## Source
+  Task 001 - MasonArt E-Commerce Platform MVP (Phase 7)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "8": Build AI poster generation system
+total_tickets: 1
+completion_percentage: 100
+is_completed: true

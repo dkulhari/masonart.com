@@ -1,0 +1,39 @@
+ticket_number: 2
+title: Add Docker Compose with PostgreSQL, Redis, MinIO
+description: |-
+  ## Implementation
+  - Create docker/docker-compose.yml with all services
+  - PostgreSQL 16 on port 5433
+  - Redis 7-alpine on port 6380
+  - MinIO for S3-compatible storage on ports 9000/9001
+  - Health checks for all services
+  - Persistent volumes for data
+
+  ## Files Created
+  - docker/docker-compose.yml
+  - .env.example
+  - docs/DEV_ENVIRONMENT.md
+feature: infrastructure-setup
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:32.402Z'
+last_updated: '2026-01-27T19:25:56.987Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-1
+  - docker
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:25:56.988Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:25:56.987Z'

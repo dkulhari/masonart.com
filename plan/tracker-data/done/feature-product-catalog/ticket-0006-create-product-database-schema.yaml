@@ -1,0 +1,54 @@
+ticket_number: 6
+title: Create product database schema and API
+description: |-
+  ## Implementation
+  - Create product database schema with variants and frames
+  - Add product API routes (list, get by slug, search, filter)
+  - Build SSR product listing page with filters
+  - Add product detail page with size/frame selection
+  - Create reusable product components
+
+  ## Files Created
+  - packages/api/src/routes/products.ts
+  - packages/api/src/database/schema/products.ts
+  - packages/shared/src/schemas/product.ts
+  - packages/shared/src/types/product.ts
+  - packages/web/app/routes/posters/index.tsx
+  - packages/web/app/routes/posters/$category.$slug.tsx
+  - packages/web/app/components/product/*.tsx (6 components)
+  - packages/web/app/hooks/useProducts.ts
+
+  ## Commit
+  ```
+  feat: Product catalog
+
+  - Create product database schema with variants and frames
+  - Add product API routes (list, get by slug, search)
+  - Build product listing page with filters (SSR)
+  - Add product detail page with size/frame selection
+  ```
+feature: product-catalog
+type: story
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:34.783Z'
+last_updated: '2026-01-27T19:25:58.687Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-5
+  - products
+  - catalog
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:25:58.687Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:25:58.687Z'

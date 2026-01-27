@@ -1,0 +1,39 @@
+name: backend-api-database
+title: Backend Api Database
+priority: high
+created: "2026-01-27T19:24:43.416Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  API package setup, database infrastructure, core utilities, shared libraries for the MasonArt platform.
+
+  ## Objectives
+  - Initialize Hono API with Drizzle ORM
+  - Create database infrastructure and seed utilities
+  - Set up Redis caching and MinIO storage utilities
+  - Add shared types, constants, and Zod schemas
+  - Configure API package with TypeScript
+
+  ## Source
+  Task 001 - MasonArt E-Commerce Platform MVP (Phase 2-3)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "3": Initialize Hono API with Drizzle ORM
+    "4": Create shared package with types and schemas
+total_tickets: 2
+completion_percentage: 100
+is_completed: true

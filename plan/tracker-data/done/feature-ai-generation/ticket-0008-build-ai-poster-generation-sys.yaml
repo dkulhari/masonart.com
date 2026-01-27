@@ -1,0 +1,58 @@
+ticket_number: 8
+title: Build AI poster generation system
+description: |-
+  ## Implementation
+  - Create BullMQ queue and worker for async AI generation
+  - Add AI style presets (10 styles) and prompt construction
+  - Build AI generation API routes
+  - Create AI generator frontend with style selector
+  - Add AI creations history page
+  - Set up AI generation database schema
+
+  ## Files Created
+  - packages/api/src/ai/generator.ts
+  - packages/api/src/ai/style-presets.ts
+  - packages/api/src/routes/ai.ts
+  - packages/api/src/queues/ai-generation.ts
+  - packages/api/src/database/schema/ai-generations.ts
+  - packages/shared/src/schemas/ai-generation.ts
+  - packages/shared/src/types/ai.ts
+  - packages/shared/src/constants/styles.ts
+  - packages/web/app/routes/create/index.tsx
+  - packages/web/app/routes/account/ai-creations.tsx
+  - packages/web/app/components/ai-generator/*.tsx
+
+  ## Commit
+  ```
+  feat: AI generation
+
+  - Create BullMQ queue and worker for AI generation
+  - Add AI style presets and prompt construction
+  - Build AI generation API routes
+  - Create AI generator frontend page with style selector
+  ```
+feature: ai-generation
+type: story
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:36.480Z'
+last_updated: '2026-01-27T19:25:59.791Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-7
+  - ai
+  - replicate
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:25:59.791Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:25:59.791Z'

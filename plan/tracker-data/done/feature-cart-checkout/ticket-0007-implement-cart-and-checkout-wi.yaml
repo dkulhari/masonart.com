@@ -1,0 +1,63 @@
+ticket_number: 7
+title: Implement cart and checkout with Razorpay
+description: |-
+  ## Implementation
+  - Create cart and order database schemas
+  - Integrate Razorpay payment gateway
+  - Add webhook handler for payment confirmation
+  - Build checkout page with address form
+  - Create cart page and cart sheet component
+  - Implement Zustand cart store with localStorage
+
+  ## Files Created
+  - packages/api/src/routes/cart.ts
+  - packages/api/src/routes/orders.ts
+  - packages/api/src/database/schema/cart.ts
+  - packages/api/src/database/schema/orders.ts
+  - packages/api/src/lib/razorpay.ts
+  - packages/api/src/routes/webhooks/razorpay.ts
+  - packages/shared/src/schemas/checkout.ts
+  - packages/shared/src/types/order.ts
+  - packages/web/app/routes/cart/index.tsx
+  - packages/web/app/routes/checkout/index.tsx
+  - packages/web/app/routes/checkout/success.tsx
+  - packages/web/app/components/cart/*.tsx
+  - packages/web/app/components/checkout/*.tsx
+  - packages/web/app/stores/cart.ts
+  - packages/web/app/hooks/useCart.ts
+
+  ## Commit
+  ```
+  feat: Cart & checkout
+
+  - Create cart and order database schemas
+  - Integrate Razorpay payment gateway with webhooks
+  - Build checkout page with address form
+  - Implement Zustand cart store with localStorage
+  ```
+feature: cart-checkout
+type: story
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:35.799Z'
+last_updated: '2026-01-27T19:25:59.188Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-6
+  - cart
+  - checkout
+  - payments
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:25:59.189Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:25:59.188Z'

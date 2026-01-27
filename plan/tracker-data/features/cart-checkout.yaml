@@ -1,0 +1,39 @@
+name: cart-checkout
+title: Cart Checkout
+priority: high
+created: "2026-01-27T19:24:45.408Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Shopping cart logic, checkout flow, order processing, Razorpay payment integration.
+
+  ## Objectives
+  - Create cart and order database schemas
+  - Integrate Razorpay payment gateway with webhooks
+  - Build checkout page with address form
+  - Add cart page and cart sheet component
+  - Implement Zustand cart store with localStorage
+  - Create order management API routes
+
+  ## Source
+  Task 001 - MasonArt E-Commerce Platform MVP (Phase 6)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "7": Implement cart and checkout with Razorpay
+total_tickets: 1
+completion_percentage: 100
+is_completed: true

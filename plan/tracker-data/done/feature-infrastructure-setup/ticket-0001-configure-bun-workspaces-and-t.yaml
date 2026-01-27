@@ -1,0 +1,53 @@
+ticket_number: 1
+title: Configure Bun workspaces and Turbo monorepo
+description: |-
+  ## Implementation
+  - Create root package.json with Bun workspaces configuration
+  - Add turbo.json for Turborepo build orchestration
+  - Set up TypeScript configuration (tsconfig.json)
+  - Configure .gitignore with comprehensive patterns
+
+  ## Files Created
+  - package.json
+  - bun.lock
+  - package-lock.json
+  - tsconfig.json
+  - turbo.json
+  - .gitignore
+  - .auto-claude-security.json
+  - .auto-claude-status
+  - .claude_settings.json
+
+  ## Commit
+  ```
+  feat: Infrastructure & setup
+
+  - Configure Bun workspaces and Turbo monorepo
+  - Add Docker Compose with PostgreSQL, Redis, MinIO
+  - Set up TypeScript and environment configuration
+  - Add development environment documentation
+  ```
+feature: infrastructure-setup
+type: story
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-27T19:25:31.901Z'
+last_updated: '2026-01-27T19:25:56.548Z'
+time_spent_minutes: 0
+labels:
+  - task-001
+  - phase-1
+  - infrastructure
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-27T19:25:56.548Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-27T19:25:56.548Z'
