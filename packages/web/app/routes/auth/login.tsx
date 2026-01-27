@@ -1,7 +1,7 @@
 /**
  * Login Page - MasonArt E-commerce Platform
  *
- * User authentication page with email/password and Google OAuth.
+ * User authentication page with email/password, phone OTP, and Google OAuth.
  *
  * Following patterns from docs/poster-app-tech-stack.md
  */
@@ -16,6 +16,8 @@ import {
   ArrowRight,
   AlertCircle,
   Loader2,
+  Phone,
+  KeyRound,
 } from 'lucide-react'
 import { z } from 'zod'
 import { cn, isValidEmail, getApiUrl } from '~/lib/utils'
@@ -49,14 +51,24 @@ export const Route = createFileRoute('/auth/login')({
 // Types
 // ============================================================================
 
-interface FormData {
+type LoginMethod = 'email' | 'phone'
+
+interface EmailFormData {
   email: string
   password: string
+}
+
+interface PhoneFormData {
+  phone: string
+  otp: string
+  name: string
 }
 
 interface FormErrors {
   email?: string
   password?: string
+  phone?: string
+  otp?: string
   general?: string
 }
 
@@ -70,19 +82,38 @@ function LoginPage() {
   const redirectUrl = search.redirect || '/'
   const justRegistered = search.registered
 
-  // Form state
-  const [formData, setFormData] = useState<FormData>({
+  // Login method state
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('email')
+
+  // Email form state
+  const [emailFormData, setEmailFormData] = useState<EmailFormData>({
     email: '',
     password: '',
   })
   const [showPassword, setShowPassword] = useState(false)
+
+  // Phone form state
+  const [phoneFormData, setPhoneFormData] = useState<PhoneFormData>({
+    phone: '',
+    otp: '',
+    name: '',
+  })
+  const [otpSent, setOtpSent] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [isExistingUser, setIsExistingUser] = useState(true)
+  const [resendTimer, setResendTimer] = useState(0)
+
+  // Common state
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<FormErrors>({})
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
 
-  // Validate form
-  const validateForm = (data: FormData): FormErrors => {
+  // ============================================================================
+  // Email Login Handlers
+  // ============================================================================
+
+  const validateEmailForm = (data: EmailFormData): FormErrors => {
     const newErrors: FormErrors = {}
 
     if (!data.email.trim()) {
@@ -100,41 +131,27 @@ function LoginPage() {
     return newErrors
   }
 
-  // Handle field change
-  const handleChange = (field: keyof FormData, value: string) => {
-    const newData = { ...formData, [field]: value }
-    setFormData(newData)
-
-    // Clear general error on any input change
+  const handleEmailChange = (field: keyof EmailFormData, value: string) => {
+    setEmailFormData((prev) => ({ ...prev, [field]: value }))
     if (errors.general) {
       setErrors((prev) => ({ ...prev, general: undefined }))
     }
   }
 
-  // Handle field blur
-  const handleBlur = (field: keyof FormData) => {
+  const handleEmailBlur = (field: keyof EmailFormData) => {
     setTouched((prev) => ({ ...prev, [field]: true }))
-    const newErrors = validateForm(formData)
+    const newErrors = validateEmailForm(emailFormData)
     setErrors((prev) => ({
       ...prev,
-      [field]: newErrors[field],
+      [field]: newErrors[field as keyof FormErrors],
     }))
   }
 
-  // Get field error (only show if touched)
-  const getFieldError = (field: keyof FormErrors) => {
-    return touched[field] ? errors[field] : undefined
-  }
-
-  // Handle form submit
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Touch all fields
     setTouched({ email: true, password: true })
 
-    // Validate
-    const validationErrors = validateForm(formData)
+    const validationErrors = validateEmailForm(emailFormData)
     setErrors(validationErrors)
 
     if (Object.keys(validationErrors).length > 0) {
@@ -146,8 +163,8 @@ function LoginPage() {
 
     try {
       const result = await signIn.email({
-        email: formData.email,
-        password: formData.password,
+        email: emailFormData.email,
+        password: emailFormData.password,
       })
 
       if (result.error) {
@@ -155,7 +172,6 @@ function LoginPage() {
         return
       }
 
-      // Redirect to intended destination
       navigate({ to: redirectUrl })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign in failed'
@@ -165,17 +181,199 @@ function LoginPage() {
     }
   }
 
-  // Handle Google sign-in
+  // ============================================================================
+  // Phone Login Handlers
+  // ============================================================================
+
+  const validatePhone = (phone: string): string | undefined => {
+    const cleaned = phone.replace(/\D/g, '')
+    if (!cleaned) {
+      return 'Phone number is required'
+    }
+    // Remove country code if present
+    const phoneDigits = cleaned.startsWith('91') && cleaned.length === 12
+      ? cleaned.slice(2)
+      : cleaned
+    if (phoneDigits.length !== 10) {
+      return 'Please enter a valid 10-digit phone number'
+    }
+    if (!['6', '7', '8', '9'].includes(phoneDigits.charAt(0))) {
+      return 'Please enter a valid Indian mobile number'
+    }
+    return undefined
+  }
+
+  const handlePhoneChange = (field: keyof PhoneFormData, value: string) => {
+    setPhoneFormData((prev) => ({ ...prev, [field]: value }))
+    if (errors.general) {
+      setErrors((prev) => ({ ...prev, general: undefined }))
+    }
+  }
+
+  const handleSendOTP = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const phoneError = validatePhone(phoneFormData.phone)
+    if (phoneError) {
+      setErrors({ phone: phoneError })
+      return
+    }
+
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      const apiUrl = getApiUrl()
+      const response = await fetch(`${apiUrl}/api/phone-auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ phone: phoneFormData.phone }),
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        setErrors({ general: data.error || 'Failed to send OTP' })
+        return
+      }
+
+      setSessionId(data.sessionId)
+      setIsExistingUser(data.isExistingUser)
+      setOtpSent(true)
+      startResendTimer()
+    } catch (error) {
+      setErrors({ general: 'Failed to send OTP. Please try again.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (phoneFormData.otp.length !== 6) {
+      setErrors({ otp: 'Please enter the 6-digit OTP' })
+      return
+    }
+
+    if (!isExistingUser && !phoneFormData.name.trim()) {
+      setErrors({ general: 'Please enter your name' })
+      return
+    }
+
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      const apiUrl = getApiUrl()
+      const response = await fetch(`${apiUrl}/api/phone-auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          phone: phoneFormData.phone,
+          otp: phoneFormData.otp,
+          sessionId,
+          name: phoneFormData.name || undefined,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        setErrors({ general: data.error || 'Invalid OTP' })
+        return
+      }
+
+      // Redirect to intended destination
+      navigate({ to: redirectUrl })
+    } catch (error) {
+      setErrors({ general: 'Verification failed. Please try again.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleResendOTP = async () => {
+    if (resendTimer > 0) return
+
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      const apiUrl = getApiUrl()
+      const response = await fetch(`${apiUrl}/api/phone-auth/resend-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ phone: phoneFormData.phone }),
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        if (data.retryAfter) {
+          setResendTimer(data.retryAfter)
+        }
+        setErrors({ general: data.error || 'Failed to resend OTP' })
+        return
+      }
+
+      setSessionId(data.sessionId)
+      startResendTimer()
+    } catch (error) {
+      setErrors({ general: 'Failed to resend OTP' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const startResendTimer = () => {
+    setResendTimer(30)
+    const interval = setInterval(() => {
+      setResendTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  const handleBackToPhone = () => {
+    setOtpSent(false)
+    setSessionId(null)
+    setPhoneFormData((prev) => ({ ...prev, otp: '' }))
+    setErrors({})
+  }
+
+  // ============================================================================
+  // Google Login Handler
+  // ============================================================================
+
   const handleGoogleSignIn = () => {
     setIsGoogleLoading(true)
-    // Redirect to Google OAuth - Better Auth handles the flow
     const apiUrl = getApiUrl()
     const googleUrl = `${apiUrl}/api/auth/sign-in/social?provider=google`
-    // Add redirect URL as state parameter (Better Auth will handle this)
     window.location.href = `${googleUrl}&redirectTo=${encodeURIComponent(redirectUrl)}`
   }
 
-  const isFormValid = Object.keys(validateForm(formData)).length === 0
+  // ============================================================================
+  // Helper Functions
+  // ============================================================================
+
+  const getFieldError = (field: keyof FormErrors) => {
+    return touched[field] ? errors[field] : undefined
+  }
+
+  const isEmailFormValid = Object.keys(validateEmailForm(emailFormData)).length === 0
+  const isPhoneValid = !validatePhone(phoneFormData.phone)
+
+  // ============================================================================
+  // Render
+  // ============================================================================
 
   return (
     <div className="min-h-screen bg-background">
@@ -242,8 +440,44 @@ function LoginPage() {
             {/* Divider */}
             <div className="my-6 flex items-center gap-4">
               <div className="h-px flex-1 bg-border" />
-              <span className="text-xs text-muted-foreground">or sign in with email</span>
+              <span className="text-xs text-muted-foreground">or</span>
               <div className="h-px flex-1 bg-border" />
+            </div>
+
+            {/* Login Method Tabs */}
+            <div className="mb-6 flex rounded-lg border border-border bg-muted/50 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('email')
+                  setErrors({})
+                }}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  loginMethod === 'email'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Mail className="h-4 w-4" />
+                Email
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('phone')
+                  setErrors({})
+                }}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  loginMethod === 'phone'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Phone className="h-4 w-4" />
+                Phone
+              </button>
             </div>
 
             {/* General Error */}
@@ -254,115 +488,300 @@ function LoginPage() {
               </div>
             )}
 
-            {/* Login Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email */}
-              <div>
-                <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground">
-                  Email
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="email"
-                    id="email"
-                    value={formData.email}
-                    onChange={(e) => handleChange('email', e.target.value)}
-                    onBlur={() => handleBlur('email')}
-                    placeholder="your@email.com"
-                    autoComplete="email"
-                    disabled={isLoading}
-                    className={cn(
-                      'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                      getFieldError('email')
-                        ? 'border-red-500 focus:ring-red-500'
-                        : 'border-input hover:border-brand-300'
-                    )}
-                  />
-                </div>
-                {getFieldError('email') && (
-                  <p className="mt-1 text-xs text-red-500">{getFieldError('email')}</p>
-                )}
-              </div>
-
-              {/* Password */}
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label htmlFor="password" className="block text-sm font-medium text-foreground">
-                    Password
+            {/* Email Login Form */}
+            {loginMethod === 'email' && (
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
+                {/* Email */}
+                <div>
+                  <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground">
+                    Email
                   </label>
-                  <a
-                    href="/auth/forgot-password"
-                    className="text-xs font-medium text-brand-600 hover:text-brand-700"
-                  >
-                    Forgot password?
-                  </a>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="email"
+                      id="email"
+                      value={emailFormData.email}
+                      onChange={(e) => handleEmailChange('email', e.target.value)}
+                      onBlur={() => handleEmailBlur('email')}
+                      placeholder="your@email.com"
+                      autoComplete="email"
+                      disabled={isLoading}
+                      className={cn(
+                        'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
+                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'disabled:cursor-not-allowed disabled:opacity-50',
+                        getFieldError('email')
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-input hover:border-brand-300'
+                      )}
+                    />
+                  </div>
+                  {getFieldError('email') && (
+                    <p className="mt-1 text-xs text-red-500">{getFieldError('email')}</p>
+                  )}
                 </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    id="password"
-                    value={formData.password}
-                    onChange={(e) => handleChange('password', e.target.value)}
-                    onBlur={() => handleBlur('password')}
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
-                    disabled={isLoading}
-                    className={cn(
-                      'w-full rounded-lg border bg-background py-2.5 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                      getFieldError('password')
-                        ? 'border-red-500 focus:ring-red-500'
-                        : 'border-input hover:border-brand-300'
-                    )}
-                  />
+
+                {/* Password */}
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label htmlFor="password" className="block text-sm font-medium text-foreground">
+                      Password
+                    </label>
+                    <a
+                      href="/auth/forgot-password"
+                      className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                    >
+                      Forgot password?
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="password"
+                      value={emailFormData.password}
+                      onChange={(e) => handleEmailChange('password', e.target.value)}
+                      onBlur={() => handleEmailBlur('password')}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      disabled={isLoading}
+                      className={cn(
+                        'w-full rounded-lg border bg-background py-2.5 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
+                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'disabled:cursor-not-allowed disabled:opacity-50',
+                        getFieldError('password')
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-input hover:border-brand-300'
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                  {getFieldError('password') && (
+                    <p className="mt-1 text-xs text-red-500">{getFieldError('password')}</p>
+                  )}
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading || !isEmailFormValid}
+                  className={cn(
+                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
+                    'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                    isEmailFormValid && !isLoading
+                      ? 'bg-brand-500 text-white hover:bg-brand-600'
+                      : 'cursor-not-allowed bg-muted text-muted-foreground'
+                  )}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      Sign In
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* Phone Login Form */}
+            {loginMethod === 'phone' && !otpSent && (
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                {/* Phone Number */}
+                <div>
+                  <label htmlFor="phone" className="mb-1.5 block text-sm font-medium text-foreground">
+                    Phone Number
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 flex -translate-y-1/2 items-center gap-1 text-muted-foreground">
+                      <span className="text-sm">+91</span>
+                    </div>
+                    <input
+                      type="tel"
+                      id="phone"
+                      value={phoneFormData.phone}
+                      onChange={(e) => handlePhoneChange('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="9876543210"
+                      autoComplete="tel"
+                      disabled={isLoading}
+                      className={cn(
+                        'w-full rounded-lg border bg-background py-2.5 pl-14 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
+                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'disabled:cursor-not-allowed disabled:opacity-50',
+                        errors.phone
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-input hover:border-brand-300'
+                      )}
+                    />
+                  </div>
+                  {errors.phone && (
+                    <p className="mt-1 text-xs text-red-500">{errors.phone}</p>
+                  )}
+                </div>
+
+                {/* Send OTP Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading || !isPhoneValid}
+                  className={cn(
+                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
+                    'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                    isPhoneValid && !isLoading
+                      ? 'bg-brand-500 text-white hover:bg-brand-600'
+                      : 'cursor-not-allowed bg-muted text-muted-foreground'
+                  )}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    <>
+                      Send OTP
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* OTP Verification Form */}
+            {loginMethod === 'phone' && otpSent && (
+              <form onSubmit={handleVerifyOTP} className="space-y-4">
+                {/* OTP Sent Message */}
+                <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+                  <p>
+                    OTP sent to{' '}
+                    <span className="font-medium">
+                      +91 {phoneFormData.phone.slice(0, 2)}****{phoneFormData.phone.slice(-4)}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Name Field (for new users) */}
+                {!isExistingUser && (
+                  <div>
+                    <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-foreground">
+                      Your Name
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      value={phoneFormData.name}
+                      onChange={(e) => handlePhoneChange('name', e.target.value)}
+                      placeholder="Enter your name"
+                      disabled={isLoading}
+                      className={cn(
+                        'w-full rounded-lg border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
+                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'disabled:cursor-not-allowed disabled:opacity-50',
+                        'border-input hover:border-brand-300'
+                      )}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This is your first time. Please enter your name.
+                    </p>
+                  </div>
+                )}
+
+                {/* OTP Input */}
+                <div>
+                  <label htmlFor="otp" className="mb-1.5 block text-sm font-medium text-foreground">
+                    Enter OTP
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      id="otp"
+                      value={phoneFormData.otp}
+                      onChange={(e) => handlePhoneChange('otp', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter 6-digit OTP"
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
+                      disabled={isLoading}
+                      className={cn(
+                        'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors tracking-widest',
+                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'disabled:cursor-not-allowed disabled:opacity-50',
+                        errors.otp
+                          ? 'border-red-500 focus:ring-red-500'
+                          : 'border-input hover:border-brand-300'
+                      )}
+                    />
+                  </div>
+                  {errors.otp && (
+                    <p className="mt-1 text-xs text-red-500">{errors.otp}</p>
+                  )}
+                </div>
+
+                {/* Resend OTP */}
+                <div className="flex items-center justify-between text-sm">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    tabIndex={-1}
+                    onClick={handleBackToPhone}
+                    className="text-muted-foreground hover:text-foreground"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
+                    Change number
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResendOTP}
+                    disabled={resendTimer > 0 || isLoading}
+                    className={cn(
+                      'font-medium',
+                      resendTimer > 0 || isLoading
+                        ? 'cursor-not-allowed text-muted-foreground'
+                        : 'text-brand-600 hover:text-brand-700'
                     )}
+                  >
+                    {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
                   </button>
                 </div>
-                {getFieldError('password') && (
-                  <p className="mt-1 text-xs text-red-500">{getFieldError('password')}</p>
-                )}
-              </div>
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isLoading || !isFormValid}
-                className={cn(
-                  'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
-                  'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                  isFormValid && !isLoading
-                    ? 'bg-brand-500 text-white hover:bg-brand-600'
-                    : 'cursor-not-allowed bg-muted text-muted-foreground'
-                )}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  <>
-                    Sign In
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </form>
+                {/* Verify Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading || phoneFormData.otp.length !== 6}
+                  className={cn(
+                    'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
+                    'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                    phoneFormData.otp.length === 6 && !isLoading
+                      ? 'bg-brand-500 text-white hover:bg-brand-600'
+                      : 'cursor-not-allowed bg-muted text-muted-foreground'
+                  )}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      Verify & Sign In
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
 
           {/* Sign Up Link */}
