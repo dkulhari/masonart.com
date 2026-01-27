@@ -49,9 +49,9 @@ status: done
 assignee: claude
 reporter: cli
 created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T04:10:00.000Z'
+last_updated: '2026-01-28T04:20:00.000Z'
 resolved: '2026-01-28T04:10:00.000Z'
-time_spent_minutes: 25
+time_spent_minutes: 35
 labels:
   - testing
   - unit-tests
@@ -84,10 +84,30 @@ comments:
       - Updated fixtures/index.ts with exports
 
       Total: ~390 tests covering the entire reviews feature
+  - author: claude
+    timestamp: '2026-01-28T04:20:00.000Z'
+    content: |-
+      Fixed admin-reviews E2E tests auth pattern:
+
+      Updated admin-reviews.spec.ts to use stored authentication state
+      (test.use({ storageState: ADMIN_AUTH })) instead of manually checking
+      for TEST_ADMIN_PASSWORD env var. This aligns with the pattern used in
+      admin-dashboard.spec.ts and other admin E2E tests.
+
+      Changes:
+      - Removed manual login helpers and env var checks
+      - Added ADMIN_AUTH and CUSTOMER_AUTH path constants
+      - Split access control tests into separate describe blocks
+      - All 82 tests now pass without skips
+
+      Commit: fix(tests): Use stored auth state in admin-reviews E2E tests
 work_sessions:
   - date: '2026-01-28'
     minutes: 25
     description: Created E2E tests and fixtures for reviews feature
+  - date: '2026-01-28'
+    minutes: 10
+    description: Fixed admin-reviews E2E tests to use stored auth state pattern
 related_tickets: []
 blocked_by:
   - 33
