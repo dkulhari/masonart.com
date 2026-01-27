@@ -13,11 +13,11 @@ The MasonArt e-commerce platform has comprehensive test coverage across all laye
 | **Unit Tests (API)** | 20 | 2,100+ | ✅ All Pass |
 | **Unit Tests (Web)** | 6 | 618 | ✅ All Pass |
 | **Integration Tests** | 4 | 178 | ✅ All Pass |
-| **E2E Tests (Playwright)** | 26 | 1,768 total (1,491 pass, 277 skip) | ✅ Stable |
+| **E2E Tests (Playwright)** | 27 | 1,812 total (1,505 pass, 288 skip) | ✅ Stable |
 | **Manual Test Docs** | 34 | 500+ test cases | ✅ Complete |
 
 **Total Automated Tests:** ~4,700+ test cases
-**Total E2E Configurations:** 8,840+ (1,768 tests × 5 browsers)
+**Total E2E Configurations:** 9,060+ (1,812 tests × 5 browsers)
 
 ---
 
@@ -170,6 +170,7 @@ bunx vitest run tests/setup/ tests/integration/
 | `auth.spec.ts` | 135 | Login, register pages |
 | `account.spec.ts` | 85 | User dashboard |
 | `wallet.spec.ts` | 22 | Wallet balance, top-up, transactions |
+| `trade.spec.ts` | 44 | Trade role access, feature comparison |
 
 ### Admin Tests
 | Test File | Unique Tests | Description |
@@ -201,17 +202,18 @@ As of 2026-01-27:
 
 | Metric | Count | Notes |
 |--------|-------|-------|
-| **Total Tests** | 1,768 | Across 26 spec files |
-| **Passing** | 1,491 | 84.4% pass rate |
-| **Skipped** | 277 | Intentionally skipped |
+| **Total Tests** | 1,812 | Across 27 spec files |
+| **Passing** | 1,505 | 83% pass rate |
+| **Skipped** | 288 | Intentionally skipped |
 | **Failing** | 0 | All active tests pass |
 
 **Skipped Tests Breakdown:**
 - Sitemap tests: ~65 (sitemap.xml not implemented)
+- Trade-specific features: ~19 (not yet implemented)
 - Mobile filter edge cases: ~15 (viewport limitations)
 - Auth flow SSR tests: ~20 (hydration differences)
 - Payment mock tests: ~30 (environment limitations)
-- Other: ~147 (various documented reasons)
+- Other: ~139 (various documented reasons)
 
 ### Browser Projects
 All E2E tests run across 5 browser configurations:
@@ -221,7 +223,7 @@ All E2E tests run across 5 browser configurations:
 4. **Mobile Chrome** (Pixel 5)
 5. **Mobile Safari** (iPhone 12)
 
-**Total E2E Configurations:** ~8,840 (1,768 tests × 5 browsers)
+**Total E2E Configurations:** ~9,060 (1,812 tests × 5 browsers)
 
 **Run Commands:**
 ```bash
