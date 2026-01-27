@@ -562,6 +562,330 @@ test.describe('Login Page', () => {
       expect(criticalErrors.length).toBe(0);
     });
   });
+
+  // ==========================================================================
+  // Phone Login Tab
+  // ==========================================================================
+
+  test.describe('Phone Login Tab', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/auth/login');
+      await page.waitForLoadState('networkidle');
+    });
+
+    test('should display Email and Phone tabs', async ({ page }) => {
+      const emailTab = page.locator('button:has-text("Email")');
+      const phoneTab = page.locator('button:has-text("Phone")');
+
+      await expect(emailTab).toBeVisible();
+      await expect(phoneTab).toBeVisible();
+    });
+
+    test('should have Email tab selected by default', async ({ page }) => {
+      const emailTab = page.locator('button:has-text("Email")');
+      await expect(emailTab).toHaveClass(/bg-background/);
+    });
+
+    test('should switch to Phone tab when clicked', async ({ page }) => {
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      await expect(phoneTab).toHaveClass(/bg-background/);
+    });
+
+    test('should show phone input when Phone tab is active', async ({ page }) => {
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      const phoneInput = page.locator('#phone');
+      await expect(phoneInput).toBeVisible();
+    });
+
+    test('should hide email form when Phone tab is active', async ({ page }) => {
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      const emailInput = page.locator('#email');
+      await expect(emailInput).not.toBeVisible();
+    });
+
+    test('should display +91 prefix for phone input', async ({ page }) => {
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      const prefix = page.locator('text=+91');
+      await expect(prefix).toBeVisible();
+    });
+
+    test('should display Send OTP button', async ({ page }) => {
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await expect(sendButton).toBeVisible();
+    });
+
+    test('should have phone placeholder', async ({ page }) => {
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      const phoneInput = page.locator('#phone');
+      await expect(phoneInput).toHaveAttribute('placeholder', '9876543210');
+    });
+
+    test('should have tel type for phone input', async ({ page }) => {
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      const phoneInput = page.locator('#phone');
+      await expect(phoneInput).toHaveAttribute('type', 'tel');
+    });
+  });
+
+  // ==========================================================================
+  // Phone Input Validation
+  // ==========================================================================
+
+  test.describe('Phone Input Validation', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/auth/login');
+      await page.waitForLoadState('networkidle');
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+    });
+
+    test('should accept valid 10-digit number', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await expect(sendButton).not.toBeDisabled();
+    });
+
+    test('should disable Send OTP for invalid phone', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('12345');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await expect(sendButton).toBeDisabled();
+    });
+
+    test('should only allow numeric input', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('abcd9876543210xyz');
+
+      const value = await phoneInput.inputValue();
+      expect(value).toBe('9876543210');
+    });
+
+    test('should limit input to 10 digits', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('98765432109999');
+
+      const value = await phoneInput.inputValue();
+      expect(value.length).toBeLessThanOrEqual(10);
+    });
+  });
+
+  // ==========================================================================
+  // OTP Flow
+  // ==========================================================================
+
+  test.describe('OTP Flow', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/auth/login');
+      await page.waitForLoadState('networkidle');
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+    });
+
+    test('should show OTP input after sending OTP', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await sendButton.click();
+
+      // Wait for OTP form to appear
+      const otpInput = page.locator('#otp');
+      await expect(otpInput).toBeVisible({ timeout: 10000 });
+    });
+
+    test('should show success message after OTP sent', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await sendButton.click();
+
+      // Wait for success message
+      const successMessage = page.locator('text=OTP sent to');
+      await expect(successMessage).toBeVisible({ timeout: 10000 });
+    });
+
+    test('should mask phone number in success message', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await sendButton.click();
+
+      // Wait for success message with masked phone
+      const maskedPhone = page.locator('text=****');
+      await expect(maskedPhone).toBeVisible({ timeout: 10000 });
+    });
+
+    test('should display Verify & Sign In button', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await sendButton.click();
+
+      // Wait for verify button
+      const verifyButton = page.locator('button:has-text("Verify & Sign In")');
+      await expect(verifyButton).toBeVisible({ timeout: 10000 });
+    });
+
+    test('should display Change number link', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await sendButton.click();
+
+      // Wait for change number link
+      const changeLink = page.locator('button:has-text("Change number")');
+      await expect(changeLink).toBeVisible({ timeout: 10000 });
+    });
+
+    test('should display Resend OTP link', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await sendButton.click();
+
+      // Wait for resend link (may have countdown)
+      const resendLink = page.locator('button:has-text(/Resend/)');
+      await expect(resendLink).toBeVisible({ timeout: 10000 });
+    });
+
+    test('should go back to phone input when Change number clicked', async ({ page }) => {
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await sendButton.click();
+
+      // Wait for change number link
+      const changeLink = page.locator('button:has-text("Change number")');
+      await changeLink.click();
+
+      // Should show phone input again
+      await expect(phoneInput).toBeVisible();
+    });
+  });
+
+  // ==========================================================================
+  // OTP Input Validation
+  // ==========================================================================
+
+  test.describe('OTP Input Validation', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/auth/login');
+      await page.waitForLoadState('networkidle');
+
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      const phoneInput = page.locator('#phone');
+      await phoneInput.fill('9876543210');
+
+      const sendButton = page.locator('button:has-text("Send OTP")');
+      await sendButton.click();
+
+      // Wait for OTP form
+      await page.locator('#otp').waitFor({ timeout: 10000 });
+    });
+
+    test('should have 6-digit OTP input', async ({ page }) => {
+      const otpInput = page.locator('#otp');
+      await expect(otpInput).toBeVisible();
+    });
+
+    test('should only allow numeric OTP input', async ({ page }) => {
+      const otpInput = page.locator('#otp');
+      await otpInput.fill('abc123def456');
+
+      const value = await otpInput.inputValue();
+      expect(value).toBe('123456');
+    });
+
+    test('should limit OTP to 6 digits', async ({ page }) => {
+      const otpInput = page.locator('#otp');
+      await otpInput.fill('12345678');
+
+      const value = await otpInput.inputValue();
+      expect(value.length).toBeLessThanOrEqual(6);
+    });
+
+    test('should disable Verify button for incomplete OTP', async ({ page }) => {
+      const otpInput = page.locator('#otp');
+      await otpInput.fill('123');
+
+      const verifyButton = page.locator('button:has-text("Verify & Sign In")');
+      await expect(verifyButton).toBeDisabled();
+    });
+
+    test('should enable Verify button for 6-digit OTP', async ({ page }) => {
+      const otpInput = page.locator('#otp');
+      await otpInput.fill('123456');
+
+      const verifyButton = page.locator('button:has-text("Verify & Sign In")');
+      await expect(verifyButton).not.toBeDisabled();
+    });
+
+    test('should have numeric input mode', async ({ page }) => {
+      const otpInput = page.locator('#otp');
+      await expect(otpInput).toHaveAttribute('inputMode', 'numeric');
+    });
+
+    test('should have one-time-code autocomplete', async ({ page }) => {
+      const otpInput = page.locator('#otp');
+      await expect(otpInput).toHaveAttribute('autocomplete', 'one-time-code');
+    });
+  });
+
+  // ==========================================================================
+  // Phone Login Responsive Design
+  // ==========================================================================
+
+  test.describe('Phone Login Responsive', () => {
+    test('should display phone login on mobile', async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 667 });
+      await page.goto('/auth/login');
+      await page.waitForLoadState('networkidle');
+
+      const phoneTab = page.locator('button:has-text("Phone")');
+      await phoneTab.click();
+
+      const phoneInput = page.locator('#phone');
+      await expect(phoneInput).toBeVisible();
+    });
+
+    test('should have proper tab styling on mobile', async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 667 });
+      await page.goto('/auth/login');
+      await page.waitForLoadState('networkidle');
+
+      const emailTab = page.locator('button:has-text("Email")');
+      const phoneTab = page.locator('button:has-text("Phone")');
+
+      await expect(emailTab).toBeVisible();
+      await expect(phoneTab).toBeVisible();
+    });
+  });
 });
 
 // ============================================================================

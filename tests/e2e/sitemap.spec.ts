@@ -109,8 +109,7 @@ function isPrivatePath(url: string): boolean {
 // Sitemap Accessibility Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Accessibility', () => {
+test.describe('Sitemap - Accessibility', () => {
   test('should return 200 status for sitemap.xml', async ({ page }) => {
     const { status } = await fetchSitemap(page);
     expect(status).toBe(200);
@@ -151,8 +150,7 @@ test.describe.skip('Sitemap - Accessibility', () => {
 // XML Format Validation Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - XML Format', () => {
+test.describe('Sitemap - XML Format', () => {
   test('should have valid XML declaration', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -218,8 +216,7 @@ test.describe.skip('Sitemap - XML Format', () => {
 // Required Elements Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Required Elements', () => {
+test.describe('Sitemap - Required Elements', () => {
   test('every url should have a loc element', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -279,8 +276,7 @@ test.describe.skip('Sitemap - Required Elements', () => {
 // Optional Elements Validation Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Optional Elements', () => {
+test.describe('Sitemap - Optional Elements', () => {
   test('lastmod should be valid ISO 8601 date if present', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -348,8 +344,7 @@ test.describe.skip('Sitemap - Optional Elements', () => {
 // Public Pages Inclusion Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Public Pages Inclusion', () => {
+test.describe('Sitemap - Public Pages Inclusion', () => {
   test('should include home page', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -433,8 +428,7 @@ test.describe.skip('Sitemap - Public Pages Inclusion', () => {
 // Private Pages Exclusion Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Private Pages Exclusion', () => {
+test.describe('Sitemap - Private Pages Exclusion', () => {
   test('should not include cart page', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -510,8 +504,7 @@ test.describe.skip('Sitemap - Private Pages Exclusion', () => {
 // URL Accessibility Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - URL Accessibility', () => {
+test.describe('Sitemap - URL Accessibility', () => {
   test('home page URL should be accessible', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -582,8 +575,7 @@ test.describe.skip('Sitemap - URL Accessibility', () => {
 // Sitemap Size and Count Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Size and Count', () => {
+test.describe('Sitemap - Size and Count', () => {
   test('should not exceed 50MB', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -627,8 +619,7 @@ test.describe.skip('Sitemap - Size and Count', () => {
 // Special Characters and Encoding Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - URL Encoding', () => {
+test.describe('Sitemap - URL Encoding', () => {
   test('URLs should be properly escaped', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -661,8 +652,7 @@ test.describe.skip('Sitemap - URL Encoding', () => {
 // Robots.txt Integration Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Robots.txt Integration', () => {
+test.describe('Sitemap - Robots.txt Integration', () => {
   test('sitemap should be referenced in robots.txt', async ({ page }) => {
     const response = await page.goto('/robots.txt');
     if (response?.status() === 200) {
@@ -698,8 +688,7 @@ test.describe.skip('Sitemap - Robots.txt Integration', () => {
 // Sitemap Index Tests (for large sites)
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Sitemap Index (Optional)', () => {
+test.describe('Sitemap - Sitemap Index (Optional)', () => {
   test('should support sitemap index format if used', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();
@@ -744,8 +733,7 @@ test.describe.skip('Sitemap - Sitemap Index (Optional)', () => {
 // Performance Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Performance', () => {
+test.describe('Sitemap - Performance', () => {
   test('sitemap should be cached appropriately', async ({ page }) => {
     const response = await page.goto('/sitemap.xml');
 
@@ -798,8 +786,7 @@ test.describe.skip('Sitemap - Performance', () => {
 // Consistency Tests
 // ============================================================================
 
-// Skipped: sitemap.xml is not implemented yet
-test.describe.skip('Sitemap - Consistency', () => {
+test.describe('Sitemap - Consistency', () => {
   test('sitemap URLs should match actual navigation', async ({ page }) => {
     const { content } = await fetchSitemap(page);
     expect(content).toBeTruthy();

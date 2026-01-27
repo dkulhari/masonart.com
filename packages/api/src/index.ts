@@ -9,6 +9,7 @@ import { cartApp } from "./routes/cart";
 import { ordersApp } from "./routes/orders";
 import { aiApp } from "./routes/ai";
 import { walletApp } from "./routes/wallet";
+import { phoneAuthApp } from "./routes/phone-auth";
 import { razorpayWebhooksApp } from "./routes/webhooks/razorpay";
 import { walletWebhookApp } from "./routes/webhooks/wallet";
 import { adminProductsApp } from "./routes/admin/products";
@@ -57,6 +58,9 @@ app.route("/api/ai", aiApp);
 
 // Wallet API - balance, transactions, top-up
 app.route("/api/wallet", walletApp);
+
+// Phone Auth API - SMS OTP login
+app.route("/api/phone-auth", phoneAuthApp);
 
 // ============================================================================
 // Admin API Routes (Protected with role-based access)
