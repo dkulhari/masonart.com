@@ -106,8 +106,8 @@ export async function sendOTP(phone: string): Promise<SendOTPResponse> {
 
     // Check if API key is configured
     if (!TWO_FACTOR_API_KEY) {
-      // In development, log and return mock session
-      if (process.env.NODE_ENV === "development") {
+      // In development or test mode, log and return mock session
+      if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
         console.log(`[SMS] Dev mode: OTP would be sent to ${normalizedPhone}`);
         console.log(`[SMS] Dev mode: Use OTP "123456" for testing`);
         return {
@@ -243,6 +243,8 @@ export async function verifyOTP(
  */
 export function isSmsServiceConfigured(): boolean {
   return (
-    !!TWO_FACTOR_API_KEY || process.env.NODE_ENV === "development"
+    !!TWO_FACTOR_API_KEY ||
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "test"
   );
 }
