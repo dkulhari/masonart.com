@@ -2,7 +2,66 @@
 
 A comprehensive guide for maintaining and updating tests as the MasonArt platform evolves.
 
-**Last Updated:** 2026-01-19
+**Last Updated:** 2026-01-27
+
+---
+
+## Related Test Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[TEST-COVERAGE.md](./TEST-COVERAGE.md)** | Comprehensive test coverage report with counts by category |
+| **[TEST-EXECUTION-RESULTS.md](./TEST-EXECUTION-RESULTS.md)** | Latest test execution results and metrics |
+| **[TEST-EXECUTION-REMEDIATION.md](./TEST-EXECUTION-REMEDIATION.md)** | Remediation steps for failing tests |
+| **[ROLES-AND-CAPABILITIES.md](./ROLES-AND-CAPABILITIES.md)** | User roles, permissions, and test coverage by role |
+| **[Manual Tests](./manual-tests/)** | 34 manual test documentation files (500+ test cases) |
+
+### Manual Test Documents by Category
+
+**API Tests:**
+- [auth-routes.md](./manual-tests/auth-routes.md) - Authentication API routes
+- [products-api.md](./manual-tests/products-api.md) - Products API
+- [cart-api.md](./manual-tests/cart-api.md) - Cart API
+- [orders-api.md](./manual-tests/orders-api.md) - Orders API
+- [ai-api.md](./manual-tests/ai-api.md) - AI generation API
+- [admin-api.md](./manual-tests/admin-api.md) - Admin API
+- [health-check.md](./manual-tests/health-check.md) - Health endpoints
+
+**Page Tests:**
+- [home-page.md](./manual-tests/home-page.md) - Home page
+- [product-listing.md](./manual-tests/product-listing.md) - Catalog page
+- [product-detail.md](./manual-tests/product-detail.md) - Product page
+- [cart-page.md](./manual-tests/cart-page.md) - Cart page
+- [checkout.md](./manual-tests/checkout.md) - Checkout page
+- [payment.md](./manual-tests/payment.md) - Payment flow
+- [order-confirmation.md](./manual-tests/order-confirmation.md) - Order confirmation
+- [auth-pages.md](./manual-tests/auth-pages.md) - Login/register pages
+- [account.md](./manual-tests/account.md) - User dashboard
+- [ai-generator.md](./manual-tests/ai-generator.md) - AI generator page
+- [ai-history.md](./manual-tests/ai-history.md) - AI creations history
+
+**Admin Tests:**
+- [admin-auth.md](./manual-tests/admin-auth.md) - Admin authentication
+- [admin-dashboard.md](./manual-tests/admin-dashboard.md) - Admin dashboard
+- [admin-products.md](./manual-tests/admin-products.md) - Product management
+- [admin-orders.md](./manual-tests/admin-orders.md) - Order management
+
+**SEO Tests:**
+- [seo-meta.md](./manual-tests/seo-meta.md) - Meta tags
+- [seo-jsonld.md](./manual-tests/seo-jsonld.md) - JSON-LD structured data
+- [sitemap.md](./manual-tests/sitemap.md) - Sitemap (not implemented)
+- [robots.md](./manual-tests/robots.md) - Robots.txt
+
+**Flow Tests:**
+- [flow-catalog.md](./manual-tests/flow-catalog.md) - Browse to cart flow
+- [flow-checkout.md](./manual-tests/flow-checkout.md) - Cart to order flow
+- [flow-auth.md](./manual-tests/flow-auth.md) - Registration to account flow
+- [flow-admin.md](./manual-tests/flow-admin.md) - Admin CRUD operations
+
+**Other:**
+- [layout.md](./manual-tests/layout.md) - Page layout
+- [styles.md](./manual-tests/styles.md) - CSS/Tailwind
+- [cart-store.md](./manual-tests/cart-store.md) - Cart state management
 
 ---
 
@@ -18,7 +77,9 @@ A comprehensive guide for maintaining and updating tests as the MasonArt platfor
 8. [Fixtures and Test Data](#fixtures-and-test-data)
 9. [CI/CD Considerations](#cicd-considerations)
 10. [Common Pitfalls](#common-pitfalls)
-11. [Checklist for Test Maintenance](#checklist-for-test-maintenance)
+11. [E2E Test Patterns and Known Issues](#e2e-test-patterns-and-known-issues)
+12. [Skipped and Flaky Tests](#skipped-and-flaky-tests)
+13. [Checklist for Test Maintenance](#checklist-for-test-maintenance)
 
 ---
 
@@ -693,6 +754,212 @@ await page.click('[data-testid="submit-button"]');
 await page.click('button:has-text("Submit")');
 await page.getByRole('button', { name: 'Submit' }).click();
 ```
+
+---
+
+## E2E Test Patterns and Known Issues
+
+This section documents common patterns and solutions discovered during E2E test maintenance. These patterns address Playwright strict mode violations, React hydration timing, and responsive design testing.
+
+### React Hydration Timing
+
+**Problem:** Tests fail because clicks happen before React finishes hydrating components.
+
+**Pattern:** Always wait for `networkidle` when testing pages with interactive elements:
+
+```typescript
+test.beforeEach(async ({ page }) => {
+  await page.goto('/posters', { waitUntil: 'networkidle' });
+});
+```
+
+**When to use:**
+- Pages with filters, modals, or dialogs
+- Pages with client-side state management
+- Any page using React Server Components with client interactivity
+
+### Mobile vs Desktop Selectors
+
+**Problem:** Selectors find multiple elements when mobile and desktop versions coexist in the DOM.
+
+**Pattern:** Scope selectors to the appropriate viewport container:
+
+```typescript
+// For desktop-only elements (hidden on mobile with Tailwind)
+const desktopFilters = page.locator('div.hidden.lg\\:block');
+const abstractCheckbox = desktopFilters.getByRole('checkbox', { name: /abstract/i });
+
+// For mobile-only elements
+const mobileMenu = page.locator('div.lg\\:hidden');
+const mobileMenuButton = mobileMenu.getByRole('button', { name: /menu/i });
+```
+
+**Note:** Escape backslashes in CSS classes containing colons (e.g., `lg\\:block`).
+
+### Strict Mode Violations
+
+**Problem:** Playwright strict mode fails when selectors match multiple elements.
+
+**Solutions in order of preference:**
+
+1. **Use role-based selectors with specific names:**
+   ```typescript
+   await page.getByRole('button', { name: 'Sign In' }).click();
+   ```
+
+2. **Scope to a unique container:**
+   ```typescript
+   const form = page.locator('form[data-testid="login-form"]');
+   await form.getByRole('textbox', { name: /email/i }).fill('test@example.com');
+   ```
+
+3. **Use `.first()` for intentionally multiple elements:**
+   ```typescript
+   // When multiple favicons exist in document head
+   const favicon = page.locator('link[rel="icon"]').first();
+   ```
+
+### Testing Modals and Dialogs
+
+**Problem:** Dialog triggers can fail due to timing or viewport issues.
+
+**Pattern:**
+```typescript
+test('should open mobile filter dialog', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/posters', { waitUntil: 'networkidle' });
+
+  // Click filter button
+  const filterButton = page.getByRole('button', { name: /filter/i });
+  await filterButton.click();
+
+  // Wait for dialog to appear with increased timeout
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible({ timeout: 10000 });
+});
+```
+
+### Serial Test Execution for Auth-Dependent Tests
+
+**Problem:** Tests sharing authentication state can have race conditions when run in parallel.
+
+**Pattern:**
+```typescript
+test.describe.configure({ mode: 'serial' });
+
+test.describe('Wallet Page - Authenticated', () => {
+  test.use({ storageState: CUSTOMER_AUTH });
+
+  test.beforeEach(async ({ page }) => {
+    // Small wait to ensure auth state file is not being written
+    await page.waitForTimeout(100);
+  });
+
+  // Tests run sequentially...
+});
+```
+
+### API Route Mocking
+
+**Pattern for mocking API responses:**
+```typescript
+test('should handle API errors gracefully', async ({ page }) => {
+  await page.route('**/api/wallet', (route) => {
+    route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Internal server error' }),
+    });
+  });
+
+  await page.goto('/account/wallet');
+  await expect(page.getByText(/error|failed/i)).toBeVisible();
+});
+```
+
+---
+
+## Skipped and Flaky Tests
+
+This section documents tests that are intentionally skipped or known to be flaky.
+
+### Sitemap Tests (All Skipped)
+
+**Location:** `tests/e2e/sitemap.spec.ts`
+
+**Reason:** sitemap.xml is not implemented yet. The endpoint returns 404.
+
+**Skipped sections:**
+- Sitemap - Accessibility
+- Sitemap - XML Format
+- Sitemap - Content Validation
+- Sitemap - Priority and Frequency
+- Sitemap - Index Validation
+- Sitemap - Mobile
+- Sitemap - Image
+- Sitemap - Video (if applicable)
+- Sitemap - News (if applicable)
+- Sitemap - Hreflang
+- Sitemap - Cache
+- Sitemap - Error Handling
+
+**To Re-enable:** Implement sitemap.xml generation and remove `.skip` from test sections.
+
+### Mobile Filter Tests (Partial Skips)
+
+**Location:** `tests/e2e/product-listing.spec.ts`
+
+**Skipped test:** "clicking backdrop should close mobile filter sheet"
+
+**Reason:** The sheet component covers the entire 375px viewport, leaving no visible backdrop area to click.
+
+**Alternative:** Test close via X button or swipe gesture instead.
+
+### Auth Flow Tests (Partial Skips)
+
+**Location:** `tests/e2e/flows/auth.spec.ts`
+
+**Skipped tests:**
+- Tests depending on SSR rendering of "Welcome back" text (doesn't appear in SSR output)
+- Tests using React-controlled inputs that don't respond to standard fill()
+
+**Reason:** SSR hydration differences and React input control patterns.
+
+### Product Listing Filter URL Tests (Partial Skips)
+
+**Location:** `tests/e2e/product-listing.spec.ts`
+
+**Skipped tests:** Client-side filter URL sync tests
+
+**Reason:** The filter implementation uses client-side state that doesn't automatically update the URL. This is a feature design decision, not a bug.
+
+### Known Flaky Tests
+
+**Wallet Tests (Flaky in Parallel)**
+
+**Location:** `tests/e2e/wallet.spec.ts`
+
+**Behavior:** All 22 tests pass when run with `--workers=1` but some fail intermittently in parallel.
+
+**Cause:** Race conditions accessing shared authentication state file.
+
+**Mitigation:** Tests configured with `mode: 'serial'` and 100ms beforeEach wait.
+
+**Payment Tests**
+
+**Location:** `tests/e2e/payment.spec.ts`
+
+**Behavior:** Some tests may fail due to Razorpay mock timing.
+
+**Mitigation:** Tests include explicit waits and are limited to UI verification (no actual payment processing).
+
+### Test Status Summary (as of 2026-01-27)
+
+| Status | Count | Notes |
+|--------|-------|-------|
+| **Passing** | 1491+ | Chromium project |
+| **Skipped** | 277 | Intentional, documented reasons |
+| **Flaky** | ~14 | Wallet tests in parallel mode |
 
 ---
 

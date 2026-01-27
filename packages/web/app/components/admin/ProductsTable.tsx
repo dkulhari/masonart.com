@@ -457,6 +457,21 @@ export function ProductsTable({
   )
 
   // Table instance
+  // Custom global filter function to search across multiple fields
+  const globalFilterFn: FilterFn<AdminProduct> = (row, _columnId, filterValue) => {
+    if (!filterValue) return true
+    const searchValue = String(filterValue).toLowerCase()
+    const product = row.original
+
+    // Search across title, SKU, slug, and description
+    return (
+      product.title.toLowerCase().includes(searchValue) ||
+      product.sku.toLowerCase().includes(searchValue) ||
+      product.slug.toLowerCase().includes(searchValue) ||
+      (product.description?.toLowerCase().includes(searchValue) ?? false)
+    )
+  }
+
   const table = useReactTable({
     data: products,
     columns,
@@ -472,6 +487,7 @@ export function ProductsTable({
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),

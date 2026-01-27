@@ -31,7 +31,7 @@ async function cleanup() {
         .where(eq(users.email, email))
         .limit(1);
 
-      if (user.length > 0) {
+      if (user.length > 0 && user[0]) {
         const userId = user[0].id;
         console.log(`  Found user: ${email} (id: ${userId})`);
 
