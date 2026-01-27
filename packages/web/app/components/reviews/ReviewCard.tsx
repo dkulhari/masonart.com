@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { CheckCircle2, User, MoreVertical, Flag, Trash2 } from 'lucide-react'
+import { CheckCircle2, MoreVertical, Flag, Trash2 } from 'lucide-react'
 import { cn, formatRelativeTime, formatDate, getInitials } from '~/lib/utils'
 import { StarRating } from './StarRating'
 

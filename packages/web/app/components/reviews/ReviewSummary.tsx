@@ -221,21 +221,31 @@ export function ReviewSummarySkeleton({
 export function calculateDistribution(
   reviews: { rating: number }[]
 ): RatingDistribution[] {
-  const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  const counts = new Map<number, number>([
+    [1, 0],
+    [2, 0],
+    [3, 0],
+    [4, 0],
+    [5, 0],
+  ])
 
   reviews.forEach((review) => {
-    if (review.rating >= 1 && review.rating <= 5) {
-      counts[Math.round(review.rating)]++
+    const rounded = Math.round(review.rating)
+    if (rounded >= 1 && rounded <= 5) {
+      counts.set(rounded, (counts.get(rounded) ?? 0) + 1)
     }
   })
 
   const total = reviews.length || 1
 
-  return [5, 4, 3, 2, 1].map((rating) => ({
-    rating,
-    count: counts[rating],
-    percentage: (counts[rating] / total) * 100,
-  }))
+  return [5, 4, 3, 2, 1].map((rating) => {
+    const count = counts.get(rating) ?? 0
+    return {
+      rating,
+      count,
+      percentage: (count / total) * 100,
+    }
+  })
 }
 
 /**

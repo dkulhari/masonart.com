@@ -1,0 +1,83 @@
+ticket_number: 33
+title: 'Integration - Product Page Reviews'
+description: |-
+  Integrate review components into product detail page following existing page patterns.
+
+  ## Implementation Details
+
+  ### Files Modified
+  - `packages/web/app/routes/posters/$slug.tsx` - Added reviews section
+
+  ### Files Created
+  - `packages/web/app/hooks/useReviews.ts` - TanStack Query hooks for reviews
+  - `packages/web/app/components/product/ProductReviews.tsx` - Reviews section component
+
+  ### Integration Points
+
+  **Product Detail Page Updates**
+  1. Added ProductReviews component after ProductDetail
+  2. Shows review summary with stats
+  3. "Write a Review" CTA button
+  4. ReviewList with filters and pagination
+  5. ReviewForm modal for authenticated users
+
+  **Data Fetching**
+  - useReviews hook for fetching product reviews
+  - useReviewStats hook for fetching aggregated stats
+  - useCreateReview mutation for submitting reviews
+  - TanStack Query for caching with 5-minute stale time
+
+  **SEO Considerations**
+  - JSON-LD structured data already existed in product page
+  - aggregateRating already included when reviews exist
+
+  ## Acceptance Criteria
+  - [x] Reviews visible on product pages
+  - [x] Summary shows stats section
+  - [x] Review list with sorting/filtering
+  - [x] Write review button with auth check
+  - [x] Structured data for SEO (existing)
+  - [ ] E2E tests (deferred to ticket #35)
+  - [x] Mobile responsive layout
+feature: user-reviews
+type: task
+priority: high
+status: done
+assignee: claude
+reporter: cli
+created: '2026-01-28T00:10:00.000Z'
+last_updated: '2026-01-28T03:15:00.000Z'
+resolved: '2026-01-28T03:15:00.000Z'
+time_spent_minutes: 15
+labels:
+  - integration
+  - frontend
+  - seo
+acceptance_criteria:
+  - Reviews visible on all product pages
+  - Summary shows above fold
+  - Review list with sorting/filtering
+  - Write review button with auth check
+  - Structured data for SEO
+comments:
+  - author: claude
+    timestamp: '2026-01-28T03:15:00.000Z'
+    content: |-
+      Completed integration with:
+      - useReviews.ts hook with TanStack Query for data fetching
+      - ProductReviews.tsx component integrating all review UI components
+      - Updated product page route to include reviews section
+      - Authentication check for review submission
+      - Loading skeletons for reviews section
+work_sessions:
+  - date: '2026-01-28'
+    minutes: 15
+    description: Created hooks and integrated reviews into product page
+related_tickets: []
+blocked_by:
+  - 29
+  - 31
+  - 32
+blocks:
+  - 35
+attachments: []

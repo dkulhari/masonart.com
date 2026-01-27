@@ -11,7 +11,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { ReviewCard, ReviewCardSkeleton, type ReviewData } from './ReviewCard'
-import { ReviewFilters, type ReviewFilterState, type ReviewSortOption } from './ReviewFilters'
+import { ReviewFilters, type ReviewFilterState } from './ReviewFilters'
 import { ReviewSummary, type ReviewStats, calculateDistribution, calculateAverageRating } from './ReviewSummary'
 
 // ============================================================================
