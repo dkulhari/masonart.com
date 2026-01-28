@@ -38,6 +38,12 @@ export type StylePreset =
   | 'photography'
   | 'line-art'
   | 'typography'
+  // New presets from Full AI Generator feature
+  | 'ink-wash'
+  | 'digital-art'
+  | 'minimalist-modern'
+  | 'impressionist'
+  | 'art-deco'
 
 export type AspectRatio = 'square' | 'portrait' | 'landscape' | 'panoramic'
 
@@ -161,6 +167,47 @@ const STYLE_PRESETS: StylePresetConfig[] = [
     category: 'decorative',
     isPremium: false,
     thumbnailColor: 'bg-gradient-to-br from-slate-800 to-slate-950',
+  },
+  // New presets from Full AI Generator feature
+  {
+    id: 'ink-wash',
+    name: 'Ink Wash',
+    description: 'Asian-inspired flowing ink gradients',
+    category: 'artistic',
+    isPremium: false,
+    thumbnailColor: 'bg-gradient-to-b from-gray-200 via-gray-400 to-gray-800',
+  },
+  {
+    id: 'digital-art',
+    name: 'Digital Art',
+    description: 'Modern digital illustration and concept art',
+    category: 'illustrative',
+    isPremium: false,
+    thumbnailColor: 'bg-gradient-to-br from-purple-500 via-cyan-400 to-pink-500',
+  },
+  {
+    id: 'minimalist-modern',
+    name: 'Minimalist Modern',
+    description: 'Clean Scandinavian-inspired simplicity',
+    category: 'decorative',
+    isPremium: false,
+    thumbnailColor: 'bg-gradient-to-br from-neutral-100 to-neutral-300',
+  },
+  {
+    id: 'impressionist',
+    name: 'Impressionist',
+    description: 'Monet-inspired light and color play',
+    category: 'artistic',
+    isPremium: false,
+    thumbnailColor: 'bg-gradient-to-br from-blue-300 via-green-200 to-yellow-200',
+  },
+  {
+    id: 'art-deco',
+    name: 'Art Deco',
+    description: '1920s geometric glamour with gold accents',
+    category: 'decorative',
+    isPremium: true,
+    thumbnailColor: 'bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-800',
   },
 ]
 
