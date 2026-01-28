@@ -1373,6 +1373,143 @@ export const shippingApi = {
  * // Get shipping options
  * const shipping = await api.shipping.getEstimate({ cartTotal: 2500 });
  */
+// ============================================================================
+// Shipments Types (Order Tracking)
+// ============================================================================
+
+/**
+ * Shipment status values
+ */
+export type ShipmentStatus =
+  | "pending"
+  | "label_created"
+  | "shipped"
+  | "in_transit"
+  | "out_for_delivery"
+  | "delivered"
+  | "returned"
+  | "cancelled";
+
+/**
+ * Shipment data from the API
+ */
+export interface Shipment {
+  id: string;
+  orderId: string;
+  trackingNumber: string | null;
+  carrier: string;
+  trackingUrl: string | null;
+  status: ShipmentStatus;
+  shippedAt: string | null;
+  estimatedDeliveryAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+  shippingOption: {
+    id: string;
+    name: string;
+    carrier: string;
+  } | null;
+}
+
+/**
+ * Order shipments list response
+ */
+export interface OrderShipmentsResponse {
+  orderId: string;
+  orderNumber: string;
+  orderStatus: string;
+  shipments: Shipment[];
+  totalShipments: number;
+}
+
+/**
+ * Tracking timeline step
+ */
+export interface TrackingTimelineStep {
+  status: string;
+  label: string;
+  completed: boolean;
+  timestamp: string | null;
+}
+
+/**
+ * Tracking timeline data
+ */
+export interface TrackingTimeline {
+  currentStatus: string;
+  steps: TrackingTimelineStep[];
+  estimatedDelivery: string | null;
+}
+
+/**
+ * Shipment tracking response
+ */
+export interface ShipmentTrackingResponse {
+  shipment: {
+    id: string;
+    orderId: string;
+    orderNumber: string;
+    trackingNumber: string | null;
+    carrier: string;
+    trackingUrl: string | null;
+    status: ShipmentStatus;
+    shippedAt: string | null;
+    estimatedDeliveryAt: string | null;
+    deliveredAt: string | null;
+    shippingOption: {
+      id: string;
+      name: string;
+      carrier: string;
+    } | null;
+  };
+  tracking: TrackingTimeline;
+}
+
+/**
+ * Shipments API
+ */
+export const shipmentsApi = {
+  /**
+   * Get shipments for an order
+   */
+  async getOrderShipments(orderId: string): Promise<OrderShipmentsResponse> {
+    const response = await fetch(`${getApiUrl()}/api/orders/${orderId}/shipments`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch shipments");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get tracking details for a shipment
+   */
+  async getTracking(shipmentId: string): Promise<ShipmentTrackingResponse> {
+    const response = await fetch(`${getApiUrl()}/api/shipments/${shipmentId}/track`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch tracking");
+    }
+
+    return response.json();
+  },
+};
+
 export const api = {
   products: productsApi,
   cart: cartApi,
@@ -1382,6 +1519,7 @@ export const api = {
   health: healthApi,
   wallet: walletApi,
   shipping: shippingApi,
+  shipments: shipmentsApi,
 };
 
 export default api;
