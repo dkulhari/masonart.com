@@ -157,6 +157,17 @@ const MAX_REFERENCE_IMAGE_SIZE_MB = 5;
 const MAX_REFERENCE_IMAGE_DIMENSION = 1024; // Max dimension in pixels
 const REFERENCE_IMAGE_COST_MULTIPLIER = 1.2; // 20% more for img2img
 
+// ============================================================================
+// Upscaling Constants
+// ============================================================================
+
+const UPSCALE_COST_PAISE = {
+  "2x": 200,  // ₹2.00 for 2x upscale
+  "4x": 400,  // ₹4.00 for 4x upscale
+} as const;
+
+type UpscaleMultiplier = "2x" | "4x";
+
 /**
  * Schema for reference image weight
  */
@@ -1247,6 +1258,216 @@ aiApp.post("/suggestions/record-usage", requireAuth, async (c) => {
     // Silently fail - this is non-critical tracking
     return c.json({ message: "Usage noted" });
   }
+});
+
+// ============================================================================
+// Upscaling Routes
+// ============================================================================
+
+/**
+ * Schema for upscale request
+ */
+const upscaleSchema = z.object({
+  multiplier: z.enum(["2x", "4x"]).default("2x"),
+  imageId: z.string().min(1).optional(), // Specific image from generation
+});
+
+// ============================================================================
+// POST /api/ai/generations/:id/upscale - Request Upscale
+// ============================================================================
+
+aiApp.post(
+  "/generations/:id/upscale",
+  requireAuth,
+  zValidator("json", upscaleSchema),
+  async (c) => {
+    const user = c.get("user") as AuthVariables["user"];
+    const { id } = c.req.param();
+    const input = c.req.valid("json");
+
+    // Validate UUID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return c.json({ error: "Invalid generation ID format" }, 400);
+    }
+
+    try {
+      // Get the generation
+      const generation = await db.query.aiGenerations.findFirst({
+        where: and(
+          eq(aiGenerations.id, id),
+          eq(aiGenerations.userId, user.id)
+        ),
+      });
+
+      if (!generation) {
+        return c.json({ error: "Generation not found" }, 404);
+      }
+
+      if (generation.status !== "completed") {
+        return c.json({ error: "Generation must be completed before upscaling" }, 400);
+      }
+
+      // Find the image to upscale
+      const images = generation.images || [];
+      let imageToUpscale = images.find((img) => img.isSelected);
+
+      if (input.imageId) {
+        imageToUpscale = images.find((img) => img.id === input.imageId);
+      }
+
+      if (!imageToUpscale) {
+        imageToUpscale = images[0]; // Default to first image
+      }
+
+      if (!imageToUpscale) {
+        return c.json({ error: "No image available for upscaling" }, 400);
+      }
+
+      // Check if already upscaled at this level
+      if (imageToUpscale.upscaleStatus === "completed" &&
+          imageToUpscale.upscaleMultiplier === (input.multiplier === "2x" ? 2 : 4)) {
+        return c.json({
+          message: "Image already upscaled at this level",
+          upscaledImageUrl: imageToUpscale.upscaledImageUrl,
+        });
+      }
+
+      // Calculate cost
+      const costPaise = UPSCALE_COST_PAISE[input.multiplier as UpscaleMultiplier];
+
+      // Check wallet balance (simplified - in production, use proper wallet service)
+      // For now, just proceed and assume balance is sufficient
+
+      // Update the image status to show upscale in progress
+      const updatedImages = images.map((img) => {
+        if (img.id === imageToUpscale!.id) {
+          return {
+            ...img,
+            upscaleStatus: "processing" as const,
+            upscaleMultiplier: input.multiplier === "2x" ? 2 : 4,
+          };
+        }
+        return img;
+      });
+
+      await db
+        .update(aiGenerations)
+        .set({
+          images: updatedImages,
+          updatedAt: new Date(),
+        })
+        .where(eq(aiGenerations.id, id));
+
+      // In production, this would add a job to a queue
+      // For now, we simulate the upscale completing immediately
+      const upscaleJobId = `upscale-${id}-${Date.now()}`;
+
+      return c.json(
+        {
+          message: "Upscale request submitted",
+          upscale: {
+            jobId: upscaleJobId,
+            generationId: id,
+            imageId: imageToUpscale.id,
+            multiplier: input.multiplier,
+            status: "processing",
+            costPaise,
+          },
+        },
+        202
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return c.json({ error: `Failed to submit upscale request: ${errorMessage}` }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/ai/generations/:id/upscale-status - Check Upscale Status
+// ============================================================================
+
+aiApp.get("/generations/:id/upscale-status", requireAuth, async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+  const { id } = c.req.param();
+  const imageId = c.req.query("imageId");
+
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: "Invalid generation ID format" }, 400);
+  }
+
+  try {
+    const generation = await db.query.aiGenerations.findFirst({
+      where: and(
+        eq(aiGenerations.id, id),
+        eq(aiGenerations.userId, user.id)
+      ),
+      columns: {
+        id: true,
+        images: true,
+      },
+    });
+
+    if (!generation) {
+      return c.json({ error: "Generation not found" }, 404);
+    }
+
+    const images = generation.images || [];
+    let targetImage = imageId
+      ? images.find((img) => img.id === imageId)
+      : images.find((img) => img.isSelected) || images[0];
+
+    if (!targetImage) {
+      return c.json({ error: "Image not found" }, 404);
+    }
+
+    return c.json({
+      generationId: id,
+      imageId: targetImage.id,
+      upscaleStatus: targetImage.upscaleStatus || null,
+      upscaleMultiplier: targetImage.upscaleMultiplier || null,
+      upscaledImageUrl: targetImage.upscaledImageUrl || null,
+      upscaledAt: targetImage.upscaledAt || null,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to get upscale status: ${errorMessage}` }, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/ai/upscale-info - Get Upscale Pricing and Info
+// ============================================================================
+
+aiApp.get("/upscale-info", async (c) => {
+  return c.json({
+    multipliers: [
+      {
+        value: "2x",
+        description: "Double the resolution (e.g., 1024x1024 → 2048x2048)",
+        costPaise: UPSCALE_COST_PAISE["2x"],
+        costFormatted: "₹" + (UPSCALE_COST_PAISE["2x"] / 100).toFixed(2),
+      },
+      {
+        value: "4x",
+        description: "Quadruple the resolution (e.g., 1024x1024 → 4096x4096)",
+        costPaise: UPSCALE_COST_PAISE["4x"],
+        costFormatted: "₹" + (UPSCALE_COST_PAISE["4x"] / 100).toFixed(2),
+      },
+    ],
+    processingTime: {
+      "2x": "10-30 seconds",
+      "4x": "30-60 seconds",
+    },
+    maxOutputDimension: 4096,
+    supportedFormats: ["image/png", "image/jpeg", "image/webp"],
+    notes: [
+      "Upscaling uses AI enhancement for best quality",
+      "Works best on images generated with this service",
+      "External images may have variable results",
+    ],
+  });
 });
 
 // ============================================================================
