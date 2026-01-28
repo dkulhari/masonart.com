@@ -89,8 +89,8 @@ priority: high
 status: done
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T06:53:30.947Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:53:30.947Z"
 time_spent_minutes: 0
 labels:
   - frontend
@@ -104,10 +104,10 @@ acceptance_criteria:
   - Component and E2E tests passing
 comments:
   - author: system
-    timestamp: '2026-01-28T06:43:27.675Z'
+    timestamp: "2026-01-28T06:43:27.675Z"
     text: Status changed from 'todo' to 'in-progress'
   - author: mcp-client
-    timestamp: '2026-01-28T06:43:40.502Z'
+    timestamp: "2026-01-28T06:43:40.502Z"
     text: |-
       Starting implementation of return request flow.
 
@@ -140,7 +140,7 @@ comments:
       - DELETE /api/returns/:id - Cancel return
       - GET /api/return-policies - Get policies
   - author: mcp-client
-    timestamp: '2026-01-28T06:53:04.133Z'
+    timestamp: "2026-01-28T06:53:04.133Z"
     text: |-
       ## Implementation Complete
 
@@ -166,8 +166,14 @@ comments:
       - 61 component tests passing (ReturnEligibilityCheck: 14, ReturnRequestForm: 17, ReturnStatusCard: 30)
       - All 278 total component tests passing
   - author: system
-    timestamp: '2026-01-28T06:53:30.947Z'
+    timestamp: "2026-01-28T06:53:30.947Z"
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-28T07:08:10.844Z"
+    text: |-
+      **Commit:** `8406056e` feat(web): Add return request flow components (#42)
+
+      Pushed to main branch.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -175,5 +181,5 @@ blocked_by:
 blocks:
   - 44
 attachments: []
-started: '2026-01-28T06:43:27.675Z'
-completed: '2026-01-28T06:53:30.947Z'
+started: "2026-01-28T06:43:27.675Z"
+completed: "2026-01-28T06:53:30.947Z"

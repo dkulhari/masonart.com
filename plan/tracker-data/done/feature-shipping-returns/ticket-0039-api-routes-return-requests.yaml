@@ -119,8 +119,8 @@ priority: high
 status: done
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T06:26:16.099Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:26:16.099Z"
 time_spent_minutes: 0
 labels:
   - api
@@ -135,10 +135,10 @@ acceptance_criteria:
   - Unit tests passing
 comments:
   - author: system
-    timestamp: '2026-01-28T06:13:56.535Z'
+    timestamp: "2026-01-28T06:13:56.535Z"
     text: Status changed from 'todo' to 'in-progress'
   - author: mcp-client
-    timestamp: '2026-01-28T06:14:04.436Z'
+    timestamp: "2026-01-28T06:14:04.436Z"
     text: |-
       Starting implementation. Plan:
 
@@ -159,7 +159,7 @@ comments:
 
       3. First, checking returns schema for types and enums.
   - author: mcp-client
-    timestamp: '2026-01-28T06:25:41.778Z'
+    timestamp: "2026-01-28T06:25:41.778Z"
     text: |-
       ## Implementation Complete
 
@@ -196,11 +196,17 @@ comments:
       - Public returns routes: 29/29 passing
       - Admin returns routes: 37/37 passing
   - author: mcp-client
-    timestamp: '2026-01-28T06:26:15.751Z'
-    text: 'Committed: 647c18ad feat(api): Add return requests API routes (#39)'
+    timestamp: "2026-01-28T06:26:15.751Z"
+    text: "Committed: 647c18ad feat(api): Add return requests API routes (#39)"
   - author: system
-    timestamp: '2026-01-28T06:26:16.099Z'
+    timestamp: "2026-01-28T06:26:16.099Z"
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-28T07:08:44.079Z"
+    text: |-
+      **Commit:** `647c18ad` feat(api): Add return requests API routes (#39)
+
+      Pushed to main branch.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -209,5 +215,5 @@ blocks:
   - 42
   - 43
 attachments: []
-started: '2026-01-28T06:13:56.535Z'
-completed: '2026-01-28T06:26:16.099Z'
+started: "2026-01-28T06:13:56.535Z"
+completed: "2026-01-28T06:26:16.099Z"

@@ -102,8 +102,8 @@ priority: high
 status: done
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T06:13:48.019Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:13:48.019Z"
 time_spent_minutes: 0
 labels:
   - api
@@ -117,10 +117,10 @@ acceptance_criteria:
   - Unit tests passing
 comments:
   - author: system
-    timestamp: '2026-01-28T06:09:31.814Z'
+    timestamp: "2026-01-28T06:09:31.814Z"
     text: Status changed from 'todo' to 'in-progress'
   - author: mcp-client
-    timestamp: '2026-01-28T06:09:40.892Z'
+    timestamp: "2026-01-28T06:09:40.892Z"
     text: |-
       Starting implementation. Plan:
 
@@ -138,7 +138,7 @@ comments:
 
       Analyzing existing orders schema first.
   - author: mcp-client
-    timestamp: '2026-01-28T06:13:28.477Z'
+    timestamp: "2026-01-28T06:13:28.477Z"
     text: |-
       Implementation completed. All tests passing (59/59).
 
@@ -169,8 +169,14 @@ comments:
       - Order ownership validation
       - Date range filtering for admin
   - author: system
-    timestamp: '2026-01-28T06:13:48.019Z'
+    timestamp: "2026-01-28T06:13:48.019Z"
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-28T07:08:43.616Z"
+    text: |-
+      **Commit:** `f4dd40f5` feat(api): Add order shipments and tracking API routes (#38)
+
+      Pushed to main branch.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -178,5 +184,5 @@ blocked_by:
 blocks:
   - 41
 attachments: []
-started: '2026-01-28T06:09:31.813Z'
-completed: '2026-01-28T06:13:48.019Z'
+started: "2026-01-28T06:09:31.813Z"
+completed: "2026-01-28T06:13:48.019Z"

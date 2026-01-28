@@ -164,6 +164,12 @@ comments:
   - author: mcp-client
     timestamp: "2026-01-28T06:04:10.038Z"
     text: "COMPLETED: All acceptance criteria met. Database schema implementation verified with 44 passing tests (18 shipping, 26 returns). Schema files created at packages/api/src/database/schema/shipping.ts and returns.ts. Migration applied successfully. Moving to ticket 37 (API Routes - Shipping Options)."
+  - author: mcp-client
+    timestamp: "2026-01-28T07:08:42.551Z"
+    text: |-
+      **Commit:** `e8893c2e` feat(api): Add shipping and returns database schema (#36)
+
+      Pushed to main branch.
 work_sessions: []
 related_tickets: []
 blocked_by: []

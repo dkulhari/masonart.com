@@ -93,8 +93,8 @@ priority: high
 status: done
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T06:09:22.328Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:09:22.328Z"
 time_spent_minutes: 0
 labels:
   - api
@@ -108,10 +108,10 @@ acceptance_criteria:
   - Unit tests passing
 comments:
   - author: system
-    timestamp: '2026-01-28T06:04:46.479Z'
+    timestamp: "2026-01-28T06:04:46.479Z"
     text: Status changed from 'todo' to 'in-progress'
   - author: mcp-client
-    timestamp: '2026-01-28T06:04:52.973Z'
+    timestamp: "2026-01-28T06:04:52.973Z"
     text: |-
       Starting implementation. Plan:
 
@@ -130,7 +130,7 @@ comments:
 
       First, analyzing existing route patterns in the codebase.
   - author: mcp-client
-    timestamp: '2026-01-28T06:08:59.557Z'
+    timestamp: "2026-01-28T06:08:59.557Z"
     text: |-
       Implementation completed. All tests passing (70/70).
 
@@ -160,8 +160,14 @@ comments:
       - Input validation with Zod
       - Proper error handling
   - author: system
-    timestamp: '2026-01-28T06:09:22.328Z'
+    timestamp: "2026-01-28T06:09:22.328Z"
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-28T07:08:43.062Z"
+    text: |-
+      **Commit:** `98acef5e` feat(api): Add shipping options API routes (#37)
+
+      Pushed to main branch.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -169,5 +175,5 @@ blocked_by:
 blocks:
   - 40
 attachments: []
-started: '2026-01-28T06:04:46.478Z'
-completed: '2026-01-28T06:09:22.328Z'
+started: "2026-01-28T06:04:46.478Z"
+completed: "2026-01-28T06:09:22.328Z"

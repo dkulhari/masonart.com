@@ -122,8 +122,8 @@ priority: high
 status: done
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T07:02:16.768Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T07:02:16.768Z"
 time_spent_minutes: 0
 labels:
   - testing
@@ -138,10 +138,10 @@ acceptance_criteria:
   - Tests run in CI pipeline
 comments:
   - author: system
-    timestamp: '2026-01-28T07:00:37.430Z'
+    timestamp: "2026-01-28T07:00:37.430Z"
     text: Status changed from 'todo' to 'in-progress'
   - author: mcp-client
-    timestamp: '2026-01-28T07:02:07.776Z'
+    timestamp: "2026-01-28T07:02:07.776Z"
     text: |-
       ## Test Coverage Summary
 
@@ -184,8 +184,14 @@ comments:
       ### E2E Tests
       The project currently lacks an E2E testing framework (Playwright/Cypress). E2E tests are noted for future implementation when the framework is set up.
   - author: system
-    timestamp: '2026-01-28T07:02:16.768Z'
+    timestamp: "2026-01-28T07:02:16.768Z"
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-28T07:08:12.184Z"
+    text: |-
+      **Commit:** `dd9d5140` docs(tickets): Complete shipping-returns feature (#44)
+
+      Pushed to main branch.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -195,5 +201,5 @@ blocked_by:
   - 43
 blocks: []
 attachments: []
-started: '2026-01-28T07:00:37.429Z'
-completed: '2026-01-28T07:02:16.768Z'
+started: "2026-01-28T07:00:37.429Z"
+completed: "2026-01-28T07:02:16.768Z"
