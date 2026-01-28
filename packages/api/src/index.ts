@@ -18,9 +18,11 @@ import { adminWalletConfigApp } from "./routes/admin/wallet-config";
 import { adminReviewsApp } from "./routes/admin/reviews";
 import { adminShippingApp } from "./routes/admin/shipping";
 import { adminShipmentsApp } from "./routes/admin/shipments";
+import { adminReturnsApp } from "./routes/admin/returns";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
 import { shipmentsApp } from "./routes/shipments";
+import { returnsApp, returnPoliciesApp } from "./routes/returns";
 import {
   productReviewsApp,
   createReviewApp,
@@ -83,8 +85,18 @@ app.route("/api/reviews", protectedReviewsApp);
 // Shipping API - shipping options and cost estimation
 app.route("/api/shipping", shippingApp);
 
+// Returns API - return requests and policies
+// Note: returnPoliciesApp must be registered before the catch-all /api routes
+// to avoid shipmentsApp/returnsApp middleware intercepting requests
+app.route("/api/return-policies", returnPoliciesApp);
+
 // Shipments API - order tracking for customers
+// Mounted at /api to handle /api/orders/:orderId/shipments and /api/shipments/:id/track
 app.route("/api", shipmentsApp);
+
+// Returns API - protected return routes
+// Mounted at /api to handle /api/orders/:orderId/returns and /api/returns/:id
+app.route("/api", returnsApp);
 
 // ============================================================================
 // Admin API Routes (Protected with role-based access)
@@ -108,6 +120,9 @@ app.route("/api/admin/shipping", adminShippingApp);
 // Admin Shipments API - shipment management
 app.route("/api/admin/shipments", adminShipmentsApp);
 app.route("/api/admin", adminShipmentsApp);
+
+// Admin Returns API - return request management
+app.route("/api/admin/returns", adminReturnsApp);
 
 // ============================================================================
 // Webhook Routes (External Service Callbacks)

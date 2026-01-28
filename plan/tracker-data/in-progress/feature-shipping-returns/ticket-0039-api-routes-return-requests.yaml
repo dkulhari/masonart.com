@@ -1,5 +1,5 @@
 ticket_number: 39
-title: 'API Routes - Return Requests'
+title: API Routes - Return Requests
 description: |-
   Create API endpoints for customer return requests and admin management.
 
@@ -116,11 +116,11 @@ description: |-
 feature: shipping-returns
 type: task
 priority: high
-status: todo
+status: in-progress
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T00:10:00.000Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:13:56.535Z"
 time_spent_minutes: 0
 labels:
   - api
@@ -133,7 +133,68 @@ acceptance_criteria:
   - Refund processing
   - Statistics for dashboard
   - Unit tests passing
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-01-28T06:13:56.535Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-01-28T06:14:04.436Z"
+    text: |-
+      Starting implementation. Plan:
+
+      1. Create packages/api/src/routes/returns.ts - Public endpoints:
+         - GET /api/orders/:orderId/returns - Get return requests for order
+         - POST /api/orders/:orderId/returns - Create return request
+         - GET /api/returns/:id - Get return request details
+         - DELETE /api/returns/:id - Cancel pending return
+         - GET /api/return-policies - Get active return policies
+
+      2. Create packages/api/src/routes/admin/returns.ts - Admin endpoints:
+         - GET /api/admin/returns - List all with filters
+         - GET /api/admin/returns/stats - Get statistics
+         - PATCH /api/admin/returns/:id - Update return request
+         - POST /api/admin/returns/:id/approve - Approve return
+         - POST /api/admin/returns/:id/reject - Reject return
+         - POST /api/admin/returns/:id/process-refund - Process refund
+
+      3. First, checking returns schema for types and enums.
+  - author: mcp-client
+    timestamp: "2026-01-28T06:25:41.778Z"
+    text: |-
+      ## Implementation Complete
+
+      ### Files Created
+      - `packages/api/src/routes/returns.ts` - Public returns API routes
+        - GET /api/return-policies - List active return policies (public, cached 1hr)
+        - GET /api/orders/:orderId/returns - Get returns for an order
+        - POST /api/orders/:orderId/returns - Create return request
+        - GET /api/returns/:id - Get return details
+        - DELETE /api/returns/:id - Cancel pending return
+
+      - `packages/api/src/routes/admin/returns.ts` - Admin returns management
+        - GET /api/admin/returns - List all returns with filtering
+        - GET /api/admin/returns/stats - Return statistics
+        - GET /api/admin/returns/:id - Get return details
+        - PUT /api/admin/returns/:id/approve - Approve return
+        - PUT /api/admin/returns/:id/reject - Reject return
+        - PUT /api/admin/returns/:id/process-refund - Process refund
+
+      - `packages/api/tests/routes/returns.test.ts` - 29 tests
+      - `packages/api/tests/routes/admin/returns.test.ts` - 37 tests
+
+      ### Key Features
+      - Return eligibility checking (order must be delivered, within return window)
+      - Policy-based return windows (default 30 days)
+      - Caching for return policies (1 hour TTL)
+      - Full CRUD for return requests
+      - Admin dashboard with stats and filtering
+
+      ### Bug Fixed
+      Fixed route ordering issue in index.ts - `/api/return-policies` must be registered BEFORE the catch-all `/api` routes (shipmentsApp/returnsApp) to prevent their `requireAuth` middleware from intercepting requests to the public endpoint.
+
+      ### Test Results
+      - Public returns routes: 29/29 passing
+      - Admin returns routes: 37/37 passing
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -142,3 +203,4 @@ blocks:
   - 42
   - 43
 attachments: []
+started: "2026-01-28T06:13:56.535Z"
