@@ -22,6 +22,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "../database";
 import {
   aiGenerations,
+  userColorPalettes,
   type AIPromptDetails,
   type AIStylePreset,
   type AIAspectRatio,
@@ -110,6 +111,35 @@ const selectImageSchema = z.object({
 const updateVisibilitySchema = z.object({
   visibility: z.enum(aiGalleryVisibilityEnum.enumValues),
 });
+
+// ============================================================================
+// Color Palette Validation Schemas
+// ============================================================================
+
+/**
+ * Hex color validation regex
+ */
+const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
+
+/**
+ * Schema for creating a color palette
+ */
+const createPaletteSchema = z.object({
+  name: z.string().min(1).max(50).trim(),
+  colors: z.array(z.string().regex(hexColorRegex, "Invalid hex color format")).min(3).max(8),
+  isDefault: z.boolean().optional().default(false),
+});
+
+/**
+ * Schema for updating a color palette
+ */
+const updatePaletteSchema = z.object({
+  name: z.string().min(1).max(50).trim().optional(),
+  colors: z.array(z.string().regex(hexColorRegex, "Invalid hex color format")).min(3).max(8).optional(),
+  isDefault: z.boolean().optional(),
+});
+
+const MAX_PALETTES_PER_USER = 20;
 
 // ============================================================================
 // Route Handler
@@ -800,6 +830,242 @@ aiApp.get("/aspect-ratios", async (c) => {
   ];
 
   return c.json({ items: aspectRatios });
+});
+
+// ============================================================================
+// Color Palette Routes
+// ============================================================================
+
+// ============================================================================
+// POST /api/ai/palettes - Create Color Palette
+// ============================================================================
+
+aiApp.post(
+  "/palettes",
+  requireAuth,
+  zValidator("json", createPaletteSchema),
+  async (c) => {
+    const user = c.get("user") as AuthVariables["user"];
+    const input = c.req.valid("json");
+
+    try {
+      // Check palette limit
+      const existingCount = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(userColorPalettes)
+        .where(eq(userColorPalettes.userId, user.id));
+
+      if ((existingCount[0]?.count ?? 0) >= MAX_PALETTES_PER_USER) {
+        return c.json(
+          { error: `Maximum ${MAX_PALETTES_PER_USER} palettes allowed per user` },
+          400
+        );
+      }
+
+      // If setting as default, unset other defaults first
+      if (input.isDefault) {
+        await db
+          .update(userColorPalettes)
+          .set({ isDefault: false })
+          .where(
+            and(
+              eq(userColorPalettes.userId, user.id),
+              eq(userColorPalettes.isDefault, true)
+            )
+          );
+      }
+
+      // Create the palette
+      const [palette] = await db
+        .insert(userColorPalettes)
+        .values({
+          userId: user.id,
+          name: input.name,
+          colors: input.colors,
+          isDefault: input.isDefault,
+        })
+        .returning();
+
+      return c.json({ palette }, 201);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return c.json({ error: `Failed to create palette: ${errorMessage}` }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/ai/palettes - List User's Palettes
+// ============================================================================
+
+aiApp.get("/palettes", requireAuth, async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+
+  try {
+    const palettes = await db
+      .select()
+      .from(userColorPalettes)
+      .where(eq(userColorPalettes.userId, user.id))
+      .orderBy(desc(userColorPalettes.createdAt));
+
+    // Also return preset color moods as system palettes
+    const systemPalettes = [
+      { id: "preset-warm", name: "Warm", colors: ["#FF5733", "#FFC300", "#FF8D1A", "#FF6B6B", "#FFE66D"], isSystem: true },
+      { id: "preset-cool", name: "Cool", colors: ["#4A90D9", "#5BC0DE", "#7B68EE", "#20B2AA", "#87CEEB"], isSystem: true },
+      { id: "preset-neutral", name: "Neutral", colors: ["#A0A0A0", "#D3D3D3", "#F5F5DC", "#C4B7A6", "#E8E8E8"], isSystem: true },
+      { id: "preset-vibrant", name: "Vibrant", colors: ["#FF0080", "#00FF00", "#0080FF", "#FFFF00", "#FF00FF"], isSystem: true },
+      { id: "preset-muted", name: "Muted", colors: ["#D4A5A5", "#A8C8A8", "#B8B8D4", "#D4C8A5", "#C8C8C8"], isSystem: true },
+      { id: "preset-earth", name: "Earth Tones", colors: ["#8B4513", "#556B2F", "#D2B48C", "#BC8F8F", "#6B4423"], isSystem: true },
+      { id: "preset-pastel", name: "Pastel", colors: ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA", "#E0BBE4"], isSystem: true },
+      { id: "preset-monochrome", name: "Monochrome", colors: ["#000000", "#333333", "#666666", "#999999", "#CCCCCC"], isSystem: true },
+    ];
+
+    return c.json({
+      userPalettes: palettes,
+      systemPalettes,
+      maxPalettes: MAX_PALETTES_PER_USER,
+      currentCount: palettes.length,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to fetch palettes: ${errorMessage}` }, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/ai/palettes/:id - Get Single Palette
+// ============================================================================
+
+aiApp.get("/palettes/:id", requireAuth, async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+  const { id } = c.req.param();
+
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: "Invalid palette ID format" }, 400);
+  }
+
+  try {
+    const palette = await db.query.userColorPalettes.findFirst({
+      where: and(
+        eq(userColorPalettes.id, id),
+        eq(userColorPalettes.userId, user.id)
+      ),
+    });
+
+    if (!palette) {
+      return c.json({ error: "Palette not found" }, 404);
+    }
+
+    return c.json({ palette });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to fetch palette: ${errorMessage}` }, 500);
+  }
+});
+
+// ============================================================================
+// PATCH /api/ai/palettes/:id - Update Palette
+// ============================================================================
+
+aiApp.patch(
+  "/palettes/:id",
+  requireAuth,
+  zValidator("json", updatePaletteSchema),
+  async (c) => {
+    const user = c.get("user") as AuthVariables["user"];
+    const { id } = c.req.param();
+    const input = c.req.valid("json");
+
+    // Validate UUID format
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return c.json({ error: "Invalid palette ID format" }, 400);
+    }
+
+    try {
+      // Verify ownership
+      const existing = await db.query.userColorPalettes.findFirst({
+        where: and(
+          eq(userColorPalettes.id, id),
+          eq(userColorPalettes.userId, user.id)
+        ),
+      });
+
+      if (!existing) {
+        return c.json({ error: "Palette not found" }, 404);
+      }
+
+      // If setting as default, unset other defaults first
+      if (input.isDefault) {
+        await db
+          .update(userColorPalettes)
+          .set({ isDefault: false })
+          .where(
+            and(
+              eq(userColorPalettes.userId, user.id),
+              eq(userColorPalettes.isDefault, true),
+              sql`${userColorPalettes.id} != ${id}`
+            )
+          );
+      }
+
+      // Build update object
+      const updateData: Partial<typeof input> & { updatedAt?: Date } = {};
+      if (input.name !== undefined) updateData.name = input.name;
+      if (input.colors !== undefined) updateData.colors = input.colors;
+      if (input.isDefault !== undefined) updateData.isDefault = input.isDefault;
+      updateData.updatedAt = new Date();
+
+      // Update the palette
+      const [updated] = await db
+        .update(userColorPalettes)
+        .set(updateData)
+        .where(eq(userColorPalettes.id, id))
+        .returning();
+
+      return c.json({ palette: updated });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return c.json({ error: `Failed to update palette: ${errorMessage}` }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// DELETE /api/ai/palettes/:id - Delete Palette
+// ============================================================================
+
+aiApp.delete("/palettes/:id", requireAuth, async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+  const { id } = c.req.param();
+
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: "Invalid palette ID format" }, 400);
+  }
+
+  try {
+    // Verify ownership
+    const existing = await db.query.userColorPalettes.findFirst({
+      where: and(
+        eq(userColorPalettes.id, id),
+        eq(userColorPalettes.userId, user.id)
+      ),
+      columns: { id: true },
+    });
+
+    if (!existing) {
+      return c.json({ error: "Palette not found" }, 404);
+    }
+
+    // Delete the palette
+    await db.delete(userColorPalettes).where(eq(userColorPalettes.id, id));
+
+    return c.json({ message: "Palette deleted successfully" });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to delete palette: ${errorMessage}` }, 500);
+  }
 });
 
 // Export the router
