@@ -46,6 +46,11 @@ import {
 import { deductFromWallet } from "../services/wallet";
 import { addAIGenerationJob } from "../queues/ai-generation";
 import { getCached, setCached, CacheKeys, redis } from "../lib/redis";
+import {
+  uploadReferenceImage,
+  isValidImageType,
+  isValidFileSize,
+} from "../lib/storage";
 
 // ============================================================================
 // Constants
@@ -72,7 +77,9 @@ const createGenerationSchema = z.object({
   aspectRatio: z.enum(aiAspectRatioEnum.enumValues),
   colorMood: z.string().max(50).optional(),
   colorPalette: z.array(z.string().max(20)).max(5).optional(),
+  customPaletteId: z.string().uuid().optional(),
   referenceImageUrl: z.string().url().optional(),
+  referenceImageWeight: z.coerce.number().min(0.1).max(1.0).optional().default(0.5),
   variationCount: z.coerce.number().int().min(1).max(MAX_VARIATION_COUNT).optional().default(DEFAULT_VARIATION_COUNT),
   modelProvider: z.enum(aiModelProviderEnum.enumValues).optional().default("stable-diffusion"),
   seed: z.coerce.number().int().min(0).max(2147483647).optional(),
@@ -142,6 +149,21 @@ const updatePaletteSchema = z.object({
 const MAX_PALETTES_PER_USER = 20;
 
 // ============================================================================
+// Reference Image Constants
+// ============================================================================
+
+const MAX_REFERENCE_IMAGE_SIZE_MB = 5;
+const MAX_REFERENCE_IMAGE_DIMENSION = 1024; // Max dimension in pixels
+const REFERENCE_IMAGE_COST_MULTIPLIER = 1.2; // 20% more for img2img
+
+/**
+ * Schema for reference image weight
+ */
+const referenceWeightSchema = z.object({
+  weight: z.coerce.number().min(0.1).max(1.0).optional().default(0.5),
+});
+
+// ============================================================================
 // Route Handler
 // ============================================================================
 
@@ -179,7 +201,9 @@ aiApp.post(
         aspectRatio: input.aspectRatio,
         colorMood: input.colorMood,
         colorPalette: input.colorPalette,
+        customPaletteId: input.customPaletteId,
         referenceImageUrl: input.referenceImageUrl,
+        referenceImageWeight: input.referenceImageWeight,
         seed: input.seed,
       };
 
@@ -830,6 +854,96 @@ aiApp.get("/aspect-ratios", async (c) => {
   ];
 
   return c.json({ items: aspectRatios });
+});
+
+// ============================================================================
+// Reference Image Routes
+// ============================================================================
+
+// ============================================================================
+// POST /api/ai/reference-image - Upload Reference Image
+// ============================================================================
+
+aiApp.post("/reference-image", requireAuth, async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+
+  try {
+    // Parse multipart form data
+    const formData = await c.req.formData();
+    const file = formData.get("file") as File | null;
+    const weightStr = formData.get("weight") as string | null;
+
+    if (!file) {
+      return c.json({ error: "No file provided" }, 400);
+    }
+
+    // Parse weight
+    const weight = weightStr ? parseFloat(weightStr) : 0.5;
+    if (isNaN(weight) || weight < 0.1 || weight > 1.0) {
+      return c.json({ error: "Weight must be between 0.1 and 1.0" }, 400);
+    }
+
+    // Validate file type
+    if (!isValidImageType(file.type)) {
+      return c.json(
+        { error: "Invalid file type. Supported: JPEG, PNG, WebP" },
+        400
+      );
+    }
+
+    // Validate file size
+    if (!isValidFileSize(file.size, MAX_REFERENCE_IMAGE_SIZE_MB)) {
+      return c.json(
+        { error: `File size must be less than ${MAX_REFERENCE_IMAGE_SIZE_MB}MB` },
+        400
+      );
+    }
+
+    // Convert file to buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Upload the reference image
+    const result = await uploadReferenceImage(buffer, user.id, file.type);
+
+    return c.json(
+      {
+        message: "Reference image uploaded successfully",
+        referenceImage: {
+          url: result.url,
+          key: result.key,
+          weight,
+          expiresAt: result.expiresAt,
+          costMultiplier: REFERENCE_IMAGE_COST_MULTIPLIER,
+        },
+      },
+      201
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to upload reference image: ${errorMessage}` }, 500);
+  }
+});
+
+// ============================================================================
+// GET /api/ai/reference-image-info - Get Reference Image Cost Info
+// ============================================================================
+
+aiApp.get("/reference-image-info", async (c) => {
+  return c.json({
+    maxSizeMB: MAX_REFERENCE_IMAGE_SIZE_MB,
+    maxDimension: MAX_REFERENCE_IMAGE_DIMENSION,
+    supportedFormats: ["image/jpeg", "image/png", "image/webp"],
+    costMultiplier: REFERENCE_IMAGE_COST_MULTIPLIER,
+    costExplanation: "Using a reference image adds 20% to generation cost due to additional processing",
+    weightRange: {
+      min: 0.1,
+      max: 1.0,
+      default: 0.5,
+      explanation: "Low weight = loose inspiration, High weight = closer match to reference",
+    },
+    expiresAfterHours: 24,
+  });
 });
 
 // ============================================================================

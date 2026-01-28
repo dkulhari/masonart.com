@@ -48,6 +48,7 @@ const CDN_URL = process.env.CDN_URL || '';
 export const StoragePaths = {
   PRODUCTS: 'products/',
   AI_GENERATIONS: 'ai-generations/',
+  AI_REFERENCE_IMAGES: 'ai-reference-images/',
   USER_UPLOADS: 'user-uploads/',
   AVATARS: 'avatars/',
   FRAMES: 'frames/',
@@ -179,6 +180,38 @@ export async function uploadAvatar(
     contentType,
     cacheControl: 'public, max-age=86400', // 1 day (avatars may change)
   });
+}
+
+/**
+ * Upload a reference image for AI generation
+ * Reference images expire after 24 hours
+ */
+export async function uploadReferenceImage(
+  buffer: Buffer,
+  userId: string,
+  contentType: string
+): Promise<UploadResult & { expiresAt: Date }> {
+  const extension = getExtensionFromContentType(contentType);
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8);
+  const key = `${StoragePaths.AI_REFERENCE_IMAGES}${userId}/${timestamp}-${random}.${extension}`;
+
+  const result = await uploadFile(buffer, key, {
+    contentType,
+    cacheControl: 'private, max-age=86400', // 24 hours
+    metadata: {
+      userId,
+      uploadedAt: new Date().toISOString(),
+    },
+  });
+
+  // Reference images expire after 24 hours
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  return {
+    ...result,
+    expiresAt,
+  };
 }
 
 // ============================================================================
