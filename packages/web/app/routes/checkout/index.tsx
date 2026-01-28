@@ -28,6 +28,7 @@ import {
 import { AddressForm, type AddressFormData, type AddressFormErrors } from '~/components/checkout/AddressForm'
 import { OrderSummary } from '~/components/checkout/OrderSummary'
 import { PaymentButton } from '~/components/checkout/PaymentButton'
+import { ShippingSelector, type SelectedShippingOption } from '~/components/checkout/ShippingSelector'
 import type { OrderInput } from '~/lib/api'
 
 // ============================================================================
@@ -54,14 +55,6 @@ export const Route = createFileRoute('/checkout/')({
 
 type CheckoutStep = 'shipping' | 'delivery' | 'payment' | 'review'
 
-interface DeliveryOption {
-  id: string
-  name: string
-  description: string
-  estimatedDays: string
-  price: number
-}
-
 // ============================================================================
 // Constants
 // ============================================================================
@@ -71,25 +64,6 @@ const CHECKOUT_STEPS: { id: CheckoutStep; label: string; icon: React.ComponentTy
   { id: 'delivery', label: 'Delivery', icon: Truck },
   { id: 'payment', label: 'Payment', icon: CreditCard },
 ]
-
-const DELIVERY_OPTIONS: DeliveryOption[] = [
-  {
-    id: 'standard',
-    name: 'Standard Delivery',
-    description: 'Regular shipping via trusted courier',
-    estimatedDays: '5-7 business days',
-    price: 99,
-  },
-  {
-    id: 'express',
-    name: 'Express Delivery',
-    description: 'Priority shipping with faster processing',
-    estimatedDays: '2-3 business days',
-    price: 199,
-  },
-]
-
-const FREE_SHIPPING_THRESHOLD = 999
 
 // ============================================================================
 // Main Component
@@ -104,13 +78,11 @@ function CheckoutPage() {
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping')
   const [shippingAddress, setShippingAddress] = useState<AddressFormData | null>(null)
   const [isAddressValid, setIsAddressValid] = useState(false)
-  const [selectedDelivery, setSelectedDelivery] = useState<string>('standard')
+  const [selectedShippingOption, setSelectedShippingOption] = useState<SelectedShippingOption | null>(null)
   const [customerNotes, setCustomerNotes] = useState('')
 
-  // Pricing calculations
-  const hasShippingFee = subtotal < FREE_SHIPPING_THRESHOLD
-  const selectedDeliveryOption = DELIVERY_OPTIONS.find((d) => d.id === selectedDelivery)
-  const shippingCost = hasShippingFee ? (selectedDeliveryOption?.price ?? 99) : 0
+  // Pricing calculations - use actual shipping cost from selected option
+  const shippingCost = selectedShippingOption?.finalCost ?? 0
   const total = subtotal + shippingCost
 
   // Handle address change
@@ -149,7 +121,7 @@ function CheckoutPage() {
       case 'shipping':
         return isAddressValid && shippingAddress !== null
       case 'delivery':
-        return selectedDelivery !== ''
+        return selectedShippingOption !== null
       case 'payment':
         return true // Will be validated by payment provider
       default:
@@ -173,7 +145,8 @@ function CheckoutPage() {
         postalCode: shippingAddress.postalCode,
         countryCode: shippingAddress.countryCode || 'IN',
       },
-      shippingMethod: selectedDelivery as 'standard' | 'express',
+      // Pass selected shipping option ID - API will handle the mapping
+      shippingOptionId: selectedShippingOption?.id,
       customerNotes: customerNotes || undefined,
     }
   }
@@ -289,69 +262,12 @@ function CheckoutPage() {
                     Delivery Options
                   </h2>
 
-                  <div className="space-y-3">
-                    {DELIVERY_OPTIONS.map((option) => {
-                      const isFree = !hasShippingFee
-                      const displayPrice = isFree ? 0 : option.price
-
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setSelectedDelivery(option.id)}
-                          className={cn(
-                            'w-full rounded-lg border p-4 text-left transition-colors',
-                            selectedDelivery === option.id
-                              ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-                              : 'border-border bg-background hover:border-brand-300'
-                          )}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-foreground">{option.name}</span>
-                                {isFree && option.id === 'standard' && (
-                                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                                    Free
-                                  </span>
-                                )}
-                              </div>
-                              <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                Estimated: {option.estimatedDays}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <span className="font-semibold text-foreground">
-                                {displayPrice === 0 ? 'FREE' : formatPrice(displayPrice)}
-                              </span>
-                              <div
-                                className={cn(
-                                  'flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors',
-                                  selectedDelivery === option.id
-                                    ? 'border-brand-500 bg-brand-500'
-                                    : 'border-muted-foreground/30 bg-transparent'
-                                )}
-                              >
-                                {selectedDelivery === option.id && (
-                                  <div className="h-2 w-2 rounded-full bg-white" />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {/* Free Shipping Notice */}
-                  {!hasShippingFee && (
-                    <div className="mt-4 flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
-                      <Check className="h-4 w-4" />
-                      You qualify for free standard shipping on orders over {formatPrice(FREE_SHIPPING_THRESHOLD)}!
-                    </div>
-                  )}
+                  <ShippingSelector
+                    cartTotal={subtotal}
+                    selectedOptionId={selectedShippingOption?.id ?? null}
+                    onSelect={setSelectedShippingOption}
+                    postalCode={shippingAddress?.postalCode}
+                  />
                 </div>
 
                 {/* Shipping Address Summary */}
@@ -435,11 +351,16 @@ function CheckoutPage() {
                     )}
 
                     {/* Delivery Method */}
-                    {selectedDeliveryOption && (
+                    {selectedShippingOption && (
                       <div className="mb-3 border-b border-border pb-3">
                         <p className="text-xs text-muted-foreground">Delivery:</p>
                         <p className="text-sm text-foreground">
-                          {selectedDeliveryOption.name} ({selectedDeliveryOption.estimatedDays})
+                          {selectedShippingOption.name} ({selectedShippingOption.carrier})
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedShippingOption.estimatedDaysMin === selectedShippingOption.estimatedDaysMax
+                            ? `${selectedShippingOption.estimatedDaysMin} business days`
+                            : `${selectedShippingOption.estimatedDaysMin}-${selectedShippingOption.estimatedDaysMax} business days`}
                         </p>
                       </div>
                     )}

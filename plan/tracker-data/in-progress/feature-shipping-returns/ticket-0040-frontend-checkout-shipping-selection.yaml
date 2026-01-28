@@ -1,5 +1,5 @@
 ticket_number: 40
-title: 'Frontend - Checkout Shipping Selection'
+title: Frontend - Checkout Shipping Selection
 description: |-
   Integrate shipping option selection into checkout flow.
 
@@ -77,11 +77,11 @@ description: |-
 feature: shipping-returns
 type: task
 priority: high
-status: todo
+status: in-progress
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T00:10:00.000Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:26:37.149Z"
 time_spent_minutes: 0
 labels:
   - frontend
@@ -93,7 +93,62 @@ acceptance_criteria:
   - Estimated delivery shown
   - Required before payment step
   - Component and E2E tests passing
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-01-28T06:26:37.150Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-01-28T06:26:37.579Z"
+    text: |-
+      Starting implementation. Will:
+      1. Explore existing checkout structure
+      2. Create ShippingSelector, ShippingOptionCard, ShippingEstimate components
+      3. Integrate into checkout flow
+      4. Add component and E2E tests
+  - author: mcp-client
+    timestamp: "2026-01-28T06:33:43.065Z"
+    text: |-
+      ## Implementation Complete
+
+      ### Files Created/Modified
+
+      **API Changes:**
+      - `packages/web/app/lib/api.ts` - Added shipping types and shippingApi
+
+      **Components Created:**
+      - `packages/web/app/components/checkout/ShippingSelector.tsx` (290 lines)
+        - Fetches shipping options from API
+        - Displays carrier icons, delivery estimates, pricing
+        - Shows free shipping progress/threshold
+        - Highlights fastest/cheapest options
+        - Error handling with retry
+
+      **Checkout Integration:**
+      - `packages/web/app/routes/checkout/index.tsx`
+        - Removed hardcoded DELIVERY_OPTIONS
+        - Integrated ShippingSelector component
+        - Updated state management for selected shipping option
+        - Updated order data building
+
+      **Tests Created:**
+      - `packages/web/tests/components/checkout/ShippingSelector.test.tsx` (19 tests)
+        - Loading state, options rendering, selection
+        - Badges, free shipping progress
+        - Error handling, API integration
+
+      ### Features Implemented
+      - Dynamic shipping options from API
+      - Estimated delivery date calculation (excludes weekends)
+      - Free shipping threshold progress bar
+      - Fastest/cheapest option badges
+      - Carrier icons (Truck for standard, Zap for express)
+
+      ### E2E Tests
+      Existing E2E tests reference hardcoded options. Will update in ticket #44 (Tests) to work with dynamic API data.
+
+      ### Test Results
+      - Component tests: 19/19 passing
+      - TypeScript: No errors in shipping components
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -101,3 +156,4 @@ blocked_by:
 blocks:
   - 44
 attachments: []
+started: "2026-01-28T06:26:37.149Z"

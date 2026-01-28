@@ -93,7 +93,10 @@ export interface OrderInput {
     postalCode: string;
     countryCode?: string;
   };
+  /** Legacy field for backward compatibility */
   shippingMethod?: "standard" | "express";
+  /** New shipping option ID from shipping API */
+  shippingOptionId?: string;
   customerNotes?: string;
   couponCode?: string;
 }
@@ -1226,6 +1229,129 @@ export const walletApi = {
 };
 
 // ============================================================================
+// Shipping Types
+// ============================================================================
+
+/**
+ * Shipping option from the API
+ */
+export interface ShippingOption {
+  id: string;
+  name: string;
+  carrier: string;
+  description: string | null;
+  baseCost: string;
+  estimatedDaysMin: number;
+  estimatedDaysMax: number;
+  sortOrder: number;
+}
+
+/**
+ * Shipping options list response
+ */
+export interface ShippingOptionsResponse {
+  options: ShippingOption[];
+  fromCache: boolean;
+}
+
+/**
+ * Shipping estimate parameters
+ */
+export interface ShippingEstimateParams {
+  cartTotal: number;
+  zipCode?: string;
+}
+
+/**
+ * Shipping estimate response
+ */
+export interface ShippingEstimateResponse {
+  options: Array<{
+    id: string;
+    name: string;
+    carrier: string;
+    baseCost: string;
+    finalCost: number;
+    estimatedDaysMin: number;
+    estimatedDaysMax: number;
+    isFree: boolean;
+  }>;
+  freeShippingThreshold: number;
+  qualifiesForFreeShipping: boolean;
+  cartTotal: number;
+}
+
+/**
+ * Shipping API
+ */
+export const shippingApi = {
+  /**
+   * Get active shipping options
+   */
+  async getOptions(): Promise<ShippingOptionsResponse> {
+    const response = await fetch(`${getApiUrl()}/api/shipping/options`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch shipping options");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get a single shipping option by ID
+   */
+  async getOptionById(id: string): Promise<{ option: ShippingOption }> {
+    const response = await fetch(`${getApiUrl()}/api/shipping/options/${id}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch shipping option");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get shipping cost estimate for cart
+   */
+  async getEstimate(params: ShippingEstimateParams): Promise<ShippingEstimateResponse> {
+    const queryParams = new URLSearchParams({
+      cartTotal: String(params.cartTotal),
+    });
+
+    if (params.zipCode) {
+      queryParams.append("zipCode", params.zipCode);
+    }
+
+    const response = await fetch(`${getApiUrl()}/api/shipping/estimate?${queryParams}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to estimate shipping");
+    }
+
+    return response.json();
+  },
+};
+
+// ============================================================================
 // Combined API Object (for convenience)
 // ============================================================================
 
@@ -1243,6 +1369,9 @@ export const walletApi = {
  *
  * // Create order
  * await api.orders.create({ shippingAddress: {...} });
+ *
+ * // Get shipping options
+ * const shipping = await api.shipping.getEstimate({ cartTotal: 2500 });
  */
 export const api = {
   products: productsApi,
@@ -1252,6 +1381,7 @@ export const api = {
   auth: authApi,
   health: healthApi,
   wallet: walletApi,
+  shipping: shippingApi,
 };
 
 export default api;
