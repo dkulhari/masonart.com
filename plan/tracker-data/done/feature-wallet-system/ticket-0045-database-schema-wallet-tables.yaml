@@ -1,0 +1,74 @@
+ticket_number: 45
+title: Database Schema - Wallet Tables
+description: |-
+  Database schema for wallet system with transaction tracking and pricing configuration.
+
+  ## Implementation Details
+
+  ### Schema Location
+  `packages/api/src/database/schema/wallet.ts`
+
+  ### Tables Created
+
+  **wallet_transactions table:**
+  - id: uuid (primary key)
+  - userId: uuid (FK to users)
+  - type: transaction_type enum
+  - amountPaise: integer
+  - balanceAfterPaise: integer
+  - description: text
+  - referenceId: varchar (nullable)
+  - createdAt: timestamp
+
+  **wallet_pricing_config table:**
+  - id: uuid (primary key)
+  - modelId: varchar
+  - baseCostUsdCents: integer
+  - markupPercentage: integer
+  - isActive: boolean
+  - createdAt, updatedAt
+
+  ### User Table Extensions
+  - walletBalancePaise: integer (default 0)
+  - freeGenerationsRemaining: integer (default 3)
+
+  ### Enums
+  - transaction_type: 'topup', 'generation', 'refund', 'admin_credit', 'admin_debit'
+
+  ## Commit
+  `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+feature: wallet-system
+type: task
+priority: high
+status: done
+assignee: claude
+reporter: cli
+created: "2026-01-26T01:40:35.000Z"
+last_updated: "2026-01-26T01:40:35.000Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+  - drizzle
+acceptance_criteria:
+  - wallet_transactions table created
+  - wallet_pricing_config table created
+  - User wallet fields added
+  - Enums defined
+  - Types exported
+comments:
+  - author: claude
+    timestamp: "2026-01-26T01:40:35.000Z"
+    text: |-
+      **Commit:** `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+
+      Implemented as part of Phase 1 of the wallet feature.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks:
+  - 46
+  - 47
+  - 48
+attachments: []
+completed: "2026-01-26T01:40:35.000Z"

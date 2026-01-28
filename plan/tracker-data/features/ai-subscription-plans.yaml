@@ -1,0 +1,40 @@
+name: ai-subscription-plans
+title: Ai Subscription Plans
+priority: low
+created: '2026-01-28T07:46:54.686Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Subscription model for AI generator with monthly plans offering unlimited generations, API access for developers, and exclusive features for subscribers.
+
+  ## Objectives
+  - Monthly subscription plan (₹999/month)
+  - Unlimited generations for subscribers
+  - No watermarks on previews
+  - Priority queue placement
+  - API access for developers
+  - Cancel anytime
+  - Razorpay subscription integration
+  - Subscription management in dashboard
+
+  ## Source
+  Roadmap Feature 33 (Phase 4)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

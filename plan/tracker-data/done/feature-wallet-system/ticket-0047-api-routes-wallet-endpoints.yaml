@@ -1,0 +1,70 @@
+ticket_number: 47
+title: API Routes - Wallet Endpoints
+description: |-
+  API routes for wallet operations, webhooks, and admin configuration.
+
+  ## Implementation Details
+
+  ### Routes Created
+
+  **routes/wallet.ts:**
+  - GET /api/wallet/balance - Get current wallet balance
+  - GET /api/wallet/transactions - Get transaction history
+  - POST /api/wallet/topup - Initiate Razorpay top-up
+  - GET /api/wallet/cost-estimate - Get AI generation cost preview
+
+  **routes/webhooks/wallet.ts:**
+  - POST /api/webhooks/wallet - Razorpay payment confirmation webhook
+  - Verifies signature and credits wallet
+
+  **routes/admin/wallet-config.ts:**
+  - GET /api/admin/wallet/config - Get pricing configuration
+  - PUT /api/admin/wallet/config - Update pricing/markup
+
+  ### Modified Routes
+  - routes/ai.ts: Integrated wallet payment in generation flow
+  - queues/ai-generation.ts: Added automatic refund on generation failure
+
+  ## Files
+  - packages/api/src/routes/wallet.ts
+  - packages/api/src/routes/webhooks/wallet.ts
+  - packages/api/src/routes/admin/wallet-config.ts
+
+  ## Commit
+  `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+feature: wallet-system
+type: task
+priority: high
+status: done
+assignee: claude
+reporter: cli
+created: "2026-01-26T01:40:35.000Z"
+last_updated: "2026-01-26T01:40:35.000Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - routes
+acceptance_criteria:
+  - Wallet balance endpoint
+  - Transaction history endpoint
+  - Top-up with Razorpay
+  - Webhook for payment confirmation
+  - Admin pricing configuration
+  - Automatic refund on failure
+comments:
+  - author: claude
+    timestamp: "2026-01-26T01:40:35.000Z"
+    text: |-
+      **Commit:** `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+
+      Implemented as part of Phase 3 of the wallet feature.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 45
+  - 46
+blocks:
+  - 48
+attachments: []
+completed: "2026-01-26T01:40:35.000Z"

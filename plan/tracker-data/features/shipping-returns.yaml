@@ -28,8 +28,7 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo:
-    "36": Database Schema - Shipping and Returns Tables
+  todo: {}
   in_progress: {}
   done:
     "36": Database Schema - Shipping and Returns Tables
@@ -41,6 +40,6 @@ tickets:
     "42": Frontend - Return Request Flow
     "43": Admin Panel - Returns Management Dashboard
     "44": Tests - Unit and E2E Test Suite
-total_tickets: 10
-completion_percentage: 90
-is_completed: false
+total_tickets: 9
+completion_percentage: 100
+is_completed: true

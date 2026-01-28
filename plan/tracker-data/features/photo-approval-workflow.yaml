@@ -1,0 +1,41 @@
+name: photo-approval-workflow
+title: Photo Approval Workflow
+priority: high
+created: '2026-01-28T07:45:53.283Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Production photo/video approval system for made-to-order items. Customers receive production photos, can zoom/review, request adjustments, or approve for shipping with timeline visibility.
+
+  ## Objectives
+  - Admin uploads production photos/video for order
+  - Customer receives email with approval link
+  - Full-screen photo view with zoom
+  - Request changes with comments
+  - Approve for shipping button
+  - Timeline showing production → approval → shipped
+  - Admin dashboard for pending approvals
+  - Deadline reminder if no action taken
+  - Approval history logged
+
+  ## Source
+  Roadmap Feature 16 (Phase 2)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

@@ -1,0 +1,43 @@
+name: advanced-search
+title: Advanced Search
+priority: medium
+created: '2026-01-28T07:45:55.398Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Implement Algolia or Elasticsearch-powered search with autocomplete, typo tolerance, faceted search, and search analytics to understand user intent.
+
+  ## Objectives
+  - Search bar with autocomplete
+  - Results appear as user types
+  - Typo tolerance and fuzzy matching
+  - Search by product name, artist, style
+  - Faceted search with filter counts
+  - Recent searches for logged-in users
+  - No results page with suggestions
+  - Search analytics dashboard in admin
+
+  ## Implementation Status
+  Basic search implemented - may need enhancement with dedicated search service
+
+  ## Source
+  Roadmap Feature 20 (Phase 2)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

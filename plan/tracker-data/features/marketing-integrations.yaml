@@ -1,0 +1,40 @@
+name: marketing-integrations
+title: Marketing Integrations
+priority: medium
+created: '2026-01-28T07:46:29.890Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Integrate Google Analytics 4, Google Search Console, Facebook Pixel, and Google Merchant Center for comprehensive marketing attribution and Shopping ads.
+
+  ## Objectives
+  - GA4 with e-commerce tracking
+  - Enhanced conversion tracking
+  - Google Search Console verified
+  - Facebook Pixel with catalog sync
+  - Google Merchant Center feed
+  - Automatic product feed updates
+  - Server-side tracking option
+  - UTM parameter tracking
+
+  ## Source
+  Roadmap Feature 27 (Phase 3)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

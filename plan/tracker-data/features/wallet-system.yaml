@@ -1,0 +1,55 @@
+name: wallet-system
+title: Wallet System
+priority: medium
+created: '2026-01-26T01:40:35.000Z'
+assignee: claude
+tags:
+  - payments
+  - ai-generation
+description: |-
+  ## Overview
+  Digital wallet system for storing credits, making payments, and managing transactions within the platform.
+
+  ## Objectives
+  - Wallet balance display in account
+  - Top-up wallet via Razorpay
+  - Pay for AI generations using wallet balance
+  - Transaction history
+  - Automatic refunds on failed generations
+  - Admin can configure pricing and markup
+
+  ## Key Features
+  - 3 free AI generations for new users
+  - Real-time cost preview before generation
+  - Razorpay integration for wallet top-ups
+  - Live USD/INR exchange rate with 1-hour cache
+  - Configurable markup percentage on API costs
+
+  ## Implementation
+  Fully implemented with commits:
+  - `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+  - `d4976c6a` test(wallet): Add unit tests and E2E tests for wallet system
+objectives:
+  - Wallet balance display in account
+  - Top-up wallet via Razorpay
+  - Pay for AI generations using wallet balance
+  - Transaction history
+  - Automatic refunds on failed generations
+  - Admin pricing configuration
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    45: 'Database Schema - Wallet Tables'
+    46: 'Backend Services - Wallet Core Functions'
+    47: 'API Routes - Wallet Endpoints'
+    48: 'Frontend - Wallet UI Components'
+    49: 'Tests - Unit and E2E Test Suite'
+total_tickets: 5
+completion_percentage: 100
+is_completed: true

@@ -1,0 +1,41 @@
+name: room-visualization
+title: Room Visualization
+priority: low
+created: '2026-01-28T07:46:30.704Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Upload room photo or use templates, drag and position poster, adjust size to real-world scale, and save/share visualization. AR preview using device camera as Phase 2.
+
+  ## Objectives
+  - Upload room photo functionality
+  - Pre-set room templates to choose from
+  - Drag and drop poster positioning
+  - Size slider for real-world scale
+  - Shadow/lighting simulation
+  - Save visualization to account
+  - Share via link or social
+  - AR camera preview (mobile only)
+  - Works with all product/frame combinations
+
+  ## Source
+  Roadmap Feature 28 (Phase 4)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

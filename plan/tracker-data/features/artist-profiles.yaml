@@ -1,0 +1,40 @@
+name: artist-profiles
+title: Artist Profiles
+priority: medium
+created: '2026-01-28T07:46:25.476Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Artist/designer profile pages with bio, portfolio gallery, social links, 'Follow Artist' functionality, and 'From This Artist' sections on product pages.
+
+  ## Objectives
+  - Artist profile page with photo and bio
+  - Portfolio gallery of all artworks
+  - Social media links
+  - Follow artist button
+  - New artwork notification for followers
+  - Artist snippet on product pages
+  - Artists index page
+  - SEO-optimized artist URLs (/artists/name)
+
+  ## Source
+  Roadmap Feature 22 (Phase 3)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

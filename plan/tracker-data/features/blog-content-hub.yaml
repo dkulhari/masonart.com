@@ -1,0 +1,41 @@
+name: blog-content-hub
+title: Blog Content Hub
+priority: medium
+created: '2026-01-28T07:46:28.398Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Blog with SEO-optimized articles on interior design, style guides, how-tos, and trends. CMS integration for easy content management and category organization.
+
+  ## Objectives
+  - Blog listing page with categories
+  - Individual post pages with rich formatting
+  - Author attribution
+  - Related posts suggestions
+  - Social sharing buttons
+  - SEO meta fields per post
+  - Admin CMS for post management
+  - Image optimization for blog images
+  - Internal linking to products
+
+  ## Source
+  Roadmap Feature 25 (Phase 3)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

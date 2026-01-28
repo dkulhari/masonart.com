@@ -1,0 +1,41 @@
+name: analytics-dashboard
+title: Analytics Dashboard
+priority: medium
+created: '2026-01-28T07:46:28.903Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Admin analytics dashboard with sales trends, product performance, traffic analytics, conversion funnels, AI generator usage, and customer acquisition metrics.
+
+  ## Objectives
+  - Sales dashboard with daily/weekly/monthly views
+  - Revenue charts and trends
+  - Top-selling products report
+  - Conversion funnel visualization
+  - AI generator usage statistics
+  - Customer acquisition sources
+  - Geographic distribution map
+  - Cohort analysis for retention
+  - Export to CSV/Excel
+
+  ## Source
+  Roadmap Feature 26 (Phase 3)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

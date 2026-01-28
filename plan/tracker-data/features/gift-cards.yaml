@@ -1,0 +1,40 @@
+name: gift-cards
+title: Gift Cards
+priority: low
+created: '2026-01-28T07:46:31.374Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Digital gift cards with custom amounts, gift wrapping option at checkout, and gift messaging for recipients.
+
+  ## Objectives
+  - Gift card purchase with custom amount
+  - Delivery by email on chosen date
+  - Personalized message
+  - Gift card redemption at checkout
+  - Balance tracking in account
+  - Gift wrapping option per item
+  - Premium gift wrapping tier
+  - Gift message card included
+
+  ## Source
+  Roadmap Feature 29 (Phase 4)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

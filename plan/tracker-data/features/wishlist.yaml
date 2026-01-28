@@ -1,0 +1,43 @@
+name: wishlist
+title: Wishlist
+priority: medium
+created: '2026-01-28T07:45:54.375Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Save products to wishlist for later purchase. Include wishlist page, quick add from product cards, move to cart functionality, and back-in-stock notifications.
+
+  ## Objectives
+  - Heart icon to add to wishlist
+  - Wishlist page in user dashboard
+  - Move to cart button
+  - Remove from wishlist
+  - Share wishlist via link
+  - Back-in-stock email notification
+  - Price drop notification option
+  - Guest wishlist stored in localStorage
+
+  ## Implementation Status
+  Partial - DB field exists (wishlistProductIds in users table), but API endpoints missing
+
+  ## Source
+  Roadmap Feature 19 (Phase 2)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

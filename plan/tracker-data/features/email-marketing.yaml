@@ -1,0 +1,40 @@
+name: email-marketing
+title: Email Marketing
+priority: medium
+created: '2026-01-28T07:45:56.606Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Integrate with email marketing platform (Klaviyo/Resend) for automated email flows: welcome series, abandoned cart, post-purchase, and re-engagement campaigns.
+
+  ## Objectives
+  - Email marketing platform integration
+  - Welcome email series (3 emails)
+  - Abandoned cart recovery (1hr, 24hr, 72hr)
+  - Post-purchase thank you email
+  - Review request email (7 days post-delivery)
+  - Back-in-stock notifications
+  - Newsletter subscription opt-in
+  - Email template customization in admin
+
+  ## Source
+  Roadmap Feature 21 (Phase 2)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

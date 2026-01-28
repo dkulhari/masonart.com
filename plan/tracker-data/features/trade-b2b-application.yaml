@@ -1,0 +1,39 @@
+name: trade-b2b-application
+title: Trade B2b Application
+priority: medium
+created: '2026-01-28T07:46:26.086Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Trade program application form for interior designers and businesses with business verification, account manager assignment, and trade pricing toggle once approved.
+
+  ## Objectives
+  - Trade application form with business details
+  - Business verification workflow in admin
+  - Automatic email on approval/rejection
+  - Trade pricing toggle in user session
+  - 20-30% trade discount applied automatically
+  - Trade badge on account
+  - Admin can manage trade accounts
+
+  ## Source
+  Roadmap Feature 23 (Phase 3)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

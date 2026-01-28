@@ -1,5 +1,5 @@
 ticket_number: 28
-title: 'Database Schema - Reviews Table'
+title: Database Schema - Reviews Table
 description: |-
   Create database schema for product reviews using Drizzle ORM patterns.
 
@@ -76,20 +76,20 @@ commit: a3d9002b
 assignee: claude
 reporter: cli
 created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T02:02:00.000Z'
+last_updated: '2026-01-28T08:13:54.506Z'
 time_spent_minutes: 30
 labels:
   - database
   - schema
   - drizzle
 acceptance_criteria:
-  - "[x] Schema file created with proper Drizzle patterns"
-  - "[x] Enum for review status defined"
-  - "[x] All indexes created for query optimization"
-  - "[x] Relations properly configured"
-  - "[x] Types exported for use in API"
-  - "[x] Unit tests written and passing (21 tests)"
-  - "[ ] Migration generated and tested (deferred - using test table creation)"
+  - '[x] Schema file created with proper Drizzle patterns'
+  - '[x] Enum for review status defined'
+  - '[x] All indexes created for query optimization'
+  - '[x] Relations properly configured'
+  - '[x] Types exported for use in API'
+  - '[x] Unit tests written and passing (21 tests)'
+  - '[ ] Migration generated and tested (deferred - using test table creation)'
 comments:
   - author: claude
     timestamp: '2026-01-28T01:50:00.000Z'
@@ -126,6 +126,12 @@ comments:
       - Updated setup.ts fallback URL
       - Created dbTest wrapper to handle runtime DB availability checks
       (vitest's skipIf evaluates at test definition time, not runtime)
+  - author: system
+    timestamp: '2026-01-28T08:13:37.451Z'
+    text: Status changed from 'done' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-28T08:13:54.507Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -133,3 +139,4 @@ blocks:
   - 29
   - 30
 attachments: []
+started: '2026-01-28T08:13:37.448Z'

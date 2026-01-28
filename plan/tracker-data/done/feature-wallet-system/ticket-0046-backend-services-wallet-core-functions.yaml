@@ -1,0 +1,68 @@
+ticket_number: 46
+title: Backend Services - Wallet Core Functions
+description: |-
+  Core backend services for wallet operations including exchange rates and wallet management.
+
+  ## Implementation Details
+
+  ### Files Created
+
+  **services/exchange-rate.ts:**
+  - Live USD/INR exchange rate fetching
+  - 1-hour Redis cache for rate data
+  - USD cents to INR paise conversion
+  - Conversion formula with configurable markup
+
+  **services/wallet.ts:**
+  - getWalletBalance(): Get user's current balance
+  - calculateGenerationCost(): Calculate cost for AI generation
+  - processPayment(): Deduct from wallet for generation
+  - processRefund(): Refund on failed generation
+  - createTransaction(): Log wallet transactions
+
+  **middleware/wallet.ts:**
+  - requireSufficientFunds: Middleware to verify balance before AI generation
+  - Handles free generation credits
+  - Returns cost preview in response
+
+  ## Files
+  - packages/api/src/services/exchange-rate.ts
+  - packages/api/src/services/wallet.ts
+  - packages/api/src/middleware/wallet.ts
+
+  ## Commit
+  `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+feature: wallet-system
+type: task
+priority: high
+status: done
+assignee: claude
+reporter: cli
+created: "2026-01-26T01:40:35.000Z"
+last_updated: "2026-01-26T01:40:35.000Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - services
+  - middleware
+acceptance_criteria:
+  - Exchange rate service implemented
+  - Wallet service with all core functions
+  - Payment verification middleware
+  - Redis caching for exchange rates
+comments:
+  - author: claude
+    timestamp: "2026-01-26T01:40:35.000Z"
+    text: |-
+      **Commit:** `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+
+      Implemented as part of Phase 2 of the wallet feature.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 45
+blocks:
+  - 47
+  - 48
+attachments: []
+completed: "2026-01-26T01:40:35.000Z"

@@ -1,0 +1,42 @@
+name: multi-currency
+title: Multi Currency
+priority: low
+created: '2026-01-28T07:46:51.284Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Support for multiple currencies (INR, USD, EUR, GBP) with automatic currency detection based on location and manual currency selector.
+
+  ## Objectives
+  - Currency selector in header
+  - Auto-detect based on IP location
+  - Store currency preference in session
+  - All prices convert accurately
+  - Checkout in selected currency
+  - Currency exchange rate management
+  - Admin can set base prices per currency
+
+  ## Implementation Status
+  Partial - Structure exists in codebase, not fully implemented
+
+  ## Source
+  Roadmap Feature 31 (Phase 4)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

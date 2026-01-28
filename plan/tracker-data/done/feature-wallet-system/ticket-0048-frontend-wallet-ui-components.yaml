@@ -1,0 +1,73 @@
+ticket_number: 48
+title: Frontend - Wallet UI Components
+description: |-
+  Frontend components for wallet management and AI generation payment flow.
+
+  ## Implementation Details
+
+  ### Components Created
+
+  **components/wallet/AddFundsButton.tsx:**
+  - Reusable Razorpay top-up button
+  - Configurable amounts
+  - Loading and error states
+
+  **routes/_authed/account/wallet.tsx:**
+  - Full wallet management page
+  - Current balance display
+  - Transaction history table
+  - Top-up form with amount selection
+
+  ### Modified Components
+  - account/index.tsx: Added wallet quick action card with balance
+  - create/index.tsx: Added cost preview, free generation badge, insufficient balance warning
+  - lib/api.ts: Added wallet API client with TypeScript types
+
+  ## Key Features
+  - 3 free AI generations for new users (displayed as badge)
+  - Real-time cost preview before generation
+  - Razorpay integration for wallet top-ups
+  - Insufficient balance warning with top-up prompt
+
+  ## Files
+  - packages/web/app/components/wallet/AddFundsButton.tsx
+  - packages/web/app/routes/_authed/account/wallet.tsx
+
+  ## Commit
+  `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+feature: wallet-system
+type: task
+priority: high
+status: done
+assignee: claude
+reporter: cli
+created: "2026-01-26T01:40:35.000Z"
+last_updated: "2026-01-26T01:40:35.000Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - components
+  - ui
+acceptance_criteria:
+  - Wallet page with balance and transactions
+  - Add funds button with Razorpay
+  - Cost preview on AI generator
+  - Free generations badge
+  - Insufficient balance warning
+comments:
+  - author: claude
+    timestamp: "2026-01-26T01:40:35.000Z"
+    text: |-
+      **Commit:** `ff508f54` feat(wallet): Add wallet-based payment system for AI image generation
+
+      Implemented as part of Phase 4 of the wallet feature.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 45
+  - 46
+  - 47
+blocks:
+  - 49
+attachments: []
+completed: "2026-01-26T01:40:35.000Z"

@@ -1,0 +1,40 @@
+name: international-shipping
+title: International Shipping
+priority: low
+created: '2026-01-28T07:46:53.471Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  International shipping with DHL/FedEx integration, customs documentation, and shipping zones with tiered pricing.
+
+  ## Objectives
+  - DHL/FedEx API integration
+  - Shipping rate calculation by zone
+  - Customs declaration generation
+  - HS codes for art products
+  - Duties/taxes estimation
+  - International tracking
+  - Delivery timeframe estimation
+  - Country restrictions management
+
+  ## Source
+  Roadmap Feature 32 (Phase 4)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

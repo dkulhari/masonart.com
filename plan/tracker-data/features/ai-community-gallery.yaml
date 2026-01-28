@@ -1,0 +1,40 @@
+name: ai-community-gallery
+title: Ai Community Gallery
+priority: high
+created: '2026-01-28T07:45:52.582Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Public gallery showcasing AI-generated posters purchased by users (with permission). Include 'Create Similar' button, top-rated designs, featured creations, and basic user profiles for creators.
+
+  ## Objectives
+  - Gallery grid with purchased AI creations
+  - Opt-in permission during checkout
+  - 'Create Similar' opens generator with prompt
+  - Like/favorite functionality
+  - Top-rated and trending sections
+  - Weekly/monthly featured creations
+  - Basic creator profiles
+  - Filter by style and color
+
+  ## Source
+  Roadmap Feature 15 (Phase 2)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

@@ -1,0 +1,40 @@
+name: image-cdn-storage
+title: Image Cdn Storage
+priority: high
+created: '2026-01-28T07:45:49.511Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Set up Cloudflare R2 or AWS S3 for product image storage with automatic optimization, WebP/AVIF conversion, and responsive srcset generation. Include image upload pipeline for admin.
+
+  ## Objectives
+  - Images served from CDN with global edge caching
+  - Automatic WebP/AVIF conversion
+  - Multiple size variants generated (thumbnail, medium, large)
+  - Responsive srcset for optimal loading
+  - Image upload API for admin panel
+  - Lazy loading for below-fold images
+  - Blur placeholder for loading state
+  - LCP consistently < 2.5s for product pages
+
+  ## Source
+  Roadmap Feature 8 (Phase 1)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

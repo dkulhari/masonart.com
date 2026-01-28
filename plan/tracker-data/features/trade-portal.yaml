@@ -1,0 +1,40 @@
+name: trade-portal
+title: Trade Portal
+priority: medium
+created: '2026-01-28T07:46:27.580Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Enhanced trade portal with project folders, bulk ordering, quote generator, high-res image downloads for presentations, and Net 30 payment terms.
+
+  ## Objectives
+  - Create project folders/boards
+  - Add products to projects
+  - Generate quotes with custom discounts
+  - Download high-res product images
+  - Bulk order with quantity discounts
+  - Net 30 payment terms option
+  - Invoice generation and tracking
+  - Project sharing with clients
+
+  ## Source
+  Roadmap Feature 24 (Phase 3)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

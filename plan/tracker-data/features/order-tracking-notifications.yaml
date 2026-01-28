@@ -1,0 +1,39 @@
+name: order-tracking-notifications
+title: Order Tracking Notifications
+priority: high
+created: '2026-01-28T07:45:50.773Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Order tracking page showing status timeline, basic email notifications for order confirmation and shipping, and SMS notifications for key updates.
+
+  ## Objectives
+  - Order tracking page with status timeline
+  - Email notification on order confirmation
+  - Email notification when shipped with tracking link
+  - SMS notification on order confirmation
+  - SMS notification when out for delivery
+  - Guest order lookup by order ID and email
+  - Integration with shipping provider tracking
+
+  ## Source
+  Roadmap Feature 11 (Phase 1)
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false
