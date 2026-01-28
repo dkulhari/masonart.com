@@ -1,5 +1,5 @@
 ticket_number: 38
-title: 'API Routes - Order Shipments & Tracking'
+title: API Routes - Order Shipments & Tracking
 description: |-
   Create API endpoints for order shipment management and tracking.
 
@@ -99,11 +99,11 @@ description: |-
 feature: shipping-returns
 type: task
 priority: high
-status: todo
+status: in-progress
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T00:10:00.000Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:09:31.813Z"
 time_spent_minutes: 0
 labels:
   - api
@@ -115,7 +115,59 @@ acceptance_criteria:
   - Tracking information accessible
   - Order status synced with shipment
   - Unit tests passing
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-01-28T06:09:31.814Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-01-28T06:09:40.892Z"
+    text: |-
+      Starting implementation. Plan:
+
+      1. Create packages/api/src/routes/shipments.ts - Public endpoints:
+         - GET /api/orders/:orderId/shipments - Get shipments (order owner)
+         - GET /api/shipments/:id/track - Get tracking info (order owner)
+
+      2. Create packages/api/src/routes/admin/shipments.ts - Admin endpoints:
+         - GET /api/admin/shipments - List all with filters
+         - POST /api/admin/orders/:orderId/ship - Create shipment
+         - PATCH /api/admin/shipments/:id - Update shipment
+         - POST /api/admin/shipments/:id/mark-delivered - Mark delivered
+
+      3. Need to check orders schema for status field integration
+
+      Analyzing existing orders schema first.
+  - author: mcp-client
+    timestamp: "2026-01-28T06:13:28.477Z"
+    text: |-
+      Implementation completed. All tests passing (59/59).
+
+      Created files:
+      1. packages/api/src/routes/shipments.ts - Public endpoints:
+         - GET /api/orders/:orderId/shipments - Get shipments (order owner only)
+         - GET /api/shipments/:id/track - Get tracking with timeline
+         - Helper: generateTrackingUrl for 8 carriers (USPS, FedEx, UPS, DHL, Delhivery, BlueDart, DTDC, Shiprocket)
+         - Helper: generateTrackingTimeline for visual tracking progress
+
+      2. packages/api/src/routes/admin/shipments.ts - Admin endpoints:
+         - GET /api/admin/shipments - List with filters (status, orderId, dateFrom, dateTo)
+         - GET /api/admin/shipments/:id - Get shipment details
+         - POST /api/admin/orders/:orderId/ship - Create shipment
+         - PATCH /api/admin/shipments/:id - Update shipment with auto-status sync
+         - POST /api/admin/shipments/:id/mark-delivered - Mark delivered
+
+      3. Updated packages/api/src/index.ts to register routes
+
+      4. Created tests:
+         - tests/routes/shipments.test.ts (27 tests)
+         - tests/routes/admin/shipments.test.ts (32 tests)
+
+      Features implemented:
+      - Auto-generate tracking URLs for common carriers
+      - Tracking timeline with status steps
+      - Order status synced with shipment status
+      - Order ownership validation
+      - Date range filtering for admin
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -123,3 +175,4 @@ blocked_by:
 blocks:
   - 41
 attachments: []
+started: "2026-01-28T06:09:31.813Z"
