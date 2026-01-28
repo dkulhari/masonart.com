@@ -1,5 +1,5 @@
 ticket_number: 37
-title: 'API Routes - Shipping Options Endpoints'
+title: API Routes - Shipping Options Endpoints
 description: |-
   Create API endpoints for managing shipping options.
 
@@ -90,11 +90,11 @@ description: |-
 feature: shipping-returns
 type: task
 priority: high
-status: todo
+status: in-progress
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T00:10:00.000Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:04:46.478Z"
 time_spent_minutes: 0
 labels:
   - api
@@ -106,7 +106,59 @@ acceptance_criteria:
   - Cost estimation endpoint
   - Redis caching implemented
   - Unit tests passing
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-01-28T06:04:46.479Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-01-28T06:04:52.973Z"
+    text: |-
+      Starting implementation. Plan:
+
+      1. Create packages/api/src/routes/shipping.ts with public endpoints:
+         - GET /api/shipping/options - List active options
+         - GET /api/shipping/options/:id - Get single option
+         - GET /api/shipping/estimate - Estimate shipping cost
+
+      2. Create packages/api/src/routes/admin/shipping.ts with admin endpoints:
+         - GET /api/admin/shipping/options - List all (including inactive)
+         - POST /api/admin/shipping/options - Create new option
+         - PATCH /api/admin/shipping/options/:id - Update option
+         - DELETE /api/admin/shipping/options/:id - Soft delete
+
+      3. Write unit tests in packages/api/tests/routes/shipping.test.ts
+
+      First, analyzing existing route patterns in the codebase.
+  - author: mcp-client
+    timestamp: "2026-01-28T06:08:59.557Z"
+    text: |-
+      Implementation completed. All tests passing (70/70).
+
+      Created files:
+      1. packages/api/src/routes/shipping.ts - Public endpoints:
+         - GET /api/shipping/options - List active options (cached 1hr)
+         - GET /api/shipping/options/:id - Get single option
+         - GET /api/shipping/estimate - Estimate costs with free shipping threshold
+
+      2. packages/api/src/routes/admin/shipping.ts - Admin endpoints:
+         - GET /api/admin/shipping/options - List all (with pagination, sorting)
+         - POST /api/admin/shipping/options - Create new option
+         - GET /api/admin/shipping/options/:id - Get single option (admin)
+         - PATCH /api/admin/shipping/options/:id - Update option
+         - DELETE /api/admin/shipping/options/:id - Soft delete (deactivate)
+
+      3. Updated packages/api/src/index.ts to register routes
+
+      4. Created tests:
+         - tests/routes/shipping.test.ts (35 tests)
+         - tests/routes/admin/shipping.test.ts (35 tests)
+
+      Features implemented:
+      - Redis caching with 1-hour TTL
+      - Free shipping threshold logic (₹1000)
+      - Estimated delivery date calculation
+      - Input validation with Zod
+      - Proper error handling
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -114,3 +166,4 @@ blocked_by:
 blocks:
   - 40
 attachments: []
+started: "2026-01-28T06:04:46.478Z"

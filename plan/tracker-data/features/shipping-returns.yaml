@@ -30,7 +30,6 @@ work_session_summary:
 tickets:
   todo:
     "36": Database Schema - Shipping and Returns Tables
-    "37": API Routes - Shipping Options Endpoints
     "38": API Routes - Order Shipments & Tracking
     "39": API Routes - Return Requests
     "40": Frontend - Checkout Shipping Selection
@@ -38,7 +37,8 @@ tickets:
     "42": Frontend - Return Request Flow
     "43": Admin Panel - Returns Management Dashboard
     "44": Tests - Unit and E2E Test Suite
-  in_progress: {}
+  in_progress:
+    "37": API Routes - Shipping Options Endpoints
   done:
     "36": Database Schema - Shipping and Returns Tables
 total_tickets: 10

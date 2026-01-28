@@ -16,7 +16,9 @@ import { adminProductsApp } from "./routes/admin/products";
 import { adminOrdersApp } from "./routes/admin/orders";
 import { adminWalletConfigApp } from "./routes/admin/wallet-config";
 import { adminReviewsApp } from "./routes/admin/reviews";
+import { adminShippingApp } from "./routes/admin/shipping";
 import { sitemapApp } from "./routes/sitemap";
+import { shippingApp } from "./routes/shipping";
 import {
   productReviewsApp,
   createReviewApp,
@@ -76,6 +78,9 @@ app.route("/api/products/:productId/reviews", createReviewApp);
 app.route("/api/reviews", reviewsApp);
 app.route("/api/reviews", protectedReviewsApp);
 
+// Shipping API - shipping options and cost estimation
+app.route("/api/shipping", shippingApp);
+
 // ============================================================================
 // Admin API Routes (Protected with role-based access)
 // ============================================================================
@@ -91,6 +96,9 @@ app.route("/api/admin/wallet-config", adminWalletConfigApp);
 
 // Admin Reviews API - moderation
 app.route("/api/admin/reviews", adminReviewsApp);
+
+// Admin Shipping API - shipping option management
+app.route("/api/admin/shipping", adminShippingApp);
 
 // ============================================================================
 // Webhook Routes (External Service Callbacks)
