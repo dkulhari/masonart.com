@@ -32,6 +32,8 @@ import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
 import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
 import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
 import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
+import { Route as AuthedAccountOrdersIdRouteImport } from './routes/_authed/account/orders.$id'
+import { Route as AuthedAccountOrdersIdReturnRouteImport } from './routes/_authed/account/orders.$id.return'
 
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
@@ -148,6 +150,17 @@ const AuthedAccountAiCreationsRoute =
     path: '/account/ai-creations',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAccountOrdersIdRoute = AuthedAccountOrdersIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthedAccountOrdersRoute,
+} as any)
+const AuthedAccountOrdersIdReturnRoute =
+  AuthedAccountOrdersIdReturnRouteImport.update({
+    id: '/return',
+    path: '/return',
+    getParentRoute: () => AuthedAccountOrdersIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -164,7 +177,7 @@ export interface FileRoutesByFullPath {
   '/gallery': typeof GalleryIndexRoute
   '/posters': typeof PostersIndexRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
-  '/account/orders': typeof AuthedAccountOrdersRoute
+  '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
@@ -172,6 +185,8 @@ export interface FileRoutesByFullPath {
   '/account': typeof AuthedAccountIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
+  '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
+  '/account/orders/$id/return': typeof AuthedAccountOrdersIdReturnRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -187,7 +202,7 @@ export interface FileRoutesByTo {
   '/gallery': typeof GalleryIndexRoute
   '/posters': typeof PostersIndexRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
-  '/account/orders': typeof AuthedAccountOrdersRoute
+  '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
@@ -195,6 +210,8 @@ export interface FileRoutesByTo {
   '/account': typeof AuthedAccountIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
+  '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
+  '/account/orders/$id/return': typeof AuthedAccountOrdersIdReturnRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -213,7 +230,7 @@ export interface FileRoutesById {
   '/gallery/': typeof GalleryIndexRoute
   '/posters/': typeof PostersIndexRoute
   '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
-  '/_authed/account/orders': typeof AuthedAccountOrdersRoute
+  '/_authed/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/_authed/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
@@ -221,6 +238,8 @@ export interface FileRoutesById {
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
+  '/_authed/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
+  '/_authed/account/orders/$id/return': typeof AuthedAccountOrdersIdReturnRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -247,6 +266,8 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin/orders'
     | '/admin/products'
+    | '/account/orders/$id'
+    | '/account/orders/$id/return'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -270,6 +291,8 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin/orders'
     | '/admin/products'
+    | '/account/orders/$id'
+    | '/account/orders/$id/return'
   id:
     | '__root__'
     | '/'
@@ -295,6 +318,8 @@ export interface FileRouteTypes {
     | '/_authed/account/'
     | '/admin/orders/'
     | '/admin/products/'
+    | '/_authed/account/orders/$id'
+    | '/_authed/account/orders/$id/return'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -475,19 +500,57 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAccountAiCreationsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/account/orders/$id': {
+      id: '/_authed/account/orders/$id'
+      path: '/$id'
+      fullPath: '/account/orders/$id'
+      preLoaderRoute: typeof AuthedAccountOrdersIdRouteImport
+      parentRoute: typeof AuthedAccountOrdersRoute
+    }
+    '/_authed/account/orders/$id/return': {
+      id: '/_authed/account/orders/$id/return'
+      path: '/return'
+      fullPath: '/account/orders/$id/return'
+      preLoaderRoute: typeof AuthedAccountOrdersIdReturnRouteImport
+      parentRoute: typeof AuthedAccountOrdersIdRoute
+    }
   }
 }
 
+interface AuthedAccountOrdersIdRouteChildren {
+  AuthedAccountOrdersIdReturnRoute: typeof AuthedAccountOrdersIdReturnRoute
+}
+
+const AuthedAccountOrdersIdRouteChildren: AuthedAccountOrdersIdRouteChildren = {
+  AuthedAccountOrdersIdReturnRoute: AuthedAccountOrdersIdReturnRoute,
+}
+
+const AuthedAccountOrdersIdRouteWithChildren =
+  AuthedAccountOrdersIdRoute._addFileChildren(
+    AuthedAccountOrdersIdRouteChildren,
+  )
+
+interface AuthedAccountOrdersRouteChildren {
+  AuthedAccountOrdersIdRoute: typeof AuthedAccountOrdersIdRouteWithChildren
+}
+
+const AuthedAccountOrdersRouteChildren: AuthedAccountOrdersRouteChildren = {
+  AuthedAccountOrdersIdRoute: AuthedAccountOrdersIdRouteWithChildren,
+}
+
+const AuthedAccountOrdersRouteWithChildren =
+  AuthedAccountOrdersRoute._addFileChildren(AuthedAccountOrdersRouteChildren)
+
 interface AuthedRouteChildren {
   AuthedAccountAiCreationsRoute: typeof AuthedAccountAiCreationsRoute
-  AuthedAccountOrdersRoute: typeof AuthedAccountOrdersRoute
+  AuthedAccountOrdersRoute: typeof AuthedAccountOrdersRouteWithChildren
   AuthedAccountWalletRoute: typeof AuthedAccountWalletRoute
   AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAccountAiCreationsRoute: AuthedAccountAiCreationsRoute,
-  AuthedAccountOrdersRoute: AuthedAccountOrdersRoute,
+  AuthedAccountOrdersRoute: AuthedAccountOrdersRouteWithChildren,
   AuthedAccountWalletRoute: AuthedAccountWalletRoute,
   AuthedAccountIndexRoute: AuthedAccountIndexRoute,
 }

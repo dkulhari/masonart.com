@@ -1510,6 +1510,213 @@ export const shipmentsApi = {
   },
 };
 
+// ============================================================================
+// Returns Types
+// ============================================================================
+
+/**
+ * Return reason values
+ */
+export type ReturnReason =
+  | "defective"
+  | "wrong_item"
+  | "not_as_described"
+  | "changed_mind"
+  | "damaged_in_transit"
+  | "late_delivery"
+  | "other";
+
+/**
+ * Return status values
+ */
+export type ReturnStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "shipped_back"
+  | "received"
+  | "processing"
+  | "refunded"
+  | "closed";
+
+/**
+ * Return request data
+ */
+export interface ReturnRequest {
+  id: string;
+  orderId: string;
+  reason: ReturnReason;
+  reasonDetails: string;
+  status: ReturnStatus;
+  requestedAt: string;
+  approvedAt: string | null;
+  processedAt: string | null;
+  refundAmount: string | null;
+  createdAt: string;
+  adminNotes?: string | null;
+}
+
+/**
+ * Order returns response
+ */
+export interface OrderReturnsResponse {
+  orderId: string;
+  orderNumber: string;
+  returns: ReturnRequest[];
+  totalReturns: number;
+  canRequestReturn: boolean;
+  eligibilityMessage?: string;
+  daysRemaining?: number;
+}
+
+/**
+ * Return request with order details
+ */
+export interface ReturnRequestDetails extends ReturnRequest {
+  order: {
+    id: string;
+    orderNumber: string;
+    total: string;
+  };
+}
+
+/**
+ * Return policy data
+ */
+export interface ReturnPolicy {
+  id: string;
+  name: string;
+  description: string | null;
+  daysAllowed: number;
+  conditionRequired: string | null;
+  refundType: string;
+  refundPercentage: number;
+}
+
+/**
+ * Return policies response
+ */
+export interface ReturnPoliciesResponse {
+  policies: ReturnPolicy[];
+  fromCache: boolean;
+}
+
+/**
+ * Create return request input
+ */
+export interface CreateReturnInput {
+  reason: ReturnReason;
+  reasonDetails: string;
+}
+
+/**
+ * Returns API
+ */
+export const returnsApi = {
+  /**
+   * Get return requests for an order (includes eligibility check)
+   */
+  async getOrderReturns(orderId: string): Promise<OrderReturnsResponse> {
+    const response = await fetch(`${getApiUrl()}/api/orders/${orderId}/returns`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch returns");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Create a return request
+   */
+  async createReturn(
+    orderId: string,
+    data: CreateReturnInput
+  ): Promise<{ message: string; return: ReturnRequest }> {
+    const response = await fetch(`${getApiUrl()}/api/orders/${orderId}/returns`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to create return request");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get return request details
+   */
+  async getReturn(returnId: string): Promise<{ return: ReturnRequestDetails }> {
+    const response = await fetch(`${getApiUrl()}/api/returns/${returnId}`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch return request");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Cancel a pending return request
+   */
+  async cancelReturn(returnId: string): Promise<{ message: string; returnId: string }> {
+    const response = await fetch(`${getApiUrl()}/api/returns/${returnId}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to cancel return request");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get active return policies
+   */
+  async getPolicies(): Promise<ReturnPoliciesResponse> {
+    const response = await fetch(`${getApiUrl()}/api/return-policies`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to fetch return policies");
+    }
+
+    return response.json();
+  },
+};
+
 export const api = {
   products: productsApi,
   cart: cartApi,
@@ -1520,6 +1727,7 @@ export const api = {
   wallet: walletApi,
   shipping: shippingApi,
   shipments: shipmentsApi,
+  returns: returnsApi,
 };
 
 export default api;
