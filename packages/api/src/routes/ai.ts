@@ -23,6 +23,7 @@ import { db } from "../database";
 import {
   aiGenerations,
   userColorPalettes,
+  aiPromptSuggestions,
   type AIPromptDetails,
   type AIStylePreset,
   type AIAspectRatio,
@@ -857,6 +858,148 @@ aiApp.get("/aspect-ratios", async (c) => {
 });
 
 // ============================================================================
+// Prompt Suggestions Data
+// ============================================================================
+
+/**
+ * Curated prompt suggestions per style preset
+ */
+const CURATED_SUGGESTIONS: Record<string, string[]> = {
+  "wabi-sabi": [
+    "A weathered wooden tea house in morning mist",
+    "Cracked ceramic bowl with wildflowers",
+    "Moss-covered stones in a quiet garden",
+    "Single autumn leaf on aged paper",
+    "Ancient bamboo grove at dawn",
+    "Imperfect pottery on worn linen",
+  ],
+  "abstract-expression": [
+    "Explosive colors cascading across the canvas",
+    "Bold brushstrokes in motion and energy",
+    "Emotional landscape of swirling hues",
+    "Dynamic interplay of primary colors",
+    "Gestural marks dancing in space",
+    "Raw energy translated into color",
+  ],
+  "botanical": [
+    "Exotic orchids in scientific detail",
+    "Wild meadow flowers arrangement",
+    "Tropical monstera leaf study",
+    "Vintage botanical illustration of roses",
+    "Succulent garden composition",
+    "Pressed flower collection layout",
+  ],
+  "geometric-modern": [
+    "Interlocking shapes in bold colors",
+    "Minimalist circles and triangles",
+    "Bauhaus-inspired composition",
+    "Sacred geometry mandala pattern",
+    "Art deco geometric abstraction",
+    "Contemporary grid structure",
+  ],
+  "vintage-poster": [
+    "Classic travel destination advertisement",
+    "Retro coffee shop announcement",
+    "1950s diner promotional art",
+    "Art nouveau theater show poster",
+    "Vintage bicycle racing advertisement",
+    "Old-fashioned market day flyer",
+  ],
+  "pop-art": [
+    "Comic book style explosion",
+    "Repeated portrait with color variations",
+    "Bold product advertisement parody",
+    "Halftone dots and primary colors",
+    "Celebrity portrait transformation",
+    "Consumer culture commentary",
+  ],
+  "watercolor": [
+    "Loose coastal landscape painting",
+    "Delicate cherry blossoms in spring",
+    "Mountain reflection in still lake",
+    "Street cafe scene in Paris",
+    "Garden path through flowers",
+    "Rainy city evening atmosphere",
+  ],
+  "photography": [
+    "Golden hour portrait with natural light",
+    "Dramatic landscape at sunset",
+    "Urban architecture in fog",
+    "Macro detail of morning dew",
+    "Street photography in motion",
+    "Minimalist still life composition",
+  ],
+  "line-art": [
+    "Continuous line portrait sketch",
+    "Botanical pen illustration",
+    "Architectural blueprint style",
+    "Minimalist animal silhouette",
+    "Hand-drawn city skyline",
+    "Elegant calligraphy letters",
+  ],
+  "typography": [
+    "Inspirational quote in elegant script",
+    "Bold motivational word poster",
+    "Vintage lettering announcement",
+    "Modern sans-serif composition",
+    "Layered text with depth",
+    "Hand-lettered adventure word",
+  ],
+  "ink-wash": [
+    "Mountain range disappearing into mist",
+    "Single crane by water's edge",
+    "Bamboo forest in rainfall",
+    "Ancient pine tree silhouette",
+    "Flowing river through valley",
+    "Meditative rock garden",
+  ],
+  "digital-art": [
+    "Futuristic city at night",
+    "Fantasy dragon in flight",
+    "Cyberpunk character portrait",
+    "Magical forest with glowing elements",
+    "Space exploration scene",
+    "Epic battle moment freeze-frame",
+  ],
+  "minimalist-modern": [
+    "Single object on clean background",
+    "Architectural detail in shadow",
+    "Negative space composition",
+    "Simple shapes in harmony",
+    "Monochrome landscape simplification",
+    "Essential forms only",
+  ],
+  "impressionist": [
+    "Water lilies at golden hour",
+    "Sunlit meadow with figures",
+    "Coastal cliffs in afternoon light",
+    "Garden party under trees",
+    "Bridge over calm water",
+    "Haystack at different times of day",
+  ],
+  "art-deco": [
+    "Glamorous 1920s fashion figure",
+    "Geometric skyline at night",
+    "Luxurious cocktail lounge scene",
+    "Streamlined automobile design",
+    "Jazz age music celebration",
+    "Opulent theater entrance",
+  ],
+};
+
+/**
+ * Default suggestions for unknown styles
+ */
+const DEFAULT_SUGGESTIONS = [
+  "Beautiful sunset over calm water",
+  "Mountain landscape at golden hour",
+  "Peaceful garden scene",
+  "Abstract shapes and colors",
+  "Elegant floral arrangement",
+  "Serene natural scenery",
+];
+
+// ============================================================================
 // Reference Image Routes
 // ============================================================================
 
@@ -944,6 +1087,166 @@ aiApp.get("/reference-image-info", async (c) => {
     },
     expiresAfterHours: 24,
   });
+});
+
+// ============================================================================
+// Prompt Suggestions Routes
+// ============================================================================
+
+// ============================================================================
+// GET /api/ai/suggestions - Get Prompt Suggestions
+// ============================================================================
+
+const suggestionsQuerySchema = z.object({
+  stylePreset: z.enum(aiStylePresetEnum.enumValues).optional(),
+  limit: z.coerce.number().int().min(1).max(20).optional().default(6),
+  shuffle: z.coerce.boolean().optional().default(true),
+});
+
+aiApp.get(
+  "/suggestions",
+  optionalAuth,
+  zValidator("query", suggestionsQuerySchema),
+  async (c) => {
+    const { stylePreset, limit, shuffle } = c.req.valid("query");
+
+    try {
+      // Get curated suggestions for the style
+      let suggestions: string[];
+      if (stylePreset && CURATED_SUGGESTIONS[stylePreset]) {
+        suggestions = [...CURATED_SUGGESTIONS[stylePreset]];
+      } else {
+        suggestions = [...DEFAULT_SUGGESTIONS];
+      }
+
+      // Shuffle if requested
+      if (shuffle) {
+        for (let i = suggestions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [suggestions[i], suggestions[j]] = [suggestions[j], suggestions[i]];
+        }
+      }
+
+      // Limit results
+      suggestions = suggestions.slice(0, limit);
+
+      // Try to get popular prompts from database
+      let popularPrompts: string[] = [];
+      try {
+        const popularResults = await db
+          .select({
+            prompt: aiPromptSuggestions.promptText,
+          })
+          .from(aiPromptSuggestions)
+          .where(
+            stylePreset
+              ? eq(aiPromptSuggestions.stylePreset, stylePreset)
+              : sql`1=1`
+          )
+          .orderBy(desc(aiPromptSuggestions.usageCount))
+          .limit(3);
+
+        popularPrompts = popularResults.map((r) => r.prompt);
+      } catch {
+        // Database not available, continue without popular prompts
+      }
+
+      return c.json({
+        stylePreset: stylePreset || "all",
+        suggestions,
+        popular: popularPrompts,
+        categories: {
+          nature: ["landscape", "flowers", "mountains", "ocean", "forest"],
+          abstract: ["shapes", "colors", "patterns", "geometric", "fluid"],
+          lifestyle: ["food", "travel", "fashion", "interior", "coffee"],
+        },
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return c.json({ error: `Failed to get suggestions: ${errorMessage}` }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// GET /api/ai/suggestions/featured - Get Featured/Trending Suggestions
+// ============================================================================
+
+aiApp.get("/suggestions/featured", async (c) => {
+  // Return featured prompts that work well across multiple styles
+  const featured = [
+    {
+      prompt: "A serene mountain lake at golden hour with mist rising",
+      tags: ["nature", "landscape", "peaceful"],
+      recommendedStyles: ["photography", "watercolor", "impressionist"],
+    },
+    {
+      prompt: "Exotic tropical flowers in vibrant colors",
+      tags: ["botanical", "colorful", "nature"],
+      recommendedStyles: ["botanical", "watercolor", "pop-art"],
+    },
+    {
+      prompt: "Abstract geometric composition with bold shapes",
+      tags: ["abstract", "modern", "geometric"],
+      recommendedStyles: ["geometric-modern", "minimalist-modern", "art-deco"],
+    },
+    {
+      prompt: "Vintage travel poster for a coastal destination",
+      tags: ["retro", "travel", "design"],
+      recommendedStyles: ["vintage-poster", "art-deco", "pop-art"],
+    },
+    {
+      prompt: "Zen garden with raked sand and stone arrangement",
+      tags: ["zen", "minimalist", "peaceful"],
+      recommendedStyles: ["wabi-sabi", "ink-wash", "minimalist-modern"],
+    },
+    {
+      prompt: "Dynamic cityscape with dramatic lighting",
+      tags: ["urban", "architecture", "dramatic"],
+      recommendedStyles: ["digital-art", "photography", "line-art"],
+    },
+  ];
+
+  return c.json({
+    featured,
+    updatedAt: new Date().toISOString(),
+  });
+});
+
+// ============================================================================
+// POST /api/ai/suggestions/record-usage - Record Prompt Usage
+// ============================================================================
+
+aiApp.post("/suggestions/record-usage", requireAuth, async (c) => {
+  const body = await c.req.json();
+  const { prompt, stylePreset } = body;
+
+  if (!prompt || typeof prompt !== "string") {
+    return c.json({ error: "Prompt is required" }, 400);
+  }
+
+  try {
+    // Try to update existing or insert new
+    await db
+      .insert(aiPromptSuggestions)
+      .values({
+        promptText: prompt.trim().substring(0, 500),
+        stylePreset: stylePreset || null,
+        usageCount: 1,
+      })
+      .onConflictDoUpdate({
+        target: [aiPromptSuggestions.promptText],
+        set: {
+          usageCount: sql`${aiPromptSuggestions.usageCount} + 1`,
+          updatedAt: new Date(),
+        },
+      });
+
+    return c.json({ message: "Usage recorded" });
+  } catch (error) {
+    // Silently fail - this is non-critical tracking
+    return c.json({ message: "Usage noted" });
+  }
 });
 
 // ============================================================================
