@@ -128,6 +128,7 @@ describe('Style Presets Module Exports', () => {
 
 describe('STYLE_PRESETS Configuration', () => {
   const expectedStylePresets: AIStylePreset[] = [
+    // Original 10 presets
     'wabi-sabi',
     'abstract-expression',
     'botanical',
@@ -138,12 +139,18 @@ describe('STYLE_PRESETS Configuration', () => {
     'photography',
     'line-art',
     'typography',
+    // 5 new presets added in full-ai-generator feature
+    'ink-wash',
+    'digital-art',
+    'minimalist-modern',
+    'impressionist',
+    'art-deco',
   ];
 
   describe('Preset count and keys', () => {
-    it('should have exactly 10 style presets', () => {
+    it('should have exactly 15 style presets', () => {
       const presetCount = Object.keys(STYLE_PRESETS).length;
-      expect(presetCount).toBe(10);
+      expect(presetCount).toBe(15);
     });
 
     it('should have all expected style preset keys', () => {
@@ -553,6 +560,7 @@ describe('constructEnhancedPrompt', () => {
     const stylePresets: AIStylePreset[] = [
       'wabi-sabi', 'abstract-expression', 'botanical', 'geometric-modern', 'vintage-poster',
       'pop-art', 'watercolor', 'photography', 'line-art', 'typography',
+      'ink-wash', 'digital-art', 'minimalist-modern', 'impressionist', 'art-deco',
     ];
 
     stylePresets.forEach((preset) => {
@@ -600,6 +608,7 @@ describe('constructNegativePrompt', () => {
     const stylePresets: AIStylePreset[] = [
       'wabi-sabi', 'abstract-expression', 'botanical', 'geometric-modern', 'vintage-poster',
       'pop-art', 'watercolor', 'photography', 'line-art', 'typography',
+      'ink-wash', 'digital-art', 'minimalist-modern', 'impressionist', 'art-deco',
     ];
 
     stylePresets.forEach((preset) => {
@@ -688,6 +697,7 @@ describe('getModelParameters', () => {
     const stylePresets: AIStylePreset[] = [
       'wabi-sabi', 'abstract-expression', 'botanical', 'geometric-modern', 'vintage-poster',
       'pop-art', 'watercolor', 'photography', 'line-art', 'typography',
+      'ink-wash', 'digital-art', 'minimalist-modern', 'impressionist', 'art-deco',
     ];
 
     stylePresets.forEach((preset) => {
@@ -836,7 +846,7 @@ describe('getStylesByCategory', () => {
       const illustrative = getStylesByCategory('illustrative');
       const decorative = getStylesByCategory('decorative');
       const total = artistic.length + photographic.length + illustrative.length + decorative.length;
-      expect(total).toBe(10);
+      expect(total).toBe(15);
     });
   });
 });
@@ -864,7 +874,7 @@ describe('getAvailableStyles', () => {
     it('should return all styles with includePremium=true', () => {
       const styles = getAvailableStyles(true);
       expect(Array.isArray(styles)).toBe(true);
-      expect(styles.length).toBe(10); // All presets
+      expect(styles.length).toBe(15); // All presets
     });
 
     it('should include premium styles when requested', () => {
@@ -941,6 +951,7 @@ describe('isValidStylePreset', () => {
     const validPresets: AIStylePreset[] = [
       'wabi-sabi', 'abstract-expression', 'botanical', 'geometric-modern', 'vintage-poster',
       'pop-art', 'watercolor', 'photography', 'line-art', 'typography',
+      'ink-wash', 'digital-art', 'minimalist-modern', 'impressionist', 'art-deco',
     ];
 
     validPresets.forEach((preset) => {

@@ -353,6 +353,120 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
     category: "decorative",
     isPremium: false,
   },
+
+  // ============================================================================
+  // New Style Presets (Full AI Generator Feature)
+  // ============================================================================
+
+  "ink-wash": {
+    id: "ink-wash",
+    name: "Ink Wash",
+    description: "Asian-inspired ink painting with flowing gradient washes and contemplative atmosphere",
+    keywords: ["ink", "asian", "chinese", "japanese", "brush", "sumi-e", "zen", "monochrome", "traditional"],
+    promptModifiers:
+      "traditional ink wash painting, sumi-e style, Chinese brush painting aesthetic, gradient ink washes, zen atmosphere, flowing brushstrokes, rice paper texture, minimalist composition, contemplative mood, black ink gradients, negative space, asian artistic tradition",
+    negativePrompt:
+      "colorful, vibrant colors, digital art, 3d render, photorealistic, harsh edges, busy composition, western style, modern, neon, saturated, complex details",
+    modelParams: {
+      cfgScale: 7.0,
+      steps: 32,
+      sampler: "DPM++ 2M Karras",
+    },
+    qualityEnhancers:
+      "museum quality, traditional art, fine art print, delicate brushwork, authentic ink painting",
+    recommendedAspectRatios: ["portrait", "square", "landscape"],
+    preferredProvider: "stable-diffusion",
+    category: "artistic",
+    isPremium: false,
+  },
+
+  "digital-art": {
+    id: "digital-art",
+    name: "Digital Art",
+    description: "Modern digital illustration with gaming and concept art aesthetics",
+    keywords: ["digital", "concept", "gaming", "illustration", "modern", "fantasy", "sci-fi", "vibrant"],
+    promptModifiers:
+      "digital art, concept art style, gaming aesthetic, vibrant digital painting, detailed illustration, professional digital artwork, cinematic lighting, dynamic composition, rich colors, artstation quality, detailed character or environment design",
+    negativePrompt:
+      "traditional media, oil painting, watercolor, sketch, rough, low detail, amateur, blurry, pixelated, low resolution, simple",
+    modelParams: {
+      cfgScale: 8.5,
+      steps: 35,
+      sampler: "Euler a",
+    },
+    qualityEnhancers:
+      "8K resolution, artstation trending, professional digital art, highly detailed, crisp render",
+    recommendedAspectRatios: ["landscape", "square", "portrait"],
+    preferredProvider: "stable-diffusion",
+    category: "illustrative",
+    isPremium: false,
+  },
+
+  "minimalist-modern": {
+    id: "minimalist-modern",
+    name: "Minimalist Modern",
+    description: "Clean lines and geometric simplicity inspired by Scandinavian design principles",
+    keywords: ["minimalist", "scandinavian", "clean", "simple", "modern", "nordic", "elegant", "sophisticated"],
+    promptModifiers:
+      "minimalist design, Scandinavian aesthetic, clean geometric forms, simple composition, negative space, muted color palette, elegant simplicity, modern interior style, Nordic design principles, uncluttered, refined, subtle textures",
+    negativePrompt:
+      "cluttered, busy, complex, ornate, baroque, detailed patterns, vibrant colors, chaotic, messy, loud, excessive decoration, vintage",
+    modelParams: {
+      cfgScale: 7.0,
+      steps: 28,
+      sampler: "DPM++ 2M",
+    },
+    qualityEnhancers:
+      "high-end design quality, architectural photography style, premium aesthetic, clean render, professional",
+    recommendedAspectRatios: ["square", "portrait", "landscape"],
+    preferredProvider: "stable-diffusion",
+    category: "decorative",
+    isPremium: false,
+  },
+
+  impressionist: {
+    id: "impressionist",
+    name: "Impressionist",
+    description: "Monet-inspired brushstrokes capturing light and atmosphere in outdoor scenes",
+    keywords: ["impressionist", "monet", "renoir", "light", "brushstrokes", "plein air", "french", "artistic"],
+    promptModifiers:
+      "impressionist painting style, Monet inspired, visible brushstrokes, light play, en plein air, soft atmospheric effects, natural lighting, color harmony, French impressionism, garden scenes, water reflections, dappled sunlight, romantic atmosphere",
+    negativePrompt:
+      "sharp edges, digital, photorealistic, flat colors, minimal, geometric, abstract, dark, harsh shadows, high contrast, modern style",
+    modelParams: {
+      cfgScale: 7.5,
+      steps: 35,
+      sampler: "DPM++ SDE Karras",
+    },
+    qualityEnhancers:
+      "museum quality, fine art masterpiece, gallery painting, beautiful brushwork, painterly texture",
+    recommendedAspectRatios: ["landscape", "square", "portrait"],
+    preferredProvider: "stable-diffusion",
+    category: "artistic",
+    isPremium: false,
+  },
+
+  "art-deco": {
+    id: "art-deco",
+    name: "Art Deco",
+    description: "1920s glamorous style with geometric patterns and luxurious gold accents",
+    keywords: ["art deco", "1920s", "gatsby", "geometric", "glamorous", "gold", "luxurious", "vintage"],
+    promptModifiers:
+      "art deco style, 1920s aesthetic, geometric patterns, gold and black color scheme, luxurious glamour, Gatsby era, symmetrical design, sunburst motifs, elegant typography, chrome accents, streamlined forms, opulent details, jazz age sophistication",
+    negativePrompt:
+      "modern minimal, rustic, organic shapes, muted colors, casual, rough textures, asymmetrical, contemporary, photorealistic, simple, plain",
+    modelParams: {
+      cfgScale: 8.0,
+      steps: 32,
+      sampler: "Euler",
+    },
+    qualityEnhancers:
+      "high fashion quality, luxury aesthetic, premium design, elegant composition, glamorous finish",
+    recommendedAspectRatios: ["portrait", "square"],
+    preferredProvider: "stable-diffusion",
+    category: "decorative",
+    isPremium: true,
+  },
 };
 
 // ============================================================================
