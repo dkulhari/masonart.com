@@ -25,6 +25,7 @@ import {
   Tags,
   ImageIcon,
   MessageSquare,
+  RotateCcw,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { authApi } from '~/lib/api'
@@ -75,6 +76,11 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Reviews',
     href: '/admin/reviews',
     icon: MessageSquare,
+  },
+  {
+    label: 'Returns',
+    href: '/admin/returns',
+    icon: RotateCcw,
   },
   {
     label: 'AI Generations',
