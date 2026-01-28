@@ -21,3 +21,9 @@ export * from "./wallet";
 
 // Product reviews and ratings
 export * from "./reviews";
+
+// Shipping options and order shipments
+export * from "./shipping";
+
+// Return policies and return requests
+export * from "./returns";

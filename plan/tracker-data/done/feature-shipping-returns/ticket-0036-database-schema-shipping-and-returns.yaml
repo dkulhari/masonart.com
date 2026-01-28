@@ -1,5 +1,5 @@
 ticket_number: 36
-title: 'Database Schema - Shipping and Returns Tables'
+title: Database Schema - Shipping and Returns Tables
 description: |-
   Create database schema for shipping options, order shipments, and return requests.
 
@@ -88,21 +88,21 @@ description: |-
   8. test('foreign keys reference correct tables')
 
   ## Acceptance Criteria
-  - [ ] All tables created with proper structure
-  - [ ] All enums defined
-  - [ ] Indexes for common queries
-  - [ ] Relations configured
-  - [ ] Types exported
-  - [ ] Unit tests passing
-  - [ ] Migration tested
+  - [x] All tables created with proper structure
+  - [x] All enums defined
+  - [x] Indexes for common queries
+  - [x] Relations configured
+  - [x] Types exported
+  - [x] Unit tests passing (44/44)
+  - [x] Migration tested
 feature: shipping-returns
 type: task
 priority: critical
-status: todo
-assignee: unassigned
+status: done
+assignee: claude
 reporter: cli
-created: '2026-01-28T00:10:00.000Z'
-last_updated: '2026-01-28T00:10:00.000Z'
+created: "2026-01-28T00:10:00.000Z"
+last_updated: "2026-01-28T06:04:04.319Z"
 time_spent_minutes: 0
 labels:
   - database
@@ -115,7 +115,55 @@ acceptance_criteria:
   - Relations configured
   - Types exported
   - Unit tests passing
-comments: []
+comments:
+  - author: claude
+    timestamp: "2026-01-28T04:30:00.000Z"
+    content: |-
+      Starting implementation. Analyzed existing schema patterns:
+
+      Decisions:
+      1. Following orders.ts pattern - imports, enums, tables, relations, type exports
+      2. Will create two files: shipping.ts and returns.ts as specified
+      3. Using uuid for primary keys, decimal(10,2) for money, timestamp for dates
+      4. Adding indexes on foreign keys and status columns for query performance
+      5. Using pgEnum for all status enums to ensure type safety
+
+      Implementation order:
+      1. Create shipping.ts with shipping_options and order_shipments tables
+      2. Create returns.ts with return_policies and return_requests tables
+      3. Update schema/index.ts to export new modules
+      4. Write unit tests for schema validation
+  - author: claude
+    timestamp: "2026-01-28T05:10:00.000Z"
+    content: |-
+      Implementation completed. All tests passing (44/44).
+
+      Created files:
+      - packages/api/src/database/schema/shipping.ts
+        - shipmentStatusEnum: 7 values (pending, label_created, shipped, in_transit, out_for_delivery, delivered, failed)
+        - shippingOptions table: id, name, carrier, description, baseCost, estimatedDaysMin/Max, isActive, sortOrder
+        - orderShipments table: id, orderId (FK), shippingOptionId (FK), trackingNumber, carrier, trackingUrl, status, timestamps
+
+      - packages/api/src/database/schema/returns.ts
+        - returnReasonEnum: 5 values (defective, wrong_item, not_as_described, changed_mind, other)
+        - returnStatusEnum: 7 values (pending, approved, rejected, shipped_back, received, refunded, closed)
+        - refundTypeEnum: 3 values (full, partial, store_credit)
+        - returnPolicies table: id, name, description, daysAllowed, conditionRequired, refundType, refundPercentage, isActive
+        - returnRequests table: id, orderId (FK), userId (FK), reason, reasonDetails, status, timestamps, refundAmount, adminNotes
+
+      - Updated packages/api/src/database/schema/index.ts to export new modules
+
+      Test files created:
+      - packages/api/tests/database/shipping.test.ts (18 tests)
+      - packages/api/tests/database/returns.test.ts (26 tests)
+
+      Applied database migration via direct SQL (drizzle-kit push had interactive prompt issues).
+  - author: system
+    timestamp: "2026-01-28T06:04:04.320Z"
+    text: Status changed from 'in_progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-28T06:04:10.038Z"
+    text: "COMPLETED: All acceptance criteria met. Database schema implementation verified with 44 passing tests (18 shipping, 26 returns). Schema files created at packages/api/src/database/schema/shipping.ts and returns.ts. Migration applied successfully. Moving to ticket 37 (API Routes - Shipping Options)."
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -124,3 +172,4 @@ blocks:
   - 38
   - 39
 attachments: []
+completed: "2026-01-28T06:04:04.319Z"

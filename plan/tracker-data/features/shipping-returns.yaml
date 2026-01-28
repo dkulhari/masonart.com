@@ -29,17 +29,18 @@ work_session_summary:
   agents: {}
 tickets:
   todo:
-    "36": "Database Schema - Shipping and Returns Tables"
-    "37": "API Routes - Shipping Options Endpoints"
-    "38": "API Routes - Order Shipments & Tracking"
-    "39": "API Routes - Return Requests"
-    "40": "Frontend - Checkout Shipping Selection"
-    "41": "Frontend - Order Tracking Display"
-    "42": "Frontend - Return Request Flow"
-    "43": "Admin Panel - Returns Management Dashboard"
-    "44": "Tests - Unit and E2E Test Suite"
+    "36": Database Schema - Shipping and Returns Tables
+    "37": API Routes - Shipping Options Endpoints
+    "38": API Routes - Order Shipments & Tracking
+    "39": API Routes - Return Requests
+    "40": Frontend - Checkout Shipping Selection
+    "41": Frontend - Order Tracking Display
+    "42": Frontend - Return Request Flow
+    "43": Admin Panel - Returns Management Dashboard
+    "44": Tests - Unit and E2E Test Suite
   in_progress: {}
-  done: {}
-total_tickets: 9
-completion_percentage: 0
+  done:
+    "36": Database Schema - Shipping and Returns Tables
+total_tickets: 10
+completion_percentage: 10
 is_completed: false
