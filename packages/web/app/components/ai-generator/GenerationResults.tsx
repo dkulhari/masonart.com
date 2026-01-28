@@ -24,6 +24,8 @@ import {
   RefreshCw,
   ImageIcon,
   ZoomIn,
+  Maximize2,
+  ChevronDown,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 
@@ -33,12 +35,22 @@ import { cn } from '~/lib/utils'
 
 export type GenerationStatus = 'idle' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
 
+export type UpscaleMultiplier = 2 | 4
+
+export interface UpscaleInfo {
+  multiplier: UpscaleMultiplier
+  upscaledImageUrl?: string
+  status: 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
+  progress?: number
+}
+
 export interface GeneratedImage {
   id: string
   imageUrl: string
   thumbnailUrl?: string
   isSelected?: boolean
   seed?: number
+  upscale?: UpscaleInfo
 }
 
 export interface Generation {
@@ -54,6 +66,12 @@ export interface Generation {
   processingTimeMs?: number
   createdAt: string
   completedAt?: string
+}
+
+export interface UpscaleCost {
+  multiplier: UpscaleMultiplier
+  cost: number
+  estimatedTimeSeconds: number
 }
 
 export interface GenerationResultsProps {
@@ -73,6 +91,16 @@ export interface GenerationResultsProps {
   onRetry?: () => void
   /** Callback when user wants to generate variations */
   onGenerateVariations?: (generation: Generation) => void
+  /** Callback when user wants to upscale an image */
+  onUpscale?: (generationId: string, imageId: string, multiplier: UpscaleMultiplier) => void
+  /** Whether an upscale is in progress for an image */
+  isImageUpscaling?: (generationId: string, imageId: string) => boolean
+  /** Get upscale job info for an image */
+  getUpscaleJob?: (generationId: string, imageId: string) => { status: string; progress: number } | undefined
+  /** Available upscale costs */
+  upscaleCosts?: UpscaleCost[]
+  /** User's wallet balance */
+  walletBalance?: number
   /** Custom className */
   className?: string
 }
@@ -84,6 +112,11 @@ export interface GenerationResultsProps {
 /**
  * GenerationResults - Displays AI generation results
  */
+const DEFAULT_UPSCALE_COSTS: UpscaleCost[] = [
+  { multiplier: 2, cost: 5, estimatedTimeSeconds: 15 },
+  { multiplier: 4, cost: 10, estimatedTimeSeconds: 30 },
+]
+
 export function GenerationResults({
   currentGeneration,
   isGenerating = false,
@@ -93,9 +126,15 @@ export function GenerationResults({
   onAddToCart,
   onRetry,
   onGenerateVariations,
+  onUpscale,
+  isImageUpscaling,
+  getUpscaleJob,
+  upscaleCosts = DEFAULT_UPSCALE_COSTS,
+  walletBalance,
   className,
 }: GenerationResultsProps) {
   const [selectedImageForPreview, setSelectedImageForPreview] = useState<GeneratedImage | null>(null)
+  const [upscaleDropdownOpen, setUpscaleDropdownOpen] = useState<string | null>(null)
 
   const handleImageSelect = useCallback(
     (imageId: string) => {
@@ -192,6 +231,10 @@ export function GenerationResults({
       <div className="grid grid-cols-2 gap-4">
         {images.map((image) => {
           const isSelected = image.id === selectedImageId
+          const imageIsUpscaling = isImageUpscaling?.(currentGeneration?.id || '', image.id) || false
+          const upscaleJob = getUpscaleJob?.(currentGeneration?.id || '', image.id)
+          const hasUpscaledVersion = image.upscale?.status === 'completed' && image.upscale?.upscaledImageUrl
+          const isUpscaleDropdownOpen = upscaleDropdownOpen === image.id
 
           return (
             <div
@@ -210,44 +253,119 @@ export function GenerationResults({
                 className="h-full w-full object-cover"
               />
 
-              {/* Selection Overlay */}
-              <div
-                className={cn(
-                  'absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40',
-                  isSelected && 'bg-black/20'
-                )}
-              >
-                {/* Selection Check */}
-                {isSelected && (
-                  <div className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-                    <Check className="h-5 w-5" />
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button
-                    type="button"
-                    onClick={() => handleImageSelect(image.id)}
-                    className={cn(
-                      'flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg transition-colors',
-                      'hover:bg-primary hover:text-primary-foreground',
-                      isSelected && 'bg-primary text-primary-foreground'
-                    )}
-                    title={isSelected ? 'Selected' : 'Select this image'}
-                  >
-                    <Check className="h-5 w-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedImageForPreview(image)}
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg transition-colors hover:bg-white"
-                    title="Preview"
-                  >
-                    <ZoomIn className="h-5 w-5" />
-                  </button>
+              {/* Upscaling Overlay */}
+              {imageIsUpscaling && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60">
+                  <Loader2 className="h-8 w-8 animate-spin text-white" />
+                  <span className="mt-2 text-sm font-medium text-white">Upscaling...</span>
+                  {upscaleJob?.progress && (
+                    <span className="mt-1 text-xs text-white/80">{upscaleJob.progress}%</span>
+                  )}
                 </div>
-              </div>
+              )}
+
+              {/* Selection Overlay */}
+              {!imageIsUpscaling && (
+                <div
+                  className={cn(
+                    'absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40',
+                    isSelected && 'bg-black/20'
+                  )}
+                >
+                  {/* Selection Check */}
+                  {isSelected && (
+                    <div className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
+                      <Check className="h-5 w-5" />
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => handleImageSelect(image.id)}
+                      className={cn(
+                        'flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg transition-colors',
+                        'hover:bg-primary hover:text-primary-foreground',
+                        isSelected && 'bg-primary text-primary-foreground'
+                      )}
+                      title={isSelected ? 'Selected' : 'Select this image'}
+                    >
+                      <Check className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedImageForPreview(image)}
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg transition-colors hover:bg-white"
+                      title="Preview"
+                    >
+                      <ZoomIn className="h-5 w-5" />
+                    </button>
+                    {/* Upscale Button */}
+                    {onUpscale && !hasUpscaledVersion && (
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setUpscaleDropdownOpen(isUpscaleDropdownOpen ? null : image.id)}
+                          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg transition-colors hover:bg-white"
+                          title="Upscale image"
+                        >
+                          <Maximize2 className="h-5 w-5" />
+                        </button>
+                        {/* Upscale Dropdown */}
+                        {isUpscaleDropdownOpen && (
+                          <div className="absolute right-0 top-12 z-10 min-w-[160px] rounded-lg border border-border bg-background p-2 shadow-lg">
+                            <p className="mb-2 px-2 text-[10px] font-medium text-muted-foreground uppercase">
+                              Upscale to
+                            </p>
+                            {upscaleCosts.map((option) => {
+                              const canAfford = walletBalance === undefined || walletBalance >= option.cost
+                              return (
+                                <button
+                                  key={option.multiplier}
+                                  type="button"
+                                  onClick={() => {
+                                    if (canAfford && currentGeneration) {
+                                      onUpscale(currentGeneration.id, image.id, option.multiplier)
+                                      setUpscaleDropdownOpen(null)
+                                    }
+                                  }}
+                                  disabled={!canAfford}
+                                  className={cn(
+                                    'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm',
+                                    canAfford
+                                      ? 'hover:bg-accent'
+                                      : 'cursor-not-allowed opacity-50'
+                                  )}
+                                >
+                                  <span className="font-medium">{option.multiplier}x</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {option.cost} credits
+                                  </span>
+                                </button>
+                              )
+                            })}
+                            {walletBalance !== undefined && (
+                              <div className="mt-2 border-t border-border pt-2">
+                                <p className="px-2 text-[10px] text-muted-foreground">
+                                  Balance: {walletBalance} credits
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Upscaled Badge */}
+              {hasUpscaledVersion && (
+                <div className="absolute right-2 top-2 rounded bg-green-600 px-2 py-0.5 text-[10px] font-medium text-white">
+                  {image.upscale?.multiplier}x Upscaled
+                </div>
+              )}
 
               {/* Seed Badge */}
               {image.seed && (
@@ -259,6 +377,22 @@ export function GenerationResults({
           )
         })}
       </div>
+
+      {/* Wallet Balance Indicator */}
+      {walletBalance !== undefined && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2">
+          <span className="text-sm text-muted-foreground">Wallet Balance</span>
+          <span className={cn(
+            'text-sm font-medium',
+            walletBalance < 5 ? 'text-amber-600' : 'text-foreground'
+          )}>
+            {walletBalance} credits
+            {walletBalance < 5 && (
+              <span className="ml-2 text-xs text-amber-600">(Low balance)</span>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -298,6 +432,12 @@ export function GenerationResults({
             handleImageSelect(selectedImageForPreview.id)
             setSelectedImageForPreview(null)
           }}
+          onUpscale={onUpscale && currentGeneration ? (multiplier) => {
+            onUpscale(currentGeneration.id, selectedImageForPreview.id, multiplier)
+          } : undefined}
+          upscaleCosts={upscaleCosts}
+          walletBalance={walletBalance}
+          isUpscaling={isImageUpscaling?.(currentGeneration?.id || '', selectedImageForPreview.id)}
         />
       )}
     </div>
@@ -444,9 +584,25 @@ interface ImagePreviewModalProps {
   image: GeneratedImage
   onClose: () => void
   onSelect: () => void
+  onUpscale?: (multiplier: UpscaleMultiplier) => void
+  upscaleCosts?: UpscaleCost[]
+  walletBalance?: number
+  isUpscaling?: boolean
 }
 
-function ImagePreviewModal({ image, onClose, onSelect }: ImagePreviewModalProps) {
+function ImagePreviewModal({
+  image,
+  onClose,
+  onSelect,
+  onUpscale,
+  upscaleCosts = DEFAULT_UPSCALE_COSTS,
+  walletBalance,
+  isUpscaling,
+}: ImagePreviewModalProps) {
+  const [showUpscaleOptions, setShowUpscaleOptions] = useState(false)
+  const hasUpscaledVersion = image.upscale?.status === 'completed' && image.upscale?.upscaledImageUrl
+  const displayUrl = hasUpscaledVersion ? image.upscale!.upscaledImageUrl! : image.imageUrl
+
   return (
     <>
       {/* Backdrop */}
@@ -473,9 +629,24 @@ function ImagePreviewModal({ image, onClose, onSelect }: ImagePreviewModalProps)
             <span className="text-2xl">&times;</span>
           </button>
 
+          {/* Upscaled Badge */}
+          {hasUpscaledVersion && (
+            <div className="absolute left-4 top-4 z-10 rounded bg-green-600 px-3 py-1 text-sm font-medium text-white">
+              {image.upscale?.multiplier}x Upscaled
+            </div>
+          )}
+
+          {/* Upscaling Overlay */}
+          {isUpscaling && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60">
+              <Loader2 className="h-12 w-12 animate-spin text-white" />
+              <span className="mt-3 text-lg font-medium text-white">Upscaling...</span>
+            </div>
+          )}
+
           {/* Image */}
           <img
-            src={image.imageUrl}
+            src={displayUrl}
             alt="Full size preview"
             className="max-h-[70vh] w-full object-contain"
           />
@@ -483,13 +654,14 @@ function ImagePreviewModal({ image, onClose, onSelect }: ImagePreviewModalProps)
           {/* Actions */}
           <div className="flex items-center justify-between border-t border-border p-4">
             <div className="flex gap-2">
-              <button
-                type="button"
+              <a
+                href={displayUrl}
+                download={hasUpscaledVersion ? 'upscaled-image.png' : 'generated-image.png'}
                 className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:bg-accent"
               >
                 <Download className="h-4 w-4" />
-                Download
-              </button>
+                {hasUpscaledVersion ? 'Download High-Res' : 'Download'}
+              </a>
               <button
                 type="button"
                 className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:bg-accent"
@@ -504,6 +676,69 @@ function ImagePreviewModal({ image, onClose, onSelect }: ImagePreviewModalProps)
                 <Heart className="h-4 w-4" />
                 Like
               </button>
+
+              {/* Upscale Button */}
+              {onUpscale && !hasUpscaledVersion && !isUpscaling && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowUpscaleOptions(!showUpscaleOptions)}
+                    className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:bg-accent"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    Upscale
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+
+                  {/* Upscale Dropdown */}
+                  {showUpscaleOptions && (
+                    <div className="absolute bottom-full left-0 mb-2 min-w-[180px] rounded-lg border border-border bg-background p-2 shadow-lg">
+                      <p className="mb-2 px-2 text-[10px] font-medium text-muted-foreground uppercase">
+                        Upscale to
+                      </p>
+                      {upscaleCosts.map((option) => {
+                        const canAfford = walletBalance === undefined || walletBalance >= option.cost
+                        return (
+                          <button
+                            key={option.multiplier}
+                            type="button"
+                            onClick={() => {
+                              if (canAfford) {
+                                onUpscale(option.multiplier)
+                                setShowUpscaleOptions(false)
+                              }
+                            }}
+                            disabled={!canAfford}
+                            className={cn(
+                              'flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm',
+                              canAfford
+                                ? 'hover:bg-accent'
+                                : 'cursor-not-allowed opacity-50'
+                            )}
+                          >
+                            <div>
+                              <span className="font-medium">{option.multiplier}x</span>
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                (~{option.estimatedTimeSeconds}s)
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {option.cost} credits
+                            </span>
+                          </button>
+                        )
+                      })}
+                      {walletBalance !== undefined && (
+                        <div className="mt-2 border-t border-border pt-2">
+                          <p className="px-2 text-xs text-muted-foreground">
+                            Balance: {walletBalance} credits
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <button
               type="button"
