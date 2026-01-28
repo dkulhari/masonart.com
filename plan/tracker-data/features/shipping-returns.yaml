@@ -30,9 +30,7 @@ work_session_summary:
 tickets:
   todo:
     "36": Database Schema - Shipping and Returns Tables
-    "44": Tests - Unit and E2E Test Suite
-  in_progress:
-    "43": Admin Panel - Returns Management Dashboard
+  in_progress: {}
   done:
     "36": Database Schema - Shipping and Returns Tables
     "37": API Routes - Shipping Options Endpoints
@@ -41,6 +39,8 @@ tickets:
     "40": Frontend - Checkout Shipping Selection
     "41": Frontend - Order Tracking Display
     "42": Frontend - Return Request Flow
+    "43": Admin Panel - Returns Management Dashboard
+    "44": Tests - Unit and E2E Test Suite
 total_tickets: 10
-completion_percentage: 70
+completion_percentage: 90
 is_completed: false
