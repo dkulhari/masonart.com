@@ -1,0 +1,52 @@
+ticket_number: 94
+title: Frontend - Add tracking link with token-based access
+description: |-
+  ## Task
+  Add tracking link generation for confirmation emails with short-lived token for direct access.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 4 - Frontend Public Tracking
+
+  ## Acceptance Criteria
+  - [ ] Generate tracking token on order creation
+  - [ ] Token-based route: /track/:token
+  - [ ] Auto-load order from token
+  - [ ] Token expiration handling
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:54.003Z"
+last_updated: "2026-01-29T18:28:36.010Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T18:28:36.010Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T18:28:50.270Z"
+    text: |-
+      ✅ **Completed**
+
+      **Files Changed**:
+      - `packages/web/app/routes/track/$token.tsx` - Token-based tracking route
+      - `packages/api/src/routes/tracking.ts` - Token lookup endpoint
+      - `packages/api/src/database/schema/orders.ts` - Added trackingToken fields
+      - `packages/web/app/lib/api.ts` - Added lookupByToken method
+
+      **Summary**:
+      Implemented token-based tracking access for email links. Added trackingToken and trackingTokenExpiresAt fields to orders table with index. Created /track/:token route that auto-loads order from token without requiring order number/email. Token expiration handling included.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-29T18:28:36.010Z"

@@ -1,0 +1,48 @@
+ticket_number: 96
+title: Frontend - Create notification toggle components
+description: |-
+  ## Task
+  Create toggle components for each notification type (email/SMS for various events).
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 5 - Frontend Preferences
+
+  ## Acceptance Criteria
+  - [ ] Toggle for each notification type
+  - [ ] Grouped by channel (Email, SMS)
+  - [ ] Descriptive labels
+  - [ ] Accessible design
+feature: order-tracking-notifications
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:39:09.282Z"
+last_updated: "2026-01-29T18:31:45.527Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T18:31:45.527Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T18:31:57.227Z"
+    text: |-
+      ✅ **Completed**
+
+      **Files Changed**:
+      - `packages/web/app/routes/_authed/account/notifications.tsx` - NotificationToggle component
+
+      **Summary**:
+      Created NotificationToggle component with accessible switch design, grouped by channel (Email, SMS). Each toggle shows label, description, and loading state. Uses aria-checked for accessibility.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-29T18:31:45.527Z"

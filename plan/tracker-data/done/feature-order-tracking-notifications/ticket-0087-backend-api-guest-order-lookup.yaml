@@ -1,0 +1,46 @@
+ticket_number: 87
+title: Backend API - Guest order lookup endpoint
+description: |-
+  ## Task
+  Create guest order lookup endpoint (`GET /api/orders/track`) that accepts orderNumber and email/phone to return order tracking details without authentication.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 3 - Backend API Routes
+
+  ## Acceptance Criteria
+  - [ ] GET /api/orders/track endpoint
+  - [ ] Query params: orderNumber, email (or phone)
+  - [ ] Validate guest email matches order
+  - [ ] Return order status and tracking info
+  - [ ] Rate limiting to prevent abuse
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:22.225Z"
+last_updated: "2026-01-29T12:27:54.254Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:26:46.004Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T12:27:54.254Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:27:54.909Z"
+    text: Created tracking routes with guest order lookup endpoint at GET /api/tracking/lookup.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T12:26:46.004Z"
+completed: "2026-01-29T12:27:54.254Z"

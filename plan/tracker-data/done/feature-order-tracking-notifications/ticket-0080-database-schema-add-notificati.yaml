@@ -1,0 +1,44 @@
+ticket_number: 80
+title: Database Schema - Add notification preference relations
+description: |-
+  ## Task
+  Add notification preference relations to users table. Create one-to-one relation between users and notificationPreferences.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 1 - Database Schema
+
+  ## Acceptance Criteria
+  - [ ] User relation to preferences defined
+  - [ ] Cascade delete on user deletion
+  - [ ] Query patterns work correctly
+feature: order-tracking-notifications
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:37:34.598Z"
+last_updated: "2026-01-29T12:18:19.733Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:15:11.357Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T12:18:19.733Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:18:33.057Z"
+    text: "Added relations to orders and users tables. Commit: b150294b"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T12:15:11.357Z"
+completed: "2026-01-29T12:18:19.733Z"

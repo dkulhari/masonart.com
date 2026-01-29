@@ -1,0 +1,54 @@
+ticket_number: 91
+title: Frontend - Create public order tracking page
+description: |-
+  ## Task
+  Create public order tracking page at `/track` that allows guests to look up their order status.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 4 - Frontend Public Tracking
+  Location: `packages/web/app/routes/track/index.tsx`
+
+  ## Acceptance Criteria
+  - [ ] Public route (no auth required)
+  - [ ] Clean URL: /track
+  - [ ] SEO-friendly page title
+  - [ ] Mobile responsive
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:47.363Z"
+last_updated: "2026-01-29T18:28:34.697Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T18:24:43.618Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T18:28:34.697Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T18:28:49.094Z"
+    text: |-
+      ✅ **Completed**
+
+      **Files Changed**:
+      - `packages/web/app/routes/track/index.tsx` - Created public order tracking page
+      - `packages/web/app/lib/api.ts` - Added trackingApi client
+
+      **Summary**:
+      Created public order tracking page at /track with SEO-friendly meta tags, mobile responsive design, and guest order lookup form.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T18:24:43.618Z"
+completed: "2026-01-29T18:28:34.697Z"

@@ -1,0 +1,42 @@
+ticket_number: 101
+title: Tests - Component tests for tracking and preferences UI
+description: |-
+  ## Task
+  Write component tests for GuestOrderLookup form and notification preferences components.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 6 - Testing
+
+  ## Acceptance Criteria
+  - [ ] GuestOrderLookup form tests
+  - [ ] NotificationPreferences toggle tests
+  - [ ] Loading and error state tests
+  - [ ] Accessibility tests
+feature: order-tracking-notifications
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-29T11:39:34.812Z'
+last_updated: '2026-01-29T18:44:26.346Z'
+time_spent_minutes: 0
+labels:
+  - tests
+  - quality
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-29T18:39:45.835Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-29T18:44:26.346Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-01-29T18:39:45.835Z'
+completed: '2026-01-29T18:44:26.346Z'

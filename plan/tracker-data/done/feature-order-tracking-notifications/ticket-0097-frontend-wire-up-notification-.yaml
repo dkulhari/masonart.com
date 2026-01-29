@@ -1,0 +1,49 @@
+ticket_number: 97
+title: Frontend - Wire up notification preferences API
+description: |-
+  ## Task
+  Wire up the notification preferences UI to the backend API with optimistic updates.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 5 - Frontend Preferences
+
+  ## Acceptance Criteria
+  - [ ] API client integration
+  - [ ] Optimistic UI updates
+  - [ ] Error rollback
+  - [ ] Loading states on toggles
+feature: order-tracking-notifications
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:39:11.905Z"
+last_updated: "2026-01-29T18:31:46.231Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T18:31:46.232Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T18:31:57.648Z"
+    text: |-
+      ✅ **Completed**
+
+      **Files Changed**:
+      - `packages/web/app/lib/api.ts` - Added notificationPreferencesApi client
+      - `packages/web/app/routes/_authed/account/notifications.tsx` - API integration
+
+      **Summary**:
+      Wired up notification preferences API with optimistic updates and error rollback. Added notificationPreferencesApi client with get() and update() methods. Success/error feedback messages implemented.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-29T18:31:46.231Z"

@@ -1,0 +1,46 @@
+ticket_number: 85
+title: Backend Services - Extend SMS service for transactional messages
+description: |-
+  ## Task
+  Extend existing SMS service to support transactional messages beyond OTP.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 2 - Backend Services
+  Location: `packages/api/src/services/sms.ts`
+
+  ## Acceptance Criteria
+  - [ ] sendTransactionalSMS function
+  - [ ] Order confirmation SMS template
+  - [ ] Out for delivery SMS template
+  - [ ] Handle 2Factor.in transactional API
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:02.207Z"
+last_updated: "2026-01-29T12:26:02.755Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:21:45.078Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T12:26:02.756Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:26:03.566Z"
+    text: Extended SMS service with sendTransactionalSMS function and template support for order notifications.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T12:21:45.078Z"
+completed: "2026-01-29T12:26:02.755Z"

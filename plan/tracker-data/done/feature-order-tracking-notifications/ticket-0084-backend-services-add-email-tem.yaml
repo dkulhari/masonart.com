@@ -1,0 +1,46 @@
+ticket_number: 84
+title: Backend Services - Add email templates
+description: |-
+  ## Task
+  Add email templates for order confirmation and shipping updates with order details, tracking link, and branding.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 2 - Backend Services
+
+  ## Acceptance Criteria
+  - [ ] Order confirmation template
+  - [ ] Shipped with tracking template
+  - [ ] Out for delivery template
+  - [ ] Responsive HTML design
+  - [ ] Plain text fallback
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:00.290Z"
+last_updated: "2026-01-29T12:21:37.599Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:20:43.256Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T12:21:37.599Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:21:38.440Z"
+    text: Created responsive HTML email templates for order confirmation, shipped, out for delivery, and delivered notifications with MasonArt branding.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T12:20:43.256Z"
+completed: "2026-01-29T12:21:37.599Z"

@@ -29,8 +29,8 @@ priority: high
 status: done
 assignee: unassigned
 reporter: cli
-created: '2026-01-28T10:39:55.430Z'
-last_updated: '2026-01-28T15:42:49.627Z'
+created: "2026-01-28T10:39:55.430Z"
+last_updated: "2026-01-28T15:42:49.627Z"
 time_spent_minutes: 0
 labels:
   - database
@@ -38,15 +38,33 @@ labels:
 acceptance_criteria: []
 comments:
   - author: system
-    timestamp: '2026-01-28T11:12:39.191Z'
+    timestamp: "2026-01-28T11:12:39.191Z"
     text: Status changed from 'todo' to 'in-progress'
   - author: system
-    timestamp: '2026-01-28T15:42:49.627Z'
+    timestamp: "2026-01-28T15:42:49.627Z"
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T05:07:30.857Z"
+    text: |-
+      **Schema and Types Committed** - Commit `7eafdba1`
+
+      Added Full AI Generator database schema and type definitions:
+
+      **Schema (ai-generations.ts):**
+      - 5 new style presets enum values (15 total)
+      - Upscaling fields in AIGeneratedImageData
+      - userColorPalettes table (custom palettes, 3-8 colors)
+      - aiPromptSuggestions table (curated prompts)
+      - customPaletteId and referenceImageWeight fields
+
+      **Types (ai.ts):**
+      - Extended AIStylePreset type
+      - AIUpscaleStatus and AIUpscaleMultiplier types
+      - Upscaling fields in AIGeneratedImage interface
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
-started: '2026-01-28T11:12:39.191Z'
-completed: '2026-01-28T15:42:49.627Z'
+started: "2026-01-28T11:12:39.191Z"
+completed: "2026-01-28T15:42:49.627Z"

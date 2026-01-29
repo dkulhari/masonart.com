@@ -1,11 +1,10 @@
 name: order-tracking-notifications
 title: Order Tracking Notifications
 priority: high
-created: '2026-01-28T07:45:50.773Z'
+created: "2026-01-28T07:45:50.773Z"
 assignee: unassigned
 tags: []
 description: |-
-  ## Overview
   ## Overview
   Order tracking page showing status timeline, basic email notifications for order confirmation and shipping, and SMS notifications for key updates.
 
@@ -21,19 +20,112 @@ description: |-
   ## Source
   Roadmap Feature 11 (Phase 1)
 
-  ## Objectives
-  - TBD
+  ## Implementation Plan
+
+  ### Phase 1: Database Schema
+  Location: `packages/api/src/database/schema/`
+  Pattern: Drizzle ORM with pgTable, pgEnum, relations
+
+  - [ ] Create `notifications` table for notification log (id, orderId, type, channel, status, sentAt, error)
+  - [ ] Create `notificationPreferences` table (userId, emailOrderConfirmation, emailShipped, smsOrderConfirmation, smsOutForDelivery)
+  - [ ] Add notification preference relations to users table
+  - [ ] Export types and update schema index
+
+  ### Phase 2: Backend Services
+  Location: `packages/api/src/services/`
+  Pattern: Async functions with TypeScript types, error handling
+
+  - [ ] Create email service (`email.ts`) with Resend/SendGrid integration
+  - [ ] Create notification service (`notifications.ts`) to orchestrate email/SMS sending
+  - [ ] Add email templates for order confirmation and shipping updates
+  - [ ] Extend existing SMS service for transactional messages (not just OTP)
+  - [ ] Create notification trigger functions for order status changes
+
+  ### Phase 3: Backend API Routes
+  Location: `packages/api/src/routes/`
+  Pattern: Hono with zValidator, requireAuth middleware
+
+  - [ ] Create guest order lookup endpoint (`GET /api/orders/track?orderNumber=&email=`)
+  - [ ] Add notification preferences endpoints (`GET/PATCH /api/users/notification-preferences`)
+  - [ ] Add webhook/internal endpoint for triggering notifications on status change
+  - [ ] Integrate notification triggers into existing order status update flows
+
+  ### Phase 4: Frontend - Public Order Tracking
+  Location: `packages/web/app/routes/`
+  Pattern: TanStack Router with file-based routing, React components
+
+  - [ ] Create public order tracking page (`/track` or `/orders/track`)
+  - [ ] Build guest lookup form component (order number + email/phone)
+  - [ ] Integrate existing `OrderTrackingCard`, `TrackingTimeline` components
+  - [ ] Add tracking link in confirmation emails with token-based access
+
+  ### Phase 5: Frontend - User Notification Preferences
+  Location: `packages/web/app/routes/_authed/account/`
+  Pattern: Authenticated routes with React Hook Form
+
+  - [ ] Add notification preferences section to account settings
+  - [ ] Create toggle components for each notification type
+  - [ ] Wire up to notification preferences API
+
+  ### Phase 6: Testing
+  Location: `packages/api/tests/` and `packages/web/tests/`
+  Pattern: Vitest with describe/it blocks, mock services
+
+  - [ ] Unit tests for email and notification services
+  - [ ] API route tests for guest order lookup
+  - [ ] API route tests for notification preferences
+  - [ ] Component tests for tracking page and preferences UI
+  - [ ] E2E test for guest order tracking flow
+
+  ## Technical Notes
+  - Project type: Bun monorepo with Turbo
+  - Database: PostgreSQL with Drizzle ORM
+  - Backend: Hono API framework with Zod validation
+  - Frontend: TanStack Start with file-based routing
+  - Existing SMS: 2Factor.in integration (expand for transactional)
+  - Email provider: Recommend Resend for transactional emails (India-friendly)
+  - Existing tracking UI components can be reused
+
+  ## Dependencies
+  - Requires existing orders and shipping schemas (already complete)
+  - Builds on existing SMS service infrastructure
+  - Uses existing order tracking UI components
 objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo: {}
   in_progress: {}
-  done: {}
-total_tickets: 0
-completion_percentage: 0
-is_completed: false
+  done:
+    "78": Database Schema - Create notifications table
+    "79": Database Schema - Create notificationPreferences table
+    "80": Database Schema - Add notification preference relations
+    "81": Database Schema - Export types and update schema index
+    "82": Backend Services - Create email service with Resend
+    "83": Backend Services - Create notification orchestration service
+    "84": Backend Services - Add email templates
+    "85": Backend Services - Extend SMS service for transactional messages
+    "86": Backend Services - Create notification trigger functions
+    "87": Backend API - Guest order lookup endpoint
+    "88": Backend API - Notification preferences endpoints
+    "89": Backend API - Internal notification trigger endpoint
+    "90": Backend API - Integrate notification triggers into order flows
+    "91": Frontend - Create public order tracking page
+    "92": Frontend - Build guest lookup form component
+    "93": Frontend - Integrate existing tracking components
+    "94": Frontend - Add tracking link with token-based access
+    "95": Frontend - Add notification preferences to account settings
+    "96": Frontend - Create notification toggle components
+    "97": Frontend - Wire up notification preferences API
+    "98": Tests - Unit tests for email and notification services
+    "99": Tests - API route tests for guest order lookup
+    "100": Tests - API route tests for notification preferences
+    "101": Tests - Component tests for tracking and preferences UI
+    "102": Tests - E2E test for guest order tracking flow
+total_tickets: 25
+completion_percentage: 100
+is_completed: true

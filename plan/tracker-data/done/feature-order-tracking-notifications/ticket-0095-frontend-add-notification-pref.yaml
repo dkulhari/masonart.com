@@ -1,0 +1,53 @@
+ticket_number: 95
+title: Frontend - Add notification preferences to account settings
+description: |-
+  ## Task
+  Add notification preferences section to account settings page for authenticated users.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 5 - Frontend Preferences
+
+  ## Acceptance Criteria
+  - [ ] Section in account settings
+  - [ ] Fetch current preferences on load
+  - [ ] Update preferences via API
+  - [ ] Success/error feedback
+feature: order-tracking-notifications
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:39:06.087Z"
+last_updated: "2026-01-29T18:31:44.877Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T18:29:19.773Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T18:31:44.877Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T18:31:56.846Z"
+    text: |-
+      ✅ **Completed**
+
+      **Files Changed**:
+      - `packages/web/app/routes/_authed/account/notifications.tsx` - Created notification preferences page
+      - `packages/web/app/routes/_authed/account/index.tsx` - Added Notifications link to quick actions
+
+      **Summary**:
+      Created dedicated notification preferences page at /account/notifications with full preferences management. Added link to account dashboard quick actions.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T18:29:19.773Z"
+completed: "2026-01-29T18:31:44.877Z"

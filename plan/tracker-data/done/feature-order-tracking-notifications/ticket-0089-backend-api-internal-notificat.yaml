@@ -1,0 +1,45 @@
+ticket_number: 89
+title: Backend API - Internal notification trigger endpoint
+description: |-
+  ## Task
+  Add internal endpoint for triggering notifications on status change. Can be called by admin routes or webhooks.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 3 - Backend API Routes
+
+  ## Acceptance Criteria
+  - [ ] POST /api/admin/orders/:id/notify
+  - [ ] Admin authentication required
+  - [ ] Trigger specific notification type
+  - [ ] Return notification status
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:27.586Z"
+last_updated: "2026-01-29T12:30:31.953Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:29:02.095Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T12:30:31.953Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:30:33.168Z"
+    text: "Created admin notification routes: POST /api/admin/orders/:orderId/notify, GET /api/admin/orders/:orderId/notifications, POST /api/admin/notifications/:id/retry"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T12:29:02.094Z"
+completed: "2026-01-29T12:30:31.953Z"

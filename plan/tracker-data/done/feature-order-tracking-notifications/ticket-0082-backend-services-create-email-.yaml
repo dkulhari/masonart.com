@@ -1,0 +1,47 @@
+ticket_number: 82
+title: Backend Services - Create email service with Resend
+description: |-
+  ## Task
+  Create email service (`email.ts`) with Resend integration for sending transactional emails.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 2 - Backend Services
+  Location: `packages/api/src/services/email.ts`
+
+  ## Acceptance Criteria
+  - [ ] Resend SDK integration
+  - [ ] sendEmail function with template support
+  - [ ] Dev mode with console logging
+  - [ ] Environment variable configuration
+  - [ ] Error handling with typed responses
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:37:55.328Z"
+last_updated: "2026-01-29T12:19:37.374Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:18:40.930Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T12:19:37.374Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:19:38.133Z"
+    text: Created email service with Resend integration, dev mode logging, and template support.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T12:18:40.929Z"
+completed: "2026-01-29T12:19:37.374Z"

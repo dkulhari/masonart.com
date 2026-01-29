@@ -1,0 +1,49 @@
+ticket_number: 93
+title: Frontend - Integrate existing tracking components
+description: |-
+  ## Task
+  Integrate existing OrderTrackingCard, TrackingTimeline, TrackingStatusBadge components into the public tracking page.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 4 - Frontend Public Tracking
+  Existing components: `packages/web/app/components/order/`
+
+  ## Acceptance Criteria
+  - [ ] Display order status with timeline
+  - [ ] Show shipping carrier and tracking number
+  - [ ] Link to external tracking URL
+  - [ ] Display estimated delivery date
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:52.214Z"
+last_updated: "2026-01-29T18:28:35.532Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T18:28:35.532Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T18:28:49.901Z"
+    text: |-
+      ✅ **Completed**
+
+      **Files Changed**:
+      - `packages/web/app/routes/track/index.tsx` - OrderTrackingResult component
+
+      **Summary**:
+      Integrated existing TrackingTimeline and TrackingStatusBadge components into the public tracking page. Displays order status with timeline, carrier/tracking details, external tracking link, and delivery location.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-29T18:28:35.532Z"

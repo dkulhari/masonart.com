@@ -1,0 +1,44 @@
+ticket_number: 81
+title: Database Schema - Export types and update schema index
+description: |-
+  ## Task
+  Export all notification-related types and update the schema index barrel file to include new tables.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 1 - Database Schema
+
+  ## Acceptance Criteria
+  - [ ] Types exported from schema file
+  - [ ] Index file updated with exports
+  - [ ] Run migrations to apply schema
+feature: order-tracking-notifications
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:37:36.128Z"
+last_updated: "2026-01-29T12:18:20.444Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:15:11.919Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-29T12:18:20.444Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:18:33.462Z"
+    text: "Exported all types and updated schema index. Commit: b150294b"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-29T12:15:11.919Z"
+completed: "2026-01-29T12:18:20.444Z"

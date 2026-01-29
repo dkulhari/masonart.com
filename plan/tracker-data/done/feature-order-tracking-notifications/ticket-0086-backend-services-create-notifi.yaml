@@ -1,0 +1,41 @@
+ticket_number: 86
+title: Backend Services - Create notification trigger functions
+description: |-
+  ## Task
+  Create notification trigger functions that fire on order status changes.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 2 - Backend Services
+
+  ## Acceptance Criteria
+  - [ ] triggerOrderConfirmation function
+  - [ ] triggerOrderShipped function
+  - [ ] triggerOutForDelivery function
+  - [ ] Async/background processing
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:04.282Z"
+last_updated: "2026-01-29T12:26:04.786Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:26:04.787Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:26:05.517Z"
+    text: "Notification trigger functions implemented in notifications.ts: notifyOrderStatusChange, sendOrderNotification, retryNotification."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-29T12:26:04.786Z"

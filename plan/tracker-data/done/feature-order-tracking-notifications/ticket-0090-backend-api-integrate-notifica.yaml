@@ -1,0 +1,42 @@
+ticket_number: 90
+title: Backend API - Integrate notification triggers into order flows
+description: |-
+  ## Task
+  Integrate notification triggers into existing order status update flows.
+
+  ## Context
+  Part of feature: order-tracking-notifications
+  Phase: Phase 3 - Backend API Routes
+
+  ## Acceptance Criteria
+  - [ ] Trigger on order confirmation (payment success)
+  - [ ] Trigger on status change to 'shipped'
+  - [ ] Trigger on status change to 'out_for_delivery'
+  - [ ] Non-blocking async calls
+feature: order-tracking-notifications
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T11:38:29.487Z"
+last_updated: "2026-01-29T12:30:33.678Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - integration
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-29T12:30:33.678Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-29T12:30:34.502Z"
+    text: Integrated notification triggers into order status update flow. Notifications fire asynchronously when status changes to confirmed, shipped, out_for_delivery, or delivered.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-29T12:30:33.678Z"

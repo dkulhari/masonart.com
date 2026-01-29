@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-01-28T10:40:15.969Z'
-total_tickets: 49
+last_updated: '2026-01-29T11:39:39.807Z'
+total_tickets: 61
 summary:
   critical: 5
-  high: 39
-  medium: 5
+  high: 46
+  medium: 10
   low: 0
 priorities:
   high:
@@ -185,6 +185,36 @@ priorities:
             - title: 'Ticket #undefined'
             - title: 'Ticket #undefined'
             - title: 'Ticket #undefined'
+    - feature: full-ai-generator
+      tickets:
+        - ticket_number: 45
+          title: Database Schema - Extended AI Generator Tables
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 46
+          title: Backend - Expand Style Presets to 15 Total
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 47
+          title: Backend - Custom Color Palette API
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 48
+          title: Backend - Reference Image Upload and Processing
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 51
+          title: Frontend - Enhanced Style Selector with Categories
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 52
+          title: Frontend - Custom Color Palette Picker
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 56
+          title: Tests - Full AI Generator Feature Test Suite
+          assignee: unassigned
+          blocked_by: []
     - feature: wallet-system
       tickets:
         - ticket_number: 45
@@ -242,6 +272,28 @@ priorities:
           blocked_by: []
         - ticket_number: 27
           title: 'Phase 16: Documentation & Finalization'
+          assignee: unassigned
+          blocked_by: []
+    - feature: full-ai-generator
+      tickets:
+        - ticket_number: 49
+          title: Backend - AI-Powered Prompt Suggestions
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 50
+          title: Backend - High-Resolution Upscaling Service
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 53
+          title: Frontend - Reference Image Upload UI
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 54
+          title: Frontend - Prompt Suggestions UI
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 55
+          title: Frontend - Upscale UI and Results Enhancement
           assignee: unassigned
           blocked_by: []
   critical:
