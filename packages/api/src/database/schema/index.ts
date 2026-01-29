@@ -27,3 +27,6 @@ export * from "./shipping";
 
 // Return policies and return requests
 export * from "./returns";
+
+// Order tracking notifications and preferences
+export * from "./notifications";
