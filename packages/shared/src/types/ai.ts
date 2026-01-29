@@ -12,9 +12,10 @@ import type { PosterOrientation, ProductColor } from './product';
 // ============================================================================
 
 /**
- * AI style presets matching catalog styles
+ * AI style presets matching catalog styles - 15 total
  */
 export type AIStylePreset =
+  // Original 10 presets
   | 'wabi-sabi'
   | 'abstract-expression'
   | 'botanical'
@@ -24,7 +25,13 @@ export type AIStylePreset =
   | 'watercolor'
   | 'photography'
   | 'line-art'
-  | 'typography';
+  | 'typography'
+  // 5 new presets added in full-ai-generator feature
+  | 'ink-wash'
+  | 'digital-art'
+  | 'minimalist-modern'
+  | 'impressionist'
+  | 'art-deco';
 
 /**
  * Aspect ratio options for AI generation
@@ -103,8 +110,12 @@ export interface AIGenerationPrompt {
   colorMood?: AIColorMood;
   /** Specific colors to include */
   colorPalette?: ProductColor[];
+  /** Reference to user's saved custom palette */
+  customPaletteId?: string;
   /** Reference image URL (optional) */
   referenceImageUrl?: string;
+  /** Reference image weight (0.1-1.0), how closely to follow reference */
+  referenceImageWeight?: number;
   /** Seed for reproducibility (optional) */
   seed?: number;
 }
@@ -132,6 +143,16 @@ export interface AIGenerationRequest {
 // ============================================================================
 
 /**
+ * Upscale status for images
+ */
+export type AIUpscaleStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+/**
+ * Upscale multiplier options
+ */
+export type AIUpscaleMultiplier = 2 | 4;
+
+/**
  * Generated image output
  */
 export interface AIGeneratedImage {
@@ -157,6 +178,14 @@ export interface AIGeneratedImage {
   isSelected: boolean;
   /** Whether watermark is present */
   hasWatermark: boolean;
+  /** URL of upscaled image (if upscaled) */
+  upscaledImageUrl?: string;
+  /** Upscale multiplier used (2x or 4x) */
+  upscaleMultiplier?: AIUpscaleMultiplier;
+  /** Status of upscaling operation */
+  upscaleStatus?: AIUpscaleStatus;
+  /** When the image was upscaled */
+  upscaledAt?: Date;
 }
 
 /**

@@ -31,7 +31,9 @@ export interface AIPromptDetails {
   aspectRatio: string;
   colorMood?: string;
   colorPalette?: string[];
+  customPaletteId?: string; // Reference to user's saved palette
   referenceImageUrl?: string;
+  referenceImageWeight?: number; // 0.1 to 1.0, how closely to follow reference
   seed?: number;
 }
 
@@ -49,6 +51,11 @@ export interface AIGeneratedImageData {
   seed: number;
   isSelected: boolean;
   hasWatermark: boolean;
+  // Upscaling fields
+  upscaledImageUrl?: string;
+  upscaleMultiplier?: 2 | 4;
+  upscaleStatus?: "pending" | "processing" | "completed" | "failed";
+  upscaledAt?: string; // ISO timestamp
 }
 
 /**
@@ -110,9 +117,10 @@ export const aiGalleryVisibilityEnum = pgEnum("ai_gallery_visibility", [
 ]);
 
 /**
- * AI style preset enum
+ * AI style preset enum - 15 total styles
  */
 export const aiStylePresetEnum = pgEnum("ai_style_preset", [
+  // Original 10 presets
   "wabi-sabi",
   "abstract-expression",
   "botanical",
@@ -123,6 +131,12 @@ export const aiStylePresetEnum = pgEnum("ai_style_preset", [
   "photography",
   "line-art",
   "typography",
+  // 5 new presets added in full-ai-generator feature
+  "ink-wash", // Asian-inspired ink painting with gradient washes
+  "digital-art", // Modern digital illustration, gaming/concept art style
+  "minimalist-modern", // Clean lines, geometric simplicity, Scandinavian design
+  "impressionist", // Monet-inspired brushstrokes, light play, outdoor scenes
+  "art-deco", // 1920s geometric patterns, gold accents, glamorous
 ]);
 
 /**
@@ -361,6 +375,81 @@ export const aiUsageTracking = pgTable(
   })
 );
 
+/**
+ * User color palettes table - Stores custom color palettes for AI generation
+ */
+export const userColorPalettes = pgTable(
+  "user_color_palettes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Palette details
+    name: text("name").notNull(), // User-defined name, max 50 chars enforced in API
+    colors: jsonb("colors").$type<string[]>().notNull(), // Array of hex colors (3-8 colors)
+    isDefault: boolean("is_default").default(false).notNull(), // User's default palette
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    userIdIdx: index("user_color_palettes_user_id_idx").on(table.userId),
+    isDefaultIdx: index("user_color_palettes_is_default_idx").on(
+      table.userId,
+      table.isDefault
+    ),
+  })
+);
+
+/**
+ * AI prompt suggestions table - Caches popular/curated prompt suggestions
+ */
+export const aiPromptSuggestions = pgTable(
+  "ai_prompt_suggestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Suggestion content
+    prompt: text("prompt").notNull(),
+    stylePreset: aiStylePresetEnum("style_preset").notNull(),
+    colorMood: text("color_mood"), // Optional color mood association
+
+    // Source and popularity
+    source: text("source", { enum: ["curated", "popular", "trending"] })
+      .default("curated")
+      .notNull(),
+    usageCount: integer("usage_count").default(0).notNull(),
+    likesCount: integer("likes_count").default(0).notNull(),
+
+    // Moderation
+    isActive: boolean("is_active").default(true).notNull(),
+    isFeatured: boolean("is_featured").default(false).notNull(),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    stylePresetIdx: index("ai_prompt_suggestions_style_preset_idx").on(
+      table.stylePreset
+    ),
+    sourceIdx: index("ai_prompt_suggestions_source_idx").on(table.source),
+    activeIdx: index("ai_prompt_suggestions_active_idx").on(
+      table.isActive,
+      table.stylePreset
+    ),
+  })
+);
+
 // ============================================================================
 // Relations
 // ============================================================================
@@ -430,6 +519,27 @@ export const aiUsageTrackingRelations = relations(
   })
 );
 
+/**
+ * User color palettes relations
+ */
+export const userColorPalettesRelations = relations(
+  userColorPalettes,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userColorPalettes.userId],
+      references: [users.id],
+    }),
+  })
+);
+
+/**
+ * AI prompt suggestions relations (no user relation - system-managed)
+ */
+export const aiPromptSuggestionsRelations = relations(
+  aiPromptSuggestions,
+  () => ({})
+);
+
 // ============================================================================
 // Type Exports (inferred from schema)
 // ============================================================================
@@ -454,3 +564,9 @@ export type AIGalleryVisibility =
   (typeof aiGalleryVisibilityEnum.enumValues)[number];
 export type AIStylePreset = (typeof aiStylePresetEnum.enumValues)[number];
 export type AIAspectRatio = (typeof aiAspectRatioEnum.enumValues)[number];
+
+export type UserColorPalette = typeof userColorPalettes.$inferSelect;
+export type NewUserColorPalette = typeof userColorPalettes.$inferInsert;
+
+export type AIPromptSuggestion = typeof aiPromptSuggestions.$inferSelect;
+export type NewAIPromptSuggestion = typeof aiPromptSuggestions.$inferInsert;
