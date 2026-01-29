@@ -34,7 +34,7 @@ import { OrderTrackingCard } from '~/components/order'
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/account/orders/$id')({
+export const Route = createFileRoute('/_authed/account/orders/$id')({
   head: () => ({
     meta: [
       { title: 'Order Details | MasonArt' },
