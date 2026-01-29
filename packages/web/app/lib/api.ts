@@ -1717,6 +1717,107 @@ export const returnsApi = {
   },
 };
 
+// ============================================================================
+// Tracking API (Public/Guest Order Lookup)
+// ============================================================================
+
+/**
+ * Guest order lookup response
+ */
+export interface GuestOrderLookupResponse {
+  orderNumber: string;
+  status: string;
+  itemCount: number;
+  shippingAddress: {
+    city?: string;
+    state?: string;
+    postalCode?: string;
+  };
+  tracking: {
+    carrier: string;
+    trackingNumber: string | null;
+    trackingUrl: string | null;
+    status: ShipmentStatus;
+    shippedAt: string | null;
+    estimatedDeliveryAt: string | null;
+    deliveredAt: string | null;
+  } | null;
+  timeline: {
+    orderedAt: string;
+    shippedAt: string | null;
+    deliveredAt: string | null;
+  };
+}
+
+/**
+ * Guest order lookup parameters
+ */
+export interface GuestOrderLookupParams {
+  orderNumber: string;
+  email?: string;
+  phone?: string;
+}
+
+/**
+ * Tracking API (public endpoints for guest order lookup)
+ */
+export const trackingApi = {
+  /**
+   * Look up an order by order number and email/phone (no auth required)
+   */
+  async lookup(params: GuestOrderLookupParams): Promise<GuestOrderLookupResponse> {
+    const queryParams = new URLSearchParams({
+      orderNumber: params.orderNumber,
+    });
+
+    if (params.email) {
+      queryParams.set("email", params.email);
+    }
+    if (params.phone) {
+      queryParams.set("phone", params.phone);
+    }
+
+    const response = await fetch(`${getApiUrl()}/api/tracking/lookup?${queryParams}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      if (response.status === 404) {
+        throw new Error("Order not found. Please check your order number and email/phone.");
+      }
+      throw new Error(error.error || "Failed to look up order");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Look up an order by tracking token (from email link)
+   */
+  async lookupByToken(token: string): Promise<GuestOrderLookupResponse> {
+    const response = await fetch(`${getApiUrl()}/api/tracking/token/${token}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      if (response.status === 404 || response.status === 410) {
+        throw new Error("This tracking link has expired or is invalid.");
+      }
+      throw new Error(error.error || "Failed to look up order");
+    }
+
+    return response.json();
+  },
+};
+
 export const api = {
   products: productsApi,
   cart: cartApi,
@@ -1728,6 +1829,7 @@ export const api = {
   shipping: shippingApi,
   shipments: shipmentsApi,
   returns: returnsApi,
+  tracking: trackingApi,
 };
 
 export default api;

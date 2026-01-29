@@ -194,6 +194,101 @@ tracking.get(
 // ============================================================================
 
 /**
+ * GET /api/tracking/token/:token
+ * Look up an order by tracking token (from email link)
+ * Tokens are generated when orders are created and included in confirmation emails.
+ */
+tracking.get(
+  "/token/:token",
+  async (c) => {
+    const token = c.req.param("token");
+
+    if (!token || token.length < 32) {
+      return c.json(
+        { error: "Invalid tracking token", code: "INVALID_TOKEN" },
+        400
+      );
+    }
+
+    try {
+      // Find order by tracking token
+      const order = await db.query.orders.findFirst({
+        where: eq(orders.trackingToken, token),
+        columns: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          trackingTokenExpiresAt: true,
+          shippingAddress: true,
+          shippingDetails: true,
+          itemCount: true,
+          createdAt: true,
+          shippedAt: true,
+          deliveredAt: true,
+        },
+      });
+
+      if (!order) {
+        return c.json(
+          { error: "Order not found or link expired", code: "TOKEN_NOT_FOUND" },
+          404
+        );
+      }
+
+      // Check if token has expired
+      if (order.trackingTokenExpiresAt && new Date(order.trackingTokenExpiresAt) < new Date()) {
+        return c.json(
+          { error: "This tracking link has expired", code: "TOKEN_EXPIRED" },
+          410
+        );
+      }
+
+      // Get shipment tracking info if available
+      const shipment = await db.query.orderShipments.findFirst({
+        where: eq(orderShipments.orderId, order.id),
+        orderBy: (shipments, { desc }) => [desc(shipments.createdAt)],
+      });
+
+      // Return tracking info (same format as lookup endpoint)
+      return c.json({
+        orderNumber: order.orderNumber,
+        status: order.status,
+        itemCount: order.itemCount,
+        shippingAddress: {
+          city: order.shippingAddress?.city,
+          state: order.shippingAddress?.state,
+          postalCode: order.shippingAddress?.postalCode,
+        },
+        tracking: shipment ? {
+          carrier: shipment.carrier,
+          trackingNumber: shipment.trackingNumber,
+          trackingUrl: shipment.trackingUrl,
+          status: shipment.status,
+          shippedAt: shipment.shippedAt,
+          estimatedDeliveryAt: shipment.estimatedDeliveryAt,
+          deliveredAt: shipment.deliveredAt,
+        } : null,
+        timeline: {
+          orderedAt: order.createdAt,
+          shippedAt: order.shippedAt,
+          deliveredAt: order.deliveredAt,
+        },
+      });
+    } catch (error) {
+      console.error("[Tracking] Error looking up order by token:", error);
+      return c.json(
+        { error: "Failed to look up order", code: "LOOKUP_ERROR" },
+        500
+      );
+    }
+  }
+);
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
  * Normalize phone number for comparison
  */
 function normalizePhone(phone: string): string {

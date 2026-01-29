@@ -195,6 +195,10 @@ export const orders = pgTable(
     customerNotes: text("customer_notes"), // Notes from customer
     internalNotes: text("internal_notes"), // Notes for admin/staff
 
+    // Tracking token (for guest order tracking links)
+    trackingToken: text("tracking_token").unique(), // UUID-like token for email links
+    trackingTokenExpiresAt: timestamp("tracking_token_expires_at"), // Optional expiration
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -213,6 +217,7 @@ export const orders = pgTable(
     paymentStatusIdx: index("orders_payment_status_idx").on(table.paymentStatus),
     createdAtIdx: index("orders_created_at_idx").on(table.createdAt),
     guestEmailIdx: index("orders_guest_email_idx").on(table.guestEmail),
+    trackingTokenIdx: index("orders_tracking_token_idx").on(table.trackingToken),
   })
 );
 
