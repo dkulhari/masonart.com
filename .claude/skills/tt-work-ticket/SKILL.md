@@ -170,9 +170,9 @@ Ready to implement. What would you like to do?
 
 | Ticket Type | Test Types | Location | Tool |
 |-------------|------------|----------|------|
-| Database/Schema | Schema validation, type inference | `packages/api/tests/database/` | Vitest |
-| Backend/API | Route tests, service unit tests | `packages/api/tests/routes/` | Vitest + supertest |
-| Frontend/UI | Component tests (if complex), hook tests | `packages/web/tests/` | Vitest + Testing Library |
+| Database/Schema | Schema validation, type inference | Discover from project | Project's test runner |
+| Backend/API | Route tests, service unit tests | Discover from project | Project's test runner |
+| Frontend/UI | Component tests (if complex), hook tests | Discover from project | Project's test runner |
 
 **E2E tests are NOT per-ticket** - they're created at feature completion by `/tt-implement-feature`.
 
@@ -183,15 +183,15 @@ Implementation:
 1. Find existing schema location (discovered in Step 4)
 2. Create/modify schema following project patterns
 3. Update any index/barrel exports
-4. Run migrations if applicable (check package.json for migration commands)
+4. Run migrations if applicable (check project for migration commands)
 
 Tests to write:
 - Schema table existence tests
 - Column type validation tests
 - Relation/foreign key tests
-- Type inference tests ($inferSelect, $inferInsert)
+- Type inference tests
 
-Example test location: packages/api/tests/database/{feature}.test.ts
+Test location: Discover from project's existing test structure
 ```
 
 ### Backend/API Tickets
@@ -209,7 +209,7 @@ Tests to write:
 - Validation tests (valid/invalid inputs)
 - Auth/permission tests (if protected route)
 
-Example test location: packages/api/tests/routes/{feature}.test.ts
+Test location: Discover from project's existing test structure
 ```
 
 ### Frontend/UI Tickets
@@ -224,9 +224,9 @@ Implementation:
 Tests to write (for complex components only):
 - Component render tests
 - User interaction tests
-- Hook tests (TanStack Query, Zustand stores)
+- State management hook tests
 
-Example test location: packages/web/tests/components/{feature}.test.tsx
+Test location: Discover from project's existing test structure
 
 Note: Simple presentational components don't need tests.
 E2E tests will cover page-level testing at feature completion.
@@ -234,22 +234,85 @@ E2E tests will cover page-level testing at feature completion.
 
 **Important**: Unit/integration tests are per-ticket. E2E tests are per-feature.
 
-## After Implementation
+## During Implementation: Document Design Decisions
 
-When implementation is complete, remind the user:
+As you implement, add ticket comments for significant decisions:
 
 ```
-✅ Implementation looks complete!
+mcp__ticketrack__addComment:
+  ticketId: {ticket-number}
+  comment: |
+    **Design Decision**: {decision title}
 
-Next steps:
-1. Run tests to verify: pnpm test
-2. Commit your changes
-3. Mark ticket done: The skill will offer to update status
+    Options considered:
+    - Option A: {description} - {pros/cons}
+    - Option B: {description} - {pros/cons}
 
-Update status now? (y/n)
+    Chosen: Option {X} because {reasoning}
 ```
 
-If yes:
+### For Bug Tickets
+
+When working on bug tickets, document the root cause:
+
+```
+mcp__ticketrack__addComment:
+  ticketId: {ticket-number}
+  comment: |
+    **Root Cause Analysis**:
+
+    The bug was caused by: {explanation}
+
+    Location: `{file:line}`
+
+    What happened:
+    - {sequence of events leading to bug}
+
+    Fix approach:
+    - {how the fix addresses the root cause}
+```
+
+## After Implementation: Commit Per-Ticket
+
+**IMPORTANT**: Every ticket gets its own commit. This ensures clean git history and easy rollbacks.
+
+### Step 7: Verify and Test
+
+```
+1. Discover project's test command (from package.json, Makefile, etc.)
+2. Run relevant tests for changed files
+3. Run build/type-check command to verify compilation
+4. Fix any issues before committing
+```
+
+### Step 8: Commit the Ticket Work
+
+Create a focused commit for this ticket's changes only:
+
+```bash
+# Stage only files related to THIS ticket
+git add {specific-files}
+
+# Commit with ticket reference
+git commit -m "feat({scope}): {brief description}
+
+{Detailed explanation of what was done}
+
+Implements #{ticket-number}
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
+
+**Commit Message Guidelines**:
+- Use conventional commits: `feat`, `fix`, `refactor`, `test`, `docs`
+- Scope should match the ticket area (schema, api, ui, etc.)
+- Reference the ticket number with `Implements #XX` or `Fixes #XX`
+- Keep first line under 72 characters
+
+### Step 9: Update Ticket with Completion Info
+
+After committing, update the ticket with full details:
+
 ```
 mcp__ticketrack__updateTicketStatus:
   ticketId: {ticket-number}
@@ -257,7 +320,43 @@ mcp__ticketrack__updateTicketStatus:
 
 mcp__ticketrack__addComment:
   ticketId: {ticket-number}
-  comment: "Completed. Commit: {commit-hash if available}"
+  comment: |
+    ✅ **Completed**
+
+    **Commit**: `{commit-hash}` - {commit-subject}
+
+    **Files Changed**:
+    - `{file1}` - {brief description}
+    - `{file2}` - {brief description}
+
+    **Summary**:
+    {What was implemented and how it satisfies the acceptance criteria}
+
+    **Tests Added**:
+    - {test-file}: {what it tests}
+```
+
+## Complete Ticket Workflow Summary
+
+```
+1. Fetch ticket details → understand scope
+2. Check dependencies → ensure no blockers
+3. Fetch feature context → understand the bigger picture
+4. Gather file context → know what exists
+5. Update status to in-progress
+6. IMPLEMENT with documentation:
+   - Add design decision comments as you go
+   - For bugs: document root cause
+7. VERIFY:
+   - Run tests
+   - Check build
+8. COMMIT (per-ticket!):
+   - Stage relevant files only
+   - Write descriptive commit message
+   - Reference ticket number
+9. UPDATE ticket:
+   - Mark as done
+   - Add completion comment with commit info
 ```
 
 ## Error Handling

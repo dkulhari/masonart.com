@@ -29,11 +29,13 @@ This skill **delegates to tt-work-ticket** for per-ticket operations:
 | File context gathering | → tt-work-ticket Step 4 |
 | Implementation guidance | → tt-work-ticket "Implementation Guidance by Label" |
 | Testing requirements | → tt-work-ticket "Testing Strategy (Per Ticket)" |
+| Design decision docs | → tt-work-ticket "During Implementation" |
+| Bug root cause docs | → tt-work-ticket "For Bug Tickets" |
+| Per-ticket commits | → tt-work-ticket Steps 7-9 |
 
 **tt-work-ticket is the source of truth** for these patterns. This skill adds:
 - Automated looping through all tickets
 - No user prompts (continuous execution)
-- Per-ticket commits
 - E2E tests at feature completion
 
 ## Arguments
@@ -171,54 +173,83 @@ Do NOT duplicate those patterns here - tt-work-ticket is the source of truth.
 
 **Key differences from tt-work-ticket:**
 1. No pause for user input - proceed directly to implementation
-2. Auto-commit after each ticket (Step 5g)
-3. Continue to next ticket after completion
+2. Continue to next ticket after completion
 
 Use Edit, Write, and other tools to make changes.
 
-#### 5f. Verify
+#### 5f. Document Design Decisions
 
-Discover and run relevant build/test commands from the project:
+**→ Follow `/tt-work-ticket` "During Implementation: Document Design Decisions"**
 
-**Step 1: Detect build system**
+For significant decisions during implementation:
 ```
-Check for: package.json, Makefile, Cargo.toml, go.mod, etc.
-Parse scripts section in package.json if present
-```
-
-**Step 2: Run appropriate commands**
-```bash
-# Examples (actual commands discovered from project):
-# npm/pnpm/yarn: Look for "build", "test", "check" scripts
-# Cargo: cargo build, cargo test
-# Go: go build, go test
-# Make: make build, make test
+mcp__ticketrack__addComment:
+  ticketId: {id}
+  comment: |
+    **Design Decision**: {title}
+    Chose {approach} because {reasoning}
 ```
 
-**Step 3: For monorepos, identify affected packages**
+**For Bug Tickets** (if ticket type is `bug`):
+
+**→ Follow `/tt-work-ticket` "For Bug Tickets"**
+
+Document the root cause before fixing:
 ```
-Check for workspace configuration
-Run commands scoped to changed packages if possible
+mcp__ticketrack__addComment:
+  ticketId: {id}
+  comment: |
+    **Root Cause**: {what caused the bug}
+    **Location**: `{file:line}`
+    **Fix**: {how it was fixed}
 ```
+
+#### 5g. Verify
+
+**→ Follow `/tt-work-ticket` Step 7: Verify and Test**
+
+Discover and run the project's build/test commands:
+
+1. **Detect build system** from project files (package.json, Makefile, Cargo.toml, etc.)
+2. **Run tests** for changed files using the project's test runner
+3. **Run build** to verify compilation/type-checking passes
 
 If tests fail:
 - Attempt to fix
 - If unable to fix after 2 attempts, pause and report
 
-#### 5g. Commit
+#### 5h. Commit (Per-Ticket)
 
-Create a commit for this ticket:
+**→ Follow `/tt-work-ticket` Step 8: Commit the Ticket Work**
+
+**IMPORTANT**: Stage ONLY files related to THIS ticket, not all changes.
 
 ```bash
-git add .
-git commit -m "{ticket-title}
+# Stage specific files (NOT git add .)
+git add {specific-files-for-this-ticket}
+
+# Commit with conventional format and ticket reference
+git commit -m "{type}({scope}): {brief description}
+
+{Detailed explanation of changes}
 
 Implements #{ticket-id} for {feature-name}
 
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ```
 
-#### 5h. Mark Done
+**Commit Types**:
+- `feat`: New feature/functionality
+- `fix`: Bug fix
+- `refactor`: Code restructuring
+- `test`: Adding/updating tests
+- `docs`: Documentation changes
+
+**Scope**: Match ticket area (schema, api, ui, service, etc.)
+
+#### 5i. Update Ticket with Completion Info
+
+**→ Follow `/tt-work-ticket` Step 9: Update Ticket**
 
 ```
 mcp__ticketrack__updateTicketStatus:
@@ -227,15 +258,28 @@ mcp__ticketrack__updateTicketStatus:
 
 mcp__ticketrack__addComment:
   ticketId: {id}
-  comment: "Implemented and committed. Commit: {commit-hash}"
+  comment: |
+    ✅ **Completed**
+
+    **Commit**: `{commit-hash}` - {commit-subject}
+
+    **Files Changed**:
+    - `{file1}` - {description}
+    - `{file2}` - {description}
+
+    **Summary**:
+    {What was implemented and how}
+
+    **Tests**:
+    - {test-file}: {what it tests}
 ```
 
-#### 5i. Progress Update
+#### 5j. Progress Update
 
 ```
 ✅ Ticket #{id} complete
-   Commit: {short-hash}
-   Files changed: {count}
+   Commit: {short-hash} - {commit-message}
+   Files: +{additions} -{deletions}
 ```
 
 ### Step 6: E2E Tests (Feature Level)
