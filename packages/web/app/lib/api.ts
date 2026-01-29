@@ -1818,6 +1818,91 @@ export const trackingApi = {
   },
 };
 
+// ============================================================================
+// Notification Preferences API
+// ============================================================================
+
+/**
+ * Notification preferences response
+ */
+export interface NotificationPreferencesResponse {
+  preferences: {
+    email: {
+      orderConfirmation: boolean;
+      shipped: boolean;
+      outForDelivery: boolean;
+      delivered: boolean;
+    };
+    sms: {
+      orderConfirmation: boolean;
+      shipped: boolean;
+      outForDelivery: boolean;
+      delivered: boolean;
+    };
+    updatedAt: string;
+  };
+}
+
+/**
+ * Notification preferences update input
+ */
+export interface NotificationPreferencesUpdate {
+  emailOrderConfirmation?: boolean;
+  emailShipped?: boolean;
+  emailOutForDelivery?: boolean;
+  emailDelivered?: boolean;
+  smsOrderConfirmation?: boolean;
+  smsShipped?: boolean;
+  smsOutForDelivery?: boolean;
+  smsDelivered?: boolean;
+}
+
+/**
+ * Notification Preferences API
+ */
+export const notificationPreferencesApi = {
+  /**
+   * Get current user's notification preferences
+   */
+  async get(): Promise<NotificationPreferencesResponse> {
+    const response = await fetch(`${getApiUrl()}/api/notification-preferences`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to get notification preferences");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Update notification preferences
+   */
+  async update(updates: NotificationPreferencesUpdate): Promise<NotificationPreferencesResponse & { message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/notification-preferences`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to update notification preferences");
+    }
+
+    return response.json();
+  },
+};
+
 export const api = {
   products: productsApi,
   cart: cartApi,
@@ -1830,6 +1915,7 @@ export const api = {
   shipments: shipmentsApi,
   returns: returnsApi,
   tracking: trackingApi,
+  notificationPreferences: notificationPreferencesApi,
 };
 
 export default api;

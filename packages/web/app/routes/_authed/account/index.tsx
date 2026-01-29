@@ -18,6 +18,7 @@ import {
   Sparkles,
   MapPin,
   Wallet,
+  Bell,
 } from 'lucide-react'
 import { cn, formatDate, getInitials } from '~/lib/utils'
 import { ordersApi } from '~/lib/api'
@@ -100,6 +101,14 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: '/account/addresses',
     color: 'text-green-600',
     bgColor: 'bg-green-100',
+  },
+  {
+    title: 'Notifications',
+    description: 'Email & SMS preferences',
+    icon: Bell,
+    href: '/account/notifications',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100',
   },
   {
     title: 'Account Settings',
