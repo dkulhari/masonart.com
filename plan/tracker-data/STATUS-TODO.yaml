@@ -1,118 +1,64 @@
 status: todo
-last_updated: '2026-01-28T00:15:00.000Z'
-total_tickets: 17
+last_updated: '2026-01-28T10:40:15.750Z'
+total_tickets: 12
 summary:
-  critical: 2
-  high: 15
-  medium: 0
+  critical: 0
+  high: 7
+  medium: 5
   low: 0
 priorities:
-  critical:
-    - feature: user-reviews
-      tickets:
-        - ticket_number: 28
-          title: 'Database Schema - Reviews Table'
-          assignee: unassigned
-          blocked_by: []
-    - feature: shipping-returns
-      tickets:
-        - ticket_number: 36
-          title: 'Database Schema - Shipping and Returns Tables'
-          assignee: unassigned
-          blocked_by: []
   high:
-    - feature: user-reviews
+    - feature: full-ai-generator
       tickets:
-        - ticket_number: 29
-          title: 'API Routes - Public Review Endpoints'
+        - ticket_number: 45
+          title: Database Schema - Extended AI Generator Tables
           assignee: unassigned
-          blocked_by: [28]
-        - ticket_number: 30
-          title: 'API Routes - Admin Moderation Endpoints'
+          blocked_by: []
+        - ticket_number: 46
+          title: Backend - Expand Style Presets to 15 Total
           assignee: unassigned
-          blocked_by: [28]
-        - ticket_number: 31
-          title: 'Frontend - Review Display Components'
+          blocked_by: []
+        - ticket_number: 47
+          title: Backend - Custom Color Palette API
           assignee: unassigned
-          blocked_by: [29]
-        - ticket_number: 32
-          title: 'Frontend - Review Submission Form'
+          blocked_by: []
+        - ticket_number: 48
+          title: Backend - Reference Image Upload and Processing
           assignee: unassigned
-          blocked_by: [29]
-        - ticket_number: 33
-          title: 'Integration - Product Page Reviews'
+          blocked_by: []
+        - ticket_number: 51
+          title: Frontend - Enhanced Style Selector with Categories
           assignee: unassigned
-          blocked_by: [29, 31, 32]
-        - ticket_number: 34
-          title: 'Admin Panel - Review Moderation Dashboard'
+          blocked_by: []
+        - ticket_number: 52
+          title: Frontend - Custom Color Palette Picker
           assignee: unassigned
-          blocked_by: [30]
-        - ticket_number: 35
-          title: 'Tests - Unit and E2E Test Suite'
+          blocked_by: []
+        - ticket_number: 56
+          title: Tests - Full AI Generator Feature Test Suite
           assignee: unassigned
-          blocked_by: [33, 34]
-    - feature: shipping-returns
+          blocked_by: []
+  medium:
+    - feature: full-ai-generator
       tickets:
-        - ticket_number: 37
-          title: 'API Routes - Shipping Options Endpoints'
+        - ticket_number: 49
+          title: Backend - AI-Powered Prompt Suggestions
           assignee: unassigned
-          blocked_by: [36]
-        - ticket_number: 38
-          title: 'API Routes - Order Shipments & Tracking'
+          blocked_by: []
+        - ticket_number: 50
+          title: Backend - High-Resolution Upscaling Service
           assignee: unassigned
-          blocked_by: [36]
-        - ticket_number: 39
-          title: 'API Routes - Return Requests'
+          blocked_by: []
+        - ticket_number: 53
+          title: Frontend - Reference Image Upload UI
           assignee: unassigned
-          blocked_by: [36]
-        - ticket_number: 40
-          title: 'Frontend - Checkout Shipping Selection'
+          blocked_by: []
+        - ticket_number: 54
+          title: Frontend - Prompt Suggestions UI
           assignee: unassigned
-          blocked_by: [37]
-        - ticket_number: 41
-          title: 'Frontend - Order Tracking Display'
+          blocked_by: []
+        - ticket_number: 55
+          title: Frontend - Upscale UI and Results Enhancement
           assignee: unassigned
-          blocked_by: [38]
-        - ticket_number: 42
-          title: 'Frontend - Return Request Flow'
-          assignee: unassigned
-          blocked_by: [39]
-        - ticket_number: 43
-          title: 'Admin Panel - Returns Management Dashboard'
-          assignee: unassigned
-          blocked_by: [39]
-        - ticket_number: 44
-          title: 'Tests - Unit and E2E Test Suite'
-          assignee: unassigned
-          blocked_by: [40, 41, 42, 43]
-blocked_tickets:
-  - ticket_number: 29
-    blocked_by: [28]
-  - ticket_number: 30
-    blocked_by: [28]
-  - ticket_number: 31
-    blocked_by: [29]
-  - ticket_number: 32
-    blocked_by: [29]
-  - ticket_number: 33
-    blocked_by: [29, 31, 32]
-  - ticket_number: 34
-    blocked_by: [30]
-  - ticket_number: 35
-    blocked_by: [33, 34]
-  - ticket_number: 37
-    blocked_by: [36]
-  - ticket_number: 38
-    blocked_by: [36]
-  - ticket_number: 39
-    blocked_by: [36]
-  - ticket_number: 40
-    blocked_by: [37]
-  - ticket_number: 41
-    blocked_by: [38]
-  - ticket_number: 42
-    blocked_by: [39]
-  - ticket_number: 43
-    blocked_by: [39]
-  - ticket_number: 44
-    blocked_by: [40, 41, 42, 43]
+          blocked_by: []
+blocked_tickets: []

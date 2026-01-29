@@ -1,0 +1,98 @@
+ticket_number: 55
+title: Frontend - Upscale UI and Results Enhancement
+description: |-
+  ## Overview
+  Add upscaling option to generation results for selected images.
+
+  ## UI Changes to GenerationResults
+
+  ### Upscale Button
+  - Appears on selected/completed images
+  - Dropdown with 2x and 4x options
+  - Shows cost for each option
+  - Disabled if insufficient wallet balance
+
+  ### Upscale Progress
+  - Loading state on image card
+  - Progress percentage
+  - 'Upscaling...' overlay
+
+  ### Upscaled Image Display
+  - Badge showing '2x' or '4x' upscaled
+  - High-res download button
+  - Before/after toggle (optional)
+
+  ## Wallet Balance Integration
+  - Show wallet balance near generate button
+  - Low balance warning
+  - Quick link to add funds
+
+  ## Files to Modify
+  - packages/web/app/components/ai-generator/GenerationResults.tsx
+  - packages/web/app/hooks/useUpscale.ts (new hook)
+  - packages/web/app/routes/create/index.tsx (wallet display)
+
+  ## Acceptance Criteria
+  - [ ] Upscale options visible on completed images
+  - [ ] Cost preview accurate
+  - [ ] Progress tracking during upscale
+  - [ ] High-res image accessible after upscale
+  - [ ] Wallet balance visible and accurate
+  - [ ] Component tests pass
+feature: full-ai-generator
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:40:12.349Z'
+last_updated: '2026-01-28T15:39:07.030Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:39:06.608Z'
+    text: |-
+      ✅ Completed in commit 9f3bcd14
+
+      Implementation:
+      - Created useUpscale hook with polling and progress tracking
+      - Added upscale button dropdown with 2x/4x options in image cards
+      - Show cost (5/10 credits) and estimated time (15/30 seconds)
+      - Display upscaling overlay with spinner and progress percentage
+      - Added "Upscaled" badge for completed upscales
+      - Added wallet balance display with low balance warning (<5 credits)
+      - Added upscale options to preview modal
+      - Added high-res download button for upscaled images
+      - Affordability check based on wallet balance
+
+      Tests: 104 passing
+      - Hook configuration and costs
+      - Job key generation
+      - Job state management
+      - Progress tracking
+      - Result handling
+      - Callbacks (onComplete, onError)
+      - Polling behavior
+      - Cancel functionality
+      - isUpscaling states
+      - Error handling
+      - API URL construction
+      - Component image grid
+      - Selection handling
+      - Upscale button and dropdown
+      - Wallet balance display
+      - Generation status states
+      - Preview modal
+  - author: system
+    timestamp: '2026-01-28T15:39:07.030Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:39:07.030Z'

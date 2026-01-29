@@ -1,0 +1,64 @@
+ticket_number: 51
+title: Frontend - Enhanced Style Selector with Categories
+description: |-
+  ## Overview
+  Update StyleSelector component to display 15 presets organized by category with better visual hierarchy.
+
+  ## UI Changes
+  1. **Category Tabs**
+     - Artistic: Wabi-Sabi, Abstract, Impressionist, Ink Wash
+     - Modern: Geometric, Digital Art, Minimalist Modern, Pop Art
+     - Classic: Vintage Poster, Art Deco, Watercolor, Botanical
+     - Specialty: Photography, Line Art, Typography
+
+  2. **Style Cards Enhancement**
+     - Larger preview images
+     - Hover shows full style description
+     - 'Popular' badge for top 3 used styles
+     - Cost indicator if style affects pricing
+
+  3. **Responsive Design**
+     - 4 columns on desktop
+     - 3 columns on tablet
+     - 2 columns on mobile
+     - Horizontal scroll within categories on small screens
+
+  ## Files to Modify
+  - packages/web/app/components/ai-generator/StyleSelector.tsx
+  - Add new preview images for 5 new styles
+
+  ## Acceptance Criteria
+  - [ ] All 15 styles visible and selectable
+  - [ ] Categories improve discoverability
+  - [ ] Mobile experience is smooth
+  - [ ] New style preview images look professional
+  - [ ] Component tests pass
+feature: full-ai-generator
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:40:04.347Z'
+last_updated: '2026-01-28T15:25:37.266Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:25:31.298Z'
+    text: |-
+      **Commit:** `853eaaa2` feat(web): Enhance StyleSelector with 5 new style presets (#51)
+
+      Added 5 new presets to frontend with gradient thumbnails and 45 tests passing.
+  - author: system
+    timestamp: '2026-01-28T15:25:37.267Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:25:37.266Z'

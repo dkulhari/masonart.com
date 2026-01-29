@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-01-27T19:33:22.880Z'
-total_tickets: 11
+last_updated: '2026-01-28T10:40:15.969Z'
+total_tickets: 49
 summary:
-  critical: 0
-  high: 9
-  medium: 2
+  critical: 5
+  high: 39
+  medium: 5
   low: 0
 priorities:
   high:
@@ -58,6 +58,165 @@ priorities:
           title: Initialize TanStack Start with Tailwind CSS
           assignee: unassigned
           blocked_by: []
+    - feature: qa-testing
+      tickets:
+        - ticket_number: 13
+          title: 'Phase 2: Infrastructure Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 14
+          title: 'Phase 3: Shared Package Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 15
+          title: 'Phase 4: Database Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 17
+          title: 'Phase 6: Backend API Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 18
+          title: 'Phase 7: Frontend Package Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 19
+          title: 'Phase 8: Frontend Pages E2E Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 22
+          title: 'Phase 11: User Account Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 23
+          title: 'Phase 12: Admin Panel Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 25
+          title: 'Phase 14: Integration Flow Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 26
+          title: 'Phase 15: CI/CD Setup'
+          assignee: unassigned
+          blocked_by: []
+    - feature: user-reviews
+      tickets:
+        - ticket_number: 29
+          title: API Routes - Public Review Endpoints
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 30
+          title: API Routes - Admin Moderation Endpoints
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 31
+          title: Frontend - Review Display Components
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 32
+          title: Frontend - Review Submission Form
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 33
+          title: Integration - Product Page Reviews
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+        - ticket_number: 34
+          title: Admin Panel - Review Moderation Dashboard
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 35
+          title: Tests - Unit and E2E Test Suite
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+    - feature: shipping-returns
+      tickets:
+        - ticket_number: 37
+          title: API Routes - Shipping Options Endpoints
+          assignee: unassigned
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 38
+          title: API Routes - Order Shipments & Tracking
+          assignee: unassigned
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 39
+          title: API Routes - Return Requests
+          assignee: unassigned
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 40
+          title: Frontend - Checkout Shipping Selection
+          assignee: unassigned
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 41
+          title: Frontend - Order Tracking Display
+          assignee: unassigned
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 42
+          title: Frontend - Return Request Flow
+          assignee: unassigned
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 43
+          title: Admin Panel - Returns Management Dashboard
+          assignee: unassigned
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 44
+          title: Tests - Unit and E2E Test Suite
+          assignee: unassigned
+          blocked_by:
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+    - feature: wallet-system
+      tickets:
+        - ticket_number: 45
+          title: Database Schema - Wallet Tables
+          assignee: claude
+          blocked_by: []
+        - ticket_number: 46
+          title: Backend Services - Wallet Core Functions
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+        - ticket_number: 47
+          title: API Routes - Wallet Endpoints
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+        - ticket_number: 48
+          title: Frontend - Wallet UI Components
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+        - ticket_number: 49
+          title: Tests - Unit and E2E Test Suite
+          assignee: claude
+          blocked_by:
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
+            - title: 'Ticket #undefined'
   medium:
     - feature: admin-panel
       tickets:
@@ -71,4 +230,152 @@ priorities:
           title: Add SEO optimization and structured data
           assignee: unassigned
           blocked_by: []
-blocked_tickets: []
+    - feature: qa-testing
+      tickets:
+        - ticket_number: 20
+          title: 'Phase 9: AI Generation Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 24
+          title: 'Phase 13: SEO & Performance Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 27
+          title: 'Phase 16: Documentation & Finalization'
+          assignee: unassigned
+          blocked_by: []
+  critical:
+    - feature: qa-testing
+      tickets:
+        - ticket_number: 12
+          title: 'Phase 1: Setup & Configuration'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 16
+          title: 'Phase 5: Authentication Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 21
+          title: 'Phase 10: Checkout & Payments Tests'
+          assignee: unassigned
+          blocked_by: []
+    - feature: user-reviews
+      tickets:
+        - ticket_number: 28
+          title: Database Schema - Reviews Table
+          assignee: claude
+          blocked_by: []
+    - feature: shipping-returns
+      tickets:
+        - ticket_number: 36
+          title: Database Schema - Shipping and Returns Tables
+          assignee: claude
+          blocked_by: []
+blocked_tickets:
+  - ticket_number: 29
+    title: API Routes - Public Review Endpoints
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 30
+    title: API Routes - Admin Moderation Endpoints
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 31
+    title: Frontend - Review Display Components
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 32
+    title: Frontend - Review Submission Form
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 33
+    title: Integration - Product Page Reviews
+    blocked_by:
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+    description: ', , '
+  - ticket_number: 34
+    title: Admin Panel - Review Moderation Dashboard
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 35
+    title: Tests - Unit and E2E Test Suite
+    blocked_by:
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+    description: ', '
+  - ticket_number: 37
+    title: API Routes - Shipping Options Endpoints
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 38
+    title: API Routes - Order Shipments & Tracking
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 39
+    title: API Routes - Return Requests
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 40
+    title: Frontend - Checkout Shipping Selection
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 41
+    title: Frontend - Order Tracking Display
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 42
+    title: Frontend - Return Request Flow
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 43
+    title: Admin Panel - Returns Management Dashboard
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 44
+    title: Tests - Unit and E2E Test Suite
+    blocked_by:
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+    description: ', , , '
+  - ticket_number: 46
+    title: Backend Services - Wallet Core Functions
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 47
+    title: API Routes - Wallet Endpoints
+    blocked_by:
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+    description: ', '
+  - ticket_number: 48
+    title: Frontend - Wallet UI Components
+    blocked_by:
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+    description: ', , '
+  - ticket_number: 49
+    title: Tests - Unit and E2E Test Suite
+    blocked_by:
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+      - title: 'Ticket #undefined'
+    description: ', , , '

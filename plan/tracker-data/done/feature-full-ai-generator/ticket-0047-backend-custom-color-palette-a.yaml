@@ -1,0 +1,66 @@
+ticket_number: 47
+title: Backend - Custom Color Palette API
+description: |-
+  ## Overview
+  API endpoints for managing user-created custom color palettes.
+
+  ## Endpoints to Implement
+  1. **POST /api/ai/palettes** - Create new palette
+     - Name (max 50 chars)
+     - Colors array (3-8 hex colors)
+     - Optional: isDefault flag
+
+  2. **GET /api/ai/palettes** - List user's palettes
+     - Return all saved palettes
+     - Include preset system palettes
+
+  3. **DELETE /api/ai/palettes/:id** - Delete palette
+     - Only allow deleting own palettes
+
+  4. **PATCH /api/ai/palettes/:id** - Update palette
+     - Allow renaming and color changes
+
+  ## Integration
+  - Modify generation endpoint to accept paletteId or customColors
+  - Pass palette colors to prompt builder for generation
+  - Store used palette reference in generation record
+
+  ## Files to Create/Modify
+  - packages/api/src/routes/ai.ts (add palette endpoints)
+  - packages/api/src/services/ai-palette.ts (new service)
+
+  ## Acceptance Criteria
+  - [ ] CRUD operations for palettes work correctly
+  - [ ] Palette colors influence generation output
+  - [ ] Max 20 palettes per user
+  - [ ] Input validation for hex colors
+  - [ ] Unit tests for all endpoints
+feature: full-ai-generator
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:39:57.791Z'
+last_updated: '2026-01-28T15:14:08.275Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:14:05.416Z'
+    text: |-
+      **Commit:** `8b4f934d` feat(api): Add custom color palette CRUD endpoints (#47)
+
+      Added CRUD endpoints for color palettes with validation and 42 tests passing.
+  - author: system
+    timestamp: '2026-01-28T15:14:08.275Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:14:08.275Z'

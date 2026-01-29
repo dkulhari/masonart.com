@@ -1,41 +1,54 @@
 name: full-ai-generator
 title: Full Ai Generator
 priority: high
-created: '2026-01-28T07:45:51.885Z'
+created: "2026-01-28T07:45:51.885Z"
 assignee: unassigned
 tags: []
 description: |-
   ## Overview
-  ## Overview
-  Expand AI generator to include all 10 style presets, color palette picker, reference image upload, negative prompts for advanced users, and premium tier with 50 monthly generations.
+  Expand AI generator with additional style presets, custom color palettes, reference image upload, AI-powered prompt suggestions, and high-resolution upscaling. Uses wallet-based pay-per-generation model (no subscription tier).
 
   ## Objectives
-  - All 10 style presets available
-  - Color mood/palette picker
-  - Reference image upload for style guidance
-  - Negative prompt for advanced users
-  - AI-powered prompt suggestions
-  - Premium tier with 50 monthly generations
-  - Priority queue for premium users
-  - High-resolution upscaling option
-  - No watermark on preview for premium
+  - Add 5 new style presets (15 total) covering more artistic styles
+  - Custom color palette picker with RGB/hex input and saved palettes
+  - Reference image upload for style guidance (uses image-to-image generation)
+  - AI-powered prompt suggestions based on style and partial input
+  - High-resolution upscaling option (2x/4x) for selected images
+  - Priority queue for generations above certain cost threshold
+  - Enhanced UI for the create page with all features integrated
 
-  ## Source
-  Roadmap Feature 14 (Phase 2)
+  ## Technical Requirements
+  - Wallet integration for all paid features (already implemented)
+  - Cost preview before generation including upscaling
+  - Reference image storage and processing
+  - Prompt suggestion API endpoint
+  - Database updates for new presets and user preferences
 
-  ## Objectives
-  - TBD
+  ## Payment Model
+  Uses existing wallet system - users preload wallet and pay per generation. Free tier gives 3 generations, then wallet balance required.
 objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo: {}
   in_progress: {}
-  done: {}
-total_tickets: 0
-completion_percentage: 0
-is_completed: false
+  done:
+    "45": Database Schema - Extended AI Generator Tables
+    "46": Backend - Expand Style Presets to 15 Total
+    "47": Backend - Custom Color Palette API
+    "48": Backend - Reference Image Upload and Processing
+    "49": Backend - AI-Powered Prompt Suggestions
+    "50": Backend - High-Resolution Upscaling Service
+    "51": Frontend - Enhanced Style Selector with Categories
+    "52": Frontend - Custom Color Palette Picker
+    "53": Frontend - Reference Image Upload UI
+    "54": Frontend - Prompt Suggestions UI
+    "55": Frontend - Upscale UI and Results Enhancement
+    "56": Tests - Full AI Generator Feature Test Suite
+total_tickets: 12
+completion_percentage: 100
+is_completed: true

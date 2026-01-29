@@ -1,0 +1,73 @@
+ticket_number: 52
+title: Frontend - Custom Color Palette Picker
+description: |-
+  ## Overview
+  New component for selecting/creating custom color palettes for AI generation.
+
+  ## Component: ColorPaletteSelector
+
+  ### Features
+  1. **Preset Color Moods** (existing)
+     - Warm, Cool, Neutral, Vibrant, etc.
+     - Show as color swatches row
+
+  2. **Custom Palette Creator**
+     - Color picker with hex input
+     - Add up to 8 colors
+     - Drag to reorder colors
+     - Save palette with name
+
+  3. **Saved Palettes**
+     - Show user's saved palettes
+     - Quick select dropdown
+     - Delete option
+
+  4. **Visual Preview**
+     - Show palette as horizontal bar
+     - Animate color transition on selection
+
+  ## UI Location
+  - Collapsible section in advanced options
+  - Below style selector
+
+  ## Files to Create/Modify
+  - packages/web/app/components/ai-generator/ColorPaletteSelector.tsx (new)
+  - packages/web/app/hooks/useColorPalettes.ts (new hook for API)
+  - packages/web/app/routes/create/index.tsx (integrate)
+
+  ## Acceptance Criteria
+  - [ ] Can select preset moods
+  - [ ] Can create/save custom palettes
+  - [ ] Palettes persist across sessions
+  - [ ] Colors influence generated artwork
+  - [ ] Accessible color picker
+  - [ ] Component tests pass
+feature: full-ai-generator
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:40:06.327Z'
+last_updated: '2026-01-28T15:28:15.709Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:28:09.719Z'
+    text: |-
+      **Commit:** `ce5a8d2b` feat(web): Add ColorPaletteSelector component (#52)
+
+      Created custom color palette picker with 8 presets, user palettes, and 36 tests passing.
+  - author: system
+    timestamp: '2026-01-28T15:28:15.709Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:28:15.709Z'

@@ -1,0 +1,91 @@
+ticket_number: 54
+title: Frontend - Prompt Suggestions UI
+description: |-
+  ## Overview
+  Display AI-powered prompt suggestions to help users craft better prompts.
+
+  ## Component: PromptSuggestions
+
+  ### Features
+  1. **Suggestion Pills**
+     - Show 5-8 clickable suggestion chips
+     - Click to insert into prompt input
+     - Fade animation on insert
+
+  2. **Contextual Updates**
+     - Refresh suggestions when style changes
+     - Show 'Popular' tag on trending prompts
+     - Shuffle button to get new suggestions
+
+  3. **Loading State**
+     - Skeleton pills while loading
+     - Subtle fade-in when ready
+
+  ## Integration with PromptInput
+  - Suggestions appear below prompt textarea
+  - Clicking appends to existing prompt (not replace)
+  - Keyboard shortcut: Tab to cycle through suggestions
+
+  ## Files to Create/Modify
+  - packages/web/app/components/ai-generator/PromptSuggestions.tsx (new)
+  - packages/web/app/components/ai-generator/PromptInput.tsx (integrate)
+  - packages/web/app/hooks/usePromptSuggestions.ts (new hook)
+
+  ## Acceptance Criteria
+  - [ ] Suggestions load for each style
+  - [ ] Click inserts prompt correctly
+  - [ ] UI is non-intrusive
+  - [ ] Works on mobile
+  - [ ] Component tests pass
+feature: full-ai-generator
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:40:10.432Z'
+last_updated: '2026-01-28T15:34:23.973Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:34:23.702Z'
+    text: |-
+      ✅ Completed in commit 783a5f67
+
+      Implementation:
+      - Created PromptSuggestions component with clickable suggestion pills
+      - Created usePromptSuggestions hook with API integration
+      - Style-based contextual suggestions
+      - Refresh/shuffle functionality with bypass cache
+      - Popular prompt indicators with TrendingUp icon
+      - 5-minute caching to reduce API calls
+      - Usage tracking for analytics
+      - Loading skeletons for better UX
+
+      Tests: 102 passing
+      - Suggestion data structure
+      - Click handling and callbacks
+      - Refresh functionality
+      - Loading states
+      - Popular indicators
+      - Style preset context
+      - Empty and disabled states
+      - Hook configuration
+      - Fetch behavior and URL construction
+      - Response parsing
+      - Caching logic
+      - Error handling
+      - Usage tracking
+  - author: system
+    timestamp: '2026-01-28T15:34:23.973Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:34:23.973Z'

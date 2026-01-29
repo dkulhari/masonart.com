@@ -1,0 +1,92 @@
+ticket_number: 53
+title: Frontend - Reference Image Upload UI
+description: |-
+  ## Overview
+  UI component for uploading reference images to guide AI generation style.
+
+  ## Component: ReferenceImageUploader
+
+  ### Features
+  1. **Upload Zone**
+     - Drag and drop area
+     - Click to browse files
+     - Accept JPEG, PNG, WebP
+     - Max 5MB indicator
+
+  2. **Preview**
+     - Show uploaded image thumbnail
+     - Remove button
+     - File name and size
+
+  3. **Reference Weight Slider**
+     - Range: 10% to 100%
+     - Default: 50%
+     - Tooltip explaining effect
+     - Low = loose inspiration, High = close match
+
+  4. **Cost Indicator**
+     - Show +20% cost when reference used
+     - Update total cost preview
+
+  ## UI Location
+  - Collapsible 'Style Reference' section
+  - Above prompt input
+
+  ## Files to Create/Modify
+  - packages/web/app/components/ai-generator/ReferenceImageUploader.tsx (new)
+  - packages/web/app/hooks/useReferenceImage.ts (new hook for upload)
+  - packages/web/app/routes/create/index.tsx (integrate)
+
+  ## Acceptance Criteria
+  - [ ] File upload works with validation
+  - [ ] Image preview displays correctly
+  - [ ] Weight slider affects generation
+  - [ ] Cost preview updates
+  - [ ] Error handling for invalid files
+  - [ ] Component tests pass
+feature: full-ai-generator
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:40:08.351Z'
+last_updated: '2026-01-28T15:31:21.640Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:31:21.374Z'
+    text: |-
+      ✅ Completed in commit be8b940b
+
+      Implementation:
+      - Created ReferenceImageUploader component for img2img generation
+      - Supports drag and drop file upload with validation
+      - Weight slider with presets (Subtle 0.2, Balanced 0.5, Strong 0.8)
+      - Cost indicator showing +20% for reference image usage
+      - File validation: JPEG, PNG, WebP up to 5MB
+      - Preview display with remove functionality
+
+      Tests: 47 passing
+      - File type validation (accept/reject)
+      - File size validation
+      - Weight control and presets
+      - Upload handling callbacks
+      - Drag and drop state management
+      - Error handling
+      - Disabled and loading states
+      - Preview display logic
+      - Edge cases
+  - author: system
+    timestamp: '2026-01-28T15:31:21.640Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:31:21.640Z'

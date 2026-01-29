@@ -1,0 +1,52 @@
+ticket_number: 45
+title: Database Schema - Extended AI Generator Tables
+description: |-
+  ## Overview
+  Extend database schema to support new AI generator features.
+
+  ## Tasks
+  1. Add new style presets to the stylePreset enum (5 new styles)
+  2. Create userColorPalettes table for saved custom palettes
+  3. Add referenceImageUrl and referenceImageWeight fields to aiGenerations table
+  4. Add upscaledImageUrl and upscaleMultiplier fields to AI image data structure
+  5. Create aiPromptSuggestions table for caching popular suggestions
+  6. Add migration file for all schema changes
+
+  ## Schema Changes
+  - New style presets: ink-wash, digital-art, minimalist-modern, impressionist, art-deco
+  - userColorPalettes: id, userId, name, colors (JSONB), isDefault, createdAt
+  - aiGenerations: referenceImageUrl, referenceImageWeight (0.1-1.0)
+  - AIGeneratedImageData: upscaledImageUrl, upscaleMultiplier
+
+  ## Acceptance Criteria
+  - [ ] All migrations run successfully
+  - [ ] Existing data is preserved
+  - [ ] TypeScript types are updated
+  - [ ] Indexes added for common queries
+feature: full-ai-generator
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:39:55.430Z'
+last_updated: '2026-01-28T15:42:49.627Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-28T11:12:39.191Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-28T15:42:49.627Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-01-28T11:12:39.191Z'
+completed: '2026-01-28T15:42:49.627Z'

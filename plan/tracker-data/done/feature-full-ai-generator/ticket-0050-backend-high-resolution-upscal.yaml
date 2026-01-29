@@ -1,0 +1,71 @@
+ticket_number: 50
+title: Backend - High-Resolution Upscaling Service
+description: |-
+  ## Overview
+  Allow users to upscale their selected AI generation to higher resolution.
+
+  ## Endpoint
+  **POST /api/ai/generations/:id/upscale**
+  - Request body: { multiplier: 2 | 4 }
+  - Only for completed generations with selected image
+  - Returns upscaled image URL
+
+  ## Upscaling Options
+  1. **2x Upscale** - Double resolution (e.g., 1024→2048)
+  2. **4x Upscale** - Quadruple resolution (e.g., 1024→4096)
+
+  ## Provider Integration
+  - FAL.ai Real-ESRGAN model for upscaling
+  - Alternative: Replicate ESRGAN
+  - Store upscaled image separately
+
+  ## Pricing
+  - 2x: 1.5x base generation cost
+  - 4x: 2.5x base generation cost
+  - Deduct from wallet before processing
+
+  ## Implementation
+  - Add upscaling service in packages/api/src/ai/upscaler.ts
+  - Store upscaled URL in image data JSONB
+  - Track upscale status (pending, completed, failed)
+
+  ## Files to Create/Modify
+  - packages/api/src/routes/ai.ts (upscale endpoint)
+  - packages/api/src/ai/upscaler.ts (new service)
+  - packages/api/src/database/schema/ai-generations.ts
+
+  ## Acceptance Criteria
+  - [ ] Upscaling produces higher quality images
+  - [ ] Wallet deduction correct for each multiplier
+  - [ ] Failed upscales refund wallet
+  - [ ] Progress tracking for long upscales
+  - [ ] Unit tests for upscale service
+feature: full-ai-generator
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:40:02.648Z'
+last_updated: '2026-01-28T15:23:00.226Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - ai
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:22:54.493Z'
+    text: |-
+      **Commit:** `205cfaa4` feat(api): Add high-resolution image upscaling service (#50)
+
+      Added 2x/4x upscaling endpoints with pricing (₹2/₹4), status tracking, and 51 tests passing.
+  - author: system
+    timestamp: '2026-01-28T15:23:00.226Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:23:00.226Z'

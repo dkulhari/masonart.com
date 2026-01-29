@@ -1,0 +1,70 @@
+ticket_number: 48
+title: Backend - Reference Image Upload and Processing
+description: |-
+  ## Overview
+  Allow users to upload a reference image for style guidance using img2img generation.
+
+  ## Features
+  1. **Upload Endpoint**: POST /api/ai/reference-image
+     - Accept image file (JPEG, PNG, WebP)
+     - Max size 5MB
+     - Resize to max 1024px on longest side
+     - Store in MinIO/S3 with user prefix
+     - Return image URL
+
+  2. **Generation Integration**
+     - Accept referenceImageUrl in generation request
+     - Accept referenceWeight (0.1-1.0, default 0.5)
+     - Pass to AI provider as img2img input
+     - Higher weight = closer to reference
+
+  3. **Provider Support**
+     - FAL.ai FLUX with image input
+     - Stable Diffusion img2img
+     - Fallback to text-only if provider doesn't support
+
+  ## Cost Adjustment
+  - Reference image generation costs 20% more (more compute)
+  - Update cost calculation in wallet middleware
+
+  ## Files to Create/Modify
+  - packages/api/src/routes/ai.ts (upload endpoint)
+  - packages/api/src/ai/generator.ts (img2img logic)
+  - packages/api/src/lib/storage.ts (reference image upload)
+
+  ## Acceptance Criteria
+  - [ ] Image upload works with validation
+  - [ ] Reference influences generation output
+  - [ ] Cost correctly adjusted for img2img
+  - [ ] Expired/unused references cleaned up after 24h
+  - [ ] Unit tests for upload and integration
+feature: full-ai-generator
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:39:59.236Z'
+last_updated: '2026-01-28T15:17:31.604Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - ai
+  - storage
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:17:27.281Z'
+    text: |-
+      **Commit:** `a3e28154` feat(api): Add reference image upload for AI generation (#48)
+
+      Added reference image upload endpoint with weight control, 5MB limit, 24hr expiration, and 47 tests passing.
+  - author: system
+    timestamp: '2026-01-28T15:17:31.604Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:17:31.604Z'

@@ -1,0 +1,69 @@
+ticket_number: 49
+title: Backend - AI-Powered Prompt Suggestions
+description: |-
+  ## Overview
+  Provide intelligent prompt suggestions based on selected style, color mood, and partial user input.
+
+  ## Endpoint
+  **GET /api/ai/prompt-suggestions**
+  - Query params: style, colorMood, partialPrompt (optional)
+  - Returns array of 5-8 suggested prompts
+  - Cached per style+mood combination
+
+  ## Suggestion Sources
+  1. **Static curated suggestions** per style
+     - 20+ handcrafted prompts per preset
+     - Cover common use cases (nature, abstract, portraits, etc.)
+
+  2. **Popular prompts** from public gallery
+     - Most liked generations' prompts (anonymized)
+     - Filtered for appropriateness
+
+  3. **Dynamic completion** (optional enhancement)
+     - If partialPrompt provided, filter/complete suggestions
+     - Simple keyword matching, no external API needed
+
+  ## Implementation
+  - Create aiPromptSuggestions.ts with curated prompts
+  - Query public gallery for trending prompts
+  - Cache suggestions in Redis (1 hour TTL)
+
+  ## Files to Create/Modify
+  - packages/api/src/routes/ai.ts (suggestions endpoint)
+  - packages/api/src/ai/prompt-suggestions.ts (new file)
+
+  ## Acceptance Criteria
+  - [ ] Returns relevant suggestions for each style
+  - [ ] Popular prompts pulled from gallery
+  - [ ] Fast response (<100ms with cache)
+  - [ ] No inappropriate content in suggestions
+  - [ ] Unit tests for suggestion logic
+feature: full-ai-generator
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:40:00.937Z'
+last_updated: '2026-01-28T15:20:22.646Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - ai
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:20:17.696Z'
+    text: |-
+      **Commit:** `66a29a57` feat(api): Add AI prompt suggestions API (#49)
+
+      Added 90 curated prompts across 15 styles, featured prompts, usage tracking, and 54 tests passing.
+  - author: system
+    timestamp: '2026-01-28T15:20:22.646Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:20:22.646Z'

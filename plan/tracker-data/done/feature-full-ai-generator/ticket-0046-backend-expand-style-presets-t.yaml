@@ -1,0 +1,60 @@
+ticket_number: 46
+title: Backend - Expand Style Presets to 15 Total
+description: |-
+  ## Overview
+  Add 5 new style presets to the AI generator, bringing total to 15 diverse artistic styles.
+
+  ## New Presets to Add
+  1. **Ink Wash** - Asian-inspired ink painting with gradient washes
+  2. **Digital Art** - Modern digital illustration, gaming/concept art style
+  3. **Minimalist Modern** - Clean lines, geometric simplicity, Scandinavian design
+  4. **Impressionist** - Monet-inspired brushstrokes, light play, outdoor scenes
+  5. **Art Deco** - 1920s geometric patterns, gold accents, glamorous
+
+  ## For Each Preset Configure
+  - Prompt modifiers and keywords
+  - Negative prompts
+  - Model parameters (CFG scale, steps, sampler)
+  - Quality enhancers
+  - Recommended aspect ratios
+  - Preferred AI provider
+  - Color mood suggestions
+
+  ## Files to Modify
+  - packages/api/src/ai/style-presets.ts
+  - packages/shared/src/types/ai.ts (if needed)
+
+  ## Acceptance Criteria
+  - [ ] 5 new presets defined with full configuration
+  - [ ] GET /api/ai/style-presets returns all 15 presets
+  - [ ] Each preset generates appropriate imagery
+  - [ ] Unit tests for preset validation
+feature: full-ai-generator
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-28T10:39:56.541Z'
+last_updated: '2026-01-28T15:10:29.487Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - ai
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-01-28T15:10:21.048Z'
+    text: |-
+      **Commit:** `59b72391` feat(ai): Add 5 new style presets for Full AI Generator (#46)
+
+      Added ink-wash, digital-art, minimalist-modern, impressionist, and art-deco presets. All 468 tests pass.
+  - author: system
+    timestamp: '2026-01-28T15:10:29.487Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-01-28T15:10:29.487Z'

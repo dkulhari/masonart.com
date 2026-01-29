@@ -1,6 +1,155 @@
 dependencies:
-  last_updated: '2026-01-27T19:33:23.269Z'
-  features: {}
+  last_updated: '2026-01-28T10:40:16.622Z'
+  features:
+    shipping-returns:
+      - ticket_number: 36
+        title: Database Schema - Shipping and Returns Tables
+        blocks:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+        blocked_by: []
+      - ticket_number: 37
+        title: API Routes - Shipping Options Endpoints
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 38
+        title: API Routes - Order Shipments & Tracking
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 39
+        title: API Routes - Return Requests
+        blocks:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 40
+        title: Frontend - Checkout Shipping Selection
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 41
+        title: Frontend - Order Tracking Display
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 42
+        title: Frontend - Return Request Flow
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 43
+        title: Admin Panel - Returns Management Dashboard
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 44
+        title: Tests - Unit and E2E Test Suite
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+    user-reviews:
+      - ticket_number: 28
+        title: Database Schema - Reviews Table
+        blocks:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+        blocked_by: []
+      - ticket_number: 29
+        title: API Routes - Public Review Endpoints
+        blocks:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 30
+        title: API Routes - Admin Moderation Endpoints
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 31
+        title: Frontend - Review Display Components
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 32
+        title: Frontend - Review Submission Form
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 33
+        title: Integration - Product Page Reviews
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+      - ticket_number: 34
+        title: Admin Panel - Review Moderation Dashboard
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 35
+        title: Tests - Unit and E2E Test Suite
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+    wallet-system:
+      - ticket_number: 45
+        title: Database Schema - Wallet Tables
+        blocks:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+        blocked_by: []
+      - ticket_number: 46
+        title: Backend Services - Wallet Core Functions
+        blocks:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 47
+        title: API Routes - Wallet Endpoints
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+      - ticket_number: 48
+        title: Frontend - Wallet UI Components
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+      - ticket_number: 49
+        title: Tests - Unit and E2E Test Suite
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
 metadata:
   format_version: 1
   description: Ticket dependency tracking with bidirectional relationships
