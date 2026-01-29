@@ -19,10 +19,13 @@ import { adminReviewsApp } from "./routes/admin/reviews";
 import { adminShippingApp } from "./routes/admin/shipping";
 import { adminShipmentsApp } from "./routes/admin/shipments";
 import { adminReturnsApp } from "./routes/admin/returns";
+import { adminNotificationsApp } from "./routes/admin/notifications";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
 import { shipmentsApp } from "./routes/shipments";
 import { returnsApp, returnPoliciesApp } from "./routes/returns";
+import { trackingApp } from "./routes/tracking";
+import { notificationPreferencesApp } from "./routes/notification-preferences";
 import {
   productReviewsApp,
   createReviewApp,
@@ -98,6 +101,12 @@ app.route("/api", shipmentsApp);
 // Mounted at /api to handle /api/orders/:orderId/returns and /api/returns/:id
 app.route("/api", returnsApp);
 
+// Order Tracking API - public guest order lookup
+app.route("/api/tracking", trackingApp);
+
+// Notification Preferences API - user notification settings
+app.route("/api/notification-preferences", notificationPreferencesApp);
+
 // ============================================================================
 // Admin API Routes (Protected with role-based access)
 // ============================================================================
@@ -123,6 +132,9 @@ app.route("/api/admin", adminShipmentsApp);
 
 // Admin Returns API - return request management
 app.route("/api/admin/returns", adminReturnsApp);
+
+// Admin Notifications API - notification management and triggers
+app.route("/api/admin", adminNotificationsApp);
 
 // ============================================================================
 // Webhook Routes (External Service Callbacks)

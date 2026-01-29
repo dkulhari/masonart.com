@@ -37,6 +37,7 @@ import {
   isRazorpayConfigured,
   RazorpayError,
 } from "../../lib/razorpay";
+import { notifyOrderStatusChange } from "../../services/notifications";
 
 // ============================================================================
 // Constants
@@ -733,6 +734,12 @@ adminOrdersApp.patch(
       if (!updatedOrder) {
         return c.json({ error: "Failed to update order" }, 500);
       }
+
+      // Trigger notification for status change (non-blocking)
+      // This runs in the background and doesn't affect the response
+      notifyOrderStatusChange(updatedOrder.id, status).catch((err) => {
+        console.error("[Orders] Failed to send notification:", err);
+      });
 
       return c.json({
         message: "Order status updated successfully",
