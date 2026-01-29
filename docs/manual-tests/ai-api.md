@@ -3,7 +3,7 @@
 ## Test Environment
 - **Browser/Tool**: Postman / cURL / Thunder Client
 - **API Base URL**: http://localhost:3000
-- **Date**: 2026-01-19
+- **Date**: 2026-01-28
 - **Tester**: Manual QA
 
 ## Prerequisites
@@ -1094,6 +1094,484 @@
 
 ---
 
+## Custom Color Palette API Tests
+
+### TC-051: List User Color Palettes
+
+**Description**: Verify authenticated user can list their custom palettes
+
+**Steps**:
+1. Authenticate as user
+2. Send GET request to `/api/ai/palettes`
+
+**Expected Result**:
+- Status code: 200
+- Response contains `items` array
+- Each palette has: `id`, `name`, `colors` (array of hex)
+- Max 10 palettes per user
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-052: Create Custom Color Palette
+
+**Description**: Verify creating a custom palette with valid colors
+
+**Steps**:
+1. Authenticate as user
+2. Send POST request to `/api/ai/palettes` with:
+   ```json
+   {
+     "name": "My Custom Palette",
+     "colors": ["#FF5733", "#33FF57", "#3357FF", "#FFFF33"]
+   }
+   ```
+
+**Expected Result**:
+- Status code: 201
+- Response contains created palette with `id`
+- Colors array stored correctly
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-053: Color Palette Minimum Colors
+
+**Description**: Verify palette requires at least 3 colors
+
+**Steps**:
+1. Authenticate as user
+2. Send POST to `/api/ai/palettes` with only 2 colors
+
+**Expected Result**:
+- Status code: 400
+- Error message: "Palette must have 3-8 colors"
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-054: Color Palette Maximum Colors
+
+**Description**: Verify palette limited to 8 colors
+
+**Steps**:
+1. Authenticate as user
+2. Send POST with 9 colors
+
+**Expected Result**:
+- Status code: 400
+- Error message indicates max 8 colors
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-055: Color Palette Hex Validation
+
+**Description**: Verify colors must be valid hex format
+
+**Steps**:
+1. Send POST with invalid color: `["#GGGGGG", "#FF0000"]`
+
+**Expected Result**:
+- Status code: 400
+- Error message indicates invalid hex color format
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-056: Delete Custom Palette
+
+**Description**: Verify user can delete their own palette
+
+**Steps**:
+1. Create a palette
+2. Send DELETE to `/api/ai/palettes/{id}`
+
+**Expected Result**:
+- Status code: 200 or 204
+- Palette no longer returned in list
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-057: Palette Limit Enforcement
+
+**Description**: Verify user limited to 10 custom palettes
+
+**Steps**:
+1. Create 10 palettes
+2. Attempt to create 11th palette
+
+**Expected Result**:
+- Status code: 400
+- Error message: "Maximum 10 custom palettes allowed"
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+## Reference Image Upload API Tests
+
+### TC-058: Upload Reference Image
+
+**Description**: Verify reference image upload works
+
+**Steps**:
+1. Authenticate as user
+2. Send POST to `/api/ai/reference-image` with multipart form data
+3. Include valid image file (JPEG, < 10MB)
+
+**Expected Result**:
+- Status code: 201
+- Response contains `imageUrl` and `imageId`
+- Image accessible at returned URL
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-059: Reference Image File Type Validation
+
+**Description**: Verify only valid image types accepted
+
+**Steps**:
+1. Try uploading PDF file
+2. Try uploading GIF file (not supported)
+
+**Expected Result**:
+- Status code: 400
+- Error: "Invalid file type. Accepted: JPEG, PNG, WebP"
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-060: Reference Image Size Limit
+
+**Description**: Verify 10MB file size limit
+
+**Steps**:
+1. Try uploading image > 10MB
+
+**Expected Result**:
+- Status code: 400
+- Error: "File too large. Maximum size: 10MB"
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-061: Generation with Reference Image
+
+**Description**: Verify generation request accepts reference image
+
+**Steps**:
+1. Upload reference image
+2. Send POST to `/api/ai/generate` with:
+   ```json
+   {
+     "prompt": "A landscape in this style",
+     "stylePreset": "watercolor",
+     "aspectRatio": "landscape",
+     "referenceImageId": "{uploaded-image-id}",
+     "referenceWeight": 0.7
+   }
+   ```
+
+**Expected Result**:
+- Status code: 201 or 202
+- Generation uses img2img mode
+- Reference weight applied
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-062: Reference Weight Validation
+
+**Description**: Verify weight must be 0.3-1.0
+
+**Steps**:
+1. Try `referenceWeight: 0.1` (too low)
+2. Try `referenceWeight: 1.5` (too high)
+
+**Expected Result**:
+- Status code: 400
+- Error: "Reference weight must be between 0.3 and 1.0"
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-063: Reference Image Additional Cost
+
+**Description**: Verify img2img adds 2 credits to cost
+
+**Steps**:
+1. Generate without reference (note cost)
+2. Generate with reference (note cost)
+
+**Expected Result**:
+- With reference: cost + 2 credits
+- Cost difference reflected in wallet deduction
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+## Prompt Suggestions API Tests
+
+### TC-064: Get Prompt Suggestions
+
+**Description**: Verify suggestions endpoint returns style-based prompts
+
+**Steps**:
+1. Send GET to `/api/ai/suggestions?style=watercolor`
+
+**Expected Result**:
+- Status code: 200
+- Response contains `suggestions` array
+- 6 curated suggestions for watercolor style
+- Each has `text` and optional `isPopular` flag
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-065: Suggestions for All Styles
+
+**Description**: Verify suggestions exist for all 15 styles
+
+**Steps**:
+1. Test each style: wabi-sabi, abstract-expression, botanical, geometric, vintage-poster, pop-art, watercolor, photography, line-art, typography, ink-wash, digital-art, minimalist-modern, impressionist, art-deco
+
+**Expected Result**:
+- Each style returns 6 suggestions
+- Total: 90 curated prompts across all styles
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-066: Suggestions Caching
+
+**Description**: Verify suggestions are cached for 5 minutes
+
+**Steps**:
+1. Request suggestions for a style
+2. Request again immediately
+3. Check cache headers
+
+**Expected Result**:
+- Cache-Control: max-age=300 (5 minutes)
+- Second request may return cached data
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-067: Track Suggestion Usage
+
+**Description**: Verify suggestion click tracking
+
+**Steps**:
+1. Send POST to `/api/ai/suggestions/usage` with:
+   ```json
+   {
+     "suggestionId": "suggestion-uuid",
+     "style": "watercolor"
+   }
+   ```
+
+**Expected Result**:
+- Status code: 200
+- Usage recorded for analytics
+- May affect "popular" flag in future
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+## Upscaling API Tests
+
+### TC-068: Upscale Image 2x
+
+**Description**: Verify 2x upscaling works
+
+**Steps**:
+1. Authenticate as user
+2. Send POST to `/api/ai/upscale` with:
+   ```json
+   {
+     "imageId": "{completed-image-id}",
+     "scale": 2
+   }
+   ```
+
+**Expected Result**:
+- Status code: 201 or 202
+- Response contains `jobId` for polling
+- Deducts 5 credits from wallet
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-069: Upscale Image 4x
+
+**Description**: Verify 4x upscaling works
+
+**Steps**:
+1. Send POST with `scale: 4`
+
+**Expected Result**:
+- Status code: 201 or 202
+- Deducts 10 credits from wallet
+- Image dimensions quadrupled
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-070: Upscale Scale Validation
+
+**Description**: Verify only 2 or 4 scale allowed
+
+**Steps**:
+1. Try `scale: 3`
+2. Try `scale: 8`
+
+**Expected Result**:
+- Status code: 400
+- Error: "Scale must be 2 or 4"
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-071: Upscale Job Status Polling
+
+**Description**: Verify upscale job status endpoint
+
+**Steps**:
+1. Start upscale operation
+2. Send GET to `/api/ai/upscale/{jobId}/status`
+3. Poll until completed
+
+**Expected Result**:
+- Status code: 200
+- Status transitions: queued → processing → completed
+- Final response includes `upscaledImageUrl`
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-072: Upscale Insufficient Credits
+
+**Description**: Verify error when not enough credits
+
+**Steps**:
+1. Set wallet balance to 3 credits
+2. Try 2x upscale (costs 5)
+
+**Expected Result**:
+- Status code: 402 or 400
+- Error: "Insufficient credits. Need 5, have 3"
+- No credits deducted
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-073: Upscale Already Upscaled Image
+
+**Description**: Verify cannot upscale already upscaled image
+
+**Steps**:
+1. Upscale an image to 2x
+2. Try to upscale the result again
+
+**Expected Result**:
+- Status code: 400
+- Error: "Image already upscaled"
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-074: Upscale Resulting Dimensions
+
+**Description**: Verify upscaled dimensions calculated correctly
+
+**Steps**:
+1. Get original image dimensions (e.g., 512x768)
+2. Upscale 2x
+3. Verify result is 1024x1536
+4. For 4x: verify 2048x3072
+
+**Expected Result**:
+- Dimensions exactly 2x or 4x original
+- Returned in response metadata
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
 ## Issues Found
 
 | ID | Description | Severity | Status |
@@ -1101,7 +1579,7 @@
 | | | | |
 
 ## Summary
-- Total Test Cases: 50
+- Total Test Cases: 74
 - Passed: ___
 - Failed: ___
 - Blocked: ___
@@ -1109,11 +1587,33 @@
 
 ## Notes
 - Authentication token format: `Bearer {token}` or session cookie
-- Valid style presets: wabi-sabi, abstract-expression, botanical, vintage-poster, minimalist, geometric, watercolor, line-art, pop-art, photography-inspired, typography
+- Valid style presets (15 total): wabi-sabi, abstract-expression, botanical, vintage-poster, minimalist, geometric, watercolor, line-art, pop-art, photography-inspired, typography, ink-wash, digital-art, minimalist-modern, impressionist, art-deco
 - Valid aspect ratios: square (1:1), portrait (2:3), landscape (3:2), panoramic (16:9)
 - Generation statuses: queued, processing, completed, failed, cancelled
 - Visibility options: private, public, unlisted
 - Default variation count: 4 (max: 8)
 - Prompt length: 3-500 characters
-- Max color palette: 5 colors
 - Gallery cache TTL: 60 seconds
+
+### Color Palette API
+- Max custom palettes per user: 10
+- Colors per palette: 3-8
+- Color format: Hex (#RRGGBB)
+- System palettes: 8 (Warm Sunset, Cool Ocean, Forest, Vintage, Monochrome, Pastel, Vibrant, None)
+
+### Reference Image API
+- Accepted formats: JPEG, PNG, WebP
+- Max file size: 10MB
+- Weight range: 0.3 - 1.0 (default: 0.5)
+- Additional cost: +2 credits for img2img
+
+### Prompt Suggestions API
+- Suggestions per style: 6
+- Total curated prompts: 90 (6 × 15 styles)
+- Cache TTL: 5 minutes (300 seconds)
+
+### Upscaling API
+- Scale options: 2x or 4x
+- 2x cost: 5 credits
+- 4x cost: 10 credits
+- Technology: Real-ESRGAN

@@ -1,6 +1,6 @@
 # MasonArt Test Coverage Report
 
-**Last Updated:** 2026-01-27
+**Last Updated:** 2026-01-28
 **Testing Framework Version:** Vitest 4.0.17, Playwright 1.57.0
 
 ## Executive Summary
@@ -10,14 +10,14 @@ The MasonArt e-commerce platform has comprehensive test coverage across all laye
 | Category | Test Files | Test Cases | Status |
 |----------|-----------|------------|--------|
 | **Unit Tests (Shared)** | 8 | 813 | ✅ All Pass |
-| **Unit Tests (API)** | 20 | 2,100+ | ✅ All Pass |
-| **Unit Tests (Web)** | 6 | 618 | ✅ All Pass |
-| **Integration Tests** | 4 | 178 | ✅ All Pass |
-| **E2E Tests (Playwright)** | 27 | 1,812 total (1,570 pass, 223 skip) | ✅ Stable |
+| **Unit Tests (API)** | 26 | 2,500+ | ✅ All Pass |
+| **Unit Tests (Web)** | 14 | 1,050+ | ✅ All Pass |
+| **Integration Tests** | 6 | 250+ | ✅ All Pass |
+| **E2E Tests (Playwright)** | 27 | 1,850 total (1,610 pass, 240 skip) | ✅ Stable |
 | **Manual Test Docs** | 34 | 500+ test cases | ✅ Complete |
 
-**Total Automated Tests:** ~4,700+ test cases
-**Total E2E Configurations:** 9,060+ (1,812 tests × 5 browsers)
+**Total Automated Tests:** ~5,700+ test cases
+**Total E2E Configurations:** 9,250+ (1,850 tests × 5 browsers)
 
 ---
 
@@ -79,7 +79,12 @@ cd packages/shared && bun run test
 | `routes/products.test.ts` | 71 | Products API endpoints |
 | `routes/cart.test.ts` | 80 | Cart API endpoints |
 | `routes/orders.test.ts` | 116 | Orders API endpoints |
-| `routes/ai.test.ts` | 137 | AI generation API endpoints |
+| `routes/ai.test.ts` | 80 | AI generation API (core endpoints, auth, gallery) |
+| `routes/ai-palettes.test.ts` | 60 | Custom color palette CRUD, validation |
+| `routes/ai-reference-image.test.ts` | 50 | Reference image upload, weight, cost |
+| `routes/ai-suggestions.test.ts` | 55 | Prompt suggestions (90 curated), usage tracking |
+| `routes/ai-upscale.test.ts` | 65 | Image upscaling (2x/4x), cost calculations |
+| `routes/ai-full.test.ts` | 40 | Full AI feature integration tests |
 | `routes/admin/products.test.ts` | 117 | Admin products management |
 | `routes/admin/orders.test.ts` | 132 | Admin orders management |
 
@@ -93,8 +98,10 @@ cd packages/shared && bun run test
 #### AI Tests
 | Test File | Tests | Description |
 |-----------|-------|-------------|
-| `ai/presets.test.ts` | 383 | Style presets, aspect ratios, prompt construction |
+| `ai/presets.test.ts` | 180 | 15 style presets, prompt construction, category filtering |
 | `queues/ai.test.ts` | 127 | BullMQ queue processing |
+
+> **Note:** All AI tests use mocks and **do not call real AI generation APIs**. This ensures no money is spent during test execution. Tests mock external services (Stable Diffusion, DALL-E 3, FAL.ai, Real-ESRGAN) using `vi.fn()` and Hono's test app infrastructure.
 
 **Run Commands:**
 ```bash
@@ -111,6 +118,7 @@ cd packages/api && SKIP_DB_RUNTIME_TESTS=true SKIP_REDIS_RUNTIME_TESTS=true bun 
 
 **Location:** `packages/web/tests/`
 
+#### Core Tests
 | Test File | Tests | Description |
 |-----------|-------|-------------|
 | `build.test.ts` | 122 | Package configuration, Vite build |
@@ -119,6 +127,28 @@ cd packages/api && SKIP_DB_RUNTIME_TESTS=true SKIP_REDIS_RUNTIME_TESTS=true bun 
 | `stores/cart.test.ts` | 50 | Zustand cart store, persistence |
 | `hooks/useProducts.test.tsx` | 58 | TanStack Query products hooks |
 | `hooks/useCart.test.tsx` | 54 | TanStack Query cart hooks |
+
+#### AI Generator Component Tests
+| Test File | Tests | Description |
+|-----------|-------|-------------|
+| `components/ai-generator/StyleSelector.test.tsx` | 50 | 15 styles, category filtering, selection |
+| `components/ai-generator/ColorPaletteSelector.test.tsx` | 45 | 8 system palettes, custom palette CRUD |
+| `components/ai-generator/ReferenceImageUploader.test.tsx` | 55 | File validation, weight slider, cost display |
+| `components/ai-generator/PromptSuggestions.test.tsx` | 55 | Suggestion pills, refresh, usage tracking |
+| `components/ai-generator/GenerationResults.test.tsx` | 60 | Results grid, upscale UI, wallet balance |
+
+#### AI Generator Hook Tests
+| Test File | Tests | Description |
+|-----------|-------|-------------|
+| `hooks/usePromptSuggestions.test.ts` | 90 | Fetch, 5-min cache, style-based suggestions |
+| `hooks/useUpscale.test.ts` | 70 | Job tracking, polling, cost (2x=5, 4x=10 credits) |
+
+#### AI Generator Integration Tests
+| Test File | Tests | Description |
+|-----------|-------|-------------|
+| `ai-generator-integration.test.ts` | 70 | Full workflow, component interactions |
+
+> **Note:** All AI component and hook tests use mocks (`vi.fn()`) to prevent real API calls. No actual AI generation occurs during testing.
 
 **Run Command:**
 ```bash
@@ -165,7 +195,7 @@ bunx vitest run tests/setup/ tests/integration/
 | `checkout.spec.ts` | 109 | Checkout flow |
 | `payment.spec.ts` | 73 | Payment processing |
 | `order-confirmation.spec.ts` | 65 | Order confirmation |
-| `ai-generator.spec.ts` | 91 | AI poster creation |
+| `ai-generator.spec.ts` | 80 | AI poster creation (15 styles, palettes, references, upscaling) |
 | `ai-history.spec.ts` | 55 | AI creations history |
 | `auth.spec.ts` | 135 | Login, register pages |
 | `account.spec.ts` | 85 | User dashboard |
@@ -198,13 +228,13 @@ bunx vitest run tests/setup/ tests/integration/
 
 ### E2E Test Health (Chromium Baseline)
 
-As of 2026-01-27:
+As of 2026-01-28:
 
 | Metric | Count | Notes |
 |--------|-------|-------|
-| **Total Tests** | 1,812 | Across 27 spec files |
-| **Passing** | 1,570 | 87% pass rate |
-| **Skipped** | 223 | Intentionally skipped |
+| **Total Tests** | 1,850 | Across 27 spec files |
+| **Passing** | 1,610 | 87% pass rate |
+| **Skipped** | 240 | Intentionally skipped |
 | **Failing** | 0 | All active tests pass |
 
 **Skipped Tests Breakdown:**
@@ -212,7 +242,8 @@ As of 2026-01-27:
 - Mobile filter edge cases: ~15 (viewport limitations)
 - Auth flow SSR tests: ~20 (hydration differences)
 - Payment mock tests: ~30 (environment limitations)
-- Other: ~189 (various documented reasons)
+- AI generator React state sync: ~40 (character counts, panel toggles, dynamic form validation)
+- Other: ~116 (various documented reasons)
 
 ### Browser Projects
 All E2E tests run across 5 browser configurations:
@@ -252,7 +283,7 @@ SKIP_E2E_SERVER=true npx playwright test
 | `cart-api.md` | 42 | Cart API |
 | `orders-api.md` | 48 | Orders API |
 | `health-check.md` | 15 | Health endpoints |
-| `ai-api.md` | 50 | AI generation API |
+| `ai-api.md` | 74 | AI generation API (Full AI Generator) |
 | `styles.md` | 46 | CSS/Tailwind |
 | `layout.md` | 58 | Page layout |
 | `cart-store.md` | 50 | Cart state |
@@ -265,8 +296,8 @@ SKIP_E2E_SERVER=true npx playwright test
 | `order-confirmation.md` | 28 | Order confirmation |
 | `auth-pages.md` | 45 | Login/register |
 | `account.md` | 42 | User dashboard |
-| `ai-generator.md` | 58 | AI generator page |
-| `ai-history.md` | 35 | AI creations |
+| `ai-generator.md` | 82 | AI generator page (Full AI Generator) |
+| `ai-history.md` | 68 | AI creations (Full AI Generator) |
 | `admin-api.md` | 40 | Admin API |
 | `admin-auth.md` | 25 | Admin access |
 | `admin-dashboard.md` | 38 | Admin dashboard |
@@ -281,7 +312,7 @@ SKIP_E2E_SERVER=true npx playwright test
 | `flow-auth.md` | 22 | Auth flow |
 | `flow-admin.md` | 28 | Admin flow |
 
-**Total Manual Test Cases:** 500+
+**Total Manual Test Cases:** 550+
 
 ---
 
@@ -382,13 +413,57 @@ SKIP_E2E_SERVER=true
 1. **Email Notifications** - Requires email service integration
 2. **Webhook Callbacks** - Requires external service simulation
 3. **Real Payment Processing** - Uses test mode only
-4. **Image Generation** - Requires AI service integration
-5. **File Uploads** - Requires MinIO/S3 service
+4. **Real AI Image Generation** - Uses mocked responses (actual AI API calls never made)
+5. **File Uploads to S3** - Requires MinIO/S3 service
 
 ### Intentionally Skipped E2E Tests
 1. **Mobile filter backdrop tests** - Sheet covers entire viewport, no backdrop clickable
 2. **SSR-dependent auth flow tests** - Server-side rendering differences in hydration
 3. **Payment processing tests** - Cannot safely mock Razorpay in E2E environment
+4. **AI generator state sync tests** - React state synchronization with Playwright event simulation (character counts, panel toggles, form validation states)
+
+---
+
+## Full AI Generator Feature Test Summary
+
+The Full AI Generator feature (Tickets #45-56) has comprehensive test coverage across all layers:
+
+| Category | Test Count | Coverage Area |
+|----------|-----------|---------------|
+| **Backend Style Presets** | 180 | 15 presets (watercolor, oil-painting, ink-wash, digital-art, minimalist-modern, impressionist, art-deco, etc.), prompt construction |
+| **Backend Color Palettes** | 60 | CRUD operations, 3-8 hex color validation, 10-palette limit |
+| **Backend Reference Images** | 50 | File validation (JPEG/PNG/WebP, 10MB max), weight 0.3-1.0, cost calculation |
+| **Backend Prompt Suggestions** | 55 | 90 curated prompts (6 per style × 15 styles), usage tracking |
+| **Backend Upscaling** | 65 | 2x/4x options, dimension calculations, cost (5/10 credits) |
+| **Backend Integration** | 40 | Full feature integration, wallet checks |
+| **Frontend StyleSelector** | 50 | 15 styles, 4 categories, filtering, responsive layout |
+| **Frontend ColorPaletteSelector** | 45 | 8 system palettes, custom palette CRUD |
+| **Frontend ReferenceImageUploader** | 55 | Drag-drop, weight slider, cost preview |
+| **Frontend PromptSuggestions** | 55 | Click-to-insert, refresh/shuffle, popular indicators |
+| **Frontend GenerationResults** | 60 | Results grid, upscale buttons, wallet balance warning |
+| **Frontend usePromptSuggestions** | 90 | 5-minute cache, style filtering, error handling |
+| **Frontend useUpscale** | 70 | Job polling, progress tracking, cost display |
+| **Frontend Integration** | 70 | Complete user workflows |
+| **E2E Page Tests** | 80 | Page rendering, accessibility, responsive design |
+
+**Total Full AI Generator Tests:** ~1,075
+
+### Safety: No Real AI API Calls
+
+All tests use proper mocking strategies to prevent actual AI generation API calls:
+
+```typescript
+// Backend tests - Hono test app with vi.fn() mocks
+const res = await app.request('/api/ai/generate');
+
+// Hook tests - mock fetch responses
+const mockFetch = vi.fn().mockResolvedValue({ suggestions: [] });
+
+// Component tests - mock callbacks
+const mockOnGenerate = vi.fn();
+```
+
+External services mocked: Stable Diffusion, DALL-E 3, FAL.ai, Real-ESRGAN upscaling
 
 ### Recommended Future Additions
 1. Visual regression tests with Playwright screenshots
@@ -476,6 +551,7 @@ The MasonArt platform has achieved comprehensive test coverage across:
 - ✅ **SEO Requirements** - Meta tags, JSON-LD, sitemap tested
 - ✅ **Admin Functionality** - Product/order management tested
 - ✅ **CI/CD Pipeline** - Automated testing on push/PR
+- ✅ **Full AI Generator** - 1,075+ tests covering styles, palettes, references, suggestions, upscaling (all mocked, no real API calls)
 
 **Test Philosophy:**
 - Tests gracefully handle unavailable services
@@ -483,3 +559,4 @@ The MasonArt platform has achieved comprehensive test coverage across:
 - Runtime tests skip with informative messages
 - All tests follow AAA pattern (Arrange, Act, Assert)
 - E2E tests use API mocking for reliability
+- AI tests mock all external services to prevent cost consumption

@@ -3,7 +3,7 @@
 ## Test Environment
 - **Browser**: Chrome (latest)
 - **Viewport**: Desktop (1920x1080) and Mobile (375x667)
-- **Date**: 2026-01-19
+- **Date**: 2026-01-28
 - **Tester**: Manual QA Testing / Claude Chrome Extension
 - **URL**: http://localhost:3001/account/ai-creations
 
@@ -491,6 +491,126 @@ This document covers manual testing of the MasonArt AI Creations history page:
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
 - Navigated URL: _______________
+
+---
+
+### Section: Full AI Generator Enhancements
+
+### TC-024a: Color Palette Display on Card
+
+**Description**: Verify color palette shown on creation card
+
+**Steps**:
+1. View creation that used a color palette
+2. Check for palette indicator
+
+**Expected Result**:
+- Color swatches displayed (3-8 small circles)
+- Palette name shown if custom
+- Visible in card metadata
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations: _______________
+
+---
+
+### TC-024b: Reference Image Indicator
+
+**Description**: Verify reference image usage shown
+
+**Steps**:
+1. View creation that used a reference image
+2. Check for reference indicator
+
+**Expected Result**:
+- "Ref" or reference icon badge visible
+- Weight percentage may be shown
+- Indicates img2img was used
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations: _______________
+
+---
+
+### TC-024c: Upscaled Badge Display
+
+**Description**: Verify upscaled images show badge
+
+**Steps**:
+1. View creation with upscaled images
+2. Check for upscale badge
+
+**Expected Result**:
+- "2x" or "4x" badge on upscaled images
+- Different styling from original
+- Badge indicates upscale factor
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations: _______________
+
+---
+
+### TC-024d: Upscale Button on History Card
+
+**Description**: Verify upscale action available
+
+**Steps**:
+1. View completed creation without upscale
+2. Check for upscale button/option
+
+**Expected Result**:
+- Upscale button or dropdown visible
+- 2x and 4x options available
+- Cost indicator shown (5/10 credits)
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations: _______________
+
+---
+
+### TC-024e: Upscaled Image Dimensions
+
+**Description**: Verify upscaled dimensions displayed
+
+**Steps**:
+1. View upscaled creation
+2. Check image metadata
+
+**Expected Result**:
+- Dimensions shown (e.g., "2048 × 3072")
+- Larger than original dimensions
+- Resolution indicator visible
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations: _______________
+
+---
+
+### TC-024f: Style Filter Includes New Styles
+
+**Description**: Verify filter includes all 15 styles
+
+**Steps**:
+1. Open style filter dropdown
+2. Check for new styles
+
+**Expected Result**:
+- All 15 styles listed:
+  - Original 10 styles
+  - Ink Wash (new)
+  - Digital Art (new)
+  - Minimalist Modern (new)
+  - Impressionist (new)
+  - Art Deco (new)
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Styles Found: _______________
 
 ---
 
@@ -1237,13 +1357,20 @@ This document covers manual testing of the MasonArt AI Creations history page:
 
 ## Summary
 
-- **Total Test Cases**: 62
+- **Total Test Cases**: 68
 - **Passed**: _______________
 - **Failed**: _______________
 - **Blocked**: _______________
 - **Pass Rate**: _______________%
 
 ## Notes
+
+### Full AI Generator Features
+- Style presets: 15 total (includes 5 new: Ink Wash, Digital Art, Minimalist Modern, Impressionist, Art Deco)
+- Color palettes: 8 system + custom (3-8 colors)
+- Reference images: JPEG/PNG/WebP, max 10MB
+- Upscaling: 2x (5 credits) or 4x (10 credits)
+- Prompt suggestions: 90 curated (6 per style)
 
 ### Test Environment Details
 - Node Version: _______________

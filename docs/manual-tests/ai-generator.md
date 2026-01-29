@@ -4,7 +4,7 @@
 - **Browser**: Chrome (latest), Firefox (latest), Safari (latest)
 - **Viewport**: Desktop (1920x1080), Tablet (768x1024), Mobile (375x667)
 - **URL**: http://localhost:3001/create
-- **Date**: 2026-01-19
+- **Date**: 2026-01-28
 - **Tester**: Manual QA / Claude Chrome Extension
 
 ## Prerequisites
@@ -335,7 +335,7 @@
 
 ### TC-016: All Style Presets Display
 
-**Description**: Verify all 10 style presets are displayed
+**Description**: Verify all 15 style presets are displayed
 
 **Steps**:
 1. Navigate to `/create`
@@ -353,6 +353,11 @@
 - Photography style visible
 - Line Art style visible
 - Typography style visible
+- Ink Wash style visible (new)
+- Digital Art style visible (new)
+- Minimalist Modern style visible (new)
+- Impressionist style visible (new)
+- Art Deco style visible (new)
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -512,6 +517,317 @@
 
 ---
 
+### Section: Color Palette Selector
+
+### TC-024a: Color Palette Section Display
+
+**Description**: Verify color palette section is displayed
+
+**Steps**:
+1. Navigate to `/create`
+2. Locate "Color Palette" section
+
+**Expected Result**:
+- "Color Palette" heading (h3) visible
+- System palette options visible
+- "Custom" option visible
+- Currently selected palette highlighted
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024b: System Color Palettes
+
+**Description**: Verify all 8 system color palettes are displayed
+
+**Steps**:
+1. Navigate to `/create`
+2. Check color palette options
+
+**Expected Result**:
+- "None" option visible (default)
+- "Warm Sunset" palette visible
+- "Cool Ocean" palette visible
+- "Forest" palette visible
+- "Vintage" palette visible
+- "Monochrome" palette visible
+- "Pastel" palette visible
+- "Vibrant" palette visible
+- Each shows 3-5 color swatches
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024c: Select System Palette
+
+**Description**: Verify selecting a system palette works
+
+**Steps**:
+1. Navigate to `/create`
+2. Click on "Warm Sunset" palette
+3. Verify selection changes
+
+**Expected Result**:
+- Warm Sunset card gets selected styling (border-primary)
+- Previous selection removed
+- Color swatches displayed in card
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024d: Custom Palette Creation
+
+**Description**: Verify custom palette creation flow
+
+**Steps**:
+1. Navigate to `/create`
+2. Click "Custom" palette option
+3. Add 3-8 colors using color picker
+4. Save custom palette
+
+**Expected Result**:
+- Color picker opens on click
+- Can add multiple colors (3-8)
+- Save button enabled with valid colors
+- Custom palette saved and selectable
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024e: Custom Palette Validation
+
+**Description**: Verify custom palette requires 3-8 colors
+
+**Steps**:
+1. Navigate to `/create`
+2. Try to save with 2 colors
+3. Try to save with 9 colors
+
+**Expected Result**:
+- Error message for < 3 colors
+- Cannot add more than 8 colors
+- Validation message displayed
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### Section: Reference Image Uploader
+
+### TC-024f: Reference Image Section Display
+
+**Description**: Verify reference image upload section is displayed
+
+**Steps**:
+1. Navigate to `/create`
+2. Locate "Reference Image" section
+
+**Expected Result**:
+- "Reference Image (Optional)" heading visible
+- Upload area with dropzone visible
+- Weight slider visible
+- Cost indicator visible
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024g: Reference Image Upload
+
+**Description**: Verify reference image upload works
+
+**Steps**:
+1. Navigate to `/create`
+2. Click upload area or drag image
+3. Select valid image (JPEG/PNG/WebP, < 10MB)
+
+**Expected Result**:
+- File picker opens on click
+- Accepts JPEG, PNG, WebP formats
+- Image preview displayed after upload
+- Remove button visible
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024h: Reference Image Weight Slider
+
+**Description**: Verify weight slider functionality
+
+**Steps**:
+1. Upload a reference image
+2. Adjust weight slider (0.3 - 1.0)
+
+**Expected Result**:
+- Slider range: 0.3 to 1.0
+- Default value: 0.5
+- Weight value displayed
+- Tooltip explains weight impact
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024i: Reference Image File Validation
+
+**Description**: Verify file type and size validation
+
+**Steps**:
+1. Try uploading invalid file type (PDF, GIF)
+2. Try uploading file > 10MB
+
+**Expected Result**:
+- Error message for invalid file type
+- Error message for file too large
+- "Accepted formats: JPEG, PNG, WebP (max 10MB)"
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024j: Reference Image Cost Display
+
+**Description**: Verify additional cost indicator
+
+**Steps**:
+1. Upload a reference image
+2. Check cost display
+
+**Expected Result**:
+- "+2 credits" indicator visible
+- Cost updates generation total
+- Tooltip explains img2img cost
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### Section: Prompt Suggestions
+
+### TC-024k: Prompt Suggestions Section Display
+
+**Description**: Verify prompt suggestions section is displayed
+
+**Steps**:
+1. Navigate to `/create`
+2. Locate "Suggestions" area near prompt input
+
+**Expected Result**:
+- "Suggestions" or "Ideas" label visible
+- Suggestion pills/buttons displayed
+- Refresh/shuffle button visible
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024l: Style-Based Suggestions
+
+**Description**: Verify suggestions change with style selection
+
+**Steps**:
+1. Select "Watercolor" style
+2. Note suggestions displayed
+3. Change to "Pop Art" style
+4. Note suggestions change
+
+**Expected Result**:
+- Suggestions refresh on style change
+- Suggestions relevant to selected style
+- 6 suggestions per style (curated)
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024m: Click Suggestion to Insert
+
+**Description**: Verify clicking suggestion populates prompt
+
+**Steps**:
+1. Navigate to `/create`
+2. Click on a suggestion pill
+
+**Expected Result**:
+- Suggestion text inserted into prompt textarea
+- Character count updates
+- Generate button becomes enabled
+- Suggestion pill shows "used" state
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024n: Refresh Suggestions
+
+**Description**: Verify refresh button loads new suggestions
+
+**Steps**:
+1. Note current suggestions
+2. Click refresh/shuffle button
+3. Verify new suggestions appear
+
+**Expected Result**:
+- New set of suggestions loaded
+- Animation during refresh
+- Different suggestions displayed
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-024o: Popular Suggestion Indicator
+
+**Description**: Verify popular suggestions are marked
+
+**Steps**:
+1. View suggestion pills
+2. Look for "popular" indicators
+
+**Expected Result**:
+- Some suggestions show "popular" or fire icon
+- Popular suggestions highlighted
+- Based on usage analytics
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
 ### Section: Generate Button
 
 ### TC-025: Generate Button Display
@@ -625,6 +941,186 @@
 - Form on left side
 - Results on right side
 - Grid layout with lg:grid-cols-2
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### Section: Upscaling UI (Results)
+
+### TC-030a: Upscale Button Display
+
+**Description**: Verify upscale button on completed generations
+
+**Steps**:
+1. Generate an image (or view completed generation)
+2. Hover over result image
+3. Check for upscale button
+
+**Expected Result**:
+- Upscale button visible on hover
+- "Upscale" text or icon displayed
+- Dropdown arrow indicates options
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-030b: Upscale Options Dropdown
+
+**Description**: Verify upscale size options
+
+**Steps**:
+1. Click upscale button on a result
+2. View dropdown options
+
+**Expected Result**:
+- "2x" option visible (5 credits)
+- "4x" option visible (10 credits)
+- Credit cost displayed for each option
+- Resulting dimensions shown
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-030c: Upscale 2x Selection
+
+**Description**: Verify 2x upscale works
+
+**Steps**:
+1. Click upscale button
+2. Select "2x" option
+3. Wait for completion
+
+**Expected Result**:
+- Confirmation or immediate start
+- Progress indicator shown
+- Costs 5 credits
+- Image doubles in dimensions
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-030d: Upscale 4x Selection
+
+**Description**: Verify 4x upscale works
+
+**Steps**:
+1. Click upscale button
+2. Select "4x" option
+3. Wait for completion
+
+**Expected Result**:
+- Confirmation or immediate start
+- Progress indicator shown
+- Costs 10 credits
+- Image quadruples in dimensions
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-030e: Upscaling Progress Overlay
+
+**Description**: Verify progress display during upscaling
+
+**Steps**:
+1. Start an upscale operation
+2. Observe the image card
+
+**Expected Result**:
+- Overlay appears on image
+- Progress bar or spinner visible
+- "Upscaling..." text displayed
+- Cannot start another upscale on same image
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-030f: Upscaled Badge
+
+**Description**: Verify upscaled images show badge
+
+**Steps**:
+1. View an upscaled image
+
+**Expected Result**:
+- "Upscaled 2x" or "Upscaled 4x" badge visible
+- Badge shows upscale factor
+- Different styling from original
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-030g: Wallet Balance Display
+
+**Description**: Verify wallet balance shown near upscale
+
+**Steps**:
+1. View results section
+2. Check for wallet balance indicator
+
+**Expected Result**:
+- Current credit balance visible
+- Updates after upscale operation
+- Low balance warning if < 10 credits
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-030h: Insufficient Credits for Upscale
+
+**Description**: Verify error when insufficient credits
+
+**Steps**:
+1. Ensure wallet has < 5 credits
+2. Try to upscale 2x
+
+**Expected Result**:
+- Error message displayed
+- "Insufficient credits" text
+- Link to add credits/top up wallet
+- Upscale not started
+
+**Actual Result**:
+- [ ] PASS / [ ] FAIL
+- Observations:
+
+---
+
+### TC-030i: Upscale in Image Preview Modal
+
+**Description**: Verify upscale available in full preview
+
+**Steps**:
+1. Click image to open preview modal
+2. Check for upscale options
+
+**Expected Result**:
+- Upscale button in modal toolbar
+- Same 2x/4x options available
+- Works same as card upscale
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -1212,7 +1708,7 @@
 | | | | |
 
 ## Summary
-- Total Test Cases: 58
+- Total Test Cases: 82
 - Passed: ___
 - Failed: ___
 - Blocked: ___
@@ -1220,15 +1716,19 @@
 
 ## Notes
 - Page URL: `/create`
-- Style presets: 10 total (Wabi-Sabi, Abstract Expression, Botanical, Geometric Modern, Vintage Poster, Pop Art, Watercolor, Photography, Line Art, Typography)
+- Style presets: 15 total (Wabi-Sabi, Abstract Expression, Botanical, Geometric Modern, Vintage Poster, Pop Art, Watercolor, Photography, Line Art, Typography, Ink Wash, Digital Art, Minimalist Modern, Impressionist, Art Deco)
 - Aspect ratios: 4 options (Square 1:1, Portrait 2:3, Landscape 3:2, Panoramic 16:9)
 - Default style: Wabi-Sabi
 - Default aspect ratio: Portrait
 - Prompt limits: 3-500 characters
 - Negative prompt limit: 300 characters
 - Example prompts: 6 available
+- Prompt suggestions: 90 curated (6 per style × 15 styles)
 - Categories: All Styles, Artistic, Photographic, Illustrative, Decorative
 - Tips: 4 tips for better results
+- Color palettes: 8 system + custom (3-8 colors)
+- Reference image: JPEG/PNG/WebP, max 10MB, weight 0.3-1.0
+- Upscaling: 2x (5 credits) or 4x (10 credits)
 
 ## Sign-Off
 
