@@ -20,6 +20,7 @@ import { adminShippingApp } from "./routes/admin/shipping";
 import { adminShipmentsApp } from "./routes/admin/shipments";
 import { adminReturnsApp } from "./routes/admin/returns";
 import { adminNotificationsApp } from "./routes/admin/notifications";
+import { adminApprovalsApp } from "./routes/admin/approvals";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
 import { shipmentsApp } from "./routes/shipments";
@@ -135,6 +136,9 @@ app.route("/api/admin/returns", adminReturnsApp);
 
 // Admin Notifications API - notification management and triggers
 app.route("/api/admin", adminNotificationsApp);
+
+// Admin Approvals API - production photo approval management
+app.route("/api/admin/approvals", adminApprovalsApp);
 
 // ============================================================================
 // Webhook Routes (External Service Callbacks)
