@@ -15,7 +15,6 @@ import {
   type ApprovalPhoto,
   type ApprovalComment,
   type ApprovalStatus,
-  type ApprovalAuthorType,
   type NewProductionApproval,
   type NewApprovalPhoto,
   type NewApprovalComment,
@@ -87,11 +86,11 @@ export interface ApprovalWithDetails extends ProductionApproval {
     id: string;
     orderNumber: string;
     status: string;
-  };
+  } | null;
   orderItem?: {
     id: string;
-    snapshot: Record<string, unknown>;
-  };
+    snapshot: unknown;
+  } | null;
 }
 
 // ============================================================================
@@ -403,7 +402,8 @@ export async function getApprovalByToken(
       },
     });
 
-    return approval as ApprovalWithDetails | null;
+    if (!approval) return null;
+    return approval as unknown as ApprovalWithDetails;
   } catch (error) {
     console.error("[Approval] Error getting approval by token:", error);
     return null;
@@ -442,7 +442,8 @@ export async function getApprovalById(
       },
     });
 
-    return approval as ApprovalWithDetails | null;
+    if (!approval) return null;
+    return approval as unknown as ApprovalWithDetails;
   } catch (error) {
     console.error("[Approval] Error getting approval by ID:", error);
     return null;
@@ -582,7 +583,7 @@ export async function addAdminComment(
       .values(commentData)
       .returning();
 
-    return inserted;
+    return inserted ?? null;
   } catch (error) {
     console.error("[Approval] Error adding admin comment:", error);
     return null;

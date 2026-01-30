@@ -6,6 +6,7 @@
  */
 
 import type { Order } from "../database/schema/orders";
+import type { ProductionApproval, ApprovalPhoto } from "../database/schema/approvals";
 
 // ============================================================================
 // Types
@@ -486,6 +487,342 @@ Thank you for choosing MasonArt!
 
   return {
     subject: `Delivered! Your Order ${order.orderNumber}`,
+    html: baseTemplate(content),
+    text,
+  };
+}
+
+// ============================================================================
+// Production Approval Email Templates
+// ============================================================================
+
+/**
+ * Approval context for email templates
+ */
+export interface ApprovalEmailContext {
+  approval: ProductionApproval;
+  order: {
+    orderNumber: string;
+    shippingAddress?: {
+      fullName?: string;
+    };
+  };
+  orderItem: {
+    snapshot: {
+      title?: string;
+      sizeLabel?: string;
+    };
+  };
+  photos?: ApprovalPhoto[];
+  approvalUrl: string;
+}
+
+/**
+ * Photo Ready for Review Email Template
+ * Sent when admin uploads production photos for customer review
+ */
+export function getPhotoReadyForReviewTemplate(
+  context: ApprovalEmailContext
+): EmailTemplate {
+  const { approval, order, orderItem, photos, approvalUrl } = context;
+  const customerName = order.shippingAddress?.fullName || "there";
+  const productTitle = orderItem.snapshot?.title || "your custom item";
+  const photoCount = photos?.length || 0;
+
+  const content = `
+    <div class="content">
+      <h2>Your Production Photos Are Ready!</h2>
+      <p>Hi ${customerName},</p>
+      <p>Great news! We've completed production of <strong>${productTitle}</strong> and have taken photos for your review.</p>
+
+      <div class="tracking-box">
+        <h3>Action Required</h3>
+        <p style="margin: 0;">
+          Please review the ${photoCount} production photo${photoCount !== 1 ? "s" : ""} and either approve for shipping or request any adjustments.
+        </p>
+      </div>
+
+      <center>
+        <a href="${approvalUrl}" class="button">Review Photos</a>
+      </center>
+
+      <div class="order-box">
+        <h3>Order Details</h3>
+        <div class="order-detail">
+          <span class="label">Order Number</span>
+          <span class="value">${order.orderNumber}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Item</span>
+          <span class="value">${productTitle}</span>
+        </div>
+        ${orderItem.snapshot?.sizeLabel ? `
+        <div class="order-detail">
+          <span class="label">Size</span>
+          <span class="value">${orderItem.snapshot.sizeLabel}</span>
+        </div>
+        ` : ""}
+        <div class="order-detail">
+          <span class="label">Review Deadline</span>
+          <span class="value">${approval.deadlineAt ? formatDate(approval.deadlineAt) : "7 days from now"}</span>
+        </div>
+      </div>
+
+      <p style="color: #777; font-size: 14px;">
+        <strong>Note:</strong> If we don't hear from you by the deadline, we'll proceed with shipping based on the current production.
+      </p>
+    </div>
+  `;
+
+  const text = `
+Your Production Photos Are Ready!
+
+Hi ${customerName},
+
+Great news! We've completed production of ${productTitle} and have taken photos for your review.
+
+Please review the photos and either approve for shipping or request any adjustments.
+
+Review Photos: ${approvalUrl}
+
+Order Details:
+- Order Number: ${order.orderNumber}
+- Item: ${productTitle}
+${orderItem.snapshot?.sizeLabel ? `- Size: ${orderItem.snapshot.sizeLabel}` : ""}
+- Review Deadline: ${approval.deadlineAt ? formatDate(approval.deadlineAt) : "7 days from now"}
+
+Note: If we don't hear from you by the deadline, we'll proceed with shipping based on the current production.
+
+Thank you for choosing MasonArt!
+  `.trim();
+
+  return {
+    subject: `Review Your Production Photos - ${order.orderNumber}`,
+    html: baseTemplate(content),
+    text,
+  };
+}
+
+/**
+ * Changes Requested Response Email Template
+ * Sent when admin responds to customer's change request with new photos
+ */
+export function getChangesRequestedResponseTemplate(
+  context: ApprovalEmailContext
+): EmailTemplate {
+  const { order, orderItem, photos, approvalUrl } = context;
+  const customerName = order.shippingAddress?.fullName || "there";
+  const productTitle = orderItem.snapshot?.title || "your custom item";
+  const photoCount = photos?.length || 0;
+
+  const content = `
+    <div class="content">
+      <h2>We've Made the Changes You Requested</h2>
+      <p>Hi ${customerName},</p>
+      <p>Thank you for your feedback! We've addressed your concerns and uploaded ${photoCount} new photo${photoCount !== 1 ? "s" : ""} of <strong>${productTitle}</strong> for your review.</p>
+
+      <div class="tracking-box">
+        <h3>Ready for Your Review</h3>
+        <p style="margin: 0;">
+          Please take a look at the updated production photos and let us know if everything looks good.
+        </p>
+      </div>
+
+      <center>
+        <a href="${approvalUrl}" class="button">Review Updated Photos</a>
+      </center>
+
+      <div class="order-box">
+        <h3>Order Details</h3>
+        <div class="order-detail">
+          <span class="label">Order Number</span>
+          <span class="value">${order.orderNumber}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Item</span>
+          <span class="value">${productTitle}</span>
+        </div>
+      </div>
+
+      <p>We're committed to making sure you're 100% happy with your order!</p>
+    </div>
+  `;
+
+  const text = `
+We've Made the Changes You Requested
+
+Hi ${customerName},
+
+Thank you for your feedback! We've addressed your concerns and uploaded new photos of ${productTitle} for your review.
+
+Please take a look at the updated production photos and let us know if everything looks good.
+
+Review Updated Photos: ${approvalUrl}
+
+Order Details:
+- Order Number: ${order.orderNumber}
+- Item: ${productTitle}
+
+We're committed to making sure you're 100% happy with your order!
+
+Thank you for choosing MasonArt!
+  `.trim();
+
+  return {
+    subject: `Updated Photos Ready for Review - ${order.orderNumber}`,
+    html: baseTemplate(content),
+    text,
+  };
+}
+
+/**
+ * Approval Confirmed Email Template
+ * Sent when customer approves production for shipping
+ */
+export function getApprovalConfirmedTemplate(
+  context: ApprovalEmailContext
+): EmailTemplate {
+  const { order, orderItem } = context;
+  const customerName = order.shippingAddress?.fullName || "there";
+  const productTitle = orderItem.snapshot?.title || "your custom item";
+
+  const content = `
+    <div class="content">
+      <h2>Thank You for Your Approval!</h2>
+      <p>Hi ${customerName},</p>
+      <p>You've approved <strong>${productTitle}</strong> for shipping. We're now preparing your order for dispatch.</p>
+
+      <div class="tracking-box">
+        <h3>What's Next?</h3>
+        <p style="margin: 0;">
+          Your order will be carefully packaged and shipped. You'll receive another email with tracking information once it's on its way.
+        </p>
+      </div>
+
+      <div class="order-box">
+        <h3>Order Details</h3>
+        <div class="order-detail">
+          <span class="label">Order Number</span>
+          <span class="value">${order.orderNumber}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Item</span>
+          <span class="value">${productTitle}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Status</span>
+          <span class="value" style="color: #22c55e;">Approved ✓</span>
+        </div>
+      </div>
+
+      <center>
+        <a href="https://masonart.com/orders/${order.orderNumber}" class="button">View Order</a>
+      </center>
+
+      <p style="text-align: center; color: #777;">
+        Thank you for trusting us with your custom art!
+      </p>
+    </div>
+  `;
+
+  const text = `
+Thank You for Your Approval!
+
+Hi ${customerName},
+
+You've approved ${productTitle} for shipping. We're now preparing your order for dispatch.
+
+What's Next?
+Your order will be carefully packaged and shipped. You'll receive another email with tracking information once it's on its way.
+
+Order Details:
+- Order Number: ${order.orderNumber}
+- Item: ${productTitle}
+- Status: Approved ✓
+
+View your order: https://masonart.com/orders/${order.orderNumber}
+
+Thank you for trusting us with your custom art!
+
+Thank you for choosing MasonArt!
+  `.trim();
+
+  return {
+    subject: `Approved for Shipping - ${order.orderNumber}`,
+    html: baseTemplate(content),
+    text,
+  };
+}
+
+/**
+ * Approval Deadline Reminder Email Template
+ * Sent when approval deadline is approaching
+ */
+export function getApprovalDeadlineReminderTemplate(
+  context: ApprovalEmailContext
+): EmailTemplate {
+  const { approval, order, orderItem, approvalUrl } = context;
+  const customerName = order.shippingAddress?.fullName || "there";
+  const productTitle = orderItem.snapshot?.title || "your custom item";
+
+  const content = `
+    <div class="content">
+      <h2>Reminder: Review Your Production Photos</h2>
+      <p>Hi ${customerName},</p>
+      <p>We noticed you haven't reviewed the production photos for <strong>${productTitle}</strong> yet.</p>
+
+      <div class="tracking-box" style="background-color: #fef3c7; border-color: #f59e0b;">
+        <h3 style="color: #92400e;">Deadline Approaching</h3>
+        <p style="margin: 0; color: #92400e;">
+          Please review and approve by <strong>${approval.deadlineAt ? formatDate(approval.deadlineAt) : "the deadline"}</strong> to avoid any delays.
+        </p>
+      </div>
+
+      <center>
+        <a href="${approvalUrl}" class="button">Review Photos Now</a>
+      </center>
+
+      <div class="order-box">
+        <h3>Order Details</h3>
+        <div class="order-detail">
+          <span class="label">Order Number</span>
+          <span class="value">${order.orderNumber}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Item</span>
+          <span class="value">${productTitle}</span>
+        </div>
+      </div>
+
+      <p style="color: #777; font-size: 14px;">
+        If you've already reviewed and approved, please disregard this email. If you have any questions, feel free to reply to this email or contact our support team.
+      </p>
+    </div>
+  `;
+
+  const text = `
+Reminder: Review Your Production Photos
+
+Hi ${customerName},
+
+We noticed you haven't reviewed the production photos for ${productTitle} yet.
+
+DEADLINE APPROACHING
+Please review and approve by ${approval.deadlineAt ? formatDate(approval.deadlineAt) : "the deadline"} to avoid any delays.
+
+Review Photos Now: ${approvalUrl}
+
+Order Details:
+- Order Number: ${order.orderNumber}
+- Item: ${productTitle}
+
+If you've already reviewed and approved, please disregard this email.
+
+Thank you for choosing MasonArt!
+  `.trim();
+
+  return {
+    subject: `Reminder: Review Photos for ${order.orderNumber}`,
     html: baseTemplate(content),
     text,
   };
