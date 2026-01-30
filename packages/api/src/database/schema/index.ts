@@ -30,3 +30,6 @@ export * from "./returns";
 
 // Order tracking notifications and preferences
 export * from "./notifications";
+
+// Production photo approvals for made-to-order items
+export * from "./approvals";
