@@ -1,6 +1,24 @@
 #!/bin/bash
 # MasonArt Comprehensive Test Runner
 # This script ensures all prerequisites are met before running tests
+#
+# Usage:
+#   ./tests/run-all-tests.sh [OPTIONS]
+#
+# Options:
+#   --project=<name>      Browser to run (chromium, firefox, webkit, mobile-chrome, mobile-safari)
+#                         Default: chromium
+#   --max-failures=<N>    Stop after N test failures (default: no limit)
+#   --workers=<N>         Number of parallel workers (default: 4)
+#   --grep=<pattern>      Only run tests matching pattern
+#   --help                Show this help message
+#
+# Examples:
+#   ./tests/run-all-tests.sh                           # Run all chromium tests
+#   ./tests/run-all-tests.sh --max-failures=1          # Stop on first failure
+#   ./tests/run-all-tests.sh --max-failures=5          # Stop after 5 failures
+#   ./tests/run-all-tests.sh --project=firefox         # Run Firefox tests
+#   ./tests/run-all-tests.sh --grep="approval"         # Run only approval tests
 
 set -e
 
@@ -10,6 +28,48 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Default options
+PROJECT="chromium"
+MAX_FAILURES=""
+WORKERS="4"
+GREP_PATTERN=""
+
+# Parse command line arguments
+for arg in "$@"; do
+    case $arg in
+        --project=*)
+            PROJECT="${arg#*=}"
+            shift
+            ;;
+        --max-failures=*)
+            MAX_FAILURES="${arg#*=}"
+            shift
+            ;;
+        --workers=*)
+            WORKERS="${arg#*=}"
+            shift
+            ;;
+        --grep=*)
+            GREP_PATTERN="${arg#*=}"
+            shift
+            ;;
+        --help)
+            sed -n '3,20p' "$0" | sed 's/^# //' | sed 's/^#//'
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Build playwright command options
+PLAYWRIGHT_OPTS="--project=$PROJECT --reporter=list --workers=$WORKERS"
+[ -n "$MAX_FAILURES" ] && PLAYWRIGHT_OPTS="$PLAYWRIGHT_OPTS --max-failures=$MAX_FAILURES"
+[ -n "$GREP_PATTERN" ] && PLAYWRIGHT_OPTS="$PLAYWRIGHT_OPTS --grep=\"$GREP_PATTERN\""
 
 # Project root
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -153,9 +213,17 @@ echo ""
 echo -e "${BLUE}━━━ Phase 5: E2E Tests (Playwright) ━━━${NC}"
 echo ""
 
-# Run E2E tests with chromium only for speed
-echo "Running E2E tests with Chromium..."
-if bunx playwright test --project=chromium --reporter=list 2>&1; then
+# Display test configuration
+echo "Configuration:"
+echo "  Project: $PROJECT"
+echo "  Workers: $WORKERS"
+[ -n "$MAX_FAILURES" ] && echo "  Max failures: $MAX_FAILURES (will stop early)"
+[ -n "$GREP_PATTERN" ] && echo "  Filter: $GREP_PATTERN"
+echo ""
+
+# Run E2E tests
+echo "Running E2E tests..."
+if eval "bunx playwright test $PLAYWRIGHT_OPTS" 2>&1; then
     echo -e "${GREEN}✓ E2E tests passed${NC}"
 else
     echo -e "${RED}✗ Some E2E tests failed${NC}"

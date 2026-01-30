@@ -58,26 +58,41 @@ $ARGUMENTS: [--max-iterations=30] [--max-tickets=20]
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  1. Run ./tests/run-all-tests.sh                        │
-│     (capture all output)                                │
+│  1. Run ./tests/run-all-tests.sh --max-failures=N       │
+│     where N = 1 + count(stuck_tests)                    │
+│     (stops on first NEW failure, allows stuck to fail)  │
 └──────────────────────┬──────────────────────────────────┘
                        │
             ┌──────────┴──────────┐
             │                     │
             ▼                     ▼
     ┌───────────────┐     ┌───────────────────────────────┐
-    │ ALL PASS      │     │ FAILURES DETECTED             │
+    │ ALL PASS      │     │ NEW FAILURE DETECTED          │
     │ (or only      │     │                               │
-    │  stuck tests) │     │  2. Parse ALL failure details │
-    │ → Done!       │     │  3. Filter out stuck tests    │
-    └───────────────┘     │  4. For each new failure:     │
-                          │     a. Detect feature         │
-                          │     b. Create/find ticket     │
-                          │     c. tt-work-ticket to fix  │
-                          │     d. If 5 fails → stuck     │
-                          │  5. GOTO Step 1               │
+    │  stuck tests) │     │  2. Parse the failure         │
+    │ → Done!       │     │  3. Create/find ticket        │
+    └───────────────┘     │  4. tt-work-ticket to fix     │
+                          │  5. If 5 fails → mark stuck   │
+                          │     (increment allowed fails) │
+                          │  6. GOTO Step 1               │
                           └───────────────────────────────┘
 ```
+
+### --max-failures Strategy
+
+The test runner uses `--max-failures=N` to stop early on the first **new** failure while allowing **stuck** tests to fail:
+
+| Stuck Tests | --max-failures | Behavior |
+|-------------|----------------|----------|
+| 0 | 1 | Stop on first failure |
+| 1 | 2 | Allow 1 stuck to fail, stop on next new failure |
+| 2 | 3 | Allow 2 stuck to fail, stop on next new failure |
+| N | N+1 | Allow N stuck to fail, stop on next new failure |
+
+This ensures we:
+1. Focus on one failure at a time (efficient)
+2. Don't re-fail already-stuck tests (wasteful)
+3. Continue discovering new failures after marking tests as stuck
 
 ## Session State
 
@@ -88,6 +103,9 @@ session:
   iteration: 0
   max_iterations: 30
   max_tickets: 20
+
+  # Dynamic --max-failures value (1 + stuck_count)
+  stuck_count: 0  # Incremented when a test is marked stuck
 
   # Tickets created this session
   tickets:
@@ -117,24 +135,30 @@ session:
 ```yaml
 session:
   iteration: 0
+  stuck_count: 0
   tickets: []
   stuck_tests: []
   attempts: {}
 ```
 
-### Step 2: Run All Tests
+### Step 2: Run Tests with --max-failures
 
 ```bash
-./tests/run-all-tests.sh 2>&1
+# Calculate max-failures: 1 (for new failure) + stuck_count (allow stuck to fail)
+MAX_FAILURES=$((1 + stuck_count))
+
+./tests/run-all-tests.sh --max-failures=$MAX_FAILURES 2>&1
 ```
 
-Capture full output including exit code.
+This command:
+- Stops on the **first new failure** (the +1)
+- Allows all **stuck tests** to fail without stopping (the stuck_count)
 
 **If exit code 0** → All tests pass → Check if we have stuck tests:
 - If no stuck tests: **Done! All tests passing!**
 - If stuck tests exist: **Done! All fixable tests passing!**
 
-**If exit code non-zero** → Parse failures and continue
+**If exit code non-zero** → Parse the failure and continue
 
 ### Step 3: Parse ALL Test Failures
 
@@ -295,6 +319,7 @@ After tt-work-ticket completes:
 
 When a test has failed 5 times:
 
+1. **Add comment to ticket**:
 ```
 mcp__ticketrack__addComment:
   ticketId: {ticket-id}
@@ -320,7 +345,12 @@ mcp__ticketrack__addComment:
     {analysis of why fixes aren't working}
 ```
 
-Add to `stuck_tests` list and continue to next failure.
+2. **Increment stuck_count** - This is critical for the --max-failures strategy:
+```python
+stuck_count += 1  # Next run will use --max-failures=(1 + stuck_count)
+```
+
+3. **Add to stuck_tests list** and continue to discover next failure.
 
 ### Step 7: Loop Back
 
@@ -534,18 +564,18 @@ tt-fix-tests (orchestrator)
 
 | Aspect | Original | Revised |
 |--------|----------|---------|
-| Stop on failure | Yes (first failure) | No (process all) |
+| Stop on failure | Run all tests | `--max-failures=1+stuck_count` |
 | User prompts | Asked for feature if unknown | Only if truly blocked |
 | Max attempts | 3 | 5 |
-| On stuck test | Skip and stop | Mark stuck, continue |
-| Test run scope | Stop on first fail | Parse all failures |
-| Allowed failures | None | Track stuck test count |
+| On stuck test | Skip and stop | Mark stuck, increment allowed failures |
+| Test run scope | Run all, parse all | Stop early, fix one at a time |
+| Allowed failures | None | Dynamic: 1 + stuck_count |
 
 ## Notes
 
 - **Autonomous execution**: Runs continuously like tt-implement-feature
-- **All failures processed**: Parses and tracks every failing test
-- **Stuck tests tracked**: After 5 attempts, allows test to fail
+- **One failure at a time**: Uses `--max-failures` for efficient fix loops
+- **Stuck tests tracked**: After 5 attempts, allows test to fail via incremented max-failures
 - **Feature linking**: Bugs properly associated with features
 - **No user prompts**: Only stops for genuine blockers
 - **Resumable**: Re-running continues where left off (tickets persist)
