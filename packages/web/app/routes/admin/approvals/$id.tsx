@@ -102,7 +102,7 @@ interface ApprovalDetail {
 // ============================================================================
 
 async function fetchApproval(id: string): Promise<ApprovalDetail> {
-  const response = await fetch(`${getApiUrl()}/admin/approvals/${id}`, {
+  const response = await fetch(`${getApiUrl()}/api/admin/approvals/${id}`, {
     credentials: 'include',
   })
 
@@ -123,7 +123,7 @@ async function uploadPhotos(
   photos: { url: string; thumbnailUrl?: string; sortOrder: number }[],
   sendNotification: boolean
 ): Promise<void> {
-  const response = await fetch(`${getApiUrl()}/admin/approvals/${approvalId}/photos`, {
+  const response = await fetch(`${getApiUrl()}/api/admin/approvals/${approvalId}/photos`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
@@ -137,7 +137,7 @@ async function uploadPhotos(
 }
 
 async function deletePhotos(approvalId: string): Promise<void> {
-  const response = await fetch(`${getApiUrl()}/admin/approvals/${approvalId}/photos`, {
+  const response = await fetch(`${getApiUrl()}/api/admin/approvals/${approvalId}/photos`, {
     method: 'DELETE',
     credentials: 'include',
   })
@@ -149,7 +149,7 @@ async function deletePhotos(approvalId: string): Promise<void> {
 }
 
 async function addComment(approvalId: string, comment: string): Promise<void> {
-  const response = await fetch(`${getApiUrl()}/admin/approvals/${approvalId}/comments`, {
+  const response = await fetch(`${getApiUrl()}/api/admin/approvals/${approvalId}/comments`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },

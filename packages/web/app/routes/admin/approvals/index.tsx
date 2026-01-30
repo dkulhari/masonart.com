@@ -260,7 +260,7 @@ function ApprovalCard({ approval }: { approval: Approval }) {
               <Calendar className="h-3 w-3" />
               Created {formatDate(approval.createdAt)}
             </span>
-            {approval.photos.length > 0 && (
+            {approval.photos?.length > 0 && (
               <span className="flex items-center gap-1">
                 <Image className="h-3 w-3" />
                 {approval.photos.length} photo{approval.photos.length !== 1 ? 's' : ''}
@@ -270,7 +270,7 @@ function ApprovalCard({ approval }: { approval: Approval }) {
         </div>
 
         {/* Photo Thumbnails */}
-        {approval.photos.length > 0 && (
+        {approval.photos?.length > 0 && (
           <div className="ml-4 flex -space-x-2">
             {approval.photos.slice(0, 3).map((photo, index) => (
               <div
@@ -335,7 +335,7 @@ function AdminApprovalsPage() {
   const fetchStats = useCallback(async () => {
     setStatsLoading(true)
     try {
-      const response = await fetch(`${getApiUrl()}/admin/approvals/stats`, {
+      const response = await fetch(`${getApiUrl()}/api/admin/approvals/stats`, {
         credentials: 'include',
       })
       if (response.ok) {
@@ -361,7 +361,7 @@ function AdminApprovalsPage() {
       if (search.pageSize) params.set('pageSize', String(search.pageSize))
       if (search.status) params.set('status', search.status)
 
-      const response = await fetch(`${getApiUrl()}/admin/approvals?${params}`, {
+      const response = await fetch(`${getApiUrl()}/api/admin/approvals?${params}`, {
         credentials: 'include',
       })
 
