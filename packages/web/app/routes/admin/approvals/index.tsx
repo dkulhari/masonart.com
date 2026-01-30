@@ -41,7 +41,7 @@ const searchParamsSchema = z.object({
 })
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Route = createFileRoute('/admin/approvals' as any)({
+export const Route = createFileRoute('/admin/approvals/' as any)({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
