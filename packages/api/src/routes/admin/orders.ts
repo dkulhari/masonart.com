@@ -39,6 +39,7 @@ import {
 } from "../../lib/razorpay";
 import { notifyOrderStatusChange } from "../../services/notifications";
 import { createApprovalsForOrder } from "../../services/approval";
+import { productionApprovals } from "../../database/schema/approvals";
 
 // ============================================================================
 // Constants
@@ -491,6 +492,21 @@ adminOrdersApp.get("/:id", async (c) => {
       return c.json({ error: "Order not found" }, 404);
     }
 
+    // Fetch approvals for this order
+    const approvals = await db
+      .select({
+        id: productionApprovals.id,
+        orderItemId: productionApprovals.orderItemId,
+        status: productionApprovals.status,
+        approvalToken: productionApprovals.approvalToken,
+        deadlineAt: productionApprovals.deadlineAt,
+        approvedAt: productionApprovals.approvedAt,
+        createdAt: productionApprovals.createdAt,
+        updatedAt: productionApprovals.updatedAt,
+      })
+      .from(productionApprovals)
+      .where(eq(productionApprovals.orderId, order.id));
+
     // Return full order details including all admin-relevant fields
     return c.json({
       id: order.id,
@@ -541,6 +557,16 @@ adminOrdersApp.get("/:id", async (c) => {
       shippedAt: order.shippedAt,
       deliveredAt: order.deliveredAt,
       cancelledAt: order.cancelledAt,
+      approvals: approvals.map((a) => ({
+        id: a.id,
+        orderItemId: a.orderItemId,
+        status: a.status,
+        approvalToken: a.approvalToken,
+        deadlineAt: a.deadlineAt,
+        approvedAt: a.approvedAt,
+        createdAt: a.createdAt,
+        updatedAt: a.updatedAt,
+      })),
     });
   } catch (error) {
     return c.json({ error: "Failed to fetch order" }, 500);

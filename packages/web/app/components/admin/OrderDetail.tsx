@@ -27,6 +27,7 @@ import {
   XCircle,
   RefreshCw,
   ImageIcon,
+  Camera,
 } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
 import type { OrderStatus, PaymentStatus } from './OrdersTable'
@@ -113,6 +114,19 @@ export interface OrderCustomer {
   phone?: string | null
 }
 
+export type ApprovalStatus = 'pending_upload' | 'pending_approval' | 'changes_requested' | 'approved' | 'expired'
+
+export interface OrderApproval {
+  id: string
+  orderItemId: string
+  status: ApprovalStatus
+  approvalToken: string
+  deadlineAt?: string | null
+  approvedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface FullOrder {
   id: string
   orderNumber: string
@@ -137,6 +151,7 @@ export interface FullOrder {
   internalNotes?: string | null
   paymentDetails?: PaymentDetails | null
   items: OrderItem[]
+  approvals?: OrderApproval[]
   createdAt: string
   updatedAt: string
   paidAt?: string | null
@@ -199,6 +214,35 @@ function OrderStatusBadge({ status }: { status: OrderStatus }) {
   )
 }
 
+function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
+  const styles: Record<ApprovalStatus, string> = {
+    pending_upload: 'bg-gray-100 text-gray-700 border-gray-200',
+    pending_approval: 'bg-amber-100 text-amber-700 border-amber-200',
+    changes_requested: 'bg-orange-100 text-orange-700 border-orange-200',
+    approved: 'bg-green-100 text-green-700 border-green-200',
+    expired: 'bg-red-100 text-red-700 border-red-200',
+  }
+
+  const labels: Record<ApprovalStatus, string> = {
+    pending_upload: 'Awaiting Upload',
+    pending_approval: 'Pending Approval',
+    changes_requested: 'Changes Requested',
+    approved: 'Approved',
+    expired: 'Expired',
+  }
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium',
+        styles[status]
+      )}
+    >
+      {labels[status]}
+    </span>
+  )
+}
+
 function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const styles: Record<PaymentStatus, string> = {
     pending: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -229,6 +273,58 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
     >
       {labels[status]}
     </span>
+  )
+}
+
+// ============================================================================
+// Approval Status Section
+// ============================================================================
+
+function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
+  // Compute overall status: show worst status if mixed
+  const getOverallStatus = (): ApprovalStatus => {
+    const statusPriority: ApprovalStatus[] = [
+      'expired',
+      'changes_requested',
+      'pending_upload',
+      'pending_approval',
+      'approved',
+    ]
+
+    for (const status of statusPriority) {
+      if (approvals.some((a) => a.status === status)) {
+        return status
+      }
+    }
+    return 'pending_upload'
+  }
+
+  const overallStatus = getOverallStatus()
+  const pendingCount = approvals.filter(
+    (a) => a.status !== 'approved' && a.status !== 'expired'
+  ).length
+  const approvedCount = approvals.filter((a) => a.status === 'approved').length
+
+  // Find first non-approved approval to link to
+  const firstPendingApproval = approvals.find(
+    (a) => a.status !== 'approved' && a.status !== 'expired'
+  )
+  const linkToApprovalId = firstPendingApproval?.id || approvals[0]?.id
+
+  return (
+    <a
+      href={`/admin/approvals/${linkToApprovalId}`}
+      className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100"
+    >
+      <Camera className="h-3.5 w-3.5" />
+      <span>Approvals</span>
+      <ApprovalStatusBadge status={overallStatus} />
+      {pendingCount > 0 && (
+        <span className="text-xs text-purple-600">
+          ({approvedCount}/{approvals.length})
+        </span>
+      )}
+    </a>
   )
 }
 
@@ -606,6 +702,9 @@ export function OrderDetail({
         <div className="flex flex-wrap items-center gap-2">
           <OrderStatusBadge status={order.status} />
           <PaymentStatusBadge status={order.paymentStatus} />
+          {order.approvals && order.approvals.length > 0 && (
+            <ApprovalStatusSection approvals={order.approvals} />
+          )}
         </div>
       </div>
 
