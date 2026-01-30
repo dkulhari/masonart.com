@@ -20,6 +20,51 @@ allowed-tools:
 
 Delivers an entire feature by automatically implementing all tickets in order.
 
+## ⚠️ CRITICAL: Continuous Execution Mode
+
+**This skill runs autonomously until all tickets are processed.** Do NOT stop or ask the user unless:
+
+1. **Genuine blocker**: Cannot proceed without user input (e.g., missing credentials, ambiguous requirements that affect multiple tickets)
+2. **User explicitly interrupts**: User sends a message or cancels
+
+**DO NOT stop to:**
+- Ask "should I continue?" - YES, always continue
+- Ask "is this approach okay?" - Make the decision and proceed
+- Confirm before each ticket - Just do it
+- Show progress and wait - Show progress AND continue immediately
+
+### Handling Failures
+
+**Build/Test failures:**
+1. Attempt to fix (up to 7 attempts)
+2. If still failing after 7 attempts:
+   - Check if ticket is in critical path (blocks other tickets)
+   - If NOT critical: Skip ticket, leave status as `in-progress`, add comment explaining failure
+   - If critical: Add comment, continue to next non-blocked ticket
+3. **Never stop the session** - always continue to next ticket
+
+**Skipped ticket comment format:**
+```
+mcp__ticketrack__addComment:
+  ticketId: {id}
+  comment: |
+    ⚠️ **Implementation Incomplete**
+
+    **Attempts**: 7
+    **Blocking Issue**: {description of what's failing}
+    **Error**: {error message}
+
+    Left in-progress for manual review.
+```
+
+### Session Completion
+
+The session ends when **no tickets remain in `todo` status** for the feature. This means:
+- All tickets are either `done` or `in-progress` (stuck)
+- Summary includes both successes AND failures
+
+**The goal is to process every ticket, not to achieve 100% success.**
+
 ## Relationship to tt-work-ticket
 
 This skill **delegates to tt-work-ticket** for per-ticket operations:
@@ -251,28 +296,37 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 **→ Follow `/tt-work-ticket` Step 9: Update Ticket**
 
+**⚠️ CRITICAL: Complete the POST-COMMIT CHECKLIST (both required!)**
+
 ```
-mcp__ticketrack__updateTicketStatus:
-  ticketId: {id}
-  status: "done"
-
-mcp__ticketrack__addComment:
-  ticketId: {id}
-  comment: |
-    ✅ **Completed**
-
-    **Commit**: `{commit-hash}` - {commit-subject}
-
-    **Files Changed**:
-    - `{file1}` - {description}
-    - `{file2}` - {description}
-
-    **Summary**:
-    {What was implemented and how}
-
-    **Tests**:
-    - {test-file}: {what it tests}
+┌─────────────────────────────────────────────────────────────┐
+│  POST-COMMIT CHECKLIST                                      │
+├─────────────────────────────────────────────────────────────┤
+│  [ ] 1. Update ticket status to "done"                      │
+│  [ ] 2. Add completion comment with commit info             │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+**Action 1**: `mcp__ticketrack__updateTicketStatus` with `newStatus: "done"`
+
+**Action 2**: `mcp__ticketrack__addComment` with completion details:
+```
+✅ **Completed**
+
+**Commit**: `{commit-hash}` - {commit-subject}
+
+**Files Changed**:
+- `{file1}` - {description}
+- `{file2}` - {description}
+
+**Summary**:
+{What was implemented and how}
+
+**Tests**:
+- {test-file}: {what it tests}
+```
+
+**DO NOT skip Action 2** - The completion comment links commits to tickets for traceability.
 
 #### 5j. Progress Update
 

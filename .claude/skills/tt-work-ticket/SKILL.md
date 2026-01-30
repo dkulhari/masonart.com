@@ -311,15 +311,30 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 
 ### Step 9: Update Ticket with Completion Info
 
-After committing, update the ticket with full details:
+**⚠️ CRITICAL: This step has TWO required actions. Do NOT skip the completion comment.**
+
+After committing, you MUST complete this checklist:
 
 ```
-mcp__ticketrack__updateTicketStatus:
-  ticketId: {ticket-number}
-  status: "done"
+┌─────────────────────────────────────────────────────────────┐
+│  POST-COMMIT CHECKLIST (both required!)                     │
+├─────────────────────────────────────────────────────────────┤
+│  [ ] 1. Update ticket status to "done"                      │
+│  [ ] 2. Add completion comment with commit info             │
+└─────────────────────────────────────────────────────────────┘
+```
 
+**Action 1: Update Status**
+```
+mcp__ticketrack__updateTicketStatus:
+  ticketNumber: {ticket-number}
+  newStatus: "done"
+```
+
+**Action 2: Add Completion Comment** (DO NOT SKIP!)
+```
 mcp__ticketrack__addComment:
-  ticketId: {ticket-number}
+  ticketNumber: {ticket-number}
   comment: |
     ✅ **Completed**
 
@@ -335,6 +350,8 @@ mcp__ticketrack__addComment:
     **Tests Added**:
     - {test-file}: {what it tests}
 ```
+
+**Why both are required**: The status update tracks progress, but the completion comment provides audit trail, links commits to tickets, and documents what was actually done. Without the comment, tickets lose traceability.
 
 ## Complete Ticket Workflow Summary
 
@@ -354,9 +371,9 @@ mcp__ticketrack__addComment:
    - Stage relevant files only
    - Write descriptive commit message
    - Reference ticket number
-9. UPDATE ticket:
-   - Mark as done
-   - Add completion comment with commit info
+9. UPDATE ticket (⚠️ BOTH required!):
+   - [ ] Mark as done (updateTicketStatus)
+   - [ ] Add completion comment with commit info (addComment)
 ```
 
 ## Error Handling
