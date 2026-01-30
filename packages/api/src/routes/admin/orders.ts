@@ -38,6 +38,7 @@ import {
   RazorpayError,
 } from "../../lib/razorpay";
 import { notifyOrderStatusChange } from "../../services/notifications";
+import { createApprovalsForOrder } from "../../services/approval";
 
 // ============================================================================
 // Constants
@@ -634,6 +635,13 @@ adminOrdersApp.patch(
         return c.json({ error: "Failed to update order" }, 500);
       }
 
+      // Create approvals for made-to-order items when moving to processing
+      if (input.status === "processing") {
+        createApprovalsForOrder(updatedOrder.id).catch((err) => {
+          console.error("[Orders] Failed to create approvals:", err);
+        });
+      }
+
       return c.json({
         message: "Order updated successfully",
         order: {
@@ -740,6 +748,14 @@ adminOrdersApp.patch(
       notifyOrderStatusChange(updatedOrder.id, status).catch((err) => {
         console.error("[Orders] Failed to send notification:", err);
       });
+
+      // Create approvals for made-to-order items when moving to processing
+      // This runs in the background and doesn't block the response
+      if (status === "processing") {
+        createApprovalsForOrder(updatedOrder.id).catch((err) => {
+          console.error("[Orders] Failed to create approvals:", err);
+        });
+      }
 
       return c.json({
         message: "Order status updated successfully",

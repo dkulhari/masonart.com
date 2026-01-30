@@ -604,3 +604,133 @@ export async function deleteApprovalPhotos(approvalId: string): Promise<boolean>
     return false;
   }
 }
+
+// ============================================================================
+// Order Integration Functions
+// ============================================================================
+
+export interface CreateApprovalsForOrderResult {
+  success: boolean;
+  approvals: ProductionApproval[];
+  errors: string[];
+}
+
+/**
+ * Create approvals for all made-to-order items in an order
+ * Called when order moves to "processing" status
+ */
+export async function createApprovalsForOrder(
+  orderId: string,
+  deadlineDays: number = 7
+): Promise<CreateApprovalsForOrderResult> {
+  const result: CreateApprovalsForOrderResult = {
+    success: true,
+    approvals: [],
+    errors: [],
+  };
+
+  try {
+    // Get all order items that require approval (AI-generated/made-to-order)
+    const items = await db.query.orderItems.findMany({
+      where: and(
+        eq(orderItems.orderId, orderId),
+        eq(orderItems.isAiGenerated, true)
+      ),
+    });
+
+    if (items.length === 0) {
+      console.log(`[Approval] No made-to-order items for order ${orderId}`);
+      return result;
+    }
+
+    console.log(
+      `[Approval] Creating approvals for ${items.length} items in order ${orderId}`
+    );
+
+    for (const item of items) {
+      // Check if approval already exists
+      const existing = await db.query.productionApprovals.findFirst({
+        where: eq(productionApprovals.orderItemId, item.id),
+      });
+
+      if (existing) {
+        console.log(
+          `[Approval] Approval already exists for item ${item.id}, skipping`
+        );
+        result.approvals.push(existing);
+        continue;
+      }
+
+      // Create approval
+      const createResult = await createApproval({
+        orderId,
+        orderItemId: item.id,
+        deadlineDays,
+      });
+
+      if (createResult.success && createResult.approval) {
+        result.approvals.push(createResult.approval);
+      } else {
+        result.errors.push(
+          `Failed to create approval for item ${item.id}: ${createResult.error}`
+        );
+        result.success = false;
+      }
+    }
+
+    console.log(
+      `[Approval] Created ${result.approvals.length} approvals for order ${orderId}`
+    );
+  } catch (error) {
+    console.error("[Approval] Error creating approvals for order:", error);
+    result.success = false;
+    result.errors.push(
+      error instanceof Error ? error.message : "Unknown error"
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Check if an order has any pending approvals
+ */
+export async function hasOrderPendingApprovals(orderId: string): Promise<boolean> {
+  try {
+    const approvals = await db.query.productionApprovals.findMany({
+      where: eq(productionApprovals.orderId, orderId),
+    });
+
+    return approvals.some(
+      (a) =>
+        a.status === "pending_upload" ||
+        a.status === "pending_approval" ||
+        a.status === "changes_requested"
+    );
+  } catch (error) {
+    console.error("[Approval] Error checking pending approvals:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if all approvals for an order are complete (approved or expired)
+ */
+export async function areOrderApprovalsComplete(orderId: string): Promise<boolean> {
+  try {
+    const approvals = await db.query.productionApprovals.findMany({
+      where: eq(productionApprovals.orderId, orderId),
+    });
+
+    if (approvals.length === 0) {
+      return true; // No approvals means nothing to wait for
+    }
+
+    return approvals.every(
+      (a) => a.status === "approved" || a.status === "expired"
+    );
+  } catch (error) {
+    console.error("[Approval] Error checking approval completion:", error);
+    return false;
+  }
+}
