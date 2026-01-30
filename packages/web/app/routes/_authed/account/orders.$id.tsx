@@ -25,6 +25,9 @@ import {
   Truck,
   RefreshCw,
   FileText,
+  Camera,
+  Timer,
+  ExternalLink,
 } from 'lucide-react'
 import { cn, formatPrice, formatDate } from '~/lib/utils'
 import { authApi, ordersApi } from '~/lib/api'
@@ -87,6 +90,18 @@ type OrderStatus =
 
 type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded'
 
+type ApprovalStatus = 'pending_upload' | 'pending_approval' | 'changes_requested' | 'approved' | 'expired'
+
+interface OrderApproval {
+  id: string
+  orderItemId: string
+  status: ApprovalStatus
+  approvalToken: string
+  deadlineAt?: string | null
+  approvedAt?: string | null
+  createdAt: string
+}
+
 interface OrderDetail {
   id: string
   orderNumber: string
@@ -106,6 +121,7 @@ interface OrderDetail {
   estimatedDelivery?: string
   shippedAt?: string
   deliveredAt?: string
+  approvals?: OrderApproval[]
 }
 
 // ============================================================================
@@ -201,6 +217,155 @@ const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, StatusConfig> = {
     color: 'text-orange-600',
     bgColor: 'bg-orange-100',
   },
+}
+
+const APPROVAL_STATUS_CONFIG: Record<ApprovalStatus, { label: string; color: string; bgColor: string }> = {
+  pending_upload: {
+    label: 'Awaiting Photos',
+    color: 'text-gray-600',
+    bgColor: 'bg-gray-100',
+  },
+  pending_approval: {
+    label: 'Ready for Review',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100',
+  },
+  changes_requested: {
+    label: 'Changes Requested',
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-100',
+  },
+  approved: {
+    label: 'Approved',
+    color: 'text-green-600',
+    bgColor: 'bg-green-100',
+  },
+  expired: {
+    label: 'Expired',
+    color: 'text-red-600',
+    bgColor: 'bg-red-100',
+  },
+}
+
+// ============================================================================
+// Approval Status Section
+// ============================================================================
+
+function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
+  if (approvals.length === 0) return null
+
+  // Compute overall status
+  const getOverallStatus = (): ApprovalStatus => {
+    const statusPriority: ApprovalStatus[] = [
+      'expired',
+      'changes_requested',
+      'pending_upload',
+      'pending_approval',
+      'approved',
+    ]
+
+    for (const status of statusPriority) {
+      if (approvals.some((a) => a.status === status)) {
+        return status
+      }
+    }
+    return 'pending_upload'
+  }
+
+  const overallStatus = getOverallStatus()
+  const config = APPROVAL_STATUS_CONFIG[overallStatus]
+  const pendingCount = approvals.filter(
+    (a) => a.status !== 'approved' && a.status !== 'expired'
+  ).length
+  const approvedCount = approvals.filter((a) => a.status === 'approved').length
+  const allApproved = approvedCount === approvals.length
+
+  // Find first pending approval token
+  const pendingApproval = approvals.find(
+    (a) => a.status === 'pending_approval' || a.status === 'changes_requested'
+  )
+
+  // Get deadline info
+  const getDeadlineText = () => {
+    if (!pendingApproval?.deadlineAt) return null
+    const deadline = new Date(pendingApproval.deadlineAt)
+    const now = new Date()
+    const hoursRemaining = Math.max(0, (deadline.getTime() - now.getTime()) / (1000 * 60 * 60))
+
+    if (hoursRemaining <= 0) return 'Deadline passed'
+    if (hoursRemaining <= 24) return `${Math.ceil(hoursRemaining)} hours remaining`
+    return `${Math.ceil(hoursRemaining / 24)} days remaining`
+  }
+
+  const deadlineText = getDeadlineText()
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+        <Camera className="h-5 w-5 text-brand-500" />
+        Production Approval
+      </h2>
+
+      <div className="mt-4 space-y-3">
+        {/* Status Badge */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Status</span>
+          <div
+            className={cn(
+              'flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium',
+              config.bgColor,
+              config.color
+            )}
+          >
+            {allApproved ? <CheckCircle className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+            {config.label}
+          </div>
+        </div>
+
+        {/* Progress */}
+        {approvals.length > 1 && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Progress</span>
+            <span className="text-sm text-foreground">
+              {approvedCount} of {approvals.length} approved
+            </span>
+          </div>
+        )}
+
+        {/* Deadline */}
+        {deadlineText && pendingCount > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Deadline</span>
+            <span className={cn(
+              'flex items-center gap-1 text-sm',
+              deadlineText.includes('hours') ? 'text-red-600' : 'text-foreground'
+            )}>
+              <Timer className="h-3.5 w-3.5" />
+              {deadlineText}
+            </span>
+          </div>
+        )}
+
+        {/* Action Button */}
+        {pendingApproval && (
+          <a
+            href={`/approve/${pendingApproval.approvalToken}`}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Review & Approve Photos
+          </a>
+        )}
+
+        {/* Approved Message */}
+        {allApproved && (
+          <p className="mt-2 text-sm text-green-600">
+            All production photos have been approved. Your order is proceeding to shipping.
+          </p>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ============================================================================
@@ -445,6 +610,11 @@ function OrderDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Production Approval Status */}
+            {order.approvals && order.approvals.length > 0 && (
+              <ApprovalStatusSection approvals={order.approvals} />
+            )}
+
             {/* Order Summary */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">

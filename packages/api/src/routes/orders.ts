@@ -26,6 +26,7 @@ import {
   type OrderPaymentDetails,
 } from "../database/schema/orders";
 import { carts, cartItems } from "../database/schema/cart";
+import { productionApprovals } from "../database/schema/approvals";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import {
   createRazorpayOrder,
@@ -502,6 +503,20 @@ ordersApp.get("/:id", async (c) => {
       return c.json({ error: "Order not found" }, 404);
     }
 
+    // Fetch approvals for this order
+    const approvals = await db
+      .select({
+        id: productionApprovals.id,
+        orderItemId: productionApprovals.orderItemId,
+        status: productionApprovals.status,
+        approvalToken: productionApprovals.approvalToken,
+        deadlineAt: productionApprovals.deadlineAt,
+        approvedAt: productionApprovals.approvedAt,
+        createdAt: productionApprovals.createdAt,
+      })
+      .from(productionApprovals)
+      .where(eq(productionApprovals.orderId, order.id));
+
     // Return full order details
     return c.json({
       id: order.id,
@@ -560,6 +575,15 @@ ordersApp.get("/:id", async (c) => {
       shippedAt: order.shippedAt,
       deliveredAt: order.deliveredAt,
       cancelledAt: order.cancelledAt,
+      approvals: approvals.map((a) => ({
+        id: a.id,
+        orderItemId: a.orderItemId,
+        status: a.status,
+        approvalToken: a.approvalToken,
+        deadlineAt: a.deadlineAt,
+        approvedAt: a.approvedAt,
+        createdAt: a.createdAt,
+      })),
     });
   } catch (error) {
     console.error("Error fetching order:", error);
