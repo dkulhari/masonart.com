@@ -27,6 +27,7 @@ import { shipmentsApp } from "./routes/shipments";
 import { returnsApp, returnPoliciesApp } from "./routes/returns";
 import { trackingApp } from "./routes/tracking";
 import { notificationPreferencesApp } from "./routes/notification-preferences";
+import { approvalsApp } from "./routes/approvals";
 import {
   productReviewsApp,
   createReviewApp,
@@ -107,6 +108,9 @@ app.route("/api/tracking", trackingApp);
 
 // Notification Preferences API - user notification settings
 app.route("/api/notification-preferences", notificationPreferencesApp);
+
+// Approvals API - public production photo approval access
+app.route("/api/approvals", approvalsApp);
 
 // ============================================================================
 // Admin API Routes (Protected with role-based access)
