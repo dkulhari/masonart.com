@@ -1,0 +1,58 @@
+ticket_number: 147
+title: 'Bug: Active filter tag click doesn''t update URL'
+description: |-
+  ## Issue
+  Clicking an active filter tag to remove it updates the client-side React state but doesn't call `navigate()` to update the URL.
+
+  ## Test
+  `tests/e2e/product-listing.spec.ts` - "should remove individual filter on tag click"
+
+  ## Steps to Reproduce
+  1. Go to `/posters?styles=abstract,minimalist`
+  2. Click the "abstract" filter tag to remove it
+  3. URL remains `/posters?styles=abstract,minimalist` (should become `/posters?styles=minimalist`)
+
+  ## Root Cause
+  The `onFiltersChange` callback in the active filter tags component only updates local state without calling TanStack Router's `navigate()` function.
+
+  ## Expected Behavior
+  URL should update to reflect the removed filter, maintaining SEO-friendly URL state.
+
+  ## Fix Location
+  `packages/web/app/routes/posters/index.tsx` - the handler passed to filter tag removal needs to call `navigate()` similar to how filter selection works.
+
+  ## Related
+  This is the same pattern as the pagination fix - need to sync URL state with filter changes.
+feature: product-catalog
+type: bug
+priority: medium
+status: done
+assignee: claude
+reporter: cli
+created: '2026-01-31T16:49:48.942Z'
+last_updated: '2026-01-31T17:00:00.000Z'
+time_spent_minutes: 15
+resolution_commit: f0134705
+resolution_summary: |
+  Root cause was test timing, not application code. The handleFiltersChange function
+  already calls navigate() correctly. Fixed E2E test by adding waitUntil: 'networkidle'
+  to ensure React hydration completes before filter interaction.
+labels:
+  - bug
+  - tests
+  - filters
+  - url-state
+acceptance_criteria: []
+comments:
+  - author: claude
+    date: '2026-01-31T17:00:00.000Z'
+    content: |
+      Investigation found the application code was correct - handleFiltersChange in posters/index.tsx already calls navigate().
+      The actual issue was test timing: tests weren't waiting for React hydration before interacting with filter components.
+      Fixed by adding waitUntil: 'networkidle' to page.goto() and appropriate timeouts to URL assertions.
+      Test now passes across all browsers.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

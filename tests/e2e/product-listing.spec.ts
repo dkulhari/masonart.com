@@ -409,9 +409,8 @@ test.describe('Product Listing - Active Filter Tags', () => {
     await expect(abstractTag.first()).toBeVisible({ timeout: 10000 });
   });
 
-  // Skipped: Active filter tags click handler updates client state but doesn't call navigate()
-  test.skip('should remove individual filter on tag click', async ({ page }) => {
-    await page.goto('/posters?styles=abstract,minimalist');
+  test('should remove individual filter on tag click', async ({ page }) => {
+    await page.goto('/posters?styles=abstract,minimalist', { waitUntil: 'networkidle' });
 
     // Click to remove abstract filter (scoped to desktop container)
     const desktopFilters = page.locator('div.hidden.lg\\:block');
@@ -420,7 +419,7 @@ test.describe('Product Listing - Active Filter Tags', () => {
     await abstractTag.click();
 
     // URL should no longer contain abstract
-    await expect(page).not.toHaveURL(/abstract/);
+    await expect(page).not.toHaveURL(/abstract/, { timeout: 10000 });
     await expect(page).toHaveURL(/minimalist/);
   });
 
