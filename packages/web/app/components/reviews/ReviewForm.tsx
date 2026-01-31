@@ -225,7 +225,7 @@ export function ReviewForm({
             You need to be logged in to share your experience with this product.
           </p>
           <a
-            href="/login"
+            href="/auth/login"
             className="mt-4 inline-flex items-center justify-center rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Sign In
