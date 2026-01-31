@@ -10,15 +10,20 @@
 #                         Default: chromium
 #   --max-failures=<N>    Stop after N test failures (default: no limit)
 #   --workers=<N>         Number of parallel workers (default: 4)
-#   --grep=<pattern>      Only run tests matching pattern
+#   --file=<path>         Run specific test file (e.g., auth.spec.ts or tests/e2e/auth.spec.ts)
+#   --grep=<pattern>      Only run tests matching pattern (within file if --file specified)
+#   --setup-only          Setup everything (Docker, DB, servers) but exit before running tests.
+#                         Servers remain running for agent-assisted manual testing.
 #   --help                Show this help message
 #
 # Examples:
 #   ./tests/run-all-tests.sh                           # Run all chromium tests
 #   ./tests/run-all-tests.sh --max-failures=1          # Stop on first failure
-#   ./tests/run-all-tests.sh --max-failures=5          # Stop after 5 failures
+#   ./tests/run-all-tests.sh --file=auth.spec.ts       # Run only auth tests
+#   ./tests/run-all-tests.sh --file=payment.spec.ts --max-failures=5
 #   ./tests/run-all-tests.sh --project=firefox         # Run Firefox tests
 #   ./tests/run-all-tests.sh --grep="approval"         # Run only approval tests
+#   ./tests/run-all-tests.sh --setup-only              # Setup env for manual testing
 
 set -e
 
@@ -33,7 +38,9 @@ NC='\033[0m' # No Color
 PROJECT="chromium"
 MAX_FAILURES=""
 WORKERS="4"
+TEST_FILE=""
 GREP_PATTERN=""
+SETUP_ONLY=false
 
 # Parse command line arguments
 for arg in "$@"; do
@@ -50,8 +57,16 @@ for arg in "$@"; do
             WORKERS="${arg#*=}"
             shift
             ;;
+        --file=*)
+            TEST_FILE="${arg#*=}"
+            shift
+            ;;
         --grep=*)
             GREP_PATTERN="${arg#*=}"
+            shift
+            ;;
+        --setup-only)
+            SETUP_ONLY=true
             shift
             ;;
         --help)
@@ -65,6 +80,24 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# Resolve test file path
+TEST_FILE_PATH=""
+if [ -n "$TEST_FILE" ]; then
+    # If it's just a filename, prepend tests/e2e/
+    if [[ "$TEST_FILE" != *"/"* ]]; then
+        TEST_FILE_PATH="tests/e2e/$TEST_FILE"
+    else
+        TEST_FILE_PATH="$TEST_FILE"
+    fi
+    # Verify file exists
+    if [ ! -f "$TEST_FILE_PATH" ] && [ ! -f "$(dirname "${BASH_SOURCE[0]}")/../$TEST_FILE_PATH" ]; then
+        echo -e "${RED}ERROR: Test file not found: $TEST_FILE_PATH${NC}"
+        echo "Available test files:"
+        ls tests/e2e/*.spec.ts 2>/dev/null | sed 's|tests/e2e/||' | head -10
+        exit 1
+    fi
+fi
 
 # Build playwright command options
 PLAYWRIGHT_OPTS="--project=$PROJECT --reporter=list --workers=$WORKERS"
@@ -87,6 +120,10 @@ DEV_PID=""
 
 # Cleanup function
 cleanup() {
+    # Skip cleanup if setup-only mode (leave servers running for manual testing)
+    if [ "$SETUP_ONLY" = true ]; then
+        return
+    fi
     echo ""
     echo -e "${YELLOW}Cleaning up...${NC}"
     if [ -n "$DEV_PID" ]; then
@@ -210,6 +247,28 @@ fi
 
 echo ""
 
+# Exit early if setup-only mode
+if [ "$SETUP_ONLY" = true ]; then
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}            SETUP COMPLETE - READY FOR MANUAL TESTING         ${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "Services running:"
+    echo "  • Web App:    http://localhost:3001"
+    echo "  • API Server: http://localhost:3000"
+    echo "  • PostgreSQL: localhost:5433"
+    echo "  • Redis:      localhost:6380"
+    echo "  • MinIO:      http://localhost:9000"
+    echo ""
+    echo "Dev server PID: $DEV_PID"
+    echo "Dev server logs: /tmp/masonart-dev.log"
+    echo ""
+    echo "To stop servers:"
+    echo "  kill $DEV_PID"
+    echo ""
+    exit 0
+fi
+
 echo -e "${BLUE}━━━ Phase 5: E2E Tests (Playwright) ━━━${NC}"
 echo ""
 
@@ -217,13 +276,14 @@ echo ""
 echo "Configuration:"
 echo "  Project: $PROJECT"
 echo "  Workers: $WORKERS"
+[ -n "$TEST_FILE_PATH" ] && echo "  Test file: $TEST_FILE_PATH"
 [ -n "$MAX_FAILURES" ] && echo "  Max failures: $MAX_FAILURES (will stop early)"
 [ -n "$GREP_PATTERN" ] && echo "  Filter: $GREP_PATTERN"
 echo ""
 
 # Run E2E tests
 echo "Running E2E tests..."
-if eval "bunx playwright test $PLAYWRIGHT_OPTS" 2>&1; then
+if eval "bunx playwright test $TEST_FILE_PATH $PLAYWRIGHT_OPTS" 2>&1; then
     echo -e "${GREEN}✓ E2E tests passed${NC}"
 else
     echo -e "${RED}✗ Some E2E tests failed${NC}"
@@ -235,8 +295,8 @@ echo ""
 echo -e "${BLUE}━━━ Phase 6: Test Report ━━━${NC}"
 echo ""
 
-# Generate HTML report
-bunx playwright test --reporter=html 2>/dev/null || true
+# Note: HTML report is auto-generated during test run
+# To manually regenerate: bunx playwright show-report
 
 echo "Reports available at:"
 echo "  - playwright-report/index.html"
