@@ -134,13 +134,11 @@ test.describe('Product Listing - Desktop Filter Sidebar', () => {
 // ============================================================================
 // Filter Selection Tests
 // ============================================================================
-// Skipped: Filter selection uses client-side state, doesn't update URL
-// These tests expect URL updates that don't happen with current implementation
 
-test.describe.skip('Product Listing - Filter Selection', () => {
+test.describe('Product Listing - Filter Selection', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    await page.goto('/posters', { waitUntil: 'networkidle' });
   });
 
   test('should select orientation filter', async ({ page }) => {
@@ -189,14 +187,13 @@ test.describe.skip('Product Listing - Filter Selection', () => {
   });
 
   test('should select subject filter', async ({ page }) => {
-    // Expand subjects section
+    // Subject section is expanded by default (see ProductFilters.tsx initialState)
     const filterPanel = page.locator('aside').first();
-    const subjectsSection = filterPanel.locator('button:has-text("Subject")');
-    await subjectsSection.click();
 
-    // Wait for section to expand, then click on the label text
+    // Scroll to and click on Nature & Landscape option (section already expanded)
     const natureLabel = filterPanel.getByText('Nature & Landscape', { exact: true });
-    await expect(natureLabel).toBeVisible();
+    await natureLabel.scrollIntoViewIfNeeded();
+    await expect(natureLabel).toBeVisible({ timeout: 5000 });
     await natureLabel.click();
 
     await expect(page).toHaveURL(/subjects=nature-landscape/, { timeout: 10000 });
@@ -412,7 +409,7 @@ test.describe('Product Listing - Active Filter Tags', () => {
     await expect(abstractTag.first()).toBeVisible({ timeout: 10000 });
   });
 
-  // Skipped: Clicking filter tag removes from client-side state but doesn't update URL
+  // Skipped: Active filter tags click handler updates client state but doesn't call navigate()
   test.skip('should remove individual filter on tag click', async ({ page }) => {
     await page.goto('/posters?styles=abstract,minimalist');
 
@@ -436,7 +433,7 @@ test.describe('Product Listing - Active Filter Tags', () => {
     await expect(clearAllButton.first()).toBeVisible({ timeout: 10000 });
   });
 
-  // Skipped: Clicking Clear all clears client-side state but doesn't update URL
+  // Skipped: Clear all button updates client state but doesn't call navigate()
   test.skip('should clear all filters on Clear all click', async ({ page }) => {
     await page.goto('/posters?styles=abstract&orientation=portrait');
 
@@ -765,9 +762,8 @@ test.describe('Product Listing - URL State', () => {
     await expect(portraitTag.first()).toBeVisible({ timeout: 10000 });
   });
 
-  // Skipped: Clicking filter changes client-side state but doesn't update URL
-  test.skip('should reset page to 1 when changing filters', async ({ page }) => {
-    await page.goto('/posters?page=2');
+  test('should reset page to 1 when changing filters', async ({ page }) => {
+    await page.goto('/posters?page=2', { waitUntil: 'networkidle' });
 
     // Select a style filter - scope to filter panel
     const filterPanel = page.locator('aside').first();
