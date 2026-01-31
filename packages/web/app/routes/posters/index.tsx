@@ -373,13 +373,20 @@ function PostersPage() {
   // Handle page change
   const handlePageChange = useCallback(
     (newPage: number) => {
+      // Build new search params preserving existing filters
+      const newSearch: PostersSearchParams = {
+        ...search,
+        page: newPage > 1 ? newPage : undefined, // Only include page param if > 1
+      }
+
+      // Remove undefined values to keep URL clean
+      const cleanSearch = Object.fromEntries(
+        Object.entries(newSearch).filter(([, v]) => v !== undefined)
+      ) as PostersSearchParams
+
       navigate({
         to: '/posters',
-        search: {
-          ...search,
-          page: newPage,
-        },
-        replace: true,
+        search: cleanSearch,
       })
     },
     [navigate, search]
@@ -747,7 +754,7 @@ function Pagination({
       {/* Previous Button */}
       <button
         type="button"
-        onClick={() => hasPreviousPage && onPageChange(currentPage - 1)}
+        onClick={() => onPageChange(currentPage - 1)}
         disabled={!hasPreviousPage}
         className={cn(
           'flex h-10 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
@@ -794,7 +801,7 @@ function Pagination({
       {/* Next Button */}
       <button
         type="button"
-        onClick={() => hasNextPage && onPageChange(currentPage + 1)}
+        onClick={() => onPageChange(currentPage + 1)}
         disabled={!hasNextPage}
         className={cn(
           'flex h-10 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',

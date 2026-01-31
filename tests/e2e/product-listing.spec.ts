@@ -615,7 +615,7 @@ test.describe('Product Listing - Empty State', () => {
 
 test.describe('Product Listing - Pagination', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto('/posters', { waitUntil: 'networkidle' });
   });
 
   test('should display pagination when multiple pages exist', async ({ page }) => {
@@ -660,7 +660,8 @@ test.describe('Product Listing - Pagination', () => {
 
       if (isDisabled === null) {
         await nextButton.click();
-        await expect(page).toHaveURL(/page=2/);
+        // Wait for client-side navigation to complete
+        await expect(page).toHaveURL(/page=2/, { timeout: 10000 });
       }
     }
   });
