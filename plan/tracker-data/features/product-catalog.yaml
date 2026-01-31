@@ -33,6 +33,8 @@ tickets:
   in_progress: {}
   done:
     "6": Create product database schema and API
-total_tickets: 1
+    "144": "Bug: Product detail page crashes with QueryClient error"
+    "145": "Bug: Pagination does not update URL with page parameter"
+total_tickets: 3
 completion_percentage: 100
 is_completed: true

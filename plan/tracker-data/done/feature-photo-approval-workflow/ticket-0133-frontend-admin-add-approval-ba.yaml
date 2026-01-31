@@ -1,0 +1,50 @@
+ticket_number: 133
+title: Frontend Admin - Add approval badge to order detail
+description: |-
+  ## Task
+  Add approval status badge to admin order detail page with link to approval management.
+
+  ## Context
+  Phase: Phase 4 - Frontend Admin Dashboard
+  Location: `packages/web/app/routes/admin/orders/$id.tsx`
+
+  ## Acceptance Criteria
+  - [ ] Approval status badge visible
+  - [ ] Badge links to approval page
+  - [ ] Component tests passing
+feature: photo-approval-workflow
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:43.396Z"
+last_updated: "2026-01-30T19:33:36.956Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:30:48.327Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-30T19:33:36.957Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:12.093Z"
+    text: |-
+      ✅ Implemented in commit `ae061a19`
+
+      **Commit:** feat(web): add approval status badge to order detail page
+
+      Added approval status badge to admin order detail with link to approval management.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-30T19:30:48.327Z"
+completed: "2026-01-30T19:33:36.956Z"

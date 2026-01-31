@@ -1,0 +1,50 @@
+ticket_number: 134
+title: Frontend - Create public approval page
+description: |-
+  ## Task
+  Create public approval page (`/approve/:token`) with full-screen photo gallery, zoom capability, timeline display.
+
+  ## Context
+  Phase: Phase 5 - Frontend Customer Approval Page
+  Location: `packages/web/app/routes/`
+
+  ## Acceptance Criteria
+  - [ ] Full-screen photo gallery
+  - [ ] Pinch-to-zoom on mobile
+  - [ ] Production timeline
+  - [ ] Component tests passing
+feature: photo-approval-workflow
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:54.599Z"
+last_updated: "2026-01-30T19:36:43.244Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:33:46.867Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-30T19:36:43.244Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:13.216Z"
+    text: |-
+      ✅ Implemented in commit `d6a153c8`
+
+      **Commit:** feat(web): add public production approval page
+
+      Created /approve/:token page with full-screen photo gallery and zoom capability.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-30T19:33:46.867Z"
+completed: "2026-01-30T19:36:43.244Z"

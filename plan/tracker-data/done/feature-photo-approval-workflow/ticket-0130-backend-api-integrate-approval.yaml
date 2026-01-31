@@ -1,0 +1,45 @@
+ticket_number: 130
+title: Backend API - Integrate approval into order flow
+description: |-
+  ## Task
+  Integrate approval creation into order processing when order contains made-to-order items.
+
+  ## Context
+  Phase: Phase 3 - Backend API Routes
+  Location: `packages/api/src/routes/admin/orders.ts`
+
+  ## Acceptance Criteria
+  - [ ] Approval auto-created for made-to-order items
+  - [ ] Order status reflects approval state
+  - [ ] Integration tests passing
+feature: photo-approval-workflow
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:27.477Z"
+last_updated: "2026-01-30T19:30:32.749Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:30:32.749Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:05.427Z"
+    text: |-
+      ✅ Implemented in commit `be8d000b`
+
+      **Commit:** feat(api): Integrate approval creation into order flow
+
+      Approval auto-created for made-to-order items when order is processed.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-30T19:30:32.749Z"

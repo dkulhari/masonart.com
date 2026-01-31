@@ -1,0 +1,30 @@
+name: testsuite-bug-auth
+title: Testsuite Bug Auth
+priority: low
+created: "2026-01-31T09:39:20.844Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Test infrastructure bugs for auth test suite - flaky selectors, timing issues, and mock problems.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "140": "Test Bug: Google OAuth divider text - incorrect text selector"
+    "141": "Test Bug: OTP Flow Resend link - invalid CSS selector syntax"
+    "142": "Test Bug: Auth setup customer login timeout"
+    "143": "Test Bug: Auth setup admin login timeout"
+total_tickets: 4
+completion_percentage: 100
+is_completed: true

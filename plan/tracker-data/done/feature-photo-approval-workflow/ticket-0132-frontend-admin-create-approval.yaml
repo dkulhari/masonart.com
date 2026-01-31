@@ -1,0 +1,46 @@
+ticket_number: 132
+title: Frontend Admin - Create approval detail page
+description: |-
+  ## Task
+  Create admin approval detail page (`/admin/approvals/:id`) with photo upload, comments view, respond form.
+
+  ## Context
+  Phase: Phase 4 - Frontend Admin Dashboard
+  Location: `packages/web/app/routes/admin/`
+
+  ## Acceptance Criteria
+  - [ ] Photo upload with drag-and-drop
+  - [ ] Customer comments timeline
+  - [ ] Component tests passing
+feature: photo-approval-workflow
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:41.977Z"
+last_updated: "2026-01-30T19:30:07.427Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:30:07.428Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:11.218Z"
+    text: |-
+      ✅ Implemented in commit `81824c99`
+
+      **Commit:** feat(web): add admin approval detail page
+
+      Created /admin/approvals/:id page with photo upload, comments timeline, and respond form.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-30T19:30:07.427Z"

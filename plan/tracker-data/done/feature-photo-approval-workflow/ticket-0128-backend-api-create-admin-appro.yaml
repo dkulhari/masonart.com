@@ -1,0 +1,51 @@
+ticket_number: 128
+title: Backend API - Create admin approval routes
+description: |-
+  ## Task
+  Create admin approval routes (`/api/admin/approvals`): list pending, get by id, upload photos, respond to change request.
+
+  ## Context
+  Phase: Phase 3 - Backend API Routes
+  Location: `packages/api/src/routes/admin/`
+
+  ## Acceptance Criteria
+  - [ ] GET /api/admin/approvals - list with filters
+  - [ ] GET /api/admin/approvals/:id - get details
+  - [ ] POST /api/admin/approvals/:id/photos - upload
+  - [ ] Route tests passing
+feature: photo-approval-workflow
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:22.628Z"
+last_updated: "2026-01-30T19:30:31.443Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:08:02.246Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-30T19:30:31.444Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:03.382Z"
+    text: |-
+      ✅ Implemented in commit `6f305d50`
+
+      **Commit:** feat(api): Add admin approval routes for photo approval workflow
+
+      Created /api/admin/approvals routes for list, get, upload photos.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-30T19:08:02.245Z"
+completed: "2026-01-30T19:30:31.443Z"

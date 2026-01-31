@@ -1,0 +1,49 @@
+ticket_number: 137
+title: E2E Tests - Admin upload and customer approval flow
+description: |-
+  ## Task
+  E2E test: Admin uploads photos, customer receives email, approves production.
+
+  ## Context
+  Phase: Phase 6 - E2E Tests & Documentation
+  Location: `tests/e2e/`
+
+  ## Acceptance Criteria
+  - [ ] Test admin photo upload flow
+  - [ ] Test customer approval page
+  - [ ] Playwright spec passing
+feature: photo-approval-workflow
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:03:11.350Z"
+last_updated: "2026-01-30T19:43:12.443Z"
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:40:08.245Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-30T19:43:12.443Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:16.600Z"
+    text: |-
+      ✅ Implemented in commit `a8db4816`
+
+      **Commit:** test(e2e): add Playwright E2E tests for photo approval workflow
+
+      E2E tests for admin photo upload and customer approval flows.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-30T19:40:08.245Z"
+completed: "2026-01-30T19:43:12.443Z"

@@ -1,0 +1,45 @@
+ticket_number: 135
+title: Frontend - Build approval actions component
+description: |-
+  ## Task
+  Build approval actions component: approve button, request changes form with comment textarea.
+
+  ## Context
+  Phase: Phase 5 - Frontend Customer Approval Page
+  Location: `packages/web/app/components/`
+
+  ## Acceptance Criteria
+  - [ ] Approve for Shipping button
+  - [ ] Request changes form
+  - [ ] Component tests passing
+feature: photo-approval-workflow
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:57.876Z"
+last_updated: "2026-01-30T19:36:52.014Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:36:52.014Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:14.559Z"
+    text: |-
+      ✅ Implemented in commit `d6a153c8`
+
+      **Commit:** feat(web): add public production approval page
+
+      Approval actions component included with approve button and request changes form.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-30T19:36:52.014Z"

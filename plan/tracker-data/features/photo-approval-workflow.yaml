@@ -1,11 +1,10 @@
 name: photo-approval-workflow
 title: Photo Approval Workflow
 priority: high
-created: '2026-01-28T07:45:53.283Z'
+created: "2026-01-28T07:45:53.283Z"
 assignee: unassigned
 tags: []
 description: |-
-  ## Overview
   ## Overview
   Production photo/video approval system for made-to-order items. Customers receive production photos, can zoom/review, request adjustments, or approve for shipping with timeline visibility.
 
@@ -23,19 +22,113 @@ description: |-
   ## Source
   Roadmap Feature 16 (Phase 2)
 
-  ## Objectives
-  - TBD
+  ## Testing Strategy
+
+  | Level | Scope | What to Test | Tool |
+  |-------|-------|--------------|------|
+  | Unit | Per ticket | Schema validation, service functions, hooks | Vitest |
+  | Integration | Per ticket | API routes, middleware, database operations | Vitest + app.request() |
+  | Component | Per ticket | Complex React components (approval viewer, timeline) | Testing Library |
+  | E2E | Per feature | Full approval flows (admin upload → customer approve) | Playwright |
+
+  ## Implementation Plan
+
+  **Note**: Each task includes unit/integration tests. E2E tests are added at feature completion.
+
+  ### Phase 1: Database Schema
+  Location: `packages/api/src/database/schema/`
+  Pattern: Drizzle ORM with pgTable, pgEnum, relations
+
+  - [ ] Create `productionApprovals` table (id, orderId, orderItemId, status enum [pending_upload, pending_approval, changes_requested, approved, expired], approvalToken, tokenExpiresAt, approvedAt, deadlineAt, createdAt, updatedAt) (+ unit tests)
+  - [ ] Create `approvalPhotos` table (id, approvalId, url, thumbnailUrl, sortOrder, uploadedAt, uploadedBy) (+ unit tests)
+  - [ ] Create `approvalComments` table (id, approvalId, authorType enum [admin, customer], authorId, comment, createdAt) for change requests and admin notes (+ unit tests)
+  - [ ] Add relations to orders/orderItems tables and export types (+ unit tests)
+
+  ### Phase 2: Backend Services
+  Location: `packages/api/src/services/`
+  Pattern: Async functions with TypeScript types, error handling
+
+  - [ ] Create approval service (`approval.ts`) with functions: createApproval, uploadPhotos, requestChanges, approveProduction, getApprovalByToken (+ unit tests)
+  - [ ] Add approval email templates: photo_ready_for_review, changes_requested_response, approval_confirmed, approval_deadline_reminder (+ unit tests)
+  - [ ] Create deadline checker service for sending reminder emails (can be cron job or BullMQ scheduled task) (+ unit tests)
+
+  ### Phase 3: Backend API Routes
+  Location: `packages/api/src/routes/`
+  Pattern: Hono with zValidator, requireAuth middleware
+
+  - [ ] Create admin approval routes (`/api/admin/approvals`): list pending, get by id, upload photos, respond to change request (+ route tests)
+  - [ ] Create public approval routes (`/api/approvals/:token`): get approval details, submit changes request, approve for shipping (+ route tests)
+  - [ ] Integrate approval creation into order processing flow when order contains made-to-order items (+ route tests)
+
+  ### Phase 4: Frontend - Admin Dashboard
+  Location: `packages/web/app/routes/admin/`
+  Pattern: React Router v7 with TanStack Table, shadcn/ui components
+
+  - [ ] Create admin approvals list page (`/admin/approvals`) with filters: pending upload, pending approval, changes requested (+ component tests)
+  - [ ] Create admin approval detail page (`/admin/approvals/:id`) with photo upload, customer comments view, respond to changes form (+ component tests)
+  - [ ] Add approval status badge to admin order detail page with link to approval management (+ component tests)
+
+  ### Phase 5: Frontend - Customer Approval Page
+  Location: `packages/web/app/routes/`
+  Pattern: Public routes with token-based access, responsive design
+
+  - [ ] Create public approval page (`/approve/:token`) with full-screen photo gallery, zoom capability, timeline display (+ component tests)
+  - [ ] Build approval actions component: approve button, request changes form with comment textarea (+ component tests)
+  - [ ] Add approval status to customer order detail page (`/account/orders/:id`) with timeline showing production → approval → shipped states (+ component tests)
+
+  ### Phase 6: E2E Tests & Documentation
+  Location: `tests/e2e/` and `docs/manual-tests/`
+  Pattern: Playwright E2E tests, manual test documentation
+
+  - [ ] E2E test: Admin uploads photos, customer receives email, approves production (+ Playwright spec)
+  - [ ] E2E test: Customer requests changes, admin responds, customer approves (+ Playwright spec)
+  - [ ] Create manual test documentation for approval workflow (+ docs/manual-tests/photo-approval.md)
+
+  ## Technical Notes
+  - Project type: Bun monorepo with Turbo
+  - Database: PostgreSQL with Drizzle ORM
+  - Backend: Hono API framework with Zod validation
+  - Frontend: React Router v7 with file-based routing
+  - Email: Resend integration (existing `packages/api/src/services/email.ts`)
+  - Image storage: MinIO (existing infrastructure) or CDN
+  - Approval tokens: UUID-like tokens similar to order tracking tokens
+  - Deadline handling: Consider BullMQ delayed jobs for reminders
+
+  ## Dependencies
+  - Requires existing orders and orderItems schemas (already complete)
+  - Builds on existing email service infrastructure
+  - Uses existing admin panel patterns and components
+  - Extends order detail pages (admin and customer)
 objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo: {}
   in_progress: {}
-  done: {}
-total_tickets: 0
-completion_percentage: 0
-is_completed: false
+  done:
+    "121": Database Schema - Create productionApprovals table
+    "122": Database Schema - Create approvalPhotos table
+    "123": Database Schema - Create approvalComments table
+    "124": Database Schema - Add relations and export types
+    "125": Backend Services - Create approval service
+    "126": Backend Services - Add approval email templates
+    "127": Backend Services - Create deadline checker service
+    "128": Backend API - Create admin approval routes
+    "129": Backend API - Create public approval routes
+    "130": Backend API - Integrate approval into order flow
+    "131": Frontend Admin - Create approvals list page
+    "132": Frontend Admin - Create approval detail page
+    "133": Frontend Admin - Add approval badge to order detail
+    "134": Frontend - Create public approval page
+    "135": Frontend - Build approval actions component
+    "136": Frontend - Add approval status to order detail
+    "137": E2E Tests - Admin upload and customer approval flow
+    "138": E2E Tests - Change request and resolution flow
+    "139": Documentation - Create manual test documentation
+total_tickets: 19
+completion_percentage: 100
+is_completed: true

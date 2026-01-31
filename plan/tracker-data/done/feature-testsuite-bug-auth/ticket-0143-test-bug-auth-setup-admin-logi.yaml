@@ -1,0 +1,66 @@
+ticket_number: 143
+title: "Test Bug: Auth setup admin login timeout"
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/auth.setup.ts`
+  **Test**: authenticate as admin
+  **Line**: 220
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  Test timeout of 30000ms exceeded.
+  Error: locator.isVisible: Target page, context or browser has been closed
+    at loginUser (tests/e2e/auth.setup.ts:75:68)
+  ```
+
+  ## Classification
+  This is a **test bug** - identical root cause to the customer login timeout issue. The admin login flow takes longer than expected, causing timeout cascades.
+
+  ## Root Cause
+  Same as ticket #142 - the login flow is slow and the waitForURL timeout (10s) is insufficient.
+
+  ## Suggested Fix
+  Same as ticket #142:
+  - Increase the `waitForURL` timeout from 10s to 20s
+  - Or investigate why the login redirect is slow
+  - Or use the pre-seeded test users with verified credentials
+feature: testsuite-bug-auth
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-31T11:13:36.876Z"
+last_updated: "2026-01-31T12:05:29.167Z"
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - auth
+  - timeout
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-31T12:05:29.168Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-31T12:05:41.957Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `a6f5f0ca` - fix(auth): Resolve test auth setup timeout and password hash issues
+
+      **Root Cause**: 
+      Same as #142 - password hash format mismatch between seed script (bcrypt) and Better Auth (scrypt).
+
+      **Fix**: 
+      Single fix addressed both customer and admin login timeout issues by correcting the password hashing approach.
+
+      **Tests**:
+      - All 172 auth tests pass in ~1.4 minutes
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-31T12:05:29.167Z"

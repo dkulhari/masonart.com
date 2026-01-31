@@ -1,0 +1,67 @@
+ticket_number: 140
+title: "Test Bug: Google OAuth divider text - incorrect text selector"
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/auth.spec.ts`
+  **Test**: Login Page › Google OAuth › should have divider with "or sign in with email" text
+  **Line**: 96
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: locator('text=or sign in with email')
+  Expected: visible
+  Timeout: 5000ms
+  Error: element(s) not found
+  ```
+
+  ## Classification
+  This is a **test bug** - the selector `text=or sign in with email` doesn't match the actual divider text on the page. The text might be "or continue with email" or similar.
+
+  ## Fix
+  Check the actual UI text in the login page and update the test selector to match.
+feature: testsuite-bug-auth
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-31T09:39:33.691Z"
+last_updated: "2026-01-31T09:42:45.641Z"
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - auth
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-31T09:40:56.333Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-31T09:42:45.643Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-31T09:43:04.364Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `30cd1a59` - fix(tests): Correct auth test selectors for divider and OTP resend
+
+      **Files Changed**:
+      - `tests/e2e/auth.spec.ts` - Fixed divider text selector
+
+      **Summary**:
+      Changed test from looking for "or sign in with email" to just "or" with exact match using `getByText('or', { exact: true })` to match the actual UI divider text.
+
+      **Root Cause**: The test expected "or sign in with email" but the actual UI only shows "or" in the divider.
+
+      **Tests**: Verified passing with `bunx playwright test --grep "should have divider"`
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-31T09:40:56.327Z"
+completed: "2026-01-31T09:42:45.641Z"

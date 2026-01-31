@@ -1,0 +1,46 @@
+ticket_number: 129
+title: Backend API - Create public approval routes
+description: |-
+  ## Task
+  Create public approval routes (`/api/approvals/:token`): get details, submit changes request, approve for shipping.
+
+  ## Context
+  Phase: Phase 3 - Backend API Routes
+  Location: `packages/api/src/routes/`
+
+  ## Acceptance Criteria
+  - [ ] GET /api/approvals/:token - get details
+  - [ ] POST /api/approvals/:token/changes - request changes
+  - [ ] POST /api/approvals/:token/approve - approve
+  - [ ] Route tests passing
+feature: photo-approval-workflow
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:24.981Z"
+last_updated: "2026-01-30T19:30:32.140Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:30:32.140Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:04.405Z"
+    text: |-
+      ✅ Implemented in commit `42d2dbe5`
+
+      **Commit:** feat(api): Add public approval routes for photo approval workflow
+
+      Created /api/approvals/:token routes for get, changes, approve.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-30T19:30:32.140Z"

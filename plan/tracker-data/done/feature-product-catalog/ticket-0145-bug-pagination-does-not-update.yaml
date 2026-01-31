@@ -1,0 +1,85 @@
+ticket_number: 145
+title: "Bug: Pagination does not update URL with page parameter"
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/product-listing.spec.ts`
+  **Test**: Product Listing - Pagination › should navigate to next page on Next click
+  **Line**: 764
+
+  ## Error (Application Bug)
+  ```
+  Error: expect(page).toHaveURL(/page=2/) failed
+
+  Expected pattern: /page=2/
+  Received string:  "http://localhost:3001/posters"
+  ```
+
+  ## Page State
+  - Page shows "Showing 37 products"
+  - Pagination component is visible with "Page 1" and "Page 2" buttons
+  - "Next" button is active and clickable
+  - Click on "Next" does not update the URL
+
+  ## Root Cause Analysis
+  The pagination component updates state client-side but does not sync the page number to the URL via search params. This breaks:
+  1. Browser back/forward navigation for pagination
+  2. Sharing links to specific pages
+  3. SEO crawlability of paginated content
+
+  ## Expected Behavior
+  Clicking "Next" should navigate to `/posters?page=2` (or similar URL with page param).
+
+  ## Classification
+  This is an **app bug** - pagination should use URL-based navigation for proper UX and SEO.
+feature: product-catalog
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-31T12:34:38.319Z"
+last_updated: "2026-01-31T12:56:40.740Z"
+time_spent_minutes: 0
+labels:
+  - bug
+  - e2e
+  - products
+  - pagination
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-31T12:43:29.103Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-31T12:56:40.745Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-31T12:56:53.365Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f395f688` - fix(web): Fix pagination button click handlers and test hydration
+
+      **Root Cause**: Two issues caused the pagination test to fail:
+      1. **Test Issue**: Pagination tests didn't wait for `networkidle` before clicking buttons, meaning React hadn't hydrated and attached event handlers
+      2. **Code Issue**: Redundant conditional checks in onClick handlers (`hasNextPage && onPageChange(...)`) could cause timing issues since the condition was evaluated at click time rather than render time
+
+      **Files Changed**:
+      - `packages/web/app/routes/posters/index.tsx` - Fixed pagination handlers
+      - `tests/e2e/product-listing.spec.ts` - Added networkidle wait
+
+      **Summary**:
+      - Added `{ waitUntil: 'networkidle' }` to pagination test beforeEach
+      - Increased URL expectation timeout to 10s for client-side navigation
+      - Removed redundant conditional checks from Previous/Next button onClick handlers (buttons already disabled via `disabled` prop)
+      - Improved `handlePageChange` to clean up undefined values from search params
+      - Removed `replace: true` to allow proper browser back navigation
+
+      **Tests**: 105/117 product-listing tests pass, 12 skipped (filter URL tests - separate issue)
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-31T12:43:29.102Z"
+completed: "2026-01-31T12:56:40.740Z"

@@ -1,0 +1,49 @@
+ticket_number: 125
+title: Backend Services - Create approval service
+description: |-
+  ## Task
+  Create approval service (`approval.ts`) with functions: createApproval, uploadPhotos, requestChanges, approveProduction, getApprovalByToken.
+
+  ## Context
+  Phase: Phase 2 - Backend Services
+  Location: `packages/api/src/services/`
+
+  ## Acceptance Criteria
+  - [ ] All service functions implemented
+  - [ ] Token generation and validation
+  - [ ] Unit tests passing
+feature: photo-approval-workflow
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:07.553Z"
+last_updated: "2026-01-30T19:02:29.678Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - services
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T18:58:44.434Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-30T19:02:29.678Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:00.284Z"
+    text: |-
+      ✅ Implemented in commit `430efce8`
+
+      **Commit:** feat(services): Add production photo approval service
+
+      Created approval.ts with createApproval, uploadPhotos, requestChanges, approveProduction, getApprovalByToken functions.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-30T18:58:44.355Z"
+completed: "2026-01-30T19:02:29.678Z"

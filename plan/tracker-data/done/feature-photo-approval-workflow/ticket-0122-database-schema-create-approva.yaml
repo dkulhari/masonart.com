@@ -1,0 +1,46 @@
+ticket_number: 122
+title: Database Schema - Create approvalPhotos table
+description: |-
+  ## Task
+  Create `approvalPhotos` table with fields: id, approvalId, url, thumbnailUrl, sortOrder, uploadedAt, uploadedBy.
+
+  ## Context
+  Part of feature: photo-approval-workflow
+  Phase: Phase 1 - Database Schema
+  Location: `packages/api/src/database/schema/`
+
+  ## Acceptance Criteria
+  - [ ] Table created with proper columns
+  - [ ] Foreign key to productionApprovals
+  - [ ] Unit tests passing
+feature: photo-approval-workflow
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:01:53.577Z"
+last_updated: "2026-01-30T18:58:31.752Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T18:58:31.752Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:46:57.003Z"
+    text: |-
+      ✅ Implemented in commit `d8ee3bd0`
+
+      **Commit:** feat(schema): Add production approvals database schema for photo approval workflow
+
+      approvalPhotos table created with FK to productionApprovals.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-30T18:58:31.752Z"

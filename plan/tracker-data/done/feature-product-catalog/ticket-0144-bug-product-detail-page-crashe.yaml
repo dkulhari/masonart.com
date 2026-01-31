@@ -1,0 +1,80 @@
+ticket_number: 144
+title: "Bug: Product detail page crashes with QueryClient error"
+description: |-
+  ## Bug Report
+
+  **URL**: `/posters/stay-curious` (and likely all product detail pages)
+
+  **Error Message**:
+  ```
+  Error
+  Something went wrong
+
+  No QueryClient set, use QueryClientProvider to set one
+  ```
+
+  ## Root Cause
+  React Query is being used in a component that is not wrapped by `QueryClientProvider`. This typically happens when:
+  1. A component using `useQuery` is rendered outside the provider tree
+  2. SSR hydration mismatch where client doesn't have the provider
+  3. A route component is missing the provider wrapper
+
+  ## Expected Behavior
+  Product detail page should load and display product information for `/posters/stay-curious`.
+
+  ## Steps to Reproduce
+  1. Navigate to `http://localhost:3001/posters/stay-curious`
+  2. Observe the error page
+
+  ## Suggested Fix
+  - Check `packages/web/app/routes/posters.$slug.tsx` or similar route file
+  - Ensure QueryClientProvider wraps the component tree in the root layout
+  - Verify SSR configuration passes QueryClient properly
+feature: product-catalog
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-31T11:22:31.131Z"
+last_updated: "2026-01-31T11:37:27.833Z"
+time_spent_minutes: 0
+labels:
+  - bug
+  - frontend
+  - react-query
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-31T11:24:10.301Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-31T11:37:27.841Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-31T11:37:32.406Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `fcf87169` - fix(web): Add QueryClientProvider for TanStack Query support
+
+      **Root Cause**: The `ProductReviews` component (added in commit `a97623a0`) uses TanStack Query hooks (`useReviews`, `useReviewStats`, `useCreateReview`), but the app was never wrapped with `QueryClientProvider`.
+
+      **Files Changed**:
+      - `packages/web/app/routes/__root.tsx` - Added QueryClientProvider wrapper
+
+      **Summary**:
+      - Added `QueryClient` and `QueryClientProvider` imports from `@tanstack/react-query`
+      - Created SSR-friendly QueryClient factory:
+        - Server: New client per request (avoids state sharing)
+        - Browser: Singleton (preserves cache across navigations)
+      - Wrapped `RootComponent` with `QueryClientProvider`
+
+      **Alignment**: Fix aligns with tech stack spec (`docs/poster-app-tech-stack.md`) which designates TanStack Query for server state management.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-31T11:24:10.300Z"
+completed: "2026-01-31T11:37:27.833Z"

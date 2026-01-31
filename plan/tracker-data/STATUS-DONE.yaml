@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-01-29T11:39:39.807Z'
-total_tickets: 61
+last_updated: '2026-01-31T12:34:43.275Z'
+total_tickets: 110
 summary:
   critical: 5
-  high: 46
-  medium: 10
-  low: 0
+  high: 55
+  medium: 33
+  low: 17
 priorities:
   high:
     - feature: infrastructure-setup
@@ -38,6 +38,10 @@ priorities:
       tickets:
         - ticket_number: 6
           title: Create product database schema and API
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 144
+          title: 'Bug: Product detail page crashes with QueryClient error'
           assignee: unassigned
           blocked_by: []
     - feature: cart-checkout
@@ -247,6 +251,42 @@ priorities:
             - title: 'Ticket #undefined'
             - title: 'Ticket #undefined'
             - title: 'Ticket #undefined'
+    - feature: order-tracking-notifications
+      tickets:
+        - ticket_number: 78
+          title: Database Schema - Create notifications table
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 79
+          title: Database Schema - Create notificationPreferences table
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 80
+          title: Database Schema - Add notification preference relations
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 81
+          title: Database Schema - Export types and update schema index
+          assignee: unassigned
+          blocked_by: []
+    - feature: photo-approval-workflow
+      tickets:
+        - ticket_number: 121
+          title: Database Schema - Create productionApprovals table
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 122
+          title: Database Schema - Create approvalPhotos table
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 123
+          title: Database Schema - Create approvalComments table
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 124
+          title: Database Schema - Add relations and export types
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: admin-panel
       tickets:
@@ -294,6 +334,177 @@ priorities:
           blocked_by: []
         - ticket_number: 55
           title: Frontend - Upscale UI and Results Enhancement
+          assignee: unassigned
+          blocked_by: []
+    - feature: order-tracking-notifications
+      tickets:
+        - ticket_number: 82
+          title: Backend Services - Create email service with Resend
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 83
+          title: Backend Services - Create notification orchestration service
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 84
+          title: Backend Services - Add email templates
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 85
+          title: Backend Services - Extend SMS service for transactional messages
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 86
+          title: Backend Services - Create notification trigger functions
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 87
+          title: Backend API - Guest order lookup endpoint
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 88
+          title: Backend API - Notification preferences endpoints
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 89
+          title: Backend API - Internal notification trigger endpoint
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 90
+          title: Backend API - Integrate notification triggers into order flows
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 91
+          title: Frontend - Create public order tracking page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 92
+          title: Frontend - Build guest lookup form component
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 93
+          title: Frontend - Integrate existing tracking components
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 94
+          title: Frontend - Add tracking link with token-based access
+          assignee: unassigned
+          blocked_by: []
+    - feature: photo-approval-workflow
+      tickets:
+        - ticket_number: 125
+          title: Backend Services - Create approval service
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 126
+          title: Backend Services - Add approval email templates
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 127
+          title: Backend Services - Create deadline checker service
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 128
+          title: Backend API - Create admin approval routes
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 129
+          title: Backend API - Create public approval routes
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 130
+          title: Backend API - Integrate approval into order flow
+          assignee: unassigned
+          blocked_by: []
+    - feature: testsuite-bug-auth
+      tickets:
+        - ticket_number: 140
+          title: 'Test Bug: Google OAuth divider text - incorrect text selector'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 141
+          title: 'Test Bug: OTP Flow Resend link - invalid CSS selector syntax'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 142
+          title: 'Test Bug: Auth setup customer login timeout'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 143
+          title: 'Test Bug: Auth setup admin login timeout'
+          assignee: unassigned
+          blocked_by: []
+  low:
+    - feature: order-tracking-notifications
+      tickets:
+        - ticket_number: 95
+          title: Frontend - Add notification preferences to account settings
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 96
+          title: Frontend - Create notification toggle components
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 97
+          title: Frontend - Wire up notification preferences API
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 98
+          title: Tests - Unit tests for email and notification services
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 99
+          title: Tests - API route tests for guest order lookup
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 100
+          title: Tests - API route tests for notification preferences
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 101
+          title: Tests - Component tests for tracking and preferences UI
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 102
+          title: Tests - E2E test for guest order tracking flow
+          assignee: unassigned
+          blocked_by: []
+    - feature: photo-approval-workflow
+      tickets:
+        - ticket_number: 131
+          title: Frontend Admin - Create approvals list page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 132
+          title: Frontend Admin - Create approval detail page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 133
+          title: Frontend Admin - Add approval badge to order detail
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 134
+          title: Frontend - Create public approval page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 135
+          title: Frontend - Build approval actions component
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 136
+          title: Frontend - Add approval status to order detail
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 137
+          title: E2E Tests - Admin upload and customer approval flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 138
+          title: E2E Tests - Change request and resolution flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 139
+          title: Documentation - Create manual test documentation
           assignee: unassigned
           blocked_by: []
   critical:

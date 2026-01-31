@@ -1,0 +1,46 @@
+ticket_number: 124
+title: Database Schema - Add relations and export types
+description: |-
+  ## Task
+  Add relations to orders/orderItems tables and export all approval-related types from schema index.
+
+  ## Context
+  Part of feature: photo-approval-workflow
+  Phase: Phase 1 - Database Schema
+  Location: `packages/api/src/database/schema/index.ts`
+
+  ## Acceptance Criteria
+  - [ ] Relations defined between approvals and orders
+  - [ ] All types exported
+  - [ ] Unit tests passing
+feature: photo-approval-workflow
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:01:56.973Z"
+last_updated: "2026-01-30T18:58:33.460Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T18:58:33.460Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:46:58.828Z"
+    text: |-
+      ✅ Implemented in commit `d8ee3bd0`
+
+      **Commit:** feat(schema): Add production approvals database schema for photo approval workflow
+
+      Relations defined and types exported from schema index.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-30T18:58:33.460Z"

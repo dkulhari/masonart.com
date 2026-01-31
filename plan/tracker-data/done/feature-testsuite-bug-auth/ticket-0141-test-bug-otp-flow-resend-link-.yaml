@@ -1,0 +1,64 @@
+ticket_number: 141
+title: "Test Bug: OTP Flow Resend link - invalid CSS selector syntax"
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/auth.spec.ts`
+  **Test**: Login Page › OTP Flow › should display Resend OTP link
+  **Line**: 850
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  Error: expect(locator).toBeVisible() failed
+
+  Locator: button:has-text(/Resend/)
+  Expected: visible
+  Error: Unexpected token "/" while parsing css selector "button:has-text(/Resend/)". Did you mean to CSS.escape it?
+  ```
+
+  ## Classification
+  This is a **test bug** - invalid Playwright selector syntax. The `:has-text()` pseudo-selector doesn't support regex with `/pattern/` syntax.
+
+  ## Fix
+  Replace with valid Playwright selector:
+  - `page.getByRole('button', { name: /Resend/ })` for regex matching
+  - Or `page.locator('button:has-text("Resend")')` for literal text
+feature: testsuite-bug-auth
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-31T09:39:38.160Z"
+last_updated: "2026-01-31T09:42:46.745Z"
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - auth
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-31T09:42:46.746Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-31T09:43:05.702Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `30cd1a59` - fix(tests): Correct auth test selectors for divider and OTP resend
+
+      **Files Changed**:
+      - `tests/e2e/auth.spec.ts` - Fixed OTP resend button selector
+
+      **Summary**:
+      Replaced invalid CSS selector `button:has-text(/Resend/)` with valid Playwright selector `page.getByRole('button', { name: /Resend/i })`. The `:has-text()` pseudo-selector doesn't support regex syntax with `/pattern/`.
+
+      **Root Cause**: Invalid Playwright selector syntax - regex in `:has-text()` requires different format.
+
+      **Tests**: Verified passing with `bunx playwright test --grep "should display Resend OTP"`
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-31T09:42:46.745Z"

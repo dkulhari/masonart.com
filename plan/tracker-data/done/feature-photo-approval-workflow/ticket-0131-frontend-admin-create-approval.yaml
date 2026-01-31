@@ -1,0 +1,46 @@
+ticket_number: 131
+title: Frontend Admin - Create approvals list page
+description: |-
+  ## Task
+  Create admin approvals list page (`/admin/approvals`) with filters: pending upload, pending approval, changes requested.
+
+  ## Context
+  Phase: Phase 4 - Frontend Admin Dashboard
+  Location: `packages/web/app/routes/admin/`
+
+  ## Acceptance Criteria
+  - [ ] List page with approval cards
+  - [ ] Status filter tabs
+  - [ ] Component tests passing
+feature: photo-approval-workflow
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-29T20:02:38.527Z"
+last_updated: "2026-01-30T19:30:33.361Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-30T19:30:33.362Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-30T21:47:10.247Z"
+    text: |-
+      ✅ Implemented in commit `b928dfac`
+
+      **Commit:** feat(web): Add admin approvals list page
+
+      Created /admin/approvals page with status filter tabs and approval cards.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-01-30T19:30:33.361Z"

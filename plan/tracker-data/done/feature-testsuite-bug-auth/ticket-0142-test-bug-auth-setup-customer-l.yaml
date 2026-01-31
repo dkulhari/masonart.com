@@ -1,0 +1,76 @@
+ticket_number: 142
+title: "Test Bug: Auth setup customer login timeout"
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/auth.setup.ts`
+  **Test**: authenticate as customer
+  **Line**: 148
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  Test timeout of 30000ms exceeded.
+  Error: locator.isVisible: Target page, context or browser has been closed
+    at loginUser (tests/e2e/auth.setup.ts:75:68)
+  ```
+
+  ## Classification
+  This is a **test bug** - the login flow takes longer than the 10-second waitForURL timeout, causing a cascade that results in the 30-second test timeout. The browser context is closed during cleanup while the error check is still executing.
+
+  ## Root Cause
+  1. `waitForURL` at line 69 times out after 10 seconds
+  2. Catch block tries to check for error messages at line 75
+  3. Meanwhile, the 30-second test timeout fires
+  4. Playwright closes the browser during cleanup
+  5. Line 75 fails because the browser is already closed
+
+  ## Suggested Fix
+  - Increase the `waitForURL` timeout from 10s to 20s
+  - Or investigate why the login redirect is slow
+  - Or use the pre-seeded test users with verified credentials instead of registering new ones
+feature: testsuite-bug-auth
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-31T11:13:27.752Z"
+last_updated: "2026-01-31T12:05:27.803Z"
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - auth
+  - timeout
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-31T11:46:16.244Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-01-31T12:05:27.807Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-31T12:05:40.445Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `a6f5f0ca` - fix(auth): Resolve test auth setup timeout and password hash issues
+
+      **Root Cause**: 
+      The test user seed script used Bun's bcrypt hash format (`$2b$10$...`), but Better Auth expects scrypt format (`salt:key`). This caused "Invalid password hash" errors.
+
+      **Files Changed**:
+      - `packages/api/src/database/seed-test-users.ts` - Import `hashPassword` from `better-auth/crypto`
+      - `packages/api/src/index.ts` - Clone request for Better Auth handler
+      - `playwright.config.ts` - Increase setup test timeout to 60s
+      - `tests/e2e/auth.setup.ts` - Increase waitForURL timeout to 25s, add page closed guard
+
+      **Tests**:
+      - All 172 auth tests pass in ~1.4 minutes
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-31T11:46:16.243Z"
+completed: "2026-01-31T12:05:27.803Z"
