@@ -22,6 +22,7 @@ const __dirname = path.dirname(__filename);
 // Path to stored authentication states
 const CUSTOMER_AUTH = path.join(__dirname, '..', '.auth', 'customer.json');
 const ADMIN_AUTH = path.join(__dirname, '..', '.auth', 'admin.json');
+const TRADE_AUTH = path.join(__dirname, '..', '.auth', 'trade.json');
 
 // ============================================================================
 // Unauthenticated Access Tests
@@ -131,14 +132,63 @@ test.describe('Customer Role Access to Admin', () => {
 
 // ============================================================================
 // Trade Role Access Tests (Non-Admin)
-// NOTE: Skipped because we don't have a trade test user seeded
+// Uses real trade user authentication via stored session state
 // ============================================================================
 
-test.describe.skip('Trade Role Access to Admin', () => {
-  // Would use storageState: TRADE_AUTH if we had that user
+test.describe('Trade Role Access to Admin', () => {
+  test.use({ storageState: TRADE_AUTH });
+
   test('should deny trade user access to admin dashboard', async ({ page }) => {
     await page.goto('/admin');
-    // Trade users should also see access denied
+    await page.waitForLoadState('networkidle');
+
+    // Trade users should see "Access Denied" message or be on an unauthorized page
+    const pageContent = await page.content();
+    const url = page.url();
+
+    const hasAccessDenied =
+      pageContent.toLowerCase().includes('access denied') ||
+      pageContent.toLowerCase().includes('unauthorized') ||
+      pageContent.toLowerCase().includes('not authorized') ||
+      pageContent.toLowerCase().includes('forbidden') ||
+      pageContent.includes('Administrator access required') ||
+      url.includes('/auth/login');
+
+    expect(hasAccessDenied).toBeTruthy();
+  });
+
+  test('should deny trade user access to admin products', async ({ page }) => {
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+
+    const pageContent = await page.content();
+    const url = page.url();
+
+    const hasAccessDenied =
+      pageContent.toLowerCase().includes('access denied') ||
+      pageContent.toLowerCase().includes('unauthorized') ||
+      pageContent.toLowerCase().includes('not authorized') ||
+      pageContent.includes('Administrator access required') ||
+      url.includes('/auth/login');
+
+    expect(hasAccessDenied).toBeTruthy();
+  });
+
+  test('should deny trade user access to admin orders', async ({ page }) => {
+    await page.goto('/admin/orders');
+    await page.waitForLoadState('networkidle');
+
+    const pageContent = await page.content();
+    const url = page.url();
+
+    const hasAccessDenied =
+      pageContent.toLowerCase().includes('access denied') ||
+      pageContent.toLowerCase().includes('unauthorized') ||
+      pageContent.toLowerCase().includes('not authorized') ||
+      pageContent.includes('Administrator access required') ||
+      url.includes('/auth/login');
+
+    expect(hasAccessDenied).toBeTruthy();
   });
 });
 
@@ -256,14 +306,43 @@ test.describe('Admin Role Access', () => {
 
 // ============================================================================
 // Super-Admin Role Access Tests
-// NOTE: Skipped because we don't have a super-admin test user seeded
+// NOTE: Currently uses admin auth since super-admin role is not yet implemented.
+// When super-admin role is added, create SUPER_ADMIN_AUTH and update storageState.
 // ============================================================================
 
-test.describe.skip('Super-Admin Role Access', () => {
-  // Would use storageState: SUPER_ADMIN_AUTH if we had that user
+test.describe('Super-Admin Role Access', () => {
+  // Using admin auth until super-admin role is implemented
+  test.use({ storageState: ADMIN_AUTH });
+
   test('should allow super-admin access to dashboard', async ({ page }) => {
     await page.goto('/admin');
+    await page.waitForLoadState('networkidle');
+
+    // Should have access to admin dashboard
     expect(page.url()).toContain('/admin');
+    expect(page.url()).not.toContain('/auth/login');
+
+    // Should not see access denied
+    const pageContent = await page.content();
+    expect(pageContent.toLowerCase()).not.toContain('access denied');
+  });
+
+  test('should allow super-admin access to all admin sections', async ({ page }) => {
+    // Test products access
+    await page.goto('/admin/products');
+    await page.waitForLoadState('networkidle');
+    expect(page.url()).toContain('/admin/products');
+
+    // Test orders access
+    await page.goto('/admin/orders');
+    await page.waitForLoadState('networkidle');
+    expect(page.url()).toContain('/admin/orders');
+
+    // Test reviews access (if exists)
+    await page.goto('/admin/reviews');
+    await page.waitForLoadState('networkidle');
+    // May redirect if reviews admin doesn't exist, but shouldn't show login
+    expect(page.url()).not.toContain('/auth/login');
   });
 });
 
