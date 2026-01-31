@@ -1,0 +1,48 @@
+ticket_number: 157
+title: 'Test Bug: Review form cancel button selector mismatch'
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/reviews.spec.ts`
+  **Test**: review form should have cancel button
+  **Line**: 351
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  expect(hasCancel || hasLoginPrompt).toBe(true)
+  Expected: true
+  Received: false
+  ```
+
+  ## Classification
+  This is a **test bug** - the selector `button:has-text("Cancel")` doesn't match the actual ReviewForm component. The cancel button may use different text or not exist.
+
+  ## Fix Required
+  Inspect ReviewForm component for actual cancel button text/structure and update selector.
+feature: testsuite-bug-reviews
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-31T18:40:02.587Z'
+last_updated: '2026-01-31T19:10:02.534Z'
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - reviews
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-31T18:43:47.417Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-31T19:10:02.534Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-01-31T18:43:47.417Z'
+completed: '2026-01-31T19:10:02.534Z'

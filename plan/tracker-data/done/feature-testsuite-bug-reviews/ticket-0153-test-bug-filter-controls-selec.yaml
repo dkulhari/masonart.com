@@ -1,0 +1,48 @@
+ticket_number: 153
+title: 'Test Bug: Filter controls selector mismatch'
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/reviews.spec.ts`
+  **Test**: should display filter controls when reviews exist
+  **Line**: 144
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  expect(hasFilters || hasEmptyState).toBe(true)
+  Expected: true
+  Received: false
+  ```
+
+  ## Classification
+  This is a **test bug** - the selectors looking for `button:has-text("All")`, `button:has-text("5 Star")`, `select`, or `[data-testid="review-filters"]` don't match the actual ReviewFilters component.
+
+  ## Fix Required
+  Inspect ReviewFilters component and update selectors to match actual filter UI elements.
+feature: testsuite-bug-reviews
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-31T18:39:43.312Z'
+last_updated: '2026-01-31T19:10:00.380Z'
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - reviews
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-31T18:43:41.900Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-31T19:10:00.380Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-01-31T18:43:41.900Z'
+completed: '2026-01-31T19:10:00.380Z'

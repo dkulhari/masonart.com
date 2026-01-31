@@ -1,0 +1,48 @@
+ticket_number: 156
+title: 'Test Bug: Review form content textarea selector mismatch'
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/reviews.spec.ts`
+  **Test**: review form should have content textarea
+  **Line**: 333
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  expect(hasContent || hasLoginPrompt).toBe(true)
+  Expected: true
+  Received: false
+  ```
+
+  ## Classification
+  This is a **test bug** - the selectors `textarea[name="content"]` and `textarea[placeholder*="review" i]` don't match the actual ReviewForm component.
+
+  ## Fix Required
+  Inspect ReviewForm component for actual textarea name/placeholder and update selectors.
+feature: testsuite-bug-reviews
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-31T18:39:57.897Z'
+last_updated: '2026-01-31T19:10:01.954Z'
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - reviews
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-31T18:43:46.310Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-31T19:10:01.954Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-01-31T18:43:46.310Z'
+completed: '2026-01-31T19:10:01.954Z'

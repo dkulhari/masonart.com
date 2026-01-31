@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-01-31T16:49:57.057Z'
-total_tickets: 111
+last_updated: '2026-01-31T18:40:04.692Z'
+total_tickets: 113
 summary:
   critical: 5
   high: 55
-  medium: 34
+  medium: 36
   low: 17
 priorities:
   high:
@@ -439,6 +439,14 @@ priorities:
         - ticket_number: 145
           title: 'Bug: Pagination does not update URL with page parameter'
           assignee: unassigned
+          blocked_by: []
+        - ticket_number: 147
+          title: 'Bug: Active filter tag click doesn''t update URL'
+          assignee: claude
+          blocked_by: []
+        - ticket_number: 148
+          title: 'Bug: Clear all filters button doesn''t update URL'
+          assignee: claude
           blocked_by: []
   low:
     - feature: order-tracking-notifications

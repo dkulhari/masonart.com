@@ -1,0 +1,48 @@
+ticket_number: 155
+title: 'Test Bug: Review form title input selector mismatch'
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/reviews.spec.ts`
+  **Test**: review form should have title input
+  **Line**: 315
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  expect(hasTitle || hasLoginPrompt).toBe(true)
+  Expected: true
+  Received: false
+  ```
+
+  ## Classification
+  This is a **test bug** - the selectors `input[name="title"]` and `input[placeholder*="title" i]` don't match the actual ReviewForm component. The login prompt selector `/sign in|log in|login/i` also doesn't match.
+
+  ## Fix Required
+  Inspect ReviewForm component for actual input name/placeholder and update selectors.
+feature: testsuite-bug-reviews
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-31T18:39:53.697Z'
+last_updated: '2026-01-31T19:10:01.539Z'
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - reviews
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-31T18:43:44.012Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-31T19:10:01.539Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-01-31T18:43:44.011Z'
+completed: '2026-01-31T19:10:01.539Z'

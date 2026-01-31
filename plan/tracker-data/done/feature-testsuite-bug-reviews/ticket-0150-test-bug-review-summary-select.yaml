@@ -1,0 +1,48 @@
+ticket_number: 150
+title: 'Test Bug: Review summary selector mismatch'
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/reviews.spec.ts`
+  **Test**: should display review summary or empty state
+  **Line**: 84
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  expect(hasSummary || hasEmptyState).toBe(true)
+  Expected: true
+  Received: false
+  ```
+
+  ## Classification
+  This is a **test bug** - the selectors `[class*="ReviewSummary"]` and `[data-testid="review-summary"]` don't match the actual component implementation. The test also looks for "No reviews yet" text which may use different wording.
+
+  ## Fix Required
+  Update selectors to match actual ReviewSummary component classes/attributes.
+feature: testsuite-bug-reviews
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-31T18:39:32.563Z'
+last_updated: '2026-01-31T19:09:58.476Z'
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - reviews
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-31T18:43:37.287Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-31T19:09:58.477Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-01-31T18:43:37.227Z'
+completed: '2026-01-31T19:09:58.476Z'

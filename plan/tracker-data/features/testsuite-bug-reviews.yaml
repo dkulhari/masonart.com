@@ -1,0 +1,40 @@
+name: testsuite-bug-reviews
+title: Testsuite Bug Reviews
+priority: low
+created: "2026-01-31T18:39:20.313Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Test infrastructure bugs for reviews test suite - flaky selectors, timing issues, and mock problems in reviews.spec.ts.
+
+  ## Objectives
+  - Fix selector mismatches between tests and actual component implementations
+  - Update test selectors to match real CSS classes and attributes
+  - Improve test reliability and reduce flakiness
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "150": "Test Bug: Review summary selector mismatch"
+    "151": "Test Bug: Average rating star selector mismatch"
+    "152": "Test Bug: Rating distribution bar selector mismatch"
+    "153": "Test Bug: Filter controls selector mismatch"
+    "154": "Test Bug: Review cards selector mismatch"
+    "155": "Test Bug: Review form title input selector mismatch"
+    "156": "Test Bug: Review form content textarea selector mismatch"
+    "157": "Test Bug: Review form cancel button selector mismatch"
+total_tickets: 8
+completion_percentage: 100
+is_completed: true

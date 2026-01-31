@@ -1,0 +1,48 @@
+ticket_number: 151
+title: 'Test Bug: Average rating star selector mismatch'
+description: |-
+  ## Test Failure
+  **File**: `tests/e2e/reviews.spec.ts`
+  **Test**: should display average rating when reviews exist
+  **Line**: 105
+
+  ## Error (Test Infrastructure Issue)
+  ```
+  expect(hasStars || hasEmptyState).toBe(true)
+  Expected: true
+  Received: false
+  ```
+
+  ## Classification
+  This is a **test bug** - the selectors `svg[class*="fill-amber"]` and `[class*="text-amber"]` don't match the actual star rating component's CSS classes.
+
+  ## Fix Required
+  Inspect actual star rating component and update selectors to match real class names.
+feature: testsuite-bug-reviews
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-01-31T18:39:36.905Z'
+last_updated: '2026-01-31T19:09:59.134Z'
+time_spent_minutes: 0
+labels:
+  - test-bug
+  - e2e
+  - reviews
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-01-31T18:43:39.293Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-01-31T19:09:59.135Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-01-31T18:43:39.292Z'
+completed: '2026-01-31T19:09:59.134Z'
