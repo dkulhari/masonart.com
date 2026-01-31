@@ -104,6 +104,8 @@ test.describe('Admin Reviews - Stats Cards', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin/reviews');
+    // Wait for stats cards to load
+    await page.locator('text=Pending Reviews').waitFor({ state: 'visible', timeout: 10000 });
   });
 
   test('should display pending reviews stat card', async ({ page }) => {
@@ -112,12 +114,14 @@ test.describe('Admin Reviews - Stats Cards', () => {
   });
 
   test('should display approved stat card', async ({ page }) => {
-    const approvedCard = page.locator('text=Approved').locator('..');
+    // Use href selector to distinguish from filter button which also says "Approved"
+    const approvedCard = page.locator('a[href*="status=approved"]');
     await expect(approvedCard).toBeVisible();
   });
 
   test('should display rejected stat card', async ({ page }) => {
-    const rejectedCard = page.locator('text=Rejected').locator('..');
+    // Use href selector to distinguish from filter button which also says "Rejected"
+    const rejectedCard = page.locator('a[href*="status=rejected"]');
     await expect(rejectedCard).toBeVisible();
   });
 
@@ -234,6 +238,8 @@ test.describe('Admin Reviews - Review Row', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin/reviews');
+    // Wait for loading to complete
+    await page.locator('text=Pending Reviews').waitFor({ state: 'visible', timeout: 10000 });
   });
 
   test('review row should have checkbox for selection', async ({ page }) => {
@@ -268,6 +274,8 @@ test.describe('Admin Reviews - Bulk Actions', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin/reviews');
+    // Wait for loading to complete
+    await page.locator('text=Pending Reviews').waitFor({ state: 'visible', timeout: 10000 });
   });
 
   test('should show bulk action bar when reviews selected', async ({ page }) => {
@@ -370,6 +378,8 @@ test.describe('Admin Reviews - Responsive Design', () => {
   test('table should be scrollable on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/admin/reviews');
+    // Wait for loading to complete
+    await page.locator('text=Pending Reviews').waitFor({ state: 'visible', timeout: 10000 });
 
     const table = page.locator('table');
     const hasTable = await table.isVisible().catch(() => false);
