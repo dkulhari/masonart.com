@@ -1,0 +1,60 @@
+ticket_number: 148
+title: 'Bug: Clear all filters button doesn''t update URL'
+description: |-
+  ## Issue
+  Clicking "Clear all" filters button updates the client-side React state but doesn't call `navigate()` to update the URL.
+
+  ## Test
+  `tests/e2e/product-listing.spec.ts` - "should clear all filters on Clear all click"
+
+  ## Steps to Reproduce
+  1. Go to `/posters?styles=abstract&orientation=portrait`
+  2. Click "Clear all" button in filter sidebar
+  3. URL remains `/posters?styles=abstract&orientation=portrait` (should become `/posters`)
+
+  ## Root Cause
+  The `clearAllFilters` callback in ProductFilters.tsx only calls `onFiltersChange` with empty filters, without navigating to update the URL.
+
+  ## Expected Behavior
+  URL should reset to `/posters` (no query params) when clearing all filters.
+
+  ## Fix Location
+  `packages/web/app/routes/posters/index.tsx` - need to add a `handleClearFilters` function that:
+  1. Clears local filter state
+  2. Calls `navigate({ to: '/posters', search: {} })`
+
+  ## Related
+  Same pattern as filter tag removal bug - URL state needs to sync with filter changes.
+feature: product-catalog
+type: bug
+priority: medium
+status: done
+assignee: claude
+reporter: cli
+created: '2026-01-31T16:49:52.062Z'
+last_updated: '2026-01-31T17:05:00.000Z'
+time_spent_minutes: 10
+resolution_commit: 0afa9f44
+resolution_summary: |
+  Root cause was test timing, not application code. The handleFiltersChange function
+  already calls navigate() correctly. Fixed E2E test by adding waitUntil: 'networkidle'
+  to ensure React hydration completes before clear all button interaction.
+labels:
+  - bug
+  - tests
+  - filters
+  - url-state
+acceptance_criteria: []
+comments:
+  - author: claude
+    date: '2026-01-31T17:00:00.000Z'
+    content: |
+      Investigation found the application code was correct - handleFiltersChange in posters/index.tsx already calls navigate().
+      The actual issue was test timing: tests weren't waiting for React hydration before interacting with filter components.
+      Fixed by adding waitUntil: 'networkidle' to page.goto() and appropriate timeouts to URL assertions.
+      Test now passes across all browsers.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

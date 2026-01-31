@@ -432,9 +432,8 @@ test.describe('Product Listing - Active Filter Tags', () => {
     await expect(clearAllButton.first()).toBeVisible({ timeout: 10000 });
   });
 
-  // Skipped: Clear all button updates client state but doesn't call navigate()
-  test.skip('should clear all filters on Clear all click', async ({ page }) => {
-    await page.goto('/posters?styles=abstract&orientation=portrait');
+  test('should clear all filters on Clear all click', async ({ page }) => {
+    await page.goto('/posters?styles=abstract&orientation=portrait', { waitUntil: 'networkidle' });
 
     // Clear all in the active filter tags section (scoped to desktop container)
     const desktopFilters = page.locator('div.hidden.lg\\:block');
@@ -443,8 +442,8 @@ test.describe('Product Listing - Active Filter Tags', () => {
     await clearAllButton.click();
 
     // URL should be clean
-    await expect(page).not.toHaveURL(/styles=/);
-    await expect(page).not.toHaveURL(/orientation=/);
+    await expect(page).not.toHaveURL(/styles=/, { timeout: 10000 });
+    await expect(page).not.toHaveURL(/orientation=/, { timeout: 10000 });
   });
 
   test('should display multiple filter tags', async ({ page }) => {
