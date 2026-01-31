@@ -251,7 +251,7 @@ If no match, use the most recently active feature or ask user (only genuine bloc
 
 ```
 mcp__ticketrack__createTicket:
-  featureName: "{detected-feature}"
+  feature: "{detected-feature}"
   title: "Bug: {test-name} failing"
   type: "bug"
   labels: ["bug", "tests", "{layer}"]

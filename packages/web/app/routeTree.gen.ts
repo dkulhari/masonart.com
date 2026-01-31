@@ -12,26 +12,32 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TrackIndexRouteImport } from './routes/track/index'
 import { Route as PostersIndexRouteImport } from './routes/posters/index'
 import { Route as GalleryIndexRouteImport } from './routes/gallery/index'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout/index'
 import { Route as CartIndexRouteImport } from './routes/cart/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as TrackTokenRouteImport } from './routes/track/$token'
 import { Route as PostersSlugRouteImport } from './routes/posters/$slug'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout/success'
 import { Route as AuthRegisterRouteImport } from './routes/auth/register'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
+import { Route as ApproveTokenRouteImport } from './routes/approve/$token'
 import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
 import { Route as AdminReturnsRouteImport } from './routes/admin/returns'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
+import { Route as AdminApprovalsIndexRouteImport } from './routes/admin/approvals/index'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
 import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
 import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
+import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$id'
 import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
 import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
+import { Route as AuthedAccountNotificationsRouteImport } from './routes/_authed/account/notifications'
 import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
 import { Route as AuthedAccountOrdersIdRouteImport } from './routes/_authed/account/orders.$id'
 import { Route as AuthedAccountOrdersIdReturnRouteImport } from './routes/_authed/account/orders.$id.return'
@@ -48,6 +54,11 @@ const AuthedRoute = AuthedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrackIndexRoute = TrackIndexRouteImport.update({
+  id: '/track/',
+  path: '/track/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PostersIndexRoute = PostersIndexRouteImport.update({
@@ -80,6 +91,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const TrackTokenRoute = TrackTokenRouteImport.update({
+  id: '/track/$token',
+  path: '/track/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PostersSlugRoute = PostersSlugRouteImport.update({
   id: '/posters/$slug',
   path: '/posters/$slug',
@@ -98,6 +114,11 @@ const AuthRegisterRoute = AuthRegisterRouteImport.update({
 const AuthLoginRoute = AuthLoginRouteImport.update({
   id: '/auth/login',
   path: '/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApproveTokenRoute = ApproveTokenRouteImport.update({
+  id: '/approve/$token',
+  path: '/approve/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminReviewsRoute = AdminReviewsRouteImport.update({
@@ -120,6 +141,11 @@ const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
   path: '/orders/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminApprovalsIndexRoute = AdminApprovalsIndexRouteImport.update({
+  id: '/approvals/',
+  path: '/approvals/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
   id: '/account/',
   path: '/account/',
@@ -140,6 +166,11 @@ const AdminOrdersIdRoute = AdminOrdersIdRouteImport.update({
   path: '/orders/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminApprovalsIdRoute = AdminApprovalsIdRouteImport.update({
+  id: '/approvals/$id',
+  path: '/approvals/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AuthedAccountWalletRoute = AuthedAccountWalletRouteImport.update({
   id: '/account/wallet',
   path: '/account/wallet',
@@ -150,6 +181,12 @@ const AuthedAccountOrdersRoute = AuthedAccountOrdersRouteImport.update({
   path: '/account/orders',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAccountNotificationsRoute =
+  AuthedAccountNotificationsRouteImport.update({
+    id: '/account/notifications',
+    path: '/account/notifications',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAccountAiCreationsRoute =
   AuthedAccountAiCreationsRouteImport.update({
     id: '/account/ai-creations',
@@ -173,23 +210,29 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
+  '/approve/$token': typeof ApproveTokenRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/posters/$slug': typeof PostersSlugRoute
+  '/track/$token': typeof TrackTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/cart': typeof CartIndexRoute
   '/checkout': typeof CheckoutIndexRoute
   '/create': typeof CreateIndexRoute
   '/gallery': typeof GalleryIndexRoute
   '/posters': typeof PostersIndexRoute
+  '/track': typeof TrackIndexRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
+  '/account/notifications': typeof AuthedAccountNotificationsRoute
   '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/account/wallet': typeof AuthedAccountWalletRoute
+  '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/account': typeof AuthedAccountIndexRoute
+  '/admin/approvals': typeof AdminApprovalsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
   '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
@@ -199,23 +242,29 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
+  '/approve/$token': typeof ApproveTokenRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/posters/$slug': typeof PostersSlugRoute
+  '/track/$token': typeof TrackTokenRoute
   '/admin': typeof AdminIndexRoute
   '/cart': typeof CartIndexRoute
   '/checkout': typeof CheckoutIndexRoute
   '/create': typeof CreateIndexRoute
   '/gallery': typeof GalleryIndexRoute
   '/posters': typeof PostersIndexRoute
+  '/track': typeof TrackIndexRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
+  '/account/notifications': typeof AuthedAccountNotificationsRoute
   '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/account/wallet': typeof AuthedAccountWalletRoute
+  '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/account': typeof AuthedAccountIndexRoute
+  '/admin/approvals': typeof AdminApprovalsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
   '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
@@ -228,23 +277,29 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
+  '/approve/$token': typeof ApproveTokenRoute
   '/auth/login': typeof AuthLoginRoute
   '/auth/register': typeof AuthRegisterRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/posters/$slug': typeof PostersSlugRoute
+  '/track/$token': typeof TrackTokenRoute
   '/admin/': typeof AdminIndexRoute
   '/cart/': typeof CartIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/create/': typeof CreateIndexRoute
   '/gallery/': typeof GalleryIndexRoute
   '/posters/': typeof PostersIndexRoute
+  '/track/': typeof TrackIndexRoute
   '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
+  '/_authed/account/notifications': typeof AuthedAccountNotificationsRoute
   '/_authed/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/_authed/account/wallet': typeof AuthedAccountWalletRoute
+  '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
+  '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/_authed/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
@@ -257,23 +312,29 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/returns'
     | '/admin/reviews'
+    | '/approve/$token'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
     | '/posters/$slug'
+    | '/track/$token'
     | '/admin/'
     | '/cart'
     | '/checkout'
     | '/create'
     | '/gallery'
     | '/posters'
+    | '/track'
     | '/account/ai-creations'
+    | '/account/notifications'
     | '/account/orders'
     | '/account/wallet'
+    | '/admin/approvals/$id'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/account'
+    | '/admin/approvals'
     | '/admin/orders'
     | '/admin/products'
     | '/account/orders/$id'
@@ -283,23 +344,29 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/returns'
     | '/admin/reviews'
+    | '/approve/$token'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
     | '/posters/$slug'
+    | '/track/$token'
     | '/admin'
     | '/cart'
     | '/checkout'
     | '/create'
     | '/gallery'
     | '/posters'
+    | '/track'
     | '/account/ai-creations'
+    | '/account/notifications'
     | '/account/orders'
     | '/account/wallet'
+    | '/admin/approvals/$id'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/account'
+    | '/admin/approvals'
     | '/admin/orders'
     | '/admin/products'
     | '/account/orders/$id'
@@ -311,23 +378,29 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/returns'
     | '/admin/reviews'
+    | '/approve/$token'
     | '/auth/login'
     | '/auth/register'
     | '/checkout/success'
     | '/posters/$slug'
+    | '/track/$token'
     | '/admin/'
     | '/cart/'
     | '/checkout/'
     | '/create/'
     | '/gallery/'
     | '/posters/'
+    | '/track/'
     | '/_authed/account/ai-creations'
+    | '/_authed/account/notifications'
     | '/_authed/account/orders'
     | '/_authed/account/wallet'
+    | '/admin/approvals/$id'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/_authed/account/'
+    | '/admin/approvals/'
     | '/admin/orders/'
     | '/admin/products/'
     | '/_authed/account/orders/$id'
@@ -338,15 +411,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
+  ApproveTokenRoute: typeof ApproveTokenRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRegisterRoute: typeof AuthRegisterRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
   PostersSlugRoute: typeof PostersSlugRoute
+  TrackTokenRoute: typeof TrackTokenRoute
   CartIndexRoute: typeof CartIndexRoute
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
   GalleryIndexRoute: typeof GalleryIndexRoute
   PostersIndexRoute: typeof PostersIndexRoute
+  TrackIndexRoute: typeof TrackIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -370,6 +446,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/track/': {
+      id: '/track/'
+      path: '/track'
+      fullPath: '/track'
+      preLoaderRoute: typeof TrackIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/posters/': {
@@ -414,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/track/$token': {
+      id: '/track/$token'
+      path: '/track/$token'
+      fullPath: '/track/$token'
+      preLoaderRoute: typeof TrackTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/posters/$slug': {
       id: '/posters/$slug'
       path: '/posters/$slug'
@@ -440,6 +530,13 @@ declare module '@tanstack/react-router' {
       path: '/auth/login'
       fullPath: '/auth/login'
       preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/approve/$token': {
+      id: '/approve/$token'
+      path: '/approve/$token'
+      fullPath: '/approve/$token'
+      preLoaderRoute: typeof ApproveTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/reviews': {
@@ -470,6 +567,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/approvals/': {
+      id: '/admin/approvals/'
+      path: '/approvals'
+      fullPath: '/admin/approvals'
+      preLoaderRoute: typeof AdminApprovalsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_authed/account/': {
       id: '/_authed/account/'
       path: '/account'
@@ -498,6 +602,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/approvals/$id': {
+      id: '/admin/approvals/$id'
+      path: '/approvals/$id'
+      fullPath: '/admin/approvals/$id'
+      preLoaderRoute: typeof AdminApprovalsIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_authed/account/wallet': {
       id: '/_authed/account/wallet'
       path: '/account/wallet'
@@ -510,6 +621,13 @@ declare module '@tanstack/react-router' {
       path: '/account/orders'
       fullPath: '/account/orders'
       preLoaderRoute: typeof AuthedAccountOrdersRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/account/notifications': {
+      id: '/_authed/account/notifications'
+      path: '/account/notifications'
+      fullPath: '/account/notifications'
+      preLoaderRoute: typeof AuthedAccountNotificationsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/account/ai-creations': {
@@ -562,6 +680,7 @@ const AuthedAccountOrdersRouteWithChildren =
 
 interface AuthedRouteChildren {
   AuthedAccountAiCreationsRoute: typeof AuthedAccountAiCreationsRoute
+  AuthedAccountNotificationsRoute: typeof AuthedAccountNotificationsRoute
   AuthedAccountOrdersRoute: typeof AuthedAccountOrdersRouteWithChildren
   AuthedAccountWalletRoute: typeof AuthedAccountWalletRoute
   AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
@@ -569,6 +688,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAccountAiCreationsRoute: AuthedAccountAiCreationsRoute,
+  AuthedAccountNotificationsRoute: AuthedAccountNotificationsRoute,
   AuthedAccountOrdersRoute: AuthedAccountOrdersRouteWithChildren,
   AuthedAccountWalletRoute: AuthedAccountWalletRoute,
   AuthedAccountIndexRoute: AuthedAccountIndexRoute,
@@ -581,9 +701,11 @@ interface AdminRouteChildren {
   AdminReturnsRoute: typeof AdminReturnsRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminApprovalsIdRoute: typeof AdminApprovalsIdRoute
   AdminOrdersIdRoute: typeof AdminOrdersIdRoute
   AdminProductsIdRoute: typeof AdminProductsIdRoute
   AdminProductsNewRoute: typeof AdminProductsNewRoute
+  AdminApprovalsIndexRoute: typeof AdminApprovalsIndexRoute
   AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
   AdminProductsIndexRoute: typeof AdminProductsIndexRoute
 }
@@ -592,9 +714,11 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminReturnsRoute: AdminReturnsRoute,
   AdminReviewsRoute: AdminReviewsRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminApprovalsIdRoute: AdminApprovalsIdRoute,
   AdminOrdersIdRoute: AdminOrdersIdRoute,
   AdminProductsIdRoute: AdminProductsIdRoute,
   AdminProductsNewRoute: AdminProductsNewRoute,
+  AdminApprovalsIndexRoute: AdminApprovalsIndexRoute,
   AdminOrdersIndexRoute: AdminOrdersIndexRoute,
   AdminProductsIndexRoute: AdminProductsIndexRoute,
 }
@@ -605,15 +729,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
+  ApproveTokenRoute: ApproveTokenRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRegisterRoute: AuthRegisterRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
   PostersSlugRoute: PostersSlugRoute,
+  TrackTokenRoute: TrackTokenRoute,
   CartIndexRoute: CartIndexRoute,
   CheckoutIndexRoute: CheckoutIndexRoute,
   CreateIndexRoute: CreateIndexRoute,
   GalleryIndexRoute: GalleryIndexRoute,
   PostersIndexRoute: PostersIndexRoute,
+  TrackIndexRoute: TrackIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
