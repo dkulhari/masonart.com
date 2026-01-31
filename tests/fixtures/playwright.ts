@@ -21,22 +21,59 @@ export interface TestSeedConfig {
 
 /**
  * Common test user credentials
+ * All test users use the same password for simplicity
  */
+const TEST_PASSWORD = 'TestPassword123!';
+
 export const testCredentials = {
+  // Primary customer
   customer: {
     email: 'test-customer@example.com',
-    password: 'TestPassword123!',
+    password: TEST_PASSWORD,
     name: 'Test Customer',
   },
+  // Additional customers for cart independence testing
+  customer2: {
+    email: 'test-customer-2@example.com',
+    password: TEST_PASSWORD,
+    name: 'Alice Tester',
+  },
+  customer3: {
+    email: 'test-customer-3@example.com',
+    password: TEST_PASSWORD,
+    name: 'Bob Buyer',
+  },
+  customer4: {
+    email: 'test-customer-4@example.com',
+    password: TEST_PASSWORD,
+    name: 'Carol Checkout',
+  },
+  customer5: {
+    email: 'test-customer-5@example.com',
+    password: TEST_PASSWORD,
+    name: 'Dave Demo',
+  },
+  // Admins
   admin: {
     email: 'test-admin@masonart.com',
-    password: 'AdminPassword123!',
+    password: TEST_PASSWORD,
     name: 'Test Admin',
   },
+  admin2: {
+    email: 'test-admin-2@masonart.com',
+    password: TEST_PASSWORD,
+    name: 'Admin Secondary',
+  },
+  // Trade users
   trade: {
     email: 'test-trade@interior.com',
-    password: 'TradePassword123!',
+    password: TEST_PASSWORD,
     name: 'Test Trade User',
+  },
+  tradePending: {
+    email: 'test-trade-pending@interior.com',
+    password: TEST_PASSWORD,
+    name: 'Pending Trade',
   },
 };
 
