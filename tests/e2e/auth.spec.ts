@@ -81,8 +81,8 @@ test.describe('Login Page', () => {
       await expect(googleIcon).toBeVisible();
     });
 
-    test('should have divider with "or sign in with email" text', async ({ page }) => {
-      const divider = page.locator('text=or sign in with email');
+    test('should have divider with "or" text', async ({ page }) => {
+      const divider = page.getByText('or', { exact: true });
       await expect(divider).toBeVisible();
     });
 
@@ -767,7 +767,7 @@ test.describe('Login Page', () => {
       await sendButton.click();
 
       // Wait for resend link (may have countdown)
-      const resendLink = page.locator('button:has-text(/Resend/)');
+      const resendLink = page.getByRole('button', { name: /Resend/i });
       await expect(resendLink).toBeVisible({ timeout: 10000 });
     });
 
