@@ -7,11 +7,46 @@ import {
 } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type * as React from 'react'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
 import globalsCss from '~/styles/globals.css?url'
 import type { Session } from '~/lib/auth-client'
+
+/**
+ * Create a QueryClient with SSR-friendly defaults
+ */
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        // With SSR, we usually want to set some default staleTime
+        // above 0 to avoid refetching immediately on the client
+        staleTime: 60 * 1000, // 1 minute
+      },
+    },
+  })
+}
+
+// Browser-only singleton QueryClient
+let browserQueryClient: QueryClient | undefined = undefined
+
+/**
+ * Get or create QueryClient
+ * - Server: Always create new client (to avoid sharing state between requests)
+ * - Browser: Use singleton (to preserve cache across navigations)
+ */
+function getQueryClient() {
+  if (typeof window === 'undefined') {
+    // Server: always make a new query client
+    return makeQueryClient()
+  } else {
+    // Browser: make a new query client if we don't already have one
+    if (!browserQueryClient) browserQueryClient = makeQueryClient()
+    return browserQueryClient
+  }
+}
 
 /**
  * Router context interface containing authenticated user session
@@ -143,13 +178,17 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 /**
  * Root component that renders the main application layout.
- * Wraps all child routes with the consistent header and footer.
+ * Wraps all child routes with QueryClientProvider and the consistent header/footer.
  */
 function RootComponent() {
+  const queryClient = getQueryClient()
+
   return (
-    <RootDocument>
-      <Outlet />
-    </RootDocument>
+    <QueryClientProvider client={queryClient}>
+      <RootDocument>
+        <Outlet />
+      </RootDocument>
+    </QueryClientProvider>
   )
 }
 
