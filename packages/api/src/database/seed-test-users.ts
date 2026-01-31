@@ -10,24 +10,19 @@
 import { db, closeDatabase } from "./index";
 import { users, accounts } from "./schema";
 import { eq } from "drizzle-orm";
+// Import Better Auth's password hashing to ensure compatibility
+// Better Auth uses scrypt with salt:key format, not bcrypt
+import { hashPassword } from "better-auth/crypto";
 
 // Password for all test users
 const TEST_PASSWORD = "TestPassword123!";
 
 /**
- * Hash password using Bun's bcrypt implementation (same as Better Auth)
- */
-async function hashPassword(password: string): Promise<string> {
-  return Bun.password.hash(password, {
-    algorithm: "bcrypt",
-    cost: 10,
-  });
-}
-
-/**
  * Test user configurations matching tests/fixtures/playwright.ts
+ * Includes multiple customers to test cart independence
  */
 const testUsers = [
+  // Primary test customer
   {
     id: "test-customer-001",
     email: "test-customer@example.com",
@@ -37,6 +32,44 @@ const testUsers = [
     role: "customer" as const,
     emailVerified: true,
   },
+  // Additional customers for cart independence testing
+  {
+    id: "test-customer-002",
+    email: "test-customer-2@example.com",
+    name: "Alice Tester",
+    firstName: "Alice",
+    lastName: "Tester",
+    role: "customer" as const,
+    emailVerified: true,
+  },
+  {
+    id: "test-customer-003",
+    email: "test-customer-3@example.com",
+    name: "Bob Buyer",
+    firstName: "Bob",
+    lastName: "Buyer",
+    role: "customer" as const,
+    emailVerified: true,
+  },
+  {
+    id: "test-customer-004",
+    email: "test-customer-4@example.com",
+    name: "Carol Checkout",
+    firstName: "Carol",
+    lastName: "Checkout",
+    role: "customer" as const,
+    emailVerified: true,
+  },
+  {
+    id: "test-customer-005",
+    email: "test-customer-5@example.com",
+    name: "Dave Demo",
+    firstName: "Dave",
+    lastName: "Demo",
+    role: "customer" as const,
+    emailVerified: true,
+  },
+  // Admin user
   {
     id: "test-admin-001",
     email: "test-admin@masonart.com",
@@ -46,6 +79,17 @@ const testUsers = [
     role: "admin" as const,
     emailVerified: true,
   },
+  // Additional admin for parallel testing
+  {
+    id: "test-admin-002",
+    email: "test-admin-2@masonart.com",
+    name: "Admin Secondary",
+    firstName: "Admin",
+    lastName: "Secondary",
+    role: "admin" as const,
+    emailVerified: true,
+  },
+  // Trade user
   {
     id: "test-trade-001",
     email: "test-trade@interior.com",
@@ -55,6 +99,17 @@ const testUsers = [
     role: "trade" as const,
     emailVerified: true,
     tradeStatus: "approved" as const,
+  },
+  // Pending trade user for testing approval flow
+  {
+    id: "test-trade-002",
+    email: "test-trade-pending@interior.com",
+    name: "Pending Trade",
+    firstName: "Pending",
+    lastName: "Trade",
+    role: "trade" as const,
+    emailVerified: true,
+    tradeStatus: "pending" as const,
   },
 ];
 
@@ -76,6 +131,7 @@ async function seedTestUsers(): Promise<void> {
         .limit(1);
 
       if (existing.length > 0) {
+        const existingUser = existing[0];
         // Update existing user to ensure email is verified
         await db
           .update(users)
@@ -90,6 +146,37 @@ async function seedTestUsers(): Promise<void> {
           })
           .where(eq(users.email, userData.email));
         console.log(`  Updated existing user: ${userData.email}`);
+
+        // Also update the credential account password for existing users
+        const passwordHash = await hashPassword(TEST_PASSWORD);
+        const existingAccount = await db
+          .select()
+          .from(accounts)
+          .where(eq(accounts.userId, existingUser.id))
+          .limit(1);
+
+        if (existingAccount.length > 0) {
+          await db
+            .update(accounts)
+            .set({
+              password: passwordHash,
+              updatedAt: new Date(),
+            })
+            .where(eq(accounts.userId, existingUser.id));
+          console.log(`    Updated password for: ${userData.email}`);
+        } else {
+          // Create credential account if missing
+          await db.insert(accounts).values({
+            id: `account-${existingUser.id}`,
+            userId: existingUser.id,
+            accountId: existingUser.id,
+            providerId: "credential",
+            password: passwordHash,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+          console.log(`    Created credential account for existing user: ${userData.email}`);
+        }
       } else {
         // Create new user
         await db.insert(users).values({
@@ -142,10 +229,22 @@ async function seedTestUsers(): Promise<void> {
   console.log("  Test Users Seeded Successfully!");
   console.log("========================================\n");
 
-  console.log("Test Credentials:");
-  console.log("  Customer: test-customer@example.com / TestPassword123!");
-  console.log("  Admin:    test-admin@masonart.com / TestPassword123!");
-  console.log("  Trade:    test-trade@interior.com / TestPassword123!");
+  console.log("Test Credentials (all use password: TestPassword123!):");
+  console.log("");
+  console.log("  Customers (5 for cart independence testing):");
+  console.log("    - test-customer@example.com");
+  console.log("    - test-customer-2@example.com (Alice)");
+  console.log("    - test-customer-3@example.com (Bob)");
+  console.log("    - test-customer-4@example.com (Carol)");
+  console.log("    - test-customer-5@example.com (Dave)");
+  console.log("");
+  console.log("  Admins:");
+  console.log("    - test-admin@masonart.com");
+  console.log("    - test-admin-2@masonart.com");
+  console.log("");
+  console.log("  Trade:");
+  console.log("    - test-trade@interior.com (approved)");
+  console.log("    - test-trade-pending@interior.com (pending)");
   console.log("");
 }
 

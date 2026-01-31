@@ -47,6 +47,8 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /.*\.setup\.ts/,
+      // Auth setup needs more time for registration + login flows
+      timeout: 60000,
     },
 
     // =========================================================================

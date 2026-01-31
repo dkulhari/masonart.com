@@ -54,8 +54,11 @@ app.use(
 // Mount Better Auth handler for all auth endpoints
 // Handles: /api/auth/sign-in, /api/auth/sign-up, /api/auth/sign-out,
 //          /api/auth/session, /api/auth/callback/:provider, etc.
-app.on(["POST", "GET"], "/api/auth/*", (c) => {
-  return auth.handler(c.req.raw);
+app.on(["POST", "GET"], "/api/auth/*", async (c) => {
+  // Clone the request to ensure body is available for Better Auth
+  // This is needed because middleware may have already read the body
+  const req = c.req.raw.clone();
+  return auth.handler(req);
 });
 
 // ============================================================================

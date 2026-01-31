@@ -28,7 +28,7 @@ export const CUSTOMER_STORAGE_STATE = path.join(STORAGE_DIR, "customer.json");
 export const TRADE_STORAGE_STATE = path.join(STORAGE_DIR, "trade.json");
 export const ADMIN_STORAGE_STATE = path.join(STORAGE_DIR, "admin.json");
 
-// Test user credentials
+// Test user credentials - must match seed-test-users.ts
 const TEST_USERS = {
   customer: {
     email: "test-customer@example.com",
@@ -36,7 +36,7 @@ const TEST_USERS = {
     name: "Test Customer",
   },
   trade: {
-    email: "test-trade@example.com",
+    email: "test-trade@interior.com", // Match seeded trade user
     password: "TestPassword123!",
     name: "Test Trade User",
   },
@@ -65,12 +65,17 @@ async function loginUser(
   await page.locator('button[type="submit"]:has-text("Sign In")').click();
 
   // Wait for navigation (success or error)
+  // Use 25s timeout to stay within 30s test timeout but allow slow redirects
   try {
     await page.waitForURL((url) => !url.pathname.includes("/auth/login"), {
-      timeout: 10000,
+      timeout: 25000,
     });
     return true;
   } catch {
+    // Guard against browser being closed by test timeout
+    if (page.isClosed()) {
+      throw new Error("Login timed out - page was closed");
+    }
     // Check for error message
     const errorVisible = await page.locator('text=Sign in failed').isVisible();
     const invalidVisible = await page.locator('text=Invalid email or password').isVisible();
