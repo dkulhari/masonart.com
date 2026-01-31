@@ -1,10 +1,10 @@
 status: todo
-last_updated: '2026-01-31T18:40:04.413Z'
-total_tickets: 10
+last_updated: '2026-01-31T19:36:06.262Z'
+total_tickets: 3
 summary:
   critical: 0
   high: 0
-  medium: 9
+  medium: 2
   low: 1
 priorities:
   medium:
@@ -14,38 +14,10 @@ priorities:
           title: 'Bug: Boolean filter URL params lost during SSR redirect'
           assignee: unassigned
           blocked_by: []
-    - feature: testsuite-bug-reviews
+    - feature: user-reviews
       tickets:
-        - ticket_number: 150
-          title: 'Test Bug: Review summary selector mismatch'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 151
-          title: 'Test Bug: Average rating star selector mismatch'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 152
-          title: 'Test Bug: Rating distribution bar selector mismatch'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 153
-          title: 'Test Bug: Filter controls selector mismatch'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 154
-          title: 'Test Bug: Review cards selector mismatch'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 155
-          title: 'Test Bug: Review form title input selector mismatch'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 156
-          title: 'Test Bug: Review form content textarea selector mismatch'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 157
-          title: 'Test Bug: Review form cancel button selector mismatch'
+        - ticket_number: 158
+          title: Login button in review UI returns 404 for unauthenticated users
           assignee: unassigned
           blocked_by: []
   low:

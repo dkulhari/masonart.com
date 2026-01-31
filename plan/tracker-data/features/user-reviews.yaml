@@ -38,6 +38,7 @@ tickets:
     "33": Integration - Product Page Reviews
     "34": Admin Panel - Review Moderation Dashboard
     "35": Tests - Unit and E2E Test Suite
-total_tickets: 8
+    "158": Login button in review UI returns 404 for unauthenticated users
+total_tickets: 9
 completion_percentage: 100
 is_completed: true

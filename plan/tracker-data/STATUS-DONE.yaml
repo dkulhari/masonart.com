@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-01-31T18:40:04.692Z'
-total_tickets: 113
+last_updated: '2026-01-31T19:36:06.684Z'
+total_tickets: 121
 summary:
   critical: 5
   high: 55
-  medium: 36
+  medium: 44
   low: 17
 priorities:
   high:
@@ -447,6 +447,40 @@ priorities:
         - ticket_number: 148
           title: 'Bug: Clear all filters button doesn''t update URL'
           assignee: claude
+          blocked_by: []
+    - feature: testsuite-bug-reviews
+      tickets:
+        - ticket_number: 150
+          title: 'Test Bug: Review summary selector mismatch'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 151
+          title: 'Test Bug: Average rating star selector mismatch'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 152
+          title: 'Test Bug: Rating distribution bar selector mismatch'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 153
+          title: 'Test Bug: Filter controls selector mismatch'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 154
+          title: 'Test Bug: Review cards selector mismatch'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 155
+          title: 'Test Bug: Review form title input selector mismatch'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 156
+          title: 'Test Bug: Review form content textarea selector mismatch'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 157
+          title: 'Test Bug: Review form cancel button selector mismatch'
+          assignee: unassigned
           blocked_by: []
   low:
     - feature: order-tracking-notifications

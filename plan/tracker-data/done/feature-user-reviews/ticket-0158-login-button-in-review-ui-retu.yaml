@@ -1,0 +1,87 @@
+ticket_number: 158
+title: Login button in review UI returns 404 for unauthenticated users
+description: |-
+  ## Bug Description
+
+  When a user is not logged in and views the review UI, a login button is presented to prompt them to sign in. However, clicking this login button results in a 404 error instead of navigating to the login page.
+
+  ## Steps to Reproduce
+
+  1. Open a product page with reviews while not logged in
+  2. Look for the login prompt/button in the review section
+  3. Click the login button
+  4. Observe 404 error
+
+  ## Expected Behavior
+
+  Clicking the login button should navigate the user to the login page (e.g., `/login` or `/login?redirect=/products/[slug]`).
+
+  ## Actual Behavior
+
+  Clicking the login button results in a 404 page not found error.
+
+  ## Possible Causes
+
+  - Incorrect href on the login button/link
+  - Missing route for the login redirect path
+  - Typo in the URL path
+feature: user-reviews
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-31T19:36:04.526Z"
+last_updated: "2026-01-31T19:38:03.971Z"
+time_spent_minutes: 0
+labels:
+  - ui
+  - auth
+  - reviews
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-01-31T19:37:10.265Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-01-31T19:37:19.106Z"
+    text: |-
+      **Root Cause Analysis**:
+
+      The bug was caused by: Incorrect login URL path in the ReviewForm component
+
+      Location: `packages/web/app/components/reviews/ReviewForm.tsx:228`
+
+      What happened:
+      - The ReviewForm shows a "Sign In" prompt when isAuthenticated is false
+      - The login button has href="/login" (line 228)
+      - The actual login route is at /auth/login (in routes/auth/login.tsx)
+      - Clicking the button navigates to a non-existent route, resulting in 404
+
+      Fix approach:
+      - Change href="/login" to href="/auth/login" in ReviewForm.tsx
+  - author: system
+    timestamp: "2026-01-31T19:38:03.972Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-01-31T19:38:06.776Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `503a3b7c` - fix(reviews): Correct login URL in ReviewForm for unauthenticated users
+
+      **Files Changed**:
+      - `packages/web/app/components/reviews/ReviewForm.tsx` - Fixed login href from /login to /auth/login
+
+      **Summary**:
+      The login button in the ReviewForm component was pointing to `/login` which doesn't exist. The actual login route is at `/auth/login` (defined in `packages/web/app/routes/auth/login.tsx`). Changed the href to the correct path.
+
+      **Tests**:
+      - All 27 existing ReviewForm tests pass
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-01-31T19:37:10.264Z"
+completed: "2026-01-31T19:38:03.971Z"
