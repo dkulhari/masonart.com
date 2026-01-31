@@ -8,6 +8,13 @@
       "when": 1769560600185,
       "tag": "0000_shipping-returns",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1769799222211,
+      "tag": "0001_add-photo-approvals",
+      "breakpoints": true
     }
   ]
 }
