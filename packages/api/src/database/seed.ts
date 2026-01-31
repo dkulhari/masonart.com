@@ -1150,6 +1150,102 @@ const sampleProducts: NewProduct[] = [
     status: "active",
     isFeatured: false,
   },
+
+  // AI Generated Collection
+  {
+    sku: "AI-001",
+    title: "Neural Dreams",
+    slug: "neural-dreams",
+    description:
+      "An AI-generated masterpiece featuring surreal dreamscapes with flowing organic forms. Created using advanced neural networks to blend imagination with artistic vision.",
+    basePrice: "1899.00",
+    styles: ["abstract", "modern-contemporary"],
+    subjects: ["abstract-geometric", "patterns"],
+    colors: ["purple", "blue", "pink"],
+    rooms: ["living-room", "office", "bedroom"],
+    tags: ["ai-generated", "surreal", "dreamscape"],
+    orientation: "landscape",
+    images: [
+      {
+        id: "img-ai-1",
+        url: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=800",
+        alt: "Neural Dreams AI Generated Art",
+        width: 800,
+        height: 600,
+        isPrimary: true,
+        sortOrder: 0,
+      },
+    ] as ProductImage[],
+    seoTitle: "Neural Dreams AI Art | Unique Generated Wall Art",
+    seoDescription:
+      "One-of-a-kind AI-generated art featuring surreal dreamscapes and flowing forms.",
+    status: "active",
+    isFeatured: false,
+    isAiGenerated: true,
+  },
+  {
+    sku: "AI-002",
+    title: "Digital Cosmos",
+    slug: "digital-cosmos",
+    description:
+      "AI-crafted cosmic landscape merging nebulae and digital fractals. A unique piece that bridges technology and cosmic wonder.",
+    basePrice: "2199.00",
+    styles: ["abstract", "modern-contemporary"],
+    subjects: ["space", "patterns"],
+    colors: ["black", "purple", "gold"],
+    rooms: ["office", "living-room", "media-room"],
+    tags: ["ai-generated", "cosmic", "digital", "space"],
+    orientation: "square",
+    images: [
+      {
+        id: "img-ai-2",
+        url: "https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?w=800",
+        alt: "Digital Cosmos AI Generated Art",
+        width: 800,
+        height: 800,
+        isPrimary: true,
+        sortOrder: 0,
+      },
+    ] as ProductImage[],
+    seoTitle: "Digital Cosmos AI Art | Space-Inspired Generated Art",
+    seoDescription:
+      "AI-generated cosmic art blending nebulae with digital fractals.",
+    status: "active",
+    isFeatured: true,
+    featuredOrder: 10,
+    isAiGenerated: true,
+  },
+  {
+    sku: "AI-003",
+    title: "Synthetic Nature",
+    slug: "synthetic-nature",
+    description:
+      "Nature reimagined through artificial intelligence. Organic forms meet algorithmic precision in this unique botanical interpretation.",
+    basePrice: "1699.00",
+    styles: ["botanical", "modern-contemporary"],
+    subjects: ["flora-botanical", "nature-landscape"],
+    colors: ["green", "teal", "neutral"],
+    rooms: ["bedroom", "living-room", "spa"],
+    tags: ["ai-generated", "botanical", "nature", "organic"],
+    orientation: "portrait",
+    images: [
+      {
+        id: "img-ai-3",
+        url: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=800",
+        alt: "Synthetic Nature AI Generated Art",
+        width: 600,
+        height: 800,
+        isPrimary: true,
+        sortOrder: 0,
+      },
+    ] as ProductImage[],
+    seoTitle: "Synthetic Nature AI Art | Botanical Generated Art",
+    seoDescription:
+      "AI-generated botanical art reimagining nature through algorithms.",
+    status: "active",
+    isFeatured: false,
+    isAiGenerated: true,
+  },
 ];
 
 /**

@@ -1,38 +1,43 @@
 ticket_number: 149
-title: 'Bug: AI Generated filter tag not shown in active filters'
+title: 'Bug: Boolean filter URL params lost during SSR redirect'
 description: |-
   ## Issue
-  When navigating to `/posters?isAiGenerated=true`, the "AI Generated" tag doesn't appear in the active filter tags section.
+  When navigating to URLs with boolean filter params (isAiGenerated, isFeatured), the params are stripped during TanStack Router's 307 redirect.
 
   ## Test
   `tests/e2e/product-listing.spec.ts` - "should show AI Generated in active filter tags"
 
   ## Root Cause
-  No AI-generated products exist in the seed data, so when the filter is applied, there may be no results or the UI doesn't display the filter tag for empty result sets.
+  The validateSearch function converts string 'true' to boolean true, but TanStack Router doesn't properly serialize booleans back to URL strings during redirect reconstruction.
+
+  Evidence:
+  - `/posters?styles=abstract` → 200 OK (string params work)
+  - `/posters?isAiGenerated=true` → 307 redirect to `/posters` (boolean param lost)
+  - `/posters?styles=abstract&isAiGenerated=true` → 307 to `/posters?styles=abstract` (only boolean stripped)
 
   ## Steps to Reproduce
-  1. Go to `/posters?isAiGenerated=true`
-  2. Look for "AI Generated" in the active filter tags area
-  3. Tag is not visible
+  1. Navigate directly to `/posters?isAiGenerated=true`
+  2. Server returns 307 redirect to `/posters`
+  3. Query param is lost, filter not applied
 
-  ## Potential Solutions
-  1. **Add AI-generated products to seed data** - Add products with `isAiGenerated: true` in `packages/api/src/database/seed.ts`
-  2. **Show filter tags even with no results** - UI should display active filters regardless of whether results exist
+  ## Fix Options
+  1. Keep boolean params as strings in validateSearch: `isAiGenerated: search.isAiGenerated as string | undefined`
+  2. Add search param stringifyFn to route definition
+  3. Use z.coerce for proper serialization
 
   ## Files
-  - `packages/api/src/database/seed.ts` - Add AI-generated products
-  - `packages/web/app/routes/posters/index.tsx` - Ensure filter tags display for all active filters
+  - `packages/web/app/routes/posters/index.tsx` - Fix validateSearch or add stringifyFn
 
   ## Priority
-  Low - affects a niche filter, main AI generation feature works
+  Medium - affects direct URL navigation with boolean filters, but clicking filters in UI works
 feature: product-catalog
 type: bug
-priority: low
+priority: medium
 status: todo
 assignee: unassigned
 reporter: cli
 created: '2026-01-31T16:49:55.440Z'
-last_updated: '2026-01-31T16:49:55.440Z'
+last_updated: '2026-01-31T17:32:15.044Z'
 time_spent_minutes: 0
 labels:
   - bug
@@ -40,7 +45,40 @@ labels:
   - filters
   - seed-data
 acceptance_criteria: []
-comments: []
+comments:
+  - author: user
+    timestamp: '2026-01-31T17:32:15.044Z'
+    text: I would prefer solution 1
+  - author: claude
+    timestamp: '2026-01-31T17:15:00.000Z'
+    text: |
+      **Investigation Results**
+
+      Added 3 AI-generated products to seed data (Neural Dreams, Digital Cosmos, Synthetic Nature).
+      The API correctly returns only these 3 products when filtered with isAiGenerated=true.
+
+      **However**, discovered a deeper bug: TanStack Router/Start 307 redirects strip query parameters.
+
+      Evidence:
+      - `curl -v "http://localhost:3001/posters?isAiGenerated=true"` returns 307 redirect
+      - Location header: `/posters` (query params stripped!)
+      - SSR response shows `filters.isAiGenerated: void 0` (undefined)
+
+      **Root Cause**: The trailing slash redirect removes query parameters.
+      This affects ALL filter URLs, not just isAiGenerated.
+
+      **Further investigation**: The issue is boolean param serialization!
+      - `/posters?styles=abstract` → 200 OK
+      - `/posters?styles=abstract&isAiGenerated=true` → 307 to `/posters?styles=abstract`
+
+      The boolean params (isAiGenerated, isFeatured) are being lost during URL reconstruction.
+      The validateSearch converts string 'true' to boolean true, but TanStack doesn't serialize it back.
+
+      **Fix**: Either:
+      1. Change validateSearch to keep isAiGenerated/isFeatured as string 'true'/'false'
+      2. Or add proper search param serialization in the route definition
+
+      The test should remain skipped until this serialization bug is fixed.
 work_sessions: []
 related_tickets: []
 blocked_by: []
