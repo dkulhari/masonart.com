@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-01-31T12:34:43.275Z'
-total_tickets: 110
+last_updated: '2026-01-31T16:49:57.057Z'
+total_tickets: 111
 summary:
   critical: 5
   high: 55
-  medium: 33
+  medium: 34
   low: 17
 priorities:
   high:
@@ -432,6 +432,12 @@ priorities:
           blocked_by: []
         - ticket_number: 143
           title: 'Test Bug: Auth setup admin login timeout'
+          assignee: unassigned
+          blocked_by: []
+    - feature: product-catalog
+      tickets:
+        - ticket_number: 145
+          title: 'Bug: Pagination does not update URL with page parameter'
           assignee: unassigned
           blocked_by: []
   low:

@@ -1,0 +1,47 @@
+ticket_number: 146
+title: 'Bug: Mobile filter sheet backdrop click doesn''t close sheet'
+description: |-
+  ## Issue
+  On mobile viewport (375px), clicking the backdrop behind the filter sheet doesn't close it.
+
+  ## Test
+  `tests/e2e/product-listing.spec.ts` - "should close mobile filter sheet on backdrop click"
+
+  ## Root Cause
+  The sheet uses `max-w-sm` (384px) which covers the entire 375px viewport width, leaving no visible backdrop area to click.
+
+  ## Expected Behavior
+  Clicking outside the filter sheet should close it on mobile.
+
+  ## Potential Solutions
+  1. Add a visible close button (already exists) - users can use this instead
+  2. Reduce sheet width on very small viewports
+  3. Add an overlay that can receive click events even when sheet is full-width
+  4. Add swipe-to-close gesture support
+
+  ## File
+  `packages/web/app/components/product/ProductFilters.tsx` or the Sheet component
+
+  ## Priority
+  Low - workaround exists (close button)
+feature: product-catalog
+type: bug
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-31T16:49:39.741Z'
+last_updated: '2026-01-31T16:49:39.741Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - mobile
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

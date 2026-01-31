@@ -1,0 +1,48 @@
+ticket_number: 149
+title: 'Bug: AI Generated filter tag not shown in active filters'
+description: |-
+  ## Issue
+  When navigating to `/posters?isAiGenerated=true`, the "AI Generated" tag doesn't appear in the active filter tags section.
+
+  ## Test
+  `tests/e2e/product-listing.spec.ts` - "should show AI Generated in active filter tags"
+
+  ## Root Cause
+  No AI-generated products exist in the seed data, so when the filter is applied, there may be no results or the UI doesn't display the filter tag for empty result sets.
+
+  ## Steps to Reproduce
+  1. Go to `/posters?isAiGenerated=true`
+  2. Look for "AI Generated" in the active filter tags area
+  3. Tag is not visible
+
+  ## Potential Solutions
+  1. **Add AI-generated products to seed data** - Add products with `isAiGenerated: true` in `packages/api/src/database/seed.ts`
+  2. **Show filter tags even with no results** - UI should display active filters regardless of whether results exist
+
+  ## Files
+  - `packages/api/src/database/seed.ts` - Add AI-generated products
+  - `packages/web/app/routes/posters/index.tsx` - Ensure filter tags display for all active filters
+
+  ## Priority
+  Low - affects a niche filter, main AI generation feature works
+feature: product-catalog
+type: bug
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-01-31T16:49:55.440Z'
+last_updated: '2026-01-31T16:49:55.440Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - filters
+  - seed-data
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

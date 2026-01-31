@@ -29,12 +29,16 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "146": "Bug: Mobile filter sheet backdrop click doesn't close sheet"
+    "149": "Bug: AI Generated filter tag not shown in active filters"
   in_progress: {}
   done:
     "6": Create product database schema and API
     "144": "Bug: Product detail page crashes with QueryClient error"
     "145": "Bug: Pagination does not update URL with page parameter"
-total_tickets: 3
-completion_percentage: 100
-is_completed: true
+    "147": "Bug: Active filter tag click doesn't update URL"
+    "148": "Bug: Clear all filters button doesn't update URL"
+total_tickets: 7
+completion_percentage: 71
+is_completed: false
