@@ -250,6 +250,41 @@ async function setupRazorpayMocks(page: Page, options?: {
       });
     });
   }
+
+  // Mock shipping estimate API - required for delivery step
+  await page.route('**/api/shipping/estimate*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        options: [
+          {
+            id: 'standard',
+            name: 'Standard Delivery',
+            carrier: 'India Post',
+            baseCost: '₹99',
+            finalCost: 0,
+            estimatedDaysMin: 5,
+            estimatedDaysMax: 7,
+            isFree: true,
+          },
+          {
+            id: 'express',
+            name: 'Express Delivery',
+            carrier: 'BlueDart',
+            baseCost: '₹199',
+            finalCost: 199,
+            estimatedDaysMin: 2,
+            estimatedDaysMax: 3,
+            isFree: false,
+          },
+        ],
+        freeShippingThreshold: 999,
+        qualifiesForFreeShipping: true,
+        cartTotal: 2999,
+      }),
+    });
+  });
 }
 
 // ============================================================================
@@ -726,6 +761,31 @@ test.describe('Payment Processing - Script Loading', () => {
       } else {
         await route.continue();
       }
+    });
+
+    // Mock shipping estimate API
+    await page.route('**/api/shipping/estimate*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          options: [
+            {
+              id: 'standard',
+              name: 'Standard Delivery',
+              carrier: 'India Post',
+              baseCost: '₹99',
+              finalCost: 0,
+              estimatedDaysMin: 5,
+              estimatedDaysMax: 7,
+              isFree: true,
+            },
+          ],
+          freeShippingThreshold: 999,
+          qualifiesForFreeShipping: true,
+          cartTotal: 2999,
+        }),
+      });
     });
 
     await navigateToPaymentStep(page);

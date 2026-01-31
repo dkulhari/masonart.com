@@ -152,9 +152,12 @@ test.describe('Admin Reviews - Filter Controls', () => {
   });
 
   test('clicking status filter should update URL', async ({ page }) => {
-    const pendingButton = page.locator('button:has-text("Pending")');
-    await pendingButton.click();
-    await page.waitForTimeout(500);
+    // Wait for stats to load (stats cards have direct links)
+    await expect(page.locator('text=Pending Reviews')).toBeVisible({ timeout: 10000 });
+
+    // Click the Pending Reviews stats card which has direct href with status param
+    await page.locator('text=Pending Reviews').click();
+    await page.waitForURL(/status=pending/, { timeout: 5000 });
     expect(page.url()).toContain('status=pending');
   });
 });
@@ -169,9 +172,16 @@ test.describe('Admin Reviews - Reviews Table', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin/reviews');
+    // Wait for loading to complete (stats cards appear after loading)
+    await page.locator('text=Pending Reviews').waitFor({ state: 'visible', timeout: 10000 });
   });
 
   test('should display table with headers or no reviews message', async ({ page }) => {
+    // Wait for either table or no reviews message to appear
+    await expect(
+      page.locator('table, :text("No reviews found")').first()
+    ).toBeVisible({ timeout: 10000 });
+
     const table = page.locator('table');
     const hasTable = await table.isVisible().catch(() => false);
     const hasNoReviews = await page.locator('text=No reviews found').isVisible().catch(() => false);
