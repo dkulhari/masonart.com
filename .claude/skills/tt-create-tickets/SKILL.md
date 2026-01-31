@@ -120,9 +120,12 @@ Within phases, tickets are generally independent unless task description indicat
 
 ### Step 6: Create Tickets
 
-Use `mcp__ticketrack__bulkCreateTickets`:
+**IMPORTANT**: Create tickets in batches of **maximum 5 tickets per API call** to avoid connection timeouts with long payloads.
+
+Use `mcp__ticketrack__bulkCreateTickets` in batches:
 
 ```
+# Batch 1: First 5 tickets
 mcp__ticketrack__bulkCreateTickets:
   tickets:
     - title: "Database Schema - Create reviews table"
@@ -130,15 +133,26 @@ mcp__ticketrack__bulkCreateTickets:
       featureName: "{feature-name}"
       labels: ["database", "schema"]
       priority: "high"
+    # ... up to 5 tickets max
+
+# Batch 2: Next 5 tickets
+mcp__ticketrack__bulkCreateTickets:
+  tickets:
     - title: "Backend API - Review service functions"
       description: "..."
       featureName: "{feature-name}"
       labels: ["backend", "api"]
       priority: "medium"
-      blocks: []
-      blockedBy: ["{phase-1-ticket-ids}"]
-    ...
+    # ... up to 5 tickets max
+
+# Continue with additional batches as needed...
 ```
+
+**Batching Strategy**:
+- Split all tickets into groups of 5 or fewer
+- Process each batch sequentially (wait for one to complete before starting next)
+- Keep ticket descriptions concise to minimize payload size
+- If a batch fails, retry that batch before continuing
 
 ### Step 7: Display Results
 
@@ -175,3 +189,4 @@ Phase 3: Frontend
 - **No plan**: "Feature has no implementation plan. Use /tt-plan-feature first."
 - **Parse failure**: "Could not parse implementation plan. Ensure it uses '- [ ] task' format."
 - **Bulk create failure**: Report which tickets failed and why.
+- **Connection timeout**: If MCP connection closes during bulk create, tickets may have been created despite no response. Check `mcp__ticketrack__listTickets` before retrying to avoid duplicates. Delete any duplicates by removing their YAML files from `plan/tracker-data/todo/feature-{name}/`.
