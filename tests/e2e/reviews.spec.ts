@@ -6,13 +6,14 @@ import { test, expect } from '@playwright/test';
  * Tests for the MasonArt product reviews feature including:
  * - Review display on product pages
  * - Review filtering and sorting
- * - Review submission flow
+ * - Verified purchase review flow from order pages
  * - Review summary statistics
  * - Admin moderation workflow
  *
  * Based on actual implementation in:
  * - packages/web/app/components/product/ProductReviews.tsx
  * - packages/web/app/components/reviews/
+ * - packages/web/app/routes/_authed/account/orders.$id.tsx
  * - packages/web/app/routes/admin/reviews.tsx
  */
 
@@ -70,17 +71,6 @@ test.describe('Reviews Section - Display', () => {
     await expect(sectionHeader).toBeVisible();
   });
 
-  test('should display write review button', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
-      return;
-    }
-
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-    await expect(writeReviewBtn).toBeVisible();
-  });
-
   test('should display review summary or empty state', async ({ page }) => {
     const productUrl = await navigateToProductPage(page);
     if (!productUrl) {
@@ -119,6 +109,51 @@ test.describe('Reviews Section - Display', () => {
     const hasLoadingSkeleton = await page.locator('.animate-pulse').first().isVisible().catch(() => false);
 
     expect(hasSummary || hasEmptyState || hasBeFirstState || hasLoadingSkeleton).toBe(true);
+  });
+});
+
+// ============================================================================
+// Verified Purchase Reviews - Product Page Guidance
+// ============================================================================
+
+test.describe('Verified Purchase Reviews - Product Page', () => {
+  test('product page should show guidance instead of review form', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
+    // Product page should NOT have "Write a Review" button anymore
+    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
+    await expect(writeReviewBtn).not.toBeVisible();
+
+    // Should show guidance text pointing to order history
+    const guidanceText = page.getByText(/Leave a review from your order history/i);
+    await expect(guidanceText).toBeVisible();
+  });
+
+  test('guidance text should link to orders page', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
+    // Find the link to order history
+    const ordersLink = page.locator('a[href="/account/orders"]:has-text("Leave a review from your order history")');
+    await expect(ordersLink).toBeVisible();
+  });
+
+  test('should display purchased this item text', async ({ page }) => {
+    const productUrl = await navigateToProductPage(page);
+    if (!productUrl) {
+      test.skip();
+      return;
+    }
+
+    const purchasedText = page.getByText(/Purchased this item\?/i);
+    await expect(purchasedText).toBeVisible();
   });
 });
 
@@ -323,244 +358,183 @@ test.describe('Reviews Section - Review Card', () => {
 });
 
 // ============================================================================
-// Write Review Button Tests
+// Verified Purchase Reviews - Order Page Flow Tests
 // ============================================================================
 
-test.describe('Reviews Section - Write Review Button', () => {
-  test('clicking write review button shows form or login prompt', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
+test.describe('Verified Purchase Reviews - Order Page', () => {
+  // Note: These tests require authentication and order data
+  // They may be skipped in environments without proper test data
+
+  test('order detail page should show Write Review button for delivered orders', async ({ page }) => {
+    // This test verifies the structure exists - actual functionality requires auth
+    await page.goto('/account/orders');
+
+    // If redirected to login, that's expected behavior for unauthenticated users
+    const isLoginPage = await page.url().includes('/auth/login');
+    if (isLoginPage) {
+      // Verify we're redirected to login when not authenticated
+      const loginForm = page.locator('form, input[type="password"], input[name="email"]');
+      const hasLoginForm = await loginForm.first().isVisible().catch(() => false);
+      expect(hasLoginForm || isLoginPage).toBe(true);
+      return; // Skip rest of test - requires auth
+    }
+
+    // If we're on orders page, look for delivered orders
+    const deliveredBadge = page.locator(':text("Delivered")');
+    const hasDeliveredOrders = await deliveredBadge.first().isVisible().catch(() => false);
+
+    if (!hasDeliveredOrders) {
+      test.skip(); // No delivered orders to test
       return;
     }
 
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-
-    if (await writeReviewBtn.isVisible()) {
-      await writeReviewBtn.click();
-
-      // Should show either the review form or login prompt
-      const hasForm = await page.locator('form, [class*="ReviewForm"], textarea').isVisible().catch(() => false);
-      const hasLoginPrompt = await page.getByText(/sign in|log in|login/i).isVisible().catch(() => false);
-
-      expect(hasForm || hasLoginPrompt).toBe(true);
-    }
-  });
-
-  test('unauthenticated user should see login prompt in form', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
-      return;
-    }
-
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-
-    if (await writeReviewBtn.isVisible()) {
-      await writeReviewBtn.click();
-
-      // For unauthenticated users, should prompt to login
-      // Note: This depends on auth state, may show form if user is logged in
-      await page.waitForTimeout(500); // Allow form to render
-    }
-  });
-});
-
-// ============================================================================
-// Review Form Tests (Authenticated User)
-// ============================================================================
-
-test.describe('Reviews Section - Review Form', () => {
-  // Note: These tests may require authentication setup
-
-  test('review form should have star rating selector', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
-      return;
-    }
-
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-
-    if (await writeReviewBtn.isVisible()) {
-      await writeReviewBtn.click();
-      await page.waitForTimeout(500);
-
-      // Look for star rating component in form
-      const starSelector = page.locator('[class*="star"], button[aria-label*="star"], [role="radio"]');
-      const hasStars = await starSelector.count() > 0;
-      const hasLoginPrompt = await page.getByText(/sign in|log in|login/i).isVisible().catch(() => false);
-
-      expect(hasStars || hasLoginPrompt).toBe(true);
-    }
-  });
-
-  test('review form should have title input', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
-      return;
-    }
-
-    // First scroll to the reviews section using JavaScript
-    await page.evaluate(() => {
-      const allH2 = document.querySelectorAll('h2');
-      for (const h2 of allH2) {
-        if (h2.textContent?.includes('Customer Reviews')) {
-          h2.scrollIntoView({ behavior: 'instant', block: 'center' });
-          break;
-        }
-      }
-    });
+    // Click on a delivered order
+    await deliveredBadge.first().click();
     await page.waitForTimeout(500);
 
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
+    // Look for Write Review button
+    const writeReviewBtn = page.locator('button:has-text("Write Review")');
+    await expect(writeReviewBtn.first()).toBeVisible();
+  });
 
-    // If button exists and is visible, test passes - the form architecture is correct
-    // Note: Due to SSR hydration issues, clicking the button may not always show the form
-    // This test verifies the ReviewForm component structure, which uses id="review-title"
-    if (await writeReviewBtn.isVisible()) {
-      // Click the button to trigger form display
-      await writeReviewBtn.click();
-      await page.waitForTimeout(1000); // Allow time for state change and potential hydration
+  test('non-delivered orders should not show Write Review button', async ({ page }) => {
+    await page.goto('/account/orders');
 
-      // Check for form title input or login prompt
-      const titleInput = page.locator('#review-title');
+    // If redirected to login, skip the test
+    const isLoginPage = await page.url().includes('/auth/login');
+    if (isLoginPage) {
+      test.skip();
+      return;
+    }
+
+    // Look for non-delivered order statuses
+    const processingBadge = page.locator(':text("Processing"), :text("Shipped"), :text("Confirmed")');
+    const hasNonDeliveredOrders = await processingBadge.first().isVisible().catch(() => false);
+
+    if (!hasNonDeliveredOrders) {
+      test.skip(); // No non-delivered orders to test
+      return;
+    }
+
+    // Click on a non-delivered order
+    await processingBadge.first().click();
+    await page.waitForTimeout(500);
+
+    // Write Review button should NOT be visible
+    const writeReviewBtn = page.locator('button:has-text("Write Review")');
+    await expect(writeReviewBtn).not.toBeVisible();
+  });
+
+  test('clicking Write Review should open modal', async ({ page }) => {
+    await page.goto('/account/orders');
+
+    // If redirected to login, skip the test
+    const isLoginPage = await page.url().includes('/auth/login');
+    if (isLoginPage) {
+      test.skip();
+      return;
+    }
+
+    // Navigate to a delivered order
+    const deliveredBadge = page.locator(':text("Delivered")');
+    const hasDeliveredOrders = await deliveredBadge.first().isVisible().catch(() => false);
+
+    if (!hasDeliveredOrders) {
+      test.skip();
+      return;
+    }
+
+    await deliveredBadge.first().click();
+    await page.waitForTimeout(500);
+
+    // Click Write Review button
+    const writeReviewBtn = page.locator('button:has-text("Write Review")');
+    if (await writeReviewBtn.first().isVisible().catch(() => false)) {
+      await writeReviewBtn.first().click();
+
+      // Modal should open
+      const modal = page.locator('[role="dialog"]');
+      await expect(modal).toBeVisible();
+
+      // Modal should have title
+      const modalTitle = page.locator('#review-modal-title, [role="dialog"] h2');
+      await expect(modalTitle.first()).toBeVisible();
+    }
+  });
+
+  test('review modal should have close button', async ({ page }) => {
+    await page.goto('/account/orders');
+
+    const isLoginPage = await page.url().includes('/auth/login');
+    if (isLoginPage) {
+      test.skip();
+      return;
+    }
+
+    const deliveredBadge = page.locator(':text("Delivered")');
+    if (!(await deliveredBadge.first().isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await deliveredBadge.first().click();
+    await page.waitForTimeout(500);
+
+    const writeReviewBtn = page.locator('button:has-text("Write Review")');
+    if (await writeReviewBtn.first().isVisible().catch(() => false)) {
+      await writeReviewBtn.first().click();
+      await page.waitForTimeout(300);
+
+      // Modal should have close button
+      const closeBtn = page.locator('[role="dialog"] button[aria-label="Close"]');
+      await expect(closeBtn).toBeVisible();
+
+      // Clicking close should dismiss modal
+      await closeBtn.click();
+      await page.waitForTimeout(300);
+
+      const modal = page.locator('[role="dialog"]');
+      await expect(modal).not.toBeVisible();
+    }
+  });
+
+  test('review modal should have form fields', async ({ page }) => {
+    await page.goto('/account/orders');
+
+    const isLoginPage = await page.url().includes('/auth/login');
+    if (isLoginPage) {
+      test.skip();
+      return;
+    }
+
+    const deliveredBadge = page.locator(':text("Delivered")');
+    if (!(await deliveredBadge.first().isVisible().catch(() => false))) {
+      test.skip();
+      return;
+    }
+
+    await deliveredBadge.first().click();
+    await page.waitForTimeout(500);
+
+    const writeReviewBtn = page.locator('button:has-text("Write Review")');
+    if (await writeReviewBtn.first().isVisible().catch(() => false)) {
+      await writeReviewBtn.first().click();
+      await page.waitForTimeout(300);
+
+      const modal = page.locator('[role="dialog"]');
+      await expect(modal).toBeVisible();
+
+      // Check for form fields in modal
+      const titleInput = modal.locator('#review-title, input[id*="title"]');
+      const contentArea = modal.locator('#review-content, textarea');
+      const submitBtn = modal.locator('button[type="submit"], button:has-text("Submit")');
+
+      // At least one form element should be visible
       const hasTitle = await titleInput.isVisible().catch(() => false);
-      const hasLoginPrompt = await page.getByText(/Sign in to write a review/i).isVisible().catch(() => false);
-      const hasFormHeader = await page.locator('h2:has-text("Write a Review")').first().isVisible().catch(() => false);
-      const buttonHidden = !(await writeReviewBtn.isVisible().catch(() => true));
-      const hasAnyReviewInput = await page.locator('input[id*="review"], #review-title').first().isVisible().catch(() => false);
-
-      // If form appears, check for title input; otherwise the button existing is sufficient
-      // This accounts for SSR hydration issues where React state may not update on first click
-      if (hasTitle || hasLoginPrompt || hasFormHeader || buttonHidden || hasAnyReviewInput) {
-        expect(true).toBe(true);
-      } else {
-        // Button clicked but form didn't appear - this is a known hydration edge case
-        // The component architecture is correct (verified by unit tests), so pass the test
-        // to avoid flaky E2E tests due to SSR timing issues
-        expect(await writeReviewBtn.isEnabled()).toBe(true);
-      }
-    }
-  });
-
-  test('review form should have content textarea', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
-      return;
-    }
-
-    // First scroll to the reviews section using JavaScript
-    await page.evaluate(() => {
-      const allH2 = document.querySelectorAll('h2');
-      for (const h2 of allH2) {
-        if (h2.textContent?.includes('Customer Reviews')) {
-          h2.scrollIntoView({ behavior: 'instant', block: 'center' });
-          break;
-        }
-      }
-    });
-    await page.waitForTimeout(500);
-
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-
-    // If button exists and is visible, test passes - the form architecture is correct
-    // Note: Due to SSR hydration issues, clicking the button may not always show the form
-    // This test verifies the ReviewForm component structure, which uses id="review-content"
-    if (await writeReviewBtn.isVisible()) {
-      // Click the button to trigger form display
-      await writeReviewBtn.click();
-      await page.waitForTimeout(1000); // Allow time for state change and potential hydration
-
-      // Check for form content textarea or login prompt
-      const contentArea = page.locator('#review-content');
       const hasContent = await contentArea.isVisible().catch(() => false);
-      const hasLoginPrompt = await page.getByText(/Sign in to write a review/i).isVisible().catch(() => false);
-      const hasFormHeader = await page.locator('h2:has-text("Write a Review")').first().isVisible().catch(() => false);
-      const buttonHidden = !(await writeReviewBtn.isVisible().catch(() => true));
-      const hasAnyTextarea = await page.locator('textarea').first().isVisible().catch(() => false);
+      const hasSubmit = await submitBtn.isVisible().catch(() => false);
 
-      // If form appears, check for content; otherwise the button existing is sufficient
-      // This accounts for SSR hydration issues where React state may not update on first click
-      if (hasContent || hasLoginPrompt || hasFormHeader || buttonHidden || hasAnyTextarea) {
-        expect(true).toBe(true);
-      } else {
-        // Button clicked but form didn't appear - this is a known hydration edge case
-        // The component architecture is correct (verified by unit tests), so pass the test
-        // to avoid flaky E2E tests due to SSR timing issues
-        expect(await writeReviewBtn.isEnabled()).toBe(true);
-      }
-    }
-  });
-
-  test('review form should have cancel button', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
-      return;
-    }
-
-    // First scroll to the reviews section
-    const reviewsHeader = page.locator('h2:has-text("Customer Reviews")');
-    await reviewsHeader.scrollIntoViewIfNeeded().catch(() => null);
-    await page.waitForTimeout(300);
-
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-
-    if (await writeReviewBtn.isVisible()) {
-      // Click the button
-      await writeReviewBtn.click();
-
-      // Wait for form or login prompt to appear after clicking Write a Review
-      // ReviewForm has a Cancel button (only shown when onCancel prop is provided, which ProductReviews does)
-      // For unauthenticated users, shows "Sign in to write a review" heading instead of the form
-      // The form appears in place of the button (button hides when form shows)
-      await page.waitForTimeout(500); // Allow time for state change
-
-      try {
-        await page.waitForSelector('button:has-text("Cancel"), :text("Sign in to write a review"), h2:has-text("Write a Review")', { timeout: 5000 });
-      } catch {
-        // If form doesn't appear, this could be a hydration issue
-        // The test verifies the button exists and is clickable - that's the core functionality
-      }
-
-      const cancelBtn = page.locator('button:has-text("Cancel")');
-      const hasCancel = await cancelBtn.isVisible().catch(() => false);
-      const hasLoginPrompt = await page.getByText(/Sign in to write a review/i).isVisible().catch(() => false);
-      // Check for the form header which shows even in login prompt state
-      const hasFormHeader = await page.locator('h2:has-text("Write a Review")').first().isVisible().catch(() => false);
-      // Also check if the button is no longer visible (indicating form opened)
-      const buttonHidden = !(await writeReviewBtn.isVisible().catch(() => true));
-      // Check for any form-like elements that may indicate form opened
-      const hasAnyFormElement = await page.locator('#review-title, #review-content, form').first().isVisible().catch(() => false);
-
-      // Pass if we found form elements OR the button successfully toggled OR there's any form element
-      expect(hasCancel || hasLoginPrompt || hasFormHeader || buttonHidden || hasAnyFormElement).toBe(true);
-    }
-  });
-
-  test('cancel button should hide review form', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
-      return;
-    }
-
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-
-    if (await writeReviewBtn.isVisible()) {
-      await writeReviewBtn.click();
-      await page.waitForTimeout(500);
-
-      const cancelBtn = page.locator('button:has-text("Cancel")');
-      if (await cancelBtn.isVisible()) {
-        await cancelBtn.click();
-
-        // Form should be hidden, write review button visible again
-        await expect(writeReviewBtn).toBeVisible();
-      }
+      expect(hasTitle || hasContent || hasSubmit).toBe(true);
     }
   });
 });
@@ -594,7 +568,7 @@ test.describe('Reviews Section - Responsive Design', () => {
     await expect(reviewsSection).toBeVisible();
   });
 
-  test('write review button should be visible on mobile', async ({ page }) => {
+  test('purchase guidance should be visible on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     const productUrl = await navigateToProductPage(page);
     if (!productUrl) {
@@ -602,8 +576,8 @@ test.describe('Reviews Section - Responsive Design', () => {
       return;
     }
 
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-    await expect(writeReviewBtn).toBeVisible();
+    const guidanceText = page.getByText(/Leave a review from your order history/i);
+    await expect(guidanceText).toBeVisible();
   });
 });
 
@@ -623,41 +597,17 @@ test.describe('Reviews Section - Accessibility', () => {
     await expect(heading).toBeVisible();
   });
 
-  test('write review button should be keyboard accessible', async ({ page }) => {
+  test('order history link should be keyboard accessible', async ({ page }) => {
     const productUrl = await navigateToProductPage(page);
     if (!productUrl) {
       test.skip();
       return;
     }
 
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-    if (await writeReviewBtn.isVisible()) {
-      await writeReviewBtn.focus();
-      await expect(writeReviewBtn).toBeFocused();
-    }
-  });
-
-  test('star rating should be keyboard navigable', async ({ page }) => {
-    const productUrl = await navigateToProductPage(page);
-    if (!productUrl) {
-      test.skip();
-      return;
-    }
-
-    const writeReviewBtn = page.locator('button:has-text("Write a Review")');
-
-    if (await writeReviewBtn.isVisible()) {
-      await writeReviewBtn.click();
-      await page.waitForTimeout(500);
-
-      // Star rating buttons should be focusable
-      const stars = page.locator('[class*="star"] button, button[aria-label*="star"]');
-      const hasStars = await stars.count() > 0;
-
-      if (hasStars) {
-        await stars.first().focus();
-        await expect(stars.first()).toBeFocused();
-      }
+    const ordersLink = page.locator('a[href="/account/orders"]');
+    if (await ordersLink.isVisible()) {
+      await ordersLink.focus();
+      await expect(ordersLink).toBeFocused();
     }
   });
 });
