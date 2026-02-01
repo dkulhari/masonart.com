@@ -21,3 +21,6 @@ export type { ReviewListProps } from './ReviewList'
 
 export { ReviewForm, ReviewFormSkeleton } from './ReviewForm'
 export type { ReviewFormProps, ReviewFormData, ReviewFormErrors } from './ReviewForm'
+
+export { ReviewModal } from './ReviewModal'
+export type { ReviewModalProps } from './ReviewModal'
