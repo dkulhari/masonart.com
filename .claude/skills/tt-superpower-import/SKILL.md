@@ -5,6 +5,7 @@ allowed-tools:
   - Read
   - Glob
   - Grep
+  - ToolSearch
   - mcp__ticketrack__createFeature
   - mcp__ticketrack__listFeatures
   - mcp__ticketrack__createTicket
@@ -18,6 +19,10 @@ allowed-tools:
 
 Migrates completed Superpowers implementations to TickeTrack retroactively. Uses claude-mem observations to find commits, file changes, and decisions.
 
+## ⚠️ CRITICAL: MCP-Only Operations
+
+**NEVER write directly to plan/tracker-data/ files.** All ticket and feature operations MUST use TickeTrack MCP tools. If MCP is unavailable, the skill MUST fail - do not fall back to file operations.
+
 ## Arguments
 
 ```
@@ -30,6 +35,33 @@ $ARGUMENTS: <plan-file> [--feature-name=<name>]
 **Example**: `/tt-superpower-import docs/plans/2026-02-01-gemini-provider-plan.md`
 
 ## Workflow
+
+### Step 0: Verify TickeTrack MCP Availability (MUST BE FIRST)
+
+**Before any other operation**, verify TickeTrack MCP is available:
+
+```
+ToolSearch: "+ticketrack list"
+```
+
+Then call:
+```
+mcp__ticketrack__listFeatures
+```
+
+**If ToolSearch returns no ticketrack tools OR listFeatures fails:**
+```
+❌ TickeTrack MCP Not Available
+
+The TickeTrack MCP server is not connected. This skill requires TickeTrack MCP for all operations.
+
+To fix:
+1. Run: /mcp (to check MCP server status)
+2. Ensure ticketrack server is running
+3. Retry: /tt-superpower-import <plan-file>
+```
+
+**DO NOT PROCEED if TickeTrack MCP is unavailable.**
 
 ### Step 1: Parse Plan File
 
@@ -77,7 +109,7 @@ mcp__plugin_claude-mem_mcp-search__search
 - Work summaries
 - Type indicators (feature, bugfix, refactor)
 
-### Step 4: Create TT Feature
+### Step 4: Create TT Feature (via MCP)
 
 ```yaml
 mcp__ticketrack__createFeature:
@@ -97,14 +129,14 @@ mcp__ticketrack__createFeature:
   priority: medium
 ```
 
-### Step 5: Create Tickets (All as Done)
+### Step 5: Create Tickets via MCP (All as Done)
 
 For each task in the plan:
 
 **5a. Create ticket:**
 ```yaml
 mcp__ticketrack__createTicket:
-  feature: <feature-name>
+  featureName: <feature-name>
   title: "Task N - <task title>"
   type: task
   labels: [<inferred from file paths>]
@@ -121,7 +153,7 @@ mcp__ticketrack__createTicket:
 ```yaml
 mcp__ticketrack__updateTicketStatus:
   ticketId: <id>
-  status: done
+  newStatus: done
 ```
 
 **5c. Add completion comment with claude-mem context:**
@@ -185,6 +217,7 @@ Infer labels from file paths in tasks:
 
 | Error | Response |
 |-------|----------|
+| TickeTrack MCP unavailable | **STOP** - Display connection error, do not proceed |
 | Plan file not found | "Plan file not found: {path}" |
 | Feature already exists | "Feature '{name}' already exists. Use --feature-name to specify different name." |
 | No tasks found in plan | "No tasks found in plan. Expected '## Task N:' format." |
