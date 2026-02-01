@@ -5,6 +5,7 @@ allowed-tools:
   - Read
   - Glob
   - Grep
+  - Bash
   - ToolSearch
   - mcp__ticketrack__createFeature
   - mcp__ticketrack__listFeatures
@@ -103,11 +104,50 @@ mcp__plugin_claude-mem_mcp-search__search
 2. Task title keywords
 3. Feature name + date range
 
+**After finding observations, fetch full content:**
+```
+mcp__plugin_claude-mem_mcp-search__get_observations
+  ids: [<observation-id-1>, <observation-id-2>]
+```
+
 **Extract from observations:**
 - Commit hashes and messages
 - Files changed
 - Work summaries
 - Type indicators (feature, bugfix, refactor)
+
+### Step 3b: Extract Commit Hashes (CRITICAL)
+
+**Commit hashes MUST be included in completion comments.** Follow this extraction strategy:
+
+**1. From claude-mem observations:**
+Look for commit patterns in observation `facts` and `narrative` fields:
+- 7-8 character hex hashes (e.g., `b2cab8de`, `cc7b27c3`)
+- Conventional commit messages (e.g., `feat(ai): implement gemini...`)
+- Patterns like "committed", "commit hash", "git commit"
+
+**2. From git log (fallback):**
+If claude-mem doesn't have commit info, use git log with file paths from the task:
+```bash
+git log --oneline --all -- <file-path-1> <file-path-2>
+```
+
+This returns commits that touched those specific files. Match by:
+- Date range (around when superpowers plan was executed)
+- Commit message keywords matching task description
+- Author (if known)
+
+**3. Example extraction:**
+```
+# From observation narrative:
+"Committed changes with cc7b27c3 - feat(ai): implement gemini image generation"
+
+# Extract:
+hash: cc7b27c3
+message: feat(ai): implement gemini image generation
+```
+
+**If no commit found:** Note in comment as "Commit: not found (manual review needed)"
 
 ### Step 4: Create TT Feature (via MCP)
 
