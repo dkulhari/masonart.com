@@ -9,6 +9,7 @@
  * Based on patterns from docs/poster-app-tech-stack.md
  */
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type {
   AIStylePreset,
   AIAspectRatio,
@@ -304,6 +305,16 @@ export async function generateImages(
           variationCount,
           input.seed,
           falModel
+        );
+        break;
+
+      case "gemini":
+        images = await generateWithGemini(
+          config,
+          enhancedPrompt,
+          dimensions,
+          variationCount,
+          input.seed
         );
         break;
 
@@ -674,6 +685,109 @@ function getNanoBananaAspectRatio(dimensions: { width: number; height: number })
 }
 
 // ============================================================================
+// Google Gemini Provider
+// ============================================================================
+
+/**
+ * Generate images using Google Gemini API (AI Studio)
+ * Uses Gemini 2.0 Flash with native image generation capabilities
+ */
+async function generateWithGemini(
+  config: AIProviderConfig,
+  prompt: string,
+  dimensions: { width: number; height: number },
+  variationCount: number,
+  baseSeed?: number
+): Promise<GeneratedImage[]> {
+  const images: GeneratedImage[] = [];
+
+  const genAI = new GoogleGenerativeAI(config.apiKey);
+  const model = genAI.getGenerativeModel({
+    model: config.modelId,
+    generationConfig: {
+      responseModalities: ["image", "text"],
+    } as any, // Type not yet in SDK
+  });
+
+  // Add aspect ratio hint to prompt
+  const aspectHint = getAspectRatioHint(dimensions);
+  const enhancedPrompt = aspectHint ? `${prompt}, ${aspectHint}` : prompt;
+
+  for (let i = 0; i < variationCount; i++) {
+    const seed = baseSeed !== undefined ? baseSeed + i : Math.floor(Math.random() * 2147483647);
+
+    try {
+      const result = await model.generateContent(enhancedPrompt);
+      const response = result.response;
+
+      // Extract image from response
+      const imageData = extractGeminiImage(response);
+
+      if (imageData) {
+        images.push({
+          buffer: imageData.buffer,
+          url: undefined, // Gemini returns base64, not URLs
+          width: imageData.width || dimensions.width,
+          height: imageData.height || dimensions.height,
+          seed,
+          variationIndex: i,
+          mimeType: imageData.mimeType || "image/png",
+        });
+      }
+    } catch (error) {
+      // Log but continue with other variations
+      console.error(`Gemini generation ${i + 1} failed:`, error);
+    }
+  }
+
+  return images;
+}
+
+/**
+ * Extract image data from Gemini response
+ */
+function extractGeminiImage(response: any): {
+  buffer: Buffer;
+  width?: number;
+  height?: number;
+  mimeType?: string;
+} | null {
+  try {
+    const candidates = response.candidates;
+    if (!candidates || candidates.length === 0) return null;
+
+    const parts = candidates[0].content?.parts;
+    if (!parts) return null;
+
+    for (const part of parts) {
+      if (part.inlineData) {
+        const { data, mimeType } = part.inlineData;
+        return {
+          buffer: Buffer.from(data, "base64"),
+          mimeType,
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get aspect ratio hint for Gemini prompt
+ */
+function getAspectRatioHint(dimensions: { width: number; height: number }): string {
+  const ratio = dimensions.width / dimensions.height;
+
+  if (ratio > 1.5) return "wide landscape format, 16:9 aspect ratio";
+  if (ratio > 1.1) return "landscape format, horizontal composition";
+  if (ratio > 0.9) return "square format, 1:1 aspect ratio";
+  if (ratio > 0.7) return "portrait format, vertical composition";
+  return "tall portrait format, 9:16 aspect ratio";
+}
+
+// ============================================================================
 // Utility Functions
 // ============================================================================
 
@@ -769,6 +883,7 @@ export function estimateGenerationCost(
     "dall-e-3": 8, // ~$0.08 per image (standard quality)
     midjourney: 10, // ~$0.10 per image (estimate)
     "fal-ai": 1, // ~$0.01 per image (FLUX Schnell)
+    gemini: 2, // ~$0.02 per image (Gemini 2.0 Flash)
   };
 
   // Nano Banana models have different pricing
@@ -800,6 +915,7 @@ export function estimateGenerationTime(
     "dall-e-3": 10, // ~10s per image on DALL-E 3
     midjourney: 30, // ~30s per image
     "fal-ai": 5, // ~5s per image (FLUX Schnell is fast)
+    gemini: 8, // ~8s per image (Gemini 2.0 Flash)
   };
 
   // Nano Banana models have different processing times
