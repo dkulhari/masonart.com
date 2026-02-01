@@ -29,13 +29,13 @@ export interface ReviewFormErrors {
 }
 
 export interface ReviewFormProps {
-  /** Product ID to review */
-  productId: string
+  /** Product ID - only used for display, not for API calls */
+  productId?: string
   /** Callback when form is submitted successfully */
   onSuccess?: (data: ReviewFormData) => void
   /** Callback when form is cancelled */
   onCancel?: () => void
-  /** Custom submit handler (for testing/overriding default) */
+  /** Submit handler - required for modal usage (direct API call deprecated) */
   onSubmit?: (data: ReviewFormData) => Promise<void>
   /** Whether user is authenticated */
   isAuthenticated?: boolean
@@ -79,6 +79,11 @@ export function ReviewForm({
   initialData,
   variant = 'inline',
 }: ReviewFormProps) {
+  // Prop validation warnings
+  if (!onSubmit && typeof productId === 'undefined') {
+    console.warn('ReviewForm: Either onSubmit or productId must be provided')
+  }
+
   // Form state
   const [formData, setFormData] = useState<ReviewFormData>({
     rating: initialData?.rating ?? 0,
@@ -179,20 +184,9 @@ export function ReviewForm({
       if (onSubmit) {
         await onSubmit(formData)
       } else {
-        // Default API call
-        const response = await fetch(`/api/products/${productId}/reviews`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(formData),
-        })
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}))
-          throw new Error(error.error?.message || 'Failed to submit review')
-        }
+        // Direct product review creation deprecated - onSubmit required
+        console.warn('ReviewForm: onSubmit prop required - direct product review creation deprecated')
+        throw new Error('Review submission requires onSubmit handler')
       }
 
       setSubmitStatus('success')
