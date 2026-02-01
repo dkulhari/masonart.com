@@ -30,7 +30,6 @@ import { notificationPreferencesApp } from "./routes/notification-preferences";
 import { approvalsApp } from "./routes/approvals";
 import {
   productReviewsApp,
-  createReviewApp,
   reviewsApp,
   protectedReviewsApp,
 } from "./routes/reviews";
@@ -83,10 +82,11 @@ app.route("/api/wallet", walletApp);
 // Phone Auth API - SMS OTP login
 app.route("/api/phone-auth", phoneAuthApp);
 
-// Reviews API - product reviews (public read, auth for write)
-// Note: Reviews use nested paths under products and separate /api/reviews
+// Reviews API - product reviews (public read)
+// Note: Review creation is now only via order items endpoint
+// GET /api/products/:productId/reviews - list reviews for a product
+// GET/PATCH/DELETE /api/reviews/:reviewId - individual review operations
 app.route("/api/products/:productId/reviews", productReviewsApp);
-app.route("/api/products/:productId/reviews", createReviewApp);
 app.route("/api/reviews", reviewsApp);
 app.route("/api/reviews", protectedReviewsApp);
 
