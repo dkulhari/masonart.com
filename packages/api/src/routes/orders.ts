@@ -27,6 +27,7 @@ import {
 } from "../database/schema/orders";
 import { carts, cartItems } from "../database/schema/cart";
 import { productionApprovals } from "../database/schema/approvals";
+import { reviews } from "../database/schema/reviews";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import {
   createRazorpayOrder,
@@ -110,6 +111,15 @@ const verifyPaymentSchema = z.object({
   razorpayOrderId: z.string().min(1),
   razorpayPaymentId: z.string().min(1),
   razorpaySignature: z.string().min(1),
+});
+
+/**
+ * Schema for creating a review from an order item
+ */
+const createOrderReviewSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  title: z.string().max(255).optional(),
+  content: z.string().min(10).max(5000),
 });
 
 // ============================================================================
@@ -790,6 +800,108 @@ ordersApp.post(
       });
     } catch (error) {
       return c.json({ error: "Failed to verify payment" }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// POST /api/orders/:orderId/items/:itemId/review - Create Review for Order Item
+// ============================================================================
+
+ordersApp.post(
+  "/:orderId/items/:itemId/review",
+  zValidator("json", createOrderReviewSchema),
+  async (c) => {
+    const user = c.get("user");
+    const { orderId, itemId } = c.req.param();
+    const { rating, title, content } = c.req.valid("json");
+
+    try {
+      // Validate UUIDs
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(orderId) || !uuidRegex.test(itemId)) {
+        return c.json({ error: "Invalid order or item ID" }, 400);
+      }
+
+      // Get order and verify ownership
+      const order = await db.query.orders.findFirst({
+        where: and(eq(orders.id, orderId), eq(orders.userId, user.id)),
+      });
+
+      if (!order) {
+        return c.json({ error: "Order not found" }, 404);
+      }
+
+      // Check order is delivered
+      if (order.status !== "delivered") {
+        return c.json(
+          { error: "Reviews can only be submitted for delivered orders" },
+          400
+        );
+      }
+
+      // Get order item
+      const orderItem = await db.query.orderItems.findFirst({
+        where: and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId)),
+      });
+
+      if (!orderItem) {
+        return c.json({ error: "Order item not found" }, 404);
+      }
+
+      if (!orderItem.productId) {
+        return c.json({ error: "Product no longer available" }, 400);
+      }
+
+      // Check for existing review
+      const existingReview = await db
+        .select({ id: reviews.id })
+        .from(reviews)
+        .where(
+          and(eq(reviews.productId, orderItem.productId), eq(reviews.userId, user.id))
+        )
+        .limit(1);
+
+      if (existingReview.length > 0) {
+        return c.json({ error: "You have already reviewed this product" }, 409);
+      }
+
+      // Create review
+      const [newReview] = await db
+        .insert(reviews)
+        .values({
+          productId: orderItem.productId,
+          userId: user.id,
+          orderItemId: itemId,
+          rating,
+          title: title || null,
+          content,
+          status: "pending",
+        })
+        .returning();
+
+      if (!newReview) {
+        throw new Error("Failed to create review");
+      }
+
+      return c.json(
+        {
+          message: "Review submitted successfully",
+          review: {
+            id: newReview.id,
+            rating: newReview.rating,
+            title: newReview.title,
+            content: newReview.content,
+            status: newReview.status,
+            orderItemId: newReview.orderItemId,
+            createdAt: newReview.createdAt,
+          },
+        },
+        201
+      );
+    } catch (error) {
+      console.error("Error creating review:", error);
+      return c.json({ error: "Failed to create review" }, 500);
     }
   }
 );
