@@ -30,7 +30,7 @@ import {
   type AuthVariables,
   type OptionalAuthVariables,
 } from "../middleware/auth";
-import { getCached, setCached, deleteCached, CacheKeys } from "../lib/redis";
+import { getCached, setCached, deleteCached } from "../lib/redis";
 
 // ============================================================================
 // Constants
@@ -273,7 +273,7 @@ reviewsApp.get("/:reviewId", async (c) => {
       return c.json({ error: "Review not found" }, 404);
     }
 
-    const review = reviewResult[0];
+    const review = reviewResult[0]!;
 
     // Only show approved reviews, unless it's the owner viewing their own
     if (review.status !== "approved") {
@@ -331,7 +331,7 @@ protectedReviewsApp.patch(
       }
 
       // Check ownership - only owner can update
-      if (!canAccess(user, existingReview[0].userId)) {
+      if (!canAccess(user, existingReview[0]!.userId)) {
         throw new HTTPException(403, { message: "You can only update your own reviews" });
       }
 
@@ -347,17 +347,17 @@ protectedReviewsApp.patch(
         .returning();
 
       // Invalidate cache
-      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0].productId}:*`);
+      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0]!.productId}:*`);
 
       return c.json({
         message: "Review updated successfully",
         review: {
-          id: updatedReview.id,
-          rating: updatedReview.rating,
-          title: updatedReview.title,
-          content: updatedReview.content,
-          status: updatedReview.status,
-          updatedAt: updatedReview.updatedAt,
+          id: updatedReview!.id,
+          rating: updatedReview!.rating,
+          title: updatedReview!.title,
+          content: updatedReview!.content,
+          status: updatedReview!.status,
+          updatedAt: updatedReview!.updatedAt,
         },
       });
     } catch (error) {
@@ -397,7 +397,7 @@ protectedReviewsApp.delete("/:reviewId", async (c) => {
     }
 
     // Check ownership - only owner can delete
-    if (!canAccess(user, existingReview[0].userId)) {
+    if (!canAccess(user, existingReview[0]!.userId)) {
       throw new HTTPException(403, { message: "You can only delete your own reviews" });
     }
 
@@ -405,7 +405,7 @@ protectedReviewsApp.delete("/:reviewId", async (c) => {
     await db.delete(reviews).where(eq(reviews.id, reviewId));
 
     // Invalidate cache
-    await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0].productId}:*`);
+    await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0]!.productId}:*`);
 
     return c.json({ message: "Review deleted successfully" });
   } catch (error) {

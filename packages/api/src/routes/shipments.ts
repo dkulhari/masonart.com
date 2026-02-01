@@ -9,7 +9,7 @@
  */
 
 import { Hono } from "hono";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db } from "../database";
 import { orderShipments, shippingOptions } from "../database/schema/shipping";
@@ -141,7 +141,7 @@ shipmentsApp.get("/orders/:orderId/shipments", async (c) => {
       return c.json({ error: "Order not found" }, 404);
     }
 
-    const order = orderResult[0];
+    const order = orderResult[0]!;
 
     // Check if user owns the order (unless admin)
     if (!canAccess(user, order.userId)) {
@@ -239,7 +239,7 @@ shipmentsApp.get("/shipments/:id/track", async (c) => {
       return c.json({ error: "Shipment not found" }, 404);
     }
 
-    const shipment = shipmentResult[0];
+    const shipment = shipmentResult[0]!;
 
     // Check if user owns the order (unless admin)
     if (!canAccess(user, shipment.order.userId)) {
