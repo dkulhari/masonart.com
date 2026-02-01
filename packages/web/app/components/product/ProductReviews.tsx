@@ -7,13 +7,12 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
-import { MessageSquare, PenLine } from 'lucide-react'
+import { useState } from 'react'
+import { MessageSquare } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import {
   useReviews,
   useReviewStats,
-  useCreateReview,
   toReviewStats,
   type ReviewFilters,
 } from '~/hooks/useReviews'
@@ -21,7 +20,6 @@ import {
   ReviewList,
   ReviewSummary,
   ReviewSummarySkeleton,
-  ReviewForm,
 } from '~/components/reviews'
 
 // ============================================================================
@@ -31,8 +29,6 @@ import {
 export interface ProductReviewsProps {
   /** Product ID to show reviews for */
   productId: string
-  /** Whether user is authenticated */
-  isAuthenticated?: boolean
   /** Custom className */
   className?: string
 }
@@ -48,15 +44,12 @@ export interface ProductReviewsProps {
  * <ProductReviews
  *   productId="123"
  *   productName="Dream Big Poster"
- *   isAuthenticated={user != null}
  * />
  */
 export function ProductReviews({
   productId,
-  isAuthenticated = false,
   className,
 }: ProductReviewsProps) {
-  const [showForm, setShowForm] = useState(false)
   const [filters] = useState<ReviewFilters>({
     sortBy: 'newest',
     page: 1,
@@ -74,31 +67,6 @@ export function ProductReviews({
     data: statsData,
     isLoading: statsLoading,
   } = useReviewStats(productId)
-
-  const createReview = useCreateReview(productId)
-
-  // Handle form success
-  const handleFormSuccess = useCallback(() => {
-    setShowForm(false)
-  }, [])
-
-  // Handle write review button
-  const handleWriteReview = useCallback(() => {
-    setShowForm(true)
-  }, [])
-
-  // Handle form cancel
-  const handleFormCancel = useCallback(() => {
-    setShowForm(false)
-  }, [])
-
-  // Handle form submit
-  const handleFormSubmit = useCallback(
-    async (data: { rating: number; title: string; content: string }) => {
-      await createReview.mutateAsync(data)
-    },
-    [createReview]
-  )
 
   // Convert stats data for ReviewSummary
   const stats = statsData ? toReviewStats(statsData) : null
@@ -118,31 +86,17 @@ export function ProductReviews({
             </h2>
           </div>
 
-          {/* Write Review Button */}
-          {!showForm && (
-            <button
-              type="button"
-              onClick={handleWriteReview}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          {/* Purchase Guidance */}
+          <div className="text-sm text-muted-foreground">
+            Purchased this item?{' '}
+            <a
+              href="/account/orders"
+              className="font-medium text-primary hover:underline"
             >
-              <PenLine className="h-4 w-4" />
-              Write a Review
-            </button>
-          )}
-        </div>
-
-        {/* Review Form (when visible) */}
-        {showForm && (
-          <div className="mb-8">
-            <ReviewForm
-              productId={productId}
-              isAuthenticated={isAuthenticated}
-              onSuccess={handleFormSuccess}
-              onCancel={handleFormCancel}
-              onSubmit={handleFormSubmit}
-            />
+              Leave a review from your order history
+            </a>
           </div>
-        )}
+        </div>
 
         {/* Stats Section */}
         <div className="mb-8">

@@ -3,10 +3,12 @@
  *
  * This test suite validates the reviews API routes:
  * - GET /api/products/:productId/reviews - List reviews for a product
- * - POST /api/products/:productId/reviews - Create a new review
  * - GET /api/reviews/:reviewId - Get a single review
  * - PATCH /api/reviews/:reviewId - Update own review
  * - DELETE /api/reviews/:reviewId - Delete own review
+ *
+ * Note: Review creation is now only available via order items endpoint
+ * (POST /api/orders/:orderId/items/:orderItemId/review)
  *
  * Tests are organized into:
  * 1. Module export tests - Verify route modules export correctly
@@ -92,10 +94,10 @@ describe("Reviews Route Module Exports", () => {
     expect(reviewsModule.productReviewsApp).toBeDefined();
   });
 
-  it("should export createReviewApp from routes/reviews", async () => {
+  it("should NOT export createReviewApp from routes/reviews (removed for verified purchase reviews)", async () => {
     const reviewsModule = await import("../../src/routes/reviews");
-    expect(reviewsModule).toHaveProperty("createReviewApp");
-    expect(reviewsModule.createReviewApp).toBeDefined();
+    // createReviewApp was removed - reviews are now created via order items endpoint
+    expect(reviewsModule).not.toHaveProperty("createReviewApp");
   });
 
   it("should export reviewsApp from routes/reviews", async () => {
@@ -334,7 +336,7 @@ describe("Reviews Route Availability", () => {
     expect(res.headers.get("content-type")).toContain("application/json");
   });
 
-  it("POST /api/products/:productId/reviews route exists", async () => {
+  it("POST /api/products/:productId/reviews route should NOT create reviews (removed for verified purchase reviews)", async () => {
     if (!app) {
       console.log("App not available, skipping route availability test");
       return;
@@ -348,8 +350,11 @@ describe("Reviews Route Availability", () => {
         content: "This is a test review content",
       }),
     });
-    // Should be 401 (unauthorized) since POST requires auth, not 404
-    expect([401, 500].includes(res.status)).toBe(true);
+    // The POST route was removed - should return 404 or 401 (middleware runs but no handler)
+    // Reviews can now only be created via order items endpoint
+    // Key point: it should NOT return 201 (created) anymore
+    expect([401, 404].includes(res.status)).toBe(true);
+    expect(res.status).not.toBe(201);
   });
 
   it("GET /api/reviews/:reviewId route exists", async () => {
@@ -464,7 +469,7 @@ describe("Reviews Input Validation", () => {
 // ============================================================================
 
 describe("Reviews Authorization", () => {
-  it("POST /api/products/:productId/reviews requires authentication", async () => {
+  it("POST /api/products/:productId/reviews endpoint no longer creates reviews", async () => {
     if (!app) {
       console.log("App not available, skipping auth test");
       return;
@@ -478,8 +483,11 @@ describe("Reviews Authorization", () => {
         content: "This is a test review content that is long enough",
       }),
     });
-    // Should be 401 unauthorized without valid session
-    expect(res.status).toBe(401);
+    // The POST endpoint was removed - returns 404 or 401 (middleware runs but no handler)
+    // Reviews are now created via order items endpoint only
+    // Key point: it should NOT return 201 (created) anymore
+    expect([401, 404].includes(res.status)).toBe(true);
+    expect(res.status).not.toBe(201);
   });
 
   it("PATCH /api/reviews/:reviewId requires authentication", async () => {
@@ -702,7 +710,7 @@ describe("Reviews Performance Tests", () => {
     expect(duration).toBeLessThan(1000);
   });
 
-  it("should respond quickly to auth errors", async () => {
+  it("should respond quickly to 404 for removed POST endpoint", async () => {
     if (!app) return;
 
     const start = Date.now();

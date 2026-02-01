@@ -13,6 +13,7 @@ import {
 import { relations } from "drizzle-orm";
 import { products } from "./products";
 import { users } from "./users";
+import { orderItems } from "./orders";
 
 // ============================================================================
 // Enums
@@ -52,6 +53,11 @@ export const reviews = pgTable(
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
 
+    // Order item that authorized this review (verified purchase)
+    orderItemId: uuid("order_item_id")
+      .references(() => orderItems.id, { onDelete: "cascade" })
+      .notNull(),
+
     // Review content
     rating: integer("rating").notNull(), // 1-5 stars
     title: text("title"), // Optional review title
@@ -75,6 +81,7 @@ export const reviews = pgTable(
     // Indexes for common query patterns
     productIdIdx: index("reviews_product_id_idx").on(table.productId),
     userIdIdx: index("reviews_user_id_idx").on(table.userId),
+    orderItemIdIdx: index("reviews_order_item_id_idx").on(table.orderItemId),
     statusIdx: index("reviews_status_idx").on(table.status),
     createdAtIdx: index("reviews_created_at_idx").on(table.createdAt),
     // Composite index for listing approved reviews by product
@@ -106,6 +113,10 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
     fields: [reviews.moderatorId],
     references: [users.id],
     relationName: "reviewModerator",
+  }),
+  orderItem: one(orderItems, {
+    fields: [reviews.orderItemId],
+    references: [orderItems.id],
   }),
 }));
 

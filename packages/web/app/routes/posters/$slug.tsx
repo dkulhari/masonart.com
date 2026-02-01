@@ -14,7 +14,6 @@ import {
   type ProductImage,
 } from '~/components/product/ProductDetail'
 import { ProductReviews, ProductReviewsSkeleton } from '~/components/product/ProductReviews'
-import { useSession } from '~/lib/auth-client'
 import type { SizeVariant } from '~/components/product/SizeSelector'
 import type { FrameOptionData } from '~/components/product/FrameSelector'
 
@@ -270,8 +269,6 @@ export const Route = createFileRoute('/posters/$slug')({
 
 function ProductPage() {
   const { product } = Route.useLoaderData()
-  const { data: session } = useSession()
-  const isAuthenticated = !!session?.user
 
   return (
     <>
@@ -285,10 +282,7 @@ function ProductPage() {
       <ProductDetail product={product} />
 
       {/* Customer Reviews Section */}
-      <ProductReviews
-        productId={product.id}
-        isAuthenticated={isAuthenticated}
-      />
+      <ProductReviews productId={product.id} />
 
       {/* Related Products Section (placeholder) */}
       <RelatedProductsSection />

@@ -42,7 +42,8 @@ const updatePreferencesSchema = z.object({
   smsDelivered: z.boolean().optional(),
 });
 
-type UpdatePreferencesInput = z.infer<typeof updatePreferencesSchema>;
+// Inferred type for documentation (not used directly but documents the schema shape)
+// type UpdatePreferencesInput = z.infer<typeof updatePreferencesSchema>;
 
 // ============================================================================
 // Router
@@ -86,7 +87,7 @@ notificationPreferencesApp.get("/", async (c) => {
         })
         .returning();
 
-      preferences = created;
+      preferences = created!;
     }
 
     return c.json({
@@ -150,7 +151,7 @@ notificationPreferencesApp.patch(
           })
           .returning();
 
-        preferences = created;
+        preferences = created!;
       } else {
         // Update existing preferences
         const [updated] = await db
@@ -159,7 +160,7 @@ notificationPreferencesApp.patch(
           .where(eq(notificationPreferences.userId, user.id))
           .returning();
 
-        preferences = updated;
+        preferences = updated!;
       }
 
       return c.json({

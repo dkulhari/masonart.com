@@ -1146,7 +1146,7 @@ aiApp.get(
       try {
         const popularResults = await db
           .select({
-            prompt: aiPromptSuggestions.promptText,
+            prompt: aiPromptSuggestions.prompt,
           })
           .from(aiPromptSuggestions)
           .where(
@@ -1241,12 +1241,12 @@ aiApp.post("/suggestions/record-usage", requireAuth, async (c) => {
     await db
       .insert(aiPromptSuggestions)
       .values({
-        promptText: prompt.trim().substring(0, 500),
-        stylePreset: stylePreset || null,
+        prompt: prompt.trim().substring(0, 500),
+        stylePreset: stylePreset as AIStylePreset,
         usageCount: 1,
       })
       .onConflictDoUpdate({
-        target: [aiPromptSuggestions.promptText],
+        target: [aiPromptSuggestions.prompt],
         set: {
           usageCount: sql`${aiPromptSuggestions.usageCount} + 1`,
           updatedAt: new Date(),
@@ -1344,7 +1344,7 @@ aiApp.post(
           return {
             ...img,
             upscaleStatus: "processing" as const,
-            upscaleMultiplier: input.multiplier === "2x" ? 2 : 4,
+            upscaleMultiplier: (input.multiplier === "2x" ? 2 : 4) as 2 | 4,
           };
         }
         return img;

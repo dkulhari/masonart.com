@@ -25,13 +25,11 @@ import {
   type ReturnReason,
   type ReturnStatus,
 } from "../database/schema/returns";
-import { orders, type OrderStatus } from "../database/schema/orders";
+import { orders } from "../database/schema/orders";
 import {
   requireAuth,
-  optionalAuth,
   canAccess,
   type AuthVariables,
-  type OptionalAuthVariables,
 } from "../middleware/auth";
 import { getCached, setCached } from "../lib/redis";
 
@@ -96,7 +94,7 @@ async function checkReturnEligibility(
     return { eligible: false, reason: "Order not found" };
   }
 
-  const order = orderResult[0];
+  const order = orderResult[0]!;
 
   // Check ownership
   if (order.userId !== userId) {
@@ -124,7 +122,7 @@ async function checkReturnEligibility(
     .limit(1);
 
   if (existingReturn.length) {
-    const existingStatus = existingReturn[0].status as ReturnStatus;
+    const existingStatus = existingReturn[0]!.status as ReturnStatus;
     if (!["rejected", "closed"].includes(existingStatus)) {
       return {
         eligible: false,
@@ -148,7 +146,7 @@ async function checkReturnEligibility(
     .orderBy(asc(returnPolicies.createdAt))
     .limit(1);
 
-  const returnWindowDays = policy.length ? policy[0].daysAllowed : DEFAULT_RETURN_WINDOW_DAYS;
+  const returnWindowDays = policy.length ? policy[0]!.daysAllowed : DEFAULT_RETURN_WINDOW_DAYS;
   const deliveredDate = new Date(order.deliveredAt);
   const returnDeadline = new Date(deliveredDate);
   returnDeadline.setDate(returnDeadline.getDate() + returnWindowDays);
@@ -262,7 +260,7 @@ returnsApp.get("/orders/:orderId/returns", async (c) => {
       return c.json({ error: "Order not found" }, 404);
     }
 
-    const order = orderResult[0];
+    const order = orderResult[0]!;
 
     // Check if user owns the order (unless admin)
     if (!canAccess(user, order.userId)) {
@@ -345,12 +343,12 @@ returnsApp.post(
         {
           message: "Return request submitted successfully",
           return: {
-            id: newReturn.id,
-            orderId: newReturn.orderId,
-            reason: newReturn.reason,
-            reasonDetails: newReturn.reasonDetails,
-            status: newReturn.status,
-            requestedAt: newReturn.requestedAt,
+            id: newReturn!.id,
+            orderId: newReturn!.orderId,
+            reason: newReturn!.reason,
+            reasonDetails: newReturn!.reasonDetails,
+            status: newReturn!.status,
+            requestedAt: newReturn!.requestedAt,
           },
         },
         201
@@ -403,7 +401,7 @@ returnsApp.get("/returns/:id", async (c) => {
       return c.json({ error: "Return request not found" }, 404);
     }
 
-    const returnRequest = returnResult[0];
+    const returnRequest = returnResult[0]!;
 
     // Check ownership (unless admin)
     if (!canAccess(user, returnRequest.userId)) {
@@ -446,7 +444,7 @@ returnsApp.delete("/returns/:id", async (c) => {
       return c.json({ error: "Return request not found" }, 404);
     }
 
-    const existing = existingResult[0];
+    const existing = existingResult[0]!;
 
     // Check ownership
     if (!canAccess(user, existing.userId)) {

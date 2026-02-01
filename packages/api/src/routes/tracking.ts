@@ -12,7 +12,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db } from "../database";
 import { orders } from "../database/schema/orders";

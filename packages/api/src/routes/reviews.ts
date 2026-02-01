@@ -3,10 +3,12 @@
  *
  * Provides public API endpoints for product reviews:
  * - GET /api/products/:productId/reviews - List reviews for a product
- * - POST /api/products/:productId/reviews - Create a new review
  * - GET /api/reviews/:reviewId - Get a single review
  * - PATCH /api/reviews/:reviewId - Update own review
  * - DELETE /api/reviews/:reviewId - Delete own review
+ *
+ * Note: Review creation is only available via order items endpoint
+ * (POST /api/orders/:orderId/items/:orderItemId/review)
  *
  * Following patterns from docs/poster-app-tech-stack.md
  */
@@ -28,7 +30,7 @@ import {
   type AuthVariables,
   type OptionalAuthVariables,
 } from "../middleware/auth";
-import { getCached, setCached, deleteCached, CacheKeys } from "../lib/redis";
+import { getCached, setCached, deleteCached } from "../lib/redis";
 
 // ============================================================================
 // Constants
@@ -229,90 +231,6 @@ productReviewsApp.get(
   }
 );
 
-/**
- * POST /api/products/:productId/reviews - Create a new review
- */
-const createReviewApp = new Hono<{ Variables: AuthVariables }>();
-createReviewApp.use("*", requireAuth);
-
-createReviewApp.post(
-  "/",
-  zValidator("json", createReviewSchema),
-  async (c) => {
-    const productId = c.req.param("productId");
-    const { rating, title, content } = c.req.valid("json");
-    const user = c.get("user");
-
-    // Validate productId
-    if (!productId || !/^[0-9a-f-]{36}$/i.test(productId)) {
-      return c.json({ error: "Invalid product ID" }, 400);
-    }
-
-    try {
-      // Check if product exists and is active
-      const product = await db
-        .select({ id: products.id, status: products.status })
-        .from(products)
-        .where(eq(products.id, productId))
-        .limit(1);
-
-      if (!product.length || product[0].status !== "active") {
-        return c.json({ error: "Product not found" }, 404);
-      }
-
-      // Check if user already has a review for this product
-      const existingReview = await db
-        .select({ id: reviews.id })
-        .from(reviews)
-        .where(
-          and(eq(reviews.productId, productId), eq(reviews.userId, user.id))
-        )
-        .limit(1);
-
-      if (existingReview.length) {
-        return c.json(
-          { error: "You have already reviewed this product" },
-          409
-        );
-      }
-
-      // Create the review with pending status
-      const [newReview] = await db
-        .insert(reviews)
-        .values({
-          productId,
-          userId: user.id,
-          rating,
-          title,
-          content,
-          status: "pending",
-        })
-        .returning();
-
-      // Invalidate cache for this product's reviews
-      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${productId}:*`);
-
-      return c.json(
-        {
-          message: "Review submitted successfully",
-          review: {
-            id: newReview.id,
-            rating: newReview.rating,
-            title: newReview.title,
-            content: newReview.content,
-            status: newReview.status,
-            createdAt: newReview.createdAt,
-          },
-        },
-        201
-      );
-    } catch (error) {
-      console.error("Error creating review:", error);
-      return c.json({ error: "Failed to create review" }, 500);
-    }
-  }
-);
-
 // Individual review routes
 const reviewsApp = new Hono<{ Variables: OptionalAuthVariables }>();
 reviewsApp.use("*", optionalAuth);
@@ -355,7 +273,7 @@ reviewsApp.get("/:reviewId", async (c) => {
       return c.json({ error: "Review not found" }, 404);
     }
 
-    const review = reviewResult[0];
+    const review = reviewResult[0]!;
 
     // Only show approved reviews, unless it's the owner viewing their own
     if (review.status !== "approved") {
@@ -413,7 +331,7 @@ protectedReviewsApp.patch(
       }
 
       // Check ownership - only owner can update
-      if (!canAccess(user, existingReview[0].userId)) {
+      if (!canAccess(user, existingReview[0]!.userId)) {
         throw new HTTPException(403, { message: "You can only update your own reviews" });
       }
 
@@ -429,17 +347,17 @@ protectedReviewsApp.patch(
         .returning();
 
       // Invalidate cache
-      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0].productId}:*`);
+      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0]!.productId}:*`);
 
       return c.json({
         message: "Review updated successfully",
         review: {
-          id: updatedReview.id,
-          rating: updatedReview.rating,
-          title: updatedReview.title,
-          content: updatedReview.content,
-          status: updatedReview.status,
-          updatedAt: updatedReview.updatedAt,
+          id: updatedReview!.id,
+          rating: updatedReview!.rating,
+          title: updatedReview!.title,
+          content: updatedReview!.content,
+          status: updatedReview!.status,
+          updatedAt: updatedReview!.updatedAt,
         },
       });
     } catch (error) {
@@ -479,7 +397,7 @@ protectedReviewsApp.delete("/:reviewId", async (c) => {
     }
 
     // Check ownership - only owner can delete
-    if (!canAccess(user, existingReview[0].userId)) {
+    if (!canAccess(user, existingReview[0]!.userId)) {
       throw new HTTPException(403, { message: "You can only delete your own reviews" });
     }
 
@@ -487,7 +405,7 @@ protectedReviewsApp.delete("/:reviewId", async (c) => {
     await db.delete(reviews).where(eq(reviews.id, reviewId));
 
     // Invalidate cache
-    await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0].productId}:*`);
+    await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0]!.productId}:*`);
 
     return c.json({ message: "Review deleted successfully" });
   } catch (error) {
@@ -500,7 +418,6 @@ protectedReviewsApp.delete("/:reviewId", async (c) => {
 // Export the routers
 export {
   productReviewsApp,
-  createReviewApp,
   reviewsApp,
   protectedReviewsApp,
   createReviewSchema,

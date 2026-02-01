@@ -28,10 +28,13 @@ import {
   Camera,
   Timer,
   ExternalLink,
+  Star,
+  PenLine,
 } from 'lucide-react'
 import { cn, formatPrice, formatDate } from '~/lib/utils'
 import { authApi, ordersApi } from '~/lib/api'
 import { OrderTrackingCard } from '~/components/order'
+import { ReviewModal } from '~/components/reviews'
 
 // ============================================================================
 // Route Definition
@@ -64,6 +67,10 @@ interface OrderItem {
   unitPrice: number
   framePrice?: number
   totalPrice: number
+  review?: {
+    id: string
+    status: 'pending' | 'approved' | 'rejected'
+  } | null
 }
 
 interface ShippingAddress {
@@ -381,6 +388,14 @@ function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reviewModalState, setReviewModalState] = useState<{
+    isOpen: boolean
+    orderItemId: string
+    productId: string
+    productName: string
+    productThumbnail?: string
+    existingReview?: { id: string; rating: number; title?: string; content: string }
+  } | null>(null)
 
   // Check authentication
   useEffect(() => {
@@ -430,6 +445,47 @@ function OrderDetailPage() {
   useEffect(() => {
     fetchOrder()
   }, [fetchOrder])
+
+  // Review handlers
+  const handleWriteReview = (item: OrderItem) => {
+    setReviewModalState({
+      isOpen: true,
+      orderItemId: item.id,
+      productId: item.productId,
+      productName: item.productTitle,
+      productThumbnail: item.thumbnailUrl,
+    })
+  }
+
+  const handleEditReview = async (item: OrderItem) => {
+    if (!item.review) return
+    // Fetch the review to get full content
+    try {
+      const res = await fetch(`/api/reviews/${item.review.id}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setReviewModalState({
+          isOpen: true,
+          orderItemId: item.id,
+          productId: item.productId,
+          productName: item.productTitle,
+          productThumbnail: item.thumbnailUrl,
+          existingReview: {
+            id: item.review.id,
+            rating: data.review.rating,
+            title: data.review.title,
+            content: data.review.content,
+          },
+        })
+      }
+    } catch (error) {
+      console.error('Failed to fetch review:', error)
+    }
+  }
+
+  const handleCloseReviewModal = () => setReviewModalState(null)
+
+  const handleReviewSuccess = () => fetchOrder()
 
   // Loading state while checking auth
   if (isAuthenticated === null) {
@@ -601,6 +657,33 @@ function OrderDetailPage() {
                           {formatPrice(item.unitPrice)} each
                         </p>
                       )}
+                      {/* Review Button - only for delivered orders */}
+                      {order.status === 'delivered' && (
+                        <div className="mt-2">
+                          {item.review ? (
+                            <button
+                              onClick={() => handleEditReview(item)}
+                              className={cn(
+                                'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                                item.review.status === 'pending'
+                                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                              )}
+                            >
+                              <Star className="h-3.5 w-3.5" />
+                              {item.review.status === 'pending' ? 'Review Pending' : 'Edit Review'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleWriteReview(item)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                            >
+                              <PenLine className="h-3.5 w-3.5" />
+                              Write Review
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -715,6 +798,21 @@ function OrderDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Review Modal */}
+        {reviewModalState && order && (
+          <ReviewModal
+            isOpen={reviewModalState.isOpen}
+            onClose={handleCloseReviewModal}
+            orderId={order.id}
+            orderItemId={reviewModalState.orderItemId}
+            productId={reviewModalState.productId}
+            productName={reviewModalState.productName}
+            productThumbnail={reviewModalState.productThumbnail}
+            existingReview={reviewModalState.existingReview}
+            onSuccess={handleReviewSuccess}
+          />
+        )}
       </div>
     </div>
   )

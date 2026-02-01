@@ -15,9 +15,7 @@ import {
   type NewNotification,
 } from "../database/schema/notifications";
 import { orders, type Order } from "../database/schema/orders";
-import { users } from "../database/schema/users";
-import { sendEmail, type SendEmailResponse } from "./email";
-import { sendOTP } from "./sms";
+import { sendEmail } from "./email";
 import {
   getOrderConfirmationTemplate,
   getShippedTemplate,
