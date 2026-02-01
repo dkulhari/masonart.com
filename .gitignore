@@ -65,6 +65,9 @@ docker/data/
 *.pem
 *.key
 
+# Git worktrees
+.worktrees/
+
 # Claude mem context files
 CLAUDE.md
 
