@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   isProviderAvailable,
   getAvailableProvider,
+  generateImages,
+  type AIGenerationInput,
 } from "../../src/ai/generator";
 
 describe("AI Generator - Gemini Provider", () => {
@@ -36,6 +38,31 @@ describe("AI Generator - Gemini Provider", () => {
       process.env.GOOGLE_AI_STUDIO_KEY = "test-key";
 
       expect(getAvailableProvider()).toBe("gemini");
+    });
+  });
+
+  describe("generateImages with Gemini", () => {
+    beforeEach(() => {
+      process.env.GOOGLE_AI_STUDIO_KEY = "test-key";
+    });
+
+    it("generates images using Gemini provider", async () => {
+      const input: AIGenerationInput = {
+        prompt: "a sunset over mountains",
+        stylePreset: "photography",
+        aspectRatio: "landscape",
+        provider: "gemini",
+      };
+
+      const result = await generateImages(input, 1);
+
+      // Should use gemini provider and handle the request
+      expect(result.provider).toBe("gemini");
+      expect(result.enhancedPrompt).toContain("sunset");
+      // The generation should not fail with "Unsupported provider" error
+      // This will fail until the gemini case is implemented in the switch statement
+      expect(result.error).not.toContain("Unsupported provider");
+      expect(result.success).toBe(true);
     });
   });
 });
