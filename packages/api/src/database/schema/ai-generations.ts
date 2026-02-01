@@ -105,6 +105,7 @@ export const aiModelProviderEnum = pgEnum("ai_model_provider", [
   "dall-e-3", // OpenAI DALL-E 3
   "midjourney", // Midjourney (if supported)
   "fal-ai", // FAL.ai
+  "gemini", // Google Gemini (Imagen 3)
 ]);
 
 /**
