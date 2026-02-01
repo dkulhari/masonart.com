@@ -15,7 +15,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 
 import { db } from "../database";
 import {
@@ -513,6 +513,30 @@ ordersApp.get("/:id", async (c) => {
       return c.json({ error: "Order not found" }, 404);
     }
 
+    // Fetch reviews for products in this order by this user
+    const productIds = order.items
+      .map((item) => item.productId)
+      .filter((id): id is string => id !== null);
+
+    const userReviews =
+      productIds.length > 0
+        ? await db
+            .select({
+              id: reviews.id,
+              productId: reviews.productId,
+              status: reviews.status,
+            })
+            .from(reviews)
+            .where(
+              and(eq(reviews.userId, user.id), inArray(reviews.productId, productIds))
+            )
+        : [];
+
+    // Create a map for quick lookup
+    const reviewsByProductId = new Map(
+      userReviews.map((r) => [r.productId, { id: r.id, status: r.status }])
+    );
+
     // Fetch approvals for this order
     const approvals = await db
       .select({
@@ -577,6 +601,9 @@ ordersApp.get("/:id", async (c) => {
               name: item.frame.name,
               type: item.frame.type,
             }
+          : null,
+        review: item.productId
+          ? reviewsByProductId.get(item.productId) || null
           : null,
       })),
       createdAt: order.createdAt,
