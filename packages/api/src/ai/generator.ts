@@ -145,6 +145,13 @@ export const FAL_MODELS = {
   nanoBananaPro: "fal-ai/gemini-pro-image", // Gemini 3 Pro - high quality text rendering
 } as const;
 
+/**
+ * Google Gemini model identifiers
+ */
+export const GEMINI_MODELS = {
+  flash: "gemini-2.0-flash-exp", // Gemini 2.0 Flash with image generation
+} as const;
+
 // ============================================================================
 // Environment Configuration
 // ============================================================================
@@ -181,6 +188,15 @@ function getProviderConfig(provider: AIModelProvider): AIProviderConfig | null {
         timeout: 90000, // 1.5 minutes
       };
 
+    case "gemini":
+      const geminiKey = process.env.GOOGLE_AI_STUDIO_KEY;
+      if (!geminiKey) return null;
+      return {
+        apiKey: geminiKey,
+        modelId: GEMINI_MODELS.flash,
+        timeout: 60000, // 1 minute
+      };
+
     default:
       return null;
   }
@@ -197,7 +213,7 @@ export function isProviderAvailable(provider: AIModelProvider): boolean {
  * Get the first available provider
  */
 export function getAvailableProvider(): AIModelProvider | null {
-  const providers: AIModelProvider[] = ["stable-diffusion", "dall-e-3", "fal-ai"];
+  const providers: AIModelProvider[] = ["stable-diffusion", "dall-e-3", "fal-ai", "gemini"];
   for (const provider of providers) {
     if (isProviderAvailable(provider)) {
       return provider;
