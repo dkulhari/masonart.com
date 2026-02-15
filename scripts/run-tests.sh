@@ -220,6 +220,13 @@ setup_database() {
 
     cd "$PROJECT_ROOT/packages/api"
 
+    # Load root .env so drizzle-kit can find DATABASE_URL
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        set -a
+        source "$PROJECT_ROOT/.env"
+        set +a
+    fi
+
     # Always: migrate schema
     echo "Running database migrations..."
     bun run db:push 2>&1 | head -5

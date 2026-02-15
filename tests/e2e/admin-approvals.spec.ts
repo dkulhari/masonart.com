@@ -261,7 +261,7 @@ async function mockAddCommentApi(page: Page) {
 test.describe('Admin Approvals List Page', () => {
   test.beforeEach(async ({ page }) => {
     await mockApprovalsListApi(page);
-    await page.goto('/admin/approvals', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals', { waitUntil: 'domcontentloaded' });
   });
 
   test('displays approvals page with header and stats', async ({ page }) => {
@@ -323,7 +323,7 @@ test.describe('Admin Approval Detail Page', () => {
     await mockApprovalDetailApi(page);
     await mockUploadPhotosApi(page);
     await mockAddCommentApi(page);
-    await page.goto('/admin/approvals/apv-002', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-002', { waitUntil: 'domcontentloaded' });
   });
 
   test('displays approval details correctly', async ({ page }) => {
@@ -377,7 +377,7 @@ test.describe('Admin Photo Upload Flow', () => {
     await mockApprovalDetailApi(page, pendingUploadApproval);
     await mockUploadPhotosApi(page);
 
-    await page.goto('/admin/approvals/apv-001', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-001', { waitUntil: 'domcontentloaded' });
 
     // Look for upload section - check for "Production Photos" heading and upload button
     await expect(page.getByRole('heading', { name: /Production Photos/i })).toBeVisible();
@@ -393,7 +393,7 @@ test.describe('Admin Photo Upload Flow', () => {
     };
 
     await mockApprovalDetailApi(page, pendingUploadApproval);
-    await page.goto('/admin/approvals/apv-001', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-001', { waitUntil: 'domcontentloaded' });
 
     // Look for notify checkbox/toggle
     const notifyOption = page.getByText(/notify.*customer|send.*email/i);
@@ -411,7 +411,7 @@ test.describe('Admin Comment Flow', () => {
   test.beforeEach(async ({ page }) => {
     await mockApprovalDetailApi(page);
     await mockAddCommentApi(page);
-    await page.goto('/admin/approvals/apv-002', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-002', { waitUntil: 'domcontentloaded' });
   });
 
   test('can add admin comment', async ({ page }) => {
@@ -447,14 +447,14 @@ test.describe('Approval Status Transitions', () => {
     };
 
     await mockApprovalDetailApi(page, pendingUploadApproval);
-    await page.goto('/admin/approvals/apv-001', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/Pending Upload|Upload.*Required/i)).toBeVisible();
   });
 
   test('pending_approval shows awaiting customer state', async ({ page }) => {
     await mockApprovalDetailApi(page);
-    await page.goto('/admin/approvals/apv-002', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-002', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/Pending Approval/i).first()).toBeVisible();
   });
@@ -475,7 +475,7 @@ test.describe('Approval Status Transitions', () => {
     };
 
     await mockApprovalDetailApi(page, changesRequestedApproval);
-    await page.goto('/admin/approvals/apv-003', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-003', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/Changes Requested/i).first()).toBeVisible();
   });
@@ -488,7 +488,7 @@ test.describe('Approval Status Transitions', () => {
     };
 
     await mockApprovalDetailApi(page, approvedApproval);
-    await page.goto('/admin/approvals/apv-004', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-004', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/Approved/i).first()).toBeVisible();
   });
@@ -503,7 +503,7 @@ test.describe('Approvals Navigation', () => {
     await mockApprovalDetailApi(page);
     await mockApprovalsListApi(page);
 
-    await page.goto('/admin/approvals/apv-002', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-002', { waitUntil: 'domcontentloaded' });
 
     // Find and click back button
     const backButton = page.getByRole('button', { name: /back/i }).or(page.getByRole('link', { name: /back/i }));
@@ -515,7 +515,7 @@ test.describe('Approvals Navigation', () => {
 
   test('can navigate to related order', async ({ page }) => {
     await mockApprovalDetailApi(page);
-    await page.goto('/admin/approvals/apv-002', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-002', { waitUntil: 'domcontentloaded' });
 
     // Find link to order
     const orderLink = page.getByRole('link', { name: /MA-2024-001235|View Order/i });
@@ -534,7 +534,7 @@ test.describe('Approvals Mobile View', () => {
 
   test('approvals list is mobile responsive', async ({ page }) => {
     await mockApprovalsListApi(page);
-    await page.goto('/admin/approvals', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals', { waitUntil: 'domcontentloaded' });
 
     // Check that content is visible and not overflowing
     await expect(page.getByRole('heading', { name: /Photo Approvals/i })).toBeVisible();
@@ -545,7 +545,7 @@ test.describe('Approvals Mobile View', () => {
 
   test('approval detail is mobile responsive', async ({ page }) => {
     await mockApprovalDetailApi(page);
-    await page.goto('/admin/approvals/apv-002', { waitUntil: 'networkidle' });
+    await page.goto('/admin/approvals/apv-002', { waitUntil: 'domcontentloaded' });
 
     // Check key elements are visible on mobile
     await expect(page.getByText('MA-2024-001235').first()).toBeVisible();
