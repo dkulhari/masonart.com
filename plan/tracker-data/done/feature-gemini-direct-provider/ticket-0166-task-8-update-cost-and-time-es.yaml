@@ -1,0 +1,54 @@
+ticket_number: 166
+title: Task 8 - Update Cost and Time Estimates
+description: |-
+  ## Task
+  Add gemini to estimateGenerationCost and estimateGenerationTime functions.
+
+  ## Files
+  - Modify: packages/api/src/ai/generator.ts
+feature: gemini-direct-provider
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T08:35:11.894Z"
+last_updated: "2026-02-01T08:35:38.729Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T08:35:38.729Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T08:36:22.943Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Summary**: Cost estimate set at 2 cents per image (~$0.02) and generation time at 8 seconds per image for Gemini provider. Added to estimateGenerationCost and estimateGenerationTime Record mappings.
+
+      **Files Changed**:
+      - `packages/api/src/ai/generator.ts` - Updated cost and time estimate functions
+
+      **Observation IDs**: #2327
+  - author: mcp-client
+    timestamp: "2026-02-01T18:08:01.239Z"
+    text: |-
+      🔗 **Commit Info** (auto-added by tt-add-commits)
+
+      | Hash | Message |
+      |------|---------|
+      | `cc7b27c3` | feat(ai): implement gemini image generation |
+
+      **Files**: packages/api/src/ai/generator.ts (cost/time estimate functions)
+
+      **Source**: git log
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T08:35:38.729Z"

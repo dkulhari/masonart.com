@@ -1,12 +1,27 @@
 status: todo
-last_updated: '2026-01-31T19:36:06.262Z'
-total_tickets: 3
+last_updated: '2026-02-01T18:43:58.389Z'
+total_tickets: 14
 summary:
   critical: 0
-  high: 0
-  medium: 2
-  low: 1
+  high: 3
+  medium: 7
+  low: 4
 priorities:
+  high:
+    - feature: verified-purchase-reviews
+      tickets:
+        - ticket_number: 169
+          title: Task 1 - Add orderItemId to Reviews Schema
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 170
+          title: Task 2 - Write API Tests for Order-Based Review Creation
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 171
+          title: Task 3 - Create Order-Based Review API Endpoint
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: product-catalog
       tickets:
@@ -14,10 +29,30 @@ priorities:
           title: 'Bug: Boolean filter URL params lost during SSR redirect'
           assignee: unassigned
           blocked_by: []
-    - feature: user-reviews
+    - feature: verified-purchase-reviews
       tickets:
-        - ticket_number: 158
-          title: Login button in review UI returns 404 for unauthenticated users
+        - ticket_number: 172
+          title: Task 4 - Remove Product-Based Review Creation
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 173
+          title: Task 5 - Extend Order Detail API with Review Status
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 174
+          title: Task 6 - Create ReviewModal Component
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 175
+          title: Task 7 - Add Review Button to Order Detail Page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 176
+          title: Task 8 - Remove Review Form from Product Page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 177
+          title: Task 9 - Update E2E Tests for Verified Purchase Reviews
           assignee: unassigned
           blocked_by: []
   low:
@@ -25,6 +60,20 @@ priorities:
       tickets:
         - ticket_number: 146
           title: 'Bug: Mobile filter sheet backdrop click doesn''t close sheet'
+          assignee: unassigned
+          blocked_by: []
+    - feature: verified-purchase-reviews
+      tickets:
+        - ticket_number: 178
+          title: Task 10 - Update ReviewForm for Modal Context
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 179
+          title: Task 11 - Run Full Test Suite and Fix Issues
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 180
+          title: Task 12 - Final Review and Cleanup
           assignee: unassigned
           blocked_by: []
 blocked_tickets: []

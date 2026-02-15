@@ -1,0 +1,54 @@
+ticket_number: 165
+title: Task 7 - Implement Gemini Image Generation Function
+description: |-
+  ## Task
+  Add generateWithGemini function with GoogleGenerativeAI SDK integration, extractGeminiImage helper, and getAspectRatioHint function.
+
+  ## Files
+  - Modify: packages/api/src/ai/generator.ts
+feature: gemini-direct-provider
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T08:35:09.004Z"
+last_updated: "2026-02-01T08:35:37.821Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T08:35:37.821Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T08:36:16.922Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Summary**: Full generateWithGemini function implemented using GoogleGenerativeAI SDK with gemini-2.0-flash-exp model. Includes extractGeminiImage helper for base64 extraction from response.candidates[0].content.parts[0].inlineData and getAspectRatioHint for prompt enhancement. Gemini added to generateImages switch statement.
+
+      **Files Changed**:
+      - `packages/api/src/ai/generator.ts` - Added generateWithGemini, extractGeminiImage, getAspectRatioHint, updated switch statement
+
+      **Observation IDs**: #2327
+  - author: mcp-client
+    timestamp: "2026-02-01T18:08:00.222Z"
+    text: |-
+      🔗 **Commit Info** (auto-added by tt-add-commits)
+
+      | Hash | Message |
+      |------|---------|
+      | `cc7b27c3` | feat(ai): implement gemini image generation |
+
+      **Files**: packages/api/src/ai/generator.ts
+
+      **Source**: git log
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T08:35:37.821Z"

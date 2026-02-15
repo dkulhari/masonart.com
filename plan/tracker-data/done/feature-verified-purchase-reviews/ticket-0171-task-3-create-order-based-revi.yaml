@@ -1,0 +1,45 @@
+ticket_number: 171
+title: Task 3 - Create Order-Based Review API Endpoint
+description: |-
+  ## Task
+  Implement POST /api/orders/:orderId/items/:itemId/review endpoint with validations.
+
+  ## Files
+  - Modify: `packages/api/src/routes/orders.ts`
+feature: verified-purchase-reviews
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:18.536Z"
+last_updated: "2026-02-01T18:44:21.765Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:21.767Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:44:55.181Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `5992d881` - feat(reviews): Add order-based review creation endpoint
+
+      **Files Changed**:
+      - `packages/api/src/routes/orders.ts` - POST /api/orders/:orderId/items/:itemId/review endpoint
+
+      **Summary**:
+      Implemented multi-layered validation: UUID format checking, order ownership verification (returns 404 to prevent info leakage), delivery status enforcement, duplicate prevention by productId+userId. Returns 201 with pending status for moderation.
+
+      **Observation IDs**: #2519, #2509, #2512, #2513
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:21.765Z"

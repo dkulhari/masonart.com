@@ -1,0 +1,45 @@
+ticket_number: 170
+title: Task 2 - Write API Tests for Order-Based Review Creation
+description: |-
+  ## Task
+  Create comprehensive test suite for order-based review creation endpoint.
+
+  ## Files
+  - Create: `packages/api/tests/routes/order-reviews.test.ts`
+feature: verified-purchase-reviews
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:14.224Z"
+last_updated: "2026-02-01T18:44:20.323Z"
+time_spent_minutes: 0
+labels:
+  - testing
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:20.324Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:44:52.755Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `4e0bf5c8` - test(reviews): Add order-based review creation tests
+
+      **Files Changed**:
+      - `packages/api/tests/routes/order-reviews.test.ts` - New comprehensive test suite (983 lines)
+
+      **Summary**:
+      TDD-driven test suite covering purchase verification, delivery status checks, order item validation, duplicate prevention, and error handling for the order-based review creation endpoint.
+
+      **Observation IDs**: #2505
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:20.323Z"

@@ -1,0 +1,45 @@
+ticket_number: 178
+title: Task 10 - Update ReviewForm for Modal Context
+description: |-
+  ## Task
+  Refactor ReviewForm component for modal-only usage.
+
+  ## Files
+  - Modify: `packages/web/app/components/reviews/ReviewForm.tsx`
+feature: verified-purchase-reviews
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:45.680Z"
+last_updated: "2026-02-01T18:44:32.904Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:32.905Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:45:18.796Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `800c6624` - refactor(reviews): Update ReviewForm for modal-only usage
+
+      **Files Changed**:
+      - `packages/web/app/components/reviews/ReviewForm.tsx` - Refactored for modal context
+
+      **Summary**:
+      Made productId optional since onSubmit is now always provided from ReviewModal. Removed default API call to product endpoint. Added warning for invalid prop combinations.
+
+      **Observation IDs**: #2659
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:32.904Z"

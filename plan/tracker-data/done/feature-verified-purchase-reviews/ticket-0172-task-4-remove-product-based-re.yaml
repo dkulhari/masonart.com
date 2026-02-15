@@ -1,0 +1,46 @@
+ticket_number: 172
+title: Task 4 - Remove Product-Based Review Creation
+description: |-
+  ## Task
+  Remove POST /api/products/:productId/reviews endpoint to enforce verified purchase requirement.
+
+  ## Files
+  - Modify: `packages/api/src/routes/reviews.ts`
+  - Modify: `packages/api/src/app.ts`
+feature: verified-purchase-reviews
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:22.582Z"
+last_updated: "2026-02-01T18:44:23.483Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:23.484Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:44:57.171Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `29db8b95` - feat(reviews): Remove product-based review creation
+
+      **Files Changed**:
+      - `packages/api/src/routes/reviews.ts` - Removed POST /api/products/:productId/reviews endpoint
+
+      **Summary**:
+      Eliminated the product-based review creation endpoint, leaving only order-based endpoint as the sole path for review submission. Enforces verified purchase business rule at API level.
+
+      **Observation IDs**: #2554
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:23.483Z"

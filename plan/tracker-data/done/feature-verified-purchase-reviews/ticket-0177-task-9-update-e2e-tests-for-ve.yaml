@@ -1,0 +1,45 @@
+ticket_number: 177
+title: Task 9 - Update E2E Tests for Verified Purchase Reviews
+description: |-
+  ## Task
+  Update E2E tests for new order-based review workflow.
+
+  ## Files
+  - Modify: `tests/e2e/reviews.spec.ts`
+feature: verified-purchase-reviews
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:41.793Z"
+last_updated: "2026-02-01T18:44:31.871Z"
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:31.871Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:45:16.324Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `1b3b553e` - test(e2e): Update review tests for verified purchase flow
+
+      **Files Changed**:
+      - `tests/e2e/reviews.spec.ts` - Updated E2E tests (402 lines changed)
+
+      **Summary**:
+      E2E tests updated to verify new order-based review workflow. 29 tests across 10 describe blocks covering verified purchase submission, modal interactions, and product page read-only display.
+
+      **Observation IDs**: #2659
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:31.871Z"

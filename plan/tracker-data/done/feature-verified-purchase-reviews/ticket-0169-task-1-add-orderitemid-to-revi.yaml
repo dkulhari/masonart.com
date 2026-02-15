@@ -1,0 +1,47 @@
+ticket_number: 169
+title: Task 1 - Add orderItemId to Reviews Schema
+description: |-
+  ## Task
+  Add orderItemId column to reviews table with foreign key to orderItems.
+
+  ## Files
+  - Modify: `packages/api/src/database/schema/reviews.ts`
+  - Create: Database migration
+feature: verified-purchase-reviews
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:10.629Z"
+last_updated: "2026-02-01T18:44:18.659Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:18.664Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:44:48.654Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `f5a4a51e` - feat(reviews): Add orderItemId to reviews schema
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/reviews.ts` - Added orderItemId column with FK to orderItems
+      - `packages/api/drizzle/0002_freezing_richard_fisk.sql` - Migration file
+
+      **Summary**:
+      Reviews schema updated to enforce verified purchase constraint. Added non-nullable orderItemId UUID field with foreign key reference to order items and cascade delete. New index reviews_order_item_id_idx added for efficient lookups.
+
+      **Observation IDs**: #2508
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:18.659Z"

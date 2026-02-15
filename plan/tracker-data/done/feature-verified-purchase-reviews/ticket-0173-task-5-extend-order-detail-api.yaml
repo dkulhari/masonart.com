@@ -1,0 +1,45 @@
+ticket_number: 173
+title: Task 5 - Extend Order Detail API with Review Status
+description: |-
+  ## Task
+  Update GET /api/orders/:id to include review info for each order item.
+
+  ## Files
+  - Modify: `packages/api/src/routes/orders.ts`
+feature: verified-purchase-reviews
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:26.863Z"
+last_updated: "2026-02-01T18:44:25.477Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:25.477Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:44:59.470Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `26993d18` - feat(orders): Include review status in order detail response
+
+      **Files Changed**:
+      - `packages/api/src/routes/orders.ts` - Enhanced GET /api/orders/:id response
+
+      **Summary**:
+      Order detail endpoint now queries reviews table for user's reviews on products in the order. Uses Map for O(1) lookup. Each item includes review field with {id, status} or null if not reviewed. All 248 tests pass.
+
+      **Observation IDs**: #2553
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:25.477Z"

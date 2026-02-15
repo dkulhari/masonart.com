@@ -1,0 +1,54 @@
+ticket_number: 163
+title: Task 5 - Implement Gemini Provider Configuration
+description: |-
+  ## Task
+  Add GEMINI_MODELS constant and gemini case to getProviderConfig and getAvailableProvider functions.
+
+  ## Files
+  - Modify: packages/api/src/ai/generator.ts
+feature: gemini-direct-provider
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T08:34:59.418Z"
+last_updated: "2026-02-01T08:35:35.419Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T08:35:35.419Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T08:36:03.024Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Summary**: GEMINI_MODELS constant added defining flash model as "gemini-2.0-flash-exp". getProviderConfig() extended with gemini case reading GOOGLE_AI_STUDIO_KEY environment variable with 60-second timeout. getAvailableProvider() updated to include "gemini" in provider priority list.
+
+      **Files Changed**:
+      - `packages/api/src/ai/generator.ts` - Added GEMINI_MODELS, updated getProviderConfig, getAvailableProvider
+
+      **Observation IDs**: #2294, #2310
+  - author: mcp-client
+    timestamp: "2026-02-01T18:07:58.443Z"
+    text: |-
+      🔗 **Commit Info** (auto-added by tt-add-commits)
+
+      | Hash | Message |
+      |------|---------|
+      | `1ec775e2` | feat(ai): add gemini provider configuration |
+
+      **Files**: packages/api/src/ai/generator.ts
+
+      **Source**: git log
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T08:35:35.419Z"

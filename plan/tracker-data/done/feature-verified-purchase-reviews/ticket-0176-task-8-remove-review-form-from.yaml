@@ -1,0 +1,45 @@
+ticket_number: 176
+title: Task 8 - Remove Review Form from Product Page
+description: |-
+  ## Task
+  Remove review submission form from product pages, add guidance to order history.
+
+  ## Files
+  - Modify: `packages/web/app/components/product/ProductReviews.tsx`
+feature: verified-purchase-reviews
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:37.556Z"
+last_updated: "2026-02-01T18:44:30.569Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:30.570Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:45:13.691Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `ea07f9dc` - feat(reviews): Remove review form from product pages
+
+      **Files Changed**:
+      - `packages/web/app/components/product/ProductReviews.tsx` - Removed form, added guidance link
+
+      **Summary**:
+      Product pages transformed to read-only review display. Removed "Write Review" button and form. Added guidance text linking to order history for submitting reviews. Enforces verified purchase requirement through UI architecture.
+
+      **Observation IDs**: #2554
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:30.569Z"

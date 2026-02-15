@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-01-31T19:36:06.684Z'
-total_tickets: 121
+last_updated: '2026-02-01T18:43:59.476Z'
+total_tickets: 132
 summary:
   critical: 5
-  high: 55
-  medium: 44
-  low: 17
+  high: 57
+  medium: 51
+  low: 19
 priorities:
   high:
     - feature: infrastructure-setup
@@ -287,6 +287,16 @@ priorities:
           title: Database Schema - Add relations and export types
           assignee: unassigned
           blocked_by: []
+    - feature: gemini-direct-provider
+      tickets:
+        - ticket_number: 159
+          title: Task 1 - Add Google Generative AI SDK
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 160
+          title: Task 2 - Create Database Migration for Gemini Provider
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: admin-panel
       tickets:
@@ -482,6 +492,38 @@ priorities:
           title: 'Test Bug: Review form cancel button selector mismatch'
           assignee: unassigned
           blocked_by: []
+    - feature: user-reviews
+      tickets:
+        - ticket_number: 158
+          title: Login button in review UI returns 404 for unauthenticated users
+          assignee: unassigned
+          blocked_by: []
+    - feature: gemini-direct-provider
+      tickets:
+        - ticket_number: 161
+          title: Task 3 - Update Schema Type Definition
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 162
+          title: Task 4 - Write Failing Test for Gemini Provider Detection
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 163
+          title: Task 5 - Implement Gemini Provider Configuration
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 164
+          title: Task 6 - Write Failing Test for Gemini Image Generation
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 165
+          title: Task 7 - Implement Gemini Image Generation Function
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 166
+          title: Task 8 - Update Cost and Time Estimates
+          assignee: unassigned
+          blocked_by: []
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -553,6 +595,16 @@ priorities:
           blocked_by: []
         - ticket_number: 139
           title: Documentation - Create manual test documentation
+          assignee: unassigned
+          blocked_by: []
+    - feature: gemini-direct-provider
+      tickets:
+        - ticket_number: 167
+          title: Task 9 - Update Environment Example
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 168
+          title: Task 10 - Manual Integration Test
           assignee: unassigned
           blocked_by: []
   critical:

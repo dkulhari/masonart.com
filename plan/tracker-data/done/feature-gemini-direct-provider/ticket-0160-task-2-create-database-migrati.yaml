@@ -1,0 +1,54 @@
+ticket_number: 160
+title: Task 2 - Create Database Migration for Gemini Provider
+description: |-
+  ## Task
+  Create SQL migration to add 'gemini' to ai_model_provider enum.
+
+  ## Files
+  - Create: packages/api/src/database/migrations/0002_add_gemini_provider.sql
+feature: gemini-direct-provider
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T08:34:53.109Z"
+last_updated: "2026-02-01T08:35:33.040Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T08:35:33.040Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T08:35:51.246Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Summary**: Database migration 0002_add_gemini_provider.sql added gemini to ai_model_provider PostgreSQL enum using ALTER TYPE ... ADD VALUE IF NOT EXISTS.
+
+      **Files Changed**:
+      - `packages/api/src/database/migrations/0002_add_gemini_provider.sql` - Migration file
+
+      **Observation IDs**: #2331
+  - author: mcp-client
+    timestamp: "2026-02-01T18:07:55.826Z"
+    text: |-
+      🔗 **Commit Info** (auto-added by tt-add-commits)
+
+      | Hash | Message |
+      |------|---------|
+      | `7555d8fc` | feat(db): add gemini to ai_model_provider enum |
+
+      **Files**: packages/api/src/database/migrations/0002_add_gemini_provider.sql
+
+      **Source**: git log
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T08:35:33.040Z"

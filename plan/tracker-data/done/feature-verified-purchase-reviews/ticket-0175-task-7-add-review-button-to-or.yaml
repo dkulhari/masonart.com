@@ -1,0 +1,45 @@
+ticket_number: 175
+title: Task 7 - Add Review Button to Order Detail Page
+description: |-
+  ## Task
+  Add conditional review buttons to order items on delivered orders.
+
+  ## Files
+  - Modify: `packages/web/app/routes/_authed/account/orders.$id.tsx`
+feature: verified-purchase-reviews
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T18:43:33.895Z"
+last_updated: "2026-02-01T18:44:27.887Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T18:44:27.888Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T18:45:11.882Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `f24c49fd` - feat(reviews): Add review button functionality to order detail page
+
+      **Files Changed**:
+      - `packages/web/app/routes/_authed/account/orders.$id.tsx` - Added review buttons and modal integration
+
+      **Summary**:
+      Order detail page displays conditional review buttons: primary "Write Review" for unreviewed delivered items, amber "Review Pending" badge for submitted reviews awaiting moderation, green "Edit Review" for approved reviews.
+
+      **Observation IDs**: #2573
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T18:44:27.887Z"

@@ -1,0 +1,44 @@
+ticket_number: 167
+title: Task 9 - Update Environment Example
+description: |-
+  ## Task
+  Add GOOGLE_AI_STUDIO_KEY to .env.example with documentation.
+
+  ## Files
+  - Modify: .env.example
+feature: gemini-direct-provider
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T08:35:15.324Z"
+last_updated: "2026-02-01T08:35:40.218Z"
+time_spent_minutes: 0
+labels:
+  - docs
+  - config
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T08:35:40.219Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T08:36:28.727Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Commit**: `b2cab8de` - docs: add GOOGLE_AI_STUDIO_KEY to env example
+
+      **Summary**: GOOGLE_AI_STUDIO_KEY environment variable added to .env.example with link to Google AI Studio API key page (https://aistudio.google.com/app/apikey). Documentation shows all four supported providers: Replicate, Google AI Studio, OpenAI, FAL.ai.
+
+      **Files Changed**:
+      - `.env.example` - Added GOOGLE_AI_STUDIO_KEY with documentation
+
+      **Observation IDs**: #2333
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T08:35:40.218Z"

@@ -1,0 +1,56 @@
+name: verified-purchase-reviews
+title: Verified Purchase Reviews
+priority: high
+created: "2026-02-01T18:42:50.274Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Goal
+  Restrict reviews to verified purchasers only - users who have ordered and received the product.
+
+  ## Architecture
+  Add `orderItemId` to reviews schema, create new endpoint for order-based review creation, add review UI to order detail page, remove review form from product pages.
+
+  ## Tech Stack
+  Hono API routes, Drizzle ORM, React components, Playwright E2E tests, Vitest unit tests
+
+  ## Source
+  Imported from Superpowers: docs/plans/2026-02-01-verified-purchase-reviews-plan.md
+
+  ## Implementation Summary
+  - Database schema: Added orderItemId foreign key to reviews table
+  - Backend API: New POST /api/orders/:orderId/items/:itemId/review endpoint
+  - Backend API: Enhanced order detail response with review status
+  - Frontend: ReviewModal component for order-based submissions
+  - Frontend: Removed review forms from product pages
+  - Testing: 39 API tests + 29 E2E tests
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "169": Task 1 - Add orderItemId to Reviews Schema
+    "170": Task 2 - Write API Tests for Order-Based Review Creation
+    "171": Task 3 - Create Order-Based Review API Endpoint
+    "172": Task 4 - Remove Product-Based Review Creation
+    "173": Task 5 - Extend Order Detail API with Review Status
+    "174": Task 6 - Create ReviewModal Component
+    "175": Task 7 - Add Review Button to Order Detail Page
+    "176": Task 8 - Remove Review Form from Product Page
+    "177": Task 9 - Update E2E Tests for Verified Purchase Reviews
+    "178": Task 10 - Update ReviewForm for Modal Context
+    "179": Task 11 - Run Full Test Suite and Fix Issues
+    "180": Task 12 - Final Review and Cleanup
+total_tickets: 12
+completion_percentage: 100
+is_completed: true

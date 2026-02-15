@@ -1,0 +1,54 @@
+ticket_number: 162
+title: Task 4 - Write Failing Test for Gemini Provider Detection
+description: |-
+  ## Task
+  Create test file with failing tests for Gemini provider detection via GOOGLE_AI_STUDIO_KEY.
+
+  ## Files
+  - Create: packages/api/tests/ai/generator.test.ts
+feature: gemini-direct-provider
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T08:34:57.108Z"
+last_updated: "2026-02-01T08:35:34.354Z"
+time_spent_minutes: 0
+labels:
+  - testing
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T08:35:34.354Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T08:35:58.730Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Summary**: Provider detection tests verified GOOGLE_AI_STUDIO_KEY environment variable handling. Tests check isProviderAvailable("gemini") returns true when key is set, false when not set, and getAvailableProvider() returns gemini when it's the only configured provider.
+
+      **Files Changed**:
+      - `packages/api/tests/ai/generator.test.ts` - Added provider detection tests
+
+      **Observation IDs**: #2308, #2311
+  - author: mcp-client
+    timestamp: "2026-02-01T18:07:57.675Z"
+    text: |-
+      🔗 **Commit Info** (auto-added by tt-add-commits)
+
+      | Hash | Message |
+      |------|---------|
+      | `3be4f723` | test(ai): add failing tests for gemini provider detection |
+
+      **Files**: packages/api/tests/ai/generator.test.ts
+
+      **Source**: git log
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T08:35:34.354Z"

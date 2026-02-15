@@ -1,0 +1,46 @@
+name: gemini-direct-provider
+title: Gemini Direct Provider
+priority: medium
+created: "2026-02-01T08:34:41.117Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Goal
+  Add Google AI Studio (Gemini 2.0 Flash) as a direct image generation provider for easy local testing.
+
+  ## Architecture
+  Add "gemini" to existing provider enum, implement generateWithGemini() function in generator.ts using Google's @google/generative-ai SDK. No changes to queue, routes, or frontend needed - fits into existing abstraction.
+
+  ## Tech Stack
+  TypeScript, Google Generative AI SDK (@google/generative-ai), Drizzle ORM (PostgreSQL enum migration)
+
+  ## Source
+  Imported from Superpowers: docs/plans/2026-02-01-gemini-direct-provider-plan.md
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "159": Task 1 - Add Google Generative AI SDK
+    "160": Task 2 - Create Database Migration for Gemini Provider
+    "161": Task 3 - Update Schema Type Definition
+    "162": Task 4 - Write Failing Test for Gemini Provider Detection
+    "163": Task 5 - Implement Gemini Provider Configuration
+    "164": Task 6 - Write Failing Test for Gemini Image Generation
+    "165": Task 7 - Implement Gemini Image Generation Function
+    "166": Task 8 - Update Cost and Time Estimates
+    "167": Task 9 - Update Environment Example
+    "168": Task 10 - Manual Integration Test
+total_tickets: 10
+completion_percentage: 100
+is_completed: true

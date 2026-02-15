@@ -1,0 +1,54 @@
+ticket_number: 161
+title: Task 3 - Update Schema Type Definition
+description: |-
+  ## Task
+  Add gemini to the aiModelProviderEnum pgEnum in TypeScript schema.
+
+  ## Files
+  - Modify: packages/api/src/database/schema/ai-generations.ts
+feature: gemini-direct-provider
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T08:34:55.007Z"
+last_updated: "2026-02-01T08:35:33.621Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T08:35:33.621Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T08:35:55.036Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Summary**: Schema updated in packages/api/src/database/schema/ai-generations.ts to include "gemini" in aiModelProviderEnum with comment "// Google AI Studio (Gemini)".
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/ai-generations.ts` - Added gemini to enum
+
+      **Observation IDs**: #2331
+  - author: mcp-client
+    timestamp: "2026-02-01T18:07:56.870Z"
+    text: |-
+      🔗 **Commit Info** (auto-added by tt-add-commits)
+
+      | Hash | Message |
+      |------|---------|
+      | `7555d8fc` | feat(db): add gemini to ai_model_provider enum |
+
+      **Files**: packages/api/src/database/schema/ai-generations.ts
+
+      **Source**: git log
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T08:35:33.621Z"

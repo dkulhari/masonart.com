@@ -1,0 +1,54 @@
+ticket_number: 164
+title: Task 6 - Write Failing Test for Gemini Image Generation
+description: |-
+  ## Task
+  Add integration test for generateImages with gemini provider.
+
+  ## Files
+  - Modify: packages/api/tests/ai/generator.test.ts
+feature: gemini-direct-provider
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-01T08:35:05.963Z"
+last_updated: "2026-02-01T08:35:36.427Z"
+time_spent_minutes: 0
+labels:
+  - testing
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-01T08:35:36.427Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-01T08:36:09.434Z"
+    text: |-
+      ✅ **Imported from Superpowers**
+
+      **Summary**: Integration test added to validate generateImages handles gemini provider without "Unsupported provider" errors. Test uses photography style preset with landscape aspect ratio and verifies result.success is true.
+
+      **Files Changed**:
+      - `packages/api/tests/ai/generator.test.ts` - Added generateImages integration test
+
+      **Observation IDs**: #2314, #2320
+  - author: mcp-client
+    timestamp: "2026-02-01T18:07:59.353Z"
+    text: |-
+      🔗 **Commit Info** (auto-added by tt-add-commits)
+
+      | Hash | Message |
+      |------|---------|
+      | `a6125eed` | test(ai): add failing test for gemini image generation |
+
+      **Files**: packages/api/tests/ai/generator.test.ts
+
+      **Source**: git log
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-01T08:35:36.427Z"
