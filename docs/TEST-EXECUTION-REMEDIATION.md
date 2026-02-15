@@ -1,6 +1,13 @@
 # MasonArt Test Execution Remediation Plan
 
-**Status:** ✅ COMPLETED (January 27, 2026)
+> **Historical Document — Do Not Modify**
+>
+> This document records the January 2026 test execution remediation effort (TickeTrack #183).
+> It is preserved as-is for historical context. For current test commands and patterns, see
+> [test-maintenance.md](./test-maintenance.md) or run `./scripts/run-tests.sh --help`.
+> Commands and checklists in this document may be outdated.
+
+**Status:** Completed (January 27, 2026)
 
 ## Executive Summary
 

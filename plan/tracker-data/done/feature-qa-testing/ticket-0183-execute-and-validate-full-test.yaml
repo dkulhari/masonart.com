@@ -1,0 +1,87 @@
+ticket_number: 183
+title: Execute and validate full test suite against running application
+description: |-
+  ## Summary
+
+  Retroactive ticket capturing the test execution remediation effort from January 25-27, 2026.
+
+  Task 004 (QA Testing, tickets #12-27) created comprehensive test infrastructure (24+ E2E files, fixtures, manual test docs, Playwright/Vitest config) but tests were never executed against a running application stack — Docker services were not started, so no test actually connected to PostgreSQL, Redis, or MinIO.
+
+  ## Work Done
+
+  Six-phase remediation to validate all tests against the running application:
+
+  1. **Infrastructure Validation** (Jan 25) — Started Docker services, verified PostgreSQL (5433), Redis (6380), MinIO (9000) connectivity
+  2. **Test Runner Script** (Jan 25) — Created `scripts/run-tests.sh` (later consolidated in #181) to automate Docker, DB setup, dev servers, and test execution
+  3. **E2E Test Execution** (Jan 27) — Ran all 27 Playwright spec files, fixed selector issues, hydration timing bugs, and mobile/desktop scoping
+  4. **Integration Tests** (Jan 27) — Validated API routes against real PostgreSQL and Redis
+  5. **User Flow Tests** (Jan 27) — Ran catalog, checkout, auth, and admin CRUD flows end-to-end
+  6. **Documentation** (Jan 27) — Updated TEST-COVERAGE.md, created TEST-EXECUTION-RESULTS.md
+
+  ## Results
+
+  - **1,491 passing** tests
+  - **277 skipped** (intentional, documented reasons)
+  - **0 failing**
+  - **84.4% pass rate** (100% of active tests)
+
+  ## Artifacts
+
+  - `docs/TEST-EXECUTION-REMEDIATION.md` — Historical plan and phase-by-phase record
+  - `docs/TEST-EXECUTION-RESULTS.md` — Detailed execution results
+  - `scripts/run-tests.sh` — Unified test runner (created here, later improved in #181, #182)
+feature: qa-testing
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-15T20:08:29.809Z"
+last_updated: "2026-02-15T20:08:35.448Z"
+time_spent_minutes: 0
+labels:
+  - test-infrastructure
+  - retroactive
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-15T20:08:35.448Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-15T20:11:32.187Z"
+    text: |-
+      ## Commits
+
+      ### Phase 1-2: Infrastructure + Test Runner (Jan 25)
+      - `e09a388a` — fix(tests): Fix E2E test failures with strict mode and hydration issues
+        - Created `docs/TEST-EXECUTION-REMEDIATION.md` (the remediation plan)
+        - Created `docs/TEST-EXECUTION-RESULTS.md` (initial results)
+        - Created `tests/run-all-tests.sh` (original test runner)
+        - Fixed cart.spec.ts and home.spec.ts E2E failures
+
+      ### Phase 3: Real Auth + Selector Fixes (Jan 25-27)
+      - `72240505` — fix(tests): Replace route mocking with real authentication for E2E tests
+        - Created auth.setup.ts for real Playwright auth flow
+        - Created init-super-admin.ts, cleanup-test-users.ts helpers
+        - Rewrote admin-auth, admin-dashboard, account tests to use real auth
+      - `9f78b531` — fix(tests): Comprehensive E2E test fixes for strict mode and hydration issues
+        - Fixed 20 E2E spec files for Playwright strict mode violations
+        - Added networkidle waits for hydration, scoped mobile/desktop selectors
+        - This was the bulk remediation commit
+
+      ### Phase 4-5: Infrastructure + Test Users (Jan 27)
+      - `16c693e2` — fix(api): TypeScript fixes and test infrastructure improvements
+        - Created seed-test-users.ts (9 test users for E2E)
+        - Fixed auth config and admin utility scripts
+
+      ### Phase 6: Documentation (Jan 27)
+      - `5cc1da59` — docs: Update test documentation with E2E remediation results
+        - Updated TEST-COVERAGE.md, TEST-EXECUTION-RESULTS.md
+        - Updated TEST-EXECUTION-REMEDIATION.md with completion status
+        - Created test-maintenance.md (patterns, conventions, known issues)
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-15T20:08:35.448Z"

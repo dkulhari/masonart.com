@@ -475,19 +475,34 @@ External services mocked: Stable Diffusion, DALL-E 3, FAL.ai, Real-ESRGAN upscal
 
 ## Running All Tests
 
-### Quick Start
+### Quick Start (Unified Test Runner)
 ```bash
 # Install dependencies
 bun install
 
-# Run all unit tests
-bun run test
+# Run all tests (unit + integration + E2E)
+./scripts/run-tests.sh
 
-# Run E2E tests (starts dev server automatically)
-npx playwright test --project=chromium
+# Run only unit tests (no Docker required)
+./scripts/run-tests.sh unit
+
+# Run E2E tests (auto-starts Docker, seeds data, starts dev servers)
+./scripts/run-tests.sh e2e
+
+# Setup environment for manual testing (minimal: frames + admin)
+./scripts/run-tests.sh setup
+
+# Setup with full test data
+./scripts/run-tests.sh setup --seed-products --seed-users
+
+# Stop everything
+./scripts/run-tests.sh stop
+
+# Full teardown (wipe volumes + data)
+./scripts/run-tests.sh clean
 ```
 
-### Full Test Suite
+### Manual Test Suite
 ```bash
 # 1. Shared package tests
 cd packages/shared && bun run test

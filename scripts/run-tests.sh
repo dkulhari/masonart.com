@@ -15,8 +15,12 @@
 #   e2e           Setup infra + run E2E tests with Playwright
 #   ci            Run all tests in CI mode (assumes services exist)
 #   setup         Setup infra only, leave servers running for manual testing
+#   stop          Stop dev servers and Docker services
+#   clean         Full teardown: stop everything + wipe volumes
 #
-# Options (for e2e, all, and ci):
+# Options (for setup, e2e, all):
+#   --seed-products       Seed 36 sample products with variants
+#   --seed-users          Seed test users (customers, admins, trade)
 #   --project=<name>      Browser project (default: chromium)
 #   --file=<path>         Run specific test file (e.g., auth.spec.ts)
 #   --grep=<pattern>      Filter tests by pattern
@@ -27,12 +31,14 @@
 # Examples:
 #   ./scripts/run-tests.sh                              # Run all tests
 #   ./scripts/run-tests.sh unit                         # Unit tests only
-#   ./scripts/run-tests.sh e2e                          # E2E tests
+#   ./scripts/run-tests.sh e2e                          # E2E tests (full seed)
 #   ./scripts/run-tests.sh e2e --file=auth.spec.ts      # Specific E2E file
 #   ./scripts/run-tests.sh e2e --max-failures=1         # Stop on first failure
-#   ./scripts/run-tests.sh e2e --project=firefox         # Firefox tests
-#   ./scripts/run-tests.sh e2e --grep="approval"        # Filter by pattern
-#   ./scripts/run-tests.sh setup                        # Setup env for manual testing
+#   ./scripts/run-tests.sh setup                        # Minimal env (frames + admin)
+#   ./scripts/run-tests.sh setup --seed-products        # + 36 sample products
+#   ./scripts/run-tests.sh setup --seed-products --seed-users  # Full data
+#   ./scripts/run-tests.sh stop                         # Stop servers + Docker
+#   ./scripts/run-tests.sh clean                        # Full teardown + wipe
 #   ./scripts/run-tests.sh ci                           # CI mode
 # =============================================================================
 
@@ -58,10 +64,17 @@ MAX_FAILURES=""
 WORKERS="4"
 TEST_FILE=""
 GREP_PATTERN=""
+SEED_PRODUCTS=false
+SEED_USERS=false
 
 # Track state
 OVERALL_STATUS=0
 DEV_PID=""
+
+# File paths
+PID_FILE="/tmp/masonart-dev.pid"
+CREDENTIALS_FILE="/tmp/masonart-credentials.txt"
+DEV_LOG="/tmp/masonart-dev.log"
 
 # Project root (resolve from script location)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -71,14 +84,14 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # ─────────────────────────────────────────────────────────────────────────────
 
 show_help() {
-    sed -n '6,36p' "$0" | sed 's/^# //' | sed 's/^#//'
+    sed -n '6,44p' "$0" | sed 's/^# //' | sed 's/^#//'
     exit 0
 }
 
 parse_args() {
     for arg in "$@"; do
         case $arg in
-            all|unit|integration|e2e|ci|setup)
+            all|unit|integration|e2e|ci|setup|stop|clean)
                 COMMAND="$arg"
                 ;;
             --project=*)
@@ -95,6 +108,12 @@ parse_args() {
                 ;;
             --grep=*)
                 GREP_PATTERN="${arg#*=}"
+                ;;
+            --seed-products)
+                SEED_PRODUCTS=true
+                ;;
+            --seed-users)
+                SEED_USERS=true
                 ;;
             --help|-h)
                 show_help
@@ -200,16 +219,69 @@ setup_database() {
     echo ""
 
     cd "$PROJECT_ROOT/packages/api"
+
+    # Always: migrate schema
     echo "Running database migrations..."
     bun run db:push 2>&1 | head -5
 
-    echo "Seeding database..."
-    bun run seed 2>/dev/null && echo -e "  ${GREEN}✓${NC} Seed data applied" || echo -e "  ${YELLOW}⚠${NC} Seed data may already exist"
+    # Always: seed frames + admin
+    echo "Seeding frames and admin user..."
+    bun run seed:admin 2>/dev/null && echo -e "  ${GREEN}✓${NC} Admin seed applied" || echo -e "  ${YELLOW}⚠${NC} Admin seed may already exist"
+
+    # Optional: seed products
+    if [ "$SEED_PRODUCTS" = true ]; then
+        echo "Seeding sample products..."
+        bun run seed 2>/dev/null && echo -e "  ${GREEN}✓${NC} Product seed applied" || echo -e "  ${YELLOW}⚠${NC} Product seed may already exist"
+    fi
+
+    # Optional: seed test users
+    if [ "$SEED_USERS" = true ]; then
+        echo "Seeding test users..."
+        bun run seed:test-users 2>/dev/null && echo -e "  ${GREEN}✓${NC} Test users seeded" || echo -e "  ${YELLOW}⚠${NC} Test users may already exist"
+    fi
+
     cd "$PROJECT_ROOT"
+
+    # Write credentials file
+    write_credentials_file
 
     echo ""
     echo -e "${GREEN}✓ Database ready${NC}"
     echo ""
+}
+
+write_credentials_file() {
+    cat > "$CREDENTIALS_FILE" << 'CRED_HEADER'
+========================================
+  MasonArt Seeded Credentials
+========================================
+
+Admin:
+  admin@masonart.com / AdminPass123! (admin)
+CRED_HEADER
+
+    if [ "$SEED_USERS" = true ]; then
+        cat >> "$CREDENTIALS_FILE" << 'CRED_USERS'
+
+Customers:
+  test-customer@example.com / TestPassword123! (customer)
+  test-customer-2@example.com / TestPassword123! (customer)
+  test-customer-3@example.com / TestPassword123! (customer)
+  test-customer-4@example.com / TestPassword123! (customer)
+  test-customer-5@example.com / TestPassword123! (customer)
+
+Admins:
+  test-admin@masonart.com / TestPassword123! (admin)
+  test-admin-2@masonart.com / TestPassword123! (admin)
+
+Trade:
+  test-trade@interior.com / TestPassword123! (trade, approved)
+  test-trade-pending@interior.com / TestPassword123! (trade, pending)
+CRED_USERS
+    fi
+
+    echo ""
+    echo -e "  ${GREEN}✓${NC} Credentials saved to: $CREDENTIALS_FILE"
 }
 
 start_dev_servers() {
@@ -225,8 +297,11 @@ start_dev_servers() {
 
     echo "Starting API and Web servers..."
     cd "$PROJECT_ROOT"
-    bun run dev > /tmp/masonart-dev.log 2>&1 &
+    bun run dev > "$DEV_LOG" 2>&1 &
     DEV_PID=$!
+
+    # Write PID file for cross-session tracking
+    echo "$DEV_PID" > "$PID_FILE"
 
     echo "Waiting for servers to start (max 60 seconds)..."
     echo -n "  API Server: "
@@ -234,7 +309,7 @@ start_dev_servers() {
         echo -e "${GREEN}✓${NC}"
     else
         echo -e "${RED}✗ FAILED${NC}"
-        cat /tmp/masonart-dev.log
+        cat "$DEV_LOG"
         exit 1
     fi
 
@@ -243,13 +318,38 @@ start_dev_servers() {
         echo -e "${GREEN}✓${NC}"
     else
         echo -e "${RED}✗ FAILED${NC}"
-        cat /tmp/masonart-dev.log
+        cat "$DEV_LOG"
         exit 1
     fi
 
     echo ""
     echo -e "${GREEN}✓ Development servers ready${NC}"
     echo ""
+}
+
+stop_dev_servers() {
+    # Try PID file first
+    if [ -f "$PID_FILE" ]; then
+        local pid
+        pid=$(cat "$PID_FILE")
+        if kill -0 "$pid" 2>/dev/null; then
+            print_status "Stopping dev servers (PID $pid)..."
+            kill "$pid" 2>/dev/null || true
+            sleep 2
+            kill -9 "$pid" 2>/dev/null || true
+        fi
+        rm -f "$PID_FILE"
+    fi
+
+    # Fallback: kill by port
+    for port in 3000 3001; do
+        local pids
+        pids=$(lsof -ti TCP:$port -s TCP:LISTEN 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            print_status "Killing process on port $port..."
+            echo "$pids" | xargs kill 2>/dev/null || true
+        fi
+    done
 }
 
 health_check() {
@@ -288,6 +388,7 @@ cleanup() {
         echo ""
         echo -e "${YELLOW}Cleaning up...${NC}"
         kill $DEV_PID 2>/dev/null || true
+        rm -f "$PID_FILE"
     fi
 }
 trap cleanup EXIT
@@ -447,6 +548,10 @@ cmd_e2e() {
         exit 1
     fi
 
+    # E2E tests need full data
+    SEED_PRODUCTS=true
+    SEED_USERS=true
+
     setup_infra
     run_e2e_tests
 
@@ -503,11 +608,69 @@ cmd_setup() {
     echo "  • Redis:      localhost:6380"
     echo "  • MinIO:      http://localhost:9000"
     echo ""
-    [ -n "$DEV_PID" ] && echo "Dev server PID: $DEV_PID"
-    echo "Dev server logs: /tmp/masonart-dev.log"
+    echo "Seeded data:"
+    echo "  • Frames: 8 frame options"
+    echo "  • Admin:  admin@masonart.com / AdminPass123!"
+    [ "$SEED_PRODUCTS" = true ] && echo "  • Products: 36 sample products with variants"
+    [ "$SEED_USERS" = true ] && echo "  • Test users: 9 users (customers, admins, trade)"
     echo ""
-    [ -n "$DEV_PID" ] && echo "To stop servers:"
-    [ -n "$DEV_PID" ] && echo "  kill $DEV_PID"
+    echo "Credentials saved to: $CREDENTIALS_FILE"
+    echo ""
+    [ -n "$DEV_PID" ] && echo "Dev server PID: $DEV_PID (saved to $PID_FILE)"
+    echo "Dev server logs: $DEV_LOG"
+    echo ""
+    echo "To stop:  ./scripts/run-tests.sh stop"
+    echo "To clean: ./scripts/run-tests.sh clean"
+    echo ""
+    exit 0
+}
+
+cmd_stop() {
+    echo -e "${BLUE}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║              MasonArt Environment Stop                      ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+
+    stop_dev_servers
+
+    if check_docker 2>/dev/null; then
+        print_status "Stopping Docker services..."
+        cd "$PROJECT_ROOT/docker" && docker compose stop && cd "$PROJECT_ROOT"
+        echo -e "  ${GREEN}✓${NC} Docker services stopped"
+    else
+        print_warning "Docker not available, skipping"
+    fi
+
+    echo ""
+    print_success "Environment stopped. Data and volumes preserved."
+    echo ""
+    exit 0
+}
+
+cmd_clean() {
+    echo -e "${BLUE}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║              MasonArt Environment Clean                     ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+
+    stop_dev_servers
+
+    if check_docker 2>/dev/null; then
+        print_status "Removing Docker containers and volumes..."
+        cd "$PROJECT_ROOT/docker" && docker compose down -v && cd "$PROJECT_ROOT"
+        echo -e "  ${GREEN}✓${NC} Docker containers and volumes removed"
+    else
+        print_warning "Docker not available, skipping"
+    fi
+
+    print_status "Removing temp files..."
+    rm -f "$PID_FILE" "$DEV_LOG" "$CREDENTIALS_FILE"
+    echo -e "  ${GREEN}✓${NC} Temp files removed"
+
+    echo ""
+    print_success "Full teardown complete. Everything wiped."
     echo ""
     exit 0
 }
@@ -525,11 +688,13 @@ cmd_all() {
     # Integration tests
     run_integration_tests
 
-    # E2E tests (need Docker)
+    # E2E tests (need Docker + full data)
     if ! check_docker; then
         print_warning "Docker not available - skipping E2E tests"
         print_warning "To run E2E tests, start Docker and run: ./scripts/run-tests.sh e2e"
     else
+        SEED_PRODUCTS=true
+        SEED_USERS=true
         setup_infra
         run_e2e_tests
     fi
@@ -565,6 +730,8 @@ main() {
         e2e)         cmd_e2e ;;
         ci)          cmd_ci ;;
         setup)       cmd_setup ;;
+        stop)        cmd_stop ;;
+        clean)       cmd_clean ;;
     esac
 
     exit $OVERALL_STATUS

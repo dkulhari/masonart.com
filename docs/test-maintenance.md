@@ -1006,29 +1006,25 @@ This section documents tests that are intentionally skipped or known to be flaky
 ## Quick Reference Commands
 
 ```bash
-# Run all tests
-bun run test
+# ── Unified Test Runner ──
+./scripts/run-tests.sh                    # Run all tests (unit + integration + E2E)
+./scripts/run-tests.sh unit               # Unit tests only (no Docker)
+./scripts/run-tests.sh e2e                # E2E tests (auto-seeds full data)
+./scripts/run-tests.sh e2e --file=auth.spec.ts  # Specific E2E file
+./scripts/run-tests.sh setup              # Setup env (minimal: frames + admin)
+./scripts/run-tests.sh setup --seed-products --seed-users  # Full test data
+./scripts/run-tests.sh stop               # Stop servers + Docker (keep data)
+./scripts/run-tests.sh clean              # Full teardown + wipe volumes
 
-# Run specific test file
-bun run test -- tests/path/to/file.test.ts
-
-# Run tests matching pattern
-bun run test -- -t "pattern"
-
-# Run E2E tests
-npx playwright test
-
-# Run E2E tests with UI
-npx playwright test --ui
-
-# Run tests with coverage
-bun run test:coverage
-
-# List E2E tests without running
-npx playwright test --list
-
-# Debug a specific E2E test
-npx playwright test --debug tests/e2e/file.spec.ts
+# ── Direct Commands ──
+bun run test                              # Run all unit tests
+bun run test -- tests/path/to/file.test.ts  # Run specific test file
+bun run test -- -t "pattern"              # Run tests matching pattern
+npx playwright test                       # Run E2E tests
+npx playwright test --ui                  # Run E2E tests with UI
+bun run test:coverage                     # Run tests with coverage
+npx playwright test --list                # List E2E tests without running
+npx playwright test --debug tests/e2e/file.spec.ts  # Debug specific E2E test
 ```
 
 ---

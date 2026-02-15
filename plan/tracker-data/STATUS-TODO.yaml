@@ -1,23 +1,24 @@
 status: todo
-last_updated: '2026-02-15T11:39:14.890Z'
+last_updated: '2026-02-15T20:08:31.011Z'
 total_tickets: 3
 summary:
   critical: 0
-  high: 0
-  medium: 2
+  high: 1
+  medium: 1
   low: 1
 priorities:
+  high:
+    - feature: qa-testing
+      tickets:
+        - ticket_number: 183
+          title: Execute and validate full test suite against running application
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: product-catalog
       tickets:
         - ticket_number: 149
           title: 'Bug: Boolean filter URL params lost during SSR redirect'
-          assignee: unassigned
-          blocked_by: []
-    - feature: qa-testing
-      tickets:
-        - ticket_number: 181
-          title: Consolidate test runner scripts into single unified script
           assignee: unassigned
           blocked_by: []
   low:

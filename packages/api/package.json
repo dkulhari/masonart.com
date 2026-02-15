@@ -29,6 +29,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "bun run --env-file=../../.env src/database/seed.ts",
+    "seed:admin": "bun run --env-file=../../.env src/database/seed-admin.ts",
     "seed:test-users": "bun run --env-file=../../.env src/database/seed-test-users.ts"
   },
   "dependencies": {

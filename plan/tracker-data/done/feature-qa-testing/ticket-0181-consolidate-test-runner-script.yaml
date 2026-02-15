@@ -49,20 +49,55 @@ description: |-
 feature: qa-testing
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-15T11:39:14.080Z'
-last_updated: '2026-02-15T11:39:14.080Z'
+created: "2026-02-15T11:39:14.080Z"
+last_updated: "2026-02-15T11:40:00.412Z"
 time_spent_minutes: 0
 labels:
   - refactor
   - dx
   - test-infrastructure
 acceptance_criteria: []
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: "2026-02-15T11:39:59.894Z"
+    text: |-
+      ## Implementation Complete
+
+      **Commit**: `c8878770` — `refactor(tests): Consolidate test runner scripts into unified script #181`
+
+      ### Changes (14 files, +620/-657)
+
+      **Script**: Rewrote `scripts/run-tests.sh` merging features from both scripts. Subcommands: all, unit, integration, e2e, ci, setup. Deleted `tests/run-all-tests.sh`.
+
+      **Updated references in**:
+      - `docs/TEST-EXECUTION-REMEDIATION.md`
+      - `docs/manual-tests/smoke-test.md`
+      - `.claude/skills/tt-debug-browser/SKILL.md`
+      - `.claude/skills/tt-fix-tests/SKILL.md`
+      - `.claude/skills/tt-run-test-suit/SKILL.md`
+
+      **Verified**: `--help` output clean, zero remaining references to old script in codebase.
+  - author: system
+    timestamp: "2026-02-15T11:40:00.412Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-15T19:19:29.434Z"
+    text: |-
+      ## Bugfix: `set -e` incompatibility with `&&` short-circuit
+
+      **Amended commit**: `eabe5592`
+
+      **Bug**: `[ -z "$COMMAND" ] && COMMAND="all"` on line 111 caused the script to exit immediately when a command was provided (e.g. `setup`). Under `set -e`, when `$COMMAND` is non-empty, `[ -z "$COMMAND" ]` returns 1, and the `&&` short-circuit propagates that as the expression's exit code, triggering `set -e` to abort.
+
+      **Fix**: Replaced with `if [ -z "$COMMAND" ]; then COMMAND="all"; fi`.
+
+      **Verified**: `./scripts/run-tests.sh setup` now works — Docker, DB, and dev servers come up correctly.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-02-15T11:40:00.412Z"
