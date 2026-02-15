@@ -53,112 +53,23 @@ MinIO API is not accessible on port 9000. Run "docker compose up -d"
 
 ### Phase 2: Test Runner Script
 
-Create a comprehensive test runner that ensures prerequisites:
+A unified test runner script at `scripts/run-tests.sh` ensures all prerequisites are met:
 
 ```bash
-#!/bin/bash
-# tests/run-all-tests.sh
+# Setup environment only (Docker, DB, dev servers) - leave running for manual testing
+./scripts/run-tests.sh setup
 
-set -e
+# Run all tests (unit + integration + E2E)
+./scripts/run-tests.sh
 
-echo "=== MasonArt Test Suite ==="
-echo ""
+# Run only E2E tests
+./scripts/run-tests.sh e2e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Run specific E2E test file
+./scripts/run-tests.sh e2e --file=auth.spec.ts
 
-# Function to check service
-check_service() {
-    local name=$1
-    local port=$2
-    if nc -z localhost $port 2>/dev/null; then
-        echo -e "${GREEN}✓${NC} $name is running on port $port"
-        return 0
-    else
-        echo -e "${RED}✗${NC} $name is NOT running on port $port"
-        return 1
-    fi
-}
-
-# Step 1: Check Docker services
-echo "Step 1: Checking Docker services..."
-SERVICES_OK=true
-
-check_service "PostgreSQL" 5433 || SERVICES_OK=false
-check_service "Redis" 6380 || SERVICES_OK=false
-check_service "MinIO API" 9000 || SERVICES_OK=false
-
-if [ "$SERVICES_OK" = false ]; then
-    echo ""
-    echo -e "${YELLOW}Starting Docker services...${NC}"
-    cd docker && docker compose up -d
-    echo "Waiting 15 seconds for services to initialize..."
-    sleep 15
-
-    # Re-check
-    check_service "PostgreSQL" 5433 || { echo "PostgreSQL failed to start"; exit 1; }
-    check_service "Redis" 6380 || { echo "Redis failed to start"; exit 1; }
-    check_service "MinIO API" 9000 || { echo "MinIO failed to start"; exit 1; }
-    cd ..
-fi
-
-echo ""
-
-# Step 2: Database setup
-echo "Step 2: Setting up database..."
-cd packages/api
-bun run db:push
-bun run seed 2>/dev/null || echo "Seed data may already exist"
-cd ../..
-echo -e "${GREEN}✓${NC} Database ready"
-echo ""
-
-# Step 3: Start dev servers
-echo "Step 3: Starting development servers..."
-bun run dev &
-DEV_PID=$!
-echo "Waiting 30 seconds for servers to start..."
-sleep 30
-
-# Check servers
-check_service "API Server" 3000 || { kill $DEV_PID 2>/dev/null; exit 1; }
-check_service "Web Server" 3001 || { kill $DEV_PID 2>/dev/null; exit 1; }
-echo ""
-
-# Step 4: Run unit tests
-echo "Step 4: Running unit tests..."
-echo "--- API Unit Tests ---"
-cd packages/api && bun test 2>&1 || true
-cd ../..
-
-echo ""
-echo "--- Web Unit Tests ---"
-cd packages/web && bun test 2>&1 || true
-cd ../..
-echo ""
-
-# Step 5: Run E2E tests
-echo "Step 5: Running E2E tests..."
-bunx playwright test --project=chromium --reporter=html
-
-# Step 6: Generate report
-echo ""
-echo "Step 6: Test execution complete!"
-echo ""
-echo "Reports generated:"
-echo "  - playwright-report/index.html"
-echo "  - packages/api/coverage/"
-echo "  - packages/web/coverage/"
-echo ""
-
-# Cleanup
-echo "Stopping dev servers..."
-kill $DEV_PID 2>/dev/null || true
-
-echo -e "${GREEN}=== Test Suite Complete ===${NC}"
+# Run unit tests only (no Docker required)
+./scripts/run-tests.sh unit
 ```
 
 ### Phase 3: E2E Test Execution

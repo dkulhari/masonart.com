@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-02-01T18:43:59.476Z'
-total_tickets: 132
+last_updated: '2026-02-15T11:39:15.173Z'
+total_tickets: 144
 summary:
   critical: 5
-  high: 57
-  medium: 51
-  low: 19
+  high: 60
+  medium: 57
+  low: 22
 priorities:
   high:
     - feature: infrastructure-setup
@@ -297,6 +297,20 @@ priorities:
           title: Task 2 - Create Database Migration for Gemini Provider
           assignee: unassigned
           blocked_by: []
+    - feature: verified-purchase-reviews
+      tickets:
+        - ticket_number: 169
+          title: Task 1 - Add orderItemId to Reviews Schema
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 170
+          title: Task 2 - Write API Tests for Order-Based Review Creation
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 171
+          title: Task 3 - Create Order-Based Review API Endpoint
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: admin-panel
       tickets:
@@ -524,6 +538,32 @@ priorities:
           title: Task 8 - Update Cost and Time Estimates
           assignee: unassigned
           blocked_by: []
+    - feature: verified-purchase-reviews
+      tickets:
+        - ticket_number: 172
+          title: Task 4 - Remove Product-Based Review Creation
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 173
+          title: Task 5 - Extend Order Detail API with Review Status
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 174
+          title: Task 6 - Create ReviewModal Component
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 175
+          title: Task 7 - Add Review Button to Order Detail Page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 176
+          title: Task 8 - Remove Review Form from Product Page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 177
+          title: Task 9 - Update E2E Tests for Verified Purchase Reviews
+          assignee: unassigned
+          blocked_by: []
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -605,6 +645,20 @@ priorities:
           blocked_by: []
         - ticket_number: 168
           title: Task 10 - Manual Integration Test
+          assignee: unassigned
+          blocked_by: []
+    - feature: verified-purchase-reviews
+      tickets:
+        - ticket_number: 178
+          title: Task 10 - Update ReviewForm for Modal Context
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 179
+          title: Task 11 - Run Full Test Suite and Fix Issues
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 180
+          title: Task 12 - Final Review and Cleanup
           assignee: unassigned
           blocked_by: []
   critical:

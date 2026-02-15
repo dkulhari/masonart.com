@@ -25,7 +25,7 @@ $ARGUMENTS: [<url-or-page>] [--ticket=<id>]
 
 Ensure dev servers are running:
 ```bash
-./tests/run-all-tests.sh --setup-only
+./scripts/run-tests.sh setup
 ```
 
 This starts Docker, DB, and dev servers at:
@@ -240,6 +240,6 @@ agent-browser wait --url "**/admin/dashboard"
 ## Notes
 
 - Requires `agent-browser` CLI installed globally
-- Uses `--setup-only` mode to keep servers running
+- Uses `setup` command to keep servers running
 - Screenshots saved to `/tmp/` for easy access
 - Profiles persist auth state across sessions

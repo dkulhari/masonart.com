@@ -58,7 +58,7 @@ $ARGUMENTS: [--max-iterations=30] [--max-tickets=20]
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  1. Run ./tests/run-all-tests.sh --max-failures=N       │
+│  1. Run ./scripts/run-tests.sh e2e --max-failures=N       │
 │     where N = 1 + count(stuck_tests)                    │
 │     (stops on first NEW failure, allows stuck to fail)  │
 └──────────────────────┬──────────────────────────────────┘
@@ -147,7 +147,7 @@ session:
 # Calculate max-failures: 1 (for new failure) + stuck_count (allow stuck to fail)
 MAX_FAILURES=$((1 + stuck_count))
 
-./tests/run-all-tests.sh --max-failures=$MAX_FAILURES 2>&1
+./scripts/run-tests.sh e2e --max-failures=$MAX_FAILURES 2>&1
 ```
 
 This command:
@@ -359,7 +359,7 @@ After processing all new failures:
 1. Increment `session.iteration`
 2. Check if `iteration >= max_iterations` → Stop with summary
 3. Check if `tickets.length >= max_tickets` → Stop with summary
-4. Run `./tests/run-all-tests.sh` again
+4. Run `./scripts/run-tests.sh e2e` again
 5. Parse failures, filter out stuck tests
 6. If new failures exist → process them
 7. If only stuck failures → **Done!**
@@ -382,7 +382,7 @@ Configuration:
 🔄 Iteration 1
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Running ./tests/run-all-tests.sh...
+Running ./scripts/run-tests.sh e2e...
 
 ❌ 3 failures detected:
    1. approval.test.ts: should create approval
@@ -420,7 +420,7 @@ Running ./tests/run-all-tests.sh...
 🔄 Iteration 2
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Running ./tests/run-all-tests.sh...
+Running ./scripts/run-tests.sh e2e...
 
 ❌ 1 failure detected:
    1. complex.spec.ts: should handle race condition
@@ -437,7 +437,7 @@ Running ./tests/run-all-tests.sh...
 🔄 Iteration 6
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Running ./tests/run-all-tests.sh...
+Running ./scripts/run-tests.sh e2e...
 
 ❌ 1 failure detected:
    1. complex.spec.ts: should handle race condition
@@ -446,7 +446,7 @@ Running ./tests/run-all-tests.sh...
    Ticket #144 left in-progress
    Adding to allowed failures list
 
-Running ./tests/run-all-tests.sh...
+Running ./scripts/run-tests.sh e2e...
 (allowing 1 stuck test to fail)
 
 ✅ All fixable tests passing!
@@ -542,7 +542,7 @@ Recommendation:
 ```
 tt-fix-tests (orchestrator)
     │
-    ├── Runs: ./tests/run-all-tests.sh
+    ├── Runs: ./scripts/run-tests.sh e2e
     │
     ├── Parses: ALL failures from output
     │

@@ -18,7 +18,8 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "181": Consolidate test runner scripts into single unified script
   in_progress: {}
   done:
     "12": "Phase 1: Setup & Configuration"
@@ -37,6 +38,6 @@ tickets:
     "25": "Phase 14: Integration Flow Tests"
     "26": "Phase 15: CI/CD Setup"
     "27": "Phase 16: Documentation & Finalization"
-total_tickets: 16
-completion_percentage: 100
-is_completed: true
+total_tickets: 17
+completion_percentage: 94
+is_completed: false

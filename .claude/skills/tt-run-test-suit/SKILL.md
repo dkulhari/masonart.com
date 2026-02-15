@@ -85,11 +85,11 @@ For each selected suite, run the corresponding test file(s):
 
 ```bash
 # Single file suite
-./tests/run-all-tests.sh --file=auth.spec.ts --max-failures=10
+./scripts/run-tests.sh e2e --file=auth.spec.ts --max-failures=10
 
 # Multi-file suite (run each file separately)
-./tests/run-all-tests.sh --file=product-detail.spec.ts --max-failures=10
-./tests/run-all-tests.sh --file=product-listing.spec.ts --max-failures=10
+./scripts/run-tests.sh e2e --file=product-detail.spec.ts --max-failures=10
+./scripts/run-tests.sh e2e --file=product-listing.spec.ts --max-failures=10
 ```
 
 **Multi-file Suite Handling:**
@@ -106,11 +106,11 @@ For suites with multiple files (products, orders, ai, approval, admin-all, seo, 
 
 **Example for admin-all suite (5 files):**
 ```bash
-./tests/run-all-tests.sh --file=admin-auth.spec.ts --max-failures=10
-./tests/run-all-tests.sh --file=admin-dashboard.spec.ts --max-failures=10
-./tests/run-all-tests.sh --file=admin-orders.spec.ts --max-failures=10
-./tests/run-all-tests.sh --file=admin-products.spec.ts --max-failures=10
-./tests/run-all-tests.sh --file=admin-reviews.spec.ts --max-failures=10
+./scripts/run-tests.sh e2e --file=admin-auth.spec.ts --max-failures=10
+./scripts/run-tests.sh e2e --file=admin-dashboard.spec.ts --max-failures=10
+./scripts/run-tests.sh e2e --file=admin-orders.spec.ts --max-failures=10
+./scripts/run-tests.sh e2e --file=admin-products.spec.ts --max-failures=10
+./scripts/run-tests.sh e2e --file=admin-reviews.spec.ts --max-failures=10
 ```
 
 **Note**: Running individual admin suites (admin-auth, admin-dashboard, etc.) is preferred over admin-all when debugging specific functionality, as failures get logged to the correct feature.
@@ -308,7 +308,7 @@ App Bugs: {count} tickets
 ## Notes
 
 - Does NOT auto-fix - only logs tickets for manual review or `/tt-work-ticket`
-- Uses `--file=` option in `run-all-tests.sh` for precise test execution
+- Uses `--file=` option in `scripts/run-tests.sh e2e` for precise test execution
 - Creates `testsuite-bug-*` features as needed
 - All tickets created with `type: "bug"`
 - Test counts are discovered at runtime from Playwright output ("Running N tests")

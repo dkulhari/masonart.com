@@ -1,0 +1,68 @@
+ticket_number: 181
+title: Consolidate test runner scripts into single unified script
+description: |-
+  ## Summary
+
+  Consolidated two overlapping test runner scripts (`tests/run-all-tests.sh` and `scripts/run-tests.sh`) into a single unified script at `scripts/run-tests.sh` with a subcommand architecture.
+
+  ## Problem
+
+  Two test runner scripts evolved separately:
+  - `tests/run-all-tests.sh` — heavily used, referenced in 5+ skill/doc files, had sophisticated features (--setup-only, --file, --grep, --max-failures)
+  - `scripts/run-tests.sh` — standard location, had unit/integration/CI modes but lacked E2E options
+
+  ## Solution
+
+  Merged both into `scripts/run-tests.sh` with 6 subcommands:
+  - `all` (default) — setup + unit + integration + E2E
+  - `unit` — unit tests only, no Docker
+  - `integration` — setup/integration tests
+  - `e2e` — setup infra + E2E with Playwright
+  - `ci` — assume services exist, run everything
+  - `setup` — setup infra only, leave servers running (replaces --setup-only)
+
+  Flags: `--project`, `--file`, `--grep`, `--max-failures`, `--workers`, `--help`
+
+  ## Files Changed (7 files, +475/-586 lines)
+
+  1. `scripts/run-tests.sh` — Rewritten with merged features
+  2. `tests/run-all-tests.sh` — Deleted
+  3. `docs/TEST-EXECUTION-REMEDIATION.md` — Updated script reference
+  4. `docs/manual-tests/smoke-test.md` — `--setup-only` → `setup`
+  5. `.claude/skills/tt-debug-browser/SKILL.md` — Updated path + command
+  6. `.claude/skills/tt-fix-tests/SKILL.md` + CLAUDE.md — Updated all references
+  7. `.claude/skills/tt-run-test-suit/SKILL.md` — Updated all references
+
+  ## Command Migration
+
+  | Old | New |
+  |-----|-----|
+  | `./tests/run-all-tests.sh` | `./scripts/run-tests.sh e2e` |
+  | `./tests/run-all-tests.sh --setup-only` | `./scripts/run-tests.sh setup` |
+  | `./tests/run-all-tests.sh --file=X` | `./scripts/run-tests.sh e2e --file=X` |
+  | `./tests/run-all-tests.sh --max-failures=N` | `./scripts/run-tests.sh e2e --max-failures=N` |
+
+  ## Verification
+
+  - `./scripts/run-tests.sh --help` outputs clean usage
+  - Zero remaining references to `tests/run-all-tests.sh` in codebase
+feature: qa-testing
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-15T11:39:14.080Z'
+last_updated: '2026-02-15T11:39:14.080Z'
+time_spent_minutes: 0
+labels:
+  - refactor
+  - dx
+  - test-infrastructure
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

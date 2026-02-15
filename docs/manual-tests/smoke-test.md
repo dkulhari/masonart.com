@@ -6,7 +6,7 @@ This document is designed to be executed by an AI Agent guiding a human tester.
 ## Prerequisites & Setup
 
 **Agent Step:** Ensure the environment is ready for testing.
-1.  **Run Setup Script:** Execute `./tests/run-all-tests.sh --setup-only` in the terminal.
+1.  **Run Setup Script:** Execute `./scripts/run-tests.sh setup` in the terminal.
     - This will start Docker services, run migrations, and launch the dev servers.
     - It will exit when ready and display the server URLs.
 2.  **Verify Output:** Confirm the script outputs "SETUP COMPLETE".
