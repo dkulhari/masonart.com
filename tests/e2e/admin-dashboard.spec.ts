@@ -213,14 +213,14 @@ test.describe('Dashboard Refresh Functionality', () => {
     });
 
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const initialCount = fetchCount;
 
     const refreshButton = page.locator('button:has-text("Refresh")');
     await refreshButton.click();
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should have made additional fetch calls
     expect(fetchCount).toBeGreaterThan(initialCount);
@@ -445,7 +445,7 @@ test.describe('Key Metrics Grid', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Total Revenue card', async ({ page }) => {
@@ -499,7 +499,7 @@ test.describe('Secondary Metrics Grid', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display "Total Orders" card', async ({ page }) => {
@@ -541,7 +541,7 @@ test.describe('Recent Orders Section', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display "Recent Orders" header', async ({ page }) => {
@@ -641,7 +641,7 @@ test.describe('Empty Orders State', () => {
     });
 
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display empty state message', async ({ page }) => {
@@ -672,7 +672,7 @@ test.describe('Quick Actions Section', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display "Quick Actions" header', async ({ page }) => {
@@ -728,7 +728,7 @@ test.describe('Quick Actions Navigation', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should navigate to new product page', async ({ page }) => {
@@ -761,7 +761,7 @@ test.describe('Order Status Breakdown', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display "Order Status" header', async ({ page }) => {
@@ -900,7 +900,7 @@ test.describe('Accessibility', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should have proper heading hierarchy', async ({ page }) => {
@@ -1005,7 +1005,7 @@ test.describe('Performance', () => {
     });
 
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // If requests are parallel, they should have similar timestamps
     if (requestTimestamps.length > 1) {
@@ -1027,7 +1027,7 @@ test.describe('Data Display', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display order date in correct format', async ({ page }) => {
@@ -1099,7 +1099,7 @@ test.describe('Content Grid Layout', () => {
   test.beforeEach(async ({ page }) => {
     await setupDashboardMocks(page);
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Recent Orders spanning 2 columns on desktop', async ({ page }) => {

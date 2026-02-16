@@ -429,7 +429,7 @@ test.describe('Admin Products List Page', () => {
   });
 
   test('should display products table/grid', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show product items
     const productItems = page.locator('[data-testid="product-row"], .product-item, tr:has-text("TX-")');
@@ -438,21 +438,21 @@ test.describe('Admin Products List Page', () => {
   });
 
   test('should display product SKU', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const sku = page.locator('text=TX-001');
     await expect(sku).toBeVisible();
   });
 
   test('should display product title', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const title = page.locator('text=Ocean Waves Abstract Poster');
     await expect(title).toBeVisible();
   });
 
   test('should display product price', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Price might be formatted as ₹1,999 or similar
     const priceRow = page.locator(':has-text("Ocean Waves")').first();
@@ -460,7 +460,7 @@ test.describe('Admin Products List Page', () => {
   });
 
   test('should display product status badge', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const activeBadge = page.locator('.bg-green-100:has-text("active"), [data-status="active"]');
     await expect(activeBadge.first()).toBeVisible();
@@ -480,7 +480,7 @@ test.describe('Products List Status Filtering', () => {
 
   test('should have status filter dropdown', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const statusFilter = page.locator('select[name="status"], [data-testid="status-filter"], button:has-text("Status")');
     await expect(statusFilter).toBeVisible();
@@ -488,7 +488,7 @@ test.describe('Products List Status Filtering', () => {
 
   test('should filter by Active status', async ({ page }) => {
     await page.goto('/admin/products?status=active');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // URL should contain status parameter
     expect(page.url()).toContain('status=active');
@@ -496,14 +496,14 @@ test.describe('Products List Status Filtering', () => {
 
   test('should filter by Draft status', async ({ page }) => {
     await page.goto('/admin/products?status=draft');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('status=draft');
   });
 
   test('should filter by Archived status', async ({ page }) => {
     await page.goto('/admin/products?status=archived');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('status=archived');
   });
@@ -527,7 +527,7 @@ test.describe('Products List Search', () => {
   });
 
   test('should search products by title', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const searchInput = page.locator('input[type="search"], input[placeholder*="Search"], [data-testid="search-input"]');
     await searchInput.fill('Ocean');
@@ -541,7 +541,7 @@ test.describe('Products List Search', () => {
   });
 
   test('should search products by SKU', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // First verify products are loaded
     const productSku = page.locator('text=TX-001');
@@ -563,7 +563,7 @@ test.describe('Products List Search', () => {
     await searchInput.clear();
 
     // Should show all products again
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 });
 
@@ -580,7 +580,7 @@ test.describe('Products List Pagination', () => {
   test('should display pagination controls', async ({ page }) => {
     await setupProductsListMock(page, mockProducts, 50);
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for the pagination info text "Page X of Y" from the admin page (not table internal pagination)
     const pageInfo = page.getByText(/^Page \d+ of \d+$/).last();
@@ -594,7 +594,7 @@ test.describe('Products List Pagination', () => {
   test('should display page numbers', async ({ page }) => {
     await setupProductsListMock(page, mockProducts, 50);
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // The admin page displays "Page X of Y" format (second instance, after table's internal pagination)
     const pageInfo = page.getByText(/^Page 1 of \d+$/).last();
@@ -604,7 +604,7 @@ test.describe('Products List Pagination', () => {
   test('should navigate to next page', async ({ page }) => {
     await setupProductsListMock(page, mockProducts, 50);
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const nextButton = page.locator('button:has-text("Next"), a:has-text("Next"), [aria-label="Next page"]');
     if (await nextButton.isVisible()) {
@@ -616,7 +616,7 @@ test.describe('Products List Pagination', () => {
   test('should navigate to previous page', async ({ page }) => {
     await setupProductsListMock(page, mockProducts, 50);
     await page.goto('/admin/products?page=2');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const prevButton = page.locator('button:has-text("Previous"), a:has-text("Previous"), [aria-label="Previous page"]');
     if (await prevButton.isVisible()) {
@@ -628,7 +628,7 @@ test.describe('Products List Pagination', () => {
   test('should display total count', async ({ page }) => {
     await setupProductsListMock(page, mockProducts, 100);
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const totalCount = page.locator('text=/\\d+.*products?/i');
     await expect(totalCount.first()).toBeVisible();
@@ -648,7 +648,7 @@ test.describe('Products List Sorting', () => {
   });
 
   test('should have sortable column headers', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for sortable headers
     const sortableHeader = page.locator('th[data-sortable], th button, [role="columnheader"]').first();
@@ -657,28 +657,28 @@ test.describe('Products List Sorting', () => {
 
   test('should sort by title', async ({ page }) => {
     await page.goto('/admin/products?sortBy=title');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('sortBy=title');
   });
 
   test('should sort by created date', async ({ page }) => {
     await page.goto('/admin/products?sortBy=createdAt');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('sortBy=createdAt');
   });
 
   test('should sort by price', async ({ page }) => {
     await page.goto('/admin/products?sortBy=basePrice');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('sortBy=basePrice');
   });
 
   test('should toggle sort order', async ({ page }) => {
     await page.goto('/admin/products?sortBy=title&sortOrder=asc');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('sortOrder=asc');
   });
@@ -698,7 +698,7 @@ test.describe('Create Product Page', () => {
 
   test('should navigate to create product page', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const addButton = page.locator('a[href="/admin/products/new"]:has-text("Add Product"), button:has-text("Add Product")');
     await addButton.click();
@@ -790,7 +790,7 @@ test.describe('Create Product Page', () => {
 
   test('should auto-generate slug from title', async ({ page }) => {
     await page.goto('/admin/products/new');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const titleInput = page.locator('#title');
     await titleInput.fill('Test Product Title');
@@ -824,7 +824,7 @@ test.describe('Create Product Page', () => {
     });
 
     await page.goto('/admin/products/new');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Fill required fields using locator.fill() for React inputs
     await page.locator('#title').fill('Test New Product');
@@ -861,7 +861,7 @@ test.describe('Edit Product Page', () => {
 
   test('should navigate to edit product page from list', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Click the action button on the first product row to open dropdown menu
     const firstRowActionButton = page.locator('table tbody tr').first().locator('button').last();
@@ -878,7 +878,7 @@ test.describe('Edit Product Page', () => {
 
   test('should display edit product form with data', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const titleInput = page.locator('input[name="title"], #title');
     await expect(titleInput).toHaveValue('Ocean Waves Abstract Poster');
@@ -886,7 +886,7 @@ test.describe('Edit Product Page', () => {
 
   test('should display product SKU', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const skuInput = page.locator('input[name="sku"], #sku');
     await expect(skuInput).toHaveValue('TX-001');
@@ -894,7 +894,7 @@ test.describe('Edit Product Page', () => {
 
   test('should display product slug', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const slugInput = page.locator('input[name="slug"], #slug');
     await expect(slugInput).toHaveValue('ocean-waves-abstract-poster');
@@ -902,7 +902,7 @@ test.describe('Edit Product Page', () => {
 
   test('should display product description', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const descriptionInput = page.locator('textarea[name="description"], #description');
     const value = await descriptionInput.inputValue();
@@ -911,7 +911,7 @@ test.describe('Edit Product Page', () => {
 
   test('should display Update/Save button', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const updateButton = page.locator('button[type="submit"]:has-text("Update"), button[type="submit"]:has-text("Save")');
     await expect(updateButton).toBeVisible();
@@ -937,7 +937,7 @@ test.describe('Edit Product Page', () => {
     });
 
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Update title
     await page.locator('#title').fill('Updated Ocean Waves Poster');
@@ -971,7 +971,7 @@ test.describe('Edit Product Page', () => {
     });
 
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Use role-based selector for reliability
     const saveButton = page.getByRole('button', { name: /save/i });
@@ -1002,7 +1002,7 @@ test.describe('Delete/Archive Product', () => {
 
   test('should display Delete/Archive button on edit page', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const deleteButton = page.locator('button:has-text("Delete"), button:has-text("Archive")');
     await expect(deleteButton).toBeVisible();
@@ -1010,7 +1010,7 @@ test.describe('Delete/Archive Product', () => {
 
   test('should show confirmation dialog before delete', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Set up dialog handler to capture the native confirm dialog
     let dialogMessage = '';
@@ -1031,7 +1031,7 @@ test.describe('Delete/Archive Product', () => {
 
   test('should cancel delete on confirmation dialog cancel', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Set up dialog handler to dismiss (cancel) the dialog
     page.once('dialog', async (dialog) => {
@@ -1065,7 +1065,7 @@ test.describe('Delete/Archive Product', () => {
     });
 
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Set up dialog handler to accept the confirmation
     page.once('dialog', async (dialog) => {
@@ -1094,7 +1094,7 @@ test.describe('Delete/Archive Product', () => {
     });
 
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Set up dialog handler to accept the confirmation
     page.once('dialog', async (dialog) => {
@@ -1124,7 +1124,7 @@ test.describe('Product Variants Management', () => {
 
   test('should display variants section on edit page', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // The variants section is a collapsible section with heading "Size Variants"
     const variantsSection = page.getByRole('button', { name: /size variant/i });
@@ -1133,7 +1133,7 @@ test.describe('Product Variants Management', () => {
 
   test('should display existing variants', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Expand the variants section first
     const variantsButton = page.getByRole('button', { name: /size variant/i });
@@ -1149,7 +1149,7 @@ test.describe('Product Variants Management', () => {
 
   test('should display Add Variant button', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // First expand the variants section
     const variantsButton = page.getByRole('button', { name: /size variant/i });
@@ -1162,7 +1162,7 @@ test.describe('Product Variants Management', () => {
 
   test('should show variant form on Add Variant click', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // First expand the variants section
     const variantsButton = page.getByRole('button', { name: /size variant/i });
@@ -1291,7 +1291,7 @@ test.describe('Products Error States', () => {
   test('should display validation errors on create', async ({ page }) => {
     // This test verifies client-side validation when submitting without required fields
     await page.goto('/admin/products/new');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Click Create Product without filling any fields
     const saveButton = page.getByRole('button', { name: 'Create Product' });
@@ -1323,7 +1323,7 @@ test.describe('Products Empty State', () => {
     });
 
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // The table shows "No products found" when empty
     const emptyState = page.getByText('No products found');
@@ -1340,7 +1340,7 @@ test.describe('Products Empty State', () => {
     });
 
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const addButton = page.locator('a[href="/admin/products/new"], button:has-text("Add Product")');
     await expect(addButton).toBeVisible();
@@ -1350,7 +1350,7 @@ test.describe('Products Empty State', () => {
     await setupProductsListMock(page, []);
 
     await page.goto('/admin/products?search=nonexistent');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // The table shows "No products found" for empty search
     const noResults = page.getByText('No products found');
@@ -1380,7 +1380,7 @@ test.describe('Products Responsive Design', () => {
   test('should stack table columns on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // On mobile, table might convert to card view
     const productItem = page.locator('[data-testid="product-row"], .product-item, tr').first();
@@ -1406,7 +1406,7 @@ test.describe('Products Responsive Design', () => {
   test('should display full table on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show full table with all columns
     const table = page.locator('table, [role="table"]');
@@ -1463,7 +1463,7 @@ test.describe('Products Accessibility', () => {
 
   test('should have focus indicators on buttons', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Find the Add Product button (could be a link or button)
     const addButton = page.locator('a:has-text("Add Product"), button:has-text("Add Product")').first();
@@ -1559,7 +1559,7 @@ test.describe('Products Navigation', () => {
 
   test('should navigate back to products list from edit page', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const backButton = page.locator('a:has-text("Back"), a[href="/admin/products"]');
     await backButton.click();
@@ -1570,7 +1570,7 @@ test.describe('Products Navigation', () => {
 
   test('should have breadcrumb navigation', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const breadcrumb = page.locator('nav[aria-label="Breadcrumb"], .breadcrumb, a:has-text("Products")');
     await expect(breadcrumb.first()).toBeVisible();
@@ -1590,7 +1590,7 @@ test.describe('Products Bulk Actions', () => {
 
   test('should display checkbox for each product row', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const checkboxes = page.locator('input[type="checkbox"]');
     const count = await checkboxes.count();
@@ -1600,7 +1600,7 @@ test.describe('Products Bulk Actions', () => {
 
   test('should display select all checkbox', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const selectAllCheckbox = page.locator('th input[type="checkbox"], [data-testid="select-all"]');
     await expect(selectAllCheckbox).toBeVisible();
@@ -1608,7 +1608,7 @@ test.describe('Products Bulk Actions', () => {
 
   test('should show bulk actions when items selected', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const firstCheckbox = page.locator('tbody input[type="checkbox"]').first();
     if (await firstCheckbox.isVisible()) {
@@ -1635,7 +1635,7 @@ test.describe('Product Image Management', () => {
 
   test('should display image upload section', async ({ page }) => {
     await page.goto('/admin/products/new');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // The Images section heading is present in the form
     const imageSection = page.getByRole('heading', { name: 'Images' });
@@ -1644,7 +1644,7 @@ test.describe('Product Image Management', () => {
 
   test('should display existing images on edit page', async ({ page }) => {
     await page.goto('/admin/products/prod-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const imagePreview = page.locator('img[src*="cdn.example.com"], [data-testid="image-preview"]');
     await expect(imagePreview.first()).toBeVisible();
@@ -1652,7 +1652,7 @@ test.describe('Product Image Management', () => {
 
   test('should have Add Image button for images', async ({ page }) => {
     await page.goto('/admin/products/new');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // The Images section has an "Add Image" button
     const addImageButton = page.getByRole('button', { name: 'Add Image' });
@@ -1670,7 +1670,7 @@ test.describe('Product Status Badges', () => {
   test.beforeEach(async ({ page }) => {
     await setupProductsListMock(page);
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display active status with green badge', async ({ page }) => {

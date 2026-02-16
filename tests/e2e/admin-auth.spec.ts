@@ -77,7 +77,7 @@ test.describe('Customer Role Access to Admin', () => {
 
   test('should deny customer access to admin dashboard', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Customer should see "Access Denied" message or be on an unauthorized page
     // The admin.tsx beforeLoad returns isUnauthorized: true for non-admin roles
@@ -97,7 +97,7 @@ test.describe('Customer Role Access to Admin', () => {
 
   test('should deny customer access to admin products', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const pageContent = await page.content();
     const url = page.url();
@@ -114,7 +114,7 @@ test.describe('Customer Role Access to Admin', () => {
 
   test('should deny customer access to admin orders', async ({ page }) => {
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const pageContent = await page.content();
     const url = page.url();
@@ -140,7 +140,7 @@ test.describe('Trade Role Access to Admin', () => {
 
   test('should deny trade user access to admin dashboard', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Trade users should see "Access Denied" message or be on an unauthorized page
     const pageContent = await page.content();
@@ -159,7 +159,7 @@ test.describe('Trade Role Access to Admin', () => {
 
   test('should deny trade user access to admin products', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const pageContent = await page.content();
     const url = page.url();
@@ -176,7 +176,7 @@ test.describe('Trade Role Access to Admin', () => {
 
   test('should deny trade user access to admin orders', async ({ page }) => {
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const pageContent = await page.content();
     const url = page.url();
@@ -203,7 +203,7 @@ test.describe('Admin Role Access', () => {
 
   test('should allow admin access to dashboard without redirect', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should stay on admin page (not redirected to login or access denied)
     expect(page.url()).toContain('/admin');
@@ -216,7 +216,7 @@ test.describe('Admin Role Access', () => {
 
   test('should display admin dashboard content', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show Dashboard heading or admin-specific content
     const dashboardHeading = page.locator('h1:has-text("Dashboard"), h2:has-text("Dashboard")');
@@ -225,7 +225,7 @@ test.describe('Admin Role Access', () => {
 
   test('should display admin sidebar navigation', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show admin sidebar with navigation links
     // Use .first() to avoid strict mode violations when there are multiple matching links
@@ -241,7 +241,7 @@ test.describe('Admin Role Access', () => {
 
   test('should allow access to admin products page', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should not redirect and show products page
     expect(page.url()).toContain('/admin/products');
@@ -250,7 +250,7 @@ test.describe('Admin Role Access', () => {
 
   test('should allow access to admin orders page', async ({ page }) => {
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should not redirect
     expect(page.url()).toContain('/admin/orders');
@@ -259,7 +259,7 @@ test.describe('Admin Role Access', () => {
 
   test('should display user info in sidebar', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show admin user's name or email
     // The seeded admin is "E2E Test Admin" with email test-e2e-admin@masonart.com
@@ -271,7 +271,7 @@ test.describe('Admin Role Access', () => {
 
   test('should have Sign Out button in sidebar', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const signOutBtn = page.locator('button:has-text("Sign Out")');
     await expect(signOutBtn).toBeVisible();
@@ -279,7 +279,7 @@ test.describe('Admin Role Access', () => {
 
   test('should navigate between admin pages via sidebar', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Use sidebar-specific locators to avoid strict mode violations
     const sidebar = page.locator('aside');
@@ -287,19 +287,19 @@ test.describe('Admin Role Access', () => {
     // Click Products link
     const productsLink = sidebar.locator('a[href="/admin/products"]').filter({ hasText: 'Products' }).first();
     await productsLink.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     expect(page.url()).toContain('/admin/products');
 
     // Click Orders link
     const ordersLink = sidebar.locator('a[href="/admin/orders"]').filter({ hasText: 'Orders' }).first();
     await ordersLink.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     expect(page.url()).toContain('/admin/orders');
 
     // Click Dashboard link
     const dashboardLink = sidebar.locator('a[href="/admin"]').filter({ hasText: 'Dashboard' }).first();
     await dashboardLink.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     expect(page.url()).toMatch(/\/admin\/?$/);
   });
 });
@@ -316,7 +316,7 @@ test.describe('Super-Admin Role Access', () => {
 
   test('should allow super-admin access to dashboard', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should have access to admin dashboard
     expect(page.url()).toContain('/admin');
@@ -330,17 +330,17 @@ test.describe('Super-Admin Role Access', () => {
   test('should allow super-admin access to all admin sections', async ({ page }) => {
     // Test products access
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     expect(page.url()).toContain('/admin/products');
 
     // Test orders access
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     expect(page.url()).toContain('/admin/orders');
 
     // Test reviews access (if exists)
     await page.goto('/admin/reviews');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     // May redirect if reviews admin doesn't exist, but shouldn't show login
     expect(page.url()).not.toContain('/auth/login');
   });
@@ -355,7 +355,7 @@ test.describe('Admin Sign Out', () => {
 
   test('should redirect to home after sign out', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Find and click sign out button
     const signOutBtn = page.locator('button:has-text("Sign Out")');
@@ -367,7 +367,7 @@ test.describe('Admin Sign Out', () => {
 
   test('should not allow access to admin after sign out', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Sign out
     const signOutBtn = page.locator('button:has-text("Sign Out")');
@@ -390,7 +390,7 @@ test.describe('Admin Responsive Layout', () => {
   test('should display sidebar by default on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Sidebar should be visible
     const sidebar = page.locator('aside');
@@ -400,7 +400,7 @@ test.describe('Admin Responsive Layout', () => {
   test('should display mobile menu button on small screens', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show mobile menu button - use getByRole for accessible name
     const menuButton = page.getByRole('button', { name: 'Open menu' }).first();
@@ -410,7 +410,7 @@ test.describe('Admin Responsive Layout', () => {
   test('should open mobile sidebar when clicking menu button', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Click the menu button - use getByRole for accessible name
     const menuButton = page.getByRole('button', { name: 'Open menu' }).first();
@@ -431,7 +431,7 @@ test.describe('Admin Accessibility', () => {
 
   test('should have proper heading hierarchy', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const h1Count = await page.locator('h1').count();
     expect(h1Count).toBeGreaterThanOrEqual(1);
@@ -440,7 +440,7 @@ test.describe('Admin Accessibility', () => {
   test('should have aria labels on interactive elements', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const buttonsWithAria = page.locator('button[aria-label]');
     const count = await buttonsWithAria.count();
@@ -449,7 +449,7 @@ test.describe('Admin Accessibility', () => {
 
   test('should be keyboard navigable', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     await page.keyboard.press('Tab');
 
@@ -459,7 +459,7 @@ test.describe('Admin Accessibility', () => {
 
   test('should have button type on Sign Out button', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const signOutBtn = page.locator('button:has-text("Sign Out")');
     const type = await signOutBtn.getAttribute('type');
@@ -477,7 +477,7 @@ test.describe('Admin Performance', () => {
   test('should load admin dashboard within acceptable time', async ({ page }) => {
     const startTime = Date.now();
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for dashboard heading
     await expect(page.locator('h1:has-text("Dashboard"), h2:has-text("Dashboard")')).toBeVisible();
@@ -491,7 +491,7 @@ test.describe('Admin Performance', () => {
     page.on('pageerror', (error) => errors.push(error.message));
 
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
 
     // Filter out non-critical errors (network issues, hydration, etc.)

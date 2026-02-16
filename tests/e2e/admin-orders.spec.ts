@@ -564,7 +564,7 @@ test.describe('Admin Orders List Page', () => {
   });
 
   test('should display total order count in subtitle', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const subtitle = page.locator('text=/\\d+.*total/i');
     await expect(subtitle.first()).toBeVisible();
   });
@@ -585,25 +585,25 @@ test.describe('Admin Orders List Page', () => {
   });
 
   test('should display orders table', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const table = page.locator('table, [role="table"]');
     await expect(table).toBeVisible();
   });
 
   test('should display order number column', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const orderNumber = page.locator('text=MA-20240115-001');
     await expect(orderNumber).toBeVisible();
   });
 
   test('should display customer name in order row', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const customerName = page.locator('text=Rahul Sharma');
     await expect(customerName).toBeVisible();
   });
 
   test('should display customer email in order row', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     const customerEmail = page.locator('text=rahul.sharma@example.com');
     await expect(customerEmail).toBeVisible();
   });
@@ -618,7 +618,7 @@ test.describe('Orders Statistics Cards', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Today\'s Orders stat card', async ({ page }) => {
@@ -654,7 +654,7 @@ test.describe('Orders Status Filtering', () => {
 
   test('should have status filter dropdown', async ({ page }) => {
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const statusFilter = page.locator('select:has-text("All Status"), [data-testid="status-filter"]');
     await expect(statusFilter).toBeVisible();
@@ -662,7 +662,7 @@ test.describe('Orders Status Filtering', () => {
 
   test('should have payment status filter dropdown', async ({ page }) => {
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const paymentFilter = page.locator('select:has-text("All Payment"), [data-testid="payment-filter"]');
     await expect(paymentFilter).toBeVisible();
@@ -670,42 +670,42 @@ test.describe('Orders Status Filtering', () => {
 
   test('should filter by Processing status', async ({ page }) => {
     await page.goto('/admin/orders?status=processing');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('status=processing');
   });
 
   test('should filter by Shipped status', async ({ page }) => {
     await page.goto('/admin/orders?status=shipped');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('status=shipped');
   });
 
   test('should filter by Delivered status', async ({ page }) => {
     await page.goto('/admin/orders?status=delivered');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('status=delivered');
   });
 
   test('should filter by Cancelled status', async ({ page }) => {
     await page.goto('/admin/orders?status=cancelled');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('status=cancelled');
   });
 
   test('should filter by Paid payment status', async ({ page }) => {
     await page.goto('/admin/orders?paymentStatus=paid');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('paymentStatus=paid');
   });
 
   test('should filter by Pending payment status', async ({ page }) => {
     await page.goto('/admin/orders?paymentStatus=pending');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('paymentStatus=pending');
   });
@@ -728,7 +728,7 @@ test.describe('Orders Search', () => {
   });
 
   test('should search orders by order number', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const searchInput = page.locator('input[type="text"][placeholder*="Search"], input[type="search"]');
     await searchInput.fill('MA-20240115');
@@ -740,7 +740,7 @@ test.describe('Orders Search', () => {
   });
 
   test('should search orders by customer email', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const searchInput = page.locator('input[type="text"][placeholder*="Search"], input[type="search"]');
     await searchInput.fill('rahul.sharma');
@@ -756,7 +756,7 @@ test.describe('Orders Search', () => {
     await searchInput.fill('test');
     await searchInput.clear();
 
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 });
 
@@ -769,7 +769,7 @@ test.describe('Orders Status Badges', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Processing status badge', async ({ page }) => {
@@ -821,7 +821,7 @@ test.describe('Orders Table Actions', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display action menu button for each row', async ({ page }) => {
@@ -869,7 +869,7 @@ test.describe('Orders List Pagination', () => {
   test('should display pagination controls', async ({ page }) => {
     await setupOrdersListMock(page, mockOrders, 50);
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for pagination controls - try CSS selectors first, then text pattern
     const paginationCss = page.locator('[data-testid="pagination"], nav[aria-label="Pagination"], .pagination');
@@ -880,7 +880,7 @@ test.describe('Orders List Pagination', () => {
   test('should display page info', async ({ page }) => {
     await setupOrdersListMock(page, mockOrders, 50);
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const pageInfo = page.locator('text=/Page.*of/');
     await expect(pageInfo.first()).toBeVisible();
@@ -889,7 +889,7 @@ test.describe('Orders List Pagination', () => {
   test('should navigate to next page', async ({ page }) => {
     await setupOrdersListMock(page, mockOrders, 50);
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const nextButton = page.locator('button:has-text("Next")');
     if (await nextButton.isVisible()) {
@@ -901,7 +901,7 @@ test.describe('Orders List Pagination', () => {
   test('should navigate to previous page', async ({ page }) => {
     await setupOrdersListMock(page, mockOrders, 50);
     await page.goto('/admin/orders?page=2');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const prevButton = page.locator('button:has-text("Previous")');
     if (await prevButton.isVisible()) {
@@ -924,7 +924,7 @@ test.describe('Order Detail Page', () => {
 
   test('should navigate to order detail page', async ({ page }) => {
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const orderNumber = page.locator('text=MA-20240115-001');
     await expect(orderNumber.first()).toBeVisible();
@@ -932,7 +932,7 @@ test.describe('Order Detail Page', () => {
 
   test('should display Order Details as page title', async ({ page }) => {
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const title = page.locator('h1:has-text("Order Details")');
     await expect(title).toBeVisible();
@@ -940,7 +940,7 @@ test.describe('Order Detail Page', () => {
 
   test('should display back button', async ({ page }) => {
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // The back button is in the header next to "Order Details" title
     // Exclude mobile-only buttons (lg:hidden class) and buttons with menu-related aria-labels
@@ -957,7 +957,7 @@ test.describe('Order Detail Page', () => {
 
   test('should display order status badges', async ({ page }) => {
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const statusBadge = page.locator('span:has-text("Processing")');
     await expect(statusBadge.first()).toBeVisible();
@@ -965,7 +965,7 @@ test.describe('Order Detail Page', () => {
 
   test('should display payment status badge', async ({ page }) => {
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const paymentBadge = page.locator('span:has-text("Paid")');
     await expect(paymentBadge.first()).toBeVisible();
@@ -973,7 +973,7 @@ test.describe('Order Detail Page', () => {
 
   test('should display Update Status button', async ({ page }) => {
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const updateStatusBtn = page.locator('button:has-text("Update Status")');
     await expect(updateStatusBtn).toBeVisible();
@@ -981,7 +981,7 @@ test.describe('Order Detail Page', () => {
 
   test('should display Update Shipping button', async ({ page }) => {
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const updateShippingBtn = page.locator('button:has-text("Update Shipping")');
     await expect(updateShippingBtn).toBeVisible();
@@ -997,7 +997,7 @@ test.describe('Order Items Section', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Order Items section header', async ({ page }) => {
@@ -1050,7 +1050,7 @@ test.describe('Customer Information Section', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Customer section header', async ({ page }) => {
@@ -1079,7 +1079,7 @@ test.describe('Shipping Address Section', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Shipping Address section', async ({ page }) => {
@@ -1112,7 +1112,7 @@ test.describe('Shipping Details Section', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Shipping Details section', async ({ page }) => {
@@ -1145,7 +1145,7 @@ test.describe('Payment Summary Section', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Payment Summary section', async ({ page }) => {
@@ -1184,7 +1184,7 @@ test.describe('Timeline Section', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Timeline section', async ({ page }) => {
@@ -1223,7 +1223,7 @@ test.describe('Internal Notes Section', () => {
     await setupOrdersListMock(page);
     await setupOrderMutationMocks(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Internal Notes section', async ({ page }) => {
@@ -1252,7 +1252,7 @@ test.describe('Status Update Modal', () => {
     await setupOrdersListMock(page);
     await setupOrderMutationMocks(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should open status update modal on button click', async ({ page }) => {
@@ -1309,7 +1309,7 @@ test.describe('Shipping Update Modal', () => {
     await setupOrdersListMock(page);
     await setupOrderMutationMocks(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should open shipping update modal on button click', async ({ page }) => {
@@ -1357,7 +1357,7 @@ test.describe('Order Not Found', () => {
 
   test('should display not found message for invalid order', async ({ page }) => {
     await page.goto('/admin/orders/invalid-order-id');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const notFound = page.locator('text=/Order Not Found|not found|404/i');
     await expect(notFound.first()).toBeVisible();
@@ -1365,7 +1365,7 @@ test.describe('Order Not Found', () => {
 
   test('should display Back to Orders button on not found', async ({ page }) => {
     await page.goto('/admin/orders/invalid-order-id');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const backButton = page.locator('button:has-text("Back to Orders"), a:has-text("Back to Orders")');
     await expect(backButton).toBeVisible();
@@ -1502,7 +1502,7 @@ test.describe('Orders Empty State', () => {
     });
 
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const emptyState = page.locator('text=/No orders|no orders found/i');
     await expect(emptyState.first()).toBeVisible();
@@ -1512,7 +1512,7 @@ test.describe('Orders Empty State', () => {
     await setupOrdersListMock(page, []);
 
     await page.goto('/admin/orders?search=nonexistent');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const noResults = page.locator('text=/No orders|no results|No matching/i');
     await expect(noResults.first()).toBeVisible();
@@ -1556,7 +1556,7 @@ test.describe('Orders Responsive Design', () => {
   test('should display full table on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const table = page.locator('table, [role="table"]');
     await expect(table).toBeVisible();
@@ -1565,7 +1565,7 @@ test.describe('Orders Responsive Design', () => {
   test('should display order detail properly on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const orderNumber = page.locator('text=MA-20240115-001');
     await expect(orderNumber.first()).toBeVisible();
@@ -1607,7 +1607,7 @@ test.describe('Orders Accessibility', () => {
 
   test('should have focus indicators on buttons', async ({ page }) => {
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Wait for button to be enabled (not disabled during loading)
     const refreshButton = page.locator('button:has-text("Refresh"):not([disabled])');
@@ -1685,7 +1685,7 @@ test.describe('Orders Navigation', () => {
 
   test('should navigate back to orders list from detail page', async ({ page }) => {
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Use keyboard shortcut or navigate via sidebar link since back button selector is fragile
     // The Orders link in sidebar is more reliable
@@ -1698,7 +1698,7 @@ test.describe('Orders Navigation', () => {
 
   test('should navigate to order detail from list', async ({ page }) => {
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Click the action button (last button in first row) to open dropdown menu
     const firstActionButton = page.locator('table tbody tr').first().locator('button').last();
@@ -1715,7 +1715,7 @@ test.describe('Orders Navigation', () => {
 
   test('should preserve filters in URL', async ({ page }) => {
     await page.goto('/admin/orders?status=processing&paymentStatus=paid');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     expect(page.url()).toContain('status=processing');
     expect(page.url()).toContain('paymentStatus=paid');
@@ -1732,7 +1732,7 @@ test.describe('Order Refund', () => {
     await setupOrdersListMock(page);
     await setupOrderMutationMocks(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Initiate Refund button for paid orders', async ({ page }) => {
@@ -1769,7 +1769,7 @@ test.describe('Orders Date Filtering', () => {
   });
 
   test('should update URL with date filter', async ({ page }) => {
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const dateFromInput = page.locator('input[type="date"]').first();
     await dateFromInput.fill('2024-01-01');
@@ -1789,7 +1789,7 @@ test.describe('Copy Order Number', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display copy button next to order number', async ({ page }) => {
@@ -1808,7 +1808,7 @@ test.describe('Customer Notes Section', () => {
     await setupAdminSession(page);
     await setupOrdersListMock(page);
     await page.goto('/admin/orders/ord-001');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
   });
 
   test('should display Customer Notes section', async ({ page }) => {
