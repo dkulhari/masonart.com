@@ -594,6 +594,8 @@ test.describe('Recent Orders Section', () => {
 
   test('should display up to 5 recent orders', async ({ page }) => {
     const orders = page.locator('a[href*="/admin/orders/order-"]');
+    // Wait for at least one order to render (count() doesn't auto-wait)
+    await orders.first().waitFor({ state: 'visible', timeout: 10000 });
     const count = await orders.count();
     expect(count).toBeLessThanOrEqual(5);
     expect(count).toBeGreaterThan(0);
@@ -925,6 +927,8 @@ test.describe('Accessibility', () => {
 
   test('should have focus indicators on interactive elements', async ({ page }) => {
     const refreshButton = page.locator('button:has-text("Refresh")');
+    // Wait for dashboard data to finish rendering (avoids hydration stealing focus)
+    await page.locator('text=Total Revenue').waitFor({ state: 'visible', timeout: 10000 });
     await refreshButton.focus();
 
     await expect(refreshButton).toBeFocused();
