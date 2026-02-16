@@ -358,17 +358,17 @@ test.describe('Product Listing - Mobile Filters', () => {
     await expect(filterSheet).not.toBeVisible();
   });
 
-  // Skipped: On 375px viewport, the sheet (max-w-sm=384px) covers entire width, no backdrop visible to click
-  test.skip('should close mobile filter sheet on backdrop click', async ({ page }) => {
+  test('should close mobile filter sheet on backdrop click', async ({ page }) => {
     const filterButton = getMobileFilterButton(page);
     await filterButton.click();
 
     const filterSheet = page.locator('div[role="dialog"][aria-label="Filters"]');
     await expect(filterSheet).toBeVisible();
 
-    // Click backdrop
+    // Click the visible backdrop area (left side, not covered by the sheet)
+    // Sheet is w-[85vw] from right, so visible backdrop is the left ~15% of viewport
     const backdrop = page.locator('.bg-black\\/50');
-    await backdrop.click({ force: true });
+    await backdrop.click({ position: { x: 20, y: 300 } });
 
     // Sheet should close
     await expect(filterSheet).not.toBeVisible();

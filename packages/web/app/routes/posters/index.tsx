@@ -861,7 +861,7 @@ function MobileFiltersSheet({
 
       {/* Sheet */}
       <div
-        className="fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-background shadow-xl transition-transform lg:hidden"
+        className="fixed inset-y-0 right-0 z-50 w-[85vw] max-w-sm bg-background shadow-xl transition-transform lg:hidden"
         role="dialog"
         aria-modal="true"
         aria-label="Filters"
