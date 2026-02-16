@@ -171,7 +171,8 @@ async function mockApprovalExpiredToken(page: Page) {
 test.describe('Customer Approval - Pending Approval State', () => {
   test.beforeEach(async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingApproval);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(/Production Photo Review/i)).toBeVisible();
   });
 
   test('displays approval page with correct header', async ({ page }) => {
@@ -217,7 +218,8 @@ test.describe('Customer Approval - Pending Approval State', () => {
 test.describe('Customer Approval - Photo Gallery', () => {
   test.beforeEach(async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingApproval);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(/Production Photo Review/i)).toBeVisible();
   });
 
   test('clicking photo opens full-screen gallery', async ({ page }) => {
@@ -276,7 +278,8 @@ test.describe('Customer Approval - Photo Gallery', () => {
 test.describe('Customer Approval - Request Changes', () => {
   test.beforeEach(async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingApproval);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(/Production Photo Review/i)).toBeVisible();
   });
 
   test('clicking Request Changes shows comment form', async ({ page }) => {
@@ -325,7 +328,8 @@ test.describe('Customer Approval - Request Changes', () => {
 test.describe('Customer Approval - Approve Production', () => {
   test.beforeEach(async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingApproval);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(/Production Photo Review/i)).toBeVisible();
   });
 
   test('clicking Approve shows confirmation and succeeds', async ({ page }) => {
@@ -360,7 +364,7 @@ test.describe('Customer Approval - Approve Production', () => {
 test.describe('Customer Approval - Pending Upload State', () => {
   test('shows waiting message when photos not uploaded', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingUpload);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/Waiting for Production Photos/i)).toBeVisible();
     await expect(page.getByText(/being produced/i)).toBeVisible();
@@ -368,7 +372,7 @@ test.describe('Customer Approval - Pending Upload State', () => {
 
   test('does not show action buttons when pending upload', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingUpload);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('button', { name: /Approve.*Ship/i })).not.toBeVisible();
     await expect(page.getByRole('button', { name: /Request Changes/i })).not.toBeVisible();
@@ -378,14 +382,14 @@ test.describe('Customer Approval - Pending Upload State', () => {
 test.describe('Customer Approval - Changes Requested State', () => {
   test('shows changes requested status', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalChangesRequested);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/Changes Requested/i)).toBeVisible();
   });
 
   test('displays conversation history', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalChangesRequested);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     // Check both customer and admin comments
     await expect(page.getByText('The colors look a bit washed out')).toBeVisible();
@@ -394,7 +398,7 @@ test.describe('Customer Approval - Changes Requested State', () => {
 
   test('still shows action buttons for review', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalChangesRequested);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('button', { name: /Approve.*Ship/i })).toBeVisible();
   });
@@ -403,7 +407,7 @@ test.describe('Customer Approval - Changes Requested State', () => {
 test.describe('Customer Approval - Approved State', () => {
   test('shows approved confirmation message', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalApproved);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/Photos Approved/i)).toBeVisible();
     await expect(page.getByText(/proceed.*shipping/i)).toBeVisible();
@@ -411,7 +415,7 @@ test.describe('Customer Approval - Approved State', () => {
 
   test('does not show action buttons when approved', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalApproved);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('button', { name: /Approve.*Ship/i })).not.toBeVisible();
     await expect(page.getByRole('button', { name: /Request Changes/i })).not.toBeVisible();
@@ -419,7 +423,7 @@ test.describe('Customer Approval - Approved State', () => {
 
   test('shows approval date', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalApproved);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/Approved on/i)).toBeVisible();
   });
@@ -428,14 +432,14 @@ test.describe('Customer Approval - Approved State', () => {
 test.describe('Customer Approval - Expired State', () => {
   test('shows expired message', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalExpired);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.locator('h2:has-text("Approval Deadline Passed")')).toBeVisible();
   });
 
   test('does not show action buttons when expired', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalExpired);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('button', { name: /Approve.*Ship/i })).not.toBeVisible();
   });
@@ -448,21 +452,21 @@ test.describe('Customer Approval - Expired State', () => {
 test.describe('Customer Approval - Error Handling', () => {
   test('shows error for invalid token', async ({ page }) => {
     await mockApprovalNotFound(page);
-    await page.goto('/approve/invalid-token', { waitUntil: 'networkidle' });
+    await page.goto('/approve/invalid-token', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/not found|expired/i)).toBeVisible();
   });
 
   test('shows error for expired link', async ({ page }) => {
     await mockApprovalExpiredToken(page);
-    await page.goto('/approve/expired-token', { waitUntil: 'networkidle' });
+    await page.goto('/approve/expired-token', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByText(/expired/i)).toBeVisible();
   });
 
   test('shows retry button on error', async ({ page }) => {
     await mockApprovalNotFound(page);
-    await page.goto('/approve/invalid-token', { waitUntil: 'networkidle' });
+    await page.goto('/approve/invalid-token', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('button', { name: /Try Again/i })).toBeVisible();
   });
@@ -477,7 +481,7 @@ test.describe('Customer Approval - Mobile View', () => {
 
   test('page is mobile responsive', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingApproval);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     // Check key elements are visible
     await expect(page.getByText(/Production Photo Review/i)).toBeVisible();
@@ -493,7 +497,7 @@ test.describe('Customer Approval - Mobile View', () => {
 
   test('gallery works on mobile', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingApproval);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     // Open gallery
     const photo = page.locator('img[src*="picsum"]').first();
@@ -505,7 +509,7 @@ test.describe('Customer Approval - Mobile View', () => {
 
   test('change request form works on mobile', async ({ page }) => {
     await mockApprovalApi(page, mockApprovalPendingApproval);
-    await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
+    await page.goto('/approve/test-token-001', { waitUntil: 'domcontentloaded' });
 
     await page.getByRole('button', { name: /Request Changes/i }).click();
 
