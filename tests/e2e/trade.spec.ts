@@ -30,8 +30,7 @@ const __dirname = path.dirname(__filename);
 const TRADE_AUTH = path.join(__dirname, '..', '.auth', 'trade.json');
 const CUSTOMER_AUTH = path.join(__dirname, '..', '.auth', 'customer.json');
 
-// Run authenticated tests serially to avoid race conditions with auth state
-test.describe.configure({ mode: 'serial' });
+// Each describe block has its own beforeEach re-auth, so parallel is fine
 
 // ============================================================================
 // Unauthenticated Tests
@@ -53,15 +52,21 @@ test.describe('Trade Role - Unauthenticated Comparison', () => {
 test.describe('Trade Role - Customer Feature Access', () => {
   test.use({ storageState: TRADE_AUTH });
 
-  // Wait to ensure auth state file is ready
+  // Re-authenticate if session expired (cookie cache is 5 min)
   test.beforeEach(async ({ page }) => {
-    await page.waitForTimeout(100);
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    if (page.url().includes('/auth/login')) {
+      await page.locator('main').getByLabel('Email').fill('test-trade@interior.com');
+      await page.locator('main').getByLabel('Password').fill('TestPassword123!');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await page.waitForURL(/\/account/, { timeout: 15000 });
+    }
   });
 
   test.describe('Account Dashboard', () => {
     test('should access account dashboard', async ({ page }) => {
       await page.goto('/account');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should stay on account page, not redirect
       expect(page.url()).toContain('/account');
@@ -73,7 +78,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
 
     test('should display user profile card', async ({ page }) => {
       await page.goto('/account');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should see profile section with user info
       const profileCard = page.locator('text=/Test Trade User|test-trade@example.com/i').first();
@@ -82,7 +87,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
 
     test('should display quick actions menu', async ({ page }) => {
       await page.goto('/account');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should see quick actions
       const quickActions = page.locator('text=/Quick Actions/i');
@@ -93,7 +98,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
   test.describe('Wallet Access', () => {
     test('should access wallet page', async ({ page }) => {
       await page.goto('/account/wallet');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should stay on wallet page
       expect(page.url()).toContain('/account/wallet');
@@ -105,7 +110,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
 
     test('should display wallet balance', async ({ page }) => {
       await page.goto('/account/wallet');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should see balance indicator
       const balanceElement = page.locator('text=/₹|Balance/i').first();
@@ -116,7 +121,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
   test.describe('AI Generation Access', () => {
     test('should access AI generator page', async ({ page }) => {
       await page.goto('/create');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should stay on create page
       expect(page.url()).toContain('/create');
@@ -130,7 +135,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
     // See ai-history.spec.ts for details
     test.skip('should access AI creations history', async ({ page }) => {
       await page.goto('/account/ai-creations');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should stay on AI creations page
       expect(page.url()).toContain('/account/ai-creations');
@@ -142,7 +147,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
     // auth state issues in the E2E test environment
     test.skip('should access orders page', async ({ page }) => {
       await page.goto('/account/orders');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should stay on orders page
       expect(page.url()).toContain('/account/orders');
@@ -156,7 +161,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
   test.describe('Shopping Features', () => {
     test('should access product catalog', async ({ page }) => {
       await page.goto('/posters');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should see products
       expect(page.url()).toContain('/posters');
@@ -164,7 +169,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
 
     test('should access cart page', async ({ page }) => {
       await page.goto('/cart');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should stay on cart page
       expect(page.url()).toContain('/cart');
@@ -179,9 +184,19 @@ test.describe('Trade Role - Customer Feature Access', () => {
 test.describe('Trade Role - Admin Access Restriction', () => {
   test.use({ storageState: TRADE_AUTH });
 
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    if (page.url().includes('/auth/login')) {
+      await page.locator('main').getByLabel('Email').fill('test-trade@interior.com');
+      await page.locator('main').getByLabel('Password').fill('TestPassword123!');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await page.waitForURL(/\/account/, { timeout: 15000 });
+    }
+  });
+
   test('should NOT access admin dashboard', async ({ page }) => {
     await page.goto('/admin');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should be redirected away from admin or show access denied
     const url = page.url();
@@ -193,7 +208,7 @@ test.describe('Trade Role - Admin Access Restriction', () => {
 
   test('should NOT access admin products page', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const url = page.url();
     const isRedirected = !url.includes('/admin/products') || url.includes('/auth/login');
@@ -204,7 +219,7 @@ test.describe('Trade Role - Admin Access Restriction', () => {
 
   test('should NOT access admin orders page', async ({ page }) => {
     await page.goto('/admin/orders');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     const url = page.url();
     const isRedirected = !url.includes('/admin/orders') || url.includes('/auth/login');
@@ -224,9 +239,19 @@ test.describe('Trade Role - Same Access as Customer', () => {
   test.describe('Trade User Access', () => {
     test.use({ storageState: TRADE_AUTH });
 
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/account', { waitUntil: 'domcontentloaded' });
+      if (page.url().includes('/auth/login')) {
+        await page.locator('main').getByLabel('Email').fill('test-trade@interior.com');
+        await page.locator('main').getByLabel('Password').fill('TestPassword123!');
+        await page.getByRole('button', { name: /sign in/i }).click();
+        await page.waitForURL(/\/account/, { timeout: 15000 });
+      }
+    });
+
     test('trade user can access account', async ({ page }) => {
       await page.goto('/account');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       expect(page.url()).toContain('/account');
       expect(page.url()).not.toContain('/auth/login');
     });
@@ -235,9 +260,19 @@ test.describe('Trade Role - Same Access as Customer', () => {
   test.describe('Customer User Access (Comparison)', () => {
     test.use({ storageState: CUSTOMER_AUTH });
 
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/account', { waitUntil: 'domcontentloaded' });
+      if (page.url().includes('/auth/login')) {
+        await page.locator('main').getByLabel('Email').fill('test-customer@example.com');
+        await page.locator('main').getByLabel('Password').fill('TestPassword123!');
+        await page.getByRole('button', { name: /sign in/i }).click();
+        await page.waitForURL(/\/account/, { timeout: 15000 });
+      }
+    });
+
     test('customer can access account', async ({ page }) => {
       await page.goto('/account');
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       expect(page.url()).toContain('/account');
       expect(page.url()).not.toContain('/auth/login');
     });
