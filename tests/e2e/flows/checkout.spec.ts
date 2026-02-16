@@ -199,6 +199,58 @@ async function setupRazorpayMocks(page: Page, options?: {
   });
 }
 
+/**
+ * Mock the shipping estimate API to return standard and express delivery options.
+ * Must be called BEFORE page.goto() so the route is registered before the page loads.
+ */
+async function setupShippingMock(page: Page, cartTotal = 2999) {
+  await page.route('**/api/shipping/estimate*', async (route) => {
+    const today = new Date();
+    const stdMin = new Date(today); stdMin.setDate(stdMin.getDate() + 5);
+    const stdMax = new Date(today); stdMax.setDate(stdMax.getDate() + 7);
+    const expMin = new Date(today); expMin.setDate(expMin.getDate() + 2);
+    const expMax = new Date(today); expMax.setDate(expMax.getDate() + 3);
+    const qualifiesFree = cartTotal >= 1000;
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        cartTotal,
+        zipCode: '400001',
+        freeShippingThreshold: 1000,
+        qualifiesForFreeShipping: qualifiesFree,
+        options: [
+          {
+            id: 'ship-standard',
+            name: 'Standard Delivery',
+            carrier: 'India Post',
+            baseCost: '99',
+            finalCost: qualifiesFree ? 0 : 99,
+            isFree: qualifiesFree,
+            estimatedDaysMin: 5,
+            estimatedDaysMax: 7,
+            estimatedDeliveryMin: stdMin.toISOString().split('T')[0],
+            estimatedDeliveryMax: stdMax.toISOString().split('T')[0],
+          },
+          {
+            id: 'ship-express',
+            name: 'Express Delivery',
+            carrier: 'DTDC',
+            baseCost: '149',
+            finalCost: 149,
+            isFree: false,
+            estimatedDaysMin: 2,
+            estimatedDaysMax: 3,
+            estimatedDeliveryMin: expMin.toISOString().split('T')[0],
+            estimatedDeliveryMax: expMax.toISOString().split('T')[0],
+          },
+        ],
+      }),
+    });
+  });
+}
+
 // ============================================================================
 // Product to Cart Flow Tests
 // ============================================================================
@@ -316,6 +368,7 @@ test.describe('Checkout Flow - Cart to Checkout', () => {
 
 test.describe('Checkout Flow - Step Progression', () => {
   test.beforeEach(async ({ page }) => {
+    await setupShippingMock(page);
     await page.goto('/checkout');
     await clearCart(page);
     await addItemToCart(page, {
@@ -474,6 +527,7 @@ test.describe.skip('Checkout Flow - Complete Purchase', () => {
 
 test.describe('Checkout Flow - Delivery Options', () => {
   test.beforeEach(async ({ page }) => {
+    await setupShippingMock(page);
     await page.goto('/checkout');
     await clearCart(page);
     await addItemToCart(page, {
@@ -502,9 +556,11 @@ test.describe('Checkout Flow - Delivery Options', () => {
     await fillValidAddressForm(page);
     await page.getByRole('button', { name: 'Continue to Delivery' }).click();
 
-    // Verify delivery times are shown
-    await expect(page.locator('text=5-7 business days')).toBeVisible();
-    await expect(page.locator('text=2-3 business days')).toBeVisible();
+    // Verify delivery times are shown (component renders "Arrives {date range}")
+    const standardCard = page.getByRole('button', { name: /Standard Delivery/ });
+    await expect(standardCard).toContainText(/Arrives/);
+    const expressCard = page.getByRole('button', { name: /Express Delivery/ });
+    await expect(expressCard).toContainText(/Arrives/);
   });
 });
 
@@ -514,6 +570,7 @@ test.describe('Checkout Flow - Delivery Options', () => {
 
 test.describe('Checkout Flow - Free Shipping', () => {
   test('should show free shipping when over threshold', async ({ page }) => {
+    await setupShippingMock(page, 1500);
     await page.goto('/checkout');
     await clearCart(page);
     await addItemToCart(page, {
@@ -533,6 +590,7 @@ test.describe('Checkout Flow - Free Shipping', () => {
   });
 
   test('should show shipping cost when under threshold', async ({ page }) => {
+    await setupShippingMock(page, 500);
     await page.goto('/checkout');
     await clearCart(page);
     await addItemToCart(page, {
@@ -733,6 +791,7 @@ test.describe.skip('Checkout Flow - AI Generated Item', () => {
 
 test.describe('Checkout Flow - Guest Checkout', () => {
   test.beforeEach(async ({ page }) => {
+    await setupShippingMock(page);
     await setupRazorpayMocks(page, { paymentSuccess: true });
     await page.goto('/checkout');
     await clearCart(page);
@@ -769,6 +828,7 @@ test.describe('Checkout Flow - Guest Checkout', () => {
 
 test.describe('Checkout Flow - Order Notes', () => {
   test.beforeEach(async ({ page }) => {
+    await setupShippingMock(page);
     await page.goto('/checkout');
     await clearCart(page);
     await addItemToCart(page, {
