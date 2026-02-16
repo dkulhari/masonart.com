@@ -448,8 +448,8 @@ test.describe('Auth Flow - Google OAuth', () => {
   test('should have proper divider between OAuth and email login', async ({ page }) => {
     await page.goto('/auth/login');
 
-    // Check for "or sign in with email" divider
-    const divider = page.locator('text=or sign in with email');
+    // Check for "or" divider between OAuth and email
+    const divider = page.getByText('or', { exact: true });
     await expect(divider).toBeVisible();
   });
 
