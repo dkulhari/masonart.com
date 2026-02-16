@@ -1,0 +1,70 @@
+ticket_number: 146
+title: "Bug: Mobile filter sheet backdrop click doesn't close sheet"
+description: |-
+  ## Issue
+  On mobile viewport (375px), clicking the backdrop behind the filter sheet doesn't close it.
+
+  ## Test
+  `tests/e2e/product-listing.spec.ts` - "should close mobile filter sheet on backdrop click"
+
+  ## Root Cause
+  The sheet uses `max-w-sm` (384px) which covers the entire 375px viewport width, leaving no visible backdrop area to click.
+
+  ## Expected Behavior
+  Clicking outside the filter sheet should close it on mobile.
+
+  ## Potential Solutions
+  1. Add a visible close button (already exists) - users can use this instead
+  2. Reduce sheet width on very small viewports
+  3. Add an overlay that can receive click events even when sheet is full-width
+  4. Add swipe-to-close gesture support
+
+  ## File
+  `packages/web/app/components/product/ProductFilters.tsx` or the Sheet component
+
+  ## Priority
+  Low - workaround exists (close button)
+feature: product-catalog
+type: bug
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-01-31T16:49:39.741Z"
+last_updated: "2026-02-16T20:33:43.791Z"
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - mobile
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-16T20:14:07.756Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-02-16T20:33:43.792Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-16T20:33:50.324Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `076ec6dc` - fix(ui): Mobile filter sheet leaves visible backdrop for close tap
+
+      **Files Changed**:
+      - `packages/web/app/routes/posters/index.tsx` - Changed sheet width from `w-full max-w-sm` to `w-[85vw] max-w-sm` so backdrop is visible on narrow viewports
+      - `tests/e2e/product-listing.spec.ts` - Unskipped backdrop click test, updated click position to target visible backdrop area
+
+      **Summary**:
+      The mobile filter sheet used `w-full` which made it 375px on a 375px viewport, covering the entire screen with no visible backdrop to tap for dismissal. Changed to `w-[85vw]` (318.75px on 375px viewport) leaving ~56px of visible backdrop on the left side that users can tap to close the sheet. The `max-w-sm` (384px) cap is preserved for larger mobile viewports.
+
+      **Tests**: E2E test passes 5/5 across all browsers (chromium, firefox, webkit, Mobile Chrome, Mobile Safari). Full product-listing spec: 567 passed.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-02-16T20:14:07.755Z"
+completed: "2026-02-16T20:33:43.791Z"

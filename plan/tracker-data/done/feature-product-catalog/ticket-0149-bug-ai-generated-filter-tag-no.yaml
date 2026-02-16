@@ -1,5 +1,5 @@
 ticket_number: 149
-title: 'Bug: Boolean filter URL params lost during SSR redirect'
+title: "Bug: Boolean filter URL params lost during SSR redirect"
 description: |-
   ## Issue
   When navigating to URLs with boolean filter params (isAiGenerated, isFeatured), the params are stripped during TanStack Router's 307 redirect.
@@ -33,11 +33,11 @@ description: |-
 feature: product-catalog
 type: bug
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-01-31T16:49:55.440Z'
-last_updated: '2026-01-31T17:32:15.044Z'
+created: "2026-01-31T16:49:55.440Z"
+last_updated: "2026-02-16T20:09:19.467Z"
 time_spent_minutes: 0
 labels:
   - bug
@@ -47,10 +47,10 @@ labels:
 acceptance_criteria: []
 comments:
   - author: user
-    timestamp: '2026-01-31T17:32:15.044Z'
+    timestamp: "2026-01-31T17:32:15.044Z"
     text: I would prefer solution 1
   - author: claude
-    timestamp: '2026-01-31T17:15:00.000Z'
+    timestamp: "2026-01-31T17:15:00.000Z"
     text: |
       **Investigation Results**
 
@@ -79,8 +79,32 @@ comments:
       2. Or add proper search param serialization in the route definition
 
       The test should remain skipped until this serialization bug is fixed.
+  - author: system
+    timestamp: "2026-02-16T19:54:00.520Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-02-16T20:09:19.467Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-16T20:09:30.549Z"
+    text: |-
+      **Completed**
+
+      **Commit**: `532fffe4` - fix(filters): Preserve boolean URL params during SSR redirect
+
+      **Root Cause**: TanStack Router's default URL parser (`qss.decode()`) converts `'true'`/`'false'` strings to JavaScript booleans at the URL level, before `validateSearch` runs. During 307 redirects (trailing slash normalization), booleans can't be serialized back to URL strings, so they're silently dropped from the redirect Location header.
+
+      **Files Changed**:
+      - `packages/web/app/router.tsx` - Added custom `parseSearch`/`stringifySearch` functions that keep all URL values as strings, preventing boolean coercion at the URL parsing layer
+      - `packages/web/app/routes/posters/index.tsx` - Updated `validateSearch` to handle both boolean and string `'true'` values
+      - `packages/web/app/routes/auth/login.tsx` - Updated Zod schema `registered` field to use `z.preprocess()` for string-to-boolean coercion (needed since URL values are now strings)
+      - `tests/e2e/product-listing.spec.ts` - Unskipped "should show AI Generated in active filter tags" test
+
+      **Verification**: All 8 E2E test runs pass (Chromium, Mobile Chrome, Firefox, WebKit, Mobile Safari). All URL scenarios return 200: `?isAiGenerated=true`, `?styles=abstract`, mixed params, and `?registered=true` on login.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: "2026-02-16T19:54:00.519Z"
+completed: "2026-02-16T20:09:19.467Z"
