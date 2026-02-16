@@ -174,8 +174,8 @@ export const Route = createFileRoute('/posters/')({
       orientation: search.orientation as Orientation | undefined,
       priceMin: search.priceMin ? Number(search.priceMin) : undefined,
       priceMax: search.priceMax ? Number(search.priceMax) : undefined,
-      isAiGenerated: search.isAiGenerated === 'true' ? true : undefined,
-      isFeatured: search.isFeatured === 'true' ? true : undefined,
+      isAiGenerated: search.isAiGenerated === true || search.isAiGenerated === 'true' ? true : undefined,
+      isFeatured: search.isFeatured === true || search.isFeatured === 'true' ? true : undefined,
       sortBy: search.sortBy as SortOption | undefined,
       sortOrder: search.sortOrder as SortOrder | undefined,
     }

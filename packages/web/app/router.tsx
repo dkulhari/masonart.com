@@ -13,6 +13,34 @@ import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { routeTree } from './routeTree.gen'
 
 /**
+ * Custom search param parser that keeps all values as strings.
+ * The default TanStack Router parser (via qss) converts 'true'/'false' to
+ * booleans and numeric strings to numbers, which breaks 307 redirect
+ * serialization for boolean URL params (see ticket #149).
+ */
+function parseSearchString(searchStr: string): Record<string, unknown> {
+  if (searchStr.startsWith('?')) searchStr = searchStr.substring(1)
+  const result: Record<string, unknown> = {}
+  if (!searchStr) return result
+  const params = new URLSearchParams(searchStr)
+  for (const [key, value] of params.entries()) {
+    result[key] = value
+  }
+  return result
+}
+
+function stringifySearchObj(search: Record<string, unknown>): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(search)) {
+    if (value !== undefined && value !== null) {
+      params.set(key, String(value))
+    }
+  }
+  const str = params.toString()
+  return str ? `?${str}` : ''
+}
+
+/**
  * Router context interface
  * This must match the context expected by createRootRouteWithContext
  */
@@ -47,6 +75,8 @@ export function createRouter() {
     scrollRestoration: true,
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
+    parseSearch: parseSearchString,
+    stringifySearch: stringifySearchObj,
     // Provide initial context - session will be populated by root route's beforeLoad
     context: {
       session: null,

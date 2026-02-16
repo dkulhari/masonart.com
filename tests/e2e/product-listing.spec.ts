@@ -1259,8 +1259,7 @@ test.describe('Product Listing - Special Filters', () => {
     await expect(page).toHaveURL(/isFeatured=true/, { timeout: 10000 });
   });
 
-  // Skipped: Server 307 redirects strip query parameters - see ticket #149
-  test.skip('should show AI Generated in active filter tags', async ({ page }) => {
+  test('should show AI Generated in active filter tags', async ({ page }) => {
     await page.goto('/posters?isAiGenerated=true', { waitUntil: 'networkidle' });
 
     // Scope to desktop active filter container

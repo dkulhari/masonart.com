@@ -29,7 +29,7 @@ import { signIn } from '~/lib/auth-client'
 
 const searchParamsSchema = z.object({
   redirect: z.string().optional(),
-  registered: z.boolean().optional(),
+  registered: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
 })
 
 export const Route = createFileRoute('/auth/login')({
