@@ -55,30 +55,36 @@ test.describe('Wallet Page - Unauthenticated', () => {
 // Authenticated Tests - Wallet Page
 // ============================================================================
 
-// Run authenticated tests serially to avoid race conditions with auth state
-test.describe.configure({ mode: 'serial' });
+// Each describe block has its own beforeEach re-auth, so parallel is fine
 
 test.describe('Wallet Page - Authenticated', () => {
   // Use the stored customer authentication state
   test.use({ storageState: CUSTOMER_AUTH });
 
-  // Add beforeEach to ensure page is ready
+  // Re-authenticate before each test if session expired (cookie cache is 5 min)
   test.beforeEach(async ({ page }) => {
-    // Wait a bit to ensure auth state file is not being written
-    await page.waitForTimeout(100);
+    // Navigate to account page to check auth status
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    // If redirected to login, re-authenticate
+    if (page.url().includes('/auth/login')) {
+      await page.getByLabel('Email').fill('test-customer@example.com');
+      await page.getByLabel('Password').fill('TestPassword123!');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await page.waitForURL(/\/account/, { timeout: 15000 });
+    }
   });
 
   test('should load wallet page without redirect', async ({ page }) => {
-    await page.goto('/account/wallet', { waitUntil: 'networkidle' });
+    await page.goto('/account/wallet', { waitUntil: 'domcontentloaded' });
 
-    // Should stay on wallet page
-    await page.waitForURL(/\/account\/wallet/, { timeout: 10000 });
+    // Should stay on wallet page (allow time for SSR redirect check)
+    await page.waitForURL(/\/account\/wallet/, { timeout: 15000 });
     expect(page.url()).toContain('/account/wallet');
   });
 
   test('should display My Wallet title', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for wallet-related heading
     const heading = page.locator('h1').filter({ hasText: /Wallet/i }).first();
@@ -87,7 +93,7 @@ test.describe('Wallet Page - Authenticated', () => {
 
   test('should display wallet balance', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Balance should be displayed (look for ₹ symbol or amount)
     const balanceElement = page.locator('text=/₹|Balance/i').first();
@@ -96,7 +102,7 @@ test.describe('Wallet Page - Authenticated', () => {
 
   test('should display free generations badge if available', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for free generations indicator (may or may not be present)
     const freeGenElement = page.locator('text=/free|generation/i').first();
@@ -109,7 +115,7 @@ test.describe('Wallet Page - Authenticated', () => {
 
   test('should display add funds section', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for add funds or top-up elements
     const addFundsSection = page.locator('text=/Add Funds|Top.?up|₹100|₹200|₹500/i').first();
@@ -118,12 +124,11 @@ test.describe('Wallet Page - Authenticated', () => {
 
   test('should display quick top-up buttons', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
-    // Look for preset amount buttons
+    // Look for preset amount buttons (wait for first to appear before counting)
     const topUpButtons = page.locator('button').filter({ hasText: /₹\d+/ });
-
-    // Should have at least one preset button
+    await expect(topUpButtons.first()).toBeVisible({ timeout: 10000 });
     const count = await topUpButtons.count();
     expect(count).toBeGreaterThan(0);
   });
@@ -136,9 +141,19 @@ test.describe('Wallet Page - Authenticated', () => {
 test.describe('Wallet Page - Transaction History', () => {
   test.use({ storageState: CUSTOMER_AUTH });
 
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    if (page.url().includes('/auth/login')) {
+      await page.getByLabel('Email').fill('test-customer@example.com');
+      await page.getByLabel('Password').fill('TestPassword123!');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await page.waitForURL(/\/account/, { timeout: 15000 });
+    }
+  });
+
   test('should display transaction history section', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for transaction history heading
     const historySection = page.locator('text=/Transaction|History|Recent/i').first();
@@ -147,7 +162,7 @@ test.describe('Wallet Page - Transaction History', () => {
 
   test('should show empty state or transactions', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Either show transactions or empty state
     const transactionOrEmpty = page.locator(
@@ -164,9 +179,19 @@ test.describe('Wallet Page - Transaction History', () => {
 test.describe('Wallet Page - Top-up Flow', () => {
   test.use({ storageState: CUSTOMER_AUTH });
 
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    if (page.url().includes('/auth/login')) {
+      await page.getByLabel('Email').fill('test-customer@example.com');
+      await page.getByLabel('Password').fill('TestPassword123!');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await page.waitForURL(/\/account/, { timeout: 15000 });
+    }
+  });
+
   test('should show custom amount input', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for custom amount input
     const customInput = page.locator('input[type="number"], input[placeholder*="amount" i]').first();
@@ -175,7 +200,7 @@ test.describe('Wallet Page - Top-up Flow', () => {
 
   test('should validate minimum amount for custom top-up', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Find custom amount input
     const customInput = page.locator('input[type="number"], input[placeholder*="amount" i]').first();
@@ -194,7 +219,7 @@ test.describe('Wallet Page - Top-up Flow', () => {
 
   test('clicking top-up button should attempt to load Razorpay', async ({ page }) => {
     await page.goto('/account/wallet');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Find a preset amount button
     const topUpButton = page.locator('button').filter({ hasText: /₹100/ }).first();
@@ -223,9 +248,19 @@ test.describe('Wallet Page - Top-up Flow', () => {
 test.describe('AI Generator - Cost Preview', () => {
   test.use({ storageState: CUSTOMER_AUTH });
 
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    if (page.url().includes('/auth/login')) {
+      await page.getByLabel('Email').fill('test-customer@example.com');
+      await page.getByLabel('Password').fill('TestPassword123!');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await page.waitForURL(/\/account/, { timeout: 15000 });
+    }
+  });
+
   test('should show cost preview on create page when logged in', async ({ page }) => {
     await page.goto('/create');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for cost preview or free generation indicator
     const costIndicator = page.locator(
@@ -238,7 +273,7 @@ test.describe('AI Generator - Cost Preview', () => {
 
   test('should show free generation badge if available', async ({ page }) => {
     await page.goto('/create');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for free generation indicator
     const freeIndicator = page.locator('text=/free.*generation|FREE/i').first();
@@ -250,7 +285,7 @@ test.describe('AI Generator - Cost Preview', () => {
 
   test('should show wallet balance in cost preview', async ({ page }) => {
     await page.goto('/create');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for balance indicator
     const balanceIndicator = page.locator('text=/Balance|₹/i');
@@ -268,9 +303,19 @@ test.describe('AI Generator - Cost Preview', () => {
 test.describe('Account Dashboard - Wallet Quick Action', () => {
   test.use({ storageState: CUSTOMER_AUTH });
 
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    if (page.url().includes('/auth/login')) {
+      await page.getByLabel('Email').fill('test-customer@example.com');
+      await page.getByLabel('Password').fill('TestPassword123!');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await page.waitForURL(/\/account/, { timeout: 15000 });
+    }
+  });
+
   test('should display wallet quick action on account page', async ({ page }) => {
     await page.goto('/account');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Look for wallet quick action card
     const walletCard = page.locator('text=/My Wallet|Wallet|Add funds/i').first();
@@ -279,7 +324,7 @@ test.describe('Account Dashboard - Wallet Quick Action', () => {
 
   test('wallet quick action should link to wallet page', async ({ page }) => {
     await page.goto('/account');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Find and click the wallet quick action
     const walletLink = page.locator('a[href*="wallet"]').first();
@@ -297,6 +342,16 @@ test.describe('Account Dashboard - Wallet Quick Action', () => {
 test.describe('Wallet Page - Error Handling', () => {
   test.use({ storageState: CUSTOMER_AUTH });
 
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/account', { waitUntil: 'domcontentloaded' });
+    if (page.url().includes('/auth/login')) {
+      await page.getByLabel('Email').fill('test-customer@example.com');
+      await page.getByLabel('Password').fill('TestPassword123!');
+      await page.getByRole('button', { name: /sign in/i }).click();
+      await page.waitForURL(/\/account/, { timeout: 15000 });
+    }
+  });
+
   test('should handle API errors gracefully', async ({ page }) => {
     // Intercept wallet API and return error
     await page.route('**/api/wallet', (route) => {
@@ -310,7 +365,7 @@ test.describe('Wallet Page - Error Handling', () => {
     await page.goto('/account/wallet');
 
     // Page should still load (with error state)
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Should show error message or retry option
     const errorOrRetry = page.locator('text=/error|failed|retry|try again/i').first();
