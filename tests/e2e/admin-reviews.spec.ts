@@ -274,60 +274,56 @@ test.describe('Admin Reviews - Bulk Actions', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin/reviews');
-    // Wait for loading to complete
-    await page.locator('text=Pending Reviews').waitFor({ state: 'visible', timeout: 10000 });
+    // Wait for page to load - use heading which is always present
+    await page.getByRole('heading', { name: /Reviews/i }).waitFor({ state: 'visible', timeout: 10000 });
   });
 
   test('should show bulk action bar when reviews selected', async ({ page }) => {
     const checkbox = page.locator('tbody input[type="checkbox"]').first();
-    if (await checkbox.isVisible()) {
+    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
       await checkbox.click();
       const bulkBar = page.locator('text=selected');
       await expect(bulkBar).toBeVisible();
     } else {
-      // No reviews to select
-      const hasNoReviews = await page.locator('text=No reviews found').isVisible().catch(() => false);
-      expect(hasNoReviews).toBe(true);
+      // No reviews exist - page shows "0 total" with no table
+      await expect(page.getByText(/0 total|No reviews/i)).toBeVisible();
     }
   });
 
   test('bulk bar should have approve all button', async ({ page }) => {
     const checkbox = page.locator('tbody input[type="checkbox"]').first();
-    if (await checkbox.isVisible()) {
+    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
       await checkbox.click();
       const approveAllBtn = page.locator('button:has-text("Approve All")');
       await expect(approveAllBtn).toBeVisible();
     } else {
-      // No reviews to select
-      const hasNoReviews = await page.locator('text=No reviews found').isVisible().catch(() => false);
-      expect(hasNoReviews).toBe(true);
+      // No reviews exist - page shows "0 total" with no table
+      await expect(page.getByText(/0 total|No reviews/i)).toBeVisible();
     }
   });
 
   test('bulk bar should have reject all button', async ({ page }) => {
     const checkbox = page.locator('tbody input[type="checkbox"]').first();
-    if (await checkbox.isVisible()) {
+    if (await checkbox.isVisible({ timeout: 3000 }).catch(() => false)) {
       await checkbox.click();
       const rejectAllBtn = page.locator('button:has-text("Reject All")');
       await expect(rejectAllBtn).toBeVisible();
     } else {
-      // No reviews to select
-      const hasNoReviews = await page.locator('text=No reviews found').isVisible().catch(() => false);
-      expect(hasNoReviews).toBe(true);
+      // No reviews exist - page shows "0 total" with no table
+      await expect(page.getByText(/0 total|No reviews/i)).toBeVisible();
     }
   });
 
   test('select all checkbox should select all rows', async ({ page }) => {
     const selectAllCheckbox = page.locator('thead input[type="checkbox"]');
-    if (await selectAllCheckbox.isVisible()) {
+    if (await selectAllCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
       await selectAllCheckbox.click();
       const checkedBoxes = await page.locator('tbody input[type="checkbox"]:checked').count();
       const totalBoxes = await page.locator('tbody input[type="checkbox"]').count();
       expect(checkedBoxes).toBe(totalBoxes);
     } else {
-      // No reviews to select
-      const hasNoReviews = await page.locator('text=No reviews found').isVisible().catch(() => false);
-      expect(hasNoReviews).toBe(true);
+      // No reviews exist - page shows "0 total" with no table
+      await expect(page.getByText(/0 total|No reviews/i)).toBeVisible();
     }
   });
 });
