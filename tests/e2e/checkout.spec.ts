@@ -29,6 +29,60 @@ import { test, expect, type Page } from '@playwright/test';
 // ============================================================================
 
 /**
+ * Mock the shipping estimate API to return standard and express delivery options.
+ * Must be called BEFORE page.goto() so the route is registered before the page loads.
+ */
+async function setupShippingMock(page: Page, cartTotal = 2999) {
+  await page.route('**/api/shipping/estimate*', async (route) => {
+    const today = new Date();
+    const stdMin = new Date(today); stdMin.setDate(stdMin.getDate() + 5);
+    const stdMax = new Date(today); stdMax.setDate(stdMax.getDate() + 7);
+    const expMin = new Date(today); expMin.setDate(expMin.getDate() + 2);
+    const expMax = new Date(today); expMax.setDate(expMax.getDate() + 3);
+    const qualifiesFree = cartTotal >= 1000;
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        cartTotal,
+        zipCode: '400001',
+        freeShippingThreshold: 1000,
+        qualifiesForFreeShipping: qualifiesFree,
+        options: [
+          {
+            id: 'ship-standard',
+            name: 'Standard Delivery',
+            carrier: 'India Post',
+            description: 'Regular delivery via India Post',
+            baseCost: '99',
+            finalCost: qualifiesFree ? 0 : 99,
+            isFree: qualifiesFree,
+            estimatedDaysMin: 5,
+            estimatedDaysMax: 7,
+            estimatedDeliveryMin: stdMin.toISOString().split('T')[0],
+            estimatedDeliveryMax: stdMax.toISOString().split('T')[0],
+          },
+          {
+            id: 'ship-express',
+            name: 'Express Delivery',
+            carrier: 'DTDC',
+            description: 'Fast delivery via DTDC courier',
+            baseCost: '149',
+            finalCost: 149,
+            isFree: false,
+            estimatedDaysMin: 2,
+            estimatedDaysMax: 3,
+            estimatedDeliveryMin: expMin.toISOString().split('T')[0],
+            estimatedDeliveryMax: expMax.toISOString().split('T')[0],
+          },
+        ],
+      }),
+    });
+  });
+}
+
+/**
  * Add a test item to cart via localStorage
  */
 async function addItemToCart(page: Page, itemOverrides?: Partial<{
@@ -475,6 +529,7 @@ test.describe('Checkout Page - Address Form Validation', () => {
 
 test.describe('Checkout Page - Delivery Step', () => {
   test.beforeEach(async ({ page }) => {
+    await setupShippingMock(page);
     await page.goto('/checkout');
     await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
     await addItemToCart(page, { productTitle: 'Delivery Test', unitPrice: 2999 });
@@ -502,13 +557,15 @@ test.describe('Checkout Page - Delivery Step', () => {
   });
 
   test('should display estimated delivery days for standard', async ({ page }) => {
-    const standardDays = page.locator('text=5-7 business days');
-    await expect(standardDays).toBeVisible();
+    // Standard Delivery card should show "Arrives {date range}"
+    const standardCard = page.getByRole('button', { name: /Standard Delivery/ });
+    await expect(standardCard).toContainText(/Arrives/);
   });
 
   test('should display estimated delivery days for express', async ({ page }) => {
-    const expressDays = page.locator('text=2-3 business days');
-    await expect(expressDays).toBeVisible();
+    // Express Delivery card should show "Arrives {date range}"
+    const expressCard = page.getByRole('button', { name: /Express Delivery/ });
+    await expect(expressCard).toContainText(/Arrives/);
   });
 
   test('should have Standard Delivery selected by default', async ({ page }) => {
@@ -577,6 +634,7 @@ test.describe('Checkout Page - Delivery Step', () => {
 
 test.describe('Checkout Page - Free Shipping', () => {
   test('should show FREE for standard when over threshold', async ({ page }) => {
+    await setupShippingMock(page, 1500);
     await page.goto('/checkout');
     await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
     // Add item over ₹999 threshold
@@ -594,6 +652,7 @@ test.describe('Checkout Page - Free Shipping', () => {
   });
 
   test('should show free shipping notice when qualified', async ({ page }) => {
+    await setupShippingMock(page, 1500);
     await page.goto('/checkout');
     await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
     // Add item over ₹999 threshold
@@ -606,11 +665,12 @@ test.describe('Checkout Page - Free Shipping', () => {
     await continueButton.click();
 
     // Check for free shipping notice
-    const notice = page.locator('text=You qualify for free standard shipping');
+    const notice = page.locator('text=/You qualify for free shipping/');
     await expect(notice).toBeVisible();
   });
 
   test('should show shipping price when under threshold', async ({ page }) => {
+    await setupShippingMock(page, 500);
     await page.goto('/checkout');
     await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
     // Add item under ₹999 threshold
@@ -634,6 +694,7 @@ test.describe('Checkout Page - Free Shipping', () => {
 
 test.describe('Checkout Page - Payment Step', () => {
   test.beforeEach(async ({ page }) => {
+    await setupShippingMock(page);
     await page.goto('/checkout');
     await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
     await addItemToCart(page, { productTitle: 'Payment Test', unitPrice: 2999 });
