@@ -316,7 +316,7 @@ test.describe('Catalog Flow - Browse and View Products', () => {
 
 test.describe('Catalog Flow - Pagination', () => {
   test('should navigate through pages of results', async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto('/posters', { waitUntil: 'networkidle' });
 
     const pagination = page.locator('nav[aria-label="Pagination"]');
 
@@ -343,7 +343,7 @@ test.describe('Catalog Flow - Pagination', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Start on page 2
-    await page.goto('/posters?page=2');
+    await page.goto('/posters?page=2', { waitUntil: 'networkidle' });
 
     const pagination = page.locator('nav[aria-label="Pagination"]');
 
@@ -362,7 +362,7 @@ test.describe('Catalog Flow - Pagination', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Start with filter applied
-    await page.goto('/posters?styles=abstract');
+    await page.goto('/posters?styles=abstract', { waitUntil: 'networkidle' });
 
     const pagination = page.locator('nav[aria-label="Pagination"]');
 
