@@ -89,7 +89,7 @@ const mockApprovalExpired = {
 // ============================================================================
 
 async function mockApprovalApi(page: Page, approval = mockApprovalPendingApproval) {
-  await page.route('**/api/approvals/*', (route) => {
+  await page.route('**/api/approvals/**', (route) => {
     const url = route.request().url();
 
     // Handle different endpoints
@@ -139,7 +139,7 @@ async function mockApprovalApi(page: Page, approval = mockApprovalPendingApprova
 }
 
 async function mockApprovalNotFound(page: Page) {
-  await page.route('**/api/approvals/*', (route) => {
+  await page.route('**/api/approvals/**', (route) => {
     route.fulfill({
       status: 404,
       contentType: 'application/json',
@@ -152,7 +152,7 @@ async function mockApprovalNotFound(page: Page) {
 }
 
 async function mockApprovalExpiredToken(page: Page) {
-  await page.route('**/api/approvals/*', (route) => {
+  await page.route('**/api/approvals/**', (route) => {
     route.fulfill({
       status: 410,
       contentType: 'application/json',
@@ -180,12 +180,12 @@ test.describe('Customer Approval - Pending Approval State', () => {
   });
 
   test('displays order item information', async ({ page }) => {
-    await expect(page.getByText('Custom AI Poster - Mountain Sunset')).toBeVisible();
+    await expect(page.getByText('Custom AI Poster - Mountain Sunset', { exact: true })).toBeVisible();
     await expect(page.getByText('24x36 inches')).toBeVisible();
   });
 
   test('displays status badge correctly', async ({ page }) => {
-    await expect(page.getByText(/Ready for Review/i)).toBeVisible();
+    await expect(page.getByText('Ready for Review', { exact: true })).toBeVisible();
   });
 
   test('displays deadline countdown', async ({ page }) => {
@@ -264,8 +264,8 @@ test.describe('Customer Approval - Photo Gallery', () => {
     const photo = page.locator('img[src*="picsum"]').first();
     await photo.click();
 
-    // Check for navigation arrows
-    await expect(page.locator('.fixed.inset-0 button >> text=1 / 3')).toBeVisible();
+    // Check for photo counter in gallery
+    await expect(page.locator('.fixed.inset-0').getByText('1 / 3')).toBeVisible();
   });
 });
 
@@ -430,7 +430,7 @@ test.describe('Customer Approval - Expired State', () => {
     await mockApprovalApi(page, mockApprovalExpired);
     await page.goto('/approve/test-token-001', { waitUntil: 'networkidle' });
 
-    await expect(page.getByText(/Approval Deadline Passed|Expired/i)).toBeVisible();
+    await expect(page.locator('h2:has-text("Approval Deadline Passed")')).toBeVisible();
   });
 
   test('does not show action buttons when expired', async ({ page }) => {
