@@ -98,6 +98,16 @@ export const aiGenerationStatusEnum = pgEnum("ai_generation_status", [
 ]);
 
 /**
+ * AI moderation status enum - tracks human review state
+ */
+export const aiModerationStatusEnum = pgEnum("ai_moderation_status", [
+  "pending_review", // Awaiting moderator review
+  "approved", // Can be shared/purchased
+  "rejected", // Blocked with reason
+  "flagged", // Requires senior review
+]);
+
+/**
  * AI model provider enum
  */
 export const aiModelProviderEnum = pgEnum("ai_model_provider", [
