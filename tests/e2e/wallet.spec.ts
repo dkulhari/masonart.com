@@ -67,6 +67,7 @@ test.describe('Wallet Page - Authenticated', () => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     // If redirected to login, re-authenticate
     if (page.url().includes('/auth/login')) {
+      await page.waitForLoadState('networkidle');
       await page.locator('main').getByLabel('Email').fill('test-customer@example.com');
       await page.locator('main').getByLabel('Password').fill('TestPassword123!');
       await page.getByRole('button', { name: /sign in/i }).click();
@@ -144,6 +145,7 @@ test.describe('Wallet Page - Transaction History', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     if (page.url().includes('/auth/login')) {
+      await page.waitForLoadState('networkidle');
       await page.locator('main').getByLabel('Email').fill('test-customer@example.com');
       await page.locator('main').getByLabel('Password').fill('TestPassword123!');
       await page.getByRole('button', { name: /sign in/i }).click();
@@ -182,6 +184,7 @@ test.describe('Wallet Page - Top-up Flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     if (page.url().includes('/auth/login')) {
+      await page.waitForLoadState('networkidle');
       await page.locator('main').getByLabel('Email').fill('test-customer@example.com');
       await page.locator('main').getByLabel('Password').fill('TestPassword123!');
       await page.getByRole('button', { name: /sign in/i }).click();
@@ -251,6 +254,7 @@ test.describe('AI Generator - Cost Preview', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     if (page.url().includes('/auth/login')) {
+      await page.waitForLoadState('networkidle');
       await page.locator('main').getByLabel('Email').fill('test-customer@example.com');
       await page.locator('main').getByLabel('Password').fill('TestPassword123!');
       await page.getByRole('button', { name: /sign in/i }).click();
@@ -306,6 +310,7 @@ test.describe('Account Dashboard - Wallet Quick Action', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     if (page.url().includes('/auth/login')) {
+      await page.waitForLoadState('networkidle');
       await page.locator('main').getByLabel('Email').fill('test-customer@example.com');
       await page.locator('main').getByLabel('Password').fill('TestPassword123!');
       await page.getByRole('button', { name: /sign in/i }).click();
@@ -345,6 +350,7 @@ test.describe('Wallet Page - Error Handling', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     if (page.url().includes('/auth/login')) {
+      await page.waitForLoadState('networkidle');
       await page.locator('main').getByLabel('Email').fill('test-customer@example.com');
       await page.locator('main').getByLabel('Password').fill('TestPassword123!');
       await page.getByRole('button', { name: /sign in/i }).click();

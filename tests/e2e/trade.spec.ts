@@ -56,6 +56,7 @@ test.describe('Trade Role - Customer Feature Access', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     if (page.url().includes('/auth/login')) {
+      await page.waitForLoadState('networkidle');
       await page.locator('main').getByLabel('Email').fill('test-trade@interior.com');
       await page.locator('main').getByLabel('Password').fill('TestPassword123!');
       await page.getByRole('button', { name: /sign in/i }).click();
@@ -187,6 +188,7 @@ test.describe('Trade Role - Admin Access Restriction', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/account', { waitUntil: 'domcontentloaded' });
     if (page.url().includes('/auth/login')) {
+      await page.waitForLoadState('networkidle');
       await page.locator('main').getByLabel('Email').fill('test-trade@interior.com');
       await page.locator('main').getByLabel('Password').fill('TestPassword123!');
       await page.getByRole('button', { name: /sign in/i }).click();
@@ -242,6 +244,7 @@ test.describe('Trade Role - Same Access as Customer', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/account', { waitUntil: 'domcontentloaded' });
       if (page.url().includes('/auth/login')) {
+        await page.waitForLoadState('networkidle');
         await page.locator('main').getByLabel('Email').fill('test-trade@interior.com');
         await page.locator('main').getByLabel('Password').fill('TestPassword123!');
         await page.getByRole('button', { name: /sign in/i }).click();
@@ -263,6 +266,7 @@ test.describe('Trade Role - Same Access as Customer', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto('/account', { waitUntil: 'domcontentloaded' });
       if (page.url().includes('/auth/login')) {
+        await page.waitForLoadState('networkidle');
         await page.locator('main').getByLabel('Email').fill('test-customer@example.com');
         await page.locator('main').getByLabel('Password').fill('TestPassword123!');
         await page.getByRole('button', { name: /sign in/i }).click();
