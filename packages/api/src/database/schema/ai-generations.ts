@@ -227,6 +227,17 @@ export const aiGenerations = pgTable(
     isFlagged: boolean("is_flagged").default(false).notNull(),
     needsReview: boolean("needs_review").default(false).notNull(),
 
+    // Human moderation workflow
+    moderationStatus: aiModerationStatusEnum("moderation_status")
+      .default("pending_review")
+      .notNull(),
+    moderatedAt: timestamp("moderated_at"),
+    moderatedBy: text("moderated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    rejectionReason: text("rejection_reason"),
+    rejectionCategory: text("rejection_category"), // e.g., "nsfw", "violence", "copyright"
+
     // Processing metrics
     processingTimeMs: integer("processing_time_ms"),
     errorMessage: text("error_message"),
@@ -272,6 +283,9 @@ export const aiGenerations = pgTable(
     needsReviewIdx: index("ai_generations_needs_review_idx").on(
       table.needsReview,
       table.isFlagged
+    ),
+    moderationStatusIdx: index("ai_generations_moderation_status_idx").on(
+      table.moderationStatus
     ),
   })
 );
