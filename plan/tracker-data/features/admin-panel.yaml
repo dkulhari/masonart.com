@@ -34,6 +34,9 @@ tickets:
   in_progress: {}
   done:
     "9": Build admin panel for product/order management
-total_tickets: 1
+    "187": "Bug: Admin sign out tests fail after domcontentloaded migration"
+    "188": "Bug: Admin dashboard tests fail due to non-waiting assertions and hydration timing"
+    "190": "Bug: Admin orders date filter test fails due to hydration timing"
+total_tickets: 4
 completion_percentage: 100
 is_completed: true

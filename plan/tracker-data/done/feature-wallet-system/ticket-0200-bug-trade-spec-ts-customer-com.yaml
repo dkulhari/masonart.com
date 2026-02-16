@@ -1,0 +1,50 @@
+ticket_number: 200
+title: 'Bug: trade.spec.ts customer comparison test fails due to session expiry'
+description: |-
+  ## Failing Test
+  **File**: `tests/e2e/trade.spec.ts`
+  **Test**: Trade Role - Same Access as Customer › Customer User Access (Comparison) › customer can access account
+  **Line**: 284
+
+  ## Error
+  ```
+  expect(received).toContain("/account")
+  Received: "http://localhost:3001/auth/login?redirect=%2Faccount"
+  ```
+
+  ## Root Cause
+  Same as #199 - Better Auth's 5-min cookie cache expires during full suite run (7+ min). The CUSTOMER_AUTH storage state cookies are stale by the time this test runs.
+
+  ## Fix
+  1. Added re-auth `beforeEach` hooks to all 4 authenticated describe blocks (trade user features, admin restriction, trade access comparison, customer access comparison)
+  2. Replaced all `networkidle` with `domcontentloaded`
+  3. Removed file-level `test.describe.configure({ mode: 'serial' })` that caused cascading skips
+  4. Replaced useless `waitForTimeout(100)` with proper re-auth logic
+
+  ## Acceptance Criteria
+  - [x] All 17 active trade tests pass
+  - [x] Tests resilient to session expiry
+feature: wallet-system
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T06:04:14.386Z'
+last_updated: '2026-02-16T06:04:20.501Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - e2e
+  - trade
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T06:04:20.501Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T06:04:20.501Z'

@@ -32,6 +32,7 @@ tickets:
   in_progress: {}
   done:
     "11": Add SEO optimization and structured data
-total_tickets: 1
+    "198": "Bug: sitemap tests fetch from wrong server (web instead of API)"
+total_tickets: 2
 completion_percentage: 100
 is_completed: true

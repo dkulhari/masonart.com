@@ -1,0 +1,58 @@
+ticket_number: 187
+title: 'Bug: Admin sign out tests fail after domcontentloaded migration'
+description: |-
+  ## Failing Tests
+  **File**: `tests/e2e/admin-auth.spec.ts`
+  **Tests**: 
+  - Admin Sign Out › should redirect to home after sign out
+  - Admin Sign Out › should not allow access to admin after sign out
+
+  ## Error
+  ```
+  Expected pattern: /^\/$|\/auth\/login/
+  Received string: "http://localhost:3001/admin"
+  ```
+
+  ## Root Cause
+  Two issues:
+  1. After replacing `networkidle` with `domcontentloaded` (ticket #186), the Sign Out button click had no effect because React hadn't hydrated yet - the onClick handler wasn't attached.
+  2. The URL regex `^\/$` was anchored to match only `/` but Playwright matches against the full URL `http://localhost:3001/`.
+
+  ## Fix
+  1. Wait for dashboard API response before clicking Sign Out (proves React hydration):
+     ```typescript
+     await Promise.all([
+       page.waitForResponse(resp => resp.url().includes('/api/admin/') && resp.status() === 200),
+       page.goto('/admin')
+     ]);
+     ```
+  2. Fixed URL regex to `localhost:\d+\/$|\/auth\/login` to match full URLs.
+
+  ## Acceptance Criteria
+  - [x] Both sign out tests pass
+  - [x] All 35 admin-auth tests pass
+  - [x] No regressions
+feature: admin-panel
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T02:19:36.556Z'
+last_updated: '2026-02-16T02:19:46.264Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T02:19:46.264Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T02:19:46.264Z'

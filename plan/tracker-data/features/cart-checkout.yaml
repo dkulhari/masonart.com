@@ -34,6 +34,8 @@ tickets:
   in_progress: {}
   done:
     "7": Implement cart and checkout with Razorpay
-total_tickets: 1
+    "191": "Bug: Checkout shipping mock data mismatch and wrong assertion text"
+    "195": "Bug: flows/checkout.spec.ts delivery options and shipping mock failures"
+total_tickets: 3
 completion_percentage: 100
 is_completed: true

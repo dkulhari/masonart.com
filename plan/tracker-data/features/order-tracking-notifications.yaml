@@ -126,6 +126,7 @@ tickets:
     "100": Tests - API route tests for notification preferences
     "101": Tests - Component tests for tracking and preferences UI
     "102": Tests - E2E test for guest order tracking flow
-total_tickets: 25
+    "196": "Bug: guest-order-tracking tests strict mode violations and assertion mismatches"
+total_tickets: 26
 completion_percentage: 100
 is_completed: true

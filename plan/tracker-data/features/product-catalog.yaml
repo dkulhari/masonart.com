@@ -39,6 +39,8 @@ tickets:
     "145": "Bug: Pagination does not update URL with page parameter"
     "147": "Bug: Active filter tag click doesn't update URL"
     "148": "Bug: Clear all filters button doesn't update URL"
-total_tickets: 7
-completion_percentage: 71
+    "189": "Bug: Admin products tests fail due to hydration and non-waiting assertions"
+    "194": "Bug: Catalog pagination tests fail due to React hydration timing"
+total_tickets: 9
+completion_percentage: 78
 is_completed: false

@@ -33,6 +33,7 @@ tickets:
   in_progress: {}
   done:
     "5": Configure Better Auth with RBAC
-total_tickets: 1
+    "193": "Bug: Auth flow OAuth divider test expects wrong text on login page"
+total_tickets: 2
 completion_percentage: 100
 is_completed: true

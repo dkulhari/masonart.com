@@ -1,0 +1,42 @@
+ticket_number: 197
+title: 'Bug: customer-approval tests networkidle timeout on approval pages'
+description: |-
+  ## Failing Test
+  **File**: `tests/e2e/customer-approval.spec.ts`
+  **Test**: Customer Approval - Pending Approval State › displays order item information
+  **Line**: 182
+
+  ## Error
+  `page.goto` with `waitUntil: 'networkidle'` times out at 30s. Page renders fully but mock image URLs keep network connections open, preventing networkidle state.
+
+  ## Fix
+  - Changed all `waitUntil: 'networkidle'` to `waitUntil: 'domcontentloaded'`
+  - Added explicit wait for "Production Photo Review" heading in beforeEach hooks to ensure React rendering completes
+
+  ## Acceptance Criteria
+  - [x] All 37 customer-approval tests pass
+  - [x] No networkidle timeouts
+feature: photo-approval-workflow
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T05:04:55.278Z'
+last_updated: '2026-02-16T05:05:00.407Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T05:05:00.407Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T05:05:00.407Z'

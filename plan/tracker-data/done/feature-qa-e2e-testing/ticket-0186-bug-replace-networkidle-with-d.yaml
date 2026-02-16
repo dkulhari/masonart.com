@@ -1,0 +1,38 @@
+ticket_number: 186
+title: 'Bug: Replace networkidle with domcontentloaded in all admin E2E tests'
+description: |-
+  ## Issue
+  Admin pages have ongoing network activity (polling, heartbeats) that prevents networkidle from resolving, causing intermittent 30s timeouts across admin-products, admin-orders, admin-dashboard, admin-auth tests.
+
+  ## Fix
+  Replaced all networkidle with domcontentloaded in admin test files. Tests use explicit element assertions that auto-wait for content to appear.
+
+  ## Files Changed
+  - tests/e2e/admin-products.spec.ts
+  - tests/e2e/admin-orders.spec.ts
+  - tests/e2e/admin-dashboard.spec.ts
+  - tests/e2e/admin-auth.spec.ts
+feature: qa-e2e-testing
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T01:55:53.360Z'
+last_updated: '2026-02-16T01:55:58.839Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T01:55:58.839Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T01:55:58.839Z'

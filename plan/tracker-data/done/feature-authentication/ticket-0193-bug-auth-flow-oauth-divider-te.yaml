@@ -1,0 +1,39 @@
+ticket_number: 193
+title: 'Bug: Auth flow OAuth divider test expects wrong text on login page'
+description: |-
+  ## Failing Test
+  **File**: `tests/e2e/flows/auth.spec.ts`
+  **Test**: should have proper divider between OAuth and email login
+  **Line**: 448
+
+  ## Error
+  Test expects `text=or sign in with email` but login page divider shows just `or`. Register page correctly shows `or sign up with email`.
+
+  ## Fix
+  Changed login page divider assertion to `getByText('or', { exact: true })` matching actual component text.
+
+  All 21 auth flow tests pass.
+feature: authentication
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T04:15:52.334Z'
+last_updated: '2026-02-16T04:16:00.639Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T04:16:00.640Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T04:16:00.639Z'

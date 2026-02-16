@@ -1,0 +1,53 @@
+ticket_number: 189
+title: 'Bug: Admin products tests fail due to hydration and non-waiting assertions'
+description: |-
+  ## Failing Tests
+  **File**: `tests/e2e/admin-products.spec.ts`
+  **Tests**:
+  - Admin Products List Page › should display products table/grid (count without wait)
+  - Create Product Page › should navigate to create product (hydration)
+  - Create Product Page › should auto-generate slug from title (hydration + fill)
+  - Create Product Page › should submit valid product data (hydration + fill)
+  - Products Error States › should display validation errors on create (hydration)
+  - Products Bulk Actions › should display checkbox for each product row (count without wait)
+
+  ## Root Cause
+  Multiple issues after `networkidle` → `domcontentloaded` migration:
+  1. `count()` calls without waiting for data to render
+  2. Interactive elements (buttons, form inputs) not working before React hydration
+  3. Playwright `fill()` not reliably updating React state before hydration
+
+  ## Fix
+  1. Added `waitFor()` before `count()` for product rows and checkboxes
+  2. Wait for product data (e.g., `TX-001`) before clicking interactive elements
+  3. Use `networkidle` for Create Product page (no ongoing API calls)
+  4. Use `pressSequentially` instead of `fill()` for reliable React state updates
+  5. Wait for hydration before clicking edit product dropdown
+
+  ## Acceptance Criteria
+  - [x] All 98 admin-products tests pass
+  - [x] No regressions
+feature: product-catalog
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T03:28:41.994Z'
+last_updated: '2026-02-16T03:28:49.083Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T03:28:49.083Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T03:28:49.083Z'

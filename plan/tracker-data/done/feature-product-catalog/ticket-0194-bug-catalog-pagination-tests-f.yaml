@@ -1,0 +1,40 @@
+ticket_number: 194
+title: 'Bug: Catalog pagination tests fail due to React hydration timing'
+description: |-
+  ## Failing Tests
+  **File**: `tests/e2e/flows/catalog.spec.ts`
+  1. "should navigate through pages of results" - Next button click no-ops before hydration
+  2. "should reset to page 1 when applying new filter" - Filter click no-ops before hydration
+  3. "should preserve filters when paginating" - Same pattern
+
+  ## Root Cause
+  Pagination buttons are SSR-rendered and visible immediately, but React onClick handlers aren't attached until hydration completes. Tests click buttons before hydration.
+
+  ## Fix
+  Added `{ waitUntil: 'networkidle' }` to page.goto() calls in pagination tests. The posters page completes all API calls during SSR, so networkidle reliably indicates hydration.
+
+  All 3 pagination tests pass.
+feature: product-catalog
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T04:25:11.866Z'
+last_updated: '2026-02-16T04:25:19.595Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T04:25:19.595Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T04:25:19.595Z'

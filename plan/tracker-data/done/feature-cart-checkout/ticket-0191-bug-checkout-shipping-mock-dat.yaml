@@ -1,0 +1,49 @@
+ticket_number: 191
+title: 'Bug: Checkout shipping mock data mismatch and wrong assertion text'
+description: |-
+  ## Failing Tests
+  **File**: `tests/e2e/checkout.spec.ts`
+
+  ### Failures:
+  1. **Line 628**: "should display estimated delivery days for standard" - Expected "5-7 business days" but component renders "Arrives {date range}"
+  2. **Line 634**: "should display estimated delivery days for express" - Same issue
+  3. **Line 654**: "should show free shipping notice when qualified" - Expected "You qualify for free standard shipping" but component renders "You qualify for free shipping on orders over ₹1,000!"
+  4. **Line 672**: "should show shipping price when under threshold" - Mock returned ₹0.00 instead of ₹99 for under-threshold cart
+
+  ## Root Causes
+  1. **Mock data field mismatch**: `setupShippingMock()` used `calculatedCost: '99.00'` (string) but `ShippingEstimateResponse` interface expects `finalCost: number`. Since `finalCost` was undefined, `formatPrice(undefined)` rendered ₹0.
+  2. **Wrong assertion text**: Test expected "You qualify for free standard shipping" but ShippingSelector component renders "You qualify for free shipping on orders over {formatPrice(threshold)}!"
+  3. **Wrong delivery format**: Tests expected "5-7 business days" text but component shows "Arrives {date range}" via `formatEstimatedDelivery()`
+
+  ## Fixes
+  1. Changed mock to use `finalCost: number` instead of `calculatedCost: string`
+  2. Updated free shipping notice assertion to match actual component text
+  3. Updated delivery days assertions to check for "Arrives" text
+
+  ## Acceptance Criteria
+  - [x] All 111 checkout tests pass
+  - [x] Mock data matches ShippingEstimateResponse interface
+feature: cart-checkout
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T03:58:27.267Z'
+last_updated: '2026-02-16T03:58:38.248Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T03:58:38.248Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T03:58:38.248Z'

@@ -1,0 +1,45 @@
+ticket_number: 185
+title: 'Bug: admin-reviews bulk actions beforeEach times out waiting for stats card'
+description: |-
+  ## Failing Test
+  **File**: `tests/e2e/admin-reviews.spec.ts`
+  **Test**: Admin Reviews - Bulk Actions › select all checkbox should select all rows
+  **Line**: 377
+
+  ## Error
+  ```
+  Test timeout of 30000ms exceeded while running "beforeEach" hook.
+  TimeoutError: locator.waitFor: Timeout 10000ms exceeded.
+  waiting for locator('text=Pending Reviews') to be visible
+  ```
+
+  ## Root Cause
+  The beforeEach hook waits for "Pending Reviews" stat card text, but with 0 reviews in the DB, stat cards can be slow to render or may not display. The fix is to wait for the always-present "Reviews" heading instead.
+
+  ## Acceptance Criteria
+  - [ ] Bulk Actions tests pass consistently
+  - [ ] No regressions in other admin-reviews tests
+feature: qa-e2e-testing
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-15T23:07:50.297Z'
+last_updated: '2026-02-16T00:35:16.719Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T00:35:16.719Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T00:35:16.719Z'

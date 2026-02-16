@@ -129,6 +129,8 @@ tickets:
     "137": E2E Tests - Admin upload and customer approval flow
     "138": E2E Tests - Change request and resolution flow
     "139": Documentation - Create manual test documentation
-total_tickets: 19
+    "192": "Bug: Customer approval tests failing due to mock pattern and strict mode violations"
+    "197": "Bug: customer-approval tests networkidle timeout on approval pages"
+total_tickets: 21
 completion_percentage: 100
 is_completed: true

@@ -1,0 +1,47 @@
+ticket_number: 196
+title: 'Bug: guest-order-tracking tests strict mode violations and assertion mismatches'
+description: |-
+  ## Failing Tests
+  **File**: `tests/e2e/guest-order-tracking.spec.ts`
+  **Tests**: 13 failures across form, error handling, validation, and accessibility tests
+
+  ## Errors
+  1. `getByLabel('Email Address')` strict mode violation - matches both page form and footer newsletter
+  2. Form fill fails due to React hydration - `page.goto` without `waitUntil: 'networkidle'`
+  3. `getByText(/shipped/i)` strict mode - matches header card and timeline
+  4. `getByRole('alert')` - component uses plain div, not role="alert"
+  5. `/order.*received/i` - component shows "Order Confirmed" not "Order Received"
+  6. `/enter.*email/i` strict mode - matches form helper text and error text
+  7. Keyboard nav test assumed wrong tab order (navigated to header links)
+
+  ## Fix
+  - Scoped Email Address locators to `page.locator('main')`
+  - Added `{ waitUntil: 'networkidle' }` to all `page.goto('/track')` calls
+  - Used `.first()` for shipped status check
+  - Replaced `getByRole('alert')` with specific error text assertions
+  - Fixed timeline step text and validation error assertions
+  - Rewrote keyboard nav test to use `.focus()` instead of Tab counting
+feature: order-tracking-notifications
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T04:58:17.421Z'
+last_updated: '2026-02-16T04:58:23.652Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T04:58:23.652Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T04:58:23.652Z'

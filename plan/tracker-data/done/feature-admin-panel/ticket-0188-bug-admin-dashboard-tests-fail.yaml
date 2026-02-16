@@ -1,0 +1,47 @@
+ticket_number: 188
+title: 'Bug: Admin dashboard tests fail due to non-waiting assertions and hydration timing'
+description: |-
+  ## Failing Tests
+  **File**: `tests/e2e/admin-dashboard.spec.ts`
+  **Tests**:
+  - Recent Orders Section › should display up to 5 recent orders
+  - Accessibility › should have focus indicators on interactive elements
+
+  ## Errors
+  1. `expect(count).toBeGreaterThan(0)` - count is 0 because `orders.count()` runs before mock data renders
+  2. `expect(refreshButton).toBeFocused()` - focus lost during React hydration
+
+  ## Root Cause
+  After switching from `networkidle` to `domcontentloaded`, assertions that don't auto-wait (`.count()`, `.focus()`) run before React processes mocked API responses. Auto-waiting assertions like `toBeVisible()` work fine.
+
+  ## Fix
+  1. Added `await orders.first().waitFor()` before counting order rows
+  2. Added wait for dashboard data before testing focus indicators
+
+  ## Acceptance Criteria
+  - [x] All 84 admin-dashboard tests pass
+  - [x] No regressions
+feature: admin-panel
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T03:14:23.194Z'
+last_updated: '2026-02-16T03:14:29.862Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T03:14:29.862Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T03:14:29.862Z'

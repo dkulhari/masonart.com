@@ -1,0 +1,45 @@
+ticket_number: 190
+title: 'Bug: Admin orders date filter test fails due to hydration timing'
+description: |-
+  ## Failing Test
+  **File**: `tests/e2e/admin-orders.spec.ts`
+  **Test**: Orders Date Filtering › should update URL with date filter
+
+  ## Error
+  ```
+  page.waitForURL: Timeout 5000ms exceeded waiting for /dateFrom/
+  ```
+
+  ## Root Cause
+  Date input fill() doesn't trigger React onChange handler because React hasn't hydrated when the fill occurs with domcontentloaded.
+
+  ## Fix
+  Wait for order data to render (proving React hydration) before filling date input.
+
+  ## Acceptance Criteria
+  - [x] Date filter test passes
+  - [x] All 126 admin-orders tests pass
+feature: admin-panel
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T03:33:03.944Z'
+last_updated: '2026-02-16T03:33:25.344Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T03:33:25.344Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T03:33:25.344Z'

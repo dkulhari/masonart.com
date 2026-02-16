@@ -1,24 +1,23 @@
 status: todo
-last_updated: '2026-02-15T20:08:31.011Z'
+last_updated: '2026-02-16T06:04:16.052Z'
 total_tickets: 3
 summary:
   critical: 0
-  high: 1
-  medium: 1
+  high: 0
+  medium: 2
   low: 1
 priorities:
-  high:
-    - feature: qa-testing
-      tickets:
-        - ticket_number: 183
-          title: Execute and validate full test suite against running application
-          assignee: unassigned
-          blocked_by: []
   medium:
     - feature: product-catalog
       tickets:
         - ticket_number: 149
           title: 'Bug: Boolean filter URL params lost during SSR redirect'
+          assignee: unassigned
+          blocked_by: []
+    - feature: wallet-system
+      tickets:
+        - ticket_number: 200
+          title: 'Bug: trade.spec.ts customer comparison test fails due to session expiry'
           assignee: unassigned
           blocked_by: []
   low:

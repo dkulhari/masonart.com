@@ -1,0 +1,50 @@
+ticket_number: 192
+title: 'Bug: Customer approval tests failing due to mock pattern and strict mode violations'
+description: |-
+  ## Failing Tests
+  **File**: `tests/e2e/customer-approval.spec.ts`
+
+  ### Failures (6 total):
+  1. **Line 183**: "displays order item information" - strict mode: getByText matched 2 elements
+  2. **Line 188**: "displays status badge correctly" - strict mode: /Ready for Review/i matched badge + comment text
+  3. **Line 268**: "gallery has navigation arrows" - locator targeted button but "1/3" is a div
+  4. **Line 317**: "can submit change request" - mock didn't intercept POST /changes (Unauthorized)
+  5. **Line 378**: "clicking Approve shows confirmation" - mock didn't intercept POST /approve (Unauthorized)
+  6. **Line 433**: "shows expired message" - strict mode: regex matched badge "Expired" + heading
+
+  ## Root Causes
+  1. **Route glob pattern**: `**/api/approvals/*` only matches single-segment paths. POST endpoints like `/api/approvals/{token}/approve` (2 segments) fell through to real API → 401 Unauthorized
+  2. **Strict mode violations**: Text selectors matched multiple elements (badge + comment, badge + heading, subtitle + item name)
+  3. **Gallery locator**: "1 / 3" counter is a div, not inside a button element
+
+  ## Fixes
+  1. Changed glob to `**/api/approvals/**` for all 3 mock functions
+  2. Used `{ exact: true }` for ambiguous text selectors
+  3. Fixed gallery locator to find text in gallery overlay div
+  4. Used specific h2 locator for expired heading
+
+  All 37 tests pass.
+feature: photo-approval-workflow
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T04:09:16.836Z'
+last_updated: '2026-02-16T04:09:24.584Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T04:09:24.584Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T04:09:24.584Z'

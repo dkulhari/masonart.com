@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-02-15T20:08:31.295Z'
-total_tickets: 146
+last_updated: '2026-02-16T06:04:16.362Z'
+total_tickets: 163
 summary:
   critical: 5
-  high: 60
-  medium: 59
+  high: 61
+  medium: 75
   low: 22
 priorities:
   high:
@@ -102,6 +102,10 @@ priorities:
           blocked_by: []
         - ticket_number: 26
           title: 'Phase 15: CI/CD Setup'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 183
+          title: Execute and validate full test suite against running application
           assignee: unassigned
           blocked_by: []
     - feature: user-reviews
@@ -318,10 +322,26 @@ priorities:
           title: Build admin panel for product/order management
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 187
+          title: 'Bug: Admin sign out tests fail after domcontentloaded migration'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 188
+          title: 'Bug: Admin dashboard tests fail due to non-waiting assertions and hydration timing'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 190
+          title: 'Bug: Admin orders date filter test fails due to hydration timing'
+          assignee: unassigned
+          blocked_by: []
     - feature: seo
       tickets:
         - ticket_number: 11
           title: Add SEO optimization and structured data
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 198
+          title: 'Bug: sitemap tests fetch from wrong server (web instead of API)'
           assignee: unassigned
           blocked_by: []
     - feature: qa-testing
@@ -422,6 +442,10 @@ priorities:
           title: Frontend - Add tracking link with token-based access
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 196
+          title: 'Bug: guest-order-tracking tests strict mode violations and assertion mismatches'
+          assignee: unassigned
+          blocked_by: []
     - feature: photo-approval-workflow
       tickets:
         - ticket_number: 125
@@ -446,6 +470,14 @@ priorities:
           blocked_by: []
         - ticket_number: 130
           title: Backend API - Integrate approval into order flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 192
+          title: 'Bug: Customer approval tests failing due to mock pattern and strict mode violations'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 197
+          title: 'Bug: customer-approval tests networkidle timeout on approval pages'
           assignee: unassigned
           blocked_by: []
     - feature: testsuite-bug-auth
@@ -479,6 +511,14 @@ priorities:
         - ticket_number: 148
           title: 'Bug: Clear all filters button doesn''t update URL'
           assignee: claude
+          blocked_by: []
+        - ticket_number: 189
+          title: 'Bug: Admin products tests fail due to hydration and non-waiting assertions'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 194
+          title: 'Bug: Catalog pagination tests fail due to React hydration timing'
+          assignee: unassigned
           blocked_by: []
     - feature: testsuite-bug-reviews
       tickets:
@@ -570,6 +610,42 @@ priorities:
           blocked_by: []
         - ticket_number: 177
           title: Task 9 - Update E2E Tests for Verified Purchase Reviews
+          assignee: unassigned
+          blocked_by: []
+    - feature: qa-e2e-testing
+      tickets:
+        - ticket_number: 184
+          title: 'Bug: admin-approvals status transition tests timeout with networkidle'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 185
+          title: 'Bug: admin-reviews bulk actions beforeEach times out waiting for stats card'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 186
+          title: 'Bug: Replace networkidle with domcontentloaded in all admin E2E tests'
+          assignee: unassigned
+          blocked_by: []
+    - feature: cart-checkout
+      tickets:
+        - ticket_number: 191
+          title: 'Bug: Checkout shipping mock data mismatch and wrong assertion text'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 195
+          title: 'Bug: flows/checkout.spec.ts delivery options and shipping mock failures'
+          assignee: unassigned
+          blocked_by: []
+    - feature: authentication
+      tickets:
+        - ticket_number: 193
+          title: 'Bug: Auth flow OAuth divider test expects wrong text on login page'
+          assignee: unassigned
+          blocked_by: []
+    - feature: wallet-system
+      tickets:
+        - ticket_number: 199
+          title: 'Bug: wallet.spec.ts auth session expires during full suite run'
           assignee: unassigned
           blocked_by: []
   low:

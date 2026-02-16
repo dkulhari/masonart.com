@@ -1,0 +1,50 @@
+ticket_number: 199
+title: 'Bug: wallet.spec.ts auth session expires during full suite run'
+description: |-
+  ## Failing Test
+  **File**: `tests/e2e/wallet.spec.ts`
+  **Test**: Wallet Page - Authenticated › should load wallet page without redirect
+  **Line**: 82
+
+  ## Error
+  ```
+  page.waitForURL(/\/account\/wallet/) - timeout
+  Page redirected to /auth/login instead of staying on /account/wallet
+  ```
+
+  ## Root Cause
+  Better Auth's cookie cache expires in 5 minutes (`cookieCache: { maxAge: 60 * 5 }`). When running the full E2E suite (7.5+ minutes), the session cookie expires before wallet tests run, causing auth redirects.
+
+  ## Fix
+  1. Added re-auth `beforeEach` hooks to all 6 authenticated describe blocks that check auth status and re-login if session expired
+  2. Replaced `networkidle` with `domcontentloaded` in wait states
+  3. Removed file-level `test.describe.configure({ mode: 'serial' })` that caused cascading skips on failure
+  4. Fixed `.count()` auto-wait issue in quick top-up buttons test by adding `.first().toBeVisible()` before counting
+
+  ## Acceptance Criteria
+  - [x] All 23 wallet tests pass
+  - [x] Tests resilient to session expiry during long suite runs
+feature: wallet-system
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T05:46:44.747Z'
+last_updated: '2026-02-16T05:46:54.350Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - e2e
+  - wallet
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T05:46:54.351Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T05:46:54.350Z'

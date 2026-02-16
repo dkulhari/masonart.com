@@ -1,7 +1,7 @@
 name: wallet-system
 title: Wallet System
 priority: medium
-created: '2026-01-26T01:40:35.000Z'
+created: "2026-01-26T01:40:35.000Z"
 assignee: claude
 tags:
   - payments
@@ -38,18 +38,20 @@ objectives:
   - Admin pricing configuration
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo: {}
   in_progress: {}
   done:
-    45: 'Database Schema - Wallet Tables'
-    46: 'Backend Services - Wallet Core Functions'
-    47: 'API Routes - Wallet Endpoints'
-    48: 'Frontend - Wallet UI Components'
-    49: 'Tests - Unit and E2E Test Suite'
-total_tickets: 5
+    "45": Database Schema - Wallet Tables
+    "46": Backend Services - Wallet Core Functions
+    "47": API Routes - Wallet Endpoints
+    "48": Frontend - Wallet UI Components
+    "49": Tests - Unit and E2E Test Suite
+    "199": "Bug: wallet.spec.ts auth session expires during full suite run"
+    "200": "Bug: trade.spec.ts customer comparison test fails due to session expiry"
+total_tickets: 7
 completion_percentage: 100
 is_completed: true

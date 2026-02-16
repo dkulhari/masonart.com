@@ -1,0 +1,43 @@
+ticket_number: 195
+title: 'Bug: flows/checkout.spec.ts delivery options and shipping mock failures'
+description: |-
+  ## Failing Test
+  **File**: `tests/e2e/flows/checkout.spec.ts`
+  **Test**: Checkout Flow - Delivery Options › should show different delivery times for options
+  **Line**: 558
+
+  ## Error
+  Tests expected "5-7 business days" text but ShippingSelector component renders "Arrives {date range}" via formatEstimatedDelivery(). Also, shipping estimate API not mocked causing "No shipping options available" state.
+
+  ## Fix
+  - Added setupShippingMock() helper function matching ShippingEstimateResponse interface (finalCost: number, not calculatedCost: string)
+  - Applied mock to Delivery Options, Step Progression, Free Shipping, Guest Checkout, and Order Notes test groups
+  - Fixed delivery time assertion to check for "Arrives" text instead of "5-7 business days"
+
+  ## Acceptance Criteria
+  - [x] All flows/checkout.spec.ts tests pass
+  - [x] Mock data matches ShippingEstimateResponse interface
+feature: cart-checkout
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-16T04:42:24.799Z'
+last_updated: '2026-02-16T04:42:34.718Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-16T04:42:34.718Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-16T04:42:34.718Z'

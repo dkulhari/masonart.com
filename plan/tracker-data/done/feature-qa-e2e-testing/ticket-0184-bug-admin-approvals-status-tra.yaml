@@ -1,0 +1,49 @@
+ticket_number: 184
+title: 'Bug: admin-approvals status transition tests timeout with networkidle'
+description: |-
+  ## Failing Test
+  **File**: `tests/e2e/admin-approvals.spec.ts`
+  **Test**: Approval Status Transitions › pending_approval shows awaiting customer state
+  **Line**: 455
+
+  ## Error
+  ```
+  Test timeout of 30000ms exceeded.
+  Error: page.goto: Test timeout of 30000ms exceeded.
+  navigating to "http://localhost:3001/admin/approvals/apv-002", waiting until "networkidle"
+  ```
+
+  ## Root Cause
+  The `waitUntil: 'networkidle'` in `page.goto()` hangs when the admin approval detail page has ongoing network activity. The "approved shows completion state" test also barely passes at 27.5s out of 30s timeout.
+
+  ## Fix
+  Replace `waitUntil: 'networkidle'` with `waitUntil: 'domcontentloaded'` in the Approval Status Transitions tests and wait for specific UI elements instead.
+
+  ## Acceptance Criteria
+  - [ ] All Approval Status Transition tests pass consistently
+  - [ ] Tests complete in under 10s each
+  - [ ] No regressions in other admin-approvals tests
+feature: qa-e2e-testing
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-15T20:52:52.531Z'
+last_updated: '2026-02-15T21:57:50.430Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-02-15T21:57:50.430Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-02-15T21:57:50.430Z'
