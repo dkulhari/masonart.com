@@ -1769,13 +1769,14 @@ test.describe('Orders Date Filtering', () => {
   });
 
   test('should update URL with date filter', async ({ page }) => {
-    await page.waitForLoadState('domcontentloaded');
+    // Wait for order data to render (proves React hydration complete)
+    await page.locator('text=MA-20240115-001').waitFor({ state: 'visible', timeout: 10000 });
 
     const dateFromInput = page.locator('input[type="date"]').first();
     await dateFromInput.fill('2024-01-01');
 
     // Wait for URL to update with the date filter
-    await page.waitForURL(/dateFrom/, { timeout: 5000 });
+    await page.waitForURL(/dateFrom/, { timeout: 10000 });
     expect(page.url()).toContain('dateFrom');
   });
 });
