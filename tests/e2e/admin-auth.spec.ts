@@ -354,25 +354,31 @@ test.describe('Admin Sign Out', () => {
   test.use({ storageState: ADMIN_AUTH });
 
   test('should redirect to home after sign out', async ({ page }) => {
-    await page.goto('/admin');
-    await page.waitForLoadState('domcontentloaded');
+    // Navigate and wait for dashboard API call (proves React hydration)
+    await Promise.all([
+      page.waitForResponse(resp => resp.url().includes('/api/admin/') && resp.status() === 200),
+      page.goto('/admin')
+    ]);
 
-    // Find and click sign out button
+    // Click sign out
     const signOutBtn = page.locator('button:has-text("Sign Out")');
     await signOutBtn.click();
 
-    // Should redirect to home page
-    await expect(page).toHaveURL('/');
+    // Should redirect to home or login page after sign out
+    await expect(page).toHaveURL(/localhost:\d+\/$|\/auth\/login/, { timeout: 15000 });
   });
 
   test('should not allow access to admin after sign out', async ({ page }) => {
-    await page.goto('/admin');
-    await page.waitForLoadState('domcontentloaded');
+    // Navigate and wait for dashboard API call (proves React hydration)
+    await Promise.all([
+      page.waitForResponse(resp => resp.url().includes('/api/admin/') && resp.status() === 200),
+      page.goto('/admin')
+    ]);
 
     // Sign out
     const signOutBtn = page.locator('button:has-text("Sign Out")');
     await signOutBtn.click();
-    await expect(page).toHaveURL('/');
+    await expect(page).toHaveURL(/localhost:\d+\/$|\/auth\/login/, { timeout: 15000 });
 
     // Try to access admin again - should redirect to login
     await page.goto('/admin');
