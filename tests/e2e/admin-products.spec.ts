@@ -431,8 +431,9 @@ test.describe('Admin Products List Page', () => {
   test('should display products table/grid', async ({ page }) => {
     await page.waitForLoadState('domcontentloaded');
 
-    // Should show product items
+    // Should show product items - wait for data to render before counting
     const productItems = page.locator('[data-testid="product-row"], .product-item, tr:has-text("TX-")');
+    await productItems.first().waitFor({ state: 'visible', timeout: 10000 });
     const count = await productItems.count();
     expect(count).toBeGreaterThan(0);
   });
@@ -698,7 +699,8 @@ test.describe('Create Product Page', () => {
 
   test('should navigate to create product page', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('domcontentloaded');
+    // Wait for product data to render (proves React hydration complete)
+    await page.locator('text=TX-001').waitFor({ state: 'visible', timeout: 10000 });
 
     const addButton = page.locator('a[href="/admin/products/new"]:has-text("Add Product"), button:has-text("Add Product")');
     await addButton.click();
@@ -778,7 +780,7 @@ test.describe('Create Product Page', () => {
   });
 
   test('should validate required fields on submit', async ({ page }) => {
-    await page.goto('/admin/products/new');
+    await page.goto('/admin/products/new', { waitUntil: 'networkidle' });
 
     const saveButton = page.locator('button[type="submit"]:has-text("Save"), button[type="submit"]:has-text("Create")');
     await saveButton.click();
@@ -789,11 +791,11 @@ test.describe('Create Product Page', () => {
   });
 
   test('should auto-generate slug from title', async ({ page }) => {
-    await page.goto('/admin/products/new');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto('/admin/products/new', { waitUntil: 'networkidle' });
 
     const titleInput = page.locator('#title');
-    await titleInput.fill('Test Product Title');
+    await titleInput.click();
+    await titleInput.pressSequentially('Test Product Title', { delay: 50 });
 
     // Click the "Auto" button to generate slug from title
     const autoButton = page.getByRole('button', { name: 'Auto' });
@@ -823,14 +825,17 @@ test.describe('Create Product Page', () => {
       }
     });
 
-    await page.goto('/admin/products/new');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto('/admin/products/new', { waitUntil: 'networkidle' });
 
-    // Fill required fields using locator.fill() for React inputs
-    await page.locator('#title').fill('Test New Product');
-    await page.locator('#sku').fill('TEST-NEW-001');
-    await page.locator('#slug').fill('test-new-product');
-    await page.locator('#basePrice').fill('1999.00');
+    // Fill required fields - use click + pressSequentially for reliable React state updates
+    await page.locator('#title').click();
+    await page.locator('#title').pressSequentially('Test New Product', { delay: 30 });
+    await page.locator('#sku').click();
+    await page.locator('#sku').pressSequentially('TEST-NEW-001', { delay: 30 });
+    await page.locator('#slug').click();
+    await page.locator('#slug').pressSequentially('test-new-product', { delay: 30 });
+    await page.locator('#basePrice').click();
+    await page.locator('#basePrice').pressSequentially('1999.00', { delay: 30 });
 
     // Select orientation
     await page.locator('#orientation').selectOption('landscape');
@@ -861,7 +866,8 @@ test.describe('Edit Product Page', () => {
 
   test('should navigate to edit product page from list', async ({ page }) => {
     await page.goto('/admin/products');
-    await page.waitForLoadState('domcontentloaded');
+    // Wait for product data to render before clicking interactive elements
+    await page.locator('text=TX-001').waitFor({ state: 'visible', timeout: 10000 });
 
     // Click the action button on the first product row to open dropdown menu
     const firstRowActionButton = page.locator('table tbody tr').first().locator('button').last();
@@ -1290,8 +1296,7 @@ test.describe('Products Error States', () => {
 
   test('should display validation errors on create', async ({ page }) => {
     // This test verifies client-side validation when submitting without required fields
-    await page.goto('/admin/products/new');
-    await page.waitForLoadState('domcontentloaded');
+    await page.goto('/admin/products/new', { waitUntil: 'networkidle' });
 
     // Click Create Product without filling any fields
     const saveButton = page.getByRole('button', { name: 'Create Product' });
@@ -1593,6 +1598,8 @@ test.describe('Products Bulk Actions', () => {
     await page.waitForLoadState('domcontentloaded');
 
     const checkboxes = page.locator('input[type="checkbox"]');
+    // Wait for product data to render before counting
+    await checkboxes.first().waitFor({ state: 'visible', timeout: 10000 });
     const count = await checkboxes.count();
     // Should have at least select-all checkbox plus individual row checkboxes
     expect(count).toBeGreaterThan(0);
