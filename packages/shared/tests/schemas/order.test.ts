@@ -15,6 +15,10 @@ import {
   AddressCreateSchema,
   AddressUpdateSchema,
   AddressTypeSchema,
+  SavedAddressSchema,
+  SavedAddressCreateSchema,
+  SavedAddressUpdateSchema,
+  SavedAddressTypeSchema,
   OrderSchema,
   OrderCreateSchema,
   OrderUpdateSchema,
@@ -232,6 +236,179 @@ describe('Address Create Schema', () => {
 
     const result = AddressCreateSchema.safeParse(invalid);
     expect(result.success).toBe(false);
+  });
+});
+
+describe('Saved Address Type Schema', () => {
+  it('should accept valid saved address types', () => {
+    expect(SavedAddressTypeSchema.safeParse('shipping').success).toBe(true);
+    expect(SavedAddressTypeSchema.safeParse('billing').success).toBe(true);
+    expect(SavedAddressTypeSchema.safeParse('both').success).toBe(true);
+  });
+
+  it('should reject invalid saved address types', () => {
+    expect(SavedAddressTypeSchema.safeParse('home').success).toBe(false);
+    expect(SavedAddressTypeSchema.safeParse('office').success).toBe(false);
+    expect(SavedAddressTypeSchema.safeParse('').success).toBe(false);
+  });
+});
+
+describe('Saved Address Schema', () => {
+  const validSavedAddress = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    userId: 'user_123',
+    type: 'both' as const,
+    fullName: 'John Doe',
+    phone: '+919876543210',
+    addressLine1: '123 MG Road, Koramangala',
+    addressLine2: 'Near Metro Station',
+    landmark: 'Opposite Forum Mall',
+    city: 'Bangalore',
+    state: 'Karnataka',
+    postalCode: '560034',
+    countryCode: 'IN',
+    isDefault: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  it('should validate a complete valid saved address', () => {
+    const result = SavedAddressSchema.safeParse(validSavedAddress);
+    expect(result.success).toBe(true);
+  });
+
+  it('should validate without optional fields', () => {
+    const { addressLine2, landmark, ...address } = validSavedAddress;
+    const result = SavedAddressSchema.safeParse(address);
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept nullable optional fields', () => {
+    const result = SavedAddressSchema.safeParse({
+      ...validSavedAddress,
+      addressLine2: null,
+      landmark: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should require a valid UUID for id', () => {
+    expect(
+      SavedAddressSchema.safeParse({ ...validSavedAddress, id: 'not-a-uuid' }).success
+    ).toBe(false);
+  });
+
+  it('should validate postalCode as 6 digits', () => {
+    expect(
+      SavedAddressSchema.safeParse({ ...validSavedAddress, postalCode: '560034' }).success
+    ).toBe(true);
+    expect(
+      SavedAddressSchema.safeParse({ ...validSavedAddress, postalCode: '94102' }).success
+    ).toBe(false);
+    expect(
+      SavedAddressSchema.safeParse({ ...validSavedAddress, postalCode: 'ABC123' }).success
+    ).toBe(false);
+  });
+
+  it('should validate countryCode as 2 characters', () => {
+    expect(
+      SavedAddressSchema.safeParse({ ...validSavedAddress, countryCode: 'IN' }).success
+    ).toBe(true);
+    expect(
+      SavedAddressSchema.safeParse({ ...validSavedAddress, countryCode: 'IND' }).success
+    ).toBe(false);
+  });
+
+  it('should validate landmark max length', () => {
+    expect(
+      SavedAddressSchema.safeParse({
+        ...validSavedAddress,
+        landmark: 'A'.repeat(201),
+      }).success
+    ).toBe(false);
+  });
+
+  it('should coerce date strings to Date objects', () => {
+    const result = SavedAddressSchema.safeParse({
+      ...validSavedAddress,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.createdAt).toBeInstanceOf(Date);
+    }
+  });
+});
+
+describe('Saved Address Create Schema', () => {
+  const validCreate = {
+    fullName: 'John Doe',
+    phone: '+919876543210',
+    addressLine1: '123 MG Road, Koramangala',
+    city: 'Bangalore',
+    state: 'Karnataka',
+    postalCode: '560034',
+  };
+
+  it('should accept minimal valid create data with defaults', () => {
+    const result = SavedAddressCreateSchema.safeParse(validCreate);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.type).toBe('both');
+      expect(result.data.countryCode).toBe('IN');
+      expect(result.data.isDefault).toBe(false);
+    }
+  });
+
+  it('should accept full create data', () => {
+    const result = SavedAddressCreateSchema.safeParse({
+      ...validCreate,
+      type: 'shipping',
+      addressLine2: 'Floor 3',
+      landmark: 'Near Metro',
+      countryCode: 'IN',
+      isDefault: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject missing required fields', () => {
+    expect(SavedAddressCreateSchema.safeParse({}).success).toBe(false);
+    expect(SavedAddressCreateSchema.safeParse({ fullName: 'John' }).success).toBe(false);
+  });
+
+  it('should reject invalid phone format', () => {
+    expect(
+      SavedAddressCreateSchema.safeParse({ ...validCreate, phone: '9876543210' }).success
+    ).toBe(false);
+  });
+
+  it('should reject invalid postal code', () => {
+    expect(
+      SavedAddressCreateSchema.safeParse({ ...validCreate, postalCode: '1234' }).success
+    ).toBe(false);
+  });
+});
+
+describe('Saved Address Update Schema', () => {
+  it('should accept partial updates', () => {
+    expect(SavedAddressUpdateSchema.safeParse({ fullName: 'Jane Doe' }).success).toBe(true);
+    expect(SavedAddressUpdateSchema.safeParse({ postalCode: '110001' }).success).toBe(true);
+    expect(SavedAddressUpdateSchema.safeParse({ isDefault: true }).success).toBe(true);
+  });
+
+  it('should accept empty update (no fields)', () => {
+    expect(SavedAddressUpdateSchema.safeParse({}).success).toBe(true);
+  });
+
+  it('should still validate field constraints', () => {
+    expect(
+      SavedAddressUpdateSchema.safeParse({ fullName: 'A' }).success
+    ).toBe(false);
+    expect(
+      SavedAddressUpdateSchema.safeParse({ postalCode: 'ABC' }).success
+    ).toBe(false);
   });
 });
 

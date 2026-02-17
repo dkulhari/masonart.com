@@ -106,6 +106,87 @@ export const AddressUpdateSchema = AddressSchema.partial().required({ id: true }
 export type AddressUpdate = z.infer<typeof AddressUpdateSchema>;
 
 /**
+ * Saved Address Type Schema - matches DB enum for address purpose
+ */
+export const SavedAddressTypeSchema = z.enum(['shipping', 'billing', 'both']);
+export type SavedAddressType = z.infer<typeof SavedAddressTypeSchema>;
+
+/**
+ * Saved Address Schema - matches the `address` DB table columns exactly.
+ * Used for the address management API (CRUD operations).
+ * Separate from AddressSchema which uses pincode/country for order snapshots.
+ */
+export const SavedAddressSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().min(1),
+  type: SavedAddressTypeSchema,
+  fullName: z
+    .string()
+    .min(2, 'Full name must be at least 2 characters')
+    .max(100, 'Full name must be 100 characters or less'),
+  phone: z
+    .string()
+    .regex(
+      /^\+[1-9]\d{1,14}$/,
+      'Phone number must be in E.164 format (e.g., +919876543210)'
+    ),
+  addressLine1: z
+    .string()
+    .min(5, 'Address line 1 must be at least 5 characters')
+    .max(200, 'Address line 1 must be 200 characters or less'),
+  addressLine2: z
+    .string()
+    .max(200, 'Address line 2 must be 200 characters or less')
+    .optional()
+    .nullable(),
+  landmark: z
+    .string()
+    .max(200, 'Landmark must be 200 characters or less')
+    .optional()
+    .nullable(),
+  city: z
+    .string()
+    .min(2, 'City must be at least 2 characters')
+    .max(100, 'City must be 100 characters or less'),
+  state: z
+    .string()
+    .min(2, 'State must be at least 2 characters')
+    .max(100, 'State must be 100 characters or less'),
+  postalCode: z
+    .string()
+    .regex(/^\d{6}$/, 'Postal code must be 6 digits'),
+  countryCode: z.string().length(2, 'Country code must be 2 characters').default('IN'),
+  isDefault: z.boolean().default(false),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
+export type SavedAddress = z.infer<typeof SavedAddressSchema>;
+
+/**
+ * Saved Address Create Schema - for POST /api/addresses
+ */
+export const SavedAddressCreateSchema = z.object({
+  type: SavedAddressTypeSchema.default('both'),
+  fullName: SavedAddressSchema.shape.fullName,
+  phone: SavedAddressSchema.shape.phone,
+  addressLine1: SavedAddressSchema.shape.addressLine1,
+  addressLine2: SavedAddressSchema.shape.addressLine2,
+  landmark: SavedAddressSchema.shape.landmark,
+  city: SavedAddressSchema.shape.city,
+  state: SavedAddressSchema.shape.state,
+  postalCode: SavedAddressSchema.shape.postalCode,
+  countryCode: SavedAddressSchema.shape.countryCode,
+  isDefault: z.boolean().default(false),
+});
+export type SavedAddressCreate = z.infer<typeof SavedAddressCreateSchema>;
+
+/**
+ * Saved Address Update Schema - for PATCH /api/addresses/:id
+ */
+export const SavedAddressUpdateSchema = SavedAddressCreateSchema.partial();
+export type SavedAddressUpdate = z.infer<typeof SavedAddressUpdateSchema>;
+
+/**
  * Order Item Customizations
  */
 export const OrderItemCustomizationsSchema = z.object({
