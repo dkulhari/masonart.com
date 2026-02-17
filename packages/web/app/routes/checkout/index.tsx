@@ -7,7 +7,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   ShoppingCart,
@@ -25,11 +25,13 @@ import {
   useCartSubtotal,
   useIsCartEmpty,
 } from '~/stores/cart'
-import { AddressForm, type AddressFormData, type AddressFormErrors } from '~/components/checkout/AddressForm'
+import { AddressForm, type AddressFormData, type AddressFormErrors, SavedAddressSelector, type SavedAddress } from '~/components/checkout/AddressForm'
 import { OrderSummary } from '~/components/checkout/OrderSummary'
 import { PaymentButton } from '~/components/checkout/PaymentButton'
 import { ShippingSelector, type SelectedShippingOption } from '~/components/checkout/ShippingSelector'
 import type { OrderInput } from '~/lib/api'
+import { addressesApi } from '~/lib/api'
+import { useSession } from '~/lib/auth-client'
 
 // ============================================================================
 // Route Definition
@@ -73,6 +75,8 @@ function CheckoutPage() {
   const items = useCartItems()
   const subtotal = useCartSubtotal()
   const isEmpty = useIsCartEmpty()
+  const { data: session } = useSession()
+  const isLoggedIn = !!session?.user
 
   // Checkout state
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping')
@@ -80,6 +84,66 @@ function CheckoutPage() {
   const [isAddressValid, setIsAddressValid] = useState(false)
   const [selectedShippingOption, setSelectedShippingOption] = useState<SelectedShippingOption | null>(null)
   const [customerNotes, setCustomerNotes] = useState('')
+
+  // Saved addresses state
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null)
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false)
+
+  // Fetch saved addresses when logged in
+  useEffect(() => {
+    if (!isLoggedIn) return
+    addressesApi.list().then((response) => {
+      const mapped: SavedAddress[] = response.addresses.map((a) => ({
+        id: a.id,
+        fullName: a.fullName,
+        phone: a.phone,
+        addressLine1: a.addressLine1,
+        addressLine2: a.addressLine2 || undefined,
+        city: a.city,
+        state: a.state,
+        postalCode: a.postalCode,
+        isDefault: a.isDefault,
+      }))
+      setSavedAddresses(mapped)
+      // Auto-select default address
+      const defaultAddr = mapped.find((a) => a.isDefault)
+      if (defaultAddr && !shippingAddress) {
+        handleSavedAddressSelect(defaultAddr)
+      }
+    }).catch(() => {
+      // Silently fail - user can still enter address manually
+    })
+  }, [isLoggedIn])
+
+  // Handle selecting a saved address
+  const handleSavedAddressSelect = useCallback((address: SavedAddress) => {
+    setSelectedSavedAddressId(address.id)
+    setShowNewAddressForm(false)
+    const formData: AddressFormData = {
+      fullName: address.fullName,
+      email: session?.user?.email || '',
+      phone: address.phone,
+      addressLine1: address.addressLine1,
+      addressLine2: address.addressLine2 || '',
+      landmark: '',
+      city: address.city,
+      state: address.state,
+      postalCode: address.postalCode,
+      countryCode: 'IN',
+      saveAddress: false,
+    }
+    setShippingAddress(formData)
+    setIsAddressValid(true)
+  }, [session?.user?.email])
+
+  // Handle "Add New Address" from selector
+  const handleAddNewAddress = useCallback(() => {
+    setSelectedSavedAddressId(null)
+    setShowNewAddressForm(true)
+    setShippingAddress(null)
+    setIsAddressValid(false)
+  }, [])
 
   // Pricing calculations - use actual shipping cost from selected option
   const shippingCost = selectedShippingOption?.finalCost ?? 0
@@ -200,13 +264,26 @@ function CheckoutPage() {
             {/* Shipping Step */}
             {currentStep === 'shipping' && (
               <div className="space-y-6">
-                <AddressForm
-                  initialData={shippingAddress || undefined}
-                  onChange={handleAddressChange}
-                  onValidationChange={handleValidationChange}
-                  isLoggedIn={false} // TODO: Check auth state
-                  title="Shipping Address"
-                />
+                {/* Saved Address Selector (for logged-in users with addresses) */}
+                {isLoggedIn && savedAddresses.length > 0 && (
+                  <SavedAddressSelector
+                    addresses={savedAddresses}
+                    selectedId={selectedSavedAddressId}
+                    onSelect={handleSavedAddressSelect}
+                    onAddNew={handleAddNewAddress}
+                  />
+                )}
+
+                {/* Show address form when: guest, no saved addresses, or adding new */}
+                {(!isLoggedIn || savedAddresses.length === 0 || showNewAddressForm) && (
+                  <AddressForm
+                    initialData={shippingAddress || undefined}
+                    onChange={handleAddressChange}
+                    onValidationChange={handleValidationChange}
+                    isLoggedIn={isLoggedIn}
+                    title="Shipping Address"
+                  />
+                )}
 
                 {/* Customer Notes */}
                 <div className="rounded-xl border border-border bg-card p-6">
