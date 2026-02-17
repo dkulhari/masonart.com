@@ -353,11 +353,12 @@ function LoginPage() {
   // Google Login Handler
   // ============================================================================
 
-  const handleGoogleSignIn = () => {
+  const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
-    const apiUrl = getApiUrl()
-    const googleUrl = `${apiUrl}/api/auth/sign-in/social?provider=google`
-    window.location.href = `${googleUrl}&redirectTo=${encodeURIComponent(redirectUrl)}`
+    await signIn.social({
+      provider: 'google',
+      callbackURL: redirectUrl,
+    })
   }
 
   // ============================================================================
