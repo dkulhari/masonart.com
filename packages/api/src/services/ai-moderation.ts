@@ -186,11 +186,17 @@ export async function reviewGeneration(
   const { aiGenerationReviews } = await import(
     "../database/schema/ai-generation-reviews"
   );
-
-  // Get current generation
+  // Get current generation with user info
   const generation = await db.query.aiGenerations.findFirst({
     where: eq(aiGenerations.id, generationId),
-    columns: { id: true, moderationStatus: true, userId: true },
+    columns: {
+      id: true,
+      moderationStatus: true,
+      userId: true,
+      promptText: true,
+      stylePreset: true,
+      selectedImageUrl: true,
+    },
   });
 
   if (!generation) {
@@ -237,12 +243,92 @@ export async function reviewGeneration(
     throw new Error("Failed to create review record");
   }
 
+  // Send email notification for approved/rejected (not flagged)
+  if ((action === "approved" || action === "rejected") && generation.userId) {
+    try {
+      await sendModerationNotification(
+        generation.userId,
+        generationId,
+        action,
+        generation.promptText,
+        generation.stylePreset,
+        generation.selectedImageUrl,
+        action === "rejected" ? reason : undefined,
+        action === "rejected" ? category : undefined
+      );
+    } catch (error) {
+      // Log but don't fail the review operation
+      console.error("[AI Moderation] Failed to send notification:", error);
+    }
+  }
+
   return {
     success: true,
     generationId,
     newStatus,
     reviewId: review.id,
   };
+}
+
+/**
+ * Send email notification for moderation decision
+ */
+async function sendModerationNotification(
+  userId: string,
+  generationId: string,
+  action: "approved" | "rejected",
+  promptText: string,
+  stylePreset: string,
+  imageUrl?: string | null,
+  rejectionReason?: string,
+  rejectionCategory?: AIRejectionCategory
+): Promise<void> {
+  const { db } = await import("../database");
+  const { eq } = await import("drizzle-orm");
+  const { users } = await import("../database/schema/users");
+  const { sendEmail } = await import("./email");
+  const {
+    getAIGenerationApprovedTemplate,
+    getAIGenerationRejectedTemplate,
+  } = await import("./email-templates");
+
+  // Get user email
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { email: true, name: true },
+  });
+
+  if (!user?.email) {
+    return; // No email to send to
+  }
+
+  const context = {
+    userName: user.name || "",
+    userEmail: user.email,
+    generationId,
+    promptText,
+    stylePreset,
+    imageUrl,
+  };
+
+  const template =
+    action === "approved"
+      ? getAIGenerationApprovedTemplate(context)
+      : getAIGenerationRejectedTemplate({
+          ...context,
+          rejectionReason: rejectionReason || "Content does not meet our guidelines",
+          rejectionCategory,
+        });
+
+  await sendEmail({
+    to: user.email,
+    subject: template.subject,
+    html: template.html,
+    tags: [
+      { name: "type", value: `ai_moderation_${action}` },
+      { name: "generation_id", value: generationId },
+    ],
+  });
 }
 
 // ============================================================================
@@ -321,7 +407,7 @@ export async function getModerationStats() {
     total: 0,
   };
 
-  const rows = stats as Array<{ status: string; count: number }>;
+  const rows = stats as unknown as Array<{ status: string; count: number }>;
   for (const row of rows) {
     result[row.status as keyof typeof result] = row.count;
     result.total += row.count;
