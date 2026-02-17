@@ -1903,6 +1903,135 @@ export const notificationPreferencesApi = {
   },
 };
 
+// ============================================================================
+// Addresses API
+// ============================================================================
+
+export interface SavedAddressResponse {
+  id: string;
+  userId: string;
+  type: "shipping" | "billing" | "both";
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  landmark: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  countryCode: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AddressCreateInput {
+  type?: "shipping" | "billing" | "both";
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2?: string | null;
+  landmark?: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  countryCode?: string;
+  isDefault?: boolean;
+}
+
+export interface AddressUpdateInput {
+  type?: "shipping" | "billing" | "both";
+  fullName?: string;
+  phone?: string;
+  addressLine1?: string;
+  addressLine2?: string | null;
+  landmark?: string | null;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  countryCode?: string;
+  isDefault?: boolean;
+}
+
+export const addressesApi = {
+  async list(): Promise<{ addresses: SavedAddressResponse[] }> {
+    const response = await fetch(`${getApiUrl()}/api/addresses`, {
+      method: "GET",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to list addresses");
+    }
+
+    return response.json();
+  },
+
+  async create(data: AddressCreateInput): Promise<{ address: SavedAddressResponse; message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/addresses`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to create address");
+    }
+
+    return response.json();
+  },
+
+  async update(id: string, data: AddressUpdateInput): Promise<{ address: SavedAddressResponse; message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/addresses/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to update address");
+    }
+
+    return response.json();
+  },
+
+  async remove(id: string): Promise<{ message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/addresses/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to delete address");
+    }
+
+    return response.json();
+  },
+
+  async setDefault(id: string): Promise<{ address: SavedAddressResponse; message: string }> {
+    const response = await fetch(`${getApiUrl()}/api/addresses/${id}/default`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to set default address");
+    }
+
+    return response.json();
+  },
+};
+
 export const api = {
   products: productsApi,
   cart: cartApi,
@@ -1916,6 +2045,7 @@ export const api = {
   returns: returnsApi,
   tracking: trackingApi,
   notificationPreferences: notificationPreferencesApi,
+  addresses: addressesApi,
 };
 
 export default api;
