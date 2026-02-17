@@ -27,6 +27,7 @@ import {
   type CartItemAIDetails,
 } from "../database/schema/cart";
 import { products, productVariants, frames } from "../database/schema/products";
+import { aiGenerations } from "../database/schema/ai-generations";
 import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
 import { getCached, setCached, deleteCached, CacheKeys } from "../lib/redis";
 
@@ -405,6 +406,32 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
       }
 
       framePrice = frame[0].priceAddition || "0.00";
+    }
+
+    // Check AI generation moderation status if adding AI-generated content
+    if (input.aiGenerationId) {
+      const generation = await db
+        .select({
+          id: aiGenerations.id,
+          moderationStatus: aiGenerations.moderationStatus,
+        })
+        .from(aiGenerations)
+        .where(eq(aiGenerations.id, input.aiGenerationId))
+        .limit(1);
+
+      if (!generation[0]) {
+        return c.json({ error: "AI generation not found" }, 404);
+      }
+
+      if (generation[0].moderationStatus !== "approved") {
+        return c.json(
+          {
+            error: "This AI creation is pending review and cannot be added to cart yet",
+            moderationStatus: generation[0].moderationStatus,
+          },
+          403
+        );
+      }
     }
 
     // Get or create cart

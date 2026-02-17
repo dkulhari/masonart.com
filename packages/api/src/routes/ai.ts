@@ -581,7 +581,7 @@ aiApp.patch(
           eq(aiGenerations.id, id),
           eq(aiGenerations.userId, user.id)
         ),
-        columns: { id: true, status: true, isFlagged: true },
+        columns: { id: true, status: true, isFlagged: true, moderationStatus: true },
       });
 
       if (!generation) {
@@ -595,6 +595,17 @@ aiApp.patch(
       // Don't allow flagged content to be made public
       if (generation.isFlagged && visibility === "public") {
         return c.json({ error: "Flagged content cannot be made public" }, 403);
+      }
+
+      // Don't allow non-approved content to be made public (requires human review)
+      if (generation.moderationStatus !== "approved" && visibility === "public") {
+        return c.json(
+          {
+            error: "This creation is pending review and cannot be shared publicly yet",
+            moderationStatus: generation.moderationStatus,
+          },
+          403
+        );
       }
 
       // Update visibility
