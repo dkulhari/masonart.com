@@ -22,6 +22,13 @@
       "when": 1769954046967,
       "tag": "0002_freezing_richard_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771302109743,
+      "tag": "0003_regular_beyonder",
+      "breakpoints": true
     }
   ]
 }

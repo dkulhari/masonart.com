@@ -16,6 +16,9 @@ export * from "./cart";
 // AI generations, likes, banned prompts, and usage tracking
 export * from "./ai-generations";
 
+// AI generation moderation reviews
+export * from "./ai-generation-reviews";
+
 // Wallet transactions and pricing config
 export * from "./wallet";
 

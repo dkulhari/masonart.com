@@ -21,6 +21,7 @@ import { adminShipmentsApp } from "./routes/admin/shipments";
 import { adminReturnsApp } from "./routes/admin/returns";
 import { adminNotificationsApp } from "./routes/admin/notifications";
 import { adminApprovalsApp } from "./routes/admin/approvals";
+import { adminModerationApp } from "./routes/admin/ai-moderation";
 import { sitemapApp } from "./routes/sitemap";
 import { shippingApp } from "./routes/shipping";
 import { shipmentsApp } from "./routes/shipments";
@@ -146,6 +147,9 @@ app.route("/api/admin", adminNotificationsApp);
 
 // Admin Approvals API - production photo approval management
 app.route("/api/admin/approvals", adminApprovalsApp);
+
+// Admin AI Moderation API - AI generation review queue
+app.route("/api/admin/ai-moderation", adminModerationApp);
 
 // ============================================================================
 // Webhook Routes (External Service Callbacks)

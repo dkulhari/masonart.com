@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { authApi, aiApi } from '~/lib/api'
-import { AICreationsList, type AICreation, type AICreationStatus } from '~/components/account/AICreationsList'
+import { AICreationsList, type AICreation, type AICreationStatus, type AIModerationStatus } from '~/components/account/AICreationsList'
 
 // ============================================================================
 // Route Definition
@@ -31,6 +31,7 @@ const searchParamsSchema = z.object({
   page: z.coerce.number().optional().default(1),
   status: z.string().optional(),
   style: z.string().optional(),
+  moderation: z.string().optional(),
 })
 
 export const Route = createFileRoute('/_authed/account/ai-creations')({
@@ -94,6 +95,13 @@ const STYLE_FILTERS: FilterOption[] = [
   { value: 'typography', label: 'Typography' },
 ]
 
+const MODERATION_FILTERS: FilterOption[] = [
+  { value: '', label: 'All' },
+  { value: 'pending_review', label: 'Pending Review' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+]
+
 const PAGE_SIZE = 12
 
 // ============================================================================
@@ -120,6 +128,7 @@ function AICreationsHistoryPage() {
   const currentPage = search.page || 1
   const currentStatus = search.status || ''
   const currentStyle = search.style || ''
+  const currentModeration = search.moderation || ''
 
   // Check authentication
   useEffect(() => {
@@ -158,6 +167,7 @@ function AICreationsHistoryPage() {
         pageSize: PAGE_SIZE,
         ...(currentStatus && { status: currentStatus as AICreationStatus }),
         ...(currentStyle && { stylePreset: currentStyle }),
+        ...(currentModeration && { moderationStatus: currentModeration as AIModerationStatus }),
       })
 
       setCreations(response.items || [])
@@ -173,7 +183,7 @@ function AICreationsHistoryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [isAuthenticated, currentPage, currentStatus, currentStyle])
+  }, [isAuthenticated, currentPage, currentStatus, currentStyle, currentModeration])
 
   useEffect(() => {
     fetchCreations()
@@ -187,6 +197,7 @@ function AICreationsHistoryPage() {
         page: 1,
         status: status || undefined,
         style: currentStyle || undefined,
+        moderation: currentModeration || undefined,
       },
     })
     setShowFilters(false)
@@ -200,6 +211,21 @@ function AICreationsHistoryPage() {
         page: 1,
         status: currentStatus || undefined,
         style: style || undefined,
+        moderation: currentModeration || undefined,
+      },
+    })
+    setShowFilters(false)
+  }
+
+  // Handle moderation filter change
+  const handleModerationChange = (moderation: string) => {
+    navigate({
+      to: '/account/ai-creations',
+      search: {
+        page: 1,
+        status: currentStatus || undefined,
+        style: currentStyle || undefined,
+        moderation: moderation || undefined,
       },
     })
     setShowFilters(false)
@@ -213,6 +239,7 @@ function AICreationsHistoryPage() {
         page: newPage,
         status: currentStatus || undefined,
         style: currentStyle || undefined,
+        moderation: currentModeration || undefined,
       },
     })
     // Scroll to top
@@ -249,7 +276,7 @@ function AICreationsHistoryPage() {
   }
 
   // Active filter count
-  const activeFilterCount = (currentStatus ? 1 : 0) + (currentStyle ? 1 : 0)
+  const activeFilterCount = (currentStatus ? 1 : 0) + (currentStyle ? 1 : 0) + (currentModeration ? 1 : 0)
 
   // Loading state while checking auth
   if (isAuthenticated === null) {
@@ -363,6 +390,28 @@ function AICreationsHistoryPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Moderation Status Filter */}
+              <div className="rounded-xl border border-border bg-card p-4">
+                <h3 className="mb-4 text-sm font-semibold text-foreground">Approval Status</h3>
+                <div className="space-y-1">
+                  {MODERATION_FILTERS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleModerationChange(option.value)}
+                      className={cn(
+                        'w-full rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                        currentModeration === option.value
+                          ? 'bg-purple-100 font-medium text-purple-700'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </aside>
 
@@ -403,7 +452,7 @@ function AICreationsHistoryPage() {
               </div>
 
               {/* Style */}
-              <div>
+              <div className="mb-4">
                 <h4 className="mb-2 text-xs font-medium text-muted-foreground uppercase">Style</h4>
                 <div className="flex flex-wrap gap-2">
                   {STYLE_FILTERS.map((option) => (
@@ -423,13 +472,35 @@ function AICreationsHistoryPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Approval Status */}
+              <div>
+                <h4 className="mb-2 text-xs font-medium text-muted-foreground uppercase">Approval Status</h4>
+                <div className="flex flex-wrap gap-2">
+                  {MODERATION_FILTERS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleModerationChange(option.value)}
+                      className={cn(
+                        'rounded-full px-3 py-1.5 text-sm transition-colors',
+                        currentModeration === option.value
+                          ? 'bg-purple-500 font-medium text-white'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
           {/* Main Content */}
           <div className="lg:col-span-3">
             {/* Active Filter Badges */}
-            {(currentStatus || currentStyle) && (
+            {(currentStatus || currentStyle || currentModeration) && (
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground">Filtered by:</span>
                 {currentStatus && (
@@ -449,6 +520,16 @@ function AICreationsHistoryPage() {
                     className="flex items-center gap-1 rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700 hover:bg-purple-200"
                   >
                     {STYLE_FILTERS.find((f) => f.value === currentStyle)?.label}
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {currentModeration && (
+                  <button
+                    type="button"
+                    onClick={() => handleModerationChange('')}
+                    className="flex items-center gap-1 rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700 hover:bg-purple-200"
+                  >
+                    {MODERATION_FILTERS.find((f) => f.value === currentModeration)?.label}
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}

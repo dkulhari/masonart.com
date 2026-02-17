@@ -827,3 +827,185 @@ Thank you for choosing MasonArt!
     text,
   };
 }
+
+// ============================================================================
+// AI Generation Moderation Email Templates
+// ============================================================================
+
+export interface AIModerationEmailContext {
+  userName: string;
+  userEmail: string;
+  generationId: string;
+  promptText: string;
+  stylePreset: string;
+  imageUrl?: string | null;
+}
+
+/**
+ * AI Generation Approved Email Template
+ * Sent when an AI-generated image passes moderation
+ */
+export function getAIGenerationApprovedTemplate(
+  context: AIModerationEmailContext
+): EmailTemplate {
+  const { userName, generationId, promptText, stylePreset, imageUrl } = context;
+  const displayName = userName || "there";
+  const truncatedPrompt = promptText.length > 100
+    ? promptText.substring(0, 100) + "..."
+    : promptText;
+
+  const content = `
+    <div class="content">
+      <h2>Your AI Creation is Approved! ✨</h2>
+      <p>Hi ${displayName},</p>
+      <p>Great news! Your AI-generated artwork has been reviewed and approved. You can now add it to your cart and share it in the gallery.</p>
+
+      ${imageUrl ? `
+      <div style="text-align: center; margin: 24px 0;">
+        <img src="${imageUrl}" alt="Your AI Creation" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+      </div>
+      ` : ''}
+
+      <div class="order-box">
+        <h3>Creation Details</h3>
+        <div class="order-detail">
+          <span class="label">Style</span>
+          <span class="value">${stylePreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Prompt</span>
+          <span class="value">${truncatedPrompt}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Status</span>
+          <span class="value" style="color: #22c55e;">Approved ✓</span>
+        </div>
+      </div>
+
+      <center>
+        <a href="https://masonart.com/account/ai-creations/${generationId}" class="button">View Your Creation</a>
+      </center>
+
+      <p style="text-align: center; color: #777; margin-top: 24px;">
+        Ready to bring your art to life? Add it to your cart and we'll print it beautifully!
+      </p>
+    </div>
+  `;
+
+  const text = `
+Your AI Creation is Approved! ✨
+
+Hi ${displayName},
+
+Great news! Your AI-generated artwork has been reviewed and approved. You can now add it to your cart and share it in the gallery.
+
+Creation Details:
+- Style: ${stylePreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+- Prompt: ${truncatedPrompt}
+- Status: Approved ✓
+
+View your creation: https://masonart.com/account/ai-creations/${generationId}
+
+Ready to bring your art to life? Add it to your cart and we'll print it beautifully!
+
+Thank you for choosing MasonArt!
+  `.trim();
+
+  return {
+    subject: `Your AI Creation is Approved! ✨`,
+    html: baseTemplate(content),
+    text,
+  };
+}
+
+/**
+ * AI Generation Rejected Email Template
+ * Sent when an AI-generated image is rejected by moderation
+ */
+export function getAIGenerationRejectedTemplate(
+  context: AIModerationEmailContext & {
+    rejectionReason: string;
+    rejectionCategory?: string;
+  }
+): EmailTemplate {
+  const { userName, promptText, stylePreset, rejectionReason, rejectionCategory } = context;
+  const displayName = userName || "there";
+  const truncatedPrompt = promptText.length > 100
+    ? promptText.substring(0, 100) + "..."
+    : promptText;
+
+  const categoryDisplay = rejectionCategory
+    ? rejectionCategory.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    : 'Content Policy';
+
+  const content = `
+    <div class="content">
+      <h2>AI Creation Review Update</h2>
+      <p>Hi ${displayName},</p>
+      <p>Thank you for using MasonArt's AI art generator. Unfortunately, your recent creation could not be approved for printing or gallery sharing.</p>
+
+      <div class="tracking-box" style="background-color: #fef2f2; border-left: 4px solid #ef4444;">
+        <h3 style="color: #dc2626;">Reason: ${categoryDisplay}</h3>
+        <p style="margin: 0; color: #991b1b;">
+          ${rejectionReason}
+        </p>
+      </div>
+
+      <div class="order-box">
+        <h3>Creation Details</h3>
+        <div class="order-detail">
+          <span class="label">Style</span>
+          <span class="value">${stylePreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Prompt</span>
+          <span class="value">${truncatedPrompt}</span>
+        </div>
+        <div class="order-detail">
+          <span class="label">Status</span>
+          <span class="value" style="color: #ef4444;">Not Approved</span>
+        </div>
+      </div>
+
+      <p>You're welcome to create a new artwork with a different prompt. Our content guidelines ensure all artwork is appropriate for printing and display.</p>
+
+      <center>
+        <a href="https://masonart.com/create" class="button">Create New Artwork</a>
+      </center>
+
+      <p style="text-align: center; color: #777; margin-top: 24px;">
+        Questions? Contact our support team and we'll be happy to help.
+      </p>
+    </div>
+  `;
+
+  const text = `
+AI Creation Review Update
+
+Hi ${displayName},
+
+Thank you for using MasonArt's AI art generator. Unfortunately, your recent creation could not be approved for printing or gallery sharing.
+
+Reason: ${categoryDisplay}
+${rejectionReason}
+
+Creation Details:
+- Style: ${stylePreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+- Prompt: ${truncatedPrompt}
+- Status: Not Approved
+
+You're welcome to create a new artwork with a different prompt. Our content guidelines ensure all artwork is appropriate for printing and display.
+
+Create new artwork: https://masonart.com/create
+
+Questions? Contact our support team and we'll be happy to help.
+
+Thank you for choosing MasonArt!
+  `.trim();
+
+  return {
+    subject: `AI Creation Review Update`,
+    html: baseTemplate(content),
+    text,
+  };
+}
