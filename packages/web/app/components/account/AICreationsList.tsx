@@ -22,6 +22,10 @@ import {
   Trash2,
   ArrowRight,
   ImagePlus,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+  ShieldAlert,
 } from 'lucide-react'
 import { cn, formatRelativeTime } from '~/lib/utils'
 
@@ -42,6 +46,9 @@ export interface AICreation {
   stylePreset: string
   aspectRatio: string
   status: AICreationStatus
+  moderationStatus?: AIModerationStatus
+  rejectionReason?: string | null
+  rejectionCategory?: string | null
   images?: AIGeneratedImage[]
   variationCount?: number
   selectedImageId?: string | null
@@ -62,6 +69,12 @@ export type AICreationStatus =
   | 'completed'
   | 'failed'
   | 'cancelled'
+
+export type AIModerationStatus =
+  | 'pending_review'
+  | 'approved'
+  | 'rejected'
+  | 'flagged'
 
 export interface AICreationsListProps {
   /** List of AI creations to display */
@@ -123,6 +136,33 @@ const STATUS_CONFIG: Record<AICreationStatus, StatusConfig> = {
     icon: XCircle,
     color: 'text-gray-600',
     bgColor: 'bg-gray-100',
+  },
+}
+
+const MODERATION_STATUS_CONFIG: Record<AIModerationStatus, StatusConfig> = {
+  pending_review: {
+    label: 'Pending Review',
+    icon: Shield,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100',
+  },
+  approved: {
+    label: 'Approved',
+    icon: ShieldCheck,
+    color: 'text-green-600',
+    bgColor: 'bg-green-100',
+  },
+  rejected: {
+    label: 'Rejected',
+    icon: ShieldX,
+    color: 'text-red-600',
+    bgColor: 'bg-red-100',
+  },
+  flagged: {
+    label: 'Under Review',
+    icon: ShieldAlert,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-100',
   },
 }
 
@@ -237,6 +277,14 @@ function AICreationCard({
   const StatusIcon = statusConfig.icon
   const isAnimated = creation.status === 'processing'
 
+  // Moderation status (only relevant for completed creations)
+  const moderationStatus = creation.moderationStatus || 'pending_review'
+  const moderationConfig = MODERATION_STATUS_CONFIG[moderationStatus]
+  const ModerationIcon = moderationConfig.icon
+  const isApproved = moderationStatus === 'approved'
+  const isRejected = moderationStatus === 'rejected'
+  const showModerationBadge = creation.status === 'completed' && moderationStatus !== 'approved'
+
   // Get display image - selected image or first from array
   const firstImage = creation.images?.[0]
   const displayImage = creation.selectedImageUrl ||
@@ -300,21 +348,52 @@ function AICreationCard({
             </div>
           </div>
         )}
+
+        {/* Moderation status badge for completed but non-approved */}
+        {!compact && showModerationBadge && (
+          <div className="absolute left-2 top-2">
+            <div
+              className={cn(
+                'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium shadow-sm',
+                moderationConfig.bgColor,
+                moderationConfig.color
+              )}
+            >
+              <ModerationIcon className="h-3.5 w-3.5" />
+              {moderationConfig.label}
+            </div>
+          </div>
+        )}
       </a>
 
       {/* Content */}
       <div className={cn('flex flex-1 flex-col', compact ? '' : 'p-4')}>
         {/* Status Badge (compact only) */}
         {compact && (
-          <div
-            className={cn(
-              'mb-1 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-              statusConfig.bgColor,
-              statusConfig.color
+          <div className="mb-1 flex flex-wrap gap-1">
+            <div
+              className={cn(
+                'inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                statusConfig.bgColor,
+                statusConfig.color
+              )}
+            >
+              <StatusIcon className={cn('h-3 w-3', isAnimated && 'animate-spin')} />
+              {statusConfig.label}
+            </div>
+            {/* Moderation badge for completed items */}
+            {creation.status === 'completed' && moderationStatus !== 'approved' && (
+              <div
+                className={cn(
+                  'inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                  moderationConfig.bgColor,
+                  moderationConfig.color
+                )}
+              >
+                <ModerationIcon className="h-3 w-3" />
+                {moderationConfig.label}
+              </div>
             )}
-          >
-            <StatusIcon className={cn('h-3 w-3', isAnimated && 'animate-spin')} />
-            {statusConfig.label}
           </div>
         )}
 
@@ -364,26 +443,56 @@ function AICreationCard({
           </div>
         )}
 
+        {/* Rejection reason (if rejected) */}
+        {!compact && isRejected && creation.rejectionReason && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+            <div className="flex items-start gap-2">
+              <ShieldX className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+              <div>
+                <p className="text-xs font-medium text-red-800">Content Not Approved</p>
+                <p className="mt-0.5 text-xs text-red-700">{creation.rejectionReason}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Actions (non-compact) */}
         {!compact && creation.status === 'completed' && (
           <div className="mt-3 flex items-center gap-2">
-            {onAddToCart && !creation.isPurchased && (
+            {/* Add to Cart - disabled if not approved */}
+            {onAddToCart && !creation.isPurchased && !isRejected && (
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault()
-                  onAddToCart(creation)
+                  if (isApproved) {
+                    onAddToCart(creation)
+                  }
                 }}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                disabled={!isApproved}
+                className={cn(
+                  'flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isApproved
+                    ? 'bg-brand-500 text-white hover:bg-brand-600'
+                    : 'cursor-not-allowed bg-gray-100 text-gray-400'
+                )}
+                title={!isApproved ? 'Awaiting moderation approval' : undefined}
               >
                 <ShoppingCart className="h-4 w-4" />
-                Add to Cart
+                {isApproved ? 'Add to Cart' : 'Pending Approval'}
               </button>
             )}
             {creation.isPurchased && (
               <span className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-100 px-3 py-2 text-sm font-medium text-green-700">
                 <CheckCircle className="h-4 w-4" />
                 Purchased
+              </span>
+            )}
+            {/* Rejected items show a different message */}
+            {isRejected && !creation.isPurchased && (
+              <span className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-100 px-3 py-2 text-sm font-medium text-red-700">
+                <ShieldX className="h-4 w-4" />
+                Not Available
               </span>
             )}
             {onDelete && !creation.isPurchased && (
