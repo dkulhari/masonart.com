@@ -219,7 +219,7 @@ export async function reviewGeneration(
     .where(eq(aiGenerations.id, generationId));
 
   // Create audit record
-  const [review] = await db
+  const reviewResult = await db
     .insert(aiGenerationReviews)
     .values({
       generationId,
@@ -231,6 +231,11 @@ export async function reviewGeneration(
       newStatus,
     })
     .returning({ id: aiGenerationReviews.id });
+
+  const review = reviewResult[0];
+  if (!review) {
+    throw new Error("Failed to create review record");
+  }
 
   return {
     success: true,
@@ -299,16 +304,14 @@ export async function bulkReject(
  */
 export async function getModerationStats() {
   const { db } = await import("../database");
+  const { sql } = await import("drizzle-orm");
 
-  const stats = await db.execute<{
-    status: string;
-    count: number;
-  }>`
+  const stats = await db.execute(sql`
     SELECT moderation_status as status, COUNT(*)::int as count
     FROM ai_generations
     WHERE moderation_status IS NOT NULL
     GROUP BY moderation_status
-  `;
+  `);
 
   const result = {
     pending_review: 0,
@@ -318,7 +321,8 @@ export async function getModerationStats() {
     total: 0,
   };
 
-  for (const row of stats.rows) {
+  const rows = stats as Array<{ status: string; count: number }>;
+  for (const row of rows) {
     result[row.status as keyof typeof result] = row.count;
     result.total += row.count;
   }
