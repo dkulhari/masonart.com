@@ -217,6 +217,23 @@ function CheckoutPage() {
 
   // Handle payment success
   const handlePaymentSuccess = (_orderId: string, orderNumber: string) => {
+    // Save address if checkbox was checked, user is logged in, and address wasn't from saved addresses
+    if (isLoggedIn && shippingAddress?.saveAddress && !selectedSavedAddressId) {
+      addressesApi.create({
+        fullName: shippingAddress.fullName,
+        phone: shippingAddress.phone.startsWith('+') ? shippingAddress.phone : `+91${shippingAddress.phone}`,
+        addressLine1: shippingAddress.addressLine1,
+        addressLine2: shippingAddress.addressLine2 || null,
+        landmark: shippingAddress.landmark || null,
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        postalCode: shippingAddress.postalCode,
+        countryCode: shippingAddress.countryCode || 'IN',
+      }).catch(() => {
+        // Silently fail - don't block order confirmation
+      })
+    }
+
     // Redirect to order confirmation page
     window.location.href = `/orders/${orderNumber}?success=true`
   }
