@@ -45,6 +45,7 @@ import {
   type WalletVariables,
 } from "../middleware/wallet";
 import { deductFromWallet } from "../services/wallet";
+import { checkPromptSafety } from "../services/ai-moderation";
 import { addAIGenerationJob } from "../queues/ai-generation";
 import { getCached, setCached, CacheKeys, redis } from "../lib/redis";
 import {
@@ -205,6 +206,22 @@ aiApp.post(
     const generationCost = c.get("generationCost");
 
     try {
+      // Check prompt safety before generation (Layer 1: Automated filtering)
+      const safetyResult = await checkPromptSafety(input.prompt);
+      if (!safetyResult.isSafe) {
+        return c.json(
+          {
+            error: "Your prompt contains content that is not allowed",
+            blockedTerms: safetyResult.blockedTerms.map((t) => ({
+              category: t.category,
+              severity: t.severity,
+            })),
+            riskScore: safetyResult.riskScore,
+          },
+          400
+        );
+      }
+
       // Create prompt details object
       const promptDetails: AIPromptDetails = {
         prompt: input.prompt,
@@ -220,6 +237,7 @@ aiApp.post(
       };
 
       // Create generation record in database
+      // All generations start as pending_review (Layer 2: Human approval required)
       const [generation] = await db
         .insert(aiGenerations)
         .values({
@@ -234,6 +252,9 @@ aiApp.post(
           queuedAt: new Date(),
           // Store cost info
           estimatedCost: generationCost?.userPricePaise,
+          // Content moderation - all generations require human review
+          moderationStatus: "pending_review",
+          needsReview: true,
         })
         .returning();
 
@@ -289,6 +310,7 @@ aiApp.post(
             aspectRatio: generation.aspectRatio,
             variationCount: generation.variationCount,
             queuedAt: generation.queuedAt,
+            moderationStatus: generation.moderationStatus,
           },
           jobId: job.id,
           payment: {
