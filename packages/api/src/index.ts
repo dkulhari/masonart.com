@@ -28,6 +28,7 @@ import { shipmentsApp } from "./routes/shipments";
 import { returnsApp, returnPoliciesApp } from "./routes/returns";
 import { trackingApp } from "./routes/tracking";
 import { notificationPreferencesApp } from "./routes/notification-preferences";
+import { addressesApp } from "./routes/addresses";
 import { approvalsApp } from "./routes/approvals";
 import {
   productReviewsApp,
@@ -112,6 +113,9 @@ app.route("/api/tracking", trackingApp);
 
 // Notification Preferences API - user notification settings
 app.route("/api/notification-preferences", notificationPreferencesApp);
+
+// Addresses API - saved address management
+app.route("/api/addresses", addressesApp);
 
 // Approvals API - public production photo approval access
 app.route("/api/approvals", approvalsApp);
