@@ -16,6 +16,7 @@ import {
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { processImage, type ProcessedImage } from './image-processing';
 
 // ============================================================================
 // S3 Client Configuration
@@ -142,6 +143,84 @@ export async function uploadImage(
     contentType,
     metadata: options?.metadata,
   });
+}
+
+/**
+ * Upload result with responsive image variants
+ */
+export interface OptimizedUploadResult extends UploadResult {
+  /** WebP URL of the original */
+  webpUrl: string;
+  /** Responsive variants with URLs */
+  variants: Array<{
+    name: string;
+    width: number;
+    url: string;
+    key: string;
+  }>;
+  /** Original image dimensions */
+  width: number;
+  height: number;
+}
+
+/**
+ * Upload an image with WebP conversion and responsive variant generation.
+ * Stores the original (as WebP) plus thumbnail, card, detail, and full variants.
+ */
+export async function uploadOptimizedImage(
+  buffer: Buffer,
+  filename: string,
+  contentType: string,
+  options?: {
+    prefix?: string;
+    userId?: string;
+    metadata?: Record<string, string>;
+  }
+): Promise<OptimizedUploadResult> {
+  const prefix = options?.prefix || StoragePaths.PRODUCTS;
+  const baseKey = generateFileKey(prefix, filename, options?.userId);
+  // Remove extension from base key for variant naming
+  const keyWithoutExt = baseKey.replace(/\.[^.]+$/, '');
+
+  // Process image: convert to WebP + generate responsive variants
+  const processed: ProcessedImage = await processImage(buffer);
+
+  // Upload original as WebP
+  const webpKey = `${keyWithoutExt}.webp`;
+  await uploadFile(processed.original.buffer, webpKey, {
+    contentType: 'image/webp',
+    metadata: options?.metadata,
+  });
+
+  // Also upload original format as fallback
+  const originalResult = await uploadFile(buffer, baseKey, {
+    contentType,
+    metadata: options?.metadata,
+  });
+
+  // Upload responsive variants
+  const variants: OptimizedUploadResult['variants'] = [];
+  for (const variant of processed.variants) {
+    const variantKey = `${keyWithoutExt}${variant.suffix}.webp`;
+    await uploadFile(variant.buffer, variantKey, {
+      contentType: 'image/webp',
+      metadata: options?.metadata,
+    });
+    variants.push({
+      name: variant.name,
+      width: variant.width,
+      url: getPublicUrl(variantKey),
+      key: variantKey,
+    });
+  }
+
+  return {
+    ...originalResult,
+    webpUrl: getPublicUrl(webpKey),
+    variants,
+    width: processed.original.width,
+    height: processed.original.height,
+  };
 }
 
 /**

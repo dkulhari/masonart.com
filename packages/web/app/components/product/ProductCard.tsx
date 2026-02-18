@@ -9,6 +9,7 @@
 
 import { Palette, Sparkles } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
+import { OptimizedImage, type ImageVariant } from '~/components/ui/OptimizedImage'
 
 // ============================================================================
 // Types
@@ -19,6 +20,10 @@ export interface ProductImage {
   url: string
   alt?: string
   isPrimary?: boolean
+  webpUrl?: string
+  width?: number
+  height?: number
+  variants?: ImageVariant[]
 }
 
 export interface ProductCardData {
@@ -122,11 +127,15 @@ export function ProductCard({
           )}
         >
           {primaryImage?.url ? (
-            <img
+            <OptimizedImage
               src={primaryImage.url}
+              webpSrc={primaryImage.webpUrl}
               alt={primaryImage.alt || product.title}
+              variants={primaryImage.variants}
+              width={primaryImage.width}
+              height={primaryImage.height}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
