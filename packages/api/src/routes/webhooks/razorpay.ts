@@ -23,6 +23,8 @@ import {
   type RazorpayWebhookPayload,
   RazorpayError,
 } from "../../lib/razorpay";
+import { redis, isRedisConnected } from "../../lib/redis";
+import { logger } from "../../lib/logger";
 
 // ============================================================================
 // Types
@@ -81,8 +83,35 @@ razorpayWebhooksApp.post("/", async (c) => {
     return c.json({ error: "Invalid JSON payload" }, 400);
   }
 
+  // Idempotency check: skip duplicate webhook events
+  const eventId = (payload as any).event_id || `${payload.event}_${Date.now()}`;
+  const dedupeKey = `webhook:razorpay:${eventId}`;
+
+  if (isRedisConnected()) {
+    const alreadyProcessed = await redis.get(dedupeKey);
+    if (alreadyProcessed) {
+      logger.info({ eventId, event: payload.event }, "Duplicate webhook event ignored");
+      return c.json({ success: true, message: "Event already processed" }, 200);
+    }
+  }
+
+  // Log webhook event for audit trail
+  logger.info(
+    { eventId, event: payload.event },
+    `Processing Razorpay webhook: ${payload.event}`
+  );
+
   // Process the webhook event
   const result = await processWebhookEvent(payload);
+
+  // Mark event as processed (TTL: 7 days)
+  if (isRedisConnected() && result.success) {
+    await redis.setex(dedupeKey, 7 * 24 * 60 * 60, JSON.stringify({
+      processedAt: new Date().toISOString(),
+      event: payload.event,
+      result: result.message,
+    }));
+  }
 
   if (!result.success) {
     // Return 200 even on processing errors to prevent Razorpay from retrying
