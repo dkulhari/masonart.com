@@ -1,0 +1,48 @@
+ticket_number: 262
+title: DELETE /api/cart returns 404 instead of 401 when unauthenticated
+description: |-
+  ## Bug
+
+  When calling `DELETE /api/cart` without authentication, the endpoint returns `{"error":"No cart found"}` with HTTP 404 instead of the expected 401 Unauthorized.
+
+  ## Expected Behavior
+  Should return 401 Unauthorized like all other cart endpoints (POST, PUT, DELETE /api/cart/:id).
+
+  ## Actual Behavior
+  - `POST /api/cart` → 401 ✅
+  - `PUT /api/cart/test` → 401 ✅  
+  - `DELETE /api/cart/test` → 401 ✅
+  - `DELETE /api/cart` → 404 `{"error":"No cart found"}` ❌
+
+  ## Impact
+  1. **Inconsistent API behavior**: One cart endpoint bypasses auth, others don't
+  2. **Information leakage**: Reveals whether a cart exists without authentication
+  3. **Security concern**: Auth middleware may not be applied to this route
+
+  ## Steps to Reproduce
+  ```bash
+  curl -s -X DELETE http://localhost:3000/api/cart
+  # Returns: {"error":"No cart found"} HTTP:404
+  # Expected: {"error":"Unauthorized","message":"Authentication required","code":"UNAUTHORIZED"} HTTP:401
+  ```
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T22:27:46.427Z'
+last_updated: '2026-02-17T22:27:46.427Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - security
+  - cart
+  - auth
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

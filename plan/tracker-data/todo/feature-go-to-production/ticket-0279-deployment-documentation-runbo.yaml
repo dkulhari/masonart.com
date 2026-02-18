@@ -1,0 +1,57 @@
+ticket_number: 279
+title: "Create deployment documentation and operational runbook"
+description: |-
+  ## Task
+  Document the complete deployment process, environment setup, and incident response procedures.
+
+  ## Deliverables
+
+  ### 1. Deployment Guide (docs/deployment.md)
+  - Prerequisites (accounts, CLI tools, access)
+  - Environment setup (env vars, secrets management)
+  - Build and deploy steps
+  - Domain and SSL configuration
+  - Database migration procedure
+
+  ### 2. Operational Runbook (docs/runbook.md)
+  - How to deploy a new version
+  - How to rollback a failed deployment
+  - How to check application health
+  - How to access logs
+  - Common issues and troubleshooting
+  - Database backup and restore
+  - Scaling procedures
+
+  ### 3. Environment Variables Reference
+  - Complete list of all env vars with descriptions
+  - Which are required vs optional
+  - Default values and valid ranges
+  - Secrets vs non-secrets
+
+  ## Dependencies
+  - Ticket #274 (deployment target) should be chosen first
+feature: go-to-production
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - documentation
+  - deployment
+  - P1
+acceptance_criteria:
+  - Deployment guide covers full setup from zero
+  - Runbook covers deploy, rollback, and troubleshooting
+  - All env vars documented with descriptions
+comments: []
+work_sessions: []
+related_tickets:
+  - 274
+blocked_by:
+  - 274
+blocks: []
+attachments: []

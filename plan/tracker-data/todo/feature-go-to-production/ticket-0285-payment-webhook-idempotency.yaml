@@ -1,0 +1,44 @@
+ticket_number: 285
+title: "Verify and enforce payment webhook idempotency"
+description: |-
+  ## Task
+  Ensure Razorpay webhook handlers are idempotent — processing the same webhook event multiple times should not create duplicate orders or double-charge customers.
+
+  ## Requirements
+  - Store webhook event IDs in database
+  - Before processing, check if event ID already processed
+  - If duplicate, return 200 OK without re-processing
+  - Add webhook signature verification (x-razorpay-signature header)
+  - Log all webhook events for audit trail
+  - Handle out-of-order webhook delivery
+
+  ## Files to Review/Modify
+  - `packages/api/src/routes/webhooks/razorpay.ts`
+  - May need new table: `webhook_events` (event_id, type, processed_at, payload)
+
+  ## Testing
+  - Send same webhook event twice, verify no duplicate processing
+  - Send webhook with invalid signature, verify rejection
+feature: go-to-production
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - payments
+  - resilience
+  - P2
+acceptance_criteria:
+  - Duplicate webhook events are safely ignored
+  - Webhook signature verified before processing
+  - All webhook events logged with event ID
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

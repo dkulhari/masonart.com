@@ -1,0 +1,46 @@
+ticket_number: 286
+title: "Implement image optimization pipeline with WebP conversion"
+description: |-
+  ## Task
+  Optimize product and AI-generated images for web delivery to reduce page load times.
+
+  ## Requirements
+  - Auto-convert uploaded images to WebP format
+  - Generate responsive sizes (thumbnail: 150px, card: 400px, detail: 800px, full: 1200px)
+  - Lazy loading for below-fold images
+  - Serve original format as fallback for unsupported browsers
+  - Integrate with existing MinIO/S3 storage
+
+  ## Implementation Options
+  1. **Build-time**: Process during upload via Sharp library
+  2. **CDN-based**: Use Cloudflare/imgproxy for on-the-fly transformation
+  3. **Hybrid**: Process popular sizes at upload, transform others on-demand
+
+  ## Files to Modify
+  - Image upload handlers in API
+  - Frontend image components (add srcSet, loading="lazy")
+  - Storage service configuration
+feature: go-to-production
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - performance
+  - frontend
+  - P2
+acceptance_criteria:
+  - Product images served in WebP with fallback
+  - Responsive image sizes generated for each upload
+  - Below-fold images lazy loaded
+  - Page load time reduced measurably
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

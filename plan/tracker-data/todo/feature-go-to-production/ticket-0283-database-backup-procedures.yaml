@@ -1,0 +1,46 @@
+ticket_number: 283
+title: "Document and configure database backup procedures"
+description: |-
+  ## Task
+  Set up automated database backups and document restore procedures.
+
+  ## Requirements
+  - Automated daily backups (pg_dump or hosting platform's backup feature)
+  - Retention policy: 7 daily, 4 weekly, 3 monthly
+  - Backup verification (periodic restore test)
+  - Document restore procedure step-by-step
+  - Point-in-time recovery capability (if hosting platform supports WAL archiving)
+
+  ## Deliverables
+  - Backup script or platform configuration
+  - Restore procedure documentation in runbook
+  - Backup monitoring (alert if backup fails)
+
+  ## Notes
+  - Implementation depends on hosting platform chosen in ticket #274
+  - Most managed PostgreSQL services (Railway, Render, AWS RDS) include automated backups
+feature: go-to-production
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - infrastructure
+  - P2
+acceptance_criteria:
+  - Daily automated backups running
+  - Restore procedure documented and tested
+  - Backup failure alerting configured
+comments: []
+work_sessions: []
+related_tickets:
+  - 274
+blocked_by:
+  - 274
+blocks: []
+attachments: []

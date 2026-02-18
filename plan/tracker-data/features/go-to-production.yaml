@@ -1,0 +1,73 @@
+name: go-to-production
+title: Go To Production
+priority: high
+created: "2026-02-18T08:30:00.000Z"
+assignee: unassigned
+tags:
+  - production
+  - deployment
+  - security
+  - observability
+description: |-
+  ## Overview
+  Take MasonArt from development to production-ready state. Addresses critical gaps in deployment infrastructure, security hardening, observability, and bug fixes required for a safe public launch.
+
+  Current production readiness score: 58/100. Target: launch-ready with core functionality, security, and observability.
+
+  ## Goals
+  - Fix all P0 bugs blocking launch (routing, auth, security headers)
+  - Create deployment infrastructure (Dockerfile, health endpoint, deploy config)
+  - Harden security (CORS, CSP, HSTS, rate limiting)
+  - Add observability (error tracking, structured logging, alerting)
+  - Optimize for production performance (bundling, compression, caching)
+  - Ensure database production readiness (backups, pooling, rollback plan)
+
+  ## Scope
+  - **In scope**: Bug fixes, deployment infra, security headers, monitoring, production configs
+  - **Out of scope**: New features, UI redesigns, additional payment providers
+
+  ## Technical Considerations
+  - Many P0 bugs already tracked in manual-testing-bugs-feb2026 feature — those tickets are referenced but not duplicated
+  - Deployment target TBD (Railway, Fly.io, AWS ECS)
+  - Bun runtime requires specific Dockerfile patterns
+  - React Router v7 SSR needs security middleware at the server level
+
+  ## Plan Document
+  See docs/plans/2026-02-18-go-to-production-plan.md for full analysis
+objectives:
+  - Fix all P0 critical bugs blocking launch
+  - Create production deployment infrastructure
+  - Add security headers and hardening
+  - Implement observability stack
+  - Optimize build and performance for production
+  - Ensure database and service resilience
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    "269": "Create production Dockerfile with multi-stage build for API and Web"
+    "270": "Add health check endpoint at /api/health with component status"
+    "271": "Configure CORS for production domain and environment-based origin"
+    "272": "Add security headers to Web server (CSP, HSTS, X-Frame-Options)"
+    "273": "Wire up rate limiting on authentication endpoints"
+    "274": "Choose deployment target and add deployment configuration"
+    "275": "Integrate Sentry for error tracking in API and Web"
+    "276": "Replace console.log with structured logging using pino"
+    "277": "Set up error alerting via Slack webhook or email"
+    "278": "Set up external uptime monitoring for production"
+    "279": "Create deployment documentation and operational runbook"
+    "280": "Add bundle analysis and optimize code splitting"
+    "281": "Add gzip/brotli compression middleware to API responses"
+    "282": "Configure database connection pooling for production"
+    "283": "Document and configure database backup procedures"
+    "284": "Add retry logic with exponential backoff for email and SMS services"
+    "285": "Verify and enforce payment webhook idempotency"
+    "286": "Implement image optimization pipeline with WebP conversion"
+  in_progress: {}
+  done: {}
+total_tickets: 18
+completion_percentage: 0
+is_completed: false

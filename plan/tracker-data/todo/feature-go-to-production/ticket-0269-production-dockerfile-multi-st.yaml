@@ -1,0 +1,48 @@
+ticket_number: 269
+title: "Create production Dockerfile with multi-stage build for API and Web"
+description: |-
+  ## Task
+  Create a production-optimized Dockerfile using multi-stage builds for both the API (Hono) and Web (React Router v7 SSR) packages.
+
+  ## Requirements
+  - Multi-stage build: deps → build → runtime (minimal final image)
+  - Use official Bun base image (`oven/bun:1`)
+  - Copy only built artifacts and production dependencies to final stage
+  - Separate build targets for API and Web (or single Dockerfile with build args)
+  - Expose correct ports (API: 3000, Web: 3001)
+  - Non-root user in final image
+  - `.dockerignore` to exclude node_modules, .env, tests, docs
+
+  ## Acceptance Criteria
+  - `docker build --target api .` produces a working API image
+  - `docker build --target web .` produces a working Web image
+  - Final images are under 200MB each
+  - Both images start successfully and serve traffic
+
+  ## Files to Create/Modify
+  - `Dockerfile` (new)
+  - `.dockerignore` (new or update)
+  - `docker/docker-compose.prod.yml` (new)
+feature: go-to-production
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - deployment
+  - infrastructure
+  - P0
+acceptance_criteria:
+  - Production Dockerfile builds successfully for API and Web
+  - Final images are under 200MB
+  - Containers start and serve traffic
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

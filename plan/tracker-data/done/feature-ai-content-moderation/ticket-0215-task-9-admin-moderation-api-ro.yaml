@@ -1,0 +1,28 @@
+ticket_number: 215
+title: Task 9 - Admin moderation API routes
+description: Create admin endpoints for moderation queue, approve, reject, flag, and bulk operations
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:56:54.595Z"
+last_updated: "2026-02-17T08:00:32.788Z"
+time_spent_minutes: 0
+labels:
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:32.903Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:15.635Z"
+    text: "Imported from Superpowers. Commit: a9569e41 - feat(admin): add AI moderation API routes. Files: ai-moderation.ts, index.ts, ai-moderation.ts service"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:32.788Z"

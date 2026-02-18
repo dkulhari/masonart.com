@@ -1,0 +1,40 @@
+ticket_number: 226
+title: Align shared address schema with DB table
+description: |-
+  ## Task
+  The existing `AddressSchema` in `packages/shared/src/schemas/order.ts` uses `pincode` and `country` while the DB table uses `postalCode`, `countryCode`, and has a `landmark` field. Add an `AddressApiSchema` (or update existing) that matches the DB columns exactly. Add `landmark` field. Ensure `AddressCreateSchema` and `AddressUpdateSchema` work for API validation.
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 1 - Shared Schema Alignment
+  Location: `packages/shared/src/schemas/order.ts`
+
+  ## Testing Requirements
+  - Schema validation tests (valid/invalid inputs)
+  - Type inference tests
+
+  ## Acceptance Criteria
+  - [ ] Shared schema matches DB table columns
+  - [ ] `landmark` field added
+  - [ ] Create and Update schemas work for API validation
+  - [ ] Unit tests written and passing
+  - [ ] Existing code using AddressSchema not broken
+feature: saved-addresses
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:19:17.129Z'
+last_updated: '2026-02-17T20:19:17.129Z'
+time_spent_minutes: 0
+labels:
+  - schema
+  - shared
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

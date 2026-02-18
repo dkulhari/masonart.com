@@ -1,0 +1,28 @@
+ticket_number: 222
+title: Task 12 - Email notifications for moderation decisions
+description: Send email notifications when AI generations are approved or rejected
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:58:49.293Z"
+last_updated: "2026-02-17T08:00:42.731Z"
+time_spent_minutes: 0
+labels:
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:42.732Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:16.531Z"
+    text: "Imported from Superpowers. Commit: 4ebcc327 - feat(api): Add email notifications for AI moderation decisions. Files: ai-moderation.ts, email-templates.ts"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:42.731Z"

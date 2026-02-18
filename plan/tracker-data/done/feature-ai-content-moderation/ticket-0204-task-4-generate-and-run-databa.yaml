@@ -1,0 +1,35 @@
+ticket_number: 204
+title: Task 4 - Generate and Run Database Migration
+description: |-
+  Generate and apply Drizzle migration for new enums (ai_moderation_status, ai_review_action, ai_rejection_category), new columns on ai_generations, and new ai_generation_reviews table.
+
+  ## Files
+  - Create: `packages/api/src/database/migrations/0003_regular_beyonder.sql`
+feature: ai-content-moderation
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:50:49.717Z"
+last_updated: "2026-02-17T08:00:22.908Z"
+time_spent_minutes: 0
+labels:
+  - database
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:22.909Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:01:39.120Z"
+    text: "Imported from Superpowers. Commit: 3212c26a - chore(db): add migration for AI content moderation. Files: 0003_regular_beyonder.sql, snapshot, journal (3 files, 6278 insertions)"
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:04.529Z"
+    text: "Imported from Superpowers. Commit: 3212c26a - chore(db): add migration for AI content moderation. Files: 0003_regular_beyonder.sql"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:22.908Z"

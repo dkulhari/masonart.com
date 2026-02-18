@@ -1,0 +1,52 @@
+ticket_number: 275
+title: "Integrate Sentry for error tracking in API and Web"
+description: |-
+  ## Task
+  Add Sentry SDK to both API (Hono) and Web (React Router v7) packages for production error tracking. Currently all errors go to console.error and are lost.
+
+  ## Requirements
+  - Install @sentry/node for API, @sentry/react for Web
+  - Initialize Sentry early in app startup (before routes)
+  - Capture unhandled exceptions and rejections
+  - Add Sentry middleware to Hono for request context
+  - Configure source maps upload in build step
+  - Environment-based DSN (only active in production/staging)
+  - User context: attach userId to error reports when authenticated
+  - Performance monitoring: sample rate configurable via env var
+
+  ## Environment Variables
+  - `SENTRY_DSN` — Sentry project DSN
+  - `SENTRY_ENVIRONMENT` — production/staging
+  - `SENTRY_TRACES_SAMPLE_RATE` — 0.0 to 1.0
+
+  ## Files to Create/Modify
+  - `packages/api/src/lib/sentry.ts` (new)
+  - `packages/api/src/index.ts` (initialize + middleware)
+  - `packages/web/app/lib/sentry.ts` (new)
+  - `packages/web/app/root.tsx` (initialize)
+  - `.env.example` (add SENTRY vars)
+feature: go-to-production
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - observability
+  - api
+  - frontend
+  - P1
+acceptance_criteria:
+  - Unhandled errors appear in Sentry dashboard
+  - Errors include request URL, user ID, and stack trace
+  - Source maps resolve correctly in Sentry
+  - Sentry disabled in development/test
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,53 @@
+ticket_number: 271
+title: "Configure CORS for production domain and environment-based origin"
+description: |-
+  ## Task
+  Update CORS configuration to properly restrict origins per environment. Currently defaults to `http://localhost:3001`.
+
+  ## Requirements
+  - Production: restrict to exact production domain(s)
+  - Staging: restrict to staging domain
+  - Development: allow localhost
+  - Validate CORS_ORIGIN is set in production (fail fast if missing)
+  - Document required env var in .env.example with production guidance
+
+  ## Current Code
+  In `packages/api/src/index.ts`:
+  ```typescript
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:3001",
+    credentials: true,
+  })
+  ```
+
+  ## Changes Needed
+  - Add startup validation: if NODE_ENV=production and CORS_ORIGIN not set, throw error
+  - Support comma-separated origins for multi-domain setups
+  - Update .env.example with clear documentation
+
+  ## Files to Modify
+  - `packages/api/src/index.ts`
+  - `.env.example`
+feature: go-to-production
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - security
+  - api
+  - P0
+acceptance_criteria:
+  - API refuses to start in production without CORS_ORIGIN set
+  - CORS headers match configured domain in responses
+  - Multiple origins supported via comma separation
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

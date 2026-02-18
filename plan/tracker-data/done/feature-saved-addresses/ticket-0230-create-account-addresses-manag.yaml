@@ -1,0 +1,54 @@
+ticket_number: 230
+title: Create account addresses management page
+description: |-
+  ## Task
+  Create `/account/addresses` page at `packages/web/app/routes/_authed/account/addresses.tsx` with:
+  - List all saved addresses with edit/delete actions
+  - "Add New Address" button that opens the AddressForm
+  - "Set as Default" action per address
+  - Empty state when no addresses saved
+  - Loading and error states
+  - Reuse existing `AddressForm` component for add/edit
+  - Confirm dialog before delete
+
+  Follow the `notifications.tsx` account page pattern with TanStack Router file-based routing.
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 4 - Account Address Management Page
+  Location: `packages/web/app/routes/_authed/account/addresses.tsx`
+  Pattern: TanStack Router under `_authed/account/`
+  Note: Dashboard already links to `/account/addresses` — this fixes the broken link.
+
+  ## Testing Requirements
+  - Component tests if complex interactions warrant it
+
+  ## Acceptance Criteria
+  - [ ] Page renders at /account/addresses
+  - [ ] CRUD operations work (add, edit, delete)
+  - [ ] Default address toggle works
+  - [ ] Empty state shown when no addresses
+  - [ ] Loading/error states handled
+  - [ ] Dashboard link now works
+feature: saved-addresses
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:20:42.810Z'
+last_updated: '2026-02-17T20:20:42.810Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 229
+    feature: saved-addresses
+    description: Add addressesApi to web API client
+blocks: []
+attachments: []

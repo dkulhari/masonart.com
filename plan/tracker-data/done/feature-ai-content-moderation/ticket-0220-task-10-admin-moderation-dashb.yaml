@@ -1,0 +1,28 @@
+ticket_number: 220
+title: Task 10 - Admin moderation dashboard page
+description: Build admin moderation dashboard with queue view and actions
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:58:33.144Z"
+last_updated: "2026-02-17T08:00:04.113Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:04.117Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:27.950Z"
+    text: "DUPLICATE of #216"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:04.113Z"

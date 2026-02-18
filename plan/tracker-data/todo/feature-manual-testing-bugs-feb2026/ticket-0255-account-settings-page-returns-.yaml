@@ -1,0 +1,23 @@
+ticket_number: 255
+title: Account Settings page returns 404
+description: 'The /account/settings route returns a 404 page. The Account Dashboard page has a "Settings" quick action button that links to /account/settings, but the route is not implemented. This means the "Account Settings" quick action in the sidebar leads to a dead end. Reproduction: Navigate to http://localhost:3001/account/settings. Expected: Settings page with profile/preferences management. Actual: 404 Not Found page.'
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T21:39:21.560Z'
+last_updated: '2026-02-17T21:39:21.560Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - auth
+  - account
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

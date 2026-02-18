@@ -1,0 +1,28 @@
+ticket_number: 219
+title: Task 9 - Admin moderation API routes
+description: Create admin endpoints for moderation queue and approve reject flag bulk ops
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:58:26.827Z"
+last_updated: "2026-02-17T08:00:02.904Z"
+time_spent_minutes: 0
+labels:
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:02.905Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:27.390Z"
+    text: "DUPLICATE of #215"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:02.904Z"

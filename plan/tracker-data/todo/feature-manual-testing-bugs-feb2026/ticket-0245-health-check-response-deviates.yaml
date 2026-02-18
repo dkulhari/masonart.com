@@ -1,0 +1,40 @@
+ticket_number: 245
+title: 'Health check response deviates from spec: "healthy" instead of "ok", missing service/version fields'
+description: |-
+  ## Bug
+  The `/health` endpoint returns `{"status":"healthy","timestamp":"..."}` but the health-check.md spec expects:
+  ```json
+  {"status": "ok", "timestamp": "...", "service": "masonart-api", "version": "1.0.0"}
+  ```
+
+  Three issues:
+  1. `status` is "healthy" instead of "ok"
+  2. `service` field is missing entirely
+  3. `version` field is missing entirely (API root shows version "0.0.1")
+
+  ## Also
+  - POST/PUT/DELETE/PATCH return 404 instead of 405 Method Not Allowed
+  - No Cache-Control headers on health endpoint
+
+  ## Impact
+  Monitoring tools expecting specific field values will fail. Docs/specs are out of sync with implementation.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:52:54.030Z'
+last_updated: '2026-02-17T20:52:54.030Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - health-check
+  - P2
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

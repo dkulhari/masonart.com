@@ -1,0 +1,45 @@
+ticket_number: 280
+title: "Add bundle analysis and optimize code splitting"
+description: |-
+  ## Task
+  Analyze the production bundle and implement code splitting to reduce initial load time.
+
+  ## Requirements
+  - Add rollup-plugin-visualizer to vite config (generates bundle report)
+  - Analyze current bundle size and identify largest chunks
+  - Implement route-based code splitting (lazy load non-critical routes)
+  - Move admin routes to a separate chunk (admin users are minority)
+  - Ensure tree-shaking is working correctly
+  - Set performance budget warnings (e.g., warn if chunk > 250KB)
+
+  ## Deliverables
+  - Bundle analysis report (save as artifact)
+  - Optimized vite.config.ts with manual chunks and lazy routes
+  - Document bundle sizes before/after optimization
+
+  ## Files to Modify
+  - `packages/web/vite.config.ts`
+  - Route files that should be lazy-loaded
+feature: go-to-production
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - performance
+  - frontend
+  - P2
+acceptance_criteria:
+  - Bundle analysis report generated
+  - Admin routes in separate chunk
+  - No chunk exceeds 250KB gzipped
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,76 @@
+name: manual-testing-bugs-feb2026
+title: Manual Testing Bugs Feb2026
+priority: high
+created: "2026-02-17T20:50:44.147Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+  Bugs discovered during comprehensive manual testing of the MasonArt platform on Feb 18, 2026. Testing covered all 38 manual test files using Chrome browser automation against localhost dev environment (API: localhost:3000, Web: localhost:3001).
+
+  ## Goals
+  - Track all bugs found during manual testing
+  - Prioritize fixes based on severity (critical/high/medium/low)
+  - Ensure all user-facing issues are addressed before production
+
+  ## Scope
+  - **In scope**: UI bugs, broken links, missing pages, API issues, SEO problems, missing static assets
+  - **Out of scope**: Features not yet implemented (e.g., newsletter backend, payment integration)
+
+  ## Testing Coverage
+  - Health check API, Home page, Layout, Product listing, Product detail, Auth pages, Cart, Checkout, AI Generator, Gallery, SEO meta tags, Sitemap, Robots.txt, Static assets, 404 page, Admin redirects, Footer links, Navigation
+
+  ## Bug Severity Classification
+  - **Critical (P0)**: Core features broken, blocking user journeys
+  - **High (P1)**: Important features missing, SEO/accessibility issues
+  - **Medium (P2)**: Spec deviations, minor UX issues
+  - **Low (P3)**: Nice-to-have improvements
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    "238": Products API (/api/products) hangs indefinitely - empty reply from server
+    "239": Cart API (/api/cart) hangs indefinitely - empty reply from server
+    "240": All static/info pages return 404 (about, contact, faq, shipping, returns, privacy, terms, cookies)
+    "241": Sitemap.xml returns 404 HTML page instead of XML sitemap
+    "242": Forgot password page (/auth/forgot-password) returns 404
+    "243": "Missing static assets: favicon.ico, apple-touch-icon.png, site.webmanifest all return 404"
+    "244": No JSON-LD structured data on any pages
+    "245": "Health check response deviates from spec: \"healthy\" instead of \"ok\", missing service/version fields"
+    "246": No skip-to-content accessibility link on any page
+    "247": "Products API routing inconsistency: trailing slash returns 401, no slash hangs"
+    "248": Cart icon aria-label doesn't include item count for screen readers
+    "249": API docs endpoint (/docs) returns 404 despite being referenced in API root response
+    "250": Gallery API (/api/ai/gallery) and Featured Products API (/api/products/featured) both hang/timeout
+    "251": Gallery API and Featured Products API both hang and timeout
+    "252": Gallery and Featured Products APIs both timeout
+    "253": No og:image meta tag on any page - social sharing has no preview image
+    "254": Auth sign-in with credentials times out like other DB endpoints
+    "255": Account Settings page returns 404
+    "256": og:image meta tag missing on most pages except /posters
+    "257": AI style presets missing description, category, isPremium fields in API response
+    "258": Home page missing H1 heading - accessibility violation
+    "259": Canonical URLs missing on home, create, and gallery pages
+    "260": API returns 500 for malformed JSON body instead of 400
+    "261": Auth sign-up endpoint returns 500 for all validation errors
+    "262": DELETE /api/cart returns 404 instead of 401 when unauthenticated
+    "263": GET /api/auth/session returns 404 (only /get-session works)
+    "264": Web server (SSR) missing ALL security headers
+    "265": No rate limiting on authentication endpoints
+    "266": No rate limiting on authentication endpoints
+    "267": "Inconsistent query parameter naming: style vs styles on category links"
+    "268": Web server returns 500 instead of 406 for non-HTML Accept headers
+  in_progress: {}
+  done: {}
+total_tickets: 31
+completion_percentage: 0
+is_completed: false

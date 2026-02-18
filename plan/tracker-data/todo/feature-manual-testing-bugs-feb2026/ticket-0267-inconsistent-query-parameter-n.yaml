@@ -1,0 +1,31 @@
+ticket_number: 267
+title: 'Inconsistent query parameter naming: style vs styles on category links'
+description: |-
+  Home page category links use two different query parameter names for the same filter:
+
+  Using plural `styles=`: /posters?styles=abstract, /posters?styles=nature, /posters?styles=minimalist, /posters?styles=typography
+  Using singular `style=`: /posters?style=abstract, /posters?style=botanical, /posters?style=minimalist
+
+  Both params also appear on the /posters page itself. If both work identically this is just a consistency concern, but if only one is read by the filter logic, some category links from the home page silently fail to filter.
+
+  Could not verify actual filter behavior due to API timeout blocking product data.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T22:55:55.346Z'
+last_updated: '2026-02-17T22:55:55.346Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - navigation
+  - consistency
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,52 @@
+ticket_number: 263
+title: GET /api/auth/session returns 404 (only /get-session works)
+description: |-
+  ## Bug
+
+  The Better Auth session endpoint at `GET /api/auth/session` returns 404, while the correct endpoint is `GET /api/auth/get-session`. The test specification references `/api/auth/session` which doesn't exist.
+
+  ## Expected Behavior
+  Either:
+  - `/api/auth/session` should work (standard REST convention), OR
+  - Documentation/tests should reference `/api/auth/get-session`
+
+  ## Actual Behavior
+  - `GET /api/auth/session` → 404
+  - `GET /api/auth/get-session` → 200 (returns null for unauthenticated, user data for authenticated)
+
+  ## Impact
+  - Developer confusion when integrating
+  - Test specs reference wrong endpoint
+  - API inconsistency with Better Auth conventions
+
+  ## Steps to Reproduce
+  ```bash
+  curl -s http://localhost:3000/api/auth/session -w " HTTP:%{http_code}"
+  # Returns: HTTP:404
+
+  curl -s http://localhost:3000/api/auth/get-session -w " HTTP:%{http_code}"
+  # Returns: null HTTP:200
+  ```
+
+  ## Note
+  This may be by design with Better Auth - the `/get-session` endpoint is Better Auth's convention. If so, the test documentation should be updated to match.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T22:28:14.735Z'
+last_updated: '2026-02-17T22:28:14.735Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - auth
+  - documentation
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

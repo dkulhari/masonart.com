@@ -1,0 +1,39 @@
+ticket_number: 250
+title: Gallery API (/api/ai/gallery) and Featured Products API (/api/products/featured) both hang/timeout
+description: |-
+  ## Bug
+  Two more API endpoints exhibit the same hanging behavior as /api/products:
+  - `GET /api/ai/gallery` - times out (HTTP 000 after 5s)
+  - `GET /api/products/featured` - times out (HTTP 000 after 5s)
+
+  These are likely related to the same root cause as #238.
+
+  ## Impact
+  - Gallery page shows "0 artworks" / "No artworks yet"
+  - Home page featured products section shows "Coming Soon" placeholder
+  - Multiple pages have missing content due to backend timeouts
+
+  ## Working endpoints for comparison
+  - `/api/ai/styles` returns 401 (fast, correct)
+  - `/api/auth/get-session` returns null (fast, correct)
+  - `/health` returns 200 (fast, correct)
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: critical
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T21:00:22.386Z'
+last_updated: '2026-02-17T21:00:22.387Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - P0
+  - timeout
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,23 @@
+ticket_number: 256
+title: og:image meta tag missing on most pages except /posters
+description: 'The og:image Open Graph meta tag is properly set on the /posters page with a custom collection image, but is completely missing on all other pages tested: home /, /create, /gallery, /auth/login, /cart, /checkout. Social media shares from these pages will have no preview image. The /posters page has excellent OG implementation with og:image, og:image:secure_url, og:image:alt, og:image:type, og:image:width, og:image:height. This should be replicated to other public pages using appropriate default images.'
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T21:39:44.190Z'
+last_updated: '2026-02-17T21:39:44.190Z'
+time_spent_minutes: 0
+labels:
+  - seo
+  - frontend
+  - meta-tags
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

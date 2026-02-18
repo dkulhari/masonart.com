@@ -1,0 +1,37 @@
+ticket_number: 201
+title: Task 1 - Add Moderation Status Enum
+description: |-
+  Add aiModerationStatusEnum to AI generations schema with states: pending_review, approved, rejected, flagged.
+
+  ## Files
+  - Modify: `packages/api/src/database/schema/ai-generations.ts`
+  - Test: `packages/api/tests/schema/ai-generations.test.ts`
+feature: ai-content-moderation
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:49:22.137Z"
+last_updated: "2026-02-17T08:00:14.897Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:14.906Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:01:15.104Z"
+    text: "Imported from Superpowers. Commit: faa3e895 - feat(schema): add AI moderation status enum. Files: ai-generations.ts, ai-generations.test.ts (2 files, 23 insertions). Observation IDs: #2892, #2889"
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:03.453Z"
+    text: "Imported from Superpowers. Commit: faa3e895 - feat(schema): add AI moderation status enum. Files: ai-generations.ts, ai-generations.test.ts"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:14.897Z"

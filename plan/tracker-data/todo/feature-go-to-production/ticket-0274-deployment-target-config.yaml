@@ -1,0 +1,50 @@
+ticket_number: 274
+title: "Choose deployment target and add deployment configuration"
+description: |-
+  ## Task
+  Select a hosting platform and create the necessary deployment configuration files.
+
+  ## Options to Evaluate
+  1. **Railway** — Simple, supports Dockerfile, auto-deploys from GitHub
+  2. **Fly.io** — Edge deployment, supports Dockerfile, good for SSR
+  3. **AWS ECS** — Full control, more complex, good for scale
+  4. **Render** — Simple, supports Dockerfile, managed PostgreSQL
+
+  ## Requirements
+  - Configuration files for chosen platform (e.g., fly.toml, railway.json, render.yaml)
+  - Environment variable management documentation
+  - Auto-deploy from main branch
+  - Staging environment support
+  - Custom domain configuration instructions
+  - SSL/TLS auto-provisioning
+
+  ## Deliverables
+  - Platform config file(s)
+  - Updated docs/plans/2026-02-18-go-to-production-plan.md with platform choice
+  - Deployment guide in docs/
+feature: go-to-production
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - deployment
+  - infrastructure
+  - P0
+acceptance_criteria:
+  - Deployment config file created for chosen platform
+  - Successful deployment to staging environment
+  - Auto-deploy from GitHub main branch working
+  - Custom domain with SSL configured
+comments: []
+work_sessions: []
+related_tickets:
+  - 269
+blocked_by:
+  - 269
+blocks: []
+attachments: []

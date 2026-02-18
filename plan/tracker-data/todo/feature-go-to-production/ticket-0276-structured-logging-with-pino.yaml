@@ -1,0 +1,46 @@
+ticket_number: 276
+title: "Replace console.log with structured logging using pino"
+description: |-
+  ## Task
+  Replace all console.log/console.error calls with structured logging via pino. Structured logs are queryable in production log aggregation services.
+
+  ## Requirements
+  - Install pino for API server
+  - Create logger instance with configurable log level (LOG_LEVEL env var)
+  - JSON output in production, pretty-print in development
+  - Replace Hono's built-in `logger()` middleware with pino-http
+  - Add request ID to all log entries (for request tracing)
+  - Log levels: error, warn, info, debug
+  - Replace console.error in services (email, SMS, payment) with logger.error
+  - Include structured context: { userId, requestId, service, action }
+
+  ## Files to Create/Modify
+  - `packages/api/src/lib/logger.ts` (new)
+  - `packages/api/src/index.ts` (replace logger middleware)
+  - `packages/api/src/services/email.ts` (replace console)
+  - `packages/api/src/services/sms.ts` (replace console)
+  - Other files with console.log/console.error
+feature: go-to-production
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - observability
+  - api
+  - P1
+acceptance_criteria:
+  - All API log output is structured JSON in production
+  - Each log entry includes timestamp, level, requestId
+  - Log level configurable via LOG_LEVEL env var
+  - No remaining console.log/console.error in API package
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

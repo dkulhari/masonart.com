@@ -1,0 +1,32 @@
+ticket_number: 207
+title: Task 6 - Create Moderation Service
+description: |-
+  Implement AI content moderation service with checkPromptSafety (Layer 1), reviewGeneration workflow (Layer 2), bulk approve/reject, and statistics.
+
+  Files: packages/api/src/services/ai-moderation.ts, packages/api/tests/services/ai-moderation.test.ts
+feature: ai-content-moderation
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:51:51.619Z"
+last_updated: "2026-02-17T07:59:45.158Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T07:59:45.159Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:23.916Z"
+    text: "DUPLICATE of #206"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T07:59:45.158Z"

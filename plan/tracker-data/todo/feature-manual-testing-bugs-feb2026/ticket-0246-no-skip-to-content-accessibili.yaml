@@ -1,0 +1,31 @@
+ticket_number: 246
+title: No skip-to-content accessibility link on any page
+description: |-
+  ## Bug
+  No skip-to-main-content link exists on any page. This is an important accessibility feature for keyboard/screen-reader users to bypass the navigation.
+
+  ## Impact
+  WCAG 2.1 Level A violation (Success Criterion 2.4.1 - Bypass Blocks). Keyboard users must tab through all navigation links before reaching page content.
+
+  ## Expected
+  A visually-hidden link that becomes visible on focus, jumping to `<main>` content.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:53:21.426Z'
+last_updated: '2026-02-17T20:53:21.426Z'
+time_spent_minutes: 0
+labels:
+  - accessibility
+  - frontend
+  - P2
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

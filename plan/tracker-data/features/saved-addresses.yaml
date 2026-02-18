@@ -1,0 +1,168 @@
+name: saved-addresses
+title: Saved Addresses
+priority: high
+created: "2026-02-17T20:09:28.549Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Address management system allowing logged-in users to save, edit, and delete shipping/billing addresses, and select from saved addresses during checkout for a faster purchasing experience.
+
+  ## Goals
+  - Let users manage a personal address book from their account dashboard
+  - Enable one-click address selection during checkout for returning customers
+  - Support a default address that auto-fills on checkout
+  - Persist addresses saved during checkout via the existing "Save for future orders" checkbox
+
+  ## Current State (Existing Infrastructure)
+  The database schema and partial UI already exist but are not connected:
+  - **DB table**: `addresses` table in `packages/api/src/database/schema/users.ts` (lines 276-306) with full fields (type, fullName, phone, addressLine1/2, landmark, city, state, postalCode, countryCode, isDefault)
+  - **UI component**: `SavedAddressSelector` in `packages/web/app/components/checkout/AddressForm.tsx` (lines 512-585) — built but not used
+  - **Checkout TODO**: `isLoggedIn={false}` hardcoded at `packages/web/app/routes/checkout/index.tsx` line 207
+  - **Dashboard link**: `/account/addresses` link exists in account index but the route doesn't exist
+  - **Shared schemas**: `AddressSchema`, `AddressCreateSchema`, `AddressUpdateSchema` already exist in `packages/shared/src/schemas/order.ts`
+
+  ## Scope
+  ### In scope
+  - Address CRUD API endpoints (`GET/POST/PUT/DELETE /api/addresses`)
+  - Account addresses management page (`/account/addresses`)
+  - Checkout integration: show saved addresses for logged-in users, allow selection or new entry
+  - Save address during checkout when checkbox is checked
+  - Default address support (auto-select in checkout, one default per user)
+  - India-specific validation (PIN code, Indian states)
+
+  ### Out of scope
+  - International address formats (countryCode stays "IN" for now)
+  - Address autocomplete/geocoding
+  - Billing vs shipping address split (type field exists but not enforced in UI)
+  - Admin address management
+
+  ## Technical Considerations
+  - Wire up the existing `SavedAddressSelector` component in checkout flow
+  - Fix the `isLoggedIn` TODO in checkout to use actual auth state
+  - Address API should enforce max addresses per user (e.g., 10)
+  - Only one default address per user (toggle pattern)
+  - Reuse existing Zod schemas from `packages/shared/src/schemas/order.ts` for API-side validation
+  - Order `shippingAddress` JSONB snapshot behavior stays unchanged (immutable copy at order time)
+
+  ## Testing Strategy
+
+  | Level | Scope | What to Test | Tool |
+  |-------|-------|--------------|------|
+  | Unit | Per ticket | Schema validation, service logic | Vitest |
+  | Integration | Per ticket | API routes with auth middleware, DB operations | Vitest + app.request() |
+  | E2E | Per feature | Address management page, checkout with saved addresses | Playwright |
+
+  ## Implementation Plan
+
+  **Note**: Each task includes unit/integration tests. E2E tests are added at feature completion.
+
+  ### Phase 1: Shared Schema Alignment
+  Location: `packages/shared/src/schemas/order.ts`
+  Pattern: Zod schemas with exported types
+
+  - [ ] **Task 1: Align shared address schema with DB table** — The existing `AddressSchema` in shared uses `pincode` and `country` while the DB uses `postalCode`, `countryCode`, and has `landmark`. Add an `AddressApiSchema` (or update existing) that matches the DB columns exactly. Add `landmark` field. Ensure `AddressCreateSchema` and `AddressUpdateSchema` work for API validation. (+ unit tests for schema validation)
+
+  ### Phase 2: Backend API
+  Location: `packages/api/src/routes/addresses.ts`
+  Pattern: Hono router with `requireAuth` middleware, `zValidator`, Drizzle queries (follow `notification-preferences.ts` pattern)
+
+  - [ ] **Task 2: Create address CRUD API route** — Create `packages/api/src/routes/addresses.ts` with:
+    - `GET /` — List all addresses for authenticated user (ordered by isDefault desc, createdAt desc)
+    - `POST /` — Create new address (enforce max 10 per user, auto-set isDefault if first address)
+    - `PATCH /:id` — Update an address (verify ownership)
+    - `DELETE /:id` — Delete an address (verify ownership, unset user's defaultAddressId if deleting default)
+    - `PATCH /:id/default` — Set address as default (unset previous default, update user's defaultAddressId)
+    Use `requireAuth` middleware on all routes. Validate with shared Zod schemas. (+ integration tests in `packages/api/tests/routes/addresses.test.ts`)
+
+  - [ ] **Task 3: Register address route in API index** — Mount the address router at `/api/addresses` in `packages/api/src/index.ts`. (quick task, no separate tests needed)
+
+  ### Phase 3: Frontend API Client
+  Location: `packages/web/app/lib/api.ts`
+  Pattern: Namespace object with fetch methods, `credentials: "include"`, typed responses
+
+  - [ ] **Task 4: Add addressesApi to web API client** — Add `addressesApi` namespace to `packages/web/app/lib/api.ts` with methods: `list()`, `create(data)`, `update(id, data)`, `remove(id)`, `setDefault(id)`. Define response types. Follow the `notificationPreferencesApi` pattern. (no separate tests — tested via E2E)
+
+  ### Phase 4: Account Address Management Page
+  Location: `packages/web/app/routes/_authed/account/addresses.tsx`
+  Pattern: TanStack Router file-based route under `_authed/account/` (follow `notifications.tsx` pattern)
+
+  - [ ] **Task 5: Create account addresses management page** — Create `/account/addresses` page with:
+    - List all saved addresses with edit/delete actions
+    - "Add New Address" button that opens the AddressForm
+    - "Set as Default" action per address
+    - Empty state when no addresses saved
+    - Loading and error states
+    - Reuse existing `AddressForm` component for add/edit
+    - Confirm dialog before delete
+    (+ component tests if complex interactions)
+
+  ### Phase 5: Checkout Integration
+  Location: `packages/web/app/routes/checkout/index.tsx`, `packages/web/app/components/checkout/AddressForm.tsx`
+  Pattern: Existing checkout flow with step-based navigation
+
+  - [ ] **Task 6: Wire up saved addresses in checkout** — Modify checkout `index.tsx`:
+    - Fix `isLoggedIn={false}` TODO on line 207 to use actual auth state
+    - For logged-in users: fetch saved addresses on mount, show `SavedAddressSelector` above `AddressForm`
+    - When a saved address is selected, populate the address form fields
+    - "Add New Address" button in selector shows the blank form
+    - Default address auto-selected on first load
+    (+ integration tests for checkout address selection flow)
+
+  - [ ] **Task 7: Implement save-address-on-checkout** — When the "Save address for future orders" checkbox is checked during checkout and order is placed, call `addressesApi.create()` to persist the address. Handle errors gracefully (don't block order if save fails). Skip if address was already a saved address. (+ unit tests for save logic)
+
+  ### Phase 6: E2E Tests
+  Location: `tests/e2e/`
+  Pattern: Playwright with `networkidle` waits, responsive testing
+
+  - [ ] **Task 8: E2E tests for address management** — Create `tests/e2e/addresses.spec.ts` with:
+    - Navigate to account addresses page
+    - Add a new address
+    - Edit an existing address
+    - Set address as default
+    - Delete an address
+    - Verify empty state
+    (Playwright E2E tests)
+
+  - [ ] **Task 9: E2E tests for checkout with saved addresses** — Create `tests/e2e/checkout-addresses.spec.ts` with:
+    - Logged-in user sees saved addresses in checkout
+    - Select a saved address and proceed
+    - Add new address during checkout
+    - "Save for future" checkbox persists address
+    (Playwright E2E tests)
+
+  ## Technical Notes
+  - **Project type**: Bun monorepo with packages/api, packages/web, packages/shared
+  - **Key frameworks**: Hono (API), React Router v7 (SSR), Drizzle ORM, Zod
+  - **DB schema**: Already exists — `addresses` table in `packages/api/src/database/schema/users.ts`
+  - **Shared schemas**: `AddressSchema` etc. in `packages/shared/src/schemas/order.ts` (needs alignment with DB)
+  - **UI components**: `SavedAddressSelector` already built in `packages/web/app/components/checkout/AddressForm.tsx`
+  - **Unit test location**: `packages/api/tests/`
+  - **E2E test location**: `tests/e2e/`
+
+  ## Dependencies
+  - Depends on: Authentication (completed), Cart/Checkout (completed)
+  - No blockers — all infrastructure already exists
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "226": Align shared address schema with DB table
+    "227": Create address CRUD API route
+    "228": Register address route in API index
+    "229": Add addressesApi to web API client
+    "230": Create account addresses management page
+    "231": Wire up saved addresses in checkout
+    "232": Implement save-address-on-checkout
+    "233": E2E tests for address management page
+    "234": E2E tests for checkout with saved addresses
+total_tickets: 9
+completion_percentage: 100
+is_completed: true

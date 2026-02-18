@@ -1,0 +1,45 @@
+ticket_number: 277
+title: "Set up error alerting via Slack webhook or email"
+description: |-
+  ## Task
+  Configure alerting so the team is notified of production errors and incidents in real-time.
+
+  ## Requirements
+  - Sentry alert rules: notify on new error types, error spikes, or P0 issues
+  - Slack integration: send alerts to a #prod-alerts channel
+  - Alert categories:
+    - Critical: payment failures, auth system errors, database connectivity
+    - Warning: rate limit exceeded, email delivery failures, high error rate
+    - Info: deployment events, health check status changes
+  - Include error context in alert: URL, user count affected, stack trace snippet
+
+  ## Implementation Options
+  1. **Sentry Alerts** (recommended if using Sentry) — built-in alert rules + Slack integration
+  2. **Custom webhook** — if not using Sentry, create a simple alert service
+
+  ## Dependencies
+  - Ticket #275 (Sentry integration) should be done first
+feature: go-to-production
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - observability
+  - P1
+acceptance_criteria:
+  - Critical errors trigger Slack notification within 1 minute
+  - Alert includes error message, URL, and affected user count
+  - Alert categories configured (critical, warning, info)
+comments: []
+work_sessions: []
+related_tickets:
+  - 275
+blocked_by:
+  - 275
+blocks: []
+attachments: []

@@ -1,0 +1,50 @@
+ticket_number: 273
+title: "Wire up rate limiting on authentication endpoints"
+description: |-
+  ## Task
+  Rate limiting helpers exist (`getUserRateLimitKey()` in auth middleware) but are not wired up to any endpoints. Auth endpoints are vulnerable to brute force attacks.
+
+  ## Requirements
+  - Rate limit the following endpoints:
+    - `POST /api/auth/sign-in` — 5 attempts per minute per IP
+    - `POST /api/auth/sign-up` — 3 attempts per minute per IP
+    - `POST /api/auth/forgot-password` — 3 attempts per minute per IP
+    - `POST /api/auth/verify-otp` — 5 attempts per minute per IP
+  - Use Redis-based rate limiting (Redis already available)
+  - Return 429 Too Many Requests with Retry-After header
+  - Log rate limit hits for security monitoring
+
+  ## Implementation Notes
+  - Consider using `hono-rate-limiter` or custom middleware with Redis
+  - Existing `getUserRateLimitKey()` can be leveraged
+  - Rate limits should be configurable via env vars
+
+  ## Files to Modify
+  - `packages/api/src/middleware/auth.ts` or new `packages/api/src/middleware/rate-limit.ts`
+  - `packages/api/src/routes/auth.ts` (apply middleware)
+feature: go-to-production
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - security
+  - api
+  - P0
+acceptance_criteria:
+  - Auth endpoints return 429 after exceeding rate limit
+  - Retry-After header present in 429 responses
+  - Rate limits use Redis for distributed counting
+  - Rate limit hits are logged
+comments: []
+work_sessions: []
+related_tickets:
+  - 265
+  - 266
+blocked_by: []
+blocks: []
+attachments: []

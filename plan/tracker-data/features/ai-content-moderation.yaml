@@ -1,0 +1,164 @@
+name: ai-content-moderation
+title: Ai Content Moderation
+priority: critical
+created: "2026-02-16T21:52:44.247Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Implement comprehensive guardrails for AI image generation to prevent pornographic, violent, or inappropriate content, with **mandatory human approval** before images can be shared publicly or printed.
+
+  ## Workflow Diagram
+
+  ```
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │                         USER GENERATES IMAGE                                 │
+  └─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │  LAYER 1: AUTOMATED FILTERING                                                │
+  │  ├── Pre-Generation: Check prompt against banned terms                      │
+  │  │   └── BLOCKED → Show error, prompt rejected                              │
+  │  ├── Generation: AI provider creates image                                  │
+  │  └── Post-Generation: Vision API scans for NSFW/violence                    │
+  │      └── FLAGGED → Auto-reject or escalate to senior review                │
+  └─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼ (passes automated checks)
+  ┌─────────────────────────────────────────────────────────────────────────────┐
+  │  LAYER 2: HUMAN APPROVAL (Mandatory)                                        │
+  │  ├── Status: "pending_review"                                               │
+  │  ├── User sees: "Your creation is being reviewed"                           │
+  │  ├── Buttons disabled: [Add to Cart] [Share to Gallery]                    │
+  │  └── Enters moderator queue at /admin/ai-moderation                        │
+  └─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                          ┌───────────┴───────────┐
+                          ▼                       ▼
+                ┌─────────────────┐     ┌─────────────────┐
+                │    APPROVED     │     │    REJECTED     │
+                │                 │     │                 │
+                │ ✅ Add to Cart  │     │ ❌ Cannot print │
+                │ ✅ Share Gallery│     │ ❌ Cannot share │
+                │ ✅ Download     │     │ 📝 Reason shown │
+                │                 │     │ 🔄 Can regenerate│
+                └─────────────────┘     └─────────────────┘
+  ```
+
+  ## Moderation Statuses
+
+  | Status | User Can View | Add to Cart | Share to Gallery |
+  |--------|---------------|-------------|------------------|
+  | `pending_review` | ✅ Yes | ❌ No | ❌ No |
+  | `approved` | ✅ Yes | ✅ Yes | ✅ Yes |
+  | `rejected` | ✅ Yes (with reason) | ❌ No | ❌ No |
+  | `flagged` | ✅ Yes | ❌ No | ❌ No |
+
+  ## Admin Moderation Dashboard (`/admin/ai-moderation`)
+
+  | Feature | Description |
+  |---------|-------------|
+  | **Queue View** | List of pending generations with thumbnails |
+  | **Bulk Actions** | Approve/reject multiple at once |
+  | **Filters** | By date, user, style, risk score |
+  | **Quick Preview** | Full-size image + prompt + user info |
+  | **Rejection Reasons** | Predefined + custom text |
+  | **Review SLA** | Track average review time |
+  | **Escalation** | Flag for senior review |
+
+  ## User Notifications
+
+  - ✅ "Your creation has been approved! You can now add it to cart or share."
+  - ❌ "Your creation was not approved. Reason: [reason]. You can try generating a new image."
+  - ⏳ "Your creation is being reviewed. We'll notify you when it's ready."
+
+  ## Two-Layer Protection System
+
+  ### Layer 1: Automated Filtering (Pre/Post Generation)
+  1. **Pre-Generation Filtering**: Block prompts containing banned terms/patterns before sending to AI providers
+  2. **Banned Terms Database**: Configurable list of prohibited keywords, phrases, and regex patterns across categories (NSFW, violence, hate speech, illegal content)
+  3. **Post-Generation Image Analysis**: Scan generated images using vision APIs (Google Cloud Vision, AWS Rekognition) to detect inappropriate content
+  4. **Risk Scoring**: Calculate risk scores based on prompt analysis and image classification
+  5. **Provider Safety Settings**: Configure safety levels per AI provider (strict/moderate/permissive)
+
+  ### Layer 2: Human Approval (Mandatory Review)
+  6. **Generation Review Queue**: All AI generations require admin/moderator approval before:
+     - Being added to public AI Community Gallery
+     - Being added to cart for printing/purchase
+  7. **Moderator Dashboard**: Admin UI at `/admin/ai-moderation` for reviewing pending generations
+  8. **Approval Workflow**:
+     - `pending_review` → Awaiting moderator review
+     - `approved` → Can be shared/purchased
+     - `rejected` → Blocked with reason provided to user
+     - `flagged` → Requires senior review
+  9. **Bulk Actions**: Approve/reject multiple generations at once
+  10. **Review SLA**: Track review times, send reminders for pending items
+
+  ### User Experience
+  - User generates image → sees "Pending Review" status
+  - Gets notification when approved/rejected
+  - Approved images unlock "Add to Cart" and "Share to Gallery" buttons
+  - Rejected images show reason and allow regeneration
+
+  ### Compliance & Audit
+  11. **User Violation Tracking**: Track violations per user, implement warnings and progressive restrictions
+  12. **Audit Logging**: Log all moderation decisions for compliance
+  13. **Appeals Process**: Allow users to appeal rejected generations
+
+  ## Technical Implementation
+  - Integrate existing `checkPromptModeration()` function into generation flow
+  - Add `moderationStatus` enum: pending_review, approved, rejected, flagged
+  - Create `ai_generation_reviews` table for moderator actions
+  - Populate `isFlagged` and `moderationResult` fields in ai_generations table
+  - Create admin UI at /admin/ai-moderation for reviewing flagged content
+  - Add banned_terms table with categories and severity levels
+  - Integrate Google Cloud Vision Safe Search API for image analysis
+  - Add notification triggers for approval/rejection
+  - Update cart flow to check approval status before allowing add-to-cart
+
+  ## Objectives
+  - Prevent inappropriate content from being generated
+  - Ensure all AI images are human-reviewed before public display or printing
+  - Provide clear feedback to users on moderation status
+  - Enable efficient bulk moderation for admins
+  - Maintain audit trail for compliance
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "201": Task 1 - Add Moderation Status Enum
+    "202": Task 2 - Add Moderation Fields to AI Generations Table
+    "203": Task 3 - Create AI Generation Reviews Table
+    "204": Task 4 - Generate and Run Database Migration
+    "205": Task 5 - Create Banned Terms Seed Data
+    "206": Task 6 - Create Moderation Service
+    "207": Task 6 - Create Moderation Service
+    "208": Task 7 - Add Pre-Generation Check to AI Routes
+    "209": Task 7 - Add Pre-Generation Check to AI Routes
+    "210": Task 7 - Integrate moderation into generation flow
+    "211": Task 7 - Integrate moderation into generation flow
+    "212": Task 7 - Integrate moderation into generation flow
+    "213": Task 7 - Integrate moderation into generation flow
+    "214": Task 8 - Block cart for non-approved generations
+    "215": Task 9 - Admin moderation API routes
+    "216": Task 10 - Admin moderation dashboard page
+    "217": Task 7 - Integrate moderation into generation flow
+    "218": Task 8 - Block cart for non-approved generations
+    "219": Task 9 - Admin moderation API routes
+    "220": Task 10 - Admin moderation dashboard page
+    "221": Task 11 - Display moderation status on AI creations page
+    "222": Task 12 - Email notifications for moderation decisions
+    "223": Task 13 - E2E tests for moderation flow
+    "224": Task 14 - Add AI Moderation link to admin sidebar
+    "225": Manual Test Documentation for AI Content Moderation
+total_tickets: 25
+completion_percentage: 100
+is_completed: true

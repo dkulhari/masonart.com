@@ -1,0 +1,47 @@
+ticket_number: 233
+title: E2E tests for address management page
+description: |-
+  ## Task
+  Create `tests/e2e/addresses.spec.ts` with Playwright E2E tests:
+  - Navigate to account addresses page
+  - Add a new address with all fields
+  - Edit an existing address
+  - Set address as default
+  - Delete an address with confirmation
+  - Verify empty state display
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 6 - E2E Tests
+  Location: `tests/e2e/addresses.spec.ts`
+  Pattern: Playwright with `networkidle` waits
+
+  ## Testing Requirements
+  This IS the test ticket.
+
+  ## Acceptance Criteria
+  - [ ] All address CRUD operations tested end-to-end
+  - [ ] Tests pass in CI
+  - [ ] Empty state verified
+feature: saved-addresses
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:22:18.410Z'
+last_updated: '2026-02-17T20:22:18.410Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 230
+    feature: saved-addresses
+    description: Create account addresses management page
+blocks: []
+attachments: []

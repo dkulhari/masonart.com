@@ -1,0 +1,39 @@
+ticket_number: 228
+title: Register address route in API index
+description: |-
+  ## Task
+  Mount the address router at `/api/addresses` in `packages/api/src/index.ts`. Import the address app and add `app.route("/api/addresses", addressesApp)`.
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 2 - Backend API
+  Location: `packages/api/src/index.ts`
+
+  ## Testing Requirements
+  No separate tests needed — covered by route integration tests.
+
+  ## Acceptance Criteria
+  - [ ] Route mounted at `/api/addresses`
+  - [ ] Import added to index.ts
+feature: saved-addresses
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:20:01.028Z'
+last_updated: '2026-02-17T20:20:01.028Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 227
+    feature: saved-addresses
+    description: Create address CRUD API route
+blocks: []
+attachments: []

@@ -1,0 +1,28 @@
+ticket_number: 223
+title: Task 13 - E2E tests for moderation flow
+description: Add Playwright E2E tests for admin AI moderation dashboard
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:58:53.552Z"
+last_updated: "2026-02-17T08:00:44.024Z"
+time_spent_minutes: 0
+labels:
+  - testing
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:44.027Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:16.826Z"
+    text: "Imported from Superpowers. Commit: 1c433bc1 - test(e2e): Add E2E tests for admin AI moderation dashboard. Files: admin-ai-moderation.spec.ts (510 lines)"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:44.024Z"

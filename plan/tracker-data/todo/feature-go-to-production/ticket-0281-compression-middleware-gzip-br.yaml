@@ -1,0 +1,43 @@
+ticket_number: 281
+title: "Add gzip/brotli compression middleware to API responses"
+description: |-
+  ## Task
+  Add response compression to reduce bandwidth usage and improve load times.
+
+  ## Requirements
+  - Add compression middleware to Hono API server
+  - Support both gzip and brotli (prefer brotli when client supports it)
+  - Skip compression for already-compressed content (images, videos)
+  - Minimum size threshold: don't compress responses under 1KB
+  - Verify compression works with SSR responses from web server
+
+  ## Implementation
+  - Use `hono/compress` middleware or `@hono/compress`
+  - Apply globally after CORS but before routes
+
+  ## Files to Modify
+  - `packages/api/src/index.ts`
+  - `packages/web/` server config if needed
+feature: go-to-production
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - performance
+  - api
+  - P2
+acceptance_criteria:
+  - API responses include Content-Encoding header (gzip or br)
+  - Response sizes reduced for JSON and HTML payloads
+  - Images/binary content not double-compressed
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

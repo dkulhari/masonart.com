@@ -1,0 +1,45 @@
+ticket_number: 284
+title: "Add retry logic with exponential backoff for email and SMS services"
+description: |-
+  ## Task
+  Email and SMS services currently fail silently on transient errors. Add retry logic to prevent lost notifications.
+
+  ## Requirements
+  - Retry transient failures (network errors, 5xx responses) up to 3 times
+  - Exponential backoff: 1s, 4s, 16s
+  - Don't retry permanent failures (invalid email, 4xx responses)
+  - Log each retry attempt with context
+  - After max retries, log error and optionally queue for manual review
+
+  ## Services to Update
+  - Email (Resend): `packages/api/src/services/email.ts`
+  - SMS (2Factor.in): `packages/api/src/services/sms.ts`
+
+  ## Implementation
+  - Create shared retry utility: `packages/api/src/lib/retry.ts`
+  - Wrap API calls in retry logic
+  - Distinguish retryable vs non-retryable errors
+feature: go-to-production
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - resilience
+  - api
+  - P2
+acceptance_criteria:
+  - Transient failures retried up to 3 times with backoff
+  - Permanent failures not retried
+  - All retry attempts logged with context
+  - Shared retry utility reusable across services
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

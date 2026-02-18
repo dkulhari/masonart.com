@@ -1,0 +1,22 @@
+ticket_number: 257
+title: AI style presets missing description, category, isPremium fields in API response
+description: 'GET /api/ai/style-presets returns only id and name for each preset, missing: description (what the style does), category (artistic/photographic/etc), isPremium (boolean for PRO badge). The frontend shows PRO badges on Photography and Art Deco presets, but the API response has no isPremium field, suggesting this is hardcoded on the frontend. According to the ai-api.md test spec, each preset should have: id, name, description, category, isPremium.'
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T21:40:13.076Z'
+last_updated: '2026-02-17T21:40:13.076Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - ai
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-02-16T06:04:16.362Z'
-total_tickets: 163
+last_updated: '2026-02-17T22:59:03.577Z'
+total_tickets: 200
 summary:
   critical: 5
-  high: 61
-  medium: 75
-  low: 22
+  high: 79
+  medium: 89
+  low: 27
 priorities:
   high:
     - feature: infrastructure-setup
@@ -315,6 +315,86 @@ priorities:
           title: Task 3 - Create Order-Based Review API Endpoint
           assignee: unassigned
           blocked_by: []
+    - feature: ai-content-moderation
+      tickets:
+        - ticket_number: 201
+          title: Task 1 - Add Moderation Status Enum
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 202
+          title: Task 2 - Add Moderation Fields to AI Generations Table
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 203
+          title: Task 3 - Create AI Generation Reviews Table
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 204
+          title: Task 4 - Generate and Run Database Migration
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 206
+          title: Task 6 - Create Moderation Service
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 207
+          title: Task 6 - Create Moderation Service
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 208
+          title: Task 7 - Add Pre-Generation Check to AI Routes
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 209
+          title: Task 7 - Add Pre-Generation Check to AI Routes
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 210
+          title: Task 7 - Integrate moderation into generation flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 211
+          title: Task 7 - Integrate moderation into generation flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 212
+          title: Task 7 - Integrate moderation into generation flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 213
+          title: Task 7 - Integrate moderation into generation flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 214
+          title: Task 8 - Block cart for non-approved generations
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 217
+          title: Task 7 - Integrate moderation into generation flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 218
+          title: Task 8 - Block cart for non-approved generations
+          assignee: unassigned
+          blocked_by: []
+    - feature: saved-addresses
+      tickets:
+        - ticket_number: 226
+          title: Align shared address schema with DB table
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 227
+          title: Create address CRUD API route
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 226
+              title: Align shared address schema with DB table
+        - ticket_number: 228
+          title: Register address route in API index
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 227
+              title: Create address CRUD API route
   medium:
     - feature: admin-panel
       tickets:
@@ -512,6 +592,10 @@ priorities:
           title: 'Bug: Clear all filters button doesn''t update URL'
           assignee: claude
           blocked_by: []
+        - ticket_number: 149
+          title: 'Bug: Boolean filter URL params lost during SSR redirect'
+          assignee: unassigned
+          blocked_by: []
         - ticket_number: 189
           title: 'Bug: Admin products tests fail due to hydration and non-waiting assertions'
           assignee: unassigned
@@ -648,6 +732,72 @@ priorities:
           title: 'Bug: wallet.spec.ts auth session expires during full suite run'
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 200
+          title: 'Bug: trade.spec.ts customer comparison test fails due to session expiry'
+          assignee: unassigned
+          blocked_by: []
+    - feature: ai-content-moderation
+      tickets:
+        - ticket_number: 205
+          title: Task 5 - Create Banned Terms Seed Data
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 215
+          title: Task 9 - Admin moderation API routes
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 216
+          title: Task 10 - Admin moderation dashboard page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 219
+          title: Task 9 - Admin moderation API routes
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 220
+          title: Task 10 - Admin moderation dashboard page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 221
+          title: Task 11 - Display moderation status on AI creations page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 222
+          title: Task 12 - Email notifications for moderation decisions
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 223
+          title: Task 13 - E2E tests for moderation flow
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 225
+          title: Manual Test Documentation for AI Content Moderation
+          assignee: unassigned
+          blocked_by: []
+    - feature: saved-addresses
+      tickets:
+        - ticket_number: 229
+          title: Add addressesApi to web API client
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 227
+              title: Create address CRUD API route
+            - ticket_number: 228
+              title: Register address route in API index
+        - ticket_number: 230
+          title: Create account addresses management page
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 229
+              title: Add addressesApi to web API client
+        - ticket_number: 231
+          title: Wire up saved addresses in checkout
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 229
+              title: Add addressesApi to web API client
+            - ticket_number: 230
+              title: Create account addresses management page
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -721,6 +871,12 @@ priorities:
           title: Documentation - Create manual test documentation
           assignee: unassigned
           blocked_by: []
+    - feature: product-catalog
+      tickets:
+        - ticket_number: 146
+          title: 'Bug: Mobile filter sheet backdrop click doesn''t close sheet'
+          assignee: unassigned
+          blocked_by: []
     - feature: gemini-direct-provider
       tickets:
         - ticket_number: 167
@@ -745,6 +901,34 @@ priorities:
           title: Task 12 - Final Review and Cleanup
           assignee: unassigned
           blocked_by: []
+    - feature: ai-content-moderation
+      tickets:
+        - ticket_number: 224
+          title: Task 14 - Add AI Moderation link to admin sidebar
+          assignee: unassigned
+          blocked_by: []
+    - feature: saved-addresses
+      tickets:
+        - ticket_number: 232
+          title: Implement save-address-on-checkout
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 231
+              title: Wire up saved addresses in checkout
+        - ticket_number: 233
+          title: E2E tests for address management page
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 230
+              title: Create account addresses management page
+        - ticket_number: 234
+          title: E2E tests for checkout with saved addresses
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 231
+              title: Wire up saved addresses in checkout
+            - ticket_number: 232
+              title: Implement save-address-on-checkout
   critical:
     - feature: qa-testing
       tickets:
@@ -880,3 +1064,57 @@ blocked_tickets:
       - title: 'Ticket #undefined'
       - title: 'Ticket #undefined'
     description: ', , , '
+  - ticket_number: 227
+    title: Create address CRUD API route
+    blocked_by:
+      - ticket_number: 226
+        title: Align shared address schema with DB table
+    description: Align shared address schema with DB table
+  - ticket_number: 228
+    title: Register address route in API index
+    blocked_by:
+      - ticket_number: 227
+        title: Create address CRUD API route
+    description: Create address CRUD API route
+  - ticket_number: 229
+    title: Add addressesApi to web API client
+    blocked_by:
+      - ticket_number: 227
+        title: Create address CRUD API route
+      - ticket_number: 228
+        title: Register address route in API index
+    description: Create address CRUD API route, Register address route in API index
+  - ticket_number: 230
+    title: Create account addresses management page
+    blocked_by:
+      - ticket_number: 229
+        title: Add addressesApi to web API client
+    description: Add addressesApi to web API client
+  - ticket_number: 231
+    title: Wire up saved addresses in checkout
+    blocked_by:
+      - ticket_number: 229
+        title: Add addressesApi to web API client
+      - ticket_number: 230
+        title: Create account addresses management page
+    description: Add addressesApi to web API client, Create account addresses management page
+  - ticket_number: 232
+    title: Implement save-address-on-checkout
+    blocked_by:
+      - ticket_number: 231
+        title: Wire up saved addresses in checkout
+    description: Wire up saved addresses in checkout
+  - ticket_number: 233
+    title: E2E tests for address management page
+    blocked_by:
+      - ticket_number: 230
+        title: Create account addresses management page
+    description: Create account addresses management page
+  - ticket_number: 234
+    title: E2E tests for checkout with saved addresses
+    blocked_by:
+      - ticket_number: 231
+        title: Wire up saved addresses in checkout
+      - ticket_number: 232
+        title: Implement save-address-on-checkout
+    description: Wire up saved addresses in checkout, Implement save-address-on-checkout

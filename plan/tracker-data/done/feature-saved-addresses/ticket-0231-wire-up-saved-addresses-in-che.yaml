@@ -1,0 +1,52 @@
+ticket_number: 231
+title: Wire up saved addresses in checkout
+description: |-
+  ## Task
+  Modify checkout `packages/web/app/routes/checkout/index.tsx`:
+  - Fix `isLoggedIn={false}` TODO on line 207 to use actual auth state
+  - For logged-in users: fetch saved addresses on mount via `addressesApi.list()`
+  - Show `SavedAddressSelector` component above `AddressForm` when user has saved addresses
+  - When a saved address is selected, populate the address form fields
+  - "Add New Address" button in selector shows the blank form
+  - Default address auto-selected on first load
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 5 - Checkout Integration
+  Location: `packages/web/app/routes/checkout/index.tsx`
+  Existing component: `SavedAddressSelector` in `packages/web/app/components/checkout/AddressForm.tsx` (lines 512-585)
+
+  ## Testing Requirements
+  - Integration tests for checkout address selection flow
+
+  ## Acceptance Criteria
+  - [ ] Auth state correctly detected in checkout
+  - [ ] Saved addresses shown for logged-in users
+  - [ ] Address selection populates form
+  - [ ] Default address auto-selected
+  - [ ] Guest checkout still works (no saved addresses shown)
+feature: saved-addresses
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:21:26.211Z'
+last_updated: '2026-02-17T20:21:26.211Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - integration
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 229
+    feature: saved-addresses
+    description: Add addressesApi to web API client
+  - ticket: 230
+    feature: saved-addresses
+    description: Create account addresses management page
+blocks: []
+attachments: []

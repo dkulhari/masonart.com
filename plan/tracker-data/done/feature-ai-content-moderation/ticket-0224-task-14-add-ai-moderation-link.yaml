@@ -1,0 +1,28 @@
+ticket_number: 224
+title: Task 14 - Add AI Moderation link to admin sidebar
+description: Add navigation link for AI Moderation in admin sidebar component
+feature: ai-content-moderation
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:59:00.109Z"
+last_updated: "2026-02-17T08:00:45.898Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:45.900Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:17.058Z"
+    text: "Imported from Superpowers. Commit: 4fd356e2 - feat(web): Add AI Moderation link to admin sidebar. Files: AdminSidebar.tsx"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:45.898Z"

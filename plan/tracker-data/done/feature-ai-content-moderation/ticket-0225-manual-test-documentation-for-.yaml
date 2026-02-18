@@ -1,0 +1,100 @@
+ticket_number: 225
+title: Manual Test Documentation for AI Content Moderation
+description: |-
+  ## Overview
+  Create comprehensive manual test documentation for the AI Content Moderation feature covering all user-facing workflows.
+
+  ## Plan
+
+  ### 1. Admin Moderation Dashboard Tests (`/admin/ai-moderation`)
+  - [ ] Access control - verify only admin users can access
+  - [ ] Stats cards display correct counts (pending, approved, rejected, flagged)
+  - [ ] Filter by moderation status works correctly
+  - [ ] Search by prompt text works
+  - [ ] Grid displays generation cards with correct information
+  - [ ] Approve action updates status and shows success toast
+  - [ ] Reject action opens modal, requires category and reason
+  - [ ] Bulk select and bulk approve/reject work correctly
+  - [ ] Image preview modal shows full-size image
+  - [ ] Pagination works when many generations exist
+
+  ### 2. User AI Creations Page Tests (`/account/ai-creations`)
+  - [ ] Moderation status badge displays correctly for each status
+  - [ ] "Add to Cart" disabled for non-approved creations
+  - [ ] Pending creations show "Pending Approval" instead of Add to Cart
+  - [ ] Rejected creations show rejection reason in red warning box
+  - [ ] Moderation filter dropdown works correctly
+  - [ ] Filter count includes moderation filter
+
+  ### 3. Email Notification Tests
+  - [ ] User receives email when generation is approved
+  - [ ] Approved email includes creation details and action link
+  - [ ] User receives email when generation is rejected
+  - [ ] Rejected email includes rejection reason and category
+  - [ ] Email formatting renders correctly in major email clients
+
+  ### 4. Cart/Gallery Gate Tests
+  - [ ] Cannot add pending_review generation to cart
+  - [ ] Cannot add rejected generation to cart
+  - [ ] Can add approved generation to cart
+  - [ ] Cannot share pending_review generation to gallery
+  - [ ] Cannot share rejected generation to gallery
+  - [ ] Can share approved generation to gallery
+
+  ### 5. Sidebar Navigation Test
+  - [ ] AI Moderation link appears in admin sidebar
+  - [ ] Link navigates to correct page
+  - [ ] Active state highlights when on moderation page
+
+  ## Output
+  Create manual test documentation in `docs/manual-tests/ai-content-moderation.md`
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T09:52:36.986Z"
+last_updated: "2026-02-17T09:55:10.410Z"
+time_spent_minutes: 0
+labels:
+  - documentation
+  - testing
+  - manual-tests
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T09:55:10.411Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T09:55:15.280Z"
+    text: |-
+      Created comprehensive manual test documentation at `docs/manual-tests/ai-content-moderation.md` with 80 test cases covering:
+
+      - Admin moderation dashboard access control (3 tests)
+      - Page structure and meta tags (2 tests)
+      - Stats cards (5 tests)
+      - Filter controls (6 tests)
+      - Generations grid (4 tests)
+      - Action buttons - approve/reject workflow (8 tests)
+      - Bulk actions (5 tests)
+      - Image preview modal (2 tests)
+      - Pagination (2 tests)
+      - Sidebar navigation (3 tests)
+      - User AI creations page - moderation status (5 tests)
+      - Add to cart gate (4 tests)
+      - Rejection display (2 tests)
+      - User moderation filter (4 tests)
+      - Email notifications (6 tests)
+      - Gallery gate (3 tests)
+      - Responsive design (4 tests)
+      - Accessibility (3 tests)
+      - Performance (3 tests)
+      - Error states (3 tests)
+      - Edge cases (3 tests)
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T09:55:10.410Z"

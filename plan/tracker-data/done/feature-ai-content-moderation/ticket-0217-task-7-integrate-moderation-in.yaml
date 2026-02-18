@@ -1,0 +1,28 @@
+ticket_number: 217
+title: Task 7 - Integrate moderation into generation flow
+description: Add pre-generation prompt safety check to AI generate endpoint
+feature: ai-content-moderation
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:58:09.214Z"
+last_updated: "2026-02-17T07:59:58.310Z"
+time_spent_minutes: 0
+labels:
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T07:59:58.311Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:26.675Z"
+    text: "DUPLICATE of #213"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T07:59:58.310Z"

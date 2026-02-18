@@ -1,0 +1,36 @@
+ticket_number: 241
+title: Sitemap.xml returns 404 HTML page instead of XML sitemap
+description: |-
+  ## Bug
+  `/sitemap.xml` returns the app's 404 HTML page instead of a proper XML sitemap. The robots.txt correctly references `Sitemap: https://masonart.com/sitemap.xml` but the endpoint doesn't exist.
+
+  ## Steps to Reproduce
+  1. `curl -s http://localhost:3001/sitemap.xml | head -5`
+  2. Observe HTML instead of XML
+
+  ## Impact
+  - Search engines cannot discover pages via sitemap
+  - SEO significantly impacted
+  - robots.txt references a non-existent resource
+
+  ## Expected
+  Valid XML sitemap with all public URLs
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:51:41.685Z'
+last_updated: '2026-02-17T20:51:41.685Z'
+time_spent_minutes: 0
+labels:
+  - seo
+  - P1
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

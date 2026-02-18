@@ -1,0 +1,37 @@
+ticket_number: 205
+title: Task 5 - Create Banned Terms Seed Data
+description: |-
+  Create seed file with default banned terms covering NSFW, violence, hate speech, illegal content, and copyright categories with severity levels.
+
+  ## Files
+  - Create: `packages/api/src/database/seeds/banned-terms.ts`
+  - Test: `packages/api/tests/seeds/banned-terms.test.ts`
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:51:01.543Z"
+last_updated: "2026-02-17T08:00:23.826Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - database
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:23.827Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:01:45.898Z"
+    text: "Imported from Superpowers. Commit: 592ee7df - feat(moderation): add banned terms seed data. Files: banned-terms.ts, banned-terms.test.ts (2 files, 303 insertions)"
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:04.731Z"
+    text: "Imported from Superpowers. Commit: 592ee7df - feat(moderation): add banned terms seed data. Files: banned-terms.ts, test"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:23.826Z"

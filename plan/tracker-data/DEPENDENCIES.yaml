@@ -1,6 +1,61 @@
 dependencies:
-  last_updated: '2026-02-16T06:04:16.948Z'
+  last_updated: '2026-02-17T22:59:07.458Z'
   features:
+    saved-addresses:
+      - ticket_number: 227
+        title: Create address CRUD API route
+        blocks: []
+        blocked_by:
+          - ticket_number: 226
+            title: Align shared address schema with DB table
+      - ticket_number: 228
+        title: Register address route in API index
+        blocks: []
+        blocked_by:
+          - ticket_number: 227
+            title: Create address CRUD API route
+      - ticket_number: 229
+        title: Add addressesApi to web API client
+        blocks: []
+        blocked_by:
+          - ticket_number: 227
+            title: Create address CRUD API route
+          - ticket_number: 228
+            title: Register address route in API index
+      - ticket_number: 230
+        title: Create account addresses management page
+        blocks: []
+        blocked_by:
+          - ticket_number: 229
+            title: Add addressesApi to web API client
+      - ticket_number: 231
+        title: Wire up saved addresses in checkout
+        blocks: []
+        blocked_by:
+          - ticket_number: 229
+            title: Add addressesApi to web API client
+          - ticket_number: 230
+            title: Create account addresses management page
+      - ticket_number: 232
+        title: Implement save-address-on-checkout
+        blocks: []
+        blocked_by:
+          - ticket_number: 231
+            title: Wire up saved addresses in checkout
+      - ticket_number: 233
+        title: E2E tests for address management page
+        blocks: []
+        blocked_by:
+          - ticket_number: 230
+            title: Create account addresses management page
+      - ticket_number: 234
+        title: E2E tests for checkout with saved addresses
+        blocks: []
+        blocked_by:
+          - ticket_number: 231
+            title: Wire up saved addresses in checkout
+          - ticket_number: 232
+            title: Implement save-address-on-checkout
     shipping-returns:
       - ticket_number: 36
         title: Database Schema - Shipping and Returns Tables

@@ -1,0 +1,23 @@
+ticket_number: 266
+title: No rate limiting on authentication endpoints
+description: Authentication endpoints (sign-in, sign-up) have no rate limiting headers and no apparent rate limiting enforcement. No X-RateLimit-*, Retry-After, or similar headers found. This allows brute force attacks, credential stuffing, and account enumeration. Auth endpoints should return rate limit headers and 429 after threshold. The API middleware directory has rate-limit referenced and Redis is available.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T22:35:24.638Z'
+last_updated: '2026-02-17T22:35:24.638Z'
+time_spent_minutes: 0
+labels:
+  - security
+  - api
+  - auth
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

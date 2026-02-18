@@ -1,0 +1,28 @@
+ticket_number: 221
+title: Task 11 - Display moderation status on AI creations page
+description: Show moderation status badges and messaging on user AI creations page
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:58:44.801Z"
+last_updated: "2026-02-17T08:00:40.706Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:40.709Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:16.321Z"
+    text: "Imported from Superpowers. Commit: 85606162 - feat(web): Display moderation status on AI creations page. Files: AICreationsList.tsx, ai-creations.tsx"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:40.706Z"

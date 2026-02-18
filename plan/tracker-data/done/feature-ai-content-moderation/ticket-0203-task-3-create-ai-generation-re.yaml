@@ -1,0 +1,38 @@
+ticket_number: 203
+title: Task 3 - Create AI Generation Reviews Table
+description: |-
+  Create audit trail table for all moderation actions with review action enum, rejection categories, and relations to generations and users.
+
+  ## Files
+  - Create: `packages/api/src/database/schema/ai-generation-reviews.ts`
+  - Modify: `packages/api/src/database/schema/index.ts`
+  - Test: `packages/api/tests/schema/ai-generation-reviews.test.ts`
+feature: ai-content-moderation
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:50:28.509Z"
+last_updated: "2026-02-17T08:00:21.188Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:21.192Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:01:32.410Z"
+    text: "Imported from Superpowers. Commit: f9d625da - feat(schema): add ai_generation_reviews audit table. Files: ai-generation-reviews.ts, schema index.ts, ai-generation-reviews.test.ts (3 files, 139 insertions)"
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:04.244Z"
+    text: "Imported from Superpowers. Commit: f9d625da - feat(schema): add ai_generation_reviews audit table. Files: ai-generation-reviews.ts, index.ts, test"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:21.188Z"

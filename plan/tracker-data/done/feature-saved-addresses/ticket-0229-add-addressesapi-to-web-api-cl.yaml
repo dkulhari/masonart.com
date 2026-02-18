@@ -1,0 +1,50 @@
+ticket_number: 229
+title: Add addressesApi to web API client
+description: |-
+  ## Task
+  Add `addressesApi` namespace to `packages/web/app/lib/api.ts` with methods:
+  - `list()` — GET /api/addresses
+  - `create(data)` — POST /api/addresses
+  - `update(id, data)` — PATCH /api/addresses/:id
+  - `remove(id)` — DELETE /api/addresses/:id
+  - `setDefault(id)` — PATCH /api/addresses/:id/default
+
+  Define response types. Follow the `notificationPreferencesApi` pattern with `credentials: "include"`.
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 3 - Frontend API Client
+  Location: `packages/web/app/lib/api.ts`
+
+  ## Testing Requirements
+  No separate tests — tested via E2E.
+
+  ## Acceptance Criteria
+  - [ ] All 5 methods implemented with proper types
+  - [ ] Follows existing API client pattern
+  - [ ] Error handling consistent with other namespaces
+feature: saved-addresses
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:20:14.307Z'
+last_updated: '2026-02-17T20:20:14.307Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 227
+    feature: saved-addresses
+    description: Create address CRUD API route
+  - ticket: 228
+    feature: saved-addresses
+    description: Register address route in API index
+blocks: []
+attachments: []

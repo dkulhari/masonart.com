@@ -1,0 +1,47 @@
+ticket_number: 282
+title: "Configure database connection pooling for production"
+description: |-
+  ## Task
+  Ensure database connections are properly pooled to handle concurrent production traffic without exhausting connections.
+
+  ## Requirements
+  - Review current Drizzle/pg connection configuration
+  - Set appropriate pool size (min: 2, max: 20, configurable via env)
+  - Add connection timeout (30s)
+  - Add idle connection timeout (10s)
+  - Consider PgBouncer if hosting platform supports it
+  - Add connection pool metrics to health check endpoint
+
+  ## Environment Variables
+  - `DB_POOL_MIN` — minimum pool size (default: 2)
+  - `DB_POOL_MAX` — maximum pool size (default: 20)
+  - `DB_POOL_IDLE_TIMEOUT` — idle timeout in ms (default: 10000)
+
+  ## Files to Modify
+  - `packages/api/src/database/index.ts` or connection config
+  - `packages/api/src/routes/health.ts` (add pool metrics)
+  - `.env.example`
+feature: go-to-production
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - performance
+  - P2
+acceptance_criteria:
+  - Connection pool size configurable via env vars
+  - Health check reports pool utilization
+  - No connection leak under concurrent load
+comments: []
+work_sessions: []
+related_tickets:
+  - 270
+blocked_by: []
+blocks: []
+attachments: []

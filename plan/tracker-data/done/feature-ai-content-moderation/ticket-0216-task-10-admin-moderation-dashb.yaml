@@ -1,0 +1,28 @@
+ticket_number: 216
+title: Task 10 - Admin moderation dashboard page
+description: Build admin moderation dashboard with queue view and approve reject flag actions
+feature: ai-content-moderation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T07:57:27.499Z"
+last_updated: "2026-02-17T08:00:36.492Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-02-17T08:00:36.495Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-02-17T08:02:16.044Z"
+    text: "Imported from Superpowers. Commit: e59dda2e - feat(admin): add AI moderation dashboard page. Files: admin ai-moderation.tsx (924 insertions)"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-02-17T08:00:36.492Z"

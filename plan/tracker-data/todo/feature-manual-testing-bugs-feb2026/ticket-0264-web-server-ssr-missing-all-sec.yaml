@@ -1,0 +1,67 @@
+ticket_number: 264
+title: Web server (SSR) missing ALL security headers
+description: |-
+  ## Bug
+
+  The React Router v7 SSR web server (localhost:3001) serves pages with NO security headers at all, while the API server (localhost:3000) has comprehensive security headers.
+
+  ## Web Server Headers (Missing ALL)
+  ```
+  HTTP/1.1 200 
+  Vary: Origin
+  content-type: text/html; charset=utf-8
+  Date: ...
+  Connection: keep-alive
+  ```
+
+  ## API Server Headers (Comprehensive)
+  ```
+  Strict-Transport-Security: max-age=15552000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  X-XSS-Protection: 0
+  Referrer-Policy: no-referrer
+  Cross-Origin-Resource-Policy: same-origin
+  Cross-Origin-Opener-Policy: same-origin
+  X-DNS-Prefetch-Control: off
+  X-Download-Options: noopen
+  X-Permitted-Cross-Domain-Policies: none
+  ```
+
+  ## Missing Security Headers on Web
+  - `Strict-Transport-Security` (HSTS)
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: SAMEORIGIN`
+  - `Content-Security-Policy`
+  - `Referrer-Policy`
+  - `Permissions-Policy`
+
+  ## Impact
+  - **Clickjacking vulnerability**: No X-Frame-Options means site can be embedded in iframes
+  - **MIME type sniffing**: No X-Content-Type-Options
+  - **No HSTS**: Browser won't enforce HTTPS
+  - **No CSP**: No Content Security Policy protection
+  - Affects ALL pages (/, /posters, /create, /gallery, /cart, /checkout, /auth/*)
+
+  ## Suggestion
+  Add security headers middleware to the React Router v7 SSR server, similar to what the API uses (likely `helmet` or equivalent for Hono).
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T22:34:23.189Z'
+last_updated: '2026-02-17T22:34:23.189Z'
+time_spent_minutes: 0
+labels:
+  - security
+  - web
+  - headers
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

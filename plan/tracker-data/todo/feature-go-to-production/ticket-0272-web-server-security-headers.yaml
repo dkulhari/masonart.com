@@ -1,0 +1,49 @@
+ticket_number: 272
+title: "Add security headers to Web server (CSP, HSTS, X-Frame-Options)"
+description: |-
+  ## Task
+  The React Router v7 SSR web server has NO security headers. The API has `secureHeaders()` from Hono but the web server needs its own middleware.
+
+  ## Requirements
+  - Content-Security-Policy (CSP): restrict scripts, styles, images to self + CDN domains
+  - Strict-Transport-Security (HSTS): max-age=31536000; includeSubDomains
+  - X-Frame-Options: DENY
+  - X-Content-Type-Options: nosniff
+  - Referrer-Policy: strict-origin-when-cross-origin
+  - Permissions-Policy: restrict camera, microphone, geolocation
+  - Only enforce in production (dev mode may need relaxed CSP for hot reload)
+
+  ## Implementation
+  Add middleware in the React Router v7 server entry or vite config that sets headers on all responses.
+
+  ## Related
+  - Ticket #264 from manual-testing-bugs-feb2026 tracks this same issue
+  - This ticket provides the implementation spec
+
+  ## Files to Create/Modify
+  - `packages/web/app/entry.server.tsx` or equivalent server middleware
+  - May need custom server setup if using default React Router dev server
+feature: go-to-production
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - security
+  - frontend
+  - P0
+acceptance_criteria:
+  - All responses from web server include CSP, HSTS, X-Frame-Options headers
+  - Headers verified via curl or browser devtools
+  - Dev mode works without CSP blocking hot reload
+comments: []
+work_sessions: []
+related_tickets:
+  - 264
+blocked_by: []
+blocks: []
+attachments: []

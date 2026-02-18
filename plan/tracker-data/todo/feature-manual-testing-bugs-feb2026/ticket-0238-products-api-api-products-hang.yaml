@@ -1,0 +1,44 @@
+ticket_number: 238
+title: Products API (/api/products) hangs indefinitely - empty reply from server
+description: |-
+  ## Bug
+  GET `/api/products` never returns a response. After ~9 seconds, curl reports "Empty reply from server" (HTTP 000). This affects the entire product catalog - the /posters page shows "No products found" and product detail pages show "Product Not Found".
+
+  ## Steps to Reproduce
+  1. `curl -v http://localhost:3000/api/products` 
+  2. Wait 10 seconds
+  3. Observe "Empty reply from server"
+
+  ## Interesting Detail
+  - `/api/products/` (WITH trailing slash) returns 401 Unauthorized immediately
+  - `/api/products` (WITHOUT trailing slash) hangs forever
+  - This suggests a routing inconsistency
+
+  ## Impact
+  - Product listing page shows no products
+  - Product detail pages show "Product Not Found"
+  - Cart items link to products that can't be viewed
+  - Core e-commerce functionality is completely broken
+
+  ## Expected
+  200 OK with paginated product list
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: critical
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:50:57.317Z'
+last_updated: '2026-02-17T20:50:57.317Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - products
+  - P0
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

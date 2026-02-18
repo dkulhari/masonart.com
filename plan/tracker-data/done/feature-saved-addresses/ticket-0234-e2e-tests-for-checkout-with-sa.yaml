@@ -1,0 +1,51 @@
+ticket_number: 234
+title: E2E tests for checkout with saved addresses
+description: |-
+  ## Task
+  Create `tests/e2e/checkout-addresses.spec.ts` with Playwright E2E tests:
+  - Logged-in user sees saved addresses in checkout
+  - Select a saved address and proceed through checkout
+  - Add new address during checkout flow
+  - "Save for future" checkbox persists address after order
+  - Guest checkout shows no saved addresses
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 6 - E2E Tests
+  Location: `tests/e2e/checkout-addresses.spec.ts`
+  Pattern: Playwright with `networkidle` waits
+
+  ## Testing Requirements
+  This IS the test ticket.
+
+  ## Acceptance Criteria
+  - [ ] Saved address selection tested in checkout
+  - [ ] New address during checkout tested
+  - [ ] Save-on-checkout tested
+  - [ ] Guest vs logged-in behavior verified
+  - [ ] Tests pass in CI
+feature: saved-addresses
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:22:51.105Z'
+last_updated: '2026-02-17T20:22:51.105Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 231
+    feature: saved-addresses
+    description: Wire up saved addresses in checkout
+  - ticket: 232
+    feature: saved-addresses
+    description: Implement save-address-on-checkout
+blocks: []
+attachments: []

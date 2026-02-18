@@ -1,0 +1,51 @@
+ticket_number: 227
+title: Create address CRUD API route
+description: |-
+  ## Task
+  Create `packages/api/src/routes/addresses.ts` with full CRUD:
+  - `GET /` — List all addresses for authenticated user (ordered by isDefault desc, createdAt desc)
+  - `POST /` — Create new address (enforce max 10 per user, auto-set isDefault if first address)
+  - `PATCH /:id` — Update an address (verify ownership)
+  - `DELETE /:id` — Delete an address (verify ownership, unset user's defaultAddressId if deleting default)
+  - `PATCH /:id/default` — Set address as default (unset previous default, update user's defaultAddressId)
+
+  Use `requireAuth` middleware on all routes. Validate with shared Zod schemas. Follow `notification-preferences.ts` pattern.
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 2 - Backend API
+  Location: `packages/api/src/routes/addresses.ts`
+  Pattern: Hono router with requireAuth, zValidator, Drizzle queries
+
+  ## Testing Requirements
+  - Integration tests in `packages/api/tests/routes/addresses.test.ts`
+  - Test all CRUD operations, ownership checks, max limit enforcement, default toggling
+
+  ## Acceptance Criteria
+  - [ ] All 5 endpoints implemented
+  - [ ] Max 10 addresses enforced
+  - [ ] Default address toggle works correctly
+  - [ ] Ownership verification on update/delete
+  - [ ] Integration tests written and passing
+feature: saved-addresses
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:19:39.900Z'
+last_updated: '2026-02-17T20:19:39.900Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 226
+    feature: saved-addresses
+    description: Align shared address schema with DB table
+blocks: []
+attachments: []

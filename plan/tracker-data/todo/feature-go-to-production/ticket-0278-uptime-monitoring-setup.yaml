@@ -1,0 +1,45 @@
+ticket_number: 278
+title: "Set up external uptime monitoring for production"
+description: |-
+  ## Task
+  Configure external uptime monitoring to detect outages before users report them.
+
+  ## Requirements
+  - Monitor /api/health endpoint every 60 seconds
+  - Monitor web homepage every 60 seconds
+  - Alert via Slack/email on downtime
+  - Track uptime percentage (target: 99.9%)
+  - Status page (optional but nice-to-have)
+
+  ## Tools to Consider
+  - UptimeRobot (free tier: 50 monitors)
+  - BetterUptime (better status pages)
+  - Checkly (supports API monitoring with assertions)
+
+  ## Dependencies
+  - Ticket #270 (health check endpoint) should be done first
+feature: go-to-production
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-18T08:30:00.000Z'
+last_updated: '2026-02-18T08:30:00.000Z'
+time_spent_minutes: 0
+labels:
+  - observability
+  - infrastructure
+  - P1
+acceptance_criteria:
+  - External monitor checking /api/health every 60s
+  - Alerts sent within 2 minutes of detected downtime
+  - Uptime dashboard accessible
+comments: []
+work_sessions: []
+related_tickets:
+  - 270
+blocked_by:
+  - 270
+blocks: []
+attachments: []

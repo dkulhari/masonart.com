@@ -1,0 +1,42 @@
+ticket_number: 232
+title: Implement save-address-on-checkout
+description: |-
+  ## Task
+  When the "Save address for future orders" checkbox is checked during checkout and order is placed, call `addressesApi.create()` to persist the address. Handle errors gracefully (don't block order if save fails). Skip if the address was already selected from saved addresses.
+
+  ## Context
+  Part of feature: saved-addresses
+  Phase: Phase 5 - Checkout Integration
+  Location: `packages/web/app/routes/checkout/index.tsx`, `packages/web/app/components/checkout/AddressForm.tsx`
+  Note: The "Save for future orders" checkbox UI already exists in AddressForm when `isLoggedIn={true}`
+
+  ## Testing Requirements
+  - Unit tests for save logic (skip if already saved, handle errors)
+
+  ## Acceptance Criteria
+  - [ ] Address saved when checkbox checked and order placed
+  - [ ] No save attempt if address was from saved addresses
+  - [ ] Order completes even if address save fails
+  - [ ] Success feedback shown to user
+feature: saved-addresses
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:21:49.505Z'
+last_updated: '2026-02-17T20:21:49.505Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - integration
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 231
+    feature: saved-addresses
+    description: Wire up saved addresses in checkout
+blocks: []
+attachments: []
