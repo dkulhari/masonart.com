@@ -2,6 +2,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
+import { checkDatabaseConnection } from "./database";
+import { isRedisConnected } from "./lib/redis";
+import redis from "./lib/redis";
 
 import { auth } from "./auth";
 import { productsApp } from "./routes/products";
@@ -177,20 +180,63 @@ app.route("/sitemap.xml", sitemapApp);
 // ============================================================================
 
 // Health check endpoints
-app.get("/health", (c) => {
-  return c.json({
-    status: "healthy",
+app.get("/health", async (c) => {
+  const startTime = process.hrtime.bigint();
+
+  // Check database
+  let dbStatus: "healthy" | "unhealthy" = "unhealthy";
+  let dbLatency = 0;
+  try {
+    const dbStart = Date.now();
+    const dbOk = await checkDatabaseConnection();
+    dbLatency = Date.now() - dbStart;
+    dbStatus = dbOk ? "healthy" : "unhealthy";
+  } catch {
+    dbStatus = "unhealthy";
+  }
+
+  // Check Redis
+  let redisStatus: "healthy" | "unhealthy" = "unhealthy";
+  let redisLatency = 0;
+  try {
+    const redisStart = Date.now();
+    if (isRedisConnected()) {
+      await redis.ping();
+      redisLatency = Date.now() - redisStart;
+      redisStatus = "healthy";
+    }
+  } catch {
+    redisStatus = "unhealthy";
+  }
+
+  const overallStatus = dbStatus === "healthy" && redisStatus === "healthy"
+    ? "healthy"
+    : "unhealthy";
+
+  const totalLatency = Number(process.hrtime.bigint() - startTime) / 1e6;
+
+  const body = {
+    status: overallStatus,
+    service: "masonart-api",
+    version: "1.0.0",
     timestamp: new Date().toISOString(),
-  });
+    uptime: Math.floor(process.uptime()),
+    latency_ms: Math.round(totalLatency),
+    components: {
+      database: { status: dbStatus, latency_ms: dbLatency },
+      redis: { status: redisStatus, latency_ms: redisLatency },
+    },
+  };
+
+  return c.json(body, overallStatus === "healthy" ? 200 : 503);
 });
 
-// API health check (for API prefix consistency)
-app.get("/api/health", (c) => {
-  return c.json({
-    status: "ok",
-    service: "masonart-api",
-    timestamp: new Date().toISOString(),
-  });
+// API health check (alias with /api prefix)
+app.get("/api/health", async (c) => {
+  // Forward to /health handler
+  const res = await app.request("/health");
+  const body = await res.json();
+  return c.json(body, res.status as 200 | 503);
 });
 
 // API root
