@@ -1,31 +1,74 @@
 version: "3.8"
 
 services:
+  # ── Cloudflare Tunnel ────────────────────────────────────────────────
+  # Exposes the app to the internet via Cloudflare's network.
+  # No port forwarding or static IP needed.
+  #
+  # Setup:
+  #   1. Install cloudflared: brew install cloudflared
+  #   2. Login: cloudflared tunnel login
+  #   3. Create tunnel: cloudflared tunnel create masonart
+  #   4. Copy the tunnel credentials JSON to docker/cloudflared/
+  #   5. Set TUNNEL_TOKEN in .env (or use credentials file)
+  #
+  # See: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - web
+      - api
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  # ── API Server ───────────────────────────────────────────────────────
   api:
     build:
       context: ..
       dockerfile: Dockerfile
       target: api
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=${REDIS_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-masonart}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-masonart}
+      - REDIS_URL=redis://redis:6379
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN}
+      - APP_URL=${APP_URL}
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
       - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
       - RESEND_API_KEY=${RESEND_API_KEY}
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@masonart.com}
       - TWO_FACTOR_API_KEY=${TWO_FACTOR_API_KEY}
+      - R2_ENDPOINT=${R2_ENDPOINT}
+      - R2_ACCESS_KEY=${R2_ACCESS_KEY}
+      - R2_SECRET_KEY=${R2_SECRET_KEY}
+      - R2_BUCKET=${R2_BUCKET:-masonart-prod}
+      - CDN_URL=${CDN_URL}
       - SENTRY_DSN=${SENTRY_DSN:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     deploy:
       resources:
@@ -33,19 +76,29 @@ services:
           memory: 512M
           cpus: "1.0"
 
+  # ── Web Server (SSR) ────────────────────────────────────────────────
   web:
     build:
       context: ..
       dockerfile: Dockerfile
       target: web
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     environment:
       - NODE_ENV=production
       - PORT=3001
       - VITE_API_URL=${VITE_API_URL:-http://api:3000}
+      - VITE_CDN_URL=${VITE_CDN_URL:-}
+      - VITE_SENTRY_DSN=${VITE_SENTRY_DSN:-}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     deploy:
       resources:
@@ -53,6 +106,7 @@ services:
           memory: 256M
           cpus: "0.5"
 
+  # ── PostgreSQL ──────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
@@ -72,9 +126,10 @@ services:
         limits:
           memory: 256M
 
+  # ── Redis ───────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -88,6 +143,24 @@ services:
         limits:
           memory: 128M
 
+  # ── MinIO (optional - use if not using Cloudflare R2) ───────────────
+  # Uncomment if you want local S3-compatible storage instead of R2
+  # minio:
+  #   image: minio/minio:latest
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     - MINIO_ROOT_USER=${R2_ACCESS_KEY:-minioadmin}
+  #     - MINIO_ROOT_PASSWORD=${R2_SECRET_KEY:-minioadmin}
+  #   volumes:
+  #     - minio_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "mc", "ready", "local"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
+  # minio_data:

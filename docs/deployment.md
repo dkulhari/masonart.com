@@ -2,130 +2,217 @@
 
 ## Prerequisites
 
-- [Railway CLI](https://docs.railway.com/guides/cli) installed (`npm i -g @railway/cli`)
-- Railway account with project created
-- GitHub repository connected to Railway
-- Domain name configured (DNS)
+- Docker & Docker Compose installed
+- [Cloudflare account](https://dash.cloudflare.com/) (free plan)
+- [`cloudflared` CLI](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) installed
+- Domain name added to Cloudflare (nameservers pointed to Cloudflare)
 
 ## Architecture
 
 ```
-┌──────────────┐     ┌──────────────┐
-│   Web (SSR)  │────▶│   API        │
-│   Port 3001  │     │   Port 3000  │
-│   Node.js    │     │   Bun        │
-└──────────────┘     └──────┬───────┘
-                            │
-                   ┌────────┴────────┐
-                   │                 │
-              ┌────▼────┐     ┌─────▼────┐
-              │ Postgres │     │  Redis   │
-              │   16     │     │   7      │
-              └──────────┘     └──────────┘
+Users → masonart.com → Cloudflare Edge → Cloudflare Tunnel
+                                              │
+                                    ┌─────────┘
+                                    ▼
+                          Your Local Machine
+                       (Docker Compose Stack)
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              ▼                     ▼                     ▼
+       ┌──────────┐         ┌──────────┐          ┌──────────┐
+       │   Web    │────────▶│   API    │─────────▶│ Postgres │
+       │  :3001   │         │  :3000   │          │   :5432  │
+       │ Node.js  │         │   Bun    │     ┌───▶│  16-alp  │
+       └──────────┘         └────┬─────┘     │    └──────────┘
+                                 │           │
+                                 ▼           │    ┌──────────┐
+                            ┌─────────┐      │    │  Redis   │
+                            │  Redis  │◀─────┘    │  :6379   │
+                            │  :6379  │           └──────────┘
+                            └─────────┘
+                                 │
+                            Cloudflare R2
+                          (image storage)
 ```
 
-Both services are built from a single Dockerfile using multi-stage targets.
+All services run locally via Docker Compose. Cloudflare Tunnel exposes them to the internet.
 
-## Railway Setup
+## Initial Setup
 
-### 1. Create Project
+### 1. Cloudflare Tunnel
 
 ```bash
-railway login
-railway init
+# Login to Cloudflare
+cloudflared tunnel login
+
+# Create a tunnel
+cloudflared tunnel create masonart
+
+# Note the tunnel ID and credentials file path
+# Credentials are saved to ~/.cloudflared/<TUNNEL_ID>.json
 ```
 
-### 2. Add Services
+### 2. Configure Tunnel Routes
 
-In Railway dashboard:
-1. Add **PostgreSQL** plugin → provides `DATABASE_URL`
-2. Add **Redis** plugin → provides `REDIS_URL`
-3. Add service **api** → Dockerfile target: `api`
-4. Add service **web** → Dockerfile target: `web`
+In the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/):
 
-### 3. Configure Build Targets
+1. Go to **Networks → Tunnels** → select your tunnel
+2. Add public hostname routes:
 
-For each service, set the Docker build target in Railway settings:
+| Subdomain | Domain | Service |
+|-----------|--------|---------|
+| (empty) | masonart.com | `http://web:3001` |
+| www | masonart.com | `http://web:3001` |
+| api | masonart.com | `http://api:3000` |
 
-**API Service:**
-- Builder: Dockerfile
-- Build target: `api`
-- Port: `3000`
-- Health check: `/api/health`
+Or configure via CLI with a config file at `docker/cloudflared/config.yml`:
 
-**Web Service:**
-- Builder: Dockerfile
-- Build target: `web`
-- Port: `3001`
-- Health check: `/`
+```yaml
+tunnel: <YOUR_TUNNEL_ID>
+credentials-file: /etc/cloudflared/credentials.json
 
-### 4. Set Environment Variables
+ingress:
+  - hostname: api.masonart.com
+    service: http://api:3000
+  - hostname: masonart.com
+    service: http://web:3001
+  - hostname: www.masonart.com
+    service: http://web:3001
+  - service: http_status:404
+```
 
-Set the following in Railway dashboard for the **API service**:
+### 3. Get Tunnel Token
 
-| Variable | Value | Required |
-|----------|-------|----------|
-| `NODE_ENV` | `production` | Yes |
-| `PORT` | `3000` | Yes |
-| `DATABASE_URL` | (auto from PostgreSQL plugin) | Yes |
-| `REDIS_URL` | (auto from Redis plugin) | Yes |
-| `CORS_ORIGIN` | `https://masonart.com,https://www.masonart.com` | Yes |
-| `BETTER_AUTH_SECRET` | (generate: `openssl rand -base64 32`) | Yes |
-| `RAZORPAY_KEY_ID` | (from Razorpay dashboard) | Yes |
-| `RAZORPAY_KEY_SECRET` | (from Razorpay dashboard) | Yes |
-| `RAZORPAY_WEBHOOK_SECRET` | (from Razorpay webhook config) | Yes |
-| `RESEND_API_KEY` | (from Resend dashboard) | Yes |
-| `TWO_FACTOR_API_KEY` | (from 2Factor.in dashboard) | Yes |
-| `SENTRY_DSN` | (from Sentry project) | Optional |
-| `SLACK_WEBHOOK_URL` | (from Slack app) | Optional |
+In Cloudflare dashboard → Tunnels → your tunnel → **Install connector** → copy the token.
 
-For the **Web service**:
+Add it to your `.env`:
+```
+CLOUDFLARE_TUNNEL_TOKEN=eyJ...
+```
 
-| Variable | Value | Required |
-|----------|-------|----------|
-| `NODE_ENV` | `production` | Yes |
-| `PORT` | `3001` | Yes |
-| `VITE_API_URL` | (internal URL of API service) | Yes |
-| `VITE_SENTRY_DSN` | (from Sentry project) | Optional |
-
-### 5. Configure Custom Domain
-
-In Railway service settings:
-1. Add custom domain: `masonart.com`
-2. Add custom domain: `www.masonart.com`
-3. Configure DNS:
-   - `A` record for `masonart.com` → Railway IP
-   - `CNAME` record for `www` → Railway domain
-
-### 6. Deploy
+### 4. Create Production `.env`
 
 ```bash
-# Deploy from current branch
-railway up
-
-# Or auto-deploy from GitHub
-# (Configure in Railway dashboard → Settings → Deploy)
+cp .env.example .env.production
 ```
 
-## Database Migrations
-
-Run migrations before first deploy and after schema changes:
+Fill in all required values:
 
 ```bash
-# Connect to Railway database
-railway run bun run db:migrate --cwd packages/api
+# ── Core ──────────────────────────────────────
+NODE_ENV=production
+APP_URL=https://masonart.com
+CORS_ORIGIN=https://masonart.com,https://www.masonart.com
 
-# Or use Railway shell
-railway shell
-cd packages/api && bun run db:migrate
+# ── Database ──────────────────────────────────
+POSTGRES_USER=masonart
+POSTGRES_PASSWORD=<strong-random-password>
+POSTGRES_DB=masonart
+
+# ── Auth ──────────────────────────────────────
+BETTER_AUTH_SECRET=<generate: openssl rand -hex 32>
+
+# ── Payments ──────────────────────────────────
+RAZORPAY_KEY_ID=<from razorpay dashboard>
+RAZORPAY_KEY_SECRET=<from razorpay dashboard>
+RAZORPAY_WEBHOOK_SECRET=<from razorpay webhook config>
+
+# ── Email ─────────────────────────────────────
+RESEND_API_KEY=<from resend.com>
+EMAIL_FROM=noreply@masonart.com
+
+# ── SMS ───────────────────────────────────────
+TWO_FACTOR_API_KEY=<from 2factor.in>
+
+# ── Storage (Cloudflare R2) ───────────────────
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY=<from R2 API tokens>
+R2_SECRET_KEY=<from R2 API tokens>
+R2_BUCKET=masonart-prod
+CDN_URL=https://cdn.masonart.com
+VITE_CDN_URL=https://cdn.masonart.com
+
+# ── Frontend ──────────────────────────────────
+VITE_API_URL=https://api.masonart.com
+
+# ── Cloudflare Tunnel ─────────────────────────
+CLOUDFLARE_TUNNEL_TOKEN=<from tunnel setup>
+
+# ── Observability (optional) ──────────────────
+SENTRY_DSN=
+VITE_SENTRY_DSN=
+SLACK_WEBHOOK_URL=
+LOG_LEVEL=info
 ```
 
-## Monitoring
+### 5. Build & Start
+
+```bash
+# Build and start all services
+docker compose -f docker/docker-compose.prod.yml --env-file .env.production up -d --build
+
+# Check all services are running
+docker compose -f docker/docker-compose.prod.yml ps
+
+# Check API health
+curl http://localhost:3000/health
+```
+
+### 6. Run Database Migrations
+
+```bash
+# Run migrations inside the API container
+docker compose -f docker/docker-compose.prod.yml exec api bun run db:push
+
+# Or seed initial data
+docker compose -f docker/docker-compose.prod.yml exec api bun run seed
+docker compose -f docker/docker-compose.prod.yml exec api bun run seed:admin
+```
+
+### 7. Verify
+
+- Open `https://masonart.com` — should load the web app
+- Check `https://api.masonart.com/health` — should return healthy status
+- Test payments with Razorpay test mode first
+
+## Cloudflare R2 Setup
+
+1. In Cloudflare dashboard → **R2** → Create bucket: `masonart-prod`
+2. Go to **R2 → Manage R2 API Tokens** → Create token with read/write access
+3. For CDN serving, connect a custom domain:
+   - R2 bucket settings → **Custom Domains** → Add `cdn.masonart.com`
+   - Cloudflare automatically creates the DNS record
+
+## Day-to-Day Operations
+
+### Viewing Logs
+
+```bash
+# All services
+docker compose -f docker/docker-compose.prod.yml logs -f
+
+# Specific service
+docker compose -f docker/docker-compose.prod.yml logs -f api
+docker compose -f docker/docker-compose.prod.yml logs -f web
+```
+
+### Updating the App
+
+```bash
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart (zero-downtime)
+docker compose -f docker/docker-compose.prod.yml up -d --build
+
+# Run migrations if schema changed
+docker compose -f docker/docker-compose.prod.yml exec api bun run db:push
+```
 
 ### Health Check
 
 ```bash
-curl https://api.masonart.com/api/health
+curl https://api.masonart.com/health
 ```
 
 Expected response:
@@ -139,37 +226,44 @@ Expected response:
 }
 ```
 
-### Logs
+### Monitoring
+
+- **Sentry dashboard**: Unhandled exceptions and performance
+- **Slack #prod-alerts**: Real-time critical error notifications
+- **Cloudflare Analytics**: Traffic, cache hit rates, security events
+
+## Backup & Recovery
+
+### Database Backup
 
 ```bash
-# Stream API logs
-railway logs --service api
+# Manual backup
+docker compose -f docker/docker-compose.prod.yml exec postgres \
+  pg_dump -U masonart masonart > backup-$(date +%Y%m%d).sql
 
-# Stream Web logs
-railway logs --service web
+# Automated daily backup (add to crontab)
+# 0 2 * * * cd /path/to/masonart.com && docker compose -f docker/docker-compose.prod.yml exec -T postgres pg_dump -U masonart masonart > /backups/masonart-$(date +\%Y\%m\%d).sql
 ```
 
-### Error Tracking
+### Restore from Backup
 
-- **Sentry dashboard**: Check for unhandled exceptions
-- **Slack #prod-alerts**: Real-time critical error notifications
+```bash
+docker compose -f docker/docker-compose.prod.yml exec -T postgres \
+  psql -U masonart masonart < backup-20260218.sql
+```
+
+### Redis Data
+
+Redis is used for caching and job queues — data is ephemeral. No backup needed. Append-only file (AOF) is enabled for crash recovery.
 
 ## Rollback
 
-### Quick Rollback (Railway)
-
-1. Go to Railway dashboard → Deployments
-2. Click on the previous successful deployment
-3. Click "Redeploy"
-
-### Git-Based Rollback
+### Quick Rollback
 
 ```bash
 # Revert to previous commit
 git revert HEAD
-git push origin main
-
-# Railway auto-deploys from main
+docker compose -f docker/docker-compose.prod.yml up -d --build
 ```
 
 ### Database Rollback
@@ -178,39 +272,51 @@ Drizzle ORM does not support automatic rollbacks. For schema issues:
 
 1. Identify the problematic migration
 2. Write a manual rollback SQL script
-3. Execute via Railway shell:
+3. Execute:
    ```bash
-   railway shell
-   psql $DATABASE_URL -f rollback.sql
+   docker compose -f docker/docker-compose.prod.yml exec postgres \
+     psql -U masonart masonart -f /path/to/rollback.sql
    ```
 
 ## Troubleshooting
 
+### Site not accessible
+
+1. Check tunnel is running: `docker compose -f docker/docker-compose.prod.yml logs cloudflared`
+2. Check tunnel status in Cloudflare dashboard → Tunnels
+3. Verify DNS records point to the tunnel
+
 ### API returns 503
 
-Check health endpoint: `curl /api/health`
-- If database unhealthy: Check `DATABASE_URL`, PostgreSQL plugin status
-- If Redis unhealthy: Check `REDIS_URL`, Redis plugin status
+Check health endpoint: `curl http://localhost:3000/health`
+- If database unhealthy: Check postgres container logs
+- If Redis unhealthy: Check redis container logs
 
 ### Web shows blank page
 
-- Check `VITE_API_URL` points to the API service internal URL
-- Check Railway logs for SSR errors: `railway logs --service web`
+- Check `VITE_API_URL` is set to `https://api.masonart.com`
+- Check web container logs for SSR errors
 
 ### Auth not working
 
 - Verify `BETTER_AUTH_SECRET` is set
 - Check `CORS_ORIGIN` includes your domain
-- Ensure cookies are set with `Secure` flag (HTTPS required)
+- Ensure you're accessing via HTTPS (Cloudflare provides SSL automatically)
 
 ### Payments failing
 
 - Verify using live Razorpay keys (not test keys `rzp_test_*`)
 - Check `RAZORPAY_WEBHOOK_SECRET` matches webhook config
-- Verify webhook URL is configured in Razorpay dashboard
+- Configure webhook URL in Razorpay dashboard: `https://api.masonart.com/api/webhooks/razorpay`
 
 ### Email/SMS not sending
 
 - Check `RESEND_API_KEY` / `TWO_FACTOR_API_KEY` are set
-- Verify sender domain is verified in Resend
+- Verify sender domain (`masonart.com`) is verified in Resend
 - Check API logs for delivery errors
+
+### Images not loading
+
+- Verify R2 bucket exists and credentials are correct
+- Check `CDN_URL` matches the R2 custom domain
+- Test with: `curl https://cdn.masonart.com/products/test.jpg`
