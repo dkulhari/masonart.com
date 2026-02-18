@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
+import { compress } from "hono/compress";
 import { checkDatabaseConnection } from "./database";
 import { isRedisConnected } from "./lib/redis";
 import redis from "./lib/redis";
@@ -72,6 +73,7 @@ app.use("*", async (c, next) => {
   );
 });
 app.use("*", secureHeaders());
+app.use("*", compress());
 app.use(
   "*",
   cors({
