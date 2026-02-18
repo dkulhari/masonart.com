@@ -1,0 +1,48 @@
+# Dependencies (installed in container)
+node_modules
+*/node_modules
+
+# Build outputs (built in container)
+dist
+.output
+.vinxi
+.next
+
+# Development files
+.env
+.env.*
+!.env.example
+docker/
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Tests
+tests/
+packages/*/tests/
+*.test.ts
+*.spec.ts
+playwright-report/
+test-results/
+coverage/
+
+# Documentation and planning
+docs/
+plan/
+*.md
+!package.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Miscellaneous
+*.png
+*.jpg
+*.log
+.claude/
