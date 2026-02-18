@@ -41,13 +41,27 @@ import {
 
 const app = new Hono();
 
+// Validate critical env vars in production
+if (process.env.NODE_ENV === "production" && !process.env.CORS_ORIGIN) {
+  throw new Error(
+    "CORS_ORIGIN environment variable is required in production. " +
+    "Set it to your production domain (e.g., https://masonart.com). " +
+    "Multiple origins can be comma-separated."
+  );
+}
+
+// Parse CORS origins (supports comma-separated list)
+const corsOrigins = (process.env.CORS_ORIGIN || "http://localhost:3001")
+  .split(",")
+  .map((o) => o.trim());
+
 // Global middleware
 app.use("*", logger());
 app.use("*", secureHeaders());
 app.use(
   "*",
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:3001",
+    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
   })
 );
