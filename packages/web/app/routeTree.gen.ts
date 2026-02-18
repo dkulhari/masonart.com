@@ -27,6 +27,7 @@ import { Route as AuthLoginRouteImport } from './routes/auth/login'
 import { Route as ApproveTokenRouteImport } from './routes/approve/$token'
 import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
 import { Route as AdminReturnsRouteImport } from './routes/admin/returns'
+import { Route as AdminAiModerationRouteImport } from './routes/admin/ai-moderation'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
 import { Route as AdminApprovalsIndexRouteImport } from './routes/admin/approvals/index'
@@ -38,6 +39,7 @@ import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$
 import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
 import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
 import { Route as AuthedAccountNotificationsRouteImport } from './routes/_authed/account/notifications'
+import { Route as AuthedAccountAddressesRouteImport } from './routes/_authed/account/addresses'
 import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
 import { Route as AuthedAccountOrdersIdRouteImport } from './routes/_authed/account/orders.$id'
 import { Route as AuthedAccountOrdersIdReturnRouteImport } from './routes/_authed/account/orders.$id.return'
@@ -131,6 +133,11 @@ const AdminReturnsRoute = AdminReturnsRouteImport.update({
   path: '/returns',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAiModerationRoute = AdminAiModerationRouteImport.update({
+  id: '/ai-moderation',
+  path: '/ai-moderation',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminProductsIndexRoute = AdminProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -187,6 +194,12 @@ const AuthedAccountNotificationsRoute =
     path: '/account/notifications',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedAccountAddressesRoute =
+  AuthedAccountAddressesRouteImport.update({
+    id: '/account/addresses',
+    path: '/account/addresses',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAccountAiCreationsRoute =
   AuthedAccountAiCreationsRouteImport.update({
     id: '/account/ai-creations',
@@ -208,6 +221,7 @@ const AuthedAccountOrdersIdReturnRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/approve/$token': typeof ApproveTokenRoute
@@ -223,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/gallery': typeof GalleryIndexRoute
   '/posters': typeof PostersIndexRoute
   '/track': typeof TrackIndexRoute
+  '/account/addresses': typeof AuthedAccountAddressesRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
   '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
@@ -240,6 +255,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/approve/$token': typeof ApproveTokenRoute
@@ -255,6 +271,7 @@ export interface FileRoutesByTo {
   '/gallery': typeof GalleryIndexRoute
   '/posters': typeof PostersIndexRoute
   '/track': typeof TrackIndexRoute
+  '/account/addresses': typeof AuthedAccountAddressesRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
   '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
@@ -275,6 +292,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
+  '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/approve/$token': typeof ApproveTokenRoute
@@ -290,6 +308,7 @@ export interface FileRoutesById {
   '/gallery/': typeof GalleryIndexRoute
   '/posters/': typeof PostersIndexRoute
   '/track/': typeof TrackIndexRoute
+  '/_authed/account/addresses': typeof AuthedAccountAddressesRoute
   '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/_authed/account/notifications': typeof AuthedAccountNotificationsRoute
   '/_authed/account/orders': typeof AuthedAccountOrdersRouteWithChildren
@@ -310,6 +329,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/admin/ai-moderation'
     | '/admin/returns'
     | '/admin/reviews'
     | '/approve/$token'
@@ -325,6 +345,7 @@ export interface FileRouteTypes {
     | '/gallery'
     | '/posters'
     | '/track'
+    | '/account/addresses'
     | '/account/ai-creations'
     | '/account/notifications'
     | '/account/orders'
@@ -342,6 +363,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin/ai-moderation'
     | '/admin/returns'
     | '/admin/reviews'
     | '/approve/$token'
@@ -357,6 +379,7 @@ export interface FileRouteTypes {
     | '/gallery'
     | '/posters'
     | '/track'
+    | '/account/addresses'
     | '/account/ai-creations'
     | '/account/notifications'
     | '/account/orders'
@@ -376,6 +399,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authed'
     | '/admin'
+    | '/admin/ai-moderation'
     | '/admin/returns'
     | '/admin/reviews'
     | '/approve/$token'
@@ -391,6 +415,7 @@ export interface FileRouteTypes {
     | '/gallery/'
     | '/posters/'
     | '/track/'
+    | '/_authed/account/addresses'
     | '/_authed/account/ai-creations'
     | '/_authed/account/notifications'
     | '/_authed/account/orders'
@@ -553,6 +578,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminReturnsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/ai-moderation': {
+      id: '/admin/ai-moderation'
+      path: '/ai-moderation'
+      fullPath: '/admin/ai-moderation'
+      preLoaderRoute: typeof AdminAiModerationRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/products/': {
       id: '/admin/products/'
       path: '/products'
@@ -679,6 +711,7 @@ const AuthedAccountOrdersRouteWithChildren =
   AuthedAccountOrdersRoute._addFileChildren(AuthedAccountOrdersRouteChildren)
 
 interface AuthedRouteChildren {
+  AuthedAccountAddressesRoute: typeof AuthedAccountAddressesRoute
   AuthedAccountAiCreationsRoute: typeof AuthedAccountAiCreationsRoute
   AuthedAccountNotificationsRoute: typeof AuthedAccountNotificationsRoute
   AuthedAccountOrdersRoute: typeof AuthedAccountOrdersRouteWithChildren
@@ -687,6 +720,7 @@ interface AuthedRouteChildren {
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedAccountAddressesRoute: AuthedAccountAddressesRoute,
   AuthedAccountAiCreationsRoute: AuthedAccountAiCreationsRoute,
   AuthedAccountNotificationsRoute: AuthedAccountNotificationsRoute,
   AuthedAccountOrdersRoute: AuthedAccountOrdersRouteWithChildren,
@@ -698,6 +732,7 @@ const AuthedRouteWithChildren =
   AuthedRoute._addFileChildren(AuthedRouteChildren)
 
 interface AdminRouteChildren {
+  AdminAiModerationRoute: typeof AdminAiModerationRoute
   AdminReturnsRoute: typeof AdminReturnsRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -711,6 +746,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAiModerationRoute: AdminAiModerationRoute,
   AdminReturnsRoute: AdminReturnsRoute,
   AdminReviewsRoute: AdminReviewsRoute,
   AdminIndexRoute: AdminIndexRoute,
