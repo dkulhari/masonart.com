@@ -6,6 +6,10 @@ import { checkDatabaseConnection } from "./database";
 import { isRedisConnected } from "./lib/redis";
 import redis from "./lib/redis";
 import { authRateLimit, signUpRateLimit, otpRateLimit, forgotPasswordRateLimit } from "./middleware/rate-limit";
+import { initSentry, captureException } from "./lib/sentry";
+
+// Initialize Sentry early, before any routes are handled
+initSentry();
 
 import { auth } from "./auth";
 import { productsApp } from "./routes/products";
@@ -271,6 +275,19 @@ app.get("/", (c) => {
     version: "0.0.1",
     documentation: "/docs",
   });
+});
+
+// Global error handler — captures to Sentry and returns 500
+app.onError((err, c) => {
+  captureException(err, {
+    url: c.req.url,
+    method: c.req.method,
+  });
+  console.error("Unhandled error:", err);
+  return c.json(
+    { error: "Internal Server Error", message: "An unexpected error occurred" },
+    500
+  );
 });
 
 // Export app for testing and type inference

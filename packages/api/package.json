@@ -37,6 +37,7 @@
     "@aws-sdk/s3-request-presigner": "^3.700.0",
     "@google/generative-ai": "^0.24.1",
     "@hono/zod-validator": "^0.4.1",
+    "@sentry/node": "^10.39.0",
     "better-auth": "^1.2.0",
     "bullmq": "^5.30.0",
     "drizzle-orm": "^0.44.0",
