@@ -7,6 +7,7 @@ import redis from "./lib/redis";
 import { authRateLimit, signUpRateLimit, otpRateLimit, forgotPasswordRateLimit } from "./middleware/rate-limit";
 import { initSentry, captureException } from "./lib/sentry";
 import { logger } from "./lib/logger";
+import { alertCritical } from "./lib/alerts";
 
 // Initialize Sentry early, before any routes are handled
 initSentry();
@@ -292,6 +293,11 @@ app.onError((err, c) => {
     method: c.req.method,
   });
   logger.error({ err, url: c.req.url, method: c.req.method }, "Unhandled error");
+  alertCritical(
+    "Unhandled API Error",
+    `\`${c.req.method} ${c.req.path}\` threw an unhandled error:\n\`\`\`${err instanceof Error ? err.message : String(err)}\`\`\``,
+    { url: c.req.url, method: c.req.method }
+  );
   return c.json(
     { error: "Internal Server Error", message: "An unexpected error occurred" },
     500
