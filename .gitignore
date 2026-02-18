@@ -8,6 +8,7 @@ node_modules/
 
 # Build outputs
 dist/
+bundle-stats.html
 build/
 .output/
 .vinxi/
