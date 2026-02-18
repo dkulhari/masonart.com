@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { checkDatabaseConnection } from "./database";
 import { isRedisConnected } from "./lib/redis";
 import redis from "./lib/redis";
 import { authRateLimit, signUpRateLimit, otpRateLimit, forgotPasswordRateLimit } from "./middleware/rate-limit";
 import { initSentry, captureException } from "./lib/sentry";
+import { logger } from "./lib/logger";
 
 // Initialize Sentry early, before any routes are handled
 initSentry();
@@ -61,7 +61,15 @@ const corsOrigins = (process.env.CORS_ORIGIN || "http://localhost:3001")
   .map((o) => o.trim());
 
 // Global middleware
-app.use("*", logger());
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  await next();
+  const duration = Date.now() - start;
+  logger.info(
+    { method: c.req.method, url: c.req.path, status: c.res.status, duration },
+    `${c.req.method} ${c.req.path} ${c.res.status} ${duration}ms`
+  );
+});
 app.use("*", secureHeaders());
 app.use(
   "*",
@@ -283,7 +291,7 @@ app.onError((err, c) => {
     url: c.req.url,
     method: c.req.method,
   });
-  console.error("Unhandled error:", err);
+  logger.error({ err, url: c.req.url, method: c.req.method }, "Unhandled error");
   return c.json(
     { error: "Internal Server Error", message: "An unexpected error occurred" },
     500
