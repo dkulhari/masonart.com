@@ -4,6 +4,9 @@ description: Edit an existing feature's description. Use when user wants to upda
 allowed-tools:
   - mcp__ticketrack__editFeature
   - mcp__ticketrack__listFeatures
+  - mcp__plugin_claude-mem_mcp-search__search
+  - mcp__plugin_claude-mem_mcp-search__timeline
+  - mcp__plugin_claude-mem_mcp-search__get_observations
   - AskUserQuestion
   - Read
   - Glob

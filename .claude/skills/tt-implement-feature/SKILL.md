@@ -7,6 +7,9 @@ allowed-tools:
   - mcp__ticketrack__showTicketDetails
   - mcp__ticketrack__updateTicketStatus
   - mcp__ticketrack__addComment
+  - mcp__plugin_claude-mem_mcp-search__search
+  - mcp__plugin_claude-mem_mcp-search__timeline
+  - mcp__plugin_claude-mem_mcp-search__get_observations
   - Read
   - Write
   - Edit

@@ -1,6 +1,16 @@
 ---
 name: tt-run-test-suit
 description: Run tests by suite, classify failures as test bugs vs app bugs, and log tickets via TickeTrack.
+allowed-tools:
+  - mcp__ticketrack__createTicket
+  - mcp__ticketrack__createFeature
+  - mcp__ticketrack__listFeatures
+  - mcp__plugin_claude-mem_mcp-search__search
+  - mcp__plugin_claude-mem_mcp-search__timeline
+  - mcp__plugin_claude-mem_mcp-search__get_observations
+  - AskUserQuestion
+  - Read
+  - Bash
 ---
 
 # /tt-run-test-suit - Suite-Based Test Runner

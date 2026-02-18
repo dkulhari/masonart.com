@@ -1,6 +1,15 @@
 ---
 name: tt-debug-browser
 description: Debug and investigate pages using agent-browser. Useful for understanding page structure, capturing state, and diagnosing test failures.
+allowed-tools:
+  - mcp__ticketrack__showTicketDetails
+  - mcp__ticketrack__addComment
+  - mcp__plugin_claude-mem_mcp-search__search
+  - mcp__plugin_claude-mem_mcp-search__timeline
+  - mcp__plugin_claude-mem_mcp-search__get_observations
+  - AskUserQuestion
+  - Read
+  - Bash
 ---
 
 # /tt-debug-browser - Browser Debugging Assistant
