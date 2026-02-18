@@ -5,6 +5,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { checkDatabaseConnection } from "./database";
 import { isRedisConnected } from "./lib/redis";
 import redis from "./lib/redis";
+import { authRateLimit, signUpRateLimit, otpRateLimit, forgotPasswordRateLimit } from "./middleware/rate-limit";
 
 import { auth } from "./auth";
 import { productsApp } from "./routes/products";
@@ -72,6 +73,15 @@ app.use(
 // Mount Better Auth handler for all auth endpoints
 // Handles: /api/auth/sign-in, /api/auth/sign-up, /api/auth/sign-out,
 //          /api/auth/session, /api/auth/callback/:provider, etc.
+
+// Rate limit sensitive auth endpoints
+app.post("/api/auth/sign-in/*", signUpRateLimit); // 5/min
+app.post("/api/auth/sign-up/*", signUpRateLimit); // 3/min
+app.post("/api/auth/forgot-password", forgotPasswordRateLimit); // 3/min
+
+// General auth rate limit on all auth POST requests
+app.post("/api/auth/*", authRateLimit); // 5/min
+
 app.on(["POST", "GET"], "/api/auth/*", async (c) => {
   // Clone the request to ensure body is available for Better Auth
   // This is needed because middleware may have already read the body
@@ -98,7 +108,8 @@ app.route("/api/ai", aiApp);
 // Wallet API - balance, transactions, top-up
 app.route("/api/wallet", walletApp);
 
-// Phone Auth API - SMS OTP login
+// Phone Auth API - SMS OTP login (rate limited)
+app.post("/api/phone-auth/*", otpRateLimit); // 5/min
 app.route("/api/phone-auth", phoneAuthApp);
 
 // Reviews API - product reviews (public read)
