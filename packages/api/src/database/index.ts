@@ -12,17 +12,18 @@ if (!databaseUrl) {
   );
 }
 
+// Connection pool configuration (configurable via env vars)
+const poolMax = parseInt(process.env.DB_POOL_MAX || "20", 10);
+const poolIdleTimeout = parseInt(process.env.DB_POOL_IDLE_TIMEOUT || "10", 10);
+const poolConnectTimeout = parseInt(process.env.DB_POOL_CONNECT_TIMEOUT || "30", 10);
+
 // Create postgres connection
 // Using postgres.js which is the recommended driver for Bun
 // https://orm.drizzle.team/docs/get-started-postgresql#postgresjs
 const queryClient = postgres(databaseUrl, {
-  // Maximum number of connections in the pool
-  max: 10,
-  // Idle connection timeout in seconds
-  idle_timeout: 20,
-  // Connection timeout in seconds
-  connect_timeout: 10,
-  // Prepare statements for better performance
+  max: poolMax,
+  idle_timeout: poolIdleTimeout,
+  connect_timeout: poolConnectTimeout,
   prepare: true,
 });
 
