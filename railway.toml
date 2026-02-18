@@ -1,0 +1,31 @@
+# Railway deployment configuration
+# This project deploys two services from a single repo: API and Web
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# API Service: use `railway deploy --service api`
+# Build target: api
+# Health check: /api/health
+# Port: 3000
+
+# Web Service: use `railway deploy --service web`
+# Build target: web
+# Health check: /
+# Port: 3001
+
+# Required environment variables (set in Railway dashboard):
+# DATABASE_URL - Railway PostgreSQL plugin provides this
+# REDIS_URL - Railway Redis plugin provides this
+# CORS_ORIGIN - Production domain (e.g., https://masonart.com)
+# BETTER_AUTH_SECRET - Auth secret key
+# RAZORPAY_KEY_ID - Payment key
+# RAZORPAY_KEY_SECRET - Payment secret
+# RAZORPAY_WEBHOOK_SECRET - Webhook verification
+# RESEND_API_KEY - Email service
+# TWO_FACTOR_API_KEY - SMS service
