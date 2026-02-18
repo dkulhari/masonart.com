@@ -11,6 +11,9 @@
  * @see https://2factor.in/v3/documentation
  */
 
+import { withRetry } from "../lib/retry";
+import { logger } from "../lib/logger";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -121,32 +124,48 @@ export async function sendOTP(phone: string): Promise<SendOTPResponse> {
       };
     }
 
-    // Send OTP via 2Factor.in API
-    // API: https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/AUTOGEN/{template_name}
+    // Send OTP via 2Factor.in API with retry for transient failures
     const url = `${TWO_FACTOR_BASE_URL}/${TWO_FACTOR_API_KEY}/SMS/${normalizedPhone}/AUTOGEN/${OTP_TEMPLATE_NAME}`;
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
+    const result = await withRetry(
+      async () => {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const data = (await response.json()) as TwoFactorSendResponse;
+
+        if (data.Status !== "Success") {
+          throw new Error(data.Details || "Failed to send OTP");
+        }
+
+        return data;
       },
-    });
+      {
+        maxRetries: 3,
+        baseDelay: 1000,
+        operationName: "sms-otp-send",
+      }
+    );
 
-    const data = (await response.json()) as TwoFactorSendResponse;
-
-    if (data.Status === "Success") {
+    if (!result.success) {
+      logger.error(
+        { err: result.error, phone: normalizedPhone, attempts: result.attempts },
+        "OTP delivery failed after retries"
+      );
       return {
-        success: true,
-        sessionId: data.Details, // 2Factor returns session ID in Details
+        success: false,
+        error: result.error instanceof Error ? result.error.message : "Failed to send OTP",
       };
     }
 
     return {
-      success: false,
-      error: data.Details || "Failed to send OTP",
+      success: true,
+      sessionId: result.data!.Details,
     };
   } catch (error) {
-    console.error("[SMS] Error sending OTP:", error);
+    logger.error({ err: error, phone }, "OTP send error");
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to send OTP",

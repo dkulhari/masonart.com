@@ -8,6 +8,8 @@
  */
 
 import { Resend } from "resend";
+import { withRetry } from "../lib/retry";
+import { logger } from "../lib/logger";
 
 // ============================================================================
 // Types
@@ -99,31 +101,49 @@ export async function sendEmail(
       };
     }
 
-    // Send email via Resend
-    const { data, error } = await client.emails.send({
-      from: from || DEFAULT_FROM_EMAIL,
-      to: Array.isArray(to) ? to : [to],
-      subject,
-      html,
-      text,
-      replyTo: replyTo || DEFAULT_REPLY_TO,
-      tags,
-    });
+    // Send email via Resend with retry for transient failures
+    const result = await withRetry(
+      async () => {
+        const { data, error } = await client.emails.send({
+          from: from || DEFAULT_FROM_EMAIL,
+          to: Array.isArray(to) ? to : [to],
+          subject,
+          html,
+          text,
+          replyTo: replyTo || DEFAULT_REPLY_TO,
+          tags,
+        });
 
-    if (error) {
-      console.error("[Email] Resend error:", error);
+        if (error) {
+          throw new Error(error.message || "Failed to send email");
+        }
+
+        return data;
+      },
+      {
+        maxRetries: 3,
+        baseDelay: 1000,
+        operationName: "email-send",
+      }
+    );
+
+    if (!result.success) {
+      logger.error(
+        { err: result.error, to, subject, attempts: result.attempts },
+        "Email delivery failed after retries"
+      );
       return {
         success: false,
-        error: error.message || "Failed to send email",
+        error: result.error instanceof Error ? result.error.message : "Failed to send email",
       };
     }
 
     return {
       success: true,
-      messageId: data?.id,
+      messageId: result.data?.id,
     };
   } catch (error) {
-    console.error("[Email] Error sending email:", error);
+    logger.error({ err: error, to, subject }, "Email send error");
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to send email",
