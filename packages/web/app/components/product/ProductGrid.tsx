@@ -37,8 +37,8 @@ export interface ProductGridProps {
   className?: string
   /** Card size variant */
   cardSize?: 'sm' | 'md' | 'lg'
-  /** Override aspect ratio for uniform card alignment (e.g. 'aspect-[3/4]') */
-  uniformAspectRatio?: string
+  /** Override aspect ratio for uniform card alignment */
+  uniformAspectRatio?: 'aspect-square' | 'aspect-[3/4]' | 'aspect-[2/3]' | 'aspect-[3/2]' | 'aspect-video'
 }
 
 // ============================================================================

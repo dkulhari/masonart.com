@@ -354,7 +354,7 @@ function CategoriesSection() {
 
               {/* Gradient overlay for text readability */}
               <div
-                className={`absolute inset-0 bg-gradient-to-br ${category.color} transition-opacity duration-300 group-hover:opacity-90`}
+                className={`absolute inset-0 bg-gradient-to-br ${category.color} opacity-75 transition-opacity duration-300 group-hover:opacity-90`}
               />
 
               {/* Text content */}
