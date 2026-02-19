@@ -48,6 +48,8 @@ export interface ProductCardProps {
   className?: string
   /** Size variant for the card */
   size?: 'sm' | 'md' | 'lg'
+  /** Override aspect ratio for uniform grid alignment (e.g. 'aspect-[3/4]') */
+  uniformAspectRatio?: string
 }
 
 // ============================================================================
@@ -82,12 +84,13 @@ export function ProductCard({
   showAiBadge = true,
   className,
   size = 'md',
+  uniformAspectRatio,
 }: ProductCardProps) {
   const primaryImage =
     product.images?.find((img) => img.isPrimary) || product.images?.[0]
   const price = parseFloat(product.basePrice)
   const aspectRatioClass =
-    ASPECT_RATIO_MAP[product.orientation] || ASPECT_RATIO_MAP.portrait
+    uniformAspectRatio || ASPECT_RATIO_MAP[product.orientation] || ASPECT_RATIO_MAP.portrait
 
   // Size-based styling
   const sizeStyles = {
