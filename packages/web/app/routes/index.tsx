@@ -23,31 +23,14 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { productsApi } from '~/lib/api'
+import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface ProductImage {
-  id: string
-  url: string
-  alt?: string
-  isPrimary?: boolean
-}
-
-interface FeaturedProduct {
-  id: string
-  title: string
-  slug: string
-  basePrice: string
-  images: ProductImage[]
-  orientation: string
-  styles?: string[]
-  isFeatured: boolean
-}
-
 export interface HomePageData {
-  featuredProducts: FeaturedProduct[]
+  featuredProducts: ProductCardData[]
 }
 
 // ============================================================================
@@ -219,7 +202,7 @@ function HeroSection() {
 // ============================================================================
 
 interface FeaturedProductsSectionProps {
-  products: FeaturedProduct[]
+  products: ProductCardData[]
 }
 
 function FeaturedProductsSection({ products }: FeaturedProductsSectionProps) {
@@ -249,7 +232,11 @@ function FeaturedProductsSection({ products }: FeaturedProductsSectionProps) {
         {products.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
             {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard
+                key={product.id}
+                product={product}
+                uniformAspectRatio="aspect-[3/4]"
+              />
             ))}
           </div>
         ) : (
@@ -268,86 +255,6 @@ function FeaturedProductsSection({ products }: FeaturedProductsSectionProps) {
         </div>
       </div>
     </section>
-  )
-}
-
-// ============================================================================
-// Product Card Component
-// ============================================================================
-
-interface ProductCardProps {
-  product: FeaturedProduct
-}
-
-function ProductCard({ product }: ProductCardProps) {
-  const primaryImage = product.images?.find((img) => img.isPrimary) || product.images?.[0]
-  const price = parseFloat(product.basePrice)
-
-  // Get aspect ratio class based on orientation
-  const aspectRatioClass = {
-    square: 'aspect-square',
-    portrait: 'aspect-[2/3]',
-    landscape: 'aspect-[3/2]',
-    panoramic: 'aspect-video',
-    round: 'aspect-square',
-  }[product.orientation] || 'aspect-[2/3]'
-
-  return (
-    <a
-      href={`/posters/${product.slug}`}
-      className="group block"
-    >
-      <div className="card-hover overflow-hidden rounded-lg border border-border bg-card">
-        {/* Image Container */}
-        <div className={`relative ${aspectRatioClass} overflow-hidden bg-muted`}>
-          {primaryImage?.url ? (
-            <img
-              src={primaryImage.url}
-              alt={primaryImage.alt || product.title}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Palette className="h-12 w-12 text-muted-foreground/50" />
-            </div>
-          )}
-
-          {/* Featured Badge */}
-          {product.isFeatured && (
-            <div className="absolute left-2 top-2 rounded-full bg-brand-500 px-2 py-0.5 text-xs font-medium text-white">
-              Featured
-            </div>
-          )}
-        </div>
-
-        {/* Product Info */}
-        <div className="p-3 sm:p-4">
-          <h3 className="line-clamp-1 text-sm font-medium text-foreground transition-colors group-hover:text-brand-600 sm:text-base">
-            {product.title}
-          </h3>
-
-          {/* Styles Tags */}
-          {product.styles && product.styles.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {product.styles.slice(0, 2).map((style) => (
-                <span
-                  key={style}
-                  className="text-xs text-muted-foreground capitalize"
-                >
-                  {style}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Price */}
-          <p className="mt-2 text-sm font-semibold text-foreground sm:text-base">
-            From ₹{price.toLocaleString('en-IN')}
-          </p>
-        </div>
-      </div>
-    </a>
   )
 }
 
