@@ -293,28 +293,28 @@ const categories = [
     slug: 'abstract',
     description: 'Bold, expressive art pieces',
     image: '/images/categories/abstract.jpg',
-    color: 'from-purple-500/80 to-pink-500/80',
+    color: 'from-purple-600/70 to-pink-600/70',
   },
   {
     name: 'Nature',
     slug: 'nature',
     description: 'Serene landscapes & botanicals',
     image: '/images/categories/nature.jpg',
-    color: 'from-green-500/80 to-teal-500/80',
+    color: 'from-green-600/70 to-teal-600/70',
   },
   {
     name: 'Minimalist',
     slug: 'minimalist',
     description: 'Clean lines, simple beauty',
     image: '/images/categories/minimalist.jpg',
-    color: 'from-gray-500/80 to-slate-500/80',
+    color: 'from-gray-600/70 to-slate-600/70',
   },
   {
     name: 'Typography',
     slug: 'typography',
     description: 'Words that inspire',
     image: '/images/categories/typography.jpg',
-    color: 'from-amber-500/80 to-orange-500/80',
+    color: 'from-amber-600/70 to-orange-600/70',
   },
 ]
 
@@ -338,14 +338,26 @@ function CategoriesSection() {
             <a
               key={category.slug}
               href={`/posters?styles=${category.slug}`}
-              className="group relative overflow-hidden rounded-xl"
+              className="group relative aspect-square overflow-hidden rounded-xl"
             >
-              {/* Background gradient (fallback for when images aren't available) */}
-              <div
-                className={`aspect-square bg-gradient-to-br ${category.color} transition-transform duration-300 group-hover:scale-105`}
+              {/* Category Image (with gradient fallback) */}
+              <img
+                src={category.image}
+                alt={category.name}
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+                onError={(e) => {
+                  // Hide broken image, gradient overlay handles the visual
+                  e.currentTarget.style.display = 'none'
+                }}
               />
 
-              {/* Overlay content */}
+              {/* Gradient overlay for text readability */}
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${category.color} transition-opacity duration-300 group-hover:opacity-90`}
+              />
+
+              {/* Text content */}
               <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-white">
                 <h3 className="text-lg font-bold sm:text-xl">
                   {category.name}
