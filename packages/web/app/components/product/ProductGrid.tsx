@@ -37,6 +37,8 @@ export interface ProductGridProps {
   className?: string
   /** Card size variant */
   cardSize?: 'sm' | 'md' | 'lg'
+  /** Override aspect ratio for uniform card alignment (e.g. 'aspect-[3/4]') */
+  uniformAspectRatio?: string
 }
 
 // ============================================================================
@@ -91,6 +93,7 @@ export function ProductGrid({
   emptyState,
   className,
   cardSize = 'md',
+  uniformAspectRatio,
 }: ProductGridProps) {
   // Build grid column classes
   const gridClasses = cn(
@@ -127,6 +130,7 @@ export function ProductGrid({
           key={product.id}
           product={product}
           size={cardSize}
+          uniformAspectRatio={uniformAspectRatio}
         />
       ))}
     </div>
