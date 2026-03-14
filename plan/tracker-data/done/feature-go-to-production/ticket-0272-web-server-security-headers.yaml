@@ -1,5 +1,5 @@
 ticket_number: 272
-title: "Add security headers to Web server (CSP, HSTS, X-Frame-Options)"
+title: Add security headers to Web server (CSP, HSTS, X-Frame-Options)
 description: |-
   ## Task
   The React Router v7 SSR web server has NO security headers. The API has `secureHeaders()` from Hono but the web server needs its own middleware.
@@ -26,11 +26,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:56:54.054Z"
 time_spent_minutes: 0
 labels:
   - security
@@ -40,10 +40,24 @@ acceptance_criteria:
   - All responses from web server include CSP, HSTS, X-Frame-Options headers
   - Headers verified via curl or browser devtools
   - Dev mode works without CSP blocking hot reload
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:56:54.054Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:19.140Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `e9bea756` - feat(web): Add security headers to SSR web server
+
+      **Files**: packages/web/app/ssr.tsx
+
+      CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy. Relaxed in dev for HMR.
 work_sessions: []
 related_tickets:
   - 264
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:56:54.054Z"

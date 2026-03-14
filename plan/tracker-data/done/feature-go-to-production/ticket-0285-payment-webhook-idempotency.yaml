@@ -1,5 +1,5 @@
 ticket_number: 285
-title: "Verify and enforce payment webhook idempotency"
+title: Verify and enforce payment webhook idempotency
 description: |-
   ## Task
   Ensure Razorpay webhook handlers are idempotent — processing the same webhook event multiple times should not create duplicate orders or double-charge customers.
@@ -22,11 +22,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:57:03.444Z"
 time_spent_minutes: 0
 labels:
   - payments
@@ -36,9 +36,23 @@ acceptance_criteria:
   - Duplicate webhook events are safely ignored
   - Webhook signature verified before processing
   - All webhook events logged with event ID
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:57:03.445Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:38.439Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d1c3acc9` - feat(api): Add webhook idempotency and audit logging for Razorpay
+
+      **Files**: packages/api/src/routes/webhooks/razorpay.ts
+
+      Webhook event ID dedup, signature verification, audit logging.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:57:03.444Z"

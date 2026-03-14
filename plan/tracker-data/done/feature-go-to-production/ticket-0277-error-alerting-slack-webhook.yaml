@@ -1,5 +1,5 @@
 ticket_number: 277
-title: "Set up error alerting via Slack webhook or email"
+title: Set up error alerting via Slack webhook or email
 description: |-
   ## Task
   Configure alerting so the team is notified of production errors and incidents in real-time.
@@ -22,11 +22,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:57:00.442Z"
 time_spent_minutes: 0
 labels:
   - observability
@@ -35,7 +35,20 @@ acceptance_criteria:
   - Critical errors trigger Slack notification within 1 minute
   - Alert includes error message, URL, and affected user count
   - Alert categories configured (critical, warning, info)
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:57:00.442Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:28.155Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `bdac5905` - feat(observability): Add Slack webhook alerting for critical errors
+
+      **Files**: packages/api/src/lib/alerts.ts
+
+      Slack webhook alerts for critical/warning/info categories. Payment failures, auth errors, rate limits.
 work_sessions: []
 related_tickets:
   - 275
@@ -43,3 +56,4 @@ blocked_by:
   - 275
 blocks: []
 attachments: []
+completed: "2026-03-14T09:57:00.442Z"

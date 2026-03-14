@@ -1,5 +1,5 @@
 ticket_number: 284
-title: "Add retry logic with exponential backoff for email and SMS services"
+title: Add retry logic with exponential backoff for email and SMS services
 description: |-
   ## Task
   Email and SMS services currently fail silently on transient errors. Add retry logic to prevent lost notifications.
@@ -22,11 +22,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:57:03.048Z"
 time_spent_minutes: 0
 labels:
   - resilience
@@ -37,9 +37,23 @@ acceptance_criteria:
   - Permanent failures not retried
   - All retry attempts logged with context
   - Shared retry utility reusable across services
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:57:03.048Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:38.150Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `09edbd1c` - feat(api): Add retry logic with exponential backoff for email and SMS
+
+      **Files**: packages/api/src/lib/retry.ts, services/email.ts, services/sms.ts
+
+      Shared retry utility, 3 retries with exponential backoff, distinguishes transient vs permanent failures.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:57:03.048Z"

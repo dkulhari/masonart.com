@@ -1,5 +1,5 @@
 ticket_number: 270
-title: "Add health check endpoint at /api/health with component status"
+title: Add health check endpoint at /api/health with component status
 description: |-
   ## Task
   Create a `GET /api/health` endpoint that reports the health of all critical dependencies. Required by hosting platforms for readiness/liveness probes.
@@ -34,11 +34,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:56:52.946Z"
 time_spent_minutes: 0
 labels:
   - api
@@ -48,10 +48,24 @@ acceptance_criteria:
   - GET /api/health returns 200 with component status when healthy
   - Returns 503 when any component is unreachable
   - Response matches documented JSON format
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:56:52.946Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:18.554Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5346ce59` - feat(api): Add comprehensive health check with component status
+
+      **Files**: packages/api/src/routes/health.ts, packages/api/src/index.ts
+
+      GET /api/health returns DB, Redis, queue status with latency. Returns 200/503.
 work_sessions: []
 related_tickets:
   - 245
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:56:52.946Z"

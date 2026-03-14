@@ -1,0 +1,77 @@
+ticket_number: 290
+title: "Hero Page - Add category images for Shop by Style section"
+description: |-
+  ## Task
+  Add category images for the "Shop by Style" section on the hero page. Currently the categories (Abstract, Nature, Minimalist, Typography) only show gradient fallbacks because the images at /images/categories/*.jpg don't exist.
+
+  ## Context
+  Part of feature: hero-grid-alignment
+  Phase: 3 - Category Images
+
+  ## Implementation Steps
+
+  - [ ] **Step 1 [implement]**: Create category images directory
+    - Run: `mkdir -p public/images/categories`
+
+  - [ ] **Step 2 [implement]**: Generate or source 4 category images
+    - Use the AI generation pipeline or source royalty-free images
+    - Required files (800x800px, JPEG):
+      - `public/images/categories/abstract.jpg` — Bold abstract art
+      - `public/images/categories/nature.jpg` — Serene landscape/botanical
+      - `public/images/categories/minimalist.jpg` — Clean lines, simple forms
+      - `public/images/categories/typography.jpg` — Typography/lettering art
+
+  - [ ] **Step 3 [implement]**: Update CategoriesSection to use real images with gradient overlay
+    - File: `packages/web/app/routes/index.tsx`
+    - Replace the gradient-only `div` with an `img` + gradient overlay:
+    ```tsx
+    <a
+      key={category.slug}
+      href={`/posters?styles=${category.slug}`}
+      className="group relative aspect-square overflow-hidden rounded-xl"
+    >
+      {/* Category Image */}
+      <img
+        src={category.image}
+        alt={category.name}
+        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        loading="lazy"
+      />
+      {/* Gradient overlay for text readability */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${category.color}`} />
+      {/* Text content (unchanged) */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-white">
+        ...
+      </div>
+    </a>
+    ```
+
+  - [ ] **Step 4 [verify-pass]**: Verify images render in browser
+    - Run: `bun run dev` (check /images/categories/ paths in browser)
+    - Expected: Category cards show images with gradient overlay, text readable
+
+  - [ ] **Step 5 [commit]**: Commit changes
+    - Run: `git add public/images/categories/ packages/web/app/routes/index.tsx && git commit -m "feat(hero): add category images for Shop by Style section (#290)"`
+feature: hero-grid-alignment
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-02-19T09:35:00.000Z'
+last_updated: '2026-02-19T09:35:00.000Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - assets
+acceptance_criteria:
+  - 4 category images exist in public/images/categories/
+  - Categories section shows real images with gradient overlay
+  - Text remains readable over images
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

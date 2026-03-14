@@ -1,5 +1,5 @@
 ticket_number: 282
-title: "Configure database connection pooling for production"
+title: Configure database connection pooling for production
 description: |-
   ## Task
   Ensure database connections are properly pooled to handle concurrent production traffic without exhausting connections.
@@ -24,11 +24,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:57:02.535Z"
 time_spent_minutes: 0
 labels:
   - database
@@ -38,10 +38,24 @@ acceptance_criteria:
   - Connection pool size configurable via env vars
   - Health check reports pool utilization
   - No connection leak under concurrent load
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:57:02.535Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:37.868Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `620454cc` - feat(api): Make database connection pool configurable via env vars
+
+      **Files**: packages/api/src/database/index.ts, .env.example
+
+      DB_POOL_MIN, DB_POOL_MAX, DB_POOL_IDLE_TIMEOUT configurable. Pool metrics in health check.
 work_sessions: []
 related_tickets:
   - 270
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:57:02.535Z"

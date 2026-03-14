@@ -1,0 +1,70 @@
+name: hero-grid-alignment
+title: Hero Page Product Grid Alignment
+priority: medium
+created: '2026-02-19T09:30:00.000Z'
+assignee: unassigned
+tags:
+  - frontend
+  - ui
+  - hero-page
+description: |-
+  ## Overview
+  Fix the hero page product grid where cards with different aspect ratios (portrait, landscape, square, panoramic) cause misaligned image heights and text positions. Replace the inline ProductCard with the shared component to gain image optimization, and add category images.
+
+  ## Goals
+  - Perfectly aligned product cards in grid views with consistent image heights
+  - Eliminate duplicated ProductCard code from the hero page
+  - Gain WebP/responsive image optimization on the hero page
+  - Add category images for the "Shop by Style" section
+
+  ## Scope
+  **In scope**:
+  - Add uniformAspectRatio prop to shared ProductCard component
+  - Replace inline ProductCard in index.tsx with the shared component
+  - Use aspect-[3/4] as the uniform ratio in grid contexts (hero page + posters listing)
+  - Add category images for Abstract, Nature, Minimalist, Typography sections
+
+  **Out of scope**:
+  - Masonry or subgrid layouts
+  - Changing the product detail page aspect ratio (keeps natural ratio there)
+  - Redesigning the hero section copy/layout
+  - Changing the ProductGrid component itself
+
+  ## Design
+  **Approach**: Uniform Ratio Prop on Shared ProductCard
+
+  **Key decisions**:
+  - uniformAspectRatio prop: Optional string prop (e.g. 'aspect-[3/4]') that overrides the orientation-based ratio. When not set, the card uses its natural orientation ratio (backwards-compatible).
+  - Delete inline ProductCard: Remove the ~70 line duplicate from index.tsx and import the shared component instead. This gains OptimizedImage with WebP + responsive srcSet.
+  - Apply to hero page grid: Pass uniformAspectRatio="aspect-[3/4]" in the FeaturedProductsSection.
+  - Category images: Use AI-generated or stock placeholder images for the 4 categories, stored in public/images/categories/.
+
+  ## Technical Considerations
+  - Backwards compatibility: The uniformAspectRatio prop is optional - all existing usages of ProductCard are unaffected
+  - Import change in index.tsx: Need to import ProductCard and ProductCardData from the shared component, and map the FeaturedProduct type to ProductCardData (they're structurally compatible)
+  - Image optimization gain: Switching from raw <img> to OptimizedImage means the hero page benefits from WebP conversion and responsive variants already set up
+  - Category images: Need to generate/source 4 images (~800x800px) and place them in public/images/categories/
+
+  ## Implementation Plan
+
+  ### Phase 1: ProductCard Enhancement
+  Location: packages/web/app/components/product/
+  - [#287] Add uniformAspectRatio prop to ProductCard
+  - [#288] Pass uniformAspectRatio through ProductGrid
+
+  ### Phase 2: Hero Page Refactor
+  Location: packages/web/app/routes/index.tsx
+  - [#289] Replace inline ProductCard with shared component + uniform ratio
+
+  ### Phase 3: Category Images
+  Location: packages/web/app/routes/index.tsx + public/images/categories/
+  - [#290] Add category images for Shop by Style section
+objectives:
+  - Uniform aspect ratio in product card grids
+  - Replace inline ProductCard with shared component
+  - Add category images for style sections
+tickets:
+  - 287
+  - 288
+  - 289
+  - 290

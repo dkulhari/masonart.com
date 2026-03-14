@@ -1,5 +1,5 @@
 ticket_number: 280
-title: "Add bundle analysis and optimize code splitting"
+title: Add bundle analysis and optimize code splitting
 description: |-
   ## Task
   Analyze the production bundle and implement code splitting to reduce initial load time.
@@ -23,11 +23,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:57:01.440Z"
 time_spent_minutes: 0
 labels:
   - performance
@@ -37,9 +37,23 @@ acceptance_criteria:
   - Bundle analysis report generated
   - Admin routes in separate chunk
   - No chunk exceeds 250KB gzipped
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:57:01.440Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:37.101Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d94470d2` - feat(web): Add bundle analysis and vendor code splitting
+
+      **Files**: packages/web/vite.config.ts
+
+      rollup-plugin-visualizer, manual chunks for vendor/admin, performance budget warnings.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:57:01.440Z"

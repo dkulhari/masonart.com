@@ -1,5 +1,5 @@
 ticket_number: 274
-title: "Choose deployment target and add deployment configuration"
+title: Choose deployment target and add deployment configuration
 description: |-
   ## Task
   Select a hosting platform and create the necessary deployment configuration files.
@@ -25,11 +25,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:56:59.168Z"
 time_spent_minutes: 0
 labels:
   - deployment
@@ -40,7 +40,23 @@ acceptance_criteria:
   - Successful deployment to staging environment
   - Auto-deploy from GitHub main branch working
   - Custom domain with SSL configured
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: "2026-03-14T05:45:04.937Z"
+    text: Originally implemented as Railway deployment (railway.json + railway.toml) in commit 0c0095ad. Later replaced with local Docker Compose + Cloudflare Tunnel setup in commit a63b8390 per user decision to self-host locally instead of using a cloud platform. Railway config files removed, docker-compose.prod.yml updated with cloudflared service, and docs/deployment.md rewritten for the local hosting workflow.
+  - author: system
+    timestamp: "2026-03-14T09:56:59.168Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:27.160Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commits**: `0c0095ad` (Railway config), `a63b8390` (replaced with local Docker + Cloudflare Tunnel)
+
+      **Files**: docker/docker-compose.prod.yml, docs/deployment.md
+
+      Originally Railway, switched to self-hosted Docker + Cloudflare Tunnel per user decision.
 work_sessions: []
 related_tickets:
   - 269
@@ -48,3 +64,4 @@ blocked_by:
   - 269
 blocks: []
 attachments: []
+completed: "2026-03-14T09:56:59.168Z"

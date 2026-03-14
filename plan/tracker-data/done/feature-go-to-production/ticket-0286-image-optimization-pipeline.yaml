@@ -1,5 +1,5 @@
 ticket_number: 286
-title: "Implement image optimization pipeline with WebP conversion"
+title: Implement image optimization pipeline with WebP conversion
 description: |-
   ## Task
   Optimize product and AI-generated images for web delivery to reduce page load times.
@@ -23,11 +23,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:57:03.967Z"
 time_spent_minutes: 0
 labels:
   - performance
@@ -38,9 +38,23 @@ acceptance_criteria:
   - Responsive image sizes generated for each upload
   - Below-fold images lazy loaded
   - Page load time reduced measurably
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:57:03.967Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:38.751Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `2bb23bab` - feat(images): Add image optimization pipeline with WebP conversion
+
+      **Files**: packages/api/src/lib/image-processing.ts, packages/api/src/lib/storage.ts, packages/web/app/components/ui/OptimizedImage.tsx
+
+      Sharp-based WebP conversion, responsive sizes, OptimizedImage component with srcSet.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:57:03.967Z"

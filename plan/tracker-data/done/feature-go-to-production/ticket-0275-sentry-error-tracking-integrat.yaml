@@ -1,5 +1,5 @@
 ticket_number: 275
-title: "Integrate Sentry for error tracking in API and Web"
+title: Integrate Sentry for error tracking in API and Web
 description: |-
   ## Task
   Add Sentry SDK to both API (Hono) and Web (React Router v7) packages for production error tracking. Currently all errors go to console.error and are lost.
@@ -28,11 +28,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:56:59.654Z"
 time_spent_minutes: 0
 labels:
   - observability
@@ -44,9 +44,23 @@ acceptance_criteria:
   - Errors include request URL, user ID, and stack trace
   - Source maps resolve correctly in Sentry
   - Sentry disabled in development/test
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:56:59.654Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:27.528Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `0d434f62` - feat(observability): Integrate Sentry error tracking in API and Web
+
+      **Files**: packages/api/src/lib/sentry.ts, packages/web/app/lib/sentry.ts
+
+      Sentry SDK in both API and Web. Environment-based DSN, user context, configurable sample rate.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:56:59.654Z"

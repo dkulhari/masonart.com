@@ -1,5 +1,5 @@
 ticket_number: 271
-title: "Configure CORS for production domain and environment-based origin"
+title: Configure CORS for production domain and environment-based origin
 description: |-
   ## Task
   Update CORS configuration to properly restrict origins per environment. Currently defaults to `http://localhost:3001`.
@@ -31,11 +31,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:56:53.655Z"
 time_spent_minutes: 0
 labels:
   - security
@@ -45,9 +45,23 @@ acceptance_criteria:
   - API refuses to start in production without CORS_ORIGIN set
   - CORS headers match configured domain in responses
   - Multiple origins supported via comma separation
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:56:53.655Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:18.863Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5b32364c` - feat(api): Add production CORS validation and multi-origin support
+
+      **Files**: packages/api/src/index.ts, .env.example
+
+      Fails fast if CORS_ORIGIN missing in production. Supports comma-separated origins.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:56:53.655Z"

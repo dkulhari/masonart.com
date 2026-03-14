@@ -1,5 +1,5 @@
 ticket_number: 276
-title: "Replace console.log with structured logging using pino"
+title: Replace console.log with structured logging using pino
 description: |-
   ## Task
   Replace all console.log/console.error calls with structured logging via pino. Structured logs are queryable in production log aggregation services.
@@ -23,11 +23,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:56:59.959Z"
 time_spent_minutes: 0
 labels:
   - observability
@@ -38,9 +38,29 @@ acceptance_criteria:
   - Each log entry includes timestamp, level, requestId
   - Log level configurable via LOG_LEVEL env var
   - No remaining console.log/console.error in API package
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:56:59.959Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:27.937Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `31c062b6` - feat(api): Replace console logging with structured pino logger
+
+      **Files**: packages/api/src/lib/logger.ts, packages/api/src/index.ts, services/email.ts, services/sms.ts
+
+      JSON output in prod, pretty-print in dev. Request ID, configurable LOG_LEVEL.
+  - author: mcp-client
+    timestamp: "2026-03-14T10:14:44.022Z"
+    text: |-
+      **Follow-up fix**: `7839916c` - Replaced remaining `console.warn` in `rate-limit.ts` with `logger.warn` from pino.
+
+      All production code now uses structured logging. Only dev utility scripts (seed.ts, update-user-role.ts) retain console usage, which is acceptable.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:56:59.959Z"

@@ -1,5 +1,5 @@
 ticket_number: 273
-title: "Wire up rate limiting on authentication endpoints"
+title: Wire up rate limiting on authentication endpoints
 description: |-
   ## Task
   Rate limiting helpers exist (`getUserRateLimitKey()` in auth middleware) but are not wired up to any endpoints. Auth endpoints are vulnerable to brute force attacks.
@@ -25,11 +25,11 @@ description: |-
 feature: go-to-production
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-03-14T09:56:54.351Z"
 time_spent_minutes: 0
 labels:
   - security
@@ -40,7 +40,20 @@ acceptance_criteria:
   - Retry-After header present in 429 responses
   - Rate limits use Redis for distributed counting
   - Rate limit hits are logged
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-03-14T09:56:54.351Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-03-14T09:57:19.546Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4e65c7dd` - feat(api): Wire up rate limiting on auth and OTP endpoints
+
+      **Files**: packages/api/src/middleware/rate-limit.ts
+
+      Redis-based rate limiting on sign-in, sign-up, forgot-password, verify-otp. Returns 429 with Retry-After.
 work_sessions: []
 related_tickets:
   - 265
@@ -48,3 +61,4 @@ related_tickets:
 blocked_by: []
 blocks: []
 attachments: []
+completed: "2026-03-14T09:56:54.351Z"
