@@ -7,6 +7,7 @@
 
 import type { Context, Next } from "hono";
 import { checkRateLimit, isRedisConnected } from "../lib/redis";
+import { logger } from "../lib/logger";
 
 interface RateLimitOptions {
   /** Maximum requests allowed in the window */
@@ -59,7 +60,7 @@ export function rateLimit(options: RateLimitOptions) {
 
     if (!result.success) {
       c.header("Retry-After", String(result.resetIn));
-      console.warn(
+      logger.warn(
         `Rate limit exceeded: ${options.keyPrefix} from ${ip}`
       );
       return c.json(
