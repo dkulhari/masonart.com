@@ -18,6 +18,9 @@ import {
   isValidIndianMobile,
   isSmsServiceConfigured,
 } from "../services/sms";
+import { createChildLogger } from "../lib/logger";
+
+const logger = createChildLogger({ service: "phone-auth" });
 
 // ============================================================================
 // Types
@@ -114,7 +117,7 @@ phoneAuthApp.post("/send-otp", zValidator("json", sendOTPSchema), async (c) => {
       message: `OTP sent to ${normalizedPhone.slice(0, 2)}****${normalizedPhone.slice(-4)}`,
     });
   } catch (error) {
-    console.error("[PhoneAuth] Error sending OTP:", error);
+    logger.error({ err: error }, "Error sending OTP");
     return c.json(
       {
         success: false,
@@ -191,7 +194,7 @@ phoneAuthApp.post(
           );
         }
 
-        console.log(`[PhoneAuth] Created new user via phone: ${userId}`);
+        logger.info({ userId }, "Created new user via phone");
       } else {
         // Update existing user's phone verification status
         if (!user.phoneVerified) {
@@ -201,7 +204,7 @@ phoneAuthApp.post(
             .where(eq(users.id, user.id));
         }
 
-        console.log(`[PhoneAuth] User logged in via phone: ${user.id}`);
+        logger.info({ userId: user.id }, "User logged in via phone");
       }
 
       // Create session using Better Auth's internal session creation
@@ -253,7 +256,7 @@ phoneAuthApp.post(
         isNewUser: !user.phoneVerified,
       });
     } catch (error) {
-      console.error("[PhoneAuth] Error verifying OTP:", error);
+      logger.error({ err: error }, "Error verifying OTP");
       return c.json(
         {
           success: false,
@@ -349,7 +352,7 @@ phoneAuthApp.post(
         message: "OTP resent successfully",
       });
     } catch (error) {
-      console.error("[PhoneAuth] Error resending OTP:", error);
+      logger.error({ err: error }, "Error resending OTP");
       return c.json(
         {
           success: false,

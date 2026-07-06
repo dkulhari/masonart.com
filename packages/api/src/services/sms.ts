@@ -111,8 +111,10 @@ export async function sendOTP(phone: string): Promise<SendOTPResponse> {
     if (!TWO_FACTOR_API_KEY) {
       // In development or test mode, log and return mock session
       if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
-        console.log(`[SMS] Dev mode: OTP would be sent to ${normalizedPhone}`);
-        console.log(`[SMS] Dev mode: Use OTP "123456" for testing`);
+        logger.info(
+          { phone: normalizedPhone },
+          'Dev mode: OTP would be sent; use OTP "123456" for testing'
+        );
         return {
           success: true,
           sessionId: `dev_${Date.now()}_${normalizedPhone}`,
@@ -195,7 +197,7 @@ export async function verifyOTP(
     // Development mode - accept "123456" as valid OTP
     if (sessionId.startsWith("dev_")) {
       if (otp === "123456") {
-        console.log(`[SMS] Dev mode: OTP verified for session ${sessionId}`);
+        logger.info({ sessionId }, "Dev mode: OTP verified");
         return { success: true };
       }
       return {
@@ -249,7 +251,7 @@ export async function verifyOTP(
       error: data.Details || "OTP verification failed",
     };
   } catch (error) {
-    console.error("[SMS] Error verifying OTP:", error);
+    logger.error({ err: error }, "Error verifying OTP");
     return {
       success: false,
       error: error instanceof Error ? error.message : "OTP verification failed",
@@ -324,11 +326,10 @@ export async function sendTransactionalSMS(
         process.env.NODE_ENV === "development" ||
         process.env.NODE_ENV === "test"
       ) {
-        console.log(`[SMS] Dev mode: Transactional SMS would be sent`);
-        console.log(`[SMS] To: ${normalizedPhone}`);
-        console.log(`[SMS] Type: ${type}`);
-        console.log(`[SMS] Template: ${templateName}`);
-        console.log(`[SMS] Variables:`, variables);
+        logger.info(
+          { to: normalizedPhone, type, template: templateName, variables },
+          "Dev mode: transactional SMS would be sent"
+        );
         return {
           success: true,
           messageId: `dev_txn_${Date.now()}`,
@@ -344,10 +345,6 @@ export async function sendTransactionalSMS(
     // API: https://2factor.in/API/V1/{api_key}/ADDON_SERVICES/SEND/TSMS
     // Method: POST with JSON body
     const url = `${TWO_FACTOR_BASE_URL}/${TWO_FACTOR_API_KEY}/ADDON_SERVICES/SEND/TSMS`;
-
-    // Build variable string for 2Factor API (pipe-separated)
-    // Note: varValues is computed but 2Factor API requires individual VAR1, VAR2, etc.
-    const _varValues = Object.values(variables).join("|"); // eslint-disable-line @typescript-eslint/no-unused-vars
 
     const response = await fetch(url, {
       method: "POST",
@@ -378,7 +375,7 @@ export async function sendTransactionalSMS(
       error: data.Details || "Failed to send transactional SMS",
     };
   } catch (error) {
-    console.error("[SMS] Error sending transactional SMS:", error);
+    logger.error({ err: error }, "Error sending transactional SMS");
     return {
       success: false,
       error:

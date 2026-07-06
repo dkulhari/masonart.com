@@ -25,6 +25,7 @@ import {
   type SendEmailOptions,
   type EmailTemplate,
 } from '../../src/services/email';
+import { logger } from '../../src/lib/logger';
 
 // ============================================================================
 // Test Constants
@@ -74,14 +75,14 @@ describe('Email Service', () => {
   // ==========================================================================
 
   describe('sendEmail', () => {
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+    let loggerSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      loggerSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
     });
 
     afterEach(() => {
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should return success with dev message ID in dev/test mode', async () => {
@@ -107,9 +108,9 @@ describe('Email Service', () => {
 
       await sendEmail(options);
 
-      expect(consoleSpy).toHaveBeenCalled();
+      expect(loggerSpy).toHaveBeenCalled();
       // Check that email details were logged
-      const calls = consoleSpy.mock.calls.flat().join(' ');
+      const calls = loggerSpy.mock.calls.flat().map((arg) => JSON.stringify(arg)).join(' ');
       expect(calls).toContain(TEST_EMAIL);
       expect(calls).toContain(TEST_SUBJECT);
     });
@@ -206,14 +207,14 @@ describe('Email Service', () => {
   // ==========================================================================
 
   describe('sendTemplateEmail', () => {
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+    let loggerSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      loggerSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
     });
 
     afterEach(() => {
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should send email using template', async () => {
@@ -267,7 +268,7 @@ describe('Email Service', () => {
 
       expect(result.success).toBe(true);
       // Template data is passed through successfully
-      expect(consoleSpy).toHaveBeenCalled();
+      expect(loggerSpy).toHaveBeenCalled();
     });
   });
 
@@ -276,14 +277,14 @@ describe('Email Service', () => {
   // ==========================================================================
 
   describe('Edge Cases', () => {
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+    let loggerSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      loggerSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
     });
 
     afterEach(() => {
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should handle very long HTML content', async () => {
@@ -344,14 +345,14 @@ describe('Email Service', () => {
   // ==========================================================================
 
   describe('Response Structure', () => {
-    let consoleSpy: ReturnType<typeof vi.spyOn>;
+    let loggerSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      loggerSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
     });
 
     afterEach(() => {
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should return SendEmailResponse structure on success', async () => {

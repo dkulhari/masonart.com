@@ -15,6 +15,7 @@ import {
   type NewNotification,
 } from "../database/schema/notifications";
 import { orders, type Order } from "../database/schema/orders";
+import { createChildLogger } from "../lib/logger";
 import { sendEmail } from "./email";
 import {
   getOrderConfirmationTemplate,
@@ -22,6 +23,8 @@ import {
   getOutForDeliveryTemplate,
   getDeliveredTemplate,
 } from "./email-templates";
+
+const logger = createChildLogger({ service: "notifications" });
 
 // ============================================================================
 // Types
@@ -176,7 +179,7 @@ async function logNotification(
       .returning({ id: notifications.id });
     return inserted?.id || null;
   } catch (error) {
-    console.error("[Notifications] Failed to log notification:", error);
+    logger.error({ err: error }, "Failed to log notification");
     return null;
   }
 }
@@ -201,7 +204,7 @@ async function updateNotificationStatus(
       })
       .where(eq(notifications.id, notificationId));
   } catch (error) {
-    console.error("[Notifications] Failed to update notification status:", error);
+    logger.error({ err: error, notificationId }, "Failed to update notification status");
   }
 }
 
@@ -319,8 +322,7 @@ export async function sendOrderNotification(
           process.env.NODE_ENV === "test"
         ) {
           const message = getSmsMessage(type, order);
-          console.log(`[SMS] Dev mode: Would send to ${recipientPhone}`);
-          console.log(`[SMS] Message: ${message}`);
+          logger.info({ to: recipientPhone, message }, "Dev mode: would send SMS");
           result.channels.sms = { sent: true };
 
           if (notificationId) {
@@ -353,7 +355,7 @@ export async function sendOrderNotification(
 
     return result;
   } catch (error) {
-    console.error("[Notifications] Error sending notification:", error);
+    logger.error({ err: error, orderId: options.orderId }, "Error sending notification");
     result.errors.push(
       error instanceof Error ? error.message : "Unknown error"
     );

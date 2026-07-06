@@ -21,6 +21,9 @@ import {
 } from "../database/schema/approvals";
 import { orders, orderItems } from "../database/schema/orders";
 import { randomUUID } from "crypto";
+import { createChildLogger } from "../lib/logger";
+
+const logger = createChildLogger({ service: "approval" });
 
 // ============================================================================
 // Types
@@ -177,7 +180,7 @@ export async function createApproval(
 
     return { success: true, approval };
   } catch (error) {
-    console.error("[Approval] Error creating approval:", error);
+    logger.error({ err: error }, "Error creating approval");
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to create approval",
@@ -239,7 +242,7 @@ export async function uploadPhotos(
 
     return { success: true, photos: insertedPhotos };
   } catch (error) {
-    console.error("[Approval] Error uploading photos:", error);
+    logger.error({ err: error }, "Error uploading photos");
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to upload photos",
@@ -307,7 +310,7 @@ export async function requestChanges(
       comment: insertedComment,
     };
   } catch (error) {
-    console.error("[Approval] Error requesting changes:", error);
+    logger.error({ err: error }, "Error requesting changes");
     return {
       success: false,
       error:
@@ -361,7 +364,7 @@ export async function approveProduction(
 
     return { success: true, approval: updatedApproval };
   } catch (error) {
-    console.error("[Approval] Error approving production:", error);
+    logger.error({ err: error }, "Error approving production");
     return {
       success: false,
       error:
@@ -405,7 +408,7 @@ export async function getApprovalByToken(
     if (!approval) return null;
     return approval as unknown as ApprovalWithDetails;
   } catch (error) {
-    console.error("[Approval] Error getting approval by token:", error);
+    logger.error({ err: error }, "Error getting approval by token");
     return null;
   }
 }
@@ -445,7 +448,7 @@ export async function getApprovalById(
     if (!approval) return null;
     return approval as unknown as ApprovalWithDetails;
   } catch (error) {
-    console.error("[Approval] Error getting approval by ID:", error);
+    logger.error({ err: error }, "Error getting approval by ID");
     return null;
   }
 }
@@ -462,7 +465,7 @@ export async function getOrderApprovals(
       orderBy: (approvals, { asc }) => [asc(approvals.createdAt)],
     });
   } catch (error) {
-    console.error("[Approval] Error getting order approvals:", error);
+    logger.error({ err: error }, "Error getting order approvals");
     return [];
   }
 }
@@ -481,7 +484,7 @@ export async function getApprovalsByStatus(
       limit,
     });
   } catch (error) {
-    console.error("[Approval] Error getting approvals by status:", error);
+    logger.error({ err: error }, "Error getting approvals by status");
     return [];
   }
 }
@@ -510,7 +513,7 @@ export async function getApprovalsNearDeadline(
       ),
     });
   } catch (error) {
-    console.error("[Approval] Error getting approvals near deadline:", error);
+    logger.error({ err: error }, "Error getting approvals near deadline");
     return [];
   }
 }
@@ -529,7 +532,7 @@ export async function markReminderSent(approvalId: string): Promise<boolean> {
       .where(eq(productionApprovals.id, approvalId));
     return true;
   } catch (error) {
-    console.error("[Approval] Error marking reminder sent:", error);
+    logger.error({ err: error }, "Error marking reminder sent");
     return false;
   }
 }
@@ -557,7 +560,7 @@ export async function expireOverdueApprovals(): Promise<number> {
 
     return result.length;
   } catch (error) {
-    console.error("[Approval] Error expiring overdue approvals:", error);
+    logger.error({ err: error }, "Error expiring overdue approvals");
     return 0;
   }
 }
@@ -585,7 +588,7 @@ export async function addAdminComment(
 
     return inserted ?? null;
   } catch (error) {
-    console.error("[Approval] Error adding admin comment:", error);
+    logger.error({ err: error }, "Error adding admin comment");
     return null;
   }
 }
@@ -600,7 +603,7 @@ export async function deleteApprovalPhotos(approvalId: string): Promise<boolean>
       .where(eq(approvalPhotos.approvalId, approvalId));
     return true;
   } catch (error) {
-    console.error("[Approval] Error deleting approval photos:", error);
+    logger.error({ err: error }, "Error deleting approval photos");
     return false;
   }
 }
@@ -639,13 +642,11 @@ export async function createApprovalsForOrder(
     });
 
     if (items.length === 0) {
-      console.log(`[Approval] No made-to-order items for order ${orderId}`);
+      logger.info({ orderId }, "No made-to-order items for order");
       return result;
     }
 
-    console.log(
-      `[Approval] Creating approvals for ${items.length} items in order ${orderId}`
-    );
+    logger.info({ orderId, itemCount: items.length }, "Creating approvals for order items");
 
     for (const item of items) {
       // Check if approval already exists
@@ -654,9 +655,7 @@ export async function createApprovalsForOrder(
       });
 
       if (existing) {
-        console.log(
-          `[Approval] Approval already exists for item ${item.id}, skipping`
-        );
+        logger.info({ orderItemId: item.id }, "Approval already exists for item, skipping");
         result.approvals.push(existing);
         continue;
       }
@@ -678,11 +677,9 @@ export async function createApprovalsForOrder(
       }
     }
 
-    console.log(
-      `[Approval] Created ${result.approvals.length} approvals for order ${orderId}`
-    );
+    logger.info({ orderId, approvalCount: result.approvals.length }, "Created approvals for order");
   } catch (error) {
-    console.error("[Approval] Error creating approvals for order:", error);
+    logger.error({ err: error }, "Error creating approvals for order");
     result.success = false;
     result.errors.push(
       error instanceof Error ? error.message : "Unknown error"
@@ -708,7 +705,7 @@ export async function hasOrderPendingApprovals(orderId: string): Promise<boolean
         a.status === "changes_requested"
     );
   } catch (error) {
-    console.error("[Approval] Error checking pending approvals:", error);
+    logger.error({ err: error }, "Error checking pending approvals");
     return false;
   }
 }
@@ -730,7 +727,7 @@ export async function areOrderApprovalsComplete(orderId: string): Promise<boolea
       (a) => a.status === "approved" || a.status === "expired"
     );
   } catch (error) {
-    console.error("[Approval] Error checking approval completion:", error);
+    logger.error({ err: error }, "Error checking approval completion");
     return false;
   }
 }

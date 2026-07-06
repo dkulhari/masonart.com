@@ -18,10 +18,13 @@ import {
   getApprovalById,
 } from "./approval";
 import { sendEmail } from "./email";
+import { createChildLogger } from "../lib/logger";
 import {
   getApprovalDeadlineReminderTemplate,
   type ApprovalEmailContext,
 } from "./email-templates";
+
+const logger = createChildLogger({ service: "approval-deadline" });
 
 // ============================================================================
 // Types
@@ -67,9 +70,7 @@ export async function sendDeadlineReminders(): Promise<{
       REMINDER_HOURS_BEFORE_DEADLINE
     );
 
-    console.log(
-      `[ApprovalDeadline] Found ${approvals.length} approvals approaching deadline`
-    );
+    logger.info({ count: approvals.length }, "Found approvals approaching deadline");
 
     for (const approval of approvals) {
       try {
@@ -145,9 +146,7 @@ export async function sendDeadlineReminders(): Promise<{
           // Mark reminder as sent
           await markReminderSent(approval.id);
           result.sent++;
-          console.log(
-            `[ApprovalDeadline] Sent reminder for approval ${approval.id}`
-          );
+          logger.info({ approvalId: approval.id }, "Sent reminder for approval");
         } else {
           result.errors.push(
             `Failed to send email for ${approval.id}: ${emailResult.error}`
@@ -160,7 +159,7 @@ export async function sendDeadlineReminders(): Promise<{
       }
     }
   } catch (error) {
-    console.error("[ApprovalDeadline] Error sending reminders:", error);
+    logger.error({ err: error }, "Error sending reminders");
     result.errors.push(
       error instanceof Error ? error.message : "Unknown error"
     );
@@ -183,12 +182,12 @@ export async function processExpiredApprovals(): Promise<{
     const expiredCount = await expireOverdueApprovals();
     result.expired = expiredCount;
 
-    console.log(`[ApprovalDeadline] Expired ${expiredCount} overdue approvals`);
+    logger.info({ expiredCount }, "Expired overdue approvals");
 
     // Note: We could send expiration notifications here if needed
     // For now, the order can proceed to shipping when approval expires
   } catch (error) {
-    console.error("[ApprovalDeadline] Error expiring approvals:", error);
+    logger.error({ err: error }, "Error expiring approvals");
     result.errors.push(
       error instanceof Error ? error.message : "Unknown error"
     );
@@ -202,7 +201,7 @@ export async function processExpiredApprovals(): Promise<{
  * This is the main entry point for scheduled jobs
  */
 export async function runDeadlineCheck(): Promise<DeadlineCheckResult> {
-  console.log("[ApprovalDeadline] Starting deadline check...");
+  logger.info("Starting deadline check");
 
   const reminderResult = await sendDeadlineReminders();
   const expireResult = await processExpiredApprovals();
@@ -213,15 +212,13 @@ export async function runDeadlineCheck(): Promise<DeadlineCheckResult> {
     errors: [...reminderResult.errors, ...expireResult.errors],
   };
 
-  console.log(
-    `[ApprovalDeadline] Completed: ${result.remindersSent} reminders sent, ${result.approvalsExpired} expired`
+  logger.info(
+    { remindersSent: result.remindersSent, approvalsExpired: result.approvalsExpired },
+    "Deadline check completed"
   );
 
   if (result.errors.length > 0) {
-    console.warn(
-      `[ApprovalDeadline] Errors: ${result.errors.length}`,
-      result.errors
-    );
+    logger.warn({ errors: result.errors }, "Deadline check finished with errors");
   }
 
   return result;
@@ -238,25 +235,23 @@ export function startDeadlineChecker(intervalHours: number = 1): {
 } {
   const intervalMs = intervalHours * 60 * 60 * 1000;
 
-  console.log(
-    `[ApprovalDeadline] Starting deadline checker (every ${intervalHours} hour(s))`
-  );
+  logger.info({ intervalHours }, "Starting deadline checker");
 
   // Run immediately on start
   runDeadlineCheck().catch((error) => {
-    console.error("[ApprovalDeadline] Initial check failed:", error);
+    logger.error({ err: error }, "Initial check failed");
   });
 
   // Schedule recurring checks
   const intervalId = setInterval(() => {
     runDeadlineCheck().catch((error) => {
-      console.error("[ApprovalDeadline] Scheduled check failed:", error);
+      logger.error({ err: error }, "Scheduled check failed");
     });
   }, intervalMs);
 
   return {
     stop: () => {
-      console.log("[ApprovalDeadline] Stopping deadline checker");
+      logger.info("Stopping deadline checker");
       clearInterval(intervalId);
     },
   };

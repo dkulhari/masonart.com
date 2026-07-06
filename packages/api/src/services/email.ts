@@ -84,11 +84,15 @@ export async function sendEmail(
         process.env.NODE_ENV === "test"
       ) {
         const recipients = Array.isArray(to) ? to.join(", ") : to;
-        console.log(`[Email] Dev mode: Would send email`);
-        console.log(`[Email] To: ${recipients}`);
-        console.log(`[Email] Subject: ${subject}`);
-        console.log(`[Email] From: ${from || DEFAULT_FROM_EMAIL}`);
-        console.log(`[Email] Content preview: ${html.substring(0, 200)}...`);
+        logger.info(
+          {
+            to: recipients,
+            subject,
+            from: from || DEFAULT_FROM_EMAIL,
+            preview: html.substring(0, 200),
+          },
+          "Dev mode: would send email"
+        );
         return {
           success: true,
           messageId: `dev_${Date.now()}`,
