@@ -300,6 +300,58 @@ describe('SMS Service', () => {
         expect(result.error).toContain('SMS service not configured');
       });
     });
+
+    describe('Production Mode Gating', () => {
+      // The sessionId comes from the client request body, so the "dev_"
+      // fixed-OTP path must be dead outside development/test — otherwise
+      // anyone could log in as any phone number in production.
+      const originalNodeEnv = process.env.NODE_ENV;
+
+      afterEach(() => {
+        process.env.NODE_ENV = originalNodeEnv;
+        vi.resetModules();
+      });
+
+      async function importSmsWithEnv(nodeEnv: string) {
+        vi.resetModules();
+        process.env.NODE_ENV = nodeEnv;
+        return await import('../../src/services/sms');
+      }
+
+      it('should reject dev sessions with OTP "123456" in production', async () => {
+        const sms = await importSmsWithEnv('production');
+        const result = await sms.verifyOTP('dev_1234567890_9876543210', '123456');
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('Invalid session');
+      });
+
+      it('should reject any dev session in production regardless of OTP', async () => {
+        const sms = await importSmsWithEnv('production');
+        const result = await sms.verifyOTP('dev_x', '000000');
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('Invalid session');
+      });
+
+      it('should reject dev sessions when NODE_ENV is unset (fail closed)', async () => {
+        const sms = await importSmsWithEnv('');
+        const result = await sms.verifyOTP('dev_1234567890_9876543210', '123456');
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('Invalid session');
+      });
+
+      it('should not issue dev sessions from sendOTP in production', async () => {
+        const sms = await importSmsWithEnv('production');
+        const result = await sms.sendOTP('9876543210');
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('SMS service not configured');
+      });
+
+      it('should still accept the dev OTP in test mode', async () => {
+        const sms = await importSmsWithEnv('test');
+        const result = await sms.verifyOTP('dev_1234567890_9876543210', '123456');
+        expect(result.success).toBe(true);
+      });
+    });
   });
 
   // ==========================================================================

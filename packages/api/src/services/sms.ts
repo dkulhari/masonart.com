@@ -50,6 +50,19 @@ const TWO_FACTOR_BASE_URL = "https://2factor.in/API/V1";
 // You'll need to register this template in your 2Factor.in dashboard
 const OTP_TEMPLATE_NAME = process.env.TWO_FACTOR_OTP_TEMPLATE || "MasonArt";
 
+/**
+ * Dev/test SMS mode gate.
+ *
+ * Active only when NODE_ENV is exactly "development" or "test" AND no real
+ * SMS API key is configured. This gates the mock OTP session ("dev_..."
+ * accepting the fixed OTP "123456") and mock transactional sends. The check
+ * is allowlist-based so an unset or misspelled NODE_ENV fails closed —
+ * the bypass can never activate in production.
+ */
+const IS_DEV_SMS_MODE =
+  (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") &&
+  !TWO_FACTOR_API_KEY;
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -110,7 +123,7 @@ export async function sendOTP(phone: string): Promise<SendOTPResponse> {
     // Check if API key is configured
     if (!TWO_FACTOR_API_KEY) {
       // In development or test mode, log and return mock session
-      if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+      if (IS_DEV_SMS_MODE) {
         logger.info(
           { phone: normalizedPhone },
           'Dev mode: OTP would be sent; use OTP "123456" for testing'
@@ -194,8 +207,20 @@ export async function verifyOTP(
       };
     }
 
-    // Development mode - accept "123456" as valid OTP
+    // Development mode - accept "123456" as valid OTP.
+    // The sessionId comes from the client, so dev sessions MUST be rejected
+    // outside dev/test mode or this becomes a production auth bypass.
     if (sessionId.startsWith("dev_")) {
+      if (!IS_DEV_SMS_MODE) {
+        logger.warn(
+          { sessionId },
+          "Rejected dev OTP session outside development/test mode"
+        );
+        return {
+          success: false,
+          error: "Invalid session",
+        };
+      }
       if (otp === "123456") {
         logger.info({ sessionId }, "Dev mode: OTP verified");
         return { success: true };
@@ -322,10 +347,7 @@ export async function sendTransactionalSMS(
     // Check if API key is configured
     if (!TWO_FACTOR_API_KEY) {
       // In development or test mode, log and return success
-      if (
-        process.env.NODE_ENV === "development" ||
-        process.env.NODE_ENV === "test"
-      ) {
+      if (IS_DEV_SMS_MODE) {
         logger.info(
           { to: normalizedPhone, type, template: templateName, variables },
           "Dev mode: transactional SMS would be sent"
