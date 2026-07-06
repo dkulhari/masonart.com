@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Sparkles, RefreshCw, TrendingUp, Loader2 } from 'lucide-react'
+import { Sparkles, RefreshCw, TrendingUp } from 'lucide-react'
 import { cn } from '~/lib/utils'
 
 // ============================================================================

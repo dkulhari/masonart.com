@@ -22,9 +22,8 @@ import { orderShipments } from "../database/schema/shipping";
 // Types
 // ============================================================================
 
-type TrackingVariables = {
-  // No auth variables needed for public routes
-};
+// No auth variables needed for public routes
+type TrackingVariables = Record<string, never>;
 
 // ============================================================================
 // Validation Schemas

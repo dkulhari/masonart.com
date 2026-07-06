@@ -162,7 +162,7 @@ export const GEMINI_MODELS = {
  */
 function getProviderConfig(provider: AIModelProvider): AIProviderConfig | null {
   switch (provider) {
-    case "stable-diffusion":
+    case "stable-diffusion": {
       const replicateKey = process.env.REPLICATE_API_TOKEN;
       if (!replicateKey) return null;
       return {
@@ -170,8 +170,9 @@ function getProviderConfig(provider: AIModelProvider): AIProviderConfig | null {
         modelId: REPLICATE_MODELS.sdxl,
         timeout: 120000, // 2 minutes
       };
+    }
 
-    case "dall-e-3":
+    case "dall-e-3": {
       const openaiKey = process.env.OPENAI_API_KEY;
       if (!openaiKey) return null;
       return {
@@ -179,8 +180,9 @@ function getProviderConfig(provider: AIModelProvider): AIProviderConfig | null {
         modelId: OPENAI_MODELS.dalleE3,
         timeout: 60000, // 1 minute
       };
+    }
 
-    case "fal-ai":
+    case "fal-ai": {
       const falKey = process.env.FAL_API_KEY;
       if (!falKey) return null;
       return {
@@ -188,8 +190,9 @@ function getProviderConfig(provider: AIModelProvider): AIProviderConfig | null {
         modelId: FAL_MODELS.fluxSchnell,
         timeout: 90000, // 1.5 minutes
       };
+    }
 
-    case "gemini":
+    case "gemini": {
       const geminiKey = process.env.GOOGLE_AI_STUDIO_KEY;
       if (!geminiKey) return null;
       return {
@@ -197,6 +200,7 @@ function getProviderConfig(provider: AIModelProvider): AIProviderConfig | null {
         modelId: GEMINI_MODELS.flash,
         timeout: 60000, // 1 minute
       };
+    }
 
     default:
       return null;
@@ -293,7 +297,7 @@ export async function generateImages(
         );
         break;
 
-      case "fal-ai":
+      case "fal-ai": {
         // Auto-select Nano Banana Pro for typography style (superior text rendering)
         const falModel = input.falModel ||
           (input.stylePreset === "typography" ? "nanoBananaPro" : "fluxSchnell");
@@ -307,6 +311,7 @@ export async function generateImages(
           falModel
         );
         break;
+      }
 
       case "gemini":
         images = await generateWithGemini(

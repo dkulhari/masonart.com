@@ -177,7 +177,7 @@ async function addItemToCart(page: typeof test.page, itemOverrides?: Partial<{
 
   await page.evaluate((cartItem) => {
     const existing = localStorage.getItem('masonart-cart-storage');
-    let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
+    const data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
     data.state.items.push(cartItem);
     localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
   }, item);
@@ -638,7 +638,7 @@ test.describe('Cart Page - Item with Frame', () => {
 
     await page.evaluate((cartItem) => {
       const existing = localStorage.getItem('masonart-cart-storage');
-      let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
+      const data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
       data.state.items.push(cartItem);
       localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
     }, item);
@@ -694,7 +694,7 @@ test.describe('Cart Page - AI Generated Item', () => {
 
     await page.evaluate((cartItem) => {
       const existing = localStorage.getItem('masonart-cart-storage');
-      let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
+      const data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
       data.state.items.push(cartItem);
       localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
     }, item);

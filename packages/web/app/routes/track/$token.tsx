@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import {
   Package,
   Loader2,
@@ -21,8 +21,8 @@ import {
   RefreshCw,
   ArrowLeft,
 } from 'lucide-react'
-import { cn, formatDate } from '~/lib/utils'
-import { trackingApi, type GuestOrderLookupResponse, type ShipmentStatus } from '~/lib/api'
+import { cn } from '~/lib/utils'
+import { trackingApi, type GuestOrderLookupResponse } from '~/lib/api'
 import { TrackingTimeline } from '~/components/order/TrackingTimeline'
 
 // ============================================================================
@@ -139,7 +139,6 @@ function getCarrierDisplayName(carrier: string): string {
 
 function TokenTrackingPage() {
   const params = Route.useParams()
-  const navigate = useNavigate()
   const token = params.token
 
   const [isLoading, setIsLoading] = useState(true)

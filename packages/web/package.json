@@ -8,6 +8,7 @@
     "build": "vite build",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "clean": "rm -rf .output .vinxi dist .turbo node_modules/.vite",
     "test": "vitest run",
     "test:watch": "vitest",

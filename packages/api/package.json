@@ -20,6 +20,7 @@
     "build": "tsc",
     "start": "bun run dist/index.js",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "clean": "rm -rf dist .turbo",
     "test": "vitest run",
     "test:watch": "vitest",

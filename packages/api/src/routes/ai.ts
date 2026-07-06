@@ -169,13 +169,6 @@ const UPSCALE_COST_PAISE = {
 
 type UpscaleMultiplier = "2x" | "4x";
 
-/**
- * Schema for reference image weight
- */
-const referenceWeightSchema = z.object({
-  weight: z.coerce.number().min(0.1).max(1.0).optional().default(0.5),
-});
-
 // ============================================================================
 // Route Handler
 // ============================================================================
@@ -1447,7 +1440,7 @@ aiApp.get("/generations/:id/upscale-status", requireAuth, async (c) => {
     }
 
     const images = generation.images || [];
-    let targetImage = imageId
+    const targetImage = imageId
       ? images.find((img) => img.id === imageId)
       : images.find((img) => img.isSelected) || images[0];
 

@@ -367,7 +367,7 @@ async function setupProductsApiMocks(page: Page) {
   });
 
   // Single product
-  await page.route(/\/api\/admin\/products\/[^\/]+$/, async (route) => {
+  await page.route(/\/api\/admin\/products\/[^/]+$/, async (route) => {
     const method = route.request().method();
     const url = route.request().url();
     const productId = url.split('/').pop();
@@ -462,7 +462,7 @@ async function setupOrdersApiMocks(page: Page) {
   });
 
   // Single order
-  await page.route(/\/api\/admin\/orders\/[^\/]+$/, async (route) => {
+  await page.route(/\/api\/admin\/orders\/[^/]+$/, async (route) => {
     const method = route.request().method();
     const url = route.request().url();
     const orderId = url.split('/').pop();
@@ -499,7 +499,7 @@ async function setupOrdersApiMocks(page: Page) {
   });
 
   // Order status update
-  await page.route(/\/api\/admin\/orders\/[^\/]+\/status/, async (route) => {
+  await page.route(/\/api\/admin\/orders\/[^/]+\/status/, async (route) => {
     const body = route.request().postDataJSON();
     await route.fulfill({
       status: 200,
@@ -513,7 +513,7 @@ async function setupOrdersApiMocks(page: Page) {
   });
 
   // Order shipping update
-  await page.route(/\/api\/admin\/orders\/[^\/]+\/shipping/, async (route) => {
+  await page.route(/\/api\/admin\/orders\/[^/]+\/shipping/, async (route) => {
     const body = route.request().postDataJSON();
     await route.fulfill({
       status: 200,

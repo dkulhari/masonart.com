@@ -288,7 +288,7 @@ export function isValidEmail(email: string): boolean {
  */
 export function isValidPhone(phone: string): boolean {
   // Indian phone number: 10 digits, optionally starting with +91
-  const phoneRegex = /^(\+91[\-\s]?)?[6-9]\d{9}$/;
+  const phoneRegex = /^(\+91[-\s]?)?[6-9]\d{9}$/;
   return phoneRegex.test(phone.replace(/\s/g, ""));
 }
 

@@ -367,13 +367,6 @@ const selectSubtotal = (state: CartStore) =>
     0
   );
 const selectIsEmpty = (state: CartStore) => state.items.length === 0;
-const selectActions = (state: CartStore) => ({
-  addItem: state.addItem,
-  updateQuantity: state.updateQuantity,
-  updateFrame: state.updateFrame,
-  removeItem: state.removeItem,
-  clearCart: state.clearCart,
-});
 
 // ============================================================================
 // Selector Hooks (for optimized re-renders)

@@ -32,7 +32,7 @@ import { cn, getApiUrl } from '~/lib/utils'
 // Route Definition
 // ============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export const Route = createFileRoute('/approve/$token' as any)({
   head: () => ({
     meta: [
@@ -177,8 +177,6 @@ function GalleryModal({ photos, currentIndex, onClose, onNavigate }: GalleryModa
 
   const currentPhoto = photos[currentIndex]
 
-  if (!currentPhoto) return null
-
   const handleZoomIn = () => setZoom((z) => Math.min(z + 0.5, 4))
   const handleZoomOut = () => {
     setZoom((z) => {
@@ -247,6 +245,9 @@ function GalleryModal({ photos, currentIndex, onClose, onNavigate }: GalleryModa
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [currentIndex, photos.length, onClose, onNavigate])
+
+  // Guard after hooks so the hook order stays stable across renders
+  if (!currentPhoto) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95">

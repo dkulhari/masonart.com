@@ -39,7 +39,7 @@ const searchParamsSchema = z.object({
   action: z.enum(['upload']).optional(),
 })
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export const Route = createFileRoute('/admin/approvals/$id' as any)({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({

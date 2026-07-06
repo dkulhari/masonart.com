@@ -547,7 +547,6 @@ describe('Hono Server Startup', () => {
   describe('Response Body Parsing', () => {
     it('should return valid JSON from root endpoint', async () => {
       const res = await app.request('/');
-      expect(() => res.json()).not.toThrow;
       const data = await res.json();
       expect(typeof data).toBe('object');
     });

@@ -1,0 +1,13 @@
+bun.lock
+**/dist
+**/.output
+**/.vinxi
+**/.turbo
+**/coverage
+**/node_modules
+**/routeTree.gen.ts
+packages/api/src/database/migrations
+playwright-report
+test-results
+plan
+docs

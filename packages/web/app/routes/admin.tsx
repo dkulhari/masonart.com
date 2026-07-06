@@ -18,18 +18,6 @@ import { cn } from '~/lib/utils'
 import { AdminSidebar, MobileAdminHeader } from '~/components/admin/AdminSidebar'
 
 // ============================================================================
-// Types
-// ============================================================================
-
-interface User {
-  id: string
-  name: string
-  email: string
-  image?: string
-  role?: string
-}
-
-// ============================================================================
 // Route Definition
 // ============================================================================
 

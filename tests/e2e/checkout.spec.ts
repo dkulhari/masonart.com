@@ -112,7 +112,7 @@ async function addItemToCart(page: Page, itemOverrides?: Partial<{
 
   await page.evaluate((cartItem) => {
     const existing = localStorage.getItem('masonart-cart-storage');
-    let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
+    const data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
     data.state.items.push(cartItem);
     localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
   }, item);
@@ -1202,7 +1202,7 @@ test.describe('Checkout Page - Item with Frame', () => {
 
     await page.evaluate((cartItem) => {
       const existing = localStorage.getItem('masonart-cart-storage');
-      let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
+      const data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
       data.state.items.push(cartItem);
       localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
     }, item);

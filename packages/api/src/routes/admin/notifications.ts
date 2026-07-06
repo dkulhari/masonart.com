@@ -16,7 +16,6 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../../database";
 import { orders } from "../../database/schema/orders";
-import { notifications } from "../../database/schema/notifications";
 import {
   requireAuth,
   requireAdmin,
@@ -26,7 +25,6 @@ import {
   sendOrderNotification,
   getOrderNotifications,
   retryNotification,
-  notifyOrderStatusChange,
 } from "../../services/notifications";
 
 // ============================================================================

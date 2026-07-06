@@ -662,7 +662,7 @@ aiGenerationWorker.on("completed", (job, result) => {
     // Log completion in non-test environments
     const logMessage = `AI generation job ${job.id} completed in ${result.processingTimeMs}ms`;
     if (process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console
+       
       console.info(logMessage);
     }
   }
@@ -672,7 +672,7 @@ aiGenerationWorker.on("failed", (job, error) => {
   if (process.env.NODE_ENV !== "test") {
     const logMessage = `AI generation job ${job?.id} failed: ${error.message}`;
     if (process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console
+       
       console.error(logMessage, error);
     }
   }
@@ -681,7 +681,7 @@ aiGenerationWorker.on("failed", (job, error) => {
 aiGenerationWorker.on("progress", (job, progress) => {
   if (process.env.NODE_ENV === "development") {
     const progressData = progress as AIGenerationProgress;
-    // eslint-disable-next-line no-console
+     
     console.info(
       `AI generation job ${job.id}: ${progressData.stage} (${progressData.progress}%)`
     );

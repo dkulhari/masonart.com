@@ -22,22 +22,18 @@ import { eq, and, desc, asc, sql, gte, lte } from "drizzle-orm";
 import { db } from "../../database";
 import {
   returnRequests,
-  returnPolicies,
   returnStatusEnum,
   returnReasonEnum,
   refundTypeEnum,
   type ReturnStatus,
-  type RefundType,
 } from "../../database/schema/returns";
-import { orders, paymentStatusEnum, type PaymentStatus } from "../../database/schema/orders";
+import { orders, type PaymentStatus } from "../../database/schema/orders";
 import { users } from "../../database/schema/users";
 import {
   requireAuth,
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
-import { deleteCached } from "../../lib/redis";
-import { RETURN_CACHE_PREFIX } from "../returns";
 
 // ============================================================================
 // Constants
