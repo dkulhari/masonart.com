@@ -77,14 +77,15 @@ masonart/
 
 ## Available Scripts
 
-| Command             | Description                   |
-| ------------------- | ----------------------------- |
-| `bun run dev`       | Start all development servers |
-| `bun run build`     | Build all packages            |
-| `bun run lint`      | Run linters                   |
-| `bun run typecheck` | Run TypeScript type checking  |
-| `bun run format`    | Format code with Prettier     |
-| `bun run clean`     | Clean build artifacts         |
+| Command                | Description                    |
+| ---------------------- | ------------------------------ |
+| `bun run dev`          | Start all development servers  |
+| `bun run build`        | Build all packages             |
+| `bun run lint`         | Run ESLint across all packages |
+| `bun run typecheck`    | Run TypeScript type checking   |
+| `bun run format`       | Format code with Prettier      |
+| `bun run format:check` | Check formatting with Prettier |
+| `bun run clean`        | Clean build artifacts          |
 
 ---
 

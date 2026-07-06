@@ -53,6 +53,12 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Lint
+        run: bun run lint
+
+      - name: Format check
+        run: bun run format:check
+
   # ===========================================================================
   # Unit Tests - Shared Package
   # ===========================================================================
