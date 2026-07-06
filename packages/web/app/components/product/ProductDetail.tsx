@@ -7,7 +7,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -20,79 +20,79 @@ import {
   Shield,
   RotateCcw,
   Palette,
-} from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
-import { useCartStore } from '~/stores/cart'
-import { SizeSelector, type SizeVariant } from './SizeSelector'
-import { FrameSelector, calculateFramePrice, type FrameOptionData } from './FrameSelector'
+} from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import { useCartStore } from "~/stores/cart";
+import { SizeSelector, type SizeVariant } from "./SizeSelector";
+import { FrameSelector, calculateFramePrice, type FrameOptionData } from "./FrameSelector";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ProductImage {
-  id: string
-  url: string
-  alt?: string
-  type?: 'main' | 'detail' | 'texture' | 'room-mockup' | 'frame-preview'
-  isPrimary?: boolean
+  id: string;
+  url: string;
+  alt?: string;
+  type?: "main" | "detail" | "texture" | "room-mockup" | "frame-preview";
+  isPrimary?: boolean;
 }
 
 export interface ProductDetailData {
   /** Product ID */
-  id: string
+  id: string;
   /** SKU */
-  sku: string
+  sku: string;
   /** Product title */
-  title: string
+  title: string;
   /** URL slug */
-  slug: string
+  slug: string;
   /** Rich description */
-  description: string
+  description: string;
   /** Short description */
-  shortDescription?: string
+  shortDescription?: string;
   /** Product images */
-  images: ProductImage[]
+  images: ProductImage[];
   /** Size variants */
-  variants: SizeVariant[]
+  variants: SizeVariant[];
   /** Available frame options */
-  frames?: FrameOptionData[]
+  frames?: FrameOptionData[];
   /** Orientation */
-  orientation: 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
+  orientation: "square" | "portrait" | "landscape" | "panoramic" | "round";
   /** Styles */
-  styles?: string[]
+  styles?: string[];
   /** Subjects */
-  subjects?: string[]
+  subjects?: string[];
   /** Primary color */
-  primaryColor?: string
+  primaryColor?: string;
   /** Room suggestions */
-  roomSuggestions?: string[]
+  roomSuggestions?: string[];
   /** Artist info */
   artist?: {
-    id: string
-    name: string
-    slug?: string
-  }
+    id: string;
+    name: string;
+    slug?: string;
+  };
   /** Rating info */
   rating?: {
-    averageRating: number
-    reviewCount: number
-  }
+    averageRating: number;
+    reviewCount: number;
+  };
   /** Is featured */
-  isFeatured?: boolean
+  isFeatured?: boolean;
   /** Is AI generated */
-  isAiGenerated?: boolean
+  isAiGenerated?: boolean;
   /** SEO title */
-  seoTitle?: string
+  seoTitle?: string;
   /** SEO description */
-  seoDescription?: string
+  seoDescription?: string;
 }
 
 export interface ProductDetailProps {
   /** Product data */
-  product: ProductDetailData
+  product: ProductDetailData;
   /** Optional className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -106,54 +106,56 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
   // State for selections
   const [selectedVariant, setSelectedVariant] = useState<SizeVariant | null>(
     product.variants.find((v) => v.isAvailable) || null
-  )
-  const [selectedFrame, setSelectedFrame] = useState<FrameOptionData | null>(null)
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [quantity, setQuantity] = useState(1)
+  );
+  const [selectedFrame, setSelectedFrame] = useState<FrameOptionData | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [quantity, setQuantity] = useState(1);
 
   // Cart store
-  const addItem = useCartStore((state) => state.addItem)
+  const addItem = useCartStore((state) => state.addItem);
 
   // Calculate total price
   const totalPrice = useMemo(() => {
-    if (!selectedVariant) return 0
+    if (!selectedVariant) return 0;
 
-    const basePrice = typeof selectedVariant.price === 'string'
-      ? parseFloat(selectedVariant.price)
-      : selectedVariant.price
+    const basePrice =
+      typeof selectedVariant.price === "string"
+        ? parseFloat(selectedVariant.price)
+        : selectedVariant.price;
 
-    let total = basePrice
+    let total = basePrice;
 
     if (selectedFrame) {
       const frameAddition = calculateFramePrice(
         basePrice,
         selectedFrame.priceModifierType,
         selectedFrame.priceModifierValue
-      )
-      total += frameAddition
+      );
+      total += frameAddition;
     }
 
-    return total
-  }, [selectedVariant, selectedFrame])
+    return total;
+  }, [selectedVariant, selectedFrame]);
 
   // Handle add to cart
   const handleAddToCart = useCallback(() => {
-    if (!selectedVariant) return
+    if (!selectedVariant) return;
 
-    const basePrice = typeof selectedVariant.price === 'string'
-      ? parseFloat(selectedVariant.price)
-      : selectedVariant.price
+    const basePrice =
+      typeof selectedVariant.price === "string"
+        ? parseFloat(selectedVariant.price)
+        : selectedVariant.price;
 
-    let framePrice = 0
+    let framePrice = 0;
     if (selectedFrame) {
       framePrice = calculateFramePrice(
         basePrice,
         selectedFrame.priceModifierType,
         selectedFrame.priceModifierValue
-      )
+      );
     }
 
-    const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0]
+    const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0];
 
     addItem({
       productId: product.id,
@@ -162,7 +164,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
       quantity,
       productTitle: product.title,
       productSlug: product.slug,
-      thumbnailUrl: primaryImage?.url || '',
+      thumbnailUrl: primaryImage?.url || "",
       sizeLabel: selectedVariant.sizeLabel,
       widthInches: selectedVariant.widthInches,
       heightInches: selectedVariant.heightInches,
@@ -171,27 +173,23 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
       frameName: selectedFrame?.name,
       frameType: selectedFrame?.type,
       isAiGenerated: product.isAiGenerated,
-    })
-  }, [selectedVariant, selectedFrame, quantity, product, addItem])
+    });
+  }, [selectedVariant, selectedFrame, quantity, product, addItem]);
 
   // Image navigation
   const handlePrevImage = useCallback(() => {
-    setCurrentImageIndex((prev) =>
-      prev === 0 ? product.images.length - 1 : prev - 1
-    )
-  }, [product.images.length])
+    setCurrentImageIndex((prev) => (prev === 0 ? product.images.length - 1 : prev - 1));
+  }, [product.images.length]);
 
   const handleNextImage = useCallback(() => {
-    setCurrentImageIndex((prev) =>
-      prev === product.images.length - 1 ? 0 : prev + 1
-    )
-  }, [product.images.length])
+    setCurrentImageIndex((prev) => (prev === product.images.length - 1 ? 0 : prev + 1));
+  }, [product.images.length]);
 
   // Get primary image
-  const currentImage = product.images[currentImageIndex] || product.images[0]
+  const currentImage = product.images[currentImageIndex] || product.images[0];
 
   return (
-    <div className={cn('', className)}>
+    <div className={cn("", className)}>
       <div className="container-wide py-6 lg:py-10">
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
           {/* Left Column - Image Gallery */}
@@ -257,10 +255,10 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                     type="button"
                     onClick={() => setCurrentImageIndex(index)}
                     className={cn(
-                      'relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-all',
+                      "relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-all",
                       index === currentImageIndex
-                        ? 'border-brand-500'
-                        : 'border-transparent hover:border-brand-300'
+                        ? "border-brand-500"
+                        : "border-transparent hover:border-brand-300"
                     )}
                   >
                     <img
@@ -286,7 +284,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                       key={style}
                       className="rounded-full bg-muted px-2.5 py-0.5 text-xs capitalize text-muted-foreground"
                     >
-                      {style.replace(/-/g, ' ')}
+                      {style.replace(/-/g, " ")}
                     </span>
                   ))}
                 </div>
@@ -329,9 +327,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                   {formatPrice(totalPrice)}
                 </span>
                 {selectedFrame && (
-                  <span className="text-sm text-muted-foreground">
-                    (includes frame)
-                  </span>
+                  <span className="text-sm text-muted-foreground">(includes frame)</span>
                 )}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -353,7 +349,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                 selectedFrameId={selectedFrame?.id || null}
                 onFrameSelect={setSelectedFrame}
                 basePrice={
-                  typeof selectedVariant.price === 'string'
+                  typeof selectedVariant.price === "string"
                     ? parseFloat(selectedVariant.price)
                     : selectedVariant.price
                 }
@@ -375,9 +371,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                   >
                     -
                   </button>
-                  <span className="min-w-[3rem] text-center text-sm font-medium">
-                    {quantity}
-                  </span>
+                  <span className="min-w-[3rem] text-center text-sm font-medium">{quantity}</span>
                   <button
                     type="button"
                     onClick={() => setQuantity((q) => q + 1)}
@@ -396,10 +390,10 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                   onClick={handleAddToCart}
                   disabled={!selectedVariant}
                   className={cn(
-                    'flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-all',
+                    "flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-all",
                     selectedVariant
-                      ? 'bg-brand-500 text-white hover:bg-brand-600'
-                      : 'cursor-not-allowed bg-muted text-muted-foreground'
+                      ? "bg-brand-500 text-white hover:bg-brand-600"
+                      : "cursor-not-allowed bg-muted text-muted-foreground"
                   )}
                 >
                   <ShoppingCart className="h-5 w-5" />
@@ -462,7 +456,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                       key={room}
                       className="rounded-full border border-border bg-background px-3 py-1 text-sm capitalize text-foreground"
                     >
-                      {room.replace(/-/g, ' ')}
+                      {room.replace(/-/g, " ")}
                     </span>
                   ))}
                 </div>
@@ -472,7 +466,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -524,7 +518,7 @@ export function ProductDetailSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default ProductDetail
+export default ProductDetail;

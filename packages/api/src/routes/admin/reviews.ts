@@ -21,11 +21,7 @@ import { db } from "../../database";
 import { reviews, type ReviewStatus } from "../../database/schema/reviews";
 import { products } from "../../database/schema/products";
 import { users } from "../../database/schema/users";
-import {
-  requireAuth,
-  requireAdmin,
-  type AuthVariables,
-} from "../../middleware/auth";
+import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
 import { deleteCached } from "../../lib/redis";
 
 // ============================================================================
@@ -74,116 +70,112 @@ adminReviewsApp.use("*", requireAdmin);
 // GET /api/admin/reviews - List Reviews (Admin)
 // ============================================================================
 
-adminReviewsApp.get(
-  "/",
-  zValidator("query", listAdminReviewsSchema),
-  async (c) => {
-    const { status, productId, userId, page, pageSize, sortBy } = c.req.valid("query");
+adminReviewsApp.get("/", zValidator("query", listAdminReviewsSchema), async (c) => {
+  const { status, productId, userId, page, pageSize, sortBy } = c.req.valid("query");
 
-    try {
-      // Build where conditions
-      const conditions: ReturnType<typeof eq>[] = [];
+  try {
+    // Build where conditions
+    const conditions: ReturnType<typeof eq>[] = [];
 
-      if (status) {
-        conditions.push(eq(reviews.status, status as ReviewStatus));
-      }
-
-      if (productId) {
-        conditions.push(eq(reviews.productId, productId));
-      }
-
-      if (userId) {
-        conditions.push(eq(reviews.userId, userId));
-      }
-
-      // Build sort order
-      const orderBy = {
-        newest: desc(reviews.createdAt),
-        oldest: asc(reviews.createdAt),
-        rating: desc(reviews.rating),
-      }[sortBy];
-
-      const offset = (page - 1) * pageSize;
-
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(reviews)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Get reviews with author and product info
-      const reviewList = await db
-        .select({
-          id: reviews.id,
-          productId: reviews.productId,
-          userId: reviews.userId,
-          rating: reviews.rating,
-          title: reviews.title,
-          content: reviews.content,
-          status: reviews.status,
-          moderatorId: reviews.moderatorId,
-          moderatorNotes: reviews.moderatorNotes,
-          createdAt: reviews.createdAt,
-          updatedAt: reviews.updatedAt,
-          author: {
-            id: users.id,
-            name: users.name,
-            email: users.email,
-          },
-        })
-        .from(reviews)
-        .leftJoin(users, eq(reviews.userId, users.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(orderBy)
-        .limit(pageSize)
-        .offset(offset);
-
-      // Fetch product info for reviews
-      const productIds = [...new Set(reviewList.map((r) => r.productId))];
-      let productMap: Record<string, { id: string; title: string; slug: string }> = {};
-
-      if (productIds.length > 0) {
-        const productList = await db
-          .select({
-            id: products.id,
-            title: products.title,
-            slug: products.slug,
-          })
-          .from(products)
-          .where(sql`${products.id} = ANY(${productIds})`);
-
-        productMap = productList.reduce(
-          (acc, product) => {
-            acc[product.id] = product;
-            return acc;
-          },
-          {} as Record<string, { id: string; title: string; slug: string }>
-        );
-      }
-
-      // Add product info to reviews
-      const reviewsWithProduct = reviewList.map((review) => ({
-        ...review,
-        product: productMap[review.productId] || null,
-      }));
-
-      return c.json({
-        items: reviewsWithProduct,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      console.error("Error fetching admin reviews:", error);
-      return c.json({ error: "Failed to fetch reviews" }, 500);
+    if (status) {
+      conditions.push(eq(reviews.status, status as ReviewStatus));
     }
+
+    if (productId) {
+      conditions.push(eq(reviews.productId, productId));
+    }
+
+    if (userId) {
+      conditions.push(eq(reviews.userId, userId));
+    }
+
+    // Build sort order
+    const orderBy = {
+      newest: desc(reviews.createdAt),
+      oldest: asc(reviews.createdAt),
+      rating: desc(reviews.rating),
+    }[sortBy];
+
+    const offset = (page - 1) * pageSize;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(reviews)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    const total = countResult[0]?.count ?? 0;
+
+    // Get reviews with author and product info
+    const reviewList = await db
+      .select({
+        id: reviews.id,
+        productId: reviews.productId,
+        userId: reviews.userId,
+        rating: reviews.rating,
+        title: reviews.title,
+        content: reviews.content,
+        status: reviews.status,
+        moderatorId: reviews.moderatorId,
+        moderatorNotes: reviews.moderatorNotes,
+        createdAt: reviews.createdAt,
+        updatedAt: reviews.updatedAt,
+        author: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(reviews)
+      .leftJoin(users, eq(reviews.userId, users.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(orderBy)
+      .limit(pageSize)
+      .offset(offset);
+
+    // Fetch product info for reviews
+    const productIds = [...new Set(reviewList.map((r) => r.productId))];
+    let productMap: Record<string, { id: string; title: string; slug: string }> = {};
+
+    if (productIds.length > 0) {
+      const productList = await db
+        .select({
+          id: products.id,
+          title: products.title,
+          slug: products.slug,
+        })
+        .from(products)
+        .where(sql`${products.id} = ANY(${productIds})`);
+
+      productMap = productList.reduce(
+        (acc, product) => {
+          acc[product.id] = product;
+          return acc;
+        },
+        {} as Record<string, { id: string; title: string; slug: string }>
+      );
+    }
+
+    // Add product info to reviews
+    const reviewsWithProduct = reviewList.map((review) => ({
+      ...review,
+      product: productMap[review.productId] || null,
+    }));
+
+    return c.json({
+      items: reviewsWithProduct,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    console.error("Error fetching admin reviews:", error);
+    return c.json({ error: "Failed to fetch reviews" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/admin/reviews/stats - Get Moderation Statistics
@@ -325,69 +317,65 @@ adminReviewsApp.get("/:reviewId", async (c) => {
 // PATCH /api/admin/reviews/:reviewId - Moderate Review
 // ============================================================================
 
-adminReviewsApp.patch(
-  "/:reviewId",
-  zValidator("json", moderateReviewSchema),
-  async (c) => {
-    const reviewId = c.req.param("reviewId");
-    const { status, moderatorNotes } = c.req.valid("json");
-    const admin = c.get("user");
+adminReviewsApp.patch("/:reviewId", zValidator("json", moderateReviewSchema), async (c) => {
+  const reviewId = c.req.param("reviewId");
+  const { status, moderatorNotes } = c.req.valid("json");
+  const admin = c.get("user");
 
-    // Validate reviewId
-    if (!reviewId || !/^[0-9a-f-]{36}$/i.test(reviewId)) {
-      return c.json({ error: "Invalid review ID" }, 400);
-    }
-
-    try {
-      // Get existing review
-      const existingReview = await db
-        .select({
-          id: reviews.id,
-          productId: reviews.productId,
-          status: reviews.status,
-        })
-        .from(reviews)
-        .where(eq(reviews.id, reviewId))
-        .limit(1);
-
-      if (!existingReview.length) {
-        return c.json({ error: "Review not found" }, 404);
-      }
-
-      const review = existingReview[0];
-
-      // Update review
-      const [updatedReview] = await db
-        .update(reviews)
-        .set({
-          status: status as ReviewStatus,
-          moderatorId: admin.id,
-          moderatorNotes: moderatorNotes || null,
-          updatedAt: new Date(),
-        })
-        .where(eq(reviews.id, reviewId))
-        .returning();
-
-      // Invalidate cache for this product's reviews
-      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${review.productId}:*`);
-
-      return c.json({
-        message: `Review ${status} successfully`,
-        review: {
-          id: updatedReview.id,
-          status: updatedReview.status,
-          moderatorId: updatedReview.moderatorId,
-          moderatorNotes: updatedReview.moderatorNotes,
-          previousStatus: review.status,
-          updatedAt: updatedReview.updatedAt,
-        },
-      });
-    } catch (error) {
-      console.error("Error moderating review:", error);
-      return c.json({ error: "Failed to moderate review" }, 500);
-    }
+  // Validate reviewId
+  if (!reviewId || !/^[0-9a-f-]{36}$/i.test(reviewId)) {
+    return c.json({ error: "Invalid review ID" }, 400);
   }
-);
+
+  try {
+    // Get existing review
+    const existingReview = await db
+      .select({
+        id: reviews.id,
+        productId: reviews.productId,
+        status: reviews.status,
+      })
+      .from(reviews)
+      .where(eq(reviews.id, reviewId))
+      .limit(1);
+
+    if (!existingReview.length) {
+      return c.json({ error: "Review not found" }, 404);
+    }
+
+    const review = existingReview[0];
+
+    // Update review
+    const [updatedReview] = await db
+      .update(reviews)
+      .set({
+        status: status as ReviewStatus,
+        moderatorId: admin.id,
+        moderatorNotes: moderatorNotes || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(reviews.id, reviewId))
+      .returning();
+
+    // Invalidate cache for this product's reviews
+    await deleteCached(`${REVIEW_CACHE_PREFIX}product:${review.productId}:*`);
+
+    return c.json({
+      message: `Review ${status} successfully`,
+      review: {
+        id: updatedReview.id,
+        status: updatedReview.status,
+        moderatorId: updatedReview.moderatorId,
+        moderatorNotes: updatedReview.moderatorNotes,
+        previousStatus: review.status,
+        updatedAt: updatedReview.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Error moderating review:", error);
+    return c.json({ error: "Failed to moderate review" }, 500);
+  }
+});
 
 // ============================================================================
 // DELETE /api/admin/reviews/:reviewId - Delete Review (Admin)
@@ -435,9 +423,5 @@ adminReviewsApp.delete("/:reviewId", async (c) => {
 });
 
 // Export the router and schemas
-export {
-  adminReviewsApp,
-  listAdminReviewsSchema,
-  moderateReviewSchema,
-};
+export { adminReviewsApp, listAdminReviewsSchema, moderateReviewSchema };
 export default adminReviewsApp;

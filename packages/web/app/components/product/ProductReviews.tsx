@@ -7,20 +7,11 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState } from 'react'
-import { MessageSquare } from 'lucide-react'
-import { cn } from '~/lib/utils'
-import {
-  useReviews,
-  useReviewStats,
-  toReviewStats,
-  type ReviewFilters,
-} from '~/hooks/useReviews'
-import {
-  ReviewList,
-  ReviewSummary,
-  ReviewSummarySkeleton,
-} from '~/components/reviews'
+import { useState } from "react";
+import { MessageSquare } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { useReviews, useReviewStats, toReviewStats, type ReviewFilters } from "~/hooks/useReviews";
+import { ReviewList, ReviewSummary, ReviewSummarySkeleton } from "~/components/reviews";
 
 // ============================================================================
 // Types
@@ -28,9 +19,9 @@ import {
 
 export interface ProductReviewsProps {
   /** Product ID to show reviews for */
-  productId: string
+  productId: string;
   /** Custom className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -46,53 +37,39 @@ export interface ProductReviewsProps {
  *   productName="Dream Big Poster"
  * />
  */
-export function ProductReviews({
-  productId,
-  className,
-}: ProductReviewsProps) {
+export function ProductReviews({ productId, className }: ProductReviewsProps) {
   const [filters] = useState<ReviewFilters>({
-    sortBy: 'newest',
+    sortBy: "newest",
     page: 1,
     limit: 10,
-  })
+  });
 
   // Fetch reviews and stats
   const {
     data: reviewsData,
     isLoading: reviewsLoading,
     error: reviewsError,
-  } = useReviews(productId, filters)
+  } = useReviews(productId, filters);
 
-  const {
-    data: statsData,
-    isLoading: statsLoading,
-  } = useReviewStats(productId)
+  const { data: statsData, isLoading: statsLoading } = useReviewStats(productId);
 
   // Convert stats data for ReviewSummary
-  const stats = statsData ? toReviewStats(statsData) : null
+  const stats = statsData ? toReviewStats(statsData) : null;
 
   return (
-    <section
-      id="reviews"
-      className={cn('border-t border-border bg-background', className)}
-    >
+    <section id="reviews" className={cn("border-t border-border bg-background", className)}>
       <div className="container-wide py-12">
         {/* Section Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold text-foreground">
-              Customer Reviews
-            </h2>
+            <h2 className="text-2xl font-bold text-foreground">Customer Reviews</h2>
           </div>
 
           {/* Purchase Guidance */}
           <div className="text-sm text-muted-foreground">
-            Purchased this item?{' '}
-            <a
-              href="/account/orders"
-              className="font-medium text-primary hover:underline"
-            >
+            Purchased this item?{" "}
+            <a href="/account/orders" className="font-medium text-primary hover:underline">
               Leave a review from your order history
             </a>
           </div>
@@ -116,9 +93,7 @@ export function ProductReviews({
         {/* Reviews List */}
         {reviewsError ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-            <p className="text-red-700">
-              Unable to load reviews. Please try again later.
-            </p>
+            <p className="text-red-700">Unable to load reviews. Please try again later.</p>
           </div>
         ) : (
           <ReviewList
@@ -132,13 +107,13 @@ export function ProductReviews({
             showActions
             onReport={(reviewId) => {
               // TODO: Implement report functionality
-              console.log('Report review:', reviewId)
+              console.log("Report review:", reviewId);
             }}
           />
         )}
       </div>
     </section>
-  )
+  );
 }
 
 // ============================================================================
@@ -147,7 +122,7 @@ export function ProductReviews({
 
 export function ProductReviewsSkeleton({ className }: { className?: string }) {
   return (
-    <section className={cn('border-t border-border bg-background', className)}>
+    <section className={cn("border-t border-border bg-background", className)}>
       <div className="container-wide py-12">
         {/* Header skeleton */}
         <div className="mb-8 flex animate-pulse items-center justify-between">
@@ -171,11 +146,11 @@ export function ProductReviewsSkeleton({ className }: { className?: string }) {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 // ============================================================================
 // Default Export
 // ============================================================================
 
-export default ProductReviews
+export default ProductReviews;

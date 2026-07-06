@@ -130,9 +130,7 @@ shippingApp.get("/options/:id", async (c) => {
         sortOrder: shippingOptions.sortOrder,
       })
       .from(shippingOptions)
-      .where(
-        and(eq(shippingOptions.id, optionId), eq(shippingOptions.isActive, true))
-      )
+      .where(and(eq(shippingOptions.id, optionId), eq(shippingOptions.isActive, true)))
       .limit(1);
 
     if (!result.length) {
@@ -156,84 +154,75 @@ shippingApp.get("/options/:id", async (c) => {
  * GET /api/shipping/estimate - Estimate shipping cost for cart
  * Returns available shipping options with calculated costs
  */
-shippingApp.get(
-  "/estimate",
-  zValidator("query", estimateShippingSchema),
-  async (c) => {
-    const { cartTotal, zipCode } = c.req.valid("query");
+shippingApp.get("/estimate", zValidator("query", estimateShippingSchema), async (c) => {
+  const { cartTotal, zipCode } = c.req.valid("query");
 
-    try {
-      // Get active shipping options
-      const options = await db
-        .select({
-          id: shippingOptions.id,
-          name: shippingOptions.name,
-          carrier: shippingOptions.carrier,
-          description: shippingOptions.description,
-          baseCost: shippingOptions.baseCost,
-          estimatedDaysMin: shippingOptions.estimatedDaysMin,
-          estimatedDaysMax: shippingOptions.estimatedDaysMax,
-        })
-        .from(shippingOptions)
-        .where(eq(shippingOptions.isActive, true))
-        .orderBy(asc(shippingOptions.sortOrder), asc(shippingOptions.baseCost));
+  try {
+    // Get active shipping options
+    const options = await db
+      .select({
+        id: shippingOptions.id,
+        name: shippingOptions.name,
+        carrier: shippingOptions.carrier,
+        description: shippingOptions.description,
+        baseCost: shippingOptions.baseCost,
+        estimatedDaysMin: shippingOptions.estimatedDaysMin,
+        estimatedDaysMax: shippingOptions.estimatedDaysMax,
+      })
+      .from(shippingOptions)
+      .where(eq(shippingOptions.isActive, true))
+      .orderBy(asc(shippingOptions.sortOrder), asc(shippingOptions.baseCost));
 
-      // Calculate costs for each option
-      // For now, using simple base cost calculation
-      // Future: could integrate with carrier APIs for real-time rates
-      const estimates = options.map((option) => {
-        const baseCostNum = parseFloat(option.baseCost);
+    // Calculate costs for each option
+    // For now, using simple base cost calculation
+    // Future: could integrate with carrier APIs for real-time rates
+    const estimates = options.map((option) => {
+      const baseCostNum = parseFloat(option.baseCost);
 
-        // Simple shipping calculation logic
-        // Could be enhanced with weight-based, distance-based, or API-based calculations
-        let calculatedCost = baseCostNum;
+      // Simple shipping calculation logic
+      // Could be enhanced with weight-based, distance-based, or API-based calculations
+      let calculatedCost = baseCostNum;
 
-        // Free shipping for orders over certain amount (e.g., ₹1000)
-        const freeShippingThreshold = 1000;
-        if (cartTotal >= freeShippingThreshold && option.carrier !== "Express") {
-          calculatedCost = 0;
-        }
+      // Free shipping for orders over certain amount (e.g., ₹1000)
+      const freeShippingThreshold = 1000;
+      if (cartTotal >= freeShippingThreshold && option.carrier !== "Express") {
+        calculatedCost = 0;
+      }
 
-        // Calculate estimated delivery date range
-        const today = new Date();
-        const minDelivery = new Date(today);
-        minDelivery.setDate(minDelivery.getDate() + option.estimatedDaysMin);
-        const maxDelivery = new Date(today);
-        maxDelivery.setDate(maxDelivery.getDate() + option.estimatedDaysMax);
+      // Calculate estimated delivery date range
+      const today = new Date();
+      const minDelivery = new Date(today);
+      minDelivery.setDate(minDelivery.getDate() + option.estimatedDaysMin);
+      const maxDelivery = new Date(today);
+      maxDelivery.setDate(maxDelivery.getDate() + option.estimatedDaysMax);
 
-        return {
-          id: option.id,
-          name: option.name,
-          carrier: option.carrier,
-          description: option.description,
-          baseCost: option.baseCost,
-          calculatedCost: calculatedCost.toFixed(2),
-          isFree: calculatedCost === 0,
-          estimatedDaysMin: option.estimatedDaysMin,
-          estimatedDaysMax: option.estimatedDaysMax,
-          estimatedDeliveryMin: minDelivery.toISOString().split("T")[0],
-          estimatedDeliveryMax: maxDelivery.toISOString().split("T")[0],
-        };
-      });
+      return {
+        id: option.id,
+        name: option.name,
+        carrier: option.carrier,
+        description: option.description,
+        baseCost: option.baseCost,
+        calculatedCost: calculatedCost.toFixed(2),
+        isFree: calculatedCost === 0,
+        estimatedDaysMin: option.estimatedDaysMin,
+        estimatedDaysMax: option.estimatedDaysMax,
+        estimatedDeliveryMin: minDelivery.toISOString().split("T")[0],
+        estimatedDeliveryMax: maxDelivery.toISOString().split("T")[0],
+      };
+    });
 
-      return c.json({
-        cartTotal,
-        zipCode: zipCode || null,
-        freeShippingThreshold: 1000,
-        options: estimates,
-      });
-    } catch (error) {
-      console.error("Error estimating shipping:", error);
-      return c.json({ error: "Failed to estimate shipping" }, 500);
-    }
+    return c.json({
+      cartTotal,
+      zipCode: zipCode || null,
+      freeShippingThreshold: 1000,
+      options: estimates,
+    });
+  } catch (error) {
+    console.error("Error estimating shipping:", error);
+    return c.json({ error: "Failed to estimate shipping" }, 500);
   }
-);
+});
 
 // Export the router and schemas
-export {
-  shippingApp,
-  estimateShippingSchema,
-  SHIPPING_CACHE_PREFIX,
-  CACHE_TTL_SHIPPING_OPTIONS,
-};
+export { shippingApp, estimateShippingSchema, SHIPPING_CACHE_PREFIX, CACHE_TTL_SHIPPING_OPTIONS };
 export default shippingApp;

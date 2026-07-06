@@ -9,7 +9,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -27,7 +27,7 @@ import {
   type HeaderContext,
   type CellContext,
   type FilterFn,
-} from '@tanstack/react-table'
+} from "@tanstack/react-table";
 import {
   ChevronDown,
   ChevronUp,
@@ -45,74 +45,74 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-} from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
+} from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ProductImage {
-  id: string
-  url: string
-  alt?: string
-  isPrimary?: boolean
+  id: string;
+  url: string;
+  alt?: string;
+  isPrimary?: boolean;
 }
 
 export interface AdminProduct {
-  id: string
-  sku: string
-  title: string
-  slug: string
-  description?: string | null
-  basePrice: string
-  styles: string[]
-  subjects: string[]
-  colors: string[]
-  rooms: string[]
-  orientation: string
-  images: ProductImage[]
-  status: 'draft' | 'active' | 'archived'
-  isFeatured: boolean
-  featuredOrder?: number | null
-  isAiGenerated: boolean
-  createdAt: string
-  updatedAt: string
+  id: string;
+  sku: string;
+  title: string;
+  slug: string;
+  description?: string | null;
+  basePrice: string;
+  styles: string[];
+  subjects: string[];
+  colors: string[];
+  rooms: string[];
+  orientation: string;
+  images: ProductImage[];
+  status: "draft" | "active" | "archived";
+  isFeatured: boolean;
+  featuredOrder?: number | null;
+  isAiGenerated: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProductsTableProps {
-  products: AdminProduct[]
-  isLoading?: boolean
-  onEdit?: (product: AdminProduct) => void
-  onDelete?: (product: AdminProduct) => void
-  onView?: (product: AdminProduct) => void
-  onArchive?: (product: AdminProduct) => void
-  onDuplicate?: (product: AdminProduct) => void
-  onBulkDelete?: (products: AdminProduct[]) => void
-  onBulkArchive?: (products: AdminProduct[]) => void
+  products: AdminProduct[];
+  isLoading?: boolean;
+  onEdit?: (product: AdminProduct) => void;
+  onDelete?: (product: AdminProduct) => void;
+  onView?: (product: AdminProduct) => void;
+  onArchive?: (product: AdminProduct) => void;
+  onDuplicate?: (product: AdminProduct) => void;
+  onBulkDelete?: (products: AdminProduct[]) => void;
+  onBulkArchive?: (products: AdminProduct[]) => void;
 }
 
 // ============================================================================
 // Status Badge Component
 // ============================================================================
 
-function StatusBadge({ status }: { status: AdminProduct['status'] }) {
+function StatusBadge({ status }: { status: AdminProduct["status"] }) {
   const styles = {
-    draft: 'bg-amber-100 text-amber-700 border-amber-200',
-    active: 'bg-green-100 text-green-700 border-green-200',
-    archived: 'bg-gray-100 text-gray-700 border-gray-200',
-  }
+    draft: "bg-amber-100 text-amber-700 border-amber-200",
+    active: "bg-green-100 text-green-700 border-green-200",
+    archived: "bg-gray-100 text-gray-700 border-gray-200",
+  };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize',
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize",
         styles[status]
       )}
     >
       {status}
     </span>
-  )
+  );
 }
 
 // ============================================================================
@@ -120,12 +120,12 @@ function StatusBadge({ status }: { status: AdminProduct['status'] }) {
 // ============================================================================
 
 interface ActionMenuProps {
-  product: AdminProduct
-  onEdit?: (product: AdminProduct) => void
-  onDelete?: (product: AdminProduct) => void
-  onView?: (product: AdminProduct) => void
-  onArchive?: (product: AdminProduct) => void
-  onDuplicate?: (product: AdminProduct) => void
+  product: AdminProduct;
+  onEdit?: (product: AdminProduct) => void;
+  onDelete?: (product: AdminProduct) => void;
+  onView?: (product: AdminProduct) => void;
+  onArchive?: (product: AdminProduct) => void;
+  onDuplicate?: (product: AdminProduct) => void;
 }
 
 function ActionMenu({
@@ -136,7 +136,7 @@ function ActionMenu({
   onArchive,
   onDuplicate,
 }: ActionMenuProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <div className="relative">
@@ -151,10 +151,7 @@ function ActionMenu({
       {isOpen && (
         <>
           {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
 
           {/* Menu */}
           <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-border bg-card py-1 shadow-lg">
@@ -162,8 +159,8 @@ function ActionMenu({
               <button
                 type="button"
                 onClick={() => {
-                  onView(product)
-                  setIsOpen(false)
+                  onView(product);
+                  setIsOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
               >
@@ -176,8 +173,8 @@ function ActionMenu({
               <button
                 type="button"
                 onClick={() => {
-                  onEdit(product)
-                  setIsOpen(false)
+                  onEdit(product);
+                  setIsOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
               >
@@ -190,8 +187,8 @@ function ActionMenu({
               <button
                 type="button"
                 onClick={() => {
-                  onDuplicate(product)
-                  setIsOpen(false)
+                  onDuplicate(product);
+                  setIsOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
               >
@@ -212,12 +209,12 @@ function ActionMenu({
 
             <div className="my-1 border-t border-border" />
 
-            {onArchive && product.status !== 'archived' && (
+            {onArchive && product.status !== "archived" && (
               <button
                 type="button"
                 onClick={() => {
-                  onArchive(product)
-                  setIsOpen(false)
+                  onArchive(product);
+                  setIsOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50"
               >
@@ -230,8 +227,8 @@ function ActionMenu({
               <button
                 type="button"
                 onClick={() => {
-                  onDelete(product)
-                  setIsOpen(false)
+                  onDelete(product);
+                  setIsOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
               >
@@ -243,7 +240,7 @@ function ActionMenu({
         </>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -254,8 +251,8 @@ function SortableHeader({
   column,
   children,
 }: {
-  column: Column<AdminProduct, unknown>
-  children: React.ReactNode
+  column: Column<AdminProduct, unknown>;
+  children: React.ReactNode;
 }) {
   return (
     <button
@@ -264,15 +261,15 @@ function SortableHeader({
       className="flex items-center gap-1 font-medium"
     >
       {children}
-      {column.getIsSorted() === 'asc' ? (
+      {column.getIsSorted() === "asc" ? (
         <ChevronUp className="h-4 w-4" />
-      ) : column.getIsSorted() === 'desc' ? (
+      ) : column.getIsSorted() === "desc" ? (
         <ChevronDown className="h-4 w-4" />
       ) : (
         <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
       )}
     </button>
-  )
+  );
 }
 
 // ============================================================================
@@ -290,18 +287,18 @@ export function ProductsTable({
   onBulkDelete,
   onBulkArchive,
 }: ProductsTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [globalFilter, setGlobalFilter] = useState('')
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [globalFilter, setGlobalFilter] = useState("");
 
   // Column definitions with proper typing
   const columns = useMemo<ColumnDef<AdminProduct>[]>(
     () => [
       // Checkbox column
       {
-        id: 'select',
+        id: "select",
         header: ({ table }: HeaderContext<AdminProduct, unknown>) => (
           <input
             type="checkbox"
@@ -324,13 +321,14 @@ export function ProductsTable({
       },
       // Product column (image + title)
       {
-        accessorKey: 'title',
+        accessorKey: "title",
         header: ({ column }: HeaderContext<AdminProduct, unknown>) => (
           <SortableHeader column={column}>Product</SortableHeader>
         ),
         cell: ({ row }: CellContext<AdminProduct, unknown>) => {
-          const product = row.original
-          const primaryImage = product.images?.find((img: ProductImage) => img.isPrimary) || product.images?.[0]
+          const product = row.original;
+          const primaryImage =
+            product.images?.find((img: ProductImage) => img.isPrimary) || product.images?.[0];
 
           return (
             <div className="flex items-center gap-3">
@@ -355,13 +353,13 @@ export function ProductsTable({
                 <p className="text-xs text-muted-foreground">{product.sku}</p>
               </div>
             </div>
-          )
+          );
         },
         size: 300,
       },
       // Status column
       {
-        accessorKey: 'status',
+        accessorKey: "status",
         header: ({ column }: HeaderContext<AdminProduct, unknown>) => (
           <SortableHeader column={column}>Status</SortableHeader>
         ),
@@ -369,75 +367,71 @@ export function ProductsTable({
           <StatusBadge status={row.original.status} />
         ),
         filterFn: ((row: Row<AdminProduct>, _columnId: string, filterValue: string) => {
-          if (!filterValue) return true
-          return row.original.status === filterValue
+          if (!filterValue) return true;
+          return row.original.status === filterValue;
         }) as FilterFn<AdminProduct>,
         size: 100,
       },
       // Price column
       {
-        accessorKey: 'basePrice',
+        accessorKey: "basePrice",
         header: ({ column }: HeaderContext<AdminProduct, unknown>) => (
           <SortableHeader column={column}>Price</SortableHeader>
         ),
-        cell: ({ row }: CellContext<AdminProduct, unknown>) => (
-          formatPrice(parseFloat(row.original.basePrice))
-        ),
+        cell: ({ row }: CellContext<AdminProduct, unknown>) =>
+          formatPrice(parseFloat(row.original.basePrice)),
         sortingFn: (rowA: Row<AdminProduct>, rowB: Row<AdminProduct>) => {
-          return parseFloat(rowA.original.basePrice) - parseFloat(rowB.original.basePrice)
+          return parseFloat(rowA.original.basePrice) - parseFloat(rowB.original.basePrice);
         },
         size: 100,
       },
       // Orientation column
       {
-        accessorKey: 'orientation',
-        header: 'Orientation',
+        accessorKey: "orientation",
+        header: "Orientation",
         cell: ({ row }: CellContext<AdminProduct, unknown>) => (
-          <span className="capitalize text-muted-foreground">
-            {row.original.orientation}
-          </span>
+          <span className="capitalize text-muted-foreground">{row.original.orientation}</span>
         ),
         size: 100,
       },
       // Featured column
       {
-        accessorKey: 'isFeatured',
-        header: 'Featured',
-        cell: ({ row }: CellContext<AdminProduct, unknown>) => (
+        accessorKey: "isFeatured",
+        header: "Featured",
+        cell: ({ row }: CellContext<AdminProduct, unknown>) =>
           row.original.isFeatured ? (
             <span className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
               Featured
             </span>
           ) : (
             <span className="text-muted-foreground">-</span>
-          )
-        ),
+          ),
         size: 80,
       },
       // Date column
       {
-        accessorKey: 'createdAt',
+        accessorKey: "createdAt",
         header: ({ column }: HeaderContext<AdminProduct, unknown>) => (
           <SortableHeader column={column}>Created</SortableHeader>
         ),
         cell: ({ row }: CellContext<AdminProduct, unknown>) => {
-          const date = new Date(row.original.createdAt)
+          const date = new Date(row.original.createdAt);
           return (
             <span className="text-sm text-muted-foreground">
-              {date.toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
+              {date.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
               })}
             </span>
-          )
+          );
         },
         size: 120,
       },
       // Actions column
       {
-        id: 'actions',
-        header: '',
+        id: "actions",
+        header: "",
         cell: ({ row }: CellContext<AdminProduct, unknown>) => (
           <ActionMenu
             product={row.original}
@@ -454,14 +448,14 @@ export function ProductsTable({
       },
     ],
     [onEdit, onDelete, onView, onArchive, onDuplicate]
-  )
+  );
 
   // Table instance
   // Custom global filter function to search across multiple fields
   const globalFilterFn: FilterFn<AdminProduct> = (row, _columnId, filterValue) => {
-    if (!filterValue) return true
-    const searchValue = String(filterValue).toLowerCase()
-    const product = row.original
+    if (!filterValue) return true;
+    const searchValue = String(filterValue).toLowerCase();
+    const product = row.original;
 
     // Search across title, SKU, slug, and description
     return (
@@ -469,8 +463,8 @@ export function ProductsTable({
       product.sku.toLowerCase().includes(searchValue) ||
       product.slug.toLowerCase().includes(searchValue) ||
       (product.description?.toLowerCase().includes(searchValue) ?? false)
-    )
-  }
+    );
+  };
 
   const table = useReactTable({
     data: products,
@@ -498,15 +492,17 @@ export function ProductsTable({
         pageSize: 10,
       },
     },
-  })
+  });
 
   // Get selected products
   const selectedProducts = table
     .getSelectedRowModel()
-    .rows.map((row: Row<AdminProduct>) => row.original)
+    .rows.map((row: Row<AdminProduct>) => row.original);
 
   // Get status filter value
-  const statusFilterValue = columnFilters.find((f) => f.id === 'status')?.value as string | undefined
+  const statusFilterValue = columnFilters.find((f) => f.id === "status")?.value as
+    | string
+    | undefined;
 
   return (
     <div className="space-y-4">
@@ -528,13 +524,13 @@ export function ProductsTable({
         <div className="flex items-center gap-2">
           {/* Status Filter */}
           <select
-            value={statusFilterValue || ''}
+            value={statusFilterValue || ""}
             onChange={(e) => {
-              const value = e.target.value
+              const value = e.target.value;
               if (value) {
-                setColumnFilters([{ id: 'status', value }])
+                setColumnFilters([{ id: "status", value }]);
               } else {
-                setColumnFilters([])
+                setColumnFilters([]);
               }
             }}
             className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
@@ -629,8 +625,8 @@ export function ProductsTable({
                   <tr
                     key={row.id}
                     className={cn(
-                      'border-b border-border transition-colors hover:bg-muted/50',
-                      row.getIsSelected() && 'bg-brand-50'
+                      "border-b border-border transition-colors hover:bg-muted/50",
+                      row.getIsSelected() && "bg-brand-50"
                     )}
                   >
                     {row.getVisibleCells().map((cell) => (
@@ -654,12 +650,12 @@ export function ProductsTable({
           <div className="flex items-center justify-between border-t border-border px-4 py-3">
             {/* Info */}
             <div className="text-sm text-muted-foreground">
-              Showing{' '}
-              {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
+              Showing{" "}
+              {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
               {Math.min(
                 (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
                 table.getFilteredRowModel().rows.length
-              )}{' '}
+              )}{" "}
               of {table.getFilteredRowModel().rows.length} products
             </div>
 
@@ -707,7 +703,7 @@ export function ProductsTable({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -728,11 +724,7 @@ export function ProductsTableSkeleton() {
         <div className="border-b border-border bg-muted/50 px-4 py-3">
           <div className="flex gap-4">
             {[40, 300, 100, 100, 100, 80, 120, 50].map((w, i) => (
-              <div
-                key={i}
-                className="h-4 animate-pulse rounded bg-muted"
-                style={{ width: w }}
-              />
+              <div key={i} className="h-4 animate-pulse rounded bg-muted" style={{ width: w }} />
             ))}
           </div>
         </div>
@@ -740,18 +732,14 @@ export function ProductsTableSkeleton() {
           <div key={i} className="border-b border-border px-4 py-3">
             <div className="flex items-center gap-4">
               {[40, 300, 100, 100, 100, 80, 120, 50].map((w, j) => (
-                <div
-                  key={j}
-                  className="h-6 animate-pulse rounded bg-muted"
-                  style={{ width: w }}
-                />
+                <div key={j} className="h-6 animate-pulse rounded bg-muted" style={{ width: w }} />
               ))}
             </div>
           </div>
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default ProductsTable
+export default ProductsTable;

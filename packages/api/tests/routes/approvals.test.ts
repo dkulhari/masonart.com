@@ -54,9 +54,7 @@ let app: Hono | null = null;
 beforeAll(async () => {
   // Check if we should skip runtime tests
   if (process.env.SKIP_DB_RUNTIME_TESTS === "true") {
-    console.log(
-      "Skipping approvals runtime tests (SKIP_DB_RUNTIME_TESTS=true)"
-    );
+    console.log("Skipping approvals runtime tests (SKIP_DB_RUNTIME_TESTS=true)");
     return;
   }
 
@@ -84,10 +82,7 @@ beforeAll(async () => {
       isDatabaseAvailable = false;
     }
   } catch (error) {
-    console.log(
-      "Could not initialize app for testing:",
-      (error as Error).message
-    );
+    console.log("Could not initialize app for testing:", (error as Error).message);
     isDatabaseAvailable = false;
   }
 }, 10000);

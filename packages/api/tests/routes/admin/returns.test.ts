@@ -74,10 +74,7 @@ beforeAll(async () => {
       isDatabaseAvailable = false;
     }
   } catch (error) {
-    console.log(
-      "Could not initialize app for testing:",
-      (error as Error).message
-    );
+    console.log("Could not initialize app for testing:", (error as Error).message);
     isDatabaseAvailable = false;
   }
 }, 10000);
@@ -187,7 +184,7 @@ describe("Admin Returns Validation Schemas", () => {
       const { updateReturnSchema } = await import("../../../src/routes/admin/returns");
 
       expect(updateReturnSchema.safeParse({ refundAmount: 0 }).success).toBe(true);
-      expect(updateReturnSchema.safeParse({ refundAmount: 100.50 }).success).toBe(true);
+      expect(updateReturnSchema.safeParse({ refundAmount: 100.5 }).success).toBe(true);
       expect(updateReturnSchema.safeParse({ refundAmount: -10 }).success).toBe(false);
     });
   });
@@ -196,23 +193,15 @@ describe("Admin Returns Validation Schemas", () => {
     it("should require reason with minimum 10 characters", async () => {
       const { rejectReturnSchema } = await import("../../../src/routes/admin/returns");
 
-      expect(
-        rejectReturnSchema.safeParse({ reason: "Too short" }).success
-      ).toBe(false);
-      expect(
-        rejectReturnSchema.safeParse({ reason: "1234567890" }).success
-      ).toBe(true);
+      expect(rejectReturnSchema.safeParse({ reason: "Too short" }).success).toBe(false);
+      expect(rejectReturnSchema.safeParse({ reason: "1234567890" }).success).toBe(true);
     });
 
     it("should reject reason exceeding 1000 characters", async () => {
       const { rejectReturnSchema } = await import("../../../src/routes/admin/returns");
 
-      expect(
-        rejectReturnSchema.safeParse({ reason: "a".repeat(1001) }).success
-      ).toBe(false);
-      expect(
-        rejectReturnSchema.safeParse({ reason: "a".repeat(1000) }).success
-      ).toBe(true);
+      expect(rejectReturnSchema.safeParse({ reason: "a".repeat(1001) }).success).toBe(false);
+      expect(rejectReturnSchema.safeParse({ reason: "a".repeat(1000) }).success).toBe(true);
     });
   });
 
@@ -220,27 +209,23 @@ describe("Admin Returns Validation Schemas", () => {
     it("should require positive refundAmount", async () => {
       const { processRefundSchema } = await import("../../../src/routes/admin/returns");
 
-      expect(
-        processRefundSchema.safeParse({ refundAmount: 100, refundType: "full" })
-          .success
-      ).toBe(true);
-      expect(
-        processRefundSchema.safeParse({ refundAmount: 0, refundType: "full" })
-          .success
-      ).toBe(false);
-      expect(
-        processRefundSchema.safeParse({ refundAmount: -50, refundType: "full" })
-          .success
-      ).toBe(false);
+      expect(processRefundSchema.safeParse({ refundAmount: 100, refundType: "full" }).success).toBe(
+        true
+      );
+      expect(processRefundSchema.safeParse({ refundAmount: 0, refundType: "full" }).success).toBe(
+        false
+      );
+      expect(processRefundSchema.safeParse({ refundAmount: -50, refundType: "full" }).success).toBe(
+        false
+      );
     });
 
     it("should validate refundType enum values", async () => {
       const { processRefundSchema } = await import("../../../src/routes/admin/returns");
 
-      expect(
-        processRefundSchema.safeParse({ refundAmount: 100, refundType: "full" })
-          .success
-      ).toBe(true);
+      expect(processRefundSchema.safeParse({ refundAmount: 100, refundType: "full" }).success).toBe(
+        true
+      );
       expect(
         processRefundSchema.safeParse({
           refundAmount: 50,
@@ -265,12 +250,8 @@ describe("Admin Returns Validation Schemas", () => {
       const { processRefundSchema } = await import("../../../src/routes/admin/returns");
 
       expect(processRefundSchema.safeParse({}).success).toBe(false);
-      expect(
-        processRefundSchema.safeParse({ refundAmount: 100 }).success
-      ).toBe(false);
-      expect(
-        processRefundSchema.safeParse({ refundType: "full" }).success
-      ).toBe(false);
+      expect(processRefundSchema.safeParse({ refundAmount: 100 }).success).toBe(false);
+      expect(processRefundSchema.safeParse({ refundType: "full" }).success).toBe(false);
     });
   });
 });
@@ -362,14 +343,11 @@ describe("Admin Returns Route Availability", () => {
       return;
     }
 
-    const res = await app.request(
-      `/api/admin/returns/${VALID_UUID}/process-refund`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refundAmount: 100, refundType: "full" }),
-      }
-    );
+    const res = await app.request(`/api/admin/returns/${VALID_UUID}/process-refund`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refundAmount: 100, refundType: "full" }),
+    });
     // Should be 401 (unauthorized) since POST requires admin auth
     expect(res.status).toBe(401);
   });
@@ -435,14 +413,11 @@ describe("Admin Returns Authorization", () => {
   it("POST /api/admin/returns/:id/process-refund requires authentication", async () => {
     if (!app) return;
 
-    const res = await app.request(
-      `/api/admin/returns/${VALID_UUID}/process-refund`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refundAmount: 100, refundType: "full" }),
-      }
-    );
+    const res = await app.request(`/api/admin/returns/${VALID_UUID}/process-refund`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refundAmount: 100, refundType: "full" }),
+    });
     expect(res.status).toBe(401);
   });
 });

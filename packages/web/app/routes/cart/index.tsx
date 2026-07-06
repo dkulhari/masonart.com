@@ -7,7 +7,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from "@tanstack/react-router";
 import {
   ShoppingBag,
   ArrowRight,
@@ -16,8 +16,8 @@ import {
   RotateCcw,
   ChevronRight,
   Trash2,
-} from 'lucide-react'
-import { formatPrice } from '~/lib/utils'
+} from "lucide-react";
+import { formatPrice } from "~/lib/utils";
 import {
   useCartItems,
   useCartSubtotal,
@@ -25,42 +25,42 @@ import {
   useCartActions,
   useIsCartEmpty,
   useCartHydration,
-} from '~/stores/cart'
-import { CartItem } from '~/components/cart/CartItem'
+} from "~/stores/cart";
+import { CartItem } from "~/components/cart/CartItem";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/cart/')({
+export const Route = createFileRoute("/cart/")({
   head: () => ({
     meta: [
-      { title: 'Shopping Cart | MasonArt' },
+      { title: "Shopping Cart | MasonArt" },
       {
-        name: 'description',
+        name: "description",
         content:
-          'View and manage items in your shopping cart. Premium posters and custom frames from MasonArt.',
+          "View and manage items in your shopping cart. Premium posters and custom frames from MasonArt.",
       },
-      { name: 'robots', content: 'noindex' }, // Don't index cart pages
+      { name: "robots", content: "noindex" }, // Don't index cart pages
     ],
   }),
   component: CartPage,
-})
+});
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function CartPage() {
-  const isHydrated = useCartHydration()
+  const isHydrated = useCartHydration();
 
   // Show loading skeleton until hydration is complete
   // This prevents store subscription during SSR which causes infinite loops
   if (!isHydrated) {
-    return <CartSkeleton />
+    return <CartSkeleton />;
   }
 
-  return <CartContent />
+  return <CartContent />;
 }
 
 /**
@@ -68,11 +68,11 @@ function CartPage() {
  * Only rendered after hydration to avoid SSR issues with Zustand persist.
  */
 function CartContent() {
-  const items = useCartItems()
-  const subtotal = useCartSubtotal()
-  const itemCount = useCartItemCount()
-  const isEmpty = useIsCartEmpty()
-  const { updateQuantity, removeItem, clearCart } = useCartActions()
+  const items = useCartItems();
+  const subtotal = useCartSubtotal();
+  const itemCount = useCartItemCount();
+  const isEmpty = useIsCartEmpty();
+  const { updateQuantity, removeItem, clearCart } = useCartActions();
 
   return (
     <div className="min-h-screen bg-background">
@@ -84,7 +84,7 @@ function CartContent() {
           </h1>
           {!isEmpty && (
             <p className="mt-1 text-muted-foreground">
-              {itemCount} {itemCount === 1 ? 'item' : 'items'} in your cart
+              {itemCount} {itemCount === 1 ? "item" : "items"} in your cart
             </p>
           )}
         </div>
@@ -139,7 +139,7 @@ function CartContent() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -147,17 +147,17 @@ function CartContent() {
 // ============================================================================
 
 interface OrderSummaryProps {
-  subtotal: number
-  itemCount: number
+  subtotal: number;
+  itemCount: number;
 }
 
 function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
   // Shipping is free over ₹999
-  const shippingThreshold = 999
-  const hasShippingFee = subtotal < shippingThreshold
-  const shippingFee = hasShippingFee ? 99 : 0
-  const total = subtotal + shippingFee
-  const amountUntilFreeShipping = shippingThreshold - subtotal
+  const shippingThreshold = 999;
+  const hasShippingFee = subtotal < shippingThreshold;
+  const shippingFee = hasShippingFee ? 99 : 0;
+  const total = subtotal + shippingFee;
+  const amountUntilFreeShipping = shippingThreshold - subtotal;
 
   return (
     <div className="sticky top-24 rounded-xl border border-border bg-card p-6">
@@ -183,7 +183,7 @@ function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
       <div className="mt-6 space-y-3">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})
+            Subtotal ({itemCount} {itemCount === 1 ? "item" : "items"})
           </span>
           <span className="font-medium text-foreground">{formatPrice(subtotal)}</span>
         </div>
@@ -240,7 +240,7 @@ function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
       <div className="mt-6 border-t border-border pt-4">
         <p className="mb-2 text-xs text-muted-foreground">Accepted Payment Methods</p>
         <div className="flex flex-wrap gap-2">
-          {['Visa', 'Mastercard', 'Razorpay', 'UPI'].map((method) => (
+          {["Visa", "Mastercard", "Razorpay", "UPI"].map((method) => (
             <span
               key={method}
               className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground"
@@ -251,7 +251,7 @@ function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -268,8 +268,8 @@ function EmptyCartState() {
       <h2 className="mb-2 text-xl font-semibold text-foreground">Your cart is empty</h2>
 
       <p className="mb-8 text-muted-foreground">
-        Looks like you haven't added anything to your cart yet.
-        Explore our collection of premium posters and find something you love.
+        Looks like you haven't added anything to your cart yet. Explore our collection of premium
+        posters and find something you love.
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -290,9 +290,7 @@ function EmptyCartState() {
 
       {/* Recommendations Section */}
       <div className="mt-16 border-t border-border pt-8">
-        <h3 className="mb-4 text-lg font-semibold text-foreground">
-          Recommended for You
-        </h3>
+        <h3 className="mb-4 text-lg font-semibold text-foreground">Recommended for You</h3>
         <p className="text-sm text-muted-foreground">
           Check out our featured collection to get inspired.
         </p>
@@ -305,7 +303,7 @@ function EmptyCartState() {
         </a>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -326,10 +324,7 @@ function CartSkeleton() {
           {/* Cart Items Column */}
           <div className="lg:col-span-2 space-y-4">
             {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="flex gap-4 rounded-lg border border-border p-4"
-              >
+              <div key={i} className="flex gap-4 rounded-lg border border-border p-4">
                 <div className="h-24 w-24 animate-pulse rounded bg-muted" />
                 <div className="flex-1 space-y-2">
                   <div className="h-5 w-3/4 animate-pulse rounded bg-muted" />
@@ -355,5 +350,5 @@ function CartSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }

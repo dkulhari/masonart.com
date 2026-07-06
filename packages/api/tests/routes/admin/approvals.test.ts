@@ -67,9 +67,7 @@ let app: Hono | null = null;
 beforeAll(async () => {
   // Check if we should skip runtime tests
   if (process.env.SKIP_DB_RUNTIME_TESTS === "true") {
-    console.log(
-      "Skipping admin approvals runtime tests (SKIP_DB_RUNTIME_TESTS=true)"
-    );
+    console.log("Skipping admin approvals runtime tests (SKIP_DB_RUNTIME_TESTS=true)");
     return;
   }
 
@@ -97,10 +95,7 @@ beforeAll(async () => {
       isDatabaseAvailable = false;
     }
   } catch (error) {
-    console.log(
-      "Could not initialize app for testing:",
-      (error as Error).message
-    );
+    console.log("Could not initialize app for testing:", (error as Error).message);
     isDatabaseAvailable = false;
   }
 }, 10000);
@@ -117,9 +112,7 @@ describe("Admin Approvals Route Module Exports", () => {
   });
 
   it("should be a Hono app instance", async () => {
-    const { adminApprovalsApp } = await import(
-      "../../../src/routes/admin/approvals"
-    );
+    const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
     expect(typeof adminApprovalsApp.fetch).toBe("function");
     expect(typeof adminApprovalsApp.request).toBe("function");
   });
@@ -182,14 +175,11 @@ describe("Admin Approvals Authentication Requirements", () => {
         return;
       }
 
-      const res = await app.request(
-        `/api/admin/approvals/${validApprovalId}/photos`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(validPhotoUploadData),
-        }
-      );
+      const res = await app.request(`/api/admin/approvals/${validApprovalId}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validPhotoUploadData),
+      });
       expect(res.status).toBe(401);
 
       const json = await res.json();
@@ -204,12 +194,9 @@ describe("Admin Approvals Authentication Requirements", () => {
         return;
       }
 
-      const res = await app.request(
-        `/api/admin/approvals/${validApprovalId}/photos`,
-        {
-          method: "DELETE",
-        }
-      );
+      const res = await app.request(`/api/admin/approvals/${validApprovalId}/photos`, {
+        method: "DELETE",
+      });
       expect(res.status).toBe(401);
 
       const json = await res.json();
@@ -224,14 +211,11 @@ describe("Admin Approvals Authentication Requirements", () => {
         return;
       }
 
-      const res = await app.request(
-        `/api/admin/approvals/${validApprovalId}/comments`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(validCommentData),
-        }
-      );
+      const res = await app.request(`/api/admin/approvals/${validApprovalId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validCommentData),
+      });
       expect(res.status).toBe(401);
 
       const json = await res.json();
@@ -249,24 +233,18 @@ describe("Admin Approvals Authentication Requirements", () => {
 describe("Admin Approvals Input Validation", () => {
   describe("GET /api/admin/approvals - Query Validation", () => {
     it("should accept valid status filter format", async () => {
-      const { adminApprovalsApp } = await import(
-        "../../../src/routes/admin/approvals"
-      );
+      const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
       // Without authentication, we'll get 401 (auth runs first)
       // This test verifies the route accepts valid query params format
-      const res = await adminApprovalsApp.request(
-        "/?status=pending_approval&page=1&pageSize=10"
-      );
+      const res = await adminApprovalsApp.request("/?status=pending_approval&page=1&pageSize=10");
 
       // Should get 401 (auth required), confirming route exists and accepts params
       expect(res.status).toBe(401);
     });
 
     it("should reject invalid status before auth check", async () => {
-      const { adminApprovalsApp } = await import(
-        "../../../src/routes/admin/approvals"
-      );
+      const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
       const res = await adminApprovalsApp.request("/?status=invalid_status");
 
@@ -278,18 +256,13 @@ describe("Admin Approvals Input Validation", () => {
 
   describe("POST /api/admin/approvals/:id/photos - Photo Upload Schema", () => {
     it("should have photo upload endpoint that requires auth first", async () => {
-      const { adminApprovalsApp } = await import(
-        "../../../src/routes/admin/approvals"
-      );
+      const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
-      const res = await adminApprovalsApp.request(
-        `/${validApprovalId}/photos`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ photos: [] }),
-        }
-      );
+      const res = await adminApprovalsApp.request(`/${validApprovalId}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos: [] }),
+      });
 
       // Auth runs before validation
       expect(res.status).toBe(401);
@@ -298,18 +271,13 @@ describe("Admin Approvals Input Validation", () => {
 
   describe("POST /api/admin/approvals/:id/comments - Comment Schema", () => {
     it("should have comment endpoint that requires auth first", async () => {
-      const { adminApprovalsApp } = await import(
-        "../../../src/routes/admin/approvals"
-      );
+      const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
-      const res = await adminApprovalsApp.request(
-        `/${validApprovalId}/comments`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ comment: "" }),
-        }
-      );
+      const res = await adminApprovalsApp.request(`/${validApprovalId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: "" }),
+      });
 
       // Auth runs before validation
       expect(res.status).toBe(401);
@@ -323,9 +291,7 @@ describe("Admin Approvals Input Validation", () => {
 
 describe("Admin Approvals Route Availability", () => {
   it("should have GET / route available", async () => {
-    const { adminApprovalsApp } = await import(
-      "../../../src/routes/admin/approvals"
-    );
+    const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
     const res = await adminApprovalsApp.request("/");
 
@@ -334,9 +300,7 @@ describe("Admin Approvals Route Availability", () => {
   });
 
   it("should have GET /stats route available", async () => {
-    const { adminApprovalsApp } = await import(
-      "../../../src/routes/admin/approvals"
-    );
+    const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
     const res = await adminApprovalsApp.request("/stats");
 
@@ -344,9 +308,7 @@ describe("Admin Approvals Route Availability", () => {
   });
 
   it("should have GET /:id route available", async () => {
-    const { adminApprovalsApp } = await import(
-      "../../../src/routes/admin/approvals"
-    );
+    const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
     const res = await adminApprovalsApp.request(`/${validApprovalId}`);
 
@@ -354,9 +316,7 @@ describe("Admin Approvals Route Availability", () => {
   });
 
   it("should have POST /:id/photos route available", async () => {
-    const { adminApprovalsApp } = await import(
-      "../../../src/routes/admin/approvals"
-    );
+    const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
     const res = await adminApprovalsApp.request(`/${validApprovalId}/photos`, {
       method: "POST",
@@ -368,9 +328,7 @@ describe("Admin Approvals Route Availability", () => {
   });
 
   it("should have DELETE /:id/photos route available", async () => {
-    const { adminApprovalsApp } = await import(
-      "../../../src/routes/admin/approvals"
-    );
+    const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
     const res = await adminApprovalsApp.request(`/${validApprovalId}/photos`, {
       method: "DELETE",
@@ -380,18 +338,13 @@ describe("Admin Approvals Route Availability", () => {
   });
 
   it("should have POST /:id/comments route available", async () => {
-    const { adminApprovalsApp } = await import(
-      "../../../src/routes/admin/approvals"
-    );
+    const { adminApprovalsApp } = await import("../../../src/routes/admin/approvals");
 
-    const res = await adminApprovalsApp.request(
-      `/${validApprovalId}/comments`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(validCommentData),
-      }
-    );
+    const res = await adminApprovalsApp.request(`/${validApprovalId}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(validCommentData),
+    });
 
     expect(res.status).not.toBe(404);
   });

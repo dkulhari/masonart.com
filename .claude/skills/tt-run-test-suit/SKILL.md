@@ -33,27 +33,27 @@ $ARGUMENTS: [--suite=<name|all>]
 
 Each suite maps directly to a test file in `tests/e2e/`:
 
-| # | Suite | Test File(s) | Feature | Description |
-|---|-------|--------------|---------|-------------|
-| 1 | auth | `auth.spec.ts` | `authentication` | Login, register, authentication |
-| 2 | account | `account.spec.ts` | `authentication` | User profile management |
-| 3 | products | `product-detail.spec.ts`, `product-listing.spec.ts` | `product-catalog` | Product catalog |
-| 4 | cart | `cart.spec.ts` | `cart-checkout` | Shopping cart |
-| 5 | checkout | `checkout.spec.ts` | `cart-checkout` | Checkout flow |
-| 6 | payment | `payment.spec.ts` | `cart-checkout` | Payment processing |
-| 7 | orders | `order-confirmation.spec.ts`, `guest-order-tracking.spec.ts` | `order-tracking-notifications` | Order management |
-| 8 | ai | `ai-generator.spec.ts`, `ai-history.spec.ts` | `ai-generation` | AI poster generation |
-| 9 | reviews | `reviews.spec.ts` | `user-reviews` | Customer reviews |
-| 10 | approval | `admin-approvals.spec.ts`, `customer-approval.spec.ts` | `photo-approval-workflow` | Photo approval workflow |
-| 11 | wallet | `wallet.spec.ts` | `wallet-system` | Wallet system |
-| 12 | admin-auth | `admin-auth.spec.ts` | `authentication` | Admin login flow |
-| 13 | admin-dashboard | `admin-dashboard.spec.ts` | `admin-panel` | Admin dashboard metrics |
-| 14 | admin-orders | `admin-orders.spec.ts` | `admin-panel` | Admin order management |
-| 15 | admin-products | `admin-products.spec.ts` | `product-catalog` | Admin product CRUD |
-| 16 | admin-reviews | `admin-reviews.spec.ts` | `user-reviews` | Admin review moderation |
-| 17 | seo | `seo-meta.spec.ts`, `seo-jsonld.spec.ts`, `robots.spec.ts`, `sitemap.spec.ts` | `seo` | SEO tests |
-| 18 | layout | `layout.spec.ts`, `home.spec.ts` | `frontend-ui` | UI layout tests |
-| 19 | admin-all | *(all admin-*.spec.ts)* | *(varies)* | All admin tests combined |
+| #   | Suite           | Test File(s)                                                                  | Feature                        | Description                     |
+| --- | --------------- | ----------------------------------------------------------------------------- | ------------------------------ | ------------------------------- |
+| 1   | auth            | `auth.spec.ts`                                                                | `authentication`               | Login, register, authentication |
+| 2   | account         | `account.spec.ts`                                                             | `authentication`               | User profile management         |
+| 3   | products        | `product-detail.spec.ts`, `product-listing.spec.ts`                           | `product-catalog`              | Product catalog                 |
+| 4   | cart            | `cart.spec.ts`                                                                | `cart-checkout`                | Shopping cart                   |
+| 5   | checkout        | `checkout.spec.ts`                                                            | `cart-checkout`                | Checkout flow                   |
+| 6   | payment         | `payment.spec.ts`                                                             | `cart-checkout`                | Payment processing              |
+| 7   | orders          | `order-confirmation.spec.ts`, `guest-order-tracking.spec.ts`                  | `order-tracking-notifications` | Order management                |
+| 8   | ai              | `ai-generator.spec.ts`, `ai-history.spec.ts`                                  | `ai-generation`                | AI poster generation            |
+| 9   | reviews         | `reviews.spec.ts`                                                             | `user-reviews`                 | Customer reviews                |
+| 10  | approval        | `admin-approvals.spec.ts`, `customer-approval.spec.ts`                        | `photo-approval-workflow`      | Photo approval workflow         |
+| 11  | wallet          | `wallet.spec.ts`                                                              | `wallet-system`                | Wallet system                   |
+| 12  | admin-auth      | `admin-auth.spec.ts`                                                          | `authentication`               | Admin login flow                |
+| 13  | admin-dashboard | `admin-dashboard.spec.ts`                                                     | `admin-panel`                  | Admin dashboard metrics         |
+| 14  | admin-orders    | `admin-orders.spec.ts`                                                        | `admin-panel`                  | Admin order management          |
+| 15  | admin-products  | `admin-products.spec.ts`                                                      | `product-catalog`              | Admin product CRUD              |
+| 16  | admin-reviews   | `admin-reviews.spec.ts`                                                       | `user-reviews`                 | Admin review moderation         |
+| 17  | seo             | `seo-meta.spec.ts`, `seo-jsonld.spec.ts`, `robots.spec.ts`, `sitemap.spec.ts` | `seo`                          | SEO tests                       |
+| 18  | layout          | `layout.spec.ts`, `home.spec.ts`                                              | `frontend-ui`                  | UI layout tests                 |
+| 19  | admin-all       | _(all admin-_.spec.ts)\*                                                      | _(varies)_                     | All admin tests combined        |
 
 **Note**: Test counts are discovered at runtime from Playwright output (e.g., "Running 172 tests").
 
@@ -115,6 +115,7 @@ For suites with multiple files (products, orders, ai, approval, admin-all, seo, 
 4. If one file hits max failures, continue to next file in suite
 
 **Example for admin-all suite (5 files):**
+
 ```bash
 ./scripts/run-tests.sh e2e --file=admin-auth.spec.ts --max-failures=10
 ./scripts/run-tests.sh e2e --file=admin-dashboard.spec.ts --max-failures=10
@@ -130,6 +131,7 @@ Capture full output from each run including all failures.
 ### Step 3: Parse Failures
 
 Extract from test output:
+
 - `test_file`: Full path to test file
 - `test_name`: Test description/name
 - `line`: Line number
@@ -137,6 +139,7 @@ Extract from test output:
 - `test_key`: Unique identifier `{filename}:{test_name}`
 
 **Playwright failure pattern**:
+
 ```
 ✘  1 [chromium] › tests/e2e/payment.spec.ts:45:5 › Payment › should process card (15s)
     Error: expect(received).toBeVisible()
@@ -145,6 +148,7 @@ Extract from test output:
 ### Step 4: Classify Each Failure
 
 **Test Bug Indicators** (log under `testsuite-bug-{suite}`):
+
 - "Timeout" / "TimeoutError"
 - "locator" / "selector" / "Element not found"
 - "waiting for" / "waitFor"
@@ -155,6 +159,7 @@ Extract from test output:
 - "strict mode violation" (multiple elements matched)
 
 **App Bug Indicators** (log under actual feature):
+
 - "expected X to equal Y" (value assertions)
 - "500" / "400" / HTTP errors
 - "ValidationError" / schema failures
@@ -179,7 +184,7 @@ Before logging a test bug, check if feature exists:
 
 **For test bugs:**
 
-```
+````
 mcp__ticketrack__createTicket:
   feature: "testsuite-bug-{suite}"
   title: "Test Bug: {test-name} - {issue-type}"
@@ -198,36 +203,36 @@ mcp__ticketrack__createTicket:
 
     ## Classification
     This is a **test bug** - likely a flaky selector, timing issue, or mock problem.
-```
+````
 
 **For app bugs:**
 
 Detect feature from test file name (order matters - more specific patterns first):
 
-| File Pattern | Feature |
-|--------------|---------|
-| `admin-auth` | `authentication` |
-| `admin-dashboard` | `admin-panel` |
-| `admin-orders` | `admin-panel` |
-| `admin-products` | `product-catalog` |
-| `admin-reviews` | `user-reviews` |
-| `admin-approvals` | `photo-approval-workflow` |
-| `customer-approval` | `photo-approval-workflow` |
-| `guest-order-tracking` | `order-tracking-notifications` |
-| `order-confirmation` | `cart-checkout` |
-| `cart` | `cart-checkout` |
-| `checkout` | `cart-checkout` |
-| `auth` | `authentication` |
-| `product` | `product-catalog` |
-| `review` | `user-reviews` |
-| `ai` | `ai-generation` |
-| `wallet` | `wallet-system` |
-| `payment` | `cart-checkout` |
-| `seo`, `robots`, `sitemap` | `seo` |
-| `layout`, `home` | `frontend-ui` |
-| `account` | `authentication` |
+| File Pattern               | Feature                        |
+| -------------------------- | ------------------------------ |
+| `admin-auth`               | `authentication`               |
+| `admin-dashboard`          | `admin-panel`                  |
+| `admin-orders`             | `admin-panel`                  |
+| `admin-products`           | `product-catalog`              |
+| `admin-reviews`            | `user-reviews`                 |
+| `admin-approvals`          | `photo-approval-workflow`      |
+| `customer-approval`        | `photo-approval-workflow`      |
+| `guest-order-tracking`     | `order-tracking-notifications` |
+| `order-confirmation`       | `cart-checkout`                |
+| `cart`                     | `cart-checkout`                |
+| `checkout`                 | `cart-checkout`                |
+| `auth`                     | `authentication`               |
+| `product`                  | `product-catalog`              |
+| `review`                   | `user-reviews`                 |
+| `ai`                       | `ai-generation`                |
+| `wallet`                   | `wallet-system`                |
+| `payment`                  | `cart-checkout`                |
+| `seo`, `robots`, `sitemap` | `seo`                          |
+| `layout`, `home`           | `frontend-ui`                  |
+| `account`                  | `authentication`               |
 
-```
+````
 mcp__ticketrack__createTicket:
   feature: "{detected-feature}"
   title: "Bug: {test-name} failing"
@@ -246,13 +251,14 @@ mcp__ticketrack__createTicket:
 
     ## Classification
     This is an **app bug** - business logic, API error, or validation issue.
-```
+````
 
 ### Step 7: Summary Report
 
 After processing all suites, output summary:
 
 **For single-file suites:**
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Test Suite Results: {suite}
@@ -275,6 +281,7 @@ App Bugs ({feature}):
 ```
 
 **For multi-file suites (aggregated results):**
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Test Suite Results: admin-all (5 files)

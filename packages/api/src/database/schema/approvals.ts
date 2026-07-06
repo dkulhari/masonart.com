@@ -1,15 +1,7 @@
 // Production Photo Approvals database schema for Photo Approval Workflow feature
 // Following the patterns defined in the existing schema files
 
-import {
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  pgEnum,
-  index,
-  integer,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, pgEnum, index, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { orders, orderItems } from "./orders";
 
@@ -81,16 +73,10 @@ export const productionApprovals = pgTable(
   },
   (table) => ({
     orderIdIdx: index("production_approvals_order_id_idx").on(table.orderId),
-    orderItemIdIdx: index("production_approvals_order_item_id_idx").on(
-      table.orderItemId
-    ),
+    orderItemIdIdx: index("production_approvals_order_item_id_idx").on(table.orderItemId),
     statusIdx: index("production_approvals_status_idx").on(table.status),
-    approvalTokenIdx: index("production_approvals_token_idx").on(
-      table.approvalToken
-    ),
-    deadlineAtIdx: index("production_approvals_deadline_idx").on(
-      table.deadlineAt
-    ),
+    approvalTokenIdx: index("production_approvals_token_idx").on(table.approvalToken),
+    deadlineAtIdx: index("production_approvals_deadline_idx").on(table.deadlineAt),
   })
 );
 
@@ -150,9 +136,7 @@ export const approvalComments = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    approvalIdIdx: index("approval_comments_approval_id_idx").on(
-      table.approvalId
-    ),
+    approvalIdIdx: index("approval_comments_approval_id_idx").on(table.approvalId),
     createdAtIdx: index("approval_comments_created_at_idx").on(table.createdAt),
   })
 );
@@ -164,21 +148,18 @@ export const approvalComments = pgTable(
 /**
  * Production approvals relations
  */
-export const productionApprovalsRelations = relations(
-  productionApprovals,
-  ({ one, many }) => ({
-    order: one(orders, {
-      fields: [productionApprovals.orderId],
-      references: [orders.id],
-    }),
-    orderItem: one(orderItems, {
-      fields: [productionApprovals.orderItemId],
-      references: [orderItems.id],
-    }),
-    photos: many(approvalPhotos),
-    comments: many(approvalComments),
-  })
-);
+export const productionApprovalsRelations = relations(productionApprovals, ({ one, many }) => ({
+  order: one(orders, {
+    fields: [productionApprovals.orderId],
+    references: [orders.id],
+  }),
+  orderItem: one(orderItems, {
+    fields: [productionApprovals.orderItemId],
+    references: [orderItems.id],
+  }),
+  photos: many(approvalPhotos),
+  comments: many(approvalComments),
+}));
 
 /**
  * Approval photos relations
@@ -193,15 +174,12 @@ export const approvalPhotosRelations = relations(approvalPhotos, ({ one }) => ({
 /**
  * Approval comments relations
  */
-export const approvalCommentsRelations = relations(
-  approvalComments,
-  ({ one }) => ({
-    approval: one(productionApprovals, {
-      fields: [approvalComments.approvalId],
-      references: [productionApprovals.id],
-    }),
-  })
-);
+export const approvalCommentsRelations = relations(approvalComments, ({ one }) => ({
+  approval: one(productionApprovals, {
+    fields: [approvalComments.approvalId],
+    references: [productionApprovals.id],
+  }),
+}));
 
 // ============================================================================
 // Type Exports (inferred from schema)
@@ -217,5 +195,4 @@ export type ApprovalComment = typeof approvalComments.$inferSelect;
 export type NewApprovalComment = typeof approvalComments.$inferInsert;
 
 export type ApprovalStatus = (typeof approvalStatusEnum.enumValues)[number];
-export type ApprovalAuthorType =
-  (typeof approvalAuthorTypeEnum.enumValues)[number];
+export type ApprovalAuthorType = (typeof approvalAuthorTypeEnum.enumValues)[number];

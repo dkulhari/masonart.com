@@ -10,15 +10,15 @@
  * Tests also gracefully skip when database is unavailable.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
 
 // Dynamically import postgres only when needed for runtime tests
 type PostgresClient = any;
 
 // Check if we should skip database runtime tests
-const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
+const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === "true";
 
 // Track database availability
 let isDatabaseAvailable = false;
@@ -27,16 +27,18 @@ let client: PostgresClient | null = null;
 
 beforeAll(async () => {
   if (SKIP_TESTS) {
-    console.log('⏭️  Skipping database seeding tests (SKIP_DB_RUNTIME_TESTS=true)');
+    console.log("⏭️  Skipping database seeding tests (SKIP_DB_RUNTIME_TESTS=true)");
     return;
   }
 
   try {
     // Dynamically import postgres
-    const postgres = (await import('postgres')).default;
+    const postgres = (await import("postgres")).default;
 
     // Use test database URL or fall back to development
-    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    const databaseUrl =
+      process.env.DATABASE_URL ||
+      "postgresql://poster_app:dev_password@localhost:5433/poster_app_test";
     client = postgres(databaseUrl, {
       max: 1,
       connect_timeout: 5,
@@ -47,9 +49,9 @@ beforeAll(async () => {
     await client`SELECT 1`;
     isDatabaseAvailable = true;
 
-    console.log('✅ Database connection established for seed tests');
+    console.log("✅ Database connection established for seed tests");
   } catch (error) {
-    console.log('⚠️  Database not available, runtime tests will be skipped');
+    console.log("⚠️  Database not available, runtime tests will be skipped");
     isDatabaseAvailable = false;
     if (client) {
       try {
@@ -75,148 +77,154 @@ afterAll(async () => {
 // Helper to check if tests should be skipped
 const shouldSkip = () => SKIP_TESTS || !isDatabaseAvailable;
 
-describe('Database Seeding Tests', () => {
-  describe('Seed Script File Validation', () => {
-    it('should have seed.ts file in database directory', () => {
-      const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
+describe("Database Seeding Tests", () => {
+  describe("Seed Script File Validation", () => {
+    it("should have seed.ts file in database directory", () => {
+      const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
       expect(fs.existsSync(seedPath)).toBe(true);
     });
 
-    it('should have package.json seed script defined', () => {
-      const pkgPath = path.join(process.cwd(), 'packages', 'api', 'package.json');
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    it("should have package.json seed script defined", () => {
+      const pkgPath = path.join(process.cwd(), "packages", "api", "package.json");
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
 
       // The seed script might be db:seed, seed, or similar
       const hasSeedScript =
-        pkg.scripts?.['db:seed'] ||
-        pkg.scripts?.['seed'] ||
-        pkg.scripts?.['database:seed'];
+        pkg.scripts?.["db:seed"] || pkg.scripts?.["seed"] || pkg.scripts?.["database:seed"];
 
       expect(hasSeedScript).toBeTruthy();
     });
 
-    it('should have database schema exports', () => {
-      const schemaIndexPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'schema', 'index.ts');
+    it("should have database schema exports", () => {
+      const schemaIndexPath = path.join(
+        process.cwd(),
+        "packages",
+        "api",
+        "src",
+        "database",
+        "schema",
+        "index.ts"
+      );
       expect(fs.existsSync(schemaIndexPath)).toBe(true);
 
-      const content = fs.readFileSync(schemaIndexPath, 'utf-8');
-      expect(content).toContain('products');
+      const content = fs.readFileSync(schemaIndexPath, "utf-8");
+      expect(content).toContain("products");
     });
   });
 
-  describe('Seed Data Content Validation', () => {
+  describe("Seed Data Content Validation", () => {
     let seedContent: string;
 
     beforeAll(() => {
-      const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-      seedContent = fs.readFileSync(seedPath, 'utf-8');
+      const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+      seedContent = fs.readFileSync(seedPath, "utf-8");
     });
 
-    describe('Sample Products', () => {
-      it('should define sample products array', () => {
-        expect(seedContent).toContain('sampleProducts');
-        expect(seedContent).toContain('NewProduct[]');
+    describe("Sample Products", () => {
+      it("should define sample products array", () => {
+        expect(seedContent).toContain("sampleProducts");
+        expect(seedContent).toContain("NewProduct[]");
       });
 
-      it('should include products from multiple collections', () => {
+      it("should include products from multiple collections", () => {
         // Abstract Collection
-        expect(seedContent).toContain('ABS-001');
-        expect(seedContent).toContain('Cosmic Harmony');
+        expect(seedContent).toContain("ABS-001");
+        expect(seedContent).toContain("Cosmic Harmony");
 
         // Nature Collection
-        expect(seedContent).toContain('NAT-001');
-        expect(seedContent).toContain('Mountain Majesty');
+        expect(seedContent).toContain("NAT-001");
+        expect(seedContent).toContain("Mountain Majesty");
 
         // Botanical Collection
-        expect(seedContent).toContain('BOT-001');
-        expect(seedContent).toContain('Monstera Dreams');
+        expect(seedContent).toContain("BOT-001");
+        expect(seedContent).toContain("Monstera Dreams");
 
         // Minimalist Collection
-        expect(seedContent).toContain('MIN-001');
-        expect(seedContent).toContain('Circle of Zen');
+        expect(seedContent).toContain("MIN-001");
+        expect(seedContent).toContain("Circle of Zen");
 
         // Typography Collection
-        expect(seedContent).toContain('TYP-001');
-        expect(seedContent).toContain('Stay Curious');
+        expect(seedContent).toContain("TYP-001");
+        expect(seedContent).toContain("Stay Curious");
       });
 
-      it('should have required product fields', () => {
+      it("should have required product fields", () => {
         // Check for required fields in product definitions
-        expect(seedContent).toContain('sku:');
-        expect(seedContent).toContain('title:');
-        expect(seedContent).toContain('slug:');
-        expect(seedContent).toContain('description:');
-        expect(seedContent).toContain('basePrice:');
-        expect(seedContent).toContain('styles:');
-        expect(seedContent).toContain('subjects:');
-        expect(seedContent).toContain('colors:');
-        expect(seedContent).toContain('rooms:');
-        expect(seedContent).toContain('orientation:');
-        expect(seedContent).toContain('images:');
-        expect(seedContent).toContain('seoTitle:');
-        expect(seedContent).toContain('seoDescription:');
-        expect(seedContent).toContain('status:');
+        expect(seedContent).toContain("sku:");
+        expect(seedContent).toContain("title:");
+        expect(seedContent).toContain("slug:");
+        expect(seedContent).toContain("description:");
+        expect(seedContent).toContain("basePrice:");
+        expect(seedContent).toContain("styles:");
+        expect(seedContent).toContain("subjects:");
+        expect(seedContent).toContain("colors:");
+        expect(seedContent).toContain("rooms:");
+        expect(seedContent).toContain("orientation:");
+        expect(seedContent).toContain("images:");
+        expect(seedContent).toContain("seoTitle:");
+        expect(seedContent).toContain("seoDescription:");
+        expect(seedContent).toContain("status:");
       });
 
-      it('should have products with different orientations', () => {
+      it("should have products with different orientations", () => {
         expect(seedContent).toContain('orientation: "square"');
         expect(seedContent).toContain('orientation: "portrait"');
         expect(seedContent).toContain('orientation: "landscape"');
         expect(seedContent).toContain('orientation: "panoramic"');
       });
 
-      it('should have featured products', () => {
-        expect(seedContent).toContain('isFeatured: true');
-        expect(seedContent).toContain('featuredOrder:');
+      it("should have featured products", () => {
+        expect(seedContent).toContain("isFeatured: true");
+        expect(seedContent).toContain("featuredOrder:");
       });
 
-      it('should have products with valid status', () => {
+      it("should have products with valid status", () => {
         expect(seedContent).toContain('status: "active"');
       });
 
-      it('should have products with tags', () => {
-        expect(seedContent).toContain('tags:');
-        expect(seedContent).toContain('bestseller');
+      it("should have products with tags", () => {
+        expect(seedContent).toContain("tags:");
+        expect(seedContent).toContain("bestseller");
       });
     });
 
-    describe('Product Variants', () => {
-      it('should define variants by orientation', () => {
-        expect(seedContent).toContain('variantsByOrientation');
+    describe("Product Variants", () => {
+      it("should define variants by orientation", () => {
+        expect(seedContent).toContain("variantsByOrientation");
       });
 
-      it('should have variants for all orientations', () => {
-        expect(seedContent).toContain('square:');
-        expect(seedContent).toContain('portrait:');
-        expect(seedContent).toContain('landscape:');
-        expect(seedContent).toContain('panoramic:');
+      it("should have variants for all orientations", () => {
+        expect(seedContent).toContain("square:");
+        expect(seedContent).toContain("portrait:");
+        expect(seedContent).toContain("landscape:");
+        expect(seedContent).toContain("panoramic:");
       });
 
-      it('should have required variant fields', () => {
-        expect(seedContent).toContain('sizeLabel:');
-        expect(seedContent).toContain('widthInches:');
-        expect(seedContent).toContain('heightInches:');
-        expect(seedContent).toContain('widthCm:');
-        expect(seedContent).toContain('heightCm:');
-        expect(seedContent).toContain('price:');
-        expect(seedContent).toContain('stockQuantity:');
-        expect(seedContent).toContain('sortOrder:');
+      it("should have required variant fields", () => {
+        expect(seedContent).toContain("sizeLabel:");
+        expect(seedContent).toContain("widthInches:");
+        expect(seedContent).toContain("heightInches:");
+        expect(seedContent).toContain("widthCm:");
+        expect(seedContent).toContain("heightCm:");
+        expect(seedContent).toContain("price:");
+        expect(seedContent).toContain("stockQuantity:");
+        expect(seedContent).toContain("sortOrder:");
       });
 
-      it('should have multiple size options per orientation', () => {
+      it("should have multiple size options per orientation", () => {
         // Each orientation should have multiple variants
         const squareVariants = seedContent.match(/square:\s*\[[\s\S]*?\{[\s\S]*?sizeLabel/g);
         expect(squareVariants).toBeTruthy();
       });
     });
 
-    describe('Frame Options', () => {
-      it('should define sample frames array', () => {
-        expect(seedContent).toContain('sampleFrames');
-        expect(seedContent).toContain('NewFrame[]');
+    describe("Frame Options", () => {
+      it("should define sample frames array", () => {
+        expect(seedContent).toContain("sampleFrames");
+        expect(seedContent).toContain("NewFrame[]");
       });
 
-      it('should include various frame types', () => {
+      it("should include various frame types", () => {
         expect(seedContent).toContain('type: "none"');
         expect(seedContent).toContain('type: "black"');
         expect(seedContent).toContain('type: "white"');
@@ -227,23 +235,23 @@ describe('Database Seeding Tests', () => {
         expect(seedContent).toContain('type: "wood"');
       });
 
-      it('should have required frame fields', () => {
-        expect(seedContent).toContain('name:');
-        expect(seedContent).toContain('type:');
-        expect(seedContent).toContain('description:');
-        expect(seedContent).toContain('material:');
-        expect(seedContent).toContain('priceModifier:');
-        expect(seedContent).toContain('priceAddition:');
-        expect(seedContent).toContain('isActive:');
-        expect(seedContent).toContain('sortOrder:');
+      it("should have required frame fields", () => {
+        expect(seedContent).toContain("name:");
+        expect(seedContent).toContain("type:");
+        expect(seedContent).toContain("description:");
+        expect(seedContent).toContain("material:");
+        expect(seedContent).toContain("priceModifier:");
+        expect(seedContent).toContain("priceAddition:");
+        expect(seedContent).toContain("isActive:");
+        expect(seedContent).toContain("sortOrder:");
       });
 
-      it('should have frame with no frame option', () => {
-        expect(seedContent).toContain('No Frame');
+      it("should have frame with no frame option", () => {
+        expect(seedContent).toContain("No Frame");
         expect(seedContent).toContain('priceAddition: "0.00"');
       });
 
-      it('should have frames with different price additions', () => {
+      it("should have frames with different price additions", () => {
         expect(seedContent).toContain('priceAddition: "399.00"');
         expect(seedContent).toContain('priceAddition: "599.00"');
         expect(seedContent).toContain('priceAddition: "699.00"');
@@ -251,59 +259,59 @@ describe('Database Seeding Tests', () => {
       });
     });
 
-    describe('Seed Functions', () => {
-      it('should have clearData function', () => {
-        expect(seedContent).toContain('async function clearData()');
-        expect(seedContent).toContain('db.delete(productVariants)');
-        expect(seedContent).toContain('db.delete(products)');
-        expect(seedContent).toContain('db.delete(frames)');
+    describe("Seed Functions", () => {
+      it("should have clearData function", () => {
+        expect(seedContent).toContain("async function clearData()");
+        expect(seedContent).toContain("db.delete(productVariants)");
+        expect(seedContent).toContain("db.delete(products)");
+        expect(seedContent).toContain("db.delete(frames)");
       });
 
-      it('should have seedProducts function', () => {
-        expect(seedContent).toContain('async function seedProducts()');
-        expect(seedContent).toContain('.insert(products)');
-        expect(seedContent).toContain('.insert(productVariants)');
+      it("should have seedProducts function", () => {
+        expect(seedContent).toContain("async function seedProducts()");
+        expect(seedContent).toContain(".insert(products)");
+        expect(seedContent).toContain(".insert(productVariants)");
       });
 
-      it('should have seedFrames function', () => {
-        expect(seedContent).toContain('async function seedFrames()');
-        expect(seedContent).toContain('.insert(frames).values(sampleFrames)');
+      it("should have seedFrames function", () => {
+        expect(seedContent).toContain("async function seedFrames()");
+        expect(seedContent).toContain(".insert(frames).values(sampleFrames)");
       });
 
-      it('should have main seed function', () => {
-        expect(seedContent).toContain('async function seed()');
-        expect(seedContent).toContain('await clearData()');
-        expect(seedContent).toContain('await seedProducts()');
-        expect(seedContent).toContain('await seedFrames()');
+      it("should have main seed function", () => {
+        expect(seedContent).toContain("async function seed()");
+        expect(seedContent).toContain("await clearData()");
+        expect(seedContent).toContain("await seedProducts()");
+        expect(seedContent).toContain("await seedFrames()");
       });
 
-      it('should have proper error handling', () => {
-        expect(seedContent).toContain('try {');
-        expect(seedContent).toContain('catch (error)');
-        expect(seedContent).toContain('console.error');
+      it("should have proper error handling", () => {
+        expect(seedContent).toContain("try {");
+        expect(seedContent).toContain("catch (error)");
+        expect(seedContent).toContain("console.error");
       });
 
-      it('should close database connection', () => {
-        expect(seedContent).toContain('closeDatabase()');
-        expect(seedContent).toContain('finally {');
+      it("should close database connection", () => {
+        expect(seedContent).toContain("closeDatabase()");
+        expect(seedContent).toContain("finally {");
       });
 
-      it('should have entry point for direct execution', () => {
-        expect(seedContent).toContain('seed()');
-        expect(seedContent).toContain('process.exit(0)');
-        expect(seedContent).toContain('process.exit(1)');
+      it("should have entry point for direct execution", () => {
+        expect(seedContent).toContain("seed()");
+        expect(seedContent).toContain("process.exit(0)");
+        expect(seedContent).toContain("process.exit(1)");
       });
     });
   });
 
-  describe('Database Runtime Tests', () => {
-    describe('Database Connectivity', () => {
-      it.skipIf(shouldSkip())('should be able to connect to database', async () => {
+  describe("Database Runtime Tests", () => {
+    describe("Database Connectivity", () => {
+      it.skipIf(shouldSkip())("should be able to connect to database", async () => {
         const result = await client!`SELECT 1 as value`;
         expect(result[0].value).toBe(1);
       });
 
-      it.skipIf(shouldSkip())('should have required tables exist', async () => {
+      it.skipIf(shouldSkip())("should have required tables exist", async () => {
         const tables = await client!`
           SELECT table_name
           FROM information_schema.tables
@@ -312,13 +320,13 @@ describe('Database Seeding Tests', () => {
         `;
 
         const tableNames = tables.map((t: any) => t.table_name);
-        expect(tableNames).toContain('products');
-        expect(tableNames).toContain('product_variants');
-        expect(tableNames).toContain('frames');
+        expect(tableNames).toContain("products");
+        expect(tableNames).toContain("product_variants");
+        expect(tableNames).toContain("frames");
       });
     });
 
-    describe('Seed Data Insertion', () => {
+    describe("Seed Data Insertion", () => {
       beforeEach(async () => {
         if (shouldSkip() || !client) return;
 
@@ -328,7 +336,7 @@ describe('Database Seeding Tests', () => {
         await client`DELETE FROM frames`;
       });
 
-      it.skipIf(shouldSkip())('should be able to insert sample products', async () => {
+      it.skipIf(shouldSkip())("should be able to insert sample products", async () => {
         // Insert a test product following the seed data structure
         const result = await client!`
           INSERT INTO products (
@@ -359,11 +367,11 @@ describe('Database Seeding Tests', () => {
         `;
 
         expect(result).toHaveLength(1);
-        expect(result[0].sku).toBe('TEST-SEED-001');
-        expect(result[0].title).toBe('Test Seed Product');
+        expect(result[0].sku).toBe("TEST-SEED-001");
+        expect(result[0].title).toBe("Test Seed Product");
       });
 
-      it.skipIf(shouldSkip())('should be able to insert product variants', async () => {
+      it.skipIf(shouldSkip())("should be able to insert product variants", async () => {
         // First insert a product
         const [product] = await client!`
           INSERT INTO products (
@@ -408,7 +416,7 @@ describe('Database Seeding Tests', () => {
         expect(variants[0].size_label).toBe('12" x 16"');
       });
 
-      it.skipIf(shouldSkip())('should be able to insert frame options', async () => {
+      it.skipIf(shouldSkip())("should be able to insert frame options", async () => {
         await client!`
           INSERT INTO frames (
             name, type, description, material, thickness, color,
@@ -423,15 +431,17 @@ describe('Database Seeding Tests', () => {
         const frames = await client!`SELECT * FROM frames ORDER BY sort_order`;
 
         expect(frames).toHaveLength(3);
-        expect(frames[0].name).toBe('No Frame');
-        expect(frames[0].price_addition).toBe('0.00');
-        expect(frames[1].name).toBe('Classic Black');
-        expect(frames[1].price_addition).toBe('399.00');
+        expect(frames[0].name).toBe("No Frame");
+        expect(frames[0].price_addition).toBe("0.00");
+        expect(frames[1].name).toBe("Classic Black");
+        expect(frames[1].price_addition).toBe("399.00");
       });
 
-      it.skipIf(shouldSkip())('should cascade delete variants when product is deleted', async () => {
-        // Insert a product with variants
-        const [product] = await client!`
+      it.skipIf(shouldSkip())(
+        "should cascade delete variants when product is deleted",
+        async () => {
+          // Insert a product with variants
+          const [product] = await client!`
           INSERT INTO products (
             sku, title, slug, description, base_price,
             styles, subjects, colors, orientation, images,
@@ -454,7 +464,7 @@ describe('Database Seeding Tests', () => {
           RETURNING id
         `;
 
-        await client!`
+          await client!`
           INSERT INTO product_variants (
             product_id, variant_sku, size_label,
             width_inches, height_inches, width_cm, height_cm,
@@ -463,28 +473,29 @@ describe('Database Seeding Tests', () => {
             (${product.id}, 'TEST-CASCADE-12x12', '12" x 12"', 12, 12, 30, 30, 799.00, 25, 1)
         `;
 
-        // Verify variant exists
-        const variantsBefore = await client!`
+          // Verify variant exists
+          const variantsBefore = await client!`
           SELECT * FROM product_variants WHERE product_id = ${product.id}
         `;
-        expect(variantsBefore).toHaveLength(1);
+          expect(variantsBefore).toHaveLength(1);
 
-        // Delete the product
-        await client!`DELETE FROM products WHERE id = ${product.id}`;
+          // Delete the product
+          await client!`DELETE FROM products WHERE id = ${product.id}`;
 
-        // Verify variants are also deleted
-        const variantsAfter = await client!`
+          // Verify variants are also deleted
+          const variantsAfter = await client!`
           SELECT * FROM product_variants WHERE product_id = ${product.id}
         `;
-        expect(variantsAfter).toHaveLength(0);
-      });
+          expect(variantsAfter).toHaveLength(0);
+        }
+      );
     });
 
-    describe('Seed Data Counts', () => {
-      it.skipIf(shouldSkip())('should have correct expected product count (12)', async () => {
+    describe("Seed Data Counts", () => {
+      it.skipIf(shouldSkip())("should have correct expected product count (12)", async () => {
         // This validates the seed data structure matches documentation
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         // Count SKU definitions
         const skuMatches = seedContent.match(/sku:\s*["'][\w-]+["']/g);
@@ -492,9 +503,9 @@ describe('Database Seeding Tests', () => {
         expect(skuMatches!.length).toBe(12);
       });
 
-      it.skipIf(shouldSkip())('should have correct expected frame count (8)', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+      it.skipIf(shouldSkip())("should have correct expected frame count (8)", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         // Count frame type definitions in sampleFrames
         const frameMatches = seedContent.match(/name:\s*["'][^"']+["'],\s*\n\s*type:/g);
@@ -502,15 +513,15 @@ describe('Database Seeding Tests', () => {
         expect(frameMatches!.length).toBe(8);
       });
 
-      it.skipIf(shouldSkip())('should have 4 variants per orientation', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+      it.skipIf(shouldSkip())("should have 4 variants per orientation", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         // Each orientation block should have 4 sizeLabel entries
-        const orientations = ['square', 'portrait', 'landscape', 'panoramic'];
+        const orientations = ["square", "portrait", "landscape", "panoramic"];
 
         for (const orientation of orientations) {
-          const regex = new RegExp(`${orientation}:\\s*\\[([\\s\\S]*?)\\],`, 'g');
+          const regex = new RegExp(`${orientation}:\\s*\\[([\\s\\S]*?)\\],`, "g");
           const match = regex.exec(seedContent);
           expect(match).toBeTruthy();
 
@@ -523,46 +534,46 @@ describe('Database Seeding Tests', () => {
       });
     });
 
-    describe('Product Collection Distribution', () => {
-      it.skipIf(shouldSkip())('should have products from Abstract collection (3)', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+    describe("Product Collection Distribution", () => {
+      it.skipIf(shouldSkip())("should have products from Abstract collection (3)", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         const abstractSkus = seedContent.match(/sku:\s*["']ABS-\d+["']/g);
         expect(abstractSkus).toBeTruthy();
         expect(abstractSkus!.length).toBe(3);
       });
 
-      it.skipIf(shouldSkip())('should have products from Nature collection (3)', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+      it.skipIf(shouldSkip())("should have products from Nature collection (3)", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         const natureSkus = seedContent.match(/sku:\s*["']NAT-\d+["']/g);
         expect(natureSkus).toBeTruthy();
         expect(natureSkus!.length).toBe(3);
       });
 
-      it.skipIf(shouldSkip())('should have products from Botanical collection (2)', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+      it.skipIf(shouldSkip())("should have products from Botanical collection (2)", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         const botanicalSkus = seedContent.match(/sku:\s*["']BOT-\d+["']/g);
         expect(botanicalSkus).toBeTruthy();
         expect(botanicalSkus!.length).toBe(2);
       });
 
-      it.skipIf(shouldSkip())('should have products from Minimalist collection (2)', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+      it.skipIf(shouldSkip())("should have products from Minimalist collection (2)", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         const minimalistSkus = seedContent.match(/sku:\s*["']MIN-\d+["']/g);
         expect(minimalistSkus).toBeTruthy();
         expect(minimalistSkus!.length).toBe(2);
       });
 
-      it.skipIf(shouldSkip())('should have products from Typography collection (2)', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+      it.skipIf(shouldSkip())("should have products from Typography collection (2)", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         const typographySkus = seedContent.match(/sku:\s*["']TYP-\d+["']/g);
         expect(typographySkus).toBeTruthy();
@@ -570,10 +581,10 @@ describe('Database Seeding Tests', () => {
       });
     });
 
-    describe('Price Validation', () => {
-      it.skipIf(shouldSkip())('should have valid base prices', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+    describe("Price Validation", () => {
+      it.skipIf(shouldSkip())("should have valid base prices", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         const priceMatches = seedContent.match(/basePrice:\s*["']\d+\.\d{2}["']/g);
         expect(priceMatches).toBeTruthy();
@@ -587,9 +598,9 @@ describe('Database Seeding Tests', () => {
         }
       });
 
-      it.skipIf(shouldSkip())('should have frame price additions in valid format', async () => {
-        const seedPath = path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed.ts');
-        const seedContent = fs.readFileSync(seedPath, 'utf-8');
+      it.skipIf(shouldSkip())("should have frame price additions in valid format", async () => {
+        const seedPath = path.join(process.cwd(), "packages", "api", "src", "database", "seed.ts");
+        const seedContent = fs.readFileSync(seedPath, "utf-8");
 
         const frameAdditions = seedContent.match(/priceAddition:\s*["']\d+\.\d{2}["']/g);
         expect(frameAdditions).toBeTruthy();
@@ -603,16 +614,17 @@ describe('Database Seeding Tests', () => {
       });
     });
 
-    describe('Test Fixtures Integration', () => {
-      it('should be able to import test fixtures', async () => {
-        const { generateTestDataSet, quickTestData } = await import('../../tests/fixtures/database');
+    describe("Test Fixtures Integration", () => {
+      it("should be able to import test fixtures", async () => {
+        const { generateTestDataSet, quickTestData } =
+          await import("../../tests/fixtures/database");
 
-        expect(typeof generateTestDataSet).toBe('function');
-        expect(typeof quickTestData).toBe('function');
+        expect(typeof generateTestDataSet).toBe("function");
+        expect(typeof quickTestData).toBe("function");
       });
 
-      it('should generate valid test data set', async () => {
-        const { generateTestDataSet } = await import('../../tests/fixtures/database');
+      it("should generate valid test data set", async () => {
+        const { generateTestDataSet } = await import("../../tests/fixtures/database");
 
         const dataSet = generateTestDataSet({
           productCount: 3,
@@ -628,8 +640,8 @@ describe('Database Seeding Tests', () => {
         expect(dataSet.productVariants.size).toBe(3);
       });
 
-      it('should generate quick test data', async () => {
-        const { quickTestData } = await import('../../tests/fixtures/database');
+      it("should generate quick test data", async () => {
+        const { quickTestData } = await import("../../tests/fixtures/database");
 
         const dataSet = quickTestData();
 

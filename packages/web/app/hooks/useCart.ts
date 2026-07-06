@@ -18,11 +18,7 @@ import {
   type UseQueryOptions,
   type UseMutationOptions,
 } from "@tanstack/react-query";
-import {
-  cartApi,
-  type CartItemInput,
-  type CartItemUpdate,
-} from "~/lib/api";
+import { cartApi, type CartItemInput, type CartItemUpdate } from "~/lib/api";
 
 // ============================================================================
 // Query Keys
@@ -191,8 +187,7 @@ export function useAddToCart(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CartItemInput) =>
-      cartApi.addItem(data) as Promise<CartOperationResult>,
+    mutationFn: (data: CartItemInput) => cartApi.addItem(data) as Promise<CartOperationResult>,
 
     // Optimistic update
     onMutate: async (newItem) => {
@@ -200,9 +195,7 @@ export function useAddToCart(
       await queryClient.cancelQueries({ queryKey: cartKeys.detail() });
 
       // Snapshot previous value
-      const previousCart = queryClient.getQueryData<ServerCart>(
-        cartKeys.detail()
-      );
+      const previousCart = queryClient.getQueryData<ServerCart>(cartKeys.detail());
 
       // Optimistically update cache
       if (previousCart) {
@@ -285,9 +278,7 @@ export function useUpdateCartItem(
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: cartKeys.detail() });
 
-      const previousCart = queryClient.getQueryData<ServerCart>(
-        cartKeys.detail()
-      );
+      const previousCart = queryClient.getQueryData<ServerCart>(cartKeys.detail());
 
       if (previousCart) {
         queryClient.setQueryData<ServerCart>(cartKeys.detail(), {
@@ -300,9 +291,7 @@ export function useUpdateCartItem(
                   frameId: data.frameId !== undefined ? data.frameId : item.frameId,
                   customizations: data.customizations ?? item.customizations,
                   savedForLater:
-                    data.isSavedForLater !== undefined
-                      ? data.isSavedForLater
-                      : item.savedForLater,
+                    data.isSavedForLater !== undefined ? data.isSavedForLater : item.savedForLater,
                   updatedAt: new Date().toISOString(),
                 }
               : item
@@ -348,16 +337,13 @@ export function useRemoveFromCart(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) =>
-      cartApi.removeItem(id) as Promise<CartOperationResult>,
+    mutationFn: (id: string) => cartApi.removeItem(id) as Promise<CartOperationResult>,
 
     // Optimistic update
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: cartKeys.detail() });
 
-      const previousCart = queryClient.getQueryData<ServerCart>(
-        cartKeys.detail()
-      );
+      const previousCart = queryClient.getQueryData<ServerCart>(cartKeys.detail());
 
       if (previousCart) {
         const removedItem = previousCart.items.find((item) => item.id === id);
@@ -414,9 +400,7 @@ export function useClearCart(
     onMutate: async () => {
       await queryClient.cancelQueries({ queryKey: cartKeys.detail() });
 
-      const previousCart = queryClient.getQueryData<ServerCart>(
-        cartKeys.detail()
-      );
+      const previousCart = queryClient.getQueryData<ServerCart>(cartKeys.detail());
 
       if (previousCart) {
         queryClient.setQueryData<ServerCart>(cartKeys.detail(), {
@@ -460,10 +444,7 @@ export function useClearCart(
  * ```
  */
 export function useMergeCart(
-  options?: Omit<
-    UseMutationOptions<CartOperationResult, Error, string>,
-    "mutationFn" | "onSettled"
-  >
+  options?: Omit<UseMutationOptions<CartOperationResult, Error, string>, "mutationFn" | "onSettled">
 ) {
   const queryClient = useQueryClient();
 
@@ -504,10 +485,7 @@ export function invalidateCart(queryClient: ReturnType<typeof useQueryClient>) {
 /**
  * Set cart data directly (useful for SSR hydration)
  */
-export function setCartData(
-  queryClient: ReturnType<typeof useQueryClient>,
-  cart: ServerCart
-) {
+export function setCartData(queryClient: ReturnType<typeof useQueryClient>, cart: ServerCart) {
   queryClient.setQueryData(cartKeys.detail(), cart);
 }
 

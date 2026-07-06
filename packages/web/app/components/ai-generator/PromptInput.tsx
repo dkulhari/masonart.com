@@ -11,9 +11,9 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
-import { Sparkles, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { useState, useCallback } from "react";
+import { Sparkles, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
@@ -21,38 +21,38 @@ import { cn } from '~/lib/utils'
 
 export interface PromptInputProps {
   /** Current prompt value */
-  prompt: string
+  prompt: string;
   /** Callback when prompt changes */
-  onPromptChange: (prompt: string) => void
+  onPromptChange: (prompt: string) => void;
   /** Optional negative prompt value */
-  negativePrompt?: string
+  negativePrompt?: string;
   /** Callback when negative prompt changes */
-  onNegativePromptChange?: (negativePrompt: string) => void
+  onNegativePromptChange?: (negativePrompt: string) => void;
   /** Maximum character count */
-  maxLength?: number
+  maxLength?: number;
   /** Placeholder text */
-  placeholder?: string
+  placeholder?: string;
   /** Whether the input is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Custom className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const DEFAULT_MAX_LENGTH = 500
-const NEGATIVE_PROMPT_MAX_LENGTH = 300
+const DEFAULT_MAX_LENGTH = 500;
+const NEGATIVE_PROMPT_MAX_LENGTH = 300;
 
 const EXAMPLE_PROMPTS = [
-  'A serene Japanese garden with cherry blossoms, morning mist',
-  'Abstract geometric shapes in warm earth tones, minimalist',
-  'Vintage travel poster of the Swiss Alps, retro style',
-  'Botanical illustration of wildflowers, watercolor effect',
-  'Modern city skyline at golden hour, photography style',
-  'Ocean waves crashing on rocky shore, dramatic lighting',
-]
+  "A serene Japanese garden with cherry blossoms, morning mist",
+  "Abstract geometric shapes in warm earth tones, minimalist",
+  "Vintage travel poster of the Swiss Alps, retro style",
+  "Botanical illustration of wildflowers, watercolor effect",
+  "Modern city skyline at golden hour, photography style",
+  "Ocean waves crashing on rocky shore, dramatic lighting",
+];
 
 // ============================================================================
 // Component
@@ -64,33 +64,33 @@ const EXAMPLE_PROMPTS = [
 export function PromptInput({
   prompt,
   onPromptChange,
-  negativePrompt = '',
+  negativePrompt = "",
   onNegativePromptChange,
   maxLength = DEFAULT_MAX_LENGTH,
-  placeholder = 'Describe the poster you want to create...',
+  placeholder = "Describe the poster you want to create...",
   disabled = false,
   className,
 }: PromptInputProps) {
-  const [showNegativePrompt, setShowNegativePrompt] = useState(!!negativePrompt)
-  const [showExamples, setShowExamples] = useState(false)
+  const [showNegativePrompt, setShowNegativePrompt] = useState(!!negativePrompt);
+  const [showExamples, setShowExamples] = useState(false);
 
-  const characterCount = prompt.length
-  const isNearLimit = characterCount > maxLength * 0.8
-  const isOverLimit = characterCount > maxLength
+  const characterCount = prompt.length;
+  const isNearLimit = characterCount > maxLength * 0.8;
+  const isOverLimit = characterCount > maxLength;
 
-  const negativeCharacterCount = negativePrompt.length
-  const isNegativeOverLimit = negativeCharacterCount > NEGATIVE_PROMPT_MAX_LENGTH
+  const negativeCharacterCount = negativePrompt.length;
+  const isNegativeOverLimit = negativeCharacterCount > NEGATIVE_PROMPT_MAX_LENGTH;
 
   const handleExampleClick = useCallback(
     (example: string) => {
-      onPromptChange(example)
-      setShowExamples(false)
+      onPromptChange(example);
+      setShowExamples(false);
     },
     [onPromptChange]
-  )
+  );
 
   return (
-    <div className={cn('flex flex-col gap-4', className)}>
+    <div className={cn("flex flex-col gap-4", className)}>
       {/* Main Prompt Input */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
@@ -127,23 +127,21 @@ export function PromptInput({
             disabled={disabled}
             rows={4}
             className={cn(
-              'w-full resize-none rounded-lg border bg-background px-4 py-3 text-sm transition-colors',
-              'placeholder:text-muted-foreground',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-              'disabled:cursor-not-allowed disabled:opacity-50',
-              isOverLimit
-                ? 'border-destructive focus:ring-destructive'
-                : 'border-border'
+              "w-full resize-none rounded-lg border bg-background px-4 py-3 text-sm transition-colors",
+              "placeholder:text-muted-foreground",
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+              "disabled:cursor-not-allowed disabled:opacity-50",
+              isOverLimit ? "border-destructive focus:ring-destructive" : "border-border"
             )}
           />
           <div
             className={cn(
-              'absolute bottom-2 right-3 text-xs',
+              "absolute bottom-2 right-3 text-xs",
               isOverLimit
-                ? 'text-destructive'
+                ? "text-destructive"
                 : isNearLimit
-                  ? 'text-amber-500'
-                  : 'text-muted-foreground'
+                  ? "text-amber-500"
+                  : "text-muted-foreground"
             )}
           >
             {characterCount}/{maxLength}
@@ -205,35 +203,33 @@ export function PromptInput({
                 disabled={disabled}
                 rows={2}
                 className={cn(
-                  'w-full resize-none rounded-lg border bg-background px-4 py-3 text-sm transition-colors',
-                  'placeholder:text-muted-foreground',
-                  'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-                  'disabled:cursor-not-allowed disabled:opacity-50',
+                  "w-full resize-none rounded-lg border bg-background px-4 py-3 text-sm transition-colors",
+                  "placeholder:text-muted-foreground",
+                  "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
                   isNegativeOverLimit
-                    ? 'border-destructive focus:ring-destructive'
-                    : 'border-border'
+                    ? "border-destructive focus:ring-destructive"
+                    : "border-border"
                 )}
               />
               <div
                 className={cn(
-                  'absolute bottom-2 right-3 text-xs',
-                  isNegativeOverLimit
-                    ? 'text-destructive'
-                    : 'text-muted-foreground'
+                  "absolute bottom-2 right-3 text-xs",
+                  isNegativeOverLimit ? "text-destructive" : "text-muted-foreground"
                 )}
               >
                 {negativeCharacterCount}/{NEGATIVE_PROMPT_MAX_LENGTH}
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Specify elements you don&apos;t want in your poster. Style-specific negative
-              prompts are automatically added based on your chosen style.
+              Specify elements you don&apos;t want in your poster. Style-specific negative prompts
+              are automatically added based on your chosen style.
             </p>
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }
 
-export default PromptInput
+export default PromptInput;

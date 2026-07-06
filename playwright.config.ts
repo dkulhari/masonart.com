@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from "@playwright/test";
 
 /**
  * Playwright E2E Test Configuration
@@ -21,31 +21,31 @@ import { defineConfig, devices } from '@playwright/test';
  * - 'Mobile Chrome', 'Mobile Safari': Mobile testing
  */
 
-const skipServer = process.env.SKIP_E2E_SERVER === 'true';
-const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3001';
+const skipServer = process.env.SKIP_E2E_SERVER === "true";
+const baseURL = process.env.E2E_BASE_URL || "http://localhost:3001";
 
 // Auth storage paths
-const CUSTOMER_STORAGE = 'tests/.auth/customer.json';
-const ADMIN_STORAGE = 'tests/.auth/admin.json';
+const CUSTOMER_STORAGE = "tests/.auth/customer.json";
+const ADMIN_STORAGE = "tests/.auth/admin.json";
 
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: "./tests/e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  reporter: "html",
   use: {
     baseURL,
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    trace: "on-first-retry",
+    screenshot: "only-on-failure",
   },
   projects: [
     // =========================================================================
     // Setup Projects - Run first to create authenticated sessions
     // =========================================================================
     {
-      name: 'setup',
+      name: "setup",
       testMatch: /.*\.setup\.ts/,
       // Auth setup needs more time for registration + login flows
       timeout: 60000,
@@ -55,66 +55,68 @@ export default defineConfig({
     // Desktop Browser Projects
     // =========================================================================
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-      dependencies: ['setup'],
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
     },
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-      dependencies: ['setup'],
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+      dependencies: ["setup"],
     },
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-      dependencies: ['setup'],
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
+      dependencies: ["setup"],
     },
 
     // =========================================================================
     // Mobile Browser Projects
     // =========================================================================
     {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-      dependencies: ['setup'],
+      name: "Mobile Chrome",
+      use: { ...devices["Pixel 5"] },
+      dependencies: ["setup"],
     },
     {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-      dependencies: ['setup'],
+      name: "Mobile Safari",
+      use: { ...devices["iPhone 12"] },
+      dependencies: ["setup"],
     },
 
     // =========================================================================
     // Authenticated Test Projects (use stored auth state)
     // =========================================================================
     {
-      name: 'chromium-customer',
+      name: "chromium-customer",
       use: {
-        ...devices['Desktop Chrome'],
+        ...devices["Desktop Chrome"],
         storageState: CUSTOMER_STORAGE,
       },
-      dependencies: ['setup'],
+      dependencies: ["setup"],
       testMatch: /.*\.(customer|account)\.spec\.ts/,
     },
     {
-      name: 'chromium-admin',
+      name: "chromium-admin",
       use: {
-        ...devices['Desktop Chrome'],
+        ...devices["Desktop Chrome"],
         storageState: ADMIN_STORAGE,
       },
-      dependencies: ['setup'],
+      dependencies: ["setup"],
       testMatch: /.*\.admin.*\.spec\.ts/,
     },
   ],
   // Only start web server if not explicitly skipped
-  ...(skipServer ? {} : {
-    webServer: [
-      {
-        command: 'bun run dev',
-        url: baseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120 * 1000,
-      },
-    ],
-  }),
+  ...(skipServer
+    ? {}
+    : {
+        webServer: [
+          {
+            command: "bun run dev",
+            url: baseURL,
+            reuseExistingServer: !process.env.CI,
+            timeout: 120 * 1000,
+          },
+        ],
+      }),
 });

@@ -13,7 +13,7 @@ import {
   type Product,
   type ProductVariant,
   type Frame,
-} from './products';
+} from "./products";
 
 import {
   createUser,
@@ -22,7 +22,7 @@ import {
   createAddress,
   type User,
   type Address,
-} from './users';
+} from "./users";
 
 import {
   createOrder,
@@ -31,13 +31,9 @@ import {
   type Order,
   type OrderItem,
   type CartItem,
-} from './orders';
+} from "./orders";
 
-import {
-  createAIGeneration,
-  createAIGenerations,
-  type AIGeneration,
-} from './ai';
+import { createAIGeneration, createAIGenerations, type AIGeneration } from "./ai";
 
 /**
  * Complete test data set for seeding
@@ -100,7 +96,7 @@ export function generateTestDataSet(config: TestDataConfig = {}): TestDataSet {
   // Add regular users
   for (let i = 0; i < mergedConfig.userCount; i++) {
     const user = createUser({
-      id: `user_${i.toString().padStart(10, '0')}`,
+      id: `user_${i.toString().padStart(10, "0")}`,
       email: `user${i}@example.com`,
       name: `Test User ${i}`,
       phone: `+9198765432${10 + i}`,
@@ -118,7 +114,7 @@ export function generateTestDataSet(config: TestDataConfig = {}): TestDataSet {
   // Add admin user
   if (mergedConfig.includeAdmin) {
     const admin = createAdminUser({
-      id: 'user_admin_001',
+      id: "user_admin_001",
     });
     users.push(admin);
     addresses.set(admin.id, [
@@ -133,7 +129,7 @@ export function generateTestDataSet(config: TestDataConfig = {}): TestDataSet {
   // Add trade user
   if (mergedConfig.includeTradeUser) {
     const trade = createTradeUser({
-      id: 'user_trade_001',
+      id: "user_trade_001",
     });
     users.push(trade);
     addresses.set(trade.id, [
@@ -147,7 +143,7 @@ export function generateTestDataSet(config: TestDataConfig = {}): TestDataSet {
 
   // Create orders for each user
   const orders: Order[] = [];
-  for (const user of users.filter(u => u.role === 'customer')) {
+  for (const user of users.filter((u) => u.role === "customer")) {
     for (let i = 0; i < mergedConfig.ordersPerUser; i++) {
       const orderItems = createOrderItems(`order_${user.id}_${i}`, 2);
       const order = createOrder({
@@ -162,25 +158,27 @@ export function generateTestDataSet(config: TestDataConfig = {}): TestDataSet {
 
   // Create cart items for each user
   const cartItems: CartItem[] = [];
-  for (const user of users.filter(u => u.role === 'customer')) {
+  for (const user of users.filter((u) => u.role === "customer")) {
     for (let i = 0; i < mergedConfig.cartItemsPerUser; i++) {
       const product = products[i % products.length];
       const variants = productVariants.get(product.id) || [];
       const variant = variants[i % variants.length];
 
-      cartItems.push(createCartItem({
-        id: `cart_${user.id}_${i}`,
-        productId: product.id,
-        variantId: variant?.id || 'variant_default',
-        frameId: frames[i % frames.length]?.id,
-        quantity: 1 + (i % 2),
-      }));
+      cartItems.push(
+        createCartItem({
+          id: `cart_${user.id}_${i}`,
+          productId: product.id,
+          variantId: variant?.id || "variant_default",
+          frameId: frames[i % frames.length]?.id,
+          quantity: 1 + (i % 2),
+        })
+      );
     }
   }
 
   // Create AI generations for each user
   const aiGenerations: AIGeneration[] = [];
-  for (const user of users.filter(u => u.role === 'customer')) {
+  for (const user of users.filter((u) => u.role === "customer")) {
     aiGenerations.push(...createAIGenerations(user.id, mergedConfig.aiGenerationsPerUser));
   }
 
@@ -284,7 +282,7 @@ export async function resetTestDatabase(db: unknown): Promise<void> {
   // await db.delete(orders);
   // await db.delete(users);
   // await db.delete(products);
-  throw new Error('resetTestDatabase must be implemented with your database client');
+  throw new Error("resetTestDatabase must be implemented with your database client");
 }
 
 /**
@@ -296,7 +294,7 @@ export async function seedTestDatabase(db: unknown, dataSet: TestDataSet): Promi
   // Example with Drizzle:
   // await db.insert(products).values(dataSet.products);
   // await db.insert(users).values(dataSet.users);
-  throw new Error('seedTestDatabase must be implemented with your database client');
+  throw new Error("seedTestDatabase must be implemented with your database client");
 }
 
 /**
@@ -305,13 +303,16 @@ export async function seedTestDatabase(db: unknown, dataSet: TestDataSet): Promi
  */
 export async function cleanupTestData(db: unknown): Promise<void> {
   // This is a placeholder - actual implementation depends on your DB client
-  throw new Error('cleanupTestData must be implemented with your database client');
+  throw new Error("cleanupTestData must be implemented with your database client");
 }
 
 /**
  * Get test user by role
  */
-export function getTestUserByRole(dataSet: TestDataSet, role: 'admin' | 'customer' | 'trade'): User | undefined {
+export function getTestUserByRole(
+  dataSet: TestDataSet,
+  role: "admin" | "customer" | "trade"
+): User | undefined {
   return dataSet.users.find((u) => u.role === role);
 }
 
@@ -326,7 +327,10 @@ export function getRandomTestProduct(dataSet: TestDataSet): Product {
 /**
  * Get product with variants
  */
-export function getProductWithVariants(dataSet: TestDataSet, productId: string): {
+export function getProductWithVariants(
+  dataSet: TestDataSet,
+  productId: string
+): {
   product: Product | undefined;
   variants: ProductVariant[];
 } {
@@ -347,7 +351,8 @@ export const testIsolation = {
   /**
    * Generate unique email for test isolation
    */
-  uniqueEmail: () => `test_${Date.now()}_${Math.random().toString(36).substring(7)}@test.example.com`,
+  uniqueEmail: () =>
+    `test_${Date.now()}_${Math.random().toString(36).substring(7)}@test.example.com`,
 
   /**
    * Generate unique order number

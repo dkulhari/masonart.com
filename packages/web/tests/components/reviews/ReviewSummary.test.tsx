@@ -4,15 +4,15 @@
  * Tests review summary display, rating distribution, and helper functions.
  */
 
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
 import {
   ReviewSummary,
   ReviewSummarySkeleton,
   calculateDistribution,
   calculateAverageRating,
   type ReviewStats,
-} from '~/components/reviews/ReviewSummary';
+} from "~/components/reviews/ReviewSummary";
 
 // Mock data
 const mockStats: ReviewStats = {
@@ -27,49 +27,49 @@ const mockStats: ReviewStats = {
   ],
 };
 
-describe('ReviewSummary Component', () => {
-  describe('Full Layout (Default)', () => {
-    it('displays average rating', () => {
+describe("ReviewSummary Component", () => {
+  describe("Full Layout (Default)", () => {
+    it("displays average rating", () => {
       render(<ReviewSummary stats={mockStats} />);
 
-      expect(screen.getByText('4.2')).toBeInTheDocument();
+      expect(screen.getByText("4.2")).toBeInTheDocument();
     });
 
-    it('displays total review count', () => {
+    it("displays total review count", () => {
       render(<ReviewSummary stats={mockStats} />);
 
       expect(screen.getByText(/Based on 128 reviews/)).toBeInTheDocument();
     });
 
-    it('displays rating distribution', () => {
+    it("displays rating distribution", () => {
       render(<ReviewSummary stats={mockStats} />);
 
       // Should show rating labels
-      expect(screen.getByText('5 stars')).toBeInTheDocument();
-      expect(screen.getByText('4 stars')).toBeInTheDocument();
-      expect(screen.getByText('3 stars')).toBeInTheDocument();
-      expect(screen.getByText('2 stars')).toBeInTheDocument();
-      expect(screen.getByText('1 star')).toBeInTheDocument();
+      expect(screen.getByText("5 stars")).toBeInTheDocument();
+      expect(screen.getByText("4 stars")).toBeInTheDocument();
+      expect(screen.getByText("3 stars")).toBeInTheDocument();
+      expect(screen.getByText("2 stars")).toBeInTheDocument();
+      expect(screen.getByText("1 star")).toBeInTheDocument();
     });
 
-    it('displays review counts in distribution', () => {
+    it("displays review counts in distribution", () => {
       render(<ReviewSummary stats={mockStats} />);
 
-      expect(screen.getByText('80')).toBeInTheDocument();
-      expect(screen.getByText('30')).toBeInTheDocument();
-      expect(screen.getByText('10')).toBeInTheDocument();
-      expect(screen.getByText('5')).toBeInTheDocument();
-      expect(screen.getByText('3')).toBeInTheDocument();
+      expect(screen.getByText("80")).toBeInTheDocument();
+      expect(screen.getByText("30")).toBeInTheDocument();
+      expect(screen.getByText("10")).toBeInTheDocument();
+      expect(screen.getByText("5")).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
     });
 
-    it('renders progress bars', () => {
+    it("renders progress bars", () => {
       render(<ReviewSummary stats={mockStats} />);
 
       const progressBars = document.querySelectorAll('[role="progressbar"]');
       expect(progressBars.length).toBe(5);
     });
 
-    it('renders star rating component', () => {
+    it("renders star rating component", () => {
       render(<ReviewSummary stats={mockStats} />);
 
       const starRating = document.querySelector('[role="img"]');
@@ -77,38 +77,38 @@ describe('ReviewSummary Component', () => {
     });
   });
 
-  describe('Compact Layout', () => {
-    it('displays compact layout when compact prop is true', () => {
+  describe("Compact Layout", () => {
+    it("displays compact layout when compact prop is true", () => {
       render(<ReviewSummary stats={mockStats} compact />);
 
       // Should show rating count inline
       expect(screen.getByText(/128 reviews/)).toBeInTheDocument();
     });
 
-    it('does not show distribution in compact mode', () => {
+    it("does not show distribution in compact mode", () => {
       render(<ReviewSummary stats={mockStats} compact />);
 
       // Should not show rating bars
-      expect(screen.queryByText('5 stars')).not.toBeInTheDocument();
+      expect(screen.queryByText("5 stars")).not.toBeInTheDocument();
     });
   });
 
-  describe('Without Distribution', () => {
-    it('hides distribution when showDistribution is false', () => {
+  describe("Without Distribution", () => {
+    it("hides distribution when showDistribution is false", () => {
       render(<ReviewSummary stats={mockStats} showDistribution={false} />);
 
-      expect(screen.queryByText('5 stars')).not.toBeInTheDocument();
+      expect(screen.queryByText("5 stars")).not.toBeInTheDocument();
     });
 
-    it('still shows average rating when distribution is hidden', () => {
+    it("still shows average rating when distribution is hidden", () => {
       render(<ReviewSummary stats={mockStats} showDistribution={false} />);
 
-      expect(screen.getByText('4.2')).toBeInTheDocument();
+      expect(screen.getByText("4.2")).toBeInTheDocument();
     });
   });
 
-  describe('Empty Distribution', () => {
-    it('handles empty distribution array', () => {
+  describe("Empty Distribution", () => {
+    it("handles empty distribution array", () => {
       const statsWithEmptyDist: ReviewStats = {
         ...mockStats,
         distribution: [],
@@ -122,7 +122,7 @@ describe('ReviewSummary Component', () => {
     });
   });
 
-  describe('Singular vs Plural', () => {
+  describe("Singular vs Plural", () => {
     it('shows "review" singular when totalReviews is 1', () => {
       const singleReviewStats: ReviewStats = {
         ...mockStats,
@@ -141,67 +141,57 @@ describe('ReviewSummary Component', () => {
     });
   });
 
-  describe('Custom ClassName', () => {
-    it('applies custom className', () => {
-      const { container } = render(
-        <ReviewSummary stats={mockStats} className="custom-summary" />
-      );
+  describe("Custom ClassName", () => {
+    it("applies custom className", () => {
+      const { container } = render(<ReviewSummary stats={mockStats} className="custom-summary" />);
 
-      expect(container.querySelector('.custom-summary')).toBeInTheDocument();
+      expect(container.querySelector(".custom-summary")).toBeInTheDocument();
     });
   });
 });
 
-describe('ReviewSummarySkeleton Component', () => {
-  it('renders with animate-pulse', () => {
+describe("ReviewSummarySkeleton Component", () => {
+  it("renders with animate-pulse", () => {
     render(<ReviewSummarySkeleton />);
 
-    const skeleton = document.querySelector('.animate-pulse');
+    const skeleton = document.querySelector(".animate-pulse");
     expect(skeleton).toBeInTheDocument();
   });
 
-  it('renders distribution skeleton by default', () => {
+  it("renders distribution skeleton by default", () => {
     render(<ReviewSummarySkeleton />);
 
     // Should have 5 bar skeletons for distribution
-    const barSkeletons = document.querySelectorAll('.h-2.flex-1.rounded.bg-muted');
+    const barSkeletons = document.querySelectorAll(".h-2.flex-1.rounded.bg-muted");
     expect(barSkeletons.length).toBe(5);
   });
 
-  it('hides distribution skeleton when showDistribution is false', () => {
+  it("hides distribution skeleton when showDistribution is false", () => {
     render(<ReviewSummarySkeleton showDistribution={false} />);
 
-    const barSkeletons = document.querySelectorAll('.h-2.flex-1.rounded.bg-muted');
+    const barSkeletons = document.querySelectorAll(".h-2.flex-1.rounded.bg-muted");
     expect(barSkeletons.length).toBe(0);
   });
 
-  it('renders compact skeleton', () => {
+  it("renders compact skeleton", () => {
     render(<ReviewSummarySkeleton compact />);
 
     // Compact skeleton should not have large rating display
-    const largePlaceholder = document.querySelector('.h-12.w-16');
+    const largePlaceholder = document.querySelector(".h-12.w-16");
     expect(largePlaceholder).not.toBeInTheDocument();
   });
 
-  it('applies custom className', () => {
-    const { container } = render(
-      <ReviewSummarySkeleton className="my-skeleton" />
-    );
+  it("applies custom className", () => {
+    const { container } = render(<ReviewSummarySkeleton className="my-skeleton" />);
 
-    expect(container.querySelector('.my-skeleton')).toBeInTheDocument();
+    expect(container.querySelector(".my-skeleton")).toBeInTheDocument();
   });
 });
 
-describe('Helper Functions', () => {
-  describe('calculateDistribution', () => {
-    it('calculates distribution from reviews', () => {
-      const reviews = [
-        { rating: 5 },
-        { rating: 5 },
-        { rating: 4 },
-        { rating: 3 },
-        { rating: 1 },
-      ];
+describe("Helper Functions", () => {
+  describe("calculateDistribution", () => {
+    it("calculates distribution from reviews", () => {
+      const reviews = [{ rating: 5 }, { rating: 5 }, { rating: 4 }, { rating: 3 }, { rating: 1 }];
 
       const distribution = calculateDistribution(reviews);
 
@@ -213,13 +203,8 @@ describe('Helper Functions', () => {
       expect(distribution.find((d) => d.rating === 1)?.count).toBe(1);
     });
 
-    it('calculates correct percentages', () => {
-      const reviews = [
-        { rating: 5 },
-        { rating: 5 },
-        { rating: 5 },
-        { rating: 5 },
-      ];
+    it("calculates correct percentages", () => {
+      const reviews = [{ rating: 5 }, { rating: 5 }, { rating: 5 }, { rating: 5 }];
 
       const distribution = calculateDistribution(reviews);
 
@@ -227,7 +212,7 @@ describe('Helper Functions', () => {
       expect(distribution.find((d) => d.rating === 1)?.percentage).toBe(0);
     });
 
-    it('handles empty reviews array', () => {
+    it("handles empty reviews array", () => {
       const distribution = calculateDistribution([]);
 
       expect(distribution).toHaveLength(5);
@@ -236,12 +221,8 @@ describe('Helper Functions', () => {
       });
     });
 
-    it('rounds ratings to nearest integer', () => {
-      const reviews = [
-        { rating: 4.7 },
-        { rating: 4.2 },
-        { rating: 3.5 },
-      ];
+    it("rounds ratings to nearest integer", () => {
+      const reviews = [{ rating: 4.7 }, { rating: 4.2 }, { rating: 3.5 }];
 
       const distribution = calculateDistribution(reviews);
 
@@ -250,7 +231,7 @@ describe('Helper Functions', () => {
       expect(distribution.find((d) => d.rating === 4)?.count).toBe(2);
     });
 
-    it('returns ratings in descending order', () => {
+    it("returns ratings in descending order", () => {
       const distribution = calculateDistribution([{ rating: 3 }]);
 
       expect(distribution[0].rating).toBe(5);
@@ -258,20 +239,16 @@ describe('Helper Functions', () => {
     });
   });
 
-  describe('calculateAverageRating', () => {
-    it('calculates correct average', () => {
-      const reviews = [
-        { rating: 5 },
-        { rating: 4 },
-        { rating: 3 },
-      ];
+  describe("calculateAverageRating", () => {
+    it("calculates correct average", () => {
+      const reviews = [{ rating: 5 }, { rating: 4 }, { rating: 3 }];
 
       const average = calculateAverageRating(reviews);
 
       expect(average).toBe(4);
     });
 
-    it('handles single review', () => {
+    it("handles single review", () => {
       const reviews = [{ rating: 3 }];
 
       const average = calculateAverageRating(reviews);
@@ -279,17 +256,14 @@ describe('Helper Functions', () => {
       expect(average).toBe(3);
     });
 
-    it('returns 0 for empty array', () => {
+    it("returns 0 for empty array", () => {
       const average = calculateAverageRating([]);
 
       expect(average).toBe(0);
     });
 
-    it('handles decimal ratings', () => {
-      const reviews = [
-        { rating: 4.5 },
-        { rating: 3.5 },
-      ];
+    it("handles decimal ratings", () => {
+      const reviews = [{ rating: 4.5 }, { rating: 3.5 }];
 
       const average = calculateAverageRating(reviews);
 

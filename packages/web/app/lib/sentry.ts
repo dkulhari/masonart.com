@@ -8,9 +8,7 @@
 
 import * as Sentry from "@sentry/react";
 
-const dsn = typeof window !== "undefined"
-  ? (import.meta as any).env?.VITE_SENTRY_DSN
-  : undefined;
+const dsn = typeof window !== "undefined" ? (import.meta as any).env?.VITE_SENTRY_DSN : undefined;
 
 /**
  * Initialize Sentry for the browser. Call in root component.
@@ -24,9 +22,7 @@ export function initSentry(): void {
   Sentry.init({
     dsn,
     environment: (import.meta as any).env?.VITE_SENTRY_ENVIRONMENT || "production",
-    tracesSampleRate: parseFloat(
-      (import.meta as any).env?.VITE_SENTRY_TRACES_SAMPLE_RATE || "0.1"
-    ),
+    tracesSampleRate: parseFloat((import.meta as any).env?.VITE_SENTRY_TRACES_SAMPLE_RATE || "0.1"),
     release: (import.meta as any).env?.VITE_SENTRY_RELEASE || "masonart-web@1.0.0",
     integrations: [
       Sentry.browserTracingIntegration(),

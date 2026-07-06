@@ -10,12 +10,12 @@
  */
 
 // Re-export configuration types for reference
-export type { } from '@tanstack/react-start'
+export type {} from "@tanstack/react-start";
 
 // App-level configuration constants
 export const appConfig = {
-  name: 'MasonArt',
-  description: 'Premium Poster & Frame E-Commerce Platform',
-  apiUrl: process.env.VITE_API_URL ?? '', // Empty uses same-origin via vite proxy
-  cdnUrl: process.env.VITE_CDN_URL ?? 'http://localhost:9000/poster-app-dev',
-} as const
+  name: "MasonArt",
+  description: "Premium Poster & Frame E-Commerce Platform",
+  apiUrl: process.env.VITE_API_URL ?? "", // Empty uses same-origin via vite proxy
+  cdnUrl: process.env.VITE_CDN_URL ?? "http://localhost:9000/poster-app-dev",
+} as const;

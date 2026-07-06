@@ -125,8 +125,7 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
       steps: 30,
       sampler: "DPM++ 2M Karras",
     },
-    qualityEnhancers:
-      "high resolution, fine art print quality, museum quality, masterpiece",
+    qualityEnhancers: "high resolution, fine art print quality, museum quality, masterpiece",
     recommendedAspectRatios: ["square", "portrait"],
     preferredProvider: "stable-diffusion",
     category: "artistic",
@@ -137,15 +136,7 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
     id: "abstract-expression",
     name: "Abstract Expression",
     description: "Bold brushstrokes and emotional expression in non-representational form",
-    keywords: [
-      "abstract",
-      "expressionism",
-      "bold",
-      "emotional",
-      "dynamic",
-      "gestural",
-      "modern",
-    ],
+    keywords: ["abstract", "expressionism", "bold", "emotional", "dynamic", "gestural", "modern"],
     promptModifiers:
       "abstract expressionism, bold brushstrokes, emotional intensity, dynamic composition, gestural marks, action painting, expressive color, spontaneous energy, dramatic contrasts, painterly texture",
     negativePrompt:
@@ -155,8 +146,7 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
       steps: 35,
       sampler: "Euler a",
     },
-    qualityEnhancers:
-      "gallery artwork, fine art, museum piece, high resolution canvas texture",
+    qualityEnhancers: "gallery artwork, fine art, museum piece, high resolution canvas texture",
     recommendedAspectRatios: ["square", "landscape"],
     preferredProvider: "stable-diffusion",
     category: "artistic",
@@ -199,8 +189,7 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
       steps: 28,
       sampler: "DPM++ 2M",
     },
-    qualityEnhancers:
-      "vector-like quality, crisp edges, print-ready, graphic poster, clean render",
+    qualityEnhancers: "vector-like quality, crisp edges, print-ready, graphic poster, clean render",
     recommendedAspectRatios: ["square", "portrait", "landscape"],
     preferredProvider: "stable-diffusion",
     category: "decorative",
@@ -255,15 +244,7 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
     id: "watercolor",
     name: "Watercolor",
     description: "Soft, flowing artistic effects with transparent washes",
-    keywords: [
-      "watercolor",
-      "soft",
-      "flowing",
-      "artistic",
-      "transparent",
-      "delicate",
-      "ethereal",
-    ],
+    keywords: ["watercolor", "soft", "flowing", "artistic", "transparent", "delicate", "ethereal"],
     promptModifiers:
       "watercolor painting style, soft blending, flowing transparent layers, wet on wet technique, paper texture visible, artistic brushwork, ethereal atmosphere, soft edges, color bleeding, impressionistic details",
     negativePrompt:
@@ -285,14 +266,7 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
     id: "photography",
     name: "Photography",
     description: "Photorealistic imagery with professional quality",
-    keywords: [
-      "photorealistic",
-      "realistic",
-      "photography",
-      "detailed",
-      "professional",
-      "sharp",
-    ],
+    keywords: ["photorealistic", "realistic", "photography", "detailed", "professional", "sharp"],
     promptModifiers:
       "professional photography, photorealistic, high detail, natural lighting, DSLR quality, sharp focus, depth of field, cinematic composition, editorial quality, lifestyle photography",
     negativePrompt:
@@ -324,8 +298,7 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
       steps: 25,
       sampler: "DPM++ 2M",
     },
-    qualityEnhancers:
-      "crisp lines, gallery quality, fine art print, clean vector-like finish",
+    qualityEnhancers: "crisp lines, gallery quality, fine art print, clean vector-like finish",
     recommendedAspectRatios: ["square", "portrait"],
     preferredProvider: "stable-diffusion",
     category: "illustrative",
@@ -335,7 +308,8 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
   typography: {
     id: "typography",
     name: "Typography",
-    description: "Text-focused artistic designs with beautiful letterforms. Uses Nano Banana Pro for superior text rendering.",
+    description:
+      "Text-focused artistic designs with beautiful letterforms. Uses Nano Banana Pro for superior text rendering.",
     keywords: ["typography", "text", "letters", "fonts", "words", "design", "quotes"],
     promptModifiers:
       "typographic art, beautiful lettering, artistic text layout, font design, decorative typography, creative word arrangement, calligraphic elements, text as art, graphic text design, poster typography, sharp readable text",
@@ -361,8 +335,19 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
   "ink-wash": {
     id: "ink-wash",
     name: "Ink Wash",
-    description: "Asian-inspired ink painting with flowing gradient washes and contemplative atmosphere",
-    keywords: ["ink", "asian", "chinese", "japanese", "brush", "sumi-e", "zen", "monochrome", "traditional"],
+    description:
+      "Asian-inspired ink painting with flowing gradient washes and contemplative atmosphere",
+    keywords: [
+      "ink",
+      "asian",
+      "chinese",
+      "japanese",
+      "brush",
+      "sumi-e",
+      "zen",
+      "monochrome",
+      "traditional",
+    ],
     promptModifiers:
       "traditional ink wash painting, sumi-e style, Chinese brush painting aesthetic, gradient ink washes, zen atmosphere, flowing brushstrokes, rice paper texture, minimalist composition, contemplative mood, black ink gradients, negative space, asian artistic tradition",
     negativePrompt:
@@ -384,7 +369,16 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
     id: "digital-art",
     name: "Digital Art",
     description: "Modern digital illustration with gaming and concept art aesthetics",
-    keywords: ["digital", "concept", "gaming", "illustration", "modern", "fantasy", "sci-fi", "vibrant"],
+    keywords: [
+      "digital",
+      "concept",
+      "gaming",
+      "illustration",
+      "modern",
+      "fantasy",
+      "sci-fi",
+      "vibrant",
+    ],
     promptModifiers:
       "digital art, concept art style, gaming aesthetic, vibrant digital painting, detailed illustration, professional digital artwork, cinematic lighting, dynamic composition, rich colors, artstation quality, detailed character or environment design",
     negativePrompt:
@@ -406,7 +400,16 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
     id: "minimalist-modern",
     name: "Minimalist Modern",
     description: "Clean lines and geometric simplicity inspired by Scandinavian design principles",
-    keywords: ["minimalist", "scandinavian", "clean", "simple", "modern", "nordic", "elegant", "sophisticated"],
+    keywords: [
+      "minimalist",
+      "scandinavian",
+      "clean",
+      "simple",
+      "modern",
+      "nordic",
+      "elegant",
+      "sophisticated",
+    ],
     promptModifiers:
       "minimalist design, Scandinavian aesthetic, clean geometric forms, simple composition, negative space, muted color palette, elegant simplicity, modern interior style, Nordic design principles, uncluttered, refined, subtle textures",
     negativePrompt:
@@ -428,7 +431,16 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
     id: "impressionist",
     name: "Impressionist",
     description: "Monet-inspired brushstrokes capturing light and atmosphere in outdoor scenes",
-    keywords: ["impressionist", "monet", "renoir", "light", "brushstrokes", "plein air", "french", "artistic"],
+    keywords: [
+      "impressionist",
+      "monet",
+      "renoir",
+      "light",
+      "brushstrokes",
+      "plein air",
+      "french",
+      "artistic",
+    ],
     promptModifiers:
       "impressionist painting style, Monet inspired, visible brushstrokes, light play, en plein air, soft atmospheric effects, natural lighting, color harmony, French impressionism, garden scenes, water reflections, dappled sunlight, romantic atmosphere",
     negativePrompt:
@@ -450,7 +462,16 @@ export const STYLE_PRESETS: Record<AIStylePreset, StylePresetConfig> = {
     id: "art-deco",
     name: "Art Deco",
     description: "1920s glamorous style with geometric patterns and luxurious gold accents",
-    keywords: ["art deco", "1920s", "gatsby", "geometric", "glamorous", "gold", "luxurious", "vintage"],
+    keywords: [
+      "art deco",
+      "1920s",
+      "gatsby",
+      "geometric",
+      "glamorous",
+      "gold",
+      "luxurious",
+      "vintage",
+    ],
     promptModifiers:
       "art deco style, 1920s aesthetic, geometric patterns, gold and black color scheme, luxurious glamour, Gatsby era, symmetrical design, sunburst motifs, elegant typography, chrome accents, streamlined forms, opulent details, jazz age sophistication",
     negativePrompt:
@@ -538,25 +559,29 @@ export const COLOR_MOODS: Record<string, ColorMoodConfig> = {
   warm: {
     id: "warm",
     name: "Warm",
-    promptAdditions: "warm color temperature, golden tones, amber hues, sunset colors, cozy atmosphere",
+    promptAdditions:
+      "warm color temperature, golden tones, amber hues, sunset colors, cozy atmosphere",
     associatedColors: ["gold", "orange", "red", "yellow", "brown"],
   },
   cool: {
     id: "cool",
     name: "Cool",
-    promptAdditions: "cool color temperature, blue tones, cyan hues, fresh atmosphere, calming palette",
+    promptAdditions:
+      "cool color temperature, blue tones, cyan hues, fresh atmosphere, calming palette",
     associatedColors: ["blue", "cyan", "teal", "purple", "grey"],
   },
   neutral: {
     id: "neutral",
     name: "Neutral",
-    promptAdditions: "neutral color palette, balanced tones, beige and grey, understated colors, sophisticated palette",
+    promptAdditions:
+      "neutral color palette, balanced tones, beige and grey, understated colors, sophisticated palette",
     associatedColors: ["beige", "grey", "cream", "taupe", "white"],
   },
   vibrant: {
     id: "vibrant",
     name: "Vibrant",
-    promptAdditions: "vibrant saturated colors, bold color choices, energetic palette, high saturation",
+    promptAdditions:
+      "vibrant saturated colors, bold color choices, energetic palette, high saturation",
     associatedColors: ["red", "orange", "yellow", "green", "blue", "purple"],
   },
   muted: {
@@ -568,13 +593,15 @@ export const COLOR_MOODS: Record<string, ColorMoodConfig> = {
   monochrome: {
     id: "monochrome",
     name: "Monochrome",
-    promptAdditions: "monochromatic color scheme, single color family, tonal variations, elegant simplicity",
+    promptAdditions:
+      "monochromatic color scheme, single color family, tonal variations, elegant simplicity",
     associatedColors: ["black", "white", "grey"],
   },
   "earth-tones": {
     id: "earth-tones",
     name: "Earth Tones",
-    promptAdditions: "earthy natural colors, organic palette, forest and soil tones, natural pigments",
+    promptAdditions:
+      "earthy natural colors, organic palette, forest and soil tones, natural pigments",
     associatedColors: ["brown", "green", "beige", "terracotta", "olive"],
   },
   pastel: {
@@ -710,9 +737,7 @@ export function getRecommendedStylesForAspectRatio(aspectRatio: AIAspectRatio): 
 /**
  * Get style presets by category
  */
-export function getStylesByCategory(
-  category: StylePresetConfig["category"]
-): StylePresetConfig[] {
+export function getStylesByCategory(category: StylePresetConfig["category"]): StylePresetConfig[] {
   return (Object.values(STYLE_PRESETS) as StylePresetConfig[]).filter(
     (preset) => preset.category === category
   );
@@ -769,7 +794,4 @@ export function isValidColorMood(mood: string): boolean {
 // Export Types
 // ============================================================================
 
-export type {
-  AIStylePreset,
-  AIAspectRatio,
-};
+export type { AIStylePreset, AIAspectRatio };

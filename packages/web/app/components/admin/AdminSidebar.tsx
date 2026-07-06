@@ -7,8 +7,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState } from 'react'
-import { useRouter } from '@tanstack/react-router'
+import { useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Package,
@@ -27,30 +27,30 @@ import {
   MessageSquare,
   RotateCcw,
   ShieldCheck,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { authApi } from '~/lib/api'
+} from "lucide-react";
+import { cn } from "~/lib/utils";
+import { authApi } from "~/lib/api";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface NavItem {
-  label: string
-  href: string
-  icon: typeof LayoutDashboard
-  badge?: string | number
-  children?: NavItem[]
+  label: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  badge?: string | number;
+  children?: NavItem[];
 }
 
 interface AdminSidebarProps {
-  className?: string
+  className?: string;
   user?: {
-    name: string
-    email: string
-    image?: string
-    role?: string
-  }
+    name: string;
+    email: string;
+    image?: string;
+    role?: string;
+  };
 }
 
 // ============================================================================
@@ -59,109 +59,109 @@ interface AdminSidebarProps {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    label: 'Dashboard',
-    href: '/admin',
+    label: "Dashboard",
+    href: "/admin",
     icon: LayoutDashboard,
   },
   {
-    label: 'Products',
-    href: '/admin/products',
+    label: "Products",
+    href: "/admin/products",
     icon: Package,
   },
   {
-    label: 'Orders',
-    href: '/admin/orders',
+    label: "Orders",
+    href: "/admin/orders",
     icon: ShoppingCart,
   },
   {
-    label: 'Reviews',
-    href: '/admin/reviews',
+    label: "Reviews",
+    href: "/admin/reviews",
     icon: MessageSquare,
   },
   {
-    label: 'AI Moderation',
-    href: '/admin/ai-moderation',
+    label: "AI Moderation",
+    href: "/admin/ai-moderation",
     icon: ShieldCheck,
   },
   {
-    label: 'Returns',
-    href: '/admin/returns',
+    label: "Returns",
+    href: "/admin/returns",
     icon: RotateCcw,
   },
   {
-    label: 'AI Generations',
-    href: '/admin/ai-generations',
+    label: "AI Generations",
+    href: "/admin/ai-generations",
     icon: Sparkles,
   },
   {
-    label: 'Customers',
-    href: '/admin/customers',
+    label: "Customers",
+    href: "/admin/customers",
     icon: Users,
   },
   {
-    label: 'Analytics',
-    href: '/admin/analytics',
+    label: "Analytics",
+    href: "/admin/analytics",
     icon: BarChart3,
   },
-]
+];
 
 const SECONDARY_NAV_ITEMS: NavItem[] = [
   {
-    label: 'Collections',
-    href: '/admin/collections',
+    label: "Collections",
+    href: "/admin/collections",
     icon: ImageIcon,
   },
   {
-    label: 'Categories',
-    href: '/admin/categories',
+    label: "Categories",
+    href: "/admin/categories",
     icon: Tags,
   },
   {
-    label: 'Settings',
-    href: '/admin/settings',
+    label: "Settings",
+    href: "/admin/settings",
     icon: Settings,
   },
-]
+];
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 export function AdminSidebar({ className, user }: AdminSidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const router = useRouter()
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const router = useRouter();
 
   // Get current path for active state
-  const currentPath = router.state.location.pathname
+  const currentPath = router.state.location.pathname;
 
   // Check if a nav item is active
   const isActive = (href: string) => {
-    if (href === '/admin') {
-      return currentPath === '/admin'
+    if (href === "/admin") {
+      return currentPath === "/admin";
     }
-    return currentPath.startsWith(href)
-  }
+    return currentPath.startsWith(href);
+  };
 
   // Handle sign out
   const handleSignOut = async () => {
     try {
-      await authApi.signOut()
-      window.location.href = '/'
+      await authApi.signOut();
+      window.location.href = "/";
     } catch {
-      window.location.href = '/'
+      window.location.href = "/";
     }
-  }
+  };
 
   // Get user initials for avatar
   const getInitials = (name: string) => {
     return name
-      .split(' ')
+      .split(" ")
       .map((n) => n[0])
-      .join('')
+      .join("")
       .toUpperCase()
-      .slice(0, 2)
-  }
+      .slice(0, 2);
+  };
 
   return (
     <>
@@ -186,9 +186,9 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-card transition-all duration-300',
-          isCollapsed ? 'w-[72px]' : 'w-64',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-card transition-all duration-300",
+          isCollapsed ? "w-[72px]" : "w-64",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           className
         )}
       >
@@ -225,7 +225,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="hidden rounded-lg p-1 hover:bg-muted lg:block"
-            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? (
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -275,12 +275,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
         {/* User Section */}
         <div className="border-t border-border p-3">
           {user && (
-            <div
-              className={cn(
-                'flex items-center gap-3',
-                isCollapsed ? 'justify-center' : ''
-              )}
-            >
+            <div className={cn("flex items-center gap-3", isCollapsed ? "justify-center" : "")}>
               {/* Avatar */}
               <div className="relative flex-shrink-0">
                 {user.image ? (
@@ -301,7 +296,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
               {!isCollapsed && (
                 <div className="flex-1 overflow-hidden">
                   <p className="truncate text-sm font-medium text-foreground">
-                    {user.name || 'Admin'}
+                    {user.name || "Admin"}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                 </div>
@@ -314,8 +309,8 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
             type="button"
             onClick={handleSignOut}
             className={cn(
-              'mt-3 flex w-full items-center gap-3 rounded-lg p-2 text-sm text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600',
-              isCollapsed ? 'justify-center' : ''
+              "mt-3 flex w-full items-center gap-3 rounded-lg p-2 text-sm text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600",
+              isCollapsed ? "justify-center" : ""
             )}
           >
             <LogOut className="h-5 w-5" />
@@ -324,7 +319,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
         </div>
       </aside>
     </>
-  )
+  );
 }
 
 // ============================================================================
@@ -332,31 +327,29 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
 // ============================================================================
 
 interface NavLinkProps {
-  item: NavItem
-  isActive: boolean
-  isCollapsed: boolean
-  onClick?: () => void
+  item: NavItem;
+  isActive: boolean;
+  isCollapsed: boolean;
+  onClick?: () => void;
 }
 
 function NavLink({ item, isActive, isCollapsed, onClick }: NavLinkProps) {
-  const Icon = item.icon
+  const Icon = item.icon;
 
   return (
     <a
       href={item.href}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all',
+        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
         isActive
-          ? 'bg-brand-50 text-brand-600'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-        isCollapsed ? 'justify-center px-2' : ''
+          ? "bg-brand-50 text-brand-600"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        isCollapsed ? "justify-center px-2" : ""
       )}
       title={isCollapsed ? item.label : undefined}
     >
-      <Icon
-        className={cn('h-5 w-5 flex-shrink-0', isActive ? 'text-brand-500' : '')}
-      />
+      <Icon className={cn("h-5 w-5 flex-shrink-0", isActive ? "text-brand-500" : "")} />
       {!isCollapsed && (
         <>
           <span className="flex-1">{item.label}</span>
@@ -368,7 +361,7 @@ function NavLink({ item, isActive, isCollapsed, onClick }: NavLinkProps) {
         </>
       )}
     </a>
-  )
+  );
 }
 
 // ============================================================================
@@ -379,14 +372,11 @@ export function MobileAdminHeader() {
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 pl-16 lg:hidden">
       <span className="text-lg font-bold text-foreground">Admin Panel</span>
-      <a
-        href="/"
-        className="text-sm text-muted-foreground hover:text-foreground"
-      >
+      <a href="/" className="text-sm text-muted-foreground hover:text-foreground">
         View Store
       </a>
     </header>
-  )
+  );
 }
 
-export default AdminSidebar
+export default AdminSidebar;

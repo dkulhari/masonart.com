@@ -56,9 +56,7 @@ beforeAll(async () => {
     isDatabaseAvailable = true;
     db = drizzle(client);
 
-    console.log(
-      "✅ Database connection established for approvals schema tests"
-    );
+    console.log("✅ Database connection established for approvals schema tests");
   } catch (error) {
     console.log("⚠️  Database not available, runtime tests will be skipped");
     isDatabaseAvailable = false;
@@ -435,22 +433,19 @@ describe("Approval Comments Table Schema", () => {
   });
 
   describe("Approval Author Type Enum", () => {
-    dbTest(
-      "should have approval_author_type enum with correct values",
-      async () => {
-        const result = await client!`
+    dbTest("should have approval_author_type enum with correct values", async () => {
+      const result = await client!`
         SELECT enumlabel FROM pg_enum
         JOIN pg_type ON pg_enum.enumtypid = pg_type.oid
         WHERE pg_type.typname = 'approval_author_type'
         ORDER BY enumsortorder
       `;
 
-        const enumValues = result.map((row: any) => row.enumlabel);
-        expect(enumValues).toContain("admin");
-        expect(enumValues).toContain("customer");
-        expect(enumValues).toHaveLength(2);
-      }
-    );
+      const enumValues = result.map((row: any) => row.enumlabel);
+      expect(enumValues).toContain("admin");
+      expect(enumValues).toContain("customer");
+      expect(enumValues).toHaveLength(2);
+    });
 
     it("should export approvalAuthorTypeEnum with correct enumValues", () => {
       expect(approvalAuthorTypeEnum.enumValues).toContain("admin");

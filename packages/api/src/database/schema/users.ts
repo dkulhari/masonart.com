@@ -53,12 +53,7 @@ export const defaultNotificationPreferences: NotificationPreferences = {
  * - admin: Admin with full access to admin panel
  * - super-admin: Super admin with system-level access
  */
-export const userRoleEnum = pgEnum("user_role", [
-  "customer",
-  "trade",
-  "admin",
-  "super-admin",
-]);
+export const userRoleEnum = pgEnum("user_role", ["customer", "trade", "admin", "super-admin"]);
 
 /**
  * User account status enum
@@ -144,21 +139,13 @@ export const users = pgTable(
 
     // AI generation credits (legacy - use wallet for new payments)
     aiCreditsRemaining: integer("ai_credits_remaining").default(5).notNull(),
-    aiSubscriptionTier: aiSubscriptionTierEnum("ai_subscription_tier").default(
-      "free"
-    ),
+    aiSubscriptionTier: aiSubscriptionTierEnum("ai_subscription_tier").default("free"),
 
     // Wallet system
     walletBalancePaise: integer("wallet_balance_paise").default(0).notNull(),
-    freeGenerationsRemaining: integer("free_generations_remaining")
-      .default(3)
-      .notNull(),
-    totalWalletTopUpsPaise: integer("total_wallet_top_ups_paise")
-      .default(0)
-      .notNull(),
-    totalWalletSpentPaise: integer("total_wallet_spent_paise")
-      .default(0)
-      .notNull(),
+    freeGenerationsRemaining: integer("free_generations_remaining").default(3).notNull(),
+    totalWalletTopUpsPaise: integer("total_wallet_top_ups_paise").default(0).notNull(),
+    totalWalletSpentPaise: integer("total_wallet_spent_paise").default(0).notNull(),
 
     // Notification preferences (stored as JSONB)
     notificationPreferences: jsonb("notification_preferences")
@@ -238,10 +225,7 @@ export const accounts = pgTable(
   },
   (table) => ({
     userIdIdx: index("account_user_id_idx").on(table.userId),
-    providerIdx: index("account_provider_idx").on(
-      table.providerId,
-      table.accountId
-    ),
+    providerIdx: index("account_provider_idx").on(table.providerId, table.accountId),
   })
 );
 
@@ -335,9 +319,7 @@ export const tradeApplications = pgTable(
   (table) => ({
     userIdIdx: index("trade_application_user_id_idx").on(table.userId),
     statusIdx: index("trade_application_status_idx").on(table.status),
-    submittedAtIdx: index("trade_application_submitted_at_idx").on(
-      table.submittedAt
-    ),
+    submittedAtIdx: index("trade_application_submitted_at_idx").on(table.submittedAt),
   })
 );
 
@@ -388,19 +370,16 @@ export const addressesRelations = relations(addresses, ({ one }) => ({
 /**
  * Trade applications relations
  */
-export const tradeApplicationsRelations = relations(
-  tradeApplications,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [tradeApplications.userId],
-      references: [users.id],
-    }),
-    reviewer: one(users, {
-      fields: [tradeApplications.reviewedBy],
-      references: [users.id],
-    }),
-  })
-);
+export const tradeApplicationsRelations = relations(tradeApplications, ({ one }) => ({
+  user: one(users, {
+    fields: [tradeApplications.userId],
+    references: [users.id],
+  }),
+  reviewer: one(users, {
+    fields: [tradeApplications.reviewedBy],
+    references: [users.id],
+  }),
+}));
 
 // ============================================================================
 // Type Exports (inferred from schema)
@@ -428,5 +407,4 @@ export type UserRole = (typeof userRoleEnum.enumValues)[number];
 export type UserStatus = (typeof userStatusEnum.enumValues)[number];
 export type TradeStatus = (typeof tradeStatusEnum.enumValues)[number];
 export type TradeAccountType = (typeof tradeAccountTypeEnum.enumValues)[number];
-export type AISubscriptionTier =
-  (typeof aiSubscriptionTierEnum.enumValues)[number];
+export type AISubscriptionTier = (typeof aiSubscriptionTierEnum.enumValues)[number];

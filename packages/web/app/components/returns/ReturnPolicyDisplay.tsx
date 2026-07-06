@@ -6,10 +6,10 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useEffect } from 'react'
-import { FileText, Clock, CreditCard, Package, Loader2, AlertCircle } from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { returnsApi, type ReturnPolicy } from '~/lib/api'
+import { useState, useEffect } from "react";
+import { FileText, Clock, CreditCard, Package, Loader2, AlertCircle } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { returnsApi, type ReturnPolicy } from "~/lib/api";
 
 // ============================================================================
 // Types
@@ -17,11 +17,11 @@ import { returnsApi, type ReturnPolicy } from '~/lib/api'
 
 export interface ReturnPolicyDisplayProps {
   /** Optional policy to display (if already fetched) */
-  policy?: ReturnPolicy
+  policy?: ReturnPolicy;
   /** Show compact version */
-  compact?: boolean
+  compact?: boolean;
   /** Optional className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -40,40 +40,40 @@ export function ReturnPolicyDisplay({
   compact = false,
   className,
 }: ReturnPolicyDisplayProps) {
-  const [policy, setPolicy] = useState<ReturnPolicy | null>(propPolicy || null)
-  const [isLoading, setIsLoading] = useState(!propPolicy)
-  const [error, setError] = useState<string | null>(null)
+  const [policy, setPolicy] = useState<ReturnPolicy | null>(propPolicy || null);
+  const [isLoading, setIsLoading] = useState(!propPolicy);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch policy if not provided
   useEffect(() => {
-    if (propPolicy) return
+    if (propPolicy) return;
 
     async function fetchPolicy() {
       try {
-        const response = await returnsApi.getPolicies()
+        const response = await returnsApi.getPolicies();
         if (response.policies.length > 0) {
-          const firstPolicy = response.policies[0]
+          const firstPolicy = response.policies[0];
           if (firstPolicy) {
-            setPolicy(firstPolicy)
+            setPolicy(firstPolicy);
           }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load policy')
+        setError(err instanceof Error ? err.message : "Failed to load policy");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchPolicy()
-  }, [propPolicy])
+    fetchPolicy();
+  }, [propPolicy]);
 
   // Loading state
   if (isLoading) {
     return (
-      <div className={cn('flex items-center justify-center p-4', className)}>
+      <div className={cn("flex items-center justify-center p-4", className)}>
         <Loader2 className="h-5 w-5 animate-spin text-brand-500" />
       </div>
-    )
+    );
   }
 
   // Error state
@@ -81,19 +81,19 @@ export function ReturnPolicyDisplay({
     return (
       <div
         className={cn(
-          'flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700',
+          "flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700",
           className
         )}
       >
         <AlertCircle className="h-4 w-4" />
         <span>Unable to load return policy</span>
       </div>
-    )
+    );
   }
 
   // No policy state
   if (!policy) {
-    return null
+    return null;
   }
 
   // Compact version
@@ -101,7 +101,7 @@ export function ReturnPolicyDisplay({
     return (
       <div
         className={cn(
-          'flex items-center gap-4 rounded-lg border border-border bg-muted/30 p-3 text-sm',
+          "flex items-center gap-4 rounded-lg border border-border bg-muted/30 p-3 text-sm",
           className
         )}
       >
@@ -112,9 +112,7 @@ export function ReturnPolicyDisplay({
         <div className="flex items-center gap-2 text-muted-foreground">
           <CreditCard className="h-4 w-4" />
           <span>
-            {policy.refundPercentage === 100
-              ? 'Full refund'
-              : `${policy.refundPercentage}% refund`}
+            {policy.refundPercentage === 100 ? "Full refund" : `${policy.refundPercentage}% refund`}
           </span>
         </div>
         <a
@@ -124,17 +122,12 @@ export function ReturnPolicyDisplay({
           View full policy
         </a>
       </div>
-    )
+    );
   }
 
   // Full version
   return (
-    <div
-      className={cn(
-        'rounded-xl border border-border bg-card',
-        className
-      )}
-    >
+    <div className={cn("rounded-xl border border-border bg-card", className)}>
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-border p-4">
         <FileText className="h-5 w-5 text-brand-500" />
@@ -170,7 +163,7 @@ export function ReturnPolicyDisplay({
               <p className="text-sm font-medium text-foreground">Refund Amount</p>
               <p className="text-sm text-muted-foreground">
                 {policy.refundPercentage === 100
-                  ? 'Full refund to original payment method'
+                  ? "Full refund to original payment method"
                   : `${policy.refundPercentage}% refund via ${policy.refundType}`}
               </p>
             </div>
@@ -201,11 +194,11 @@ export function ReturnPolicyDisplay({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Exports
 // ============================================================================
 
-export default ReturnPolicyDisplay
+export default ReturnPolicyDisplay;

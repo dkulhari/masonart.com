@@ -5,7 +5,7 @@
  * These schemas match the types defined in ../types/order.ts and ../types/user.ts
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 import {
   productConfigurationSchema,
   productPriceBreakdownSchema,
@@ -13,101 +13,101 @@ import {
   frameTypeSchema,
   matOptionSchema,
   glassOptionSchema,
-} from './product';
+} from "./product";
 
 // ============================================================================
 // User-Related Enum Schemas
 // ============================================================================
 
-export const userRoleSchema = z.enum(['customer', 'trade', 'admin', 'super-admin']);
+export const userRoleSchema = z.enum(["customer", "trade", "admin", "super-admin"]);
 
-export const authProviderSchema = z.enum(['email', 'google', 'facebook', 'apple', 'phone']);
+export const authProviderSchema = z.enum(["email", "google", "facebook", "apple", "phone"]);
 
-export const userStatusSchema = z.enum(['active', 'inactive', 'suspended', 'pending-verification']);
+export const userStatusSchema = z.enum(["active", "inactive", "suspended", "pending-verification"]);
 
-export const tradeStatusSchema = z.enum(['none', 'pending', 'approved', 'rejected', 'suspended']);
+export const tradeStatusSchema = z.enum(["none", "pending", "approved", "rejected", "suspended"]);
 
 export const tradeAccountTypeSchema = z.enum([
-  'interior-designer',
-  'architect',
-  'staging-company',
-  'hospitality',
-  'office-designer',
-  'art-consultant',
-  'other',
+  "interior-designer",
+  "architect",
+  "staging-company",
+  "hospitality",
+  "office-designer",
+  "art-consultant",
+  "other",
 ]);
 
-export const notificationChannelSchema = z.enum(['email', 'sms', 'push', 'whatsapp']);
+export const notificationChannelSchema = z.enum(["email", "sms", "push", "whatsapp"]);
 
-export const addressTypeSchema = z.enum(['shipping', 'billing', 'both']);
+export const addressTypeSchema = z.enum(["shipping", "billing", "both"]);
 
-export const paymentMethodTypeSchema = z.enum(['card', 'upi', 'netbanking', 'wallet']);
+export const paymentMethodTypeSchema = z.enum(["card", "upi", "netbanking", "wallet"]);
 
-export const cardBrandSchema = z.enum(['visa', 'mastercard', 'amex', 'rupay', 'other']);
+export const cardBrandSchema = z.enum(["visa", "mastercard", "amex", "rupay", "other"]);
 
 // ============================================================================
 // Order-Related Enum Schemas
 // ============================================================================
 
 export const orderStatusSchema = z.enum([
-  'pending',
-  'confirmed',
-  'processing',
-  'awaiting-approval',
-  'approved',
-  'production',
-  'ready-to-ship',
-  'shipped',
-  'out-for-delivery',
-  'delivered',
-  'cancelled',
-  'refunded',
-  'on-hold',
+  "pending",
+  "confirmed",
+  "processing",
+  "awaiting-approval",
+  "approved",
+  "production",
+  "ready-to-ship",
+  "shipped",
+  "out-for-delivery",
+  "delivered",
+  "cancelled",
+  "refunded",
+  "on-hold",
 ]);
 
 export const paymentStatusSchema = z.enum([
-  'pending',
-  'authorized',
-  'captured',
-  'failed',
-  'refunded',
-  'partially-refunded',
-  'cancelled',
+  "pending",
+  "authorized",
+  "captured",
+  "failed",
+  "refunded",
+  "partially-refunded",
+  "cancelled",
 ]);
 
-export const deliveryTypeSchema = z.enum(['standard', 'express', 'scheduled']);
+export const deliveryTypeSchema = z.enum(["standard", "express", "scheduled"]);
 
 export const approvalStatusSchema = z.enum([
-  'not-required',
-  'pending-production',
-  'production-complete',
-  'pending-approval',
-  'approved',
-  'revision-requested',
-  'rejected',
+  "not-required",
+  "pending-production",
+  "production-complete",
+  "pending-approval",
+  "approved",
+  "revision-requested",
+  "rejected",
 ]);
 
 export const returnReasonSchema = z.enum([
-  'damaged',
-  'wrong-item',
-  'quality-issue',
-  'not-as-described',
-  'changed-mind',
-  'wrong-size',
-  'other',
+  "damaged",
+  "wrong-item",
+  "quality-issue",
+  "not-as-described",
+  "changed-mind",
+  "wrong-size",
+  "other",
 ]);
 
-export const discountTypeSchema = z.enum(['percentage', 'fixed', 'free-shipping']);
+export const discountTypeSchema = z.enum(["percentage", "fixed", "free-shipping"]);
 
 export const returnStatusSchema = z.enum([
-  'requested',
-  'approved',
-  'rejected',
-  'pickup-scheduled',
-  'picked-up',
-  'received',
-  'refund-initiated',
-  'completed',
+  "requested",
+  "approved",
+  "rejected",
+  "pickup-scheduled",
+  "picked-up",
+  "received",
+  "refund-initiated",
+  "completed",
 ]);
 
 // ============================================================================
@@ -266,7 +266,7 @@ export const shippingDetailsSchema = z.object({
 
 export const paymentDetailsSchema = z.object({
   paymentId: z.string().min(1),
-  gateway: z.enum(['razorpay', 'stripe', 'payu']),
+  gateway: z.enum(["razorpay", "stripe", "payu"]),
   methodType: paymentMethodTypeSchema,
   cardBrand: cardBrandSchema.optional(),
   last4: z.string().length(4).optional(),
@@ -290,7 +290,7 @@ export const paymentDetailsSchema = z.object({
 
 export const productionMediaSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(['photo', 'video']),
+  type: z.enum(["photo", "video"]),
   url: z.string().url(),
   thumbnailUrl: z.string().url().optional(),
   caption: z.string().max(500).optional(),
@@ -331,10 +331,10 @@ export const orderItemSchema = z.object({
 
 export const orderEventSchema = z.object({
   id: z.string().min(1),
-  type: z.union([orderStatusSchema, z.enum(['note', 'payment', 'approval'])]),
+  type: z.union([orderStatusSchema, z.enum(["note", "payment", "approval"])]),
   title: z.string().min(1),
   description: z.string().optional(),
-  actorType: z.enum(['system', 'customer', 'admin']),
+  actorType: z.enum(["system", "customer", "admin"]),
   actorUserId: z.string().optional(),
   occurredAt: z.coerce.date(),
 });
@@ -403,7 +403,7 @@ export const checkoutSessionSchema = z.object({
   userId: z.string().optional(),
   guestEmail: z.string().email().optional(),
   guestPhone: z.string().min(10).max(15).optional(),
-  currentStep: z.enum(['cart', 'account', 'shipping', 'delivery', 'payment', 'review']),
+  currentStep: z.enum(["cart", "account", "shipping", "delivery", "payment", "review"]),
   shippingAddress: addressSchema.optional(),
   billingAddress: addressSchema.optional(),
   sameBillingAsShipping: z.boolean(),
@@ -424,13 +424,14 @@ export const guestCheckoutInputSchema = z.object({
   name: z.string().min(1).max(100),
 });
 
-export const setShippingAddressInputSchema = z.object({
-  addressId: z.string().optional(),
-  address: addressInputSchema.optional(),
-}).refine(
-  (data) => data.addressId || data.address,
-  { message: 'Either addressId or address must be provided' }
-);
+export const setShippingAddressInputSchema = z
+  .object({
+    addressId: z.string().optional(),
+    address: addressInputSchema.optional(),
+  })
+  .refine((data) => data.addressId || data.address, {
+    message: "Either addressId or address must be provided",
+  });
 
 export const selectShippingRateInputSchema = z.object({
   shippingRateId: z.string().min(1),
@@ -496,7 +497,7 @@ export const submitApprovalInputSchema = z.object({
 
 export const uploadProductionMediaInputSchema = z.object({
   orderItemId: z.string().min(1),
-  type: z.enum(['photo', 'video']),
+  type: z.enum(["photo", "video"]),
   caption: z.string().max(500).optional(),
 });
 
@@ -518,16 +519,16 @@ export const orderFiltersSchema = z.object({
 });
 
 export const orderSortFieldSchema = z.enum([
-  'createdAt',
-  'updatedAt',
-  'total',
-  'orderNumber',
-  'status',
+  "createdAt",
+  "updatedAt",
+  "total",
+  "orderNumber",
+  "status",
 ]);
 
 export const orderSortSchema = z.object({
   field: orderSortFieldSchema,
-  direction: z.enum(['asc', 'desc']),
+  direction: z.enum(["asc", "desc"]),
 });
 
 export const paginatedOrdersSchema = z.object({

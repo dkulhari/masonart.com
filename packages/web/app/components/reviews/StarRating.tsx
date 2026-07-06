@@ -7,9 +7,9 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
-import { Star } from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { useState, useCallback } from "react";
+import { Star } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
@@ -17,25 +17,25 @@ import { cn } from '~/lib/utils'
 
 export interface StarRatingProps {
   /** Current rating value (0-5) */
-  rating: number
+  rating: number;
   /** Maximum rating value */
-  maxRating?: number
+  maxRating?: number;
   /** Size variant for stars */
-  size?: 'xs' | 'sm' | 'md' | 'lg'
+  size?: "xs" | "sm" | "md" | "lg";
   /** Show rating count next to stars */
-  showCount?: boolean
+  showCount?: boolean;
   /** Rating count to display */
-  count?: number
+  count?: number;
   /** Show numeric rating value */
-  showValue?: boolean
+  showValue?: boolean;
   /** Enable interactive rating selection */
-  interactive?: boolean
+  interactive?: boolean;
   /** Callback when rating changes (only used when interactive) */
-  onRatingChange?: (rating: number) => void
+  onRatingChange?: (rating: number) => void;
   /** Custom className */
-  className?: string
+  className?: string;
   /** Show half stars */
-  showHalfStars?: boolean
+  showHalfStars?: boolean;
 }
 
 // ============================================================================
@@ -44,26 +44,26 @@ export interface StarRatingProps {
 
 const SIZE_MAP = {
   xs: {
-    star: 'h-3 w-3',
-    gap: 'gap-0.5',
-    text: 'text-xs',
+    star: "h-3 w-3",
+    gap: "gap-0.5",
+    text: "text-xs",
   },
   sm: {
-    star: 'h-4 w-4',
-    gap: 'gap-0.5',
-    text: 'text-sm',
+    star: "h-4 w-4",
+    gap: "gap-0.5",
+    text: "text-sm",
   },
   md: {
-    star: 'h-5 w-5',
-    gap: 'gap-1',
-    text: 'text-base',
+    star: "h-5 w-5",
+    gap: "gap-1",
+    text: "text-base",
   },
   lg: {
-    star: 'h-6 w-6',
-    gap: 'gap-1',
-    text: 'text-lg',
+    star: "h-6 w-6",
+    gap: "gap-1",
+    text: "text-lg",
   },
-}
+};
 
 // ============================================================================
 // Component
@@ -87,7 +87,7 @@ const SIZE_MAP = {
 export function StarRating({
   rating,
   maxRating = 5,
-  size = 'md',
+  size = "md",
   showCount = false,
   count = 0,
   showValue = false,
@@ -96,65 +96,62 @@ export function StarRating({
   className,
   showHalfStars = true,
 }: StarRatingProps) {
-  const [hoverRating, setHoverRating] = useState<number | null>(null)
-  const sizeStyles = SIZE_MAP[size]
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
+  const sizeStyles = SIZE_MAP[size];
 
   // Current display rating (hover takes priority in interactive mode)
-  const displayRating = interactive && hoverRating !== null ? hoverRating : rating
+  const displayRating = interactive && hoverRating !== null ? hoverRating : rating;
 
   // Handle mouse enter on star
   const handleMouseEnter = useCallback(
     (index: number) => {
       if (interactive) {
-        setHoverRating(index + 1)
+        setHoverRating(index + 1);
       }
     },
     [interactive]
-  )
+  );
 
   // Handle mouse leave
   const handleMouseLeave = useCallback(() => {
     if (interactive) {
-      setHoverRating(null)
+      setHoverRating(null);
     }
-  }, [interactive])
+  }, [interactive]);
 
   // Handle click on star
   const handleClick = useCallback(
     (index: number) => {
       if (interactive && onRatingChange) {
-        onRatingChange(index + 1)
+        onRatingChange(index + 1);
       }
     },
     [interactive, onRatingChange]
-  )
+  );
 
   // Generate accessible label
-  const ariaLabel = `Rating: ${rating.toFixed(1)} out of ${maxRating} stars${count > 0 ? `, ${count} reviews` : ''}`
+  const ariaLabel = `Rating: ${rating.toFixed(1)} out of ${maxRating} stars${count > 0 ? `, ${count} reviews` : ""}`;
 
   // Render individual star
   const renderStar = (index: number) => {
-    const fillPercentage = Math.min(Math.max(displayRating - index, 0), 1)
-    const isFilled = fillPercentage >= 1
-    const isHalfFilled = showHalfStars && fillPercentage > 0 && fillPercentage < 1
+    const fillPercentage = Math.min(Math.max(displayRating - index, 0), 1);
+    const isFilled = fillPercentage >= 1;
+    const isHalfFilled = showHalfStars && fillPercentage > 0 && fillPercentage < 1;
 
     return (
       <span
         key={index}
-        className={cn(
-          'relative inline-block',
-          interactive && 'cursor-pointer'
-        )}
+        className={cn("relative inline-block", interactive && "cursor-pointer")}
         onMouseEnter={() => handleMouseEnter(index)}
         onClick={() => handleClick(index)}
-        role={interactive ? 'button' : undefined}
+        role={interactive ? "button" : undefined}
         tabIndex={interactive ? 0 : undefined}
         onKeyDown={
           interactive
             ? (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  handleClick(index)
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleClick(index);
                 }
               }
             : undefined
@@ -165,8 +162,8 @@ export function StarRating({
         <Star
           className={cn(
             sizeStyles.star,
-            'text-muted-foreground/30',
-            interactive && 'transition-colors'
+            "text-muted-foreground/30",
+            interactive && "transition-colors"
           )}
         />
         {/* Foreground star (filled) */}
@@ -178,43 +175,43 @@ export function StarRating({
             <Star
               className={cn(
                 sizeStyles.star,
-                'fill-amber-400 text-amber-400',
-                interactive && 'transition-colors'
+                "fill-amber-400 text-amber-400",
+                interactive && "transition-colors"
               )}
             />
           </span>
         )}
       </span>
-    )
-  }
+    );
+  };
 
   return (
     <div
-      className={cn('flex items-center', sizeStyles.gap, className)}
+      className={cn("flex items-center", sizeStyles.gap, className)}
       role="img"
       aria-label={ariaLabel}
       onMouseLeave={handleMouseLeave}
     >
       {/* Stars */}
-      <div className={cn('flex', sizeStyles.gap)}>
+      <div className={cn("flex", sizeStyles.gap)}>
         {Array.from({ length: maxRating }, (_, index) => renderStar(index))}
       </div>
 
       {/* Rating value */}
       {showValue && (
-        <span className={cn('font-medium text-foreground', sizeStyles.text)}>
+        <span className={cn("font-medium text-foreground", sizeStyles.text)}>
           {rating.toFixed(1)}
         </span>
       )}
 
       {/* Review count */}
       {showCount && (
-        <span className={cn('text-muted-foreground', sizeStyles.text)}>
+        <span className={cn("text-muted-foreground", sizeStyles.text)}>
           ({count.toLocaleString()})
         </span>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -225,29 +222,26 @@ export function StarRating({
  * StarRatingSkeleton - Loading skeleton for star rating
  */
 export function StarRatingSkeleton({
-  size = 'md',
+  size = "md",
   showCount = false,
   className,
 }: {
-  size?: 'xs' | 'sm' | 'md' | 'lg'
-  showCount?: boolean
-  className?: string
+  size?: "xs" | "sm" | "md" | "lg";
+  showCount?: boolean;
+  className?: string;
 }) {
-  const sizeStyles = SIZE_MAP[size]
+  const sizeStyles = SIZE_MAP[size];
 
   return (
-    <div className={cn('flex animate-pulse items-center', sizeStyles.gap, className)}>
-      <div className={cn('flex', sizeStyles.gap)}>
+    <div className={cn("flex animate-pulse items-center", sizeStyles.gap, className)}>
+      <div className={cn("flex", sizeStyles.gap)}>
         {Array.from({ length: 5 }, (_, index) => (
-          <div
-            key={index}
-            className={cn(sizeStyles.star, 'rounded bg-muted')}
-          />
+          <div key={index} className={cn(sizeStyles.star, "rounded bg-muted")} />
         ))}
       </div>
       {showCount && <div className="h-4 w-12 rounded bg-muted" />}
     </div>
-  )
+  );
 }
 
-export default StarRating
+export default StarRating;

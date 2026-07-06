@@ -9,7 +9,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -25,7 +25,7 @@ import {
   type HeaderContext,
   type CellContext,
   type FilterFn,
-} from '@tanstack/react-table'
+} from "@tanstack/react-table";
 import {
   ChevronDown,
   ChevronUp,
@@ -42,74 +42,74 @@ import {
   ChevronsRight,
   Package,
   DollarSign,
-} from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
+} from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface AdminOrderCustomer {
-  name?: string | null
-  email: string
-  phone?: string | null
+  name?: string | null;
+  email: string;
+  phone?: string | null;
 }
 
 export interface AdminOrder {
-  id: string
-  orderNumber: string
-  userId?: string | null
-  guestEmail?: string | null
-  guestPhone?: string | null
-  status: OrderStatus
-  paymentStatus: PaymentStatus
-  orderType: 'regular' | 'ai_generated' | 'trade'
-  shippingMethod?: string | null
-  shippingCost: string
-  subtotal: string
-  discount: string
-  tax: string
-  total: string
-  itemCount: number
-  currency: string
-  createdAt: string
-  updatedAt: string
-  paidAt?: string | null
-  shippedAt?: string | null
-  deliveredAt?: string | null
-  cancelledAt?: string | null
-  customer?: AdminOrderCustomer | null
+  id: string;
+  orderNumber: string;
+  userId?: string | null;
+  guestEmail?: string | null;
+  guestPhone?: string | null;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  orderType: "regular" | "ai_generated" | "trade";
+  shippingMethod?: string | null;
+  shippingCost: string;
+  subtotal: string;
+  discount: string;
+  tax: string;
+  total: string;
+  itemCount: number;
+  currency: string;
+  createdAt: string;
+  updatedAt: string;
+  paidAt?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+  cancelledAt?: string | null;
+  customer?: AdminOrderCustomer | null;
 }
 
 export type OrderStatus =
-  | 'pending'
-  | 'pending_payment'
-  | 'confirmed'
-  | 'processing'
-  | 'shipped'
-  | 'out_for_delivery'
-  | 'delivered'
-  | 'cancelled'
-  | 'refund_requested'
-  | 'refunded'
-  | 'failed'
+  | "pending"
+  | "pending_payment"
+  | "confirmed"
+  | "processing"
+  | "shipped"
+  | "out_for_delivery"
+  | "delivered"
+  | "cancelled"
+  | "refund_requested"
+  | "refunded"
+  | "failed";
 
 export type PaymentStatus =
-  | 'pending'
-  | 'processing'
-  | 'paid'
-  | 'failed'
-  | 'refunded'
-  | 'partially_refunded'
-  | 'cancelled'
+  | "pending"
+  | "processing"
+  | "paid"
+  | "failed"
+  | "refunded"
+  | "partially_refunded"
+  | "cancelled";
 
 export interface OrdersTableProps {
-  orders: AdminOrder[]
-  isLoading?: boolean
-  onView?: (order: AdminOrder) => void
-  onUpdateStatus?: (order: AdminOrder) => void
-  onCancel?: (order: AdminOrder) => void
-  onRefund?: (order: AdminOrder) => void
+  orders: AdminOrder[];
+  isLoading?: boolean;
+  onView?: (order: AdminOrder) => void;
+  onUpdateStatus?: (order: AdminOrder) => void;
+  onCancel?: (order: AdminOrder) => void;
+  onRefund?: (order: AdminOrder) => void;
 }
 
 // ============================================================================
@@ -118,76 +118,76 @@ export interface OrdersTableProps {
 
 function OrderStatusBadge({ status }: { status: OrderStatus }) {
   const styles: Record<OrderStatus, string> = {
-    pending: 'bg-amber-100 text-amber-700 border-amber-200',
-    pending_payment: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
-    processing: 'bg-purple-100 text-purple-700 border-purple-200',
-    shipped: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    out_for_delivery: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-    delivered: 'bg-green-100 text-green-700 border-green-200',
-    cancelled: 'bg-gray-100 text-gray-700 border-gray-200',
-    refund_requested: 'bg-orange-100 text-orange-700 border-orange-200',
-    refunded: 'bg-gray-100 text-gray-600 border-gray-200',
-    failed: 'bg-red-100 text-red-700 border-red-200',
-  }
+    pending: "bg-amber-100 text-amber-700 border-amber-200",
+    pending_payment: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    confirmed: "bg-blue-100 text-blue-700 border-blue-200",
+    processing: "bg-purple-100 text-purple-700 border-purple-200",
+    shipped: "bg-indigo-100 text-indigo-700 border-indigo-200",
+    out_for_delivery: "bg-cyan-100 text-cyan-700 border-cyan-200",
+    delivered: "bg-green-100 text-green-700 border-green-200",
+    cancelled: "bg-gray-100 text-gray-700 border-gray-200",
+    refund_requested: "bg-orange-100 text-orange-700 border-orange-200",
+    refunded: "bg-gray-100 text-gray-600 border-gray-200",
+    failed: "bg-red-100 text-red-700 border-red-200",
+  };
 
   const labels: Record<OrderStatus, string> = {
-    pending: 'Pending',
-    pending_payment: 'Payment Pending',
-    confirmed: 'Confirmed',
-    processing: 'Processing',
-    shipped: 'Shipped',
-    out_for_delivery: 'Out for Delivery',
-    delivered: 'Delivered',
-    cancelled: 'Cancelled',
-    refund_requested: 'Refund Requested',
-    refunded: 'Refunded',
-    failed: 'Failed',
-  }
+    pending: "Pending",
+    pending_payment: "Payment Pending",
+    confirmed: "Confirmed",
+    processing: "Processing",
+    shipped: "Shipped",
+    out_for_delivery: "Out for Delivery",
+    delivered: "Delivered",
+    cancelled: "Cancelled",
+    refund_requested: "Refund Requested",
+    refunded: "Refunded",
+    failed: "Failed",
+  };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
         styles[status]
       )}
     >
       {labels[status]}
     </span>
-  )
+  );
 }
 
 function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const styles: Record<PaymentStatus, string> = {
-    pending: 'bg-amber-100 text-amber-700 border-amber-200',
-    processing: 'bg-blue-100 text-blue-700 border-blue-200',
-    paid: 'bg-green-100 text-green-700 border-green-200',
-    failed: 'bg-red-100 text-red-700 border-red-200',
-    refunded: 'bg-gray-100 text-gray-600 border-gray-200',
-    partially_refunded: 'bg-orange-100 text-orange-700 border-orange-200',
-    cancelled: 'bg-gray-100 text-gray-600 border-gray-200',
-  }
+    pending: "bg-amber-100 text-amber-700 border-amber-200",
+    processing: "bg-blue-100 text-blue-700 border-blue-200",
+    paid: "bg-green-100 text-green-700 border-green-200",
+    failed: "bg-red-100 text-red-700 border-red-200",
+    refunded: "bg-gray-100 text-gray-600 border-gray-200",
+    partially_refunded: "bg-orange-100 text-orange-700 border-orange-200",
+    cancelled: "bg-gray-100 text-gray-600 border-gray-200",
+  };
 
   const labels: Record<PaymentStatus, string> = {
-    pending: 'Pending',
-    processing: 'Processing',
-    paid: 'Paid',
-    failed: 'Failed',
-    refunded: 'Refunded',
-    partially_refunded: 'Partial Refund',
-    cancelled: 'Cancelled',
-  }
+    pending: "Pending",
+    processing: "Processing",
+    paid: "Paid",
+    failed: "Failed",
+    refunded: "Refunded",
+    partially_refunded: "Partial Refund",
+    cancelled: "Cancelled",
+  };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+        "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
         styles[status]
       )}
     >
       {labels[status]}
     </span>
-  )
+  );
 }
 
 // ============================================================================
@@ -195,32 +195,20 @@ function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
 // ============================================================================
 
 interface ActionMenuProps {
-  order: AdminOrder
-  onView?: (order: AdminOrder) => void
-  onUpdateStatus?: (order: AdminOrder) => void
-  onCancel?: (order: AdminOrder) => void
-  onRefund?: (order: AdminOrder) => void
+  order: AdminOrder;
+  onView?: (order: AdminOrder) => void;
+  onUpdateStatus?: (order: AdminOrder) => void;
+  onCancel?: (order: AdminOrder) => void;
+  onRefund?: (order: AdminOrder) => void;
 }
 
-function ActionMenu({
-  order,
-  onView,
-  onUpdateStatus,
-  onCancel,
-  onRefund,
-}: ActionMenuProps) {
-  const [isOpen, setIsOpen] = useState(false)
+function ActionMenu({ order, onView, onUpdateStatus, onCancel, onRefund }: ActionMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
 
-  const canCancel = ![
-    'delivered',
-    'cancelled',
-    'refunded',
-    'failed',
-  ].includes(order.status)
+  const canCancel = !["delivered", "cancelled", "refunded", "failed"].includes(order.status);
 
   const canRefund =
-    order.paymentStatus === 'paid' &&
-    !['refunded', 'cancelled'].includes(order.status)
+    order.paymentStatus === "paid" && !["refunded", "cancelled"].includes(order.status);
 
   return (
     <div className="relative">
@@ -235,10 +223,7 @@ function ActionMenu({
       {isOpen && (
         <>
           {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
 
           {/* Menu */}
           <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-border bg-card py-1 shadow-lg">
@@ -246,8 +231,8 @@ function ActionMenu({
               <button
                 type="button"
                 onClick={() => {
-                  onView(order)
-                  setIsOpen(false)
+                  onView(order);
+                  setIsOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
               >
@@ -260,8 +245,8 @@ function ActionMenu({
               <button
                 type="button"
                 onClick={() => {
-                  onUpdateStatus(order)
-                  setIsOpen(false)
+                  onUpdateStatus(order);
+                  setIsOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted"
               >
@@ -276,8 +261,8 @@ function ActionMenu({
                 <button
                   type="button"
                   onClick={() => {
-                    onCancel(order)
-                    setIsOpen(false)
+                    onCancel(order);
+                    setIsOpen(false);
                   }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50"
                 >
@@ -291,8 +276,8 @@ function ActionMenu({
               <button
                 type="button"
                 onClick={() => {
-                  onRefund(order)
-                  setIsOpen(false)
+                  onRefund(order);
+                  setIsOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
               >
@@ -304,7 +289,7 @@ function ActionMenu({
         </>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -315,8 +300,8 @@ function SortableHeader({
   column,
   children,
 }: {
-  column: Column<AdminOrder, unknown>
-  children: React.ReactNode
+  column: Column<AdminOrder, unknown>;
+  children: React.ReactNode;
 }) {
   return (
     <button
@@ -325,15 +310,15 @@ function SortableHeader({
       className="flex items-center gap-1 font-medium"
     >
       {children}
-      {column.getIsSorted() === 'asc' ? (
+      {column.getIsSorted() === "asc" ? (
         <ChevronUp className="h-4 w-4" />
-      ) : column.getIsSorted() === 'desc' ? (
+      ) : column.getIsSorted() === "desc" ? (
         <ChevronDown className="h-4 w-4" />
       ) : (
         <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
       )}
     </button>
-  )
+  );
 }
 
 // ============================================================================
@@ -348,65 +333,61 @@ export function OrdersTable({
   onCancel,
   onRefund,
 }: OrdersTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
 
   // Column definitions
   const columns = useMemo<ColumnDef<AdminOrder>[]>(
     () => [
       // Order Number column
       {
-        accessorKey: 'orderNumber',
+        accessorKey: "orderNumber",
         header: ({ column }: HeaderContext<AdminOrder, unknown>) => (
           <SortableHeader column={column}>Order</SortableHeader>
         ),
         cell: ({ row }: CellContext<AdminOrder, unknown>) => {
-          const order = row.original
-          const date = new Date(order.createdAt)
+          const order = row.original;
+          const date = new Date(order.createdAt);
           return (
             <div className="min-w-0">
-              <p className="font-mono font-medium text-foreground">
-                {order.orderNumber}
-              </p>
+              <p className="font-mono font-medium text-foreground">{order.orderNumber}</p>
               <p className="text-xs text-muted-foreground">
-                {date.toLocaleDateString('en-IN', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
+                {date.toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
                 })}
               </p>
             </div>
-          )
+          );
         },
         size: 150,
       },
       // Customer column
       {
-        id: 'customer',
-        accessorFn: (row) => row.customer?.email || row.guestEmail || '',
-        header: 'Customer',
+        id: "customer",
+        accessorFn: (row) => row.customer?.email || row.guestEmail || "",
+        header: "Customer",
         cell: ({ row }: CellContext<AdminOrder, unknown>) => {
-          const order = row.original
-          const customer = order.customer
+          const order = row.original;
+          const customer = order.customer;
           return (
             <div className="min-w-0">
               {customer?.name && (
-                <p className="truncate font-medium text-foreground">
-                  {customer.name}
-                </p>
+                <p className="truncate font-medium text-foreground">{customer.name}</p>
               )}
               <p className="truncate text-sm text-muted-foreground">
-                {customer?.email || order.guestEmail || 'Guest'}
+                {customer?.email || order.guestEmail || "Guest"}
               </p>
             </div>
-          )
+          );
         },
         size: 200,
       },
       // Order Status column
       {
-        accessorKey: 'status',
+        accessorKey: "status",
         header: ({ column }: HeaderContext<AdminOrder, unknown>) => (
           <SortableHeader column={column}>Status</SortableHeader>
         ),
@@ -414,14 +395,14 @@ export function OrdersTable({
           <OrderStatusBadge status={row.original.status} />
         ),
         filterFn: ((row: Row<AdminOrder>, _columnId: string, filterValue: string) => {
-          if (!filterValue) return true
-          return row.original.status === filterValue
+          if (!filterValue) return true;
+          return row.original.status === filterValue;
         }) as FilterFn<AdminOrder>,
         size: 140,
       },
       // Payment Status column
       {
-        accessorKey: 'paymentStatus',
+        accessorKey: "paymentStatus",
         header: ({ column }: HeaderContext<AdminOrder, unknown>) => (
           <SortableHeader column={column}>Payment</SortableHeader>
         ),
@@ -429,15 +410,15 @@ export function OrdersTable({
           <PaymentStatusBadge status={row.original.paymentStatus} />
         ),
         filterFn: ((row: Row<AdminOrder>, _columnId: string, filterValue: string) => {
-          if (!filterValue) return true
-          return row.original.paymentStatus === filterValue
+          if (!filterValue) return true;
+          return row.original.paymentStatus === filterValue;
         }) as FilterFn<AdminOrder>,
         size: 120,
       },
       // Items column
       {
-        accessorKey: 'itemCount',
-        header: 'Items',
+        accessorKey: "itemCount",
+        header: "Items",
         cell: ({ row }: CellContext<AdminOrder, unknown>) => (
           <div className="flex items-center gap-1 text-muted-foreground">
             <Package className="h-4 w-4" />
@@ -448,7 +429,7 @@ export function OrdersTable({
       },
       // Total column
       {
-        accessorKey: 'total',
+        accessorKey: "total",
         header: ({ column }: HeaderContext<AdminOrder, unknown>) => (
           <SortableHeader column={column}>Total</SortableHeader>
         ),
@@ -459,14 +440,14 @@ export function OrdersTable({
           </div>
         ),
         sortingFn: (rowA: Row<AdminOrder>, rowB: Row<AdminOrder>) => {
-          return parseFloat(rowA.original.total) - parseFloat(rowB.original.total)
+          return parseFloat(rowA.original.total) - parseFloat(rowB.original.total);
         },
         size: 100,
       },
       // Actions column
       {
-        id: 'actions',
-        header: '',
+        id: "actions",
+        header: "",
         cell: ({ row }: CellContext<AdminOrder, unknown>) => (
           <ActionMenu
             order={row.original}
@@ -482,7 +463,7 @@ export function OrdersTable({
       },
     ],
     [onView, onUpdateStatus, onCancel, onRefund]
-  )
+  );
 
   // Table instance
   const table = useReactTable({
@@ -505,11 +486,15 @@ export function OrdersTable({
         pageSize: 10,
       },
     },
-  })
+  });
 
   // Get filter values
-  const statusFilterValue = columnFilters.find((f) => f.id === 'status')?.value as string | undefined
-  const paymentFilterValue = columnFilters.find((f) => f.id === 'paymentStatus')?.value as string | undefined
+  const statusFilterValue = columnFilters.find((f) => f.id === "status")?.value as
+    | string
+    | undefined;
+  const paymentFilterValue = columnFilters.find((f) => f.id === "paymentStatus")?.value as
+    | string
+    | undefined;
 
   return (
     <div className="space-y-4">
@@ -531,14 +516,14 @@ export function OrdersTable({
         <div className="flex flex-wrap items-center gap-2">
           {/* Order Status Filter */}
           <select
-            value={statusFilterValue || ''}
+            value={statusFilterValue || ""}
             onChange={(e) => {
-              const value = e.target.value
-              const newFilters = columnFilters.filter((f) => f.id !== 'status')
+              const value = e.target.value;
+              const newFilters = columnFilters.filter((f) => f.id !== "status");
               if (value) {
-                newFilters.push({ id: 'status', value })
+                newFilters.push({ id: "status", value });
               }
-              setColumnFilters(newFilters)
+              setColumnFilters(newFilters);
             }}
             className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
@@ -558,14 +543,14 @@ export function OrdersTable({
 
           {/* Payment Status Filter */}
           <select
-            value={paymentFilterValue || ''}
+            value={paymentFilterValue || ""}
             onChange={(e) => {
-              const value = e.target.value
-              const newFilters = columnFilters.filter((f) => f.id !== 'paymentStatus')
+              const value = e.target.value;
+              const newFilters = columnFilters.filter((f) => f.id !== "paymentStatus");
               if (value) {
-                newFilters.push({ id: 'paymentStatus', value })
+                newFilters.push({ id: "paymentStatus", value });
               }
-              setColumnFilters(newFilters)
+              setColumnFilters(newFilters);
             }}
             className="h-9 rounded-lg border border-border bg-background px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           >
@@ -658,12 +643,12 @@ export function OrdersTable({
           <div className="flex items-center justify-between border-t border-border px-4 py-3">
             {/* Info */}
             <div className="text-sm text-muted-foreground">
-              Showing{' '}
-              {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
+              Showing{" "}
+              {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
               {Math.min(
                 (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
                 table.getFilteredRowModel().rows.length
-              )}{' '}
+              )}{" "}
               of {table.getFilteredRowModel().rows.length} orders
             </div>
 
@@ -711,7 +696,7 @@ export function OrdersTable({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -735,11 +720,7 @@ export function OrdersTableSkeleton() {
         <div className="border-b border-border bg-muted/50 px-4 py-3">
           <div className="flex gap-4">
             {[150, 200, 140, 120, 70, 100, 50].map((w, i) => (
-              <div
-                key={i}
-                className="h-4 animate-pulse rounded bg-muted"
-                style={{ width: w }}
-              />
+              <div key={i} className="h-4 animate-pulse rounded bg-muted" style={{ width: w }} />
             ))}
           </div>
         </div>
@@ -747,18 +728,14 @@ export function OrdersTableSkeleton() {
           <div key={i} className="border-b border-border px-4 py-3">
             <div className="flex items-center gap-4">
               {[150, 200, 140, 120, 70, 100, 50].map((w, j) => (
-                <div
-                  key={j}
-                  className="h-6 animate-pulse rounded bg-muted"
-                  style={{ width: w }}
-                />
+                <div key={j} className="h-6 animate-pulse rounded bg-muted" style={{ width: w }} />
               ))}
             </div>
           </div>
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default OrdersTable
+export default OrdersTable;

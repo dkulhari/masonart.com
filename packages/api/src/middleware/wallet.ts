@@ -118,12 +118,7 @@ export function requireSufficientFunds(
     const falModel = params.falModel;
 
     // Calculate cost
-    const cost = await calculateGenerationCost(
-      provider,
-      variationCount,
-      falModel,
-      user.id
-    );
+    const cost = await calculateGenerationCost(provider, variationCount, falModel, user.id);
 
     // Check funds
     const fundsCheck = await hasSufficientFunds(user.id, cost.userPricePaise);

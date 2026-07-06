@@ -10,11 +10,11 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { CreditCard, Loader2, ShieldCheck, AlertCircle } from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
-import { ordersApi, type OrderInput } from '~/lib/api'
-import { useCartActions } from '~/stores/cart'
+import { useState, useEffect, useCallback } from "react";
+import { CreditCard, Loader2, ShieldCheck, AlertCircle } from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import { ordersApi, type OrderInput } from "~/lib/api";
+import { useCartActions } from "~/stores/cart";
 
 // ============================================================================
 // Types
@@ -22,72 +22,79 @@ import { useCartActions } from '~/stores/cart'
 
 declare global {
   interface Window {
-    Razorpay: new (options: RazorpayOptions) => RazorpayInstance
+    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
   }
 }
 
 interface RazorpayOptions {
-  key: string
-  amount: number
-  currency: string
-  name: string
-  description: string
-  order_id: string
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
   prefill?: {
-    name?: string
-    email?: string
-    contact?: string
-  }
-  notes?: Record<string, string>
+    name?: string;
+    email?: string;
+    contact?: string;
+  };
+  notes?: Record<string, string>;
   theme?: {
-    color?: string
-  }
-  handler: (response: RazorpayResponse) => void
+    color?: string;
+  };
+  handler: (response: RazorpayResponse) => void;
   modal?: {
-    ondismiss?: () => void
-    escape?: boolean
-    animation?: boolean
-  }
+    ondismiss?: () => void;
+    escape?: boolean;
+    animation?: boolean;
+  };
 }
 
 interface RazorpayInstance {
-  open: () => void
-  close: () => void
-  on: (event: string, callback: () => void) => void
+  open: () => void;
+  close: () => void;
+  on: (event: string, callback: () => void) => void;
 }
 
 interface RazorpayResponse {
-  razorpay_order_id: string
-  razorpay_payment_id: string
-  razorpay_signature: string
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
 }
 
-type PaymentStatus = 'idle' | 'creating_order' | 'initiating_payment' | 'processing' | 'verifying' | 'success' | 'error'
+type PaymentStatus =
+  | "idle"
+  | "creating_order"
+  | "initiating_payment"
+  | "processing"
+  | "verifying"
+  | "success"
+  | "error";
 
 interface PaymentButtonProps {
   /** Order input data (shipping address, delivery method, etc.) */
-  orderData: OrderInput
+  orderData: OrderInput;
   /** Total amount to be paid */
-  totalAmount: number
+  totalAmount: number;
   /** Whether the payment button should be disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Customer phone number for Razorpay prefill */
-  customerPhone?: string
+  customerPhone?: string;
   /** Callback when payment is successful */
-  onSuccess: (orderId: string, orderNumber: string) => void
+  onSuccess: (orderId: string, orderNumber: string) => void;
   /** Callback when payment fails or is cancelled */
-  onError: (error: string) => void
+  onError: (error: string) => void;
   /** Additional className for styling */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js'
-const COMPANY_NAME = 'MasonArt'
-const THEME_COLOR = '#C89B5E' // brand-500 color
+const RAZORPAY_SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js";
+const COMPANY_NAME = "MasonArt";
+const THEME_COLOR = "#C89B5E"; // brand-500 color
 
 // ============================================================================
 // Razorpay Script Loader
@@ -97,26 +104,26 @@ function loadRazorpayScript(): Promise<boolean> {
   return new Promise((resolve) => {
     // Check if already loaded
     if (window.Razorpay) {
-      resolve(true)
-      return
+      resolve(true);
+      return;
     }
 
     // Check if script is already in DOM
-    const existingScript = document.querySelector(`script[src="${RAZORPAY_SCRIPT_URL}"]`)
+    const existingScript = document.querySelector(`script[src="${RAZORPAY_SCRIPT_URL}"]`);
     if (existingScript) {
-      existingScript.addEventListener('load', () => resolve(true))
-      existingScript.addEventListener('error', () => resolve(false))
-      return
+      existingScript.addEventListener("load", () => resolve(true));
+      existingScript.addEventListener("error", () => resolve(false));
+      return;
     }
 
     // Load script
-    const script = document.createElement('script')
-    script.src = RAZORPAY_SCRIPT_URL
-    script.async = true
-    script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
-    document.body.appendChild(script)
-  })
+    const script = document.createElement("script");
+    script.src = RAZORPAY_SCRIPT_URL;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 }
 
 // ============================================================================
@@ -132,42 +139,42 @@ export function PaymentButton({
   onError,
   className,
 }: PaymentButtonProps) {
-  const [status, setStatus] = useState<PaymentStatus>('idle')
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [scriptLoaded, setScriptLoaded] = useState(false)
-  const { clearCart } = useCartActions()
+  const [status, setStatus] = useState<PaymentStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const { clearCart } = useCartActions();
 
   // Load Razorpay script on mount
   useEffect(() => {
     loadRazorpayScript().then((loaded) => {
-      setScriptLoaded(loaded)
+      setScriptLoaded(loaded);
       if (!loaded) {
-        setErrorMessage('Failed to load payment gateway. Please refresh the page.')
+        setErrorMessage("Failed to load payment gateway. Please refresh the page.");
       }
-    })
-  }, [])
+    });
+  }, []);
 
   // Handle payment process
   const handlePayment = useCallback(async () => {
     if (!scriptLoaded) {
-      onError('Payment gateway not loaded. Please refresh the page.')
-      return
+      onError("Payment gateway not loaded. Please refresh the page.");
+      return;
     }
 
-    setErrorMessage(null)
+    setErrorMessage(null);
 
     try {
       // Step 1: Create order in our system
-      setStatus('creating_order')
-      const orderResponse = await ordersApi.create(orderData)
-      const orderId = orderResponse.order.id
+      setStatus("creating_order");
+      const orderResponse = await ordersApi.create(orderData);
+      const orderId = orderResponse.order.id;
 
       // Step 2: Initiate payment with Razorpay
-      setStatus('initiating_payment')
-      const paymentData = await ordersApi.initiatePayment(orderId)
+      setStatus("initiating_payment");
+      const paymentData = await ordersApi.initiatePayment(orderId);
 
       // Step 3: Open Razorpay checkout modal
-      setStatus('processing')
+      setStatus("processing");
 
       const razorpayOptions: RazorpayOptions = {
         key: paymentData.razorpayKeyId,
@@ -191,82 +198,85 @@ export function PaymentButton({
         handler: async (response: RazorpayResponse) => {
           // Step 4: Verify payment
           try {
-            setStatus('verifying')
+            setStatus("verifying");
             const verifyResult = await ordersApi.verifyPayment(orderId, {
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
-            })
+            });
 
             if (verifyResult.success) {
-              setStatus('success')
+              setStatus("success");
               // Clear the cart after successful payment
-              clearCart()
-              onSuccess(verifyResult.order.id, verifyResult.order.orderNumber)
+              clearCart();
+              onSuccess(verifyResult.order.id, verifyResult.order.orderNumber);
             } else {
-              throw new Error('Payment verification failed')
+              throw new Error("Payment verification failed");
             }
           } catch (verifyError) {
-            setStatus('error')
-            const errorMsg = verifyError instanceof Error ? verifyError.message : 'Payment verification failed'
-            setErrorMessage(errorMsg)
-            onError(errorMsg)
+            setStatus("error");
+            const errorMsg =
+              verifyError instanceof Error ? verifyError.message : "Payment verification failed";
+            setErrorMessage(errorMsg);
+            onError(errorMsg);
           }
         },
         modal: {
           ondismiss: () => {
-            setStatus('idle')
-            setErrorMessage('Payment was cancelled')
+            setStatus("idle");
+            setErrorMessage("Payment was cancelled");
           },
           escape: true,
           animation: true,
         },
-      }
+      };
 
-      const razorpay = new window.Razorpay(razorpayOptions)
-      razorpay.on('payment.failed', () => {
-        setStatus('error')
-        setErrorMessage('Payment failed. Please try again.')
-        onError('Payment failed. Please try again.')
-      })
+      const razorpay = new window.Razorpay(razorpayOptions);
+      razorpay.on("payment.failed", () => {
+        setStatus("error");
+        setErrorMessage("Payment failed. Please try again.");
+        onError("Payment failed. Please try again.");
+      });
 
-      razorpay.open()
+      razorpay.open();
     } catch (error) {
-      setStatus('error')
-      const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred'
-      setErrorMessage(errorMsg)
-      onError(errorMsg)
+      setStatus("error");
+      const errorMsg = error instanceof Error ? error.message : "An unexpected error occurred";
+      setErrorMessage(errorMsg);
+      onError(errorMsg);
     }
-  }, [scriptLoaded, orderData, customerPhone, onSuccess, onError, clearCart])
+  }, [scriptLoaded, orderData, customerPhone, onSuccess, onError, clearCart]);
 
   // Get button text based on status
   const getButtonText = () => {
     switch (status) {
-      case 'creating_order':
-        return 'Creating Order...'
-      case 'initiating_payment':
-        return 'Initiating Payment...'
-      case 'processing':
-        return 'Processing...'
-      case 'verifying':
-        return 'Verifying Payment...'
-      case 'success':
-        return 'Payment Successful!'
-      case 'error':
-        return 'Try Again'
+      case "creating_order":
+        return "Creating Order...";
+      case "initiating_payment":
+        return "Initiating Payment...";
+      case "processing":
+        return "Processing...";
+      case "verifying":
+        return "Verifying Payment...";
+      case "success":
+        return "Payment Successful!";
+      case "error":
+        return "Try Again";
       default:
-        return `Pay ${formatPrice(totalAmount)}`
+        return `Pay ${formatPrice(totalAmount)}`;
     }
-  }
+  };
 
   // Check if button should be in loading state
-  const isLoading = ['creating_order', 'initiating_payment', 'processing', 'verifying'].includes(status)
-  const isDisabled = disabled || isLoading || !scriptLoaded || status === 'success'
+  const isLoading = ["creating_order", "initiating_payment", "processing", "verifying"].includes(
+    status
+  );
+  const isDisabled = disabled || isLoading || !scriptLoaded || status === "success";
 
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn("space-y-4", className)}>
       {/* Error Message */}
-      {errorMessage && status === 'error' && (
+      {errorMessage && status === "error" && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span>{errorMessage}</span>
@@ -279,18 +289,18 @@ export function PaymentButton({
         onClick={handlePayment}
         disabled={isDisabled}
         className={cn(
-          'flex w-full items-center justify-center gap-3 rounded-lg px-6 py-4 text-base font-semibold transition-all',
-          'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-          status === 'success'
-            ? 'bg-green-500 text-white'
+          "flex w-full items-center justify-center gap-3 rounded-lg px-6 py-4 text-base font-semibold transition-all",
+          "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
+          status === "success"
+            ? "bg-green-500 text-white"
             : isDisabled
-              ? 'cursor-not-allowed bg-muted text-muted-foreground'
-              : 'bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.98]'
+              ? "cursor-not-allowed bg-muted text-muted-foreground"
+              : "bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.98]"
         )}
       >
         {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin" />
-        ) : status === 'success' ? (
+        ) : status === "success" ? (
           <ShieldCheck className="h-5 w-5" />
         ) : (
           <CreditCard className="h-5 w-5" />
@@ -306,7 +316,7 @@ export function PaymentButton({
 
       {/* Accepted Payment Methods */}
       <div className="flex flex-wrap items-center justify-center gap-2">
-        {['UPI', 'Cards', 'Net Banking', 'Wallets'].map((method) => (
+        {["UPI", "Cards", "Net Banking", "Wallets"].map((method) => (
           <span
             key={method}
             className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground"
@@ -316,7 +326,7 @@ export function PaymentButton({
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default PaymentButton
+export default PaymentButton;

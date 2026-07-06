@@ -6,9 +6,9 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
-import { z } from 'zod'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { z } from "zod";
 import {
   Sparkles,
   ArrowLeft,
@@ -18,10 +18,15 @@ import {
   ChevronRight,
   X,
   Plus,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { authApi, aiApi } from '~/lib/api'
-import { AICreationsList, type AICreation, type AICreationStatus, type AIModerationStatus } from '~/components/account/AICreationsList'
+} from "lucide-react";
+import { cn } from "~/lib/utils";
+import { authApi, aiApi } from "~/lib/api";
+import {
+  AICreationsList,
+  type AICreation,
+  type AICreationStatus,
+  type AIModerationStatus,
+} from "~/components/account/AICreationsList";
 
 // ============================================================================
 // Route Definition
@@ -32,35 +37,35 @@ const searchParamsSchema = z.object({
   status: z.string().optional(),
   style: z.string().optional(),
   moderation: z.string().optional(),
-})
+});
 
-export const Route = createFileRoute('/_authed/account/ai-creations')({
+export const Route = createFileRoute("/_authed/account/ai-creations")({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'AI Creations | MasonArt' },
+      { title: "AI Creations | MasonArt" },
       {
-        name: 'description',
-        content: 'View and manage your AI-generated artwork created with MasonArt.',
+        name: "description",
+        content: "View and manage your AI-generated artwork created with MasonArt.",
       },
-      { name: 'robots', content: 'noindex' },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: AICreationsHistoryPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface CreationsResponse {
-  items: AICreation[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
+  items: AICreation[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 // ============================================================================
@@ -68,98 +73,98 @@ interface CreationsResponse {
 // ============================================================================
 
 interface FilterOption {
-  value: string
-  label: string
+  value: string;
+  label: string;
 }
 
 const STATUS_FILTERS: FilterOption[] = [
-  { value: '', label: 'All Creations' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'queued', label: 'In Queue' },
-  { value: 'failed', label: 'Failed' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
+  { value: "", label: "All Creations" },
+  { value: "completed", label: "Completed" },
+  { value: "processing", label: "Processing" },
+  { value: "queued", label: "In Queue" },
+  { value: "failed", label: "Failed" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 const STYLE_FILTERS: FilterOption[] = [
-  { value: '', label: 'All Styles' },
-  { value: 'wabi-sabi', label: 'Wabi-Sabi' },
-  { value: 'abstract-expression', label: 'Abstract Expression' },
-  { value: 'botanical', label: 'Botanical' },
-  { value: 'geometric-modern', label: 'Geometric Modern' },
-  { value: 'vintage-poster', label: 'Vintage Poster' },
-  { value: 'pop-art', label: 'Pop Art' },
-  { value: 'watercolor', label: 'Watercolor' },
-  { value: 'photography', label: 'Photography' },
-  { value: 'line-art', label: 'Line Art' },
-  { value: 'typography', label: 'Typography' },
-]
+  { value: "", label: "All Styles" },
+  { value: "wabi-sabi", label: "Wabi-Sabi" },
+  { value: "abstract-expression", label: "Abstract Expression" },
+  { value: "botanical", label: "Botanical" },
+  { value: "geometric-modern", label: "Geometric Modern" },
+  { value: "vintage-poster", label: "Vintage Poster" },
+  { value: "pop-art", label: "Pop Art" },
+  { value: "watercolor", label: "Watercolor" },
+  { value: "photography", label: "Photography" },
+  { value: "line-art", label: "Line Art" },
+  { value: "typography", label: "Typography" },
+];
 
 const MODERATION_FILTERS: FilterOption[] = [
-  { value: '', label: 'All' },
-  { value: 'pending_review', label: 'Pending Review' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'rejected', label: 'Rejected' },
-]
+  { value: "", label: "All" },
+  { value: "pending_review", label: "Pending Review" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+];
 
-const PAGE_SIZE = 12
+const PAGE_SIZE = 12;
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function AICreationsHistoryPage() {
-  const navigate = useNavigate()
-  const search = useSearch({ from: '/_authed/account/ai-creations' })
+  const navigate = useNavigate();
+  const search = useSearch({ from: "/_authed/account/ai-creations" });
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
-  const [creations, setCreations] = useState<AICreation[]>([])
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [creations, setCreations] = useState<AICreation[]>([]);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
     totalPages: 0,
     hasNextPage: false,
     hasPreviousPage: false,
-  })
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showFilters, setShowFilters] = useState(false)
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const currentPage = search.page || 1
-  const currentStatus = search.status || ''
-  const currentStyle = search.style || ''
-  const currentModeration = search.moderation || ''
+  const currentPage = search.page || 1;
+  const currentStatus = search.status || "";
+  const currentStyle = search.style || "";
+  const currentModeration = search.moderation || "";
 
   // Check authentication
   useEffect(() => {
     async function checkAuth() {
       try {
-        const session = await authApi.getSession()
+        const session = await authApi.getSession();
         if (!session?.user) {
           navigate({
-            to: '/auth/login',
-            search: { redirect: '/account/ai-creations' },
-          })
-          return
+            to: "/auth/login",
+            search: { redirect: "/account/ai-creations" },
+          });
+          return;
         }
-        setIsAuthenticated(true)
+        setIsAuthenticated(true);
       } catch {
         navigate({
-          to: '/auth/login',
-          search: { redirect: '/account/ai-creations' },
-        })
+          to: "/auth/login",
+          search: { redirect: "/account/ai-creations" },
+        });
       }
     }
 
-    checkAuth()
-  }, [navigate])
+    checkAuth();
+  }, [navigate]);
 
   // Fetch creations
   const fetchCreations = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) return;
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
       const response: CreationsResponse = await aiApi.list({
@@ -168,115 +173,116 @@ function AICreationsHistoryPage() {
         ...(currentStatus && { status: currentStatus as AICreationStatus }),
         ...(currentStyle && { stylePreset: currentStyle }),
         ...(currentModeration && { moderationStatus: currentModeration as AIModerationStatus }),
-      })
+      });
 
-      setCreations(response.items || [])
+      setCreations(response.items || []);
       setPagination({
         total: response.total,
         page: response.page,
         totalPages: response.totalPages,
         hasNextPage: response.hasNextPage,
         hasPreviousPage: response.hasPreviousPage,
-      })
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load creations')
+      setError(err instanceof Error ? err.message : "Failed to load creations");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [isAuthenticated, currentPage, currentStatus, currentStyle, currentModeration])
+  }, [isAuthenticated, currentPage, currentStatus, currentStyle, currentModeration]);
 
   useEffect(() => {
-    fetchCreations()
-  }, [fetchCreations])
+    fetchCreations();
+  }, [fetchCreations]);
 
   // Handle status filter change
   const handleStatusChange = (status: string) => {
     navigate({
-      to: '/account/ai-creations',
+      to: "/account/ai-creations",
       search: {
         page: 1,
         status: status || undefined,
         style: currentStyle || undefined,
         moderation: currentModeration || undefined,
       },
-    })
-    setShowFilters(false)
-  }
+    });
+    setShowFilters(false);
+  };
 
   // Handle style filter change
   const handleStyleChange = (style: string) => {
     navigate({
-      to: '/account/ai-creations',
+      to: "/account/ai-creations",
       search: {
         page: 1,
         status: currentStatus || undefined,
         style: style || undefined,
         moderation: currentModeration || undefined,
       },
-    })
-    setShowFilters(false)
-  }
+    });
+    setShowFilters(false);
+  };
 
   // Handle moderation filter change
   const handleModerationChange = (moderation: string) => {
     navigate({
-      to: '/account/ai-creations',
+      to: "/account/ai-creations",
       search: {
         page: 1,
         status: currentStatus || undefined,
         style: currentStyle || undefined,
         moderation: moderation || undefined,
       },
-    })
-    setShowFilters(false)
-  }
+    });
+    setShowFilters(false);
+  };
 
   // Handle pagination
   const handlePageChange = (newPage: number) => {
     navigate({
-      to: '/account/ai-creations',
+      to: "/account/ai-creations",
       search: {
         page: newPage,
         status: currentStatus || undefined,
         style: currentStyle || undefined,
         moderation: currentModeration || undefined,
       },
-    })
+    });
     // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Clear all filters
   const handleClearFilters = () => {
     navigate({
-      to: '/account/ai-creations',
+      to: "/account/ai-creations",
       search: { page: 1 },
-    })
-  }
+    });
+  };
 
   // Handle delete
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this creation? This cannot be undone.')) {
-      return
+    if (!confirm("Are you sure you want to delete this creation? This cannot be undone.")) {
+      return;
     }
 
     try {
-      await aiApi.delete(id)
+      await aiApi.delete(id);
       // Refresh the list
-      fetchCreations()
+      fetchCreations();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete creation')
+      alert(err instanceof Error ? err.message : "Failed to delete creation");
     }
-  }
+  };
 
   // Handle add to cart
   const handleAddToCart = (creation: AICreation) => {
     // Navigate to the creation detail page where they can configure and add to cart
-    navigate({ to: `/account/ai-creations/${creation.id}` })
-  }
+    navigate({ to: `/account/ai-creations/${creation.id}` });
+  };
 
   // Active filter count
-  const activeFilterCount = (currentStatus ? 1 : 0) + (currentStyle ? 1 : 0) + (currentModeration ? 1 : 0)
+  const activeFilterCount =
+    (currentStatus ? 1 : 0) + (currentStyle ? 1 : 0) + (currentModeration ? 1 : 0);
 
   // Loading state while checking auth
   if (isAuthenticated === null) {
@@ -287,7 +293,7 @@ function AICreationsHistoryPage() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -311,8 +317,8 @@ function AICreationsHistoryPage() {
             </h1>
             <p className="mt-2 text-muted-foreground">
               {pagination.total > 0
-                ? `${pagination.total} ${pagination.total === 1 ? 'creation' : 'creations'} found`
-                : 'Create unique artwork with AI'}
+                ? `${pagination.total} ${pagination.total === 1 ? "creation" : "creations"} found`
+                : "Create unique artwork with AI"}
             </p>
           </div>
 
@@ -357,10 +363,10 @@ function AICreationsHistoryPage() {
                       type="button"
                       onClick={() => handleStatusChange(option.value)}
                       className={cn(
-                        'w-full rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
                         currentStatus === option.value
-                          ? 'bg-purple-100 font-medium text-purple-700'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          ? "bg-purple-100 font-medium text-purple-700"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}
                     >
                       {option.label}
@@ -379,10 +385,10 @@ function AICreationsHistoryPage() {
                       type="button"
                       onClick={() => handleStyleChange(option.value)}
                       className={cn(
-                        'w-full rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
                         currentStyle === option.value
-                          ? 'bg-purple-100 font-medium text-purple-700'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          ? "bg-purple-100 font-medium text-purple-700"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}
                     >
                       {option.label}
@@ -401,10 +407,10 @@ function AICreationsHistoryPage() {
                       type="button"
                       onClick={() => handleModerationChange(option.value)}
                       className={cn(
-                        'w-full rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                        "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
                         currentModeration === option.value
-                          ? 'bg-purple-100 font-medium text-purple-700'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          ? "bg-purple-100 font-medium text-purple-700"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       )}
                     >
                       {option.label}
@@ -439,10 +445,10 @@ function AICreationsHistoryPage() {
                       type="button"
                       onClick={() => handleStatusChange(option.value)}
                       className={cn(
-                        'rounded-full px-3 py-1.5 text-sm transition-colors',
+                        "rounded-full px-3 py-1.5 text-sm transition-colors",
                         currentStatus === option.value
-                          ? 'bg-purple-500 font-medium text-white'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                          ? "bg-purple-500 font-medium text-white"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                       )}
                     >
                       {option.label}
@@ -461,10 +467,10 @@ function AICreationsHistoryPage() {
                       type="button"
                       onClick={() => handleStyleChange(option.value)}
                       className={cn(
-                        'rounded-full px-3 py-1.5 text-sm transition-colors',
+                        "rounded-full px-3 py-1.5 text-sm transition-colors",
                         currentStyle === option.value
-                          ? 'bg-purple-500 font-medium text-white'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                          ? "bg-purple-500 font-medium text-white"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                       )}
                     >
                       {option.label}
@@ -475,7 +481,9 @@ function AICreationsHistoryPage() {
 
               {/* Approval Status */}
               <div>
-                <h4 className="mb-2 text-xs font-medium text-muted-foreground uppercase">Approval Status</h4>
+                <h4 className="mb-2 text-xs font-medium text-muted-foreground uppercase">
+                  Approval Status
+                </h4>
                 <div className="flex flex-wrap gap-2">
                   {MODERATION_FILTERS.map((option) => (
                     <button
@@ -483,10 +491,10 @@ function AICreationsHistoryPage() {
                       type="button"
                       onClick={() => handleModerationChange(option.value)}
                       className={cn(
-                        'rounded-full px-3 py-1.5 text-sm transition-colors',
+                        "rounded-full px-3 py-1.5 text-sm transition-colors",
                         currentModeration === option.value
-                          ? 'bg-purple-500 font-medium text-white'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                          ? "bg-purple-500 font-medium text-white"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                       )}
                     >
                       {option.label}
@@ -506,7 +514,7 @@ function AICreationsHistoryPage() {
                 {currentStatus && (
                   <button
                     type="button"
-                    onClick={() => handleStatusChange('')}
+                    onClick={() => handleStatusChange("")}
                     className="flex items-center gap-1 rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700 hover:bg-purple-200"
                   >
                     {STATUS_FILTERS.find((f) => f.value === currentStatus)?.label}
@@ -516,7 +524,7 @@ function AICreationsHistoryPage() {
                 {currentStyle && (
                   <button
                     type="button"
-                    onClick={() => handleStyleChange('')}
+                    onClick={() => handleStyleChange("")}
                     className="flex items-center gap-1 rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700 hover:bg-purple-200"
                   >
                     {STYLE_FILTERS.find((f) => f.value === currentStyle)?.label}
@@ -526,7 +534,7 @@ function AICreationsHistoryPage() {
                 {currentModeration && (
                   <button
                     type="button"
-                    onClick={() => handleModerationChange('')}
+                    onClick={() => handleModerationChange("")}
                     className="flex items-center gap-1 rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700 hover:bg-purple-200"
                   >
                     {MODERATION_FILTERS.find((f) => f.value === currentModeration)?.label}
@@ -568,7 +576,7 @@ function AICreationsHistoryPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -576,11 +584,11 @@ function AICreationsHistoryPage() {
 // ============================================================================
 
 interface PaginationProps {
-  currentPage: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-  onPageChange: (page: number) => void
+  currentPage: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  onPageChange: (page: number) => void;
 }
 
 function Pagination({
@@ -592,25 +600,21 @@ function Pagination({
 }: PaginationProps) {
   // Generate page numbers to display
   const getPageNumbers = () => {
-    const pages: (number | 'ellipsis')[] = []
-    const delta = 1 // Number of pages to show on each side of current
+    const pages: (number | "ellipsis")[] = [];
+    const delta = 1; // Number of pages to show on each side of current
 
     for (let i = 1; i <= totalPages; i++) {
-      if (
-        i === 1 ||
-        i === totalPages ||
-        (i >= currentPage - delta && i <= currentPage + delta)
-      ) {
-        pages.push(i)
-      } else if (pages[pages.length - 1] !== 'ellipsis') {
-        pages.push('ellipsis')
+      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+        pages.push(i);
+      } else if (pages[pages.length - 1] !== "ellipsis") {
+        pages.push("ellipsis");
       }
     }
 
-    return pages
-  }
+    return pages;
+  };
 
-  const pageNumbers = getPageNumbers()
+  const pageNumbers = getPageNumbers();
 
   return (
     <div className="mt-8 flex items-center justify-center gap-2">
@@ -620,10 +624,10 @@ function Pagination({
         onClick={() => onPageChange(currentPage - 1)}
         disabled={!hasPreviousPage}
         className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-lg border transition-colors',
+          "flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
           hasPreviousPage
-            ? 'border-border bg-background text-foreground hover:bg-muted'
-            : 'cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground'
+            ? "border-border bg-background text-foreground hover:bg-muted"
+            : "cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground"
         )}
         aria-label="Previous page"
       >
@@ -633,7 +637,7 @@ function Pagination({
       {/* Page Numbers */}
       <div className="flex items-center gap-1">
         {pageNumbers.map((page, index) =>
-          page === 'ellipsis' ? (
+          page === "ellipsis" ? (
             <span
               key={`ellipsis-${index}`}
               className="flex h-10 w-10 items-center justify-center text-muted-foreground"
@@ -646,10 +650,10 @@ function Pagination({
               type="button"
               onClick={() => onPageChange(page)}
               className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors',
+                "flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors",
                 page === currentPage
-                  ? 'border-purple-500 bg-purple-500 text-white'
-                  : 'border-border bg-background text-foreground hover:bg-muted'
+                  ? "border-purple-500 bg-purple-500 text-white"
+                  : "border-border bg-background text-foreground hover:bg-muted"
               )}
             >
               {page}
@@ -664,15 +668,15 @@ function Pagination({
         onClick={() => onPageChange(currentPage + 1)}
         disabled={!hasNextPage}
         className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-lg border transition-colors',
+          "flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
           hasNextPage
-            ? 'border-border bg-background text-foreground hover:bg-muted'
-            : 'cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground'
+            ? "border-border bg-background text-foreground hover:bg-muted"
+            : "cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground"
         )}
         aria-label="Next page"
       >
         <ChevronRight className="h-5 w-5" />
       </button>
     </div>
-  )
+  );
 }

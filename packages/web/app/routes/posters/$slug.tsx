@@ -5,78 +5,78 @@
  * Fetches product by slug and renders the detail page.
  */
 
-import { createFileRoute, notFound } from '@tanstack/react-router'
-import { productsApi } from '~/lib/api'
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { productsApi } from "~/lib/api";
 import {
   ProductDetail,
   ProductDetailSkeleton,
   type ProductDetailData,
   type ProductImage,
-} from '~/components/product/ProductDetail'
-import { ProductReviews, ProductReviewsSkeleton } from '~/components/product/ProductReviews'
-import type { SizeVariant } from '~/components/product/SizeSelector'
-import type { FrameOptionData } from '~/components/product/FrameSelector'
+} from "~/components/product/ProductDetail";
+import { ProductReviews, ProductReviewsSkeleton } from "~/components/product/ProductReviews";
+import type { SizeVariant } from "~/components/product/SizeSelector";
+import type { FrameOptionData } from "~/components/product/FrameSelector";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface ProductApiResponse {
-  id: string
-  sku: string
-  title: string
-  slug: string
-  description: string
-  shortDescription?: string
+  id: string;
+  sku: string;
+  title: string;
+  slug: string;
+  description: string;
+  shortDescription?: string;
   images: Array<{
-    id: string
-    url: string
-    alt?: string
-    type?: string
-    isPrimary?: boolean
-  }>
+    id: string;
+    url: string;
+    alt?: string;
+    type?: string;
+    isPrimary?: boolean;
+  }>;
   variants: Array<{
-    id: string
-    sizeId?: string
-    sizeLabel: string
-    widthInches: number
-    heightInches: number
-    price: string | number
-    stockQuantity: number
-    isInStock: boolean
-    variantSku?: string
-  }>
+    id: string;
+    sizeId?: string;
+    sizeLabel: string;
+    widthInches: number;
+    heightInches: number;
+    price: string | number;
+    stockQuantity: number;
+    isInStock: boolean;
+    variantSku?: string;
+  }>;
   frames?: Array<{
-    id: string
-    type: string
-    name: string
-    description: string
-    material?: string
-    imageUrl?: string
-    priceModifier: string
-    priceAddition: string
-  }>
-  orientation: 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
-  styles?: string[]
-  subjects?: string[]
-  primaryColor?: string
-  rooms?: string[]
+    id: string;
+    type: string;
+    name: string;
+    description: string;
+    material?: string;
+    imageUrl?: string;
+    priceModifier: string;
+    priceAddition: string;
+  }>;
+  orientation: "square" | "portrait" | "landscape" | "panoramic" | "round";
+  styles?: string[];
+  subjects?: string[];
+  primaryColor?: string;
+  rooms?: string[];
   artist?: {
-    id: string
-    name: string
-    slug?: string
-  }
+    id: string;
+    name: string;
+    slug?: string;
+  };
   rating?: {
-    averageRating: number
-    reviewCount: number
-  }
-  isFeatured?: boolean
-  isAiGenerated?: boolean
-  seoTitle?: string
-  seoDescription?: string
-  basePrice?: string | number
-  minPrice?: number
-  maxPrice?: number
+    averageRating: number;
+    reviewCount: number;
+  };
+  isFeatured?: boolean;
+  isAiGenerated?: boolean;
+  seoTitle?: string;
+  seoDescription?: string;
+  basePrice?: string | number;
+  minPrice?: number;
+  maxPrice?: number;
 }
 
 // ============================================================================
@@ -88,10 +88,10 @@ interface ProductApiResponse {
  */
 async function fetchProductData(slug: string): Promise<ProductDetailData | null> {
   try {
-    const response = await productsApi.getBySlug(slug) as ProductApiResponse | null
+    const response = (await productsApi.getBySlug(slug)) as ProductApiResponse | null;
 
     if (!response) {
-      return null
+      return null;
     }
 
     // Transform API response to component data structure
@@ -102,36 +102,42 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
       slug: response.slug,
       description: response.description,
       shortDescription: response.shortDescription,
-      images: response.images.map((img): ProductImage => ({
-        id: img.id,
-        url: img.url,
-        alt: img.alt,
-        type: img.type as ProductImage['type'],
-        isPrimary: img.isPrimary,
-      })),
-      variants: response.variants.map((v): SizeVariant => ({
-        id: v.id,
-        sizeId: v.sizeId || v.id,
-        sizeLabel: v.sizeLabel,
-        widthInches: v.widthInches,
-        heightInches: v.heightInches,
-        price: v.price,
-        stockQuantity: v.stockQuantity,
-        isAvailable: v.isInStock,
-        sku: v.variantSku,
-      })),
-      frames: response.frames?.map((f): FrameOptionData => ({
-        id: f.id,
-        type: f.type,
-        name: f.name,
-        description: f.description,
-        material: f.material,
-        imageUrl: f.imageUrl,
-        // API returns priceAddition as string in rupees, component expects fixed price in paise
-        priceModifierType: 'fixed',
-        priceModifierValue: parseFloat(f.priceAddition || '0') * 100,
-        isAvailable: true,
-      })),
+      images: response.images.map(
+        (img): ProductImage => ({
+          id: img.id,
+          url: img.url,
+          alt: img.alt,
+          type: img.type as ProductImage["type"],
+          isPrimary: img.isPrimary,
+        })
+      ),
+      variants: response.variants.map(
+        (v): SizeVariant => ({
+          id: v.id,
+          sizeId: v.sizeId || v.id,
+          sizeLabel: v.sizeLabel,
+          widthInches: v.widthInches,
+          heightInches: v.heightInches,
+          price: v.price,
+          stockQuantity: v.stockQuantity,
+          isAvailable: v.isInStock,
+          sku: v.variantSku,
+        })
+      ),
+      frames: response.frames?.map(
+        (f): FrameOptionData => ({
+          id: f.id,
+          type: f.type,
+          name: f.name,
+          description: f.description,
+          material: f.material,
+          imageUrl: f.imageUrl,
+          // API returns priceAddition as string in rupees, component expects fixed price in paise
+          priceModifierType: "fixed",
+          priceModifierValue: parseFloat(f.priceAddition || "0") * 100,
+          isAvailable: true,
+        })
+      ),
       orientation: response.orientation,
       styles: response.styles,
       subjects: response.subjects,
@@ -143,12 +149,12 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
       isAiGenerated: response.isAiGenerated,
       seoTitle: response.seoTitle,
       seoDescription: response.seoDescription,
-    }
+    };
 
-    return product
+    return product;
   } catch (error) {
     // Return null on error - will trigger 404
-    return null
+    return null;
   }
 }
 
@@ -156,119 +162,129 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/posters/$slug')({
+export const Route = createFileRoute("/posters/$slug")({
   loader: async ({ params }) => {
-    const product = await fetchProductData(params.slug)
+    const product = await fetchProductData(params.slug);
 
     if (!product) {
-      throw notFound()
+      throw notFound();
     }
 
-    return { product }
+    return { product };
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
         meta: [
-          { title: 'Product Not Found | MasonArt' },
-          { name: 'description', content: 'The product you are looking for could not be found.' },
+          { title: "Product Not Found | MasonArt" },
+          { name: "description", content: "The product you are looking for could not be found." },
         ],
-      }
+      };
     }
 
-    const { product } = loaderData
-    const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0]
+    const { product } = loaderData;
+    const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0];
 
     // Calculate price range for display
     const prices = product.variants.map((v) =>
-      typeof v.price === 'string' ? parseFloat(v.price) : v.price
-    )
-    const minPrice = Math.min(...prices)
-    const maxPrice = Math.max(...prices)
-    const priceText = minPrice === maxPrice
-      ? `₹${minPrice.toLocaleString('en-IN')}`
-      : `₹${minPrice.toLocaleString('en-IN')} - ₹${maxPrice.toLocaleString('en-IN')}`
+      typeof v.price === "string" ? parseFloat(v.price) : v.price
+    );
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const priceText =
+      minPrice === maxPrice
+        ? `₹${minPrice.toLocaleString("en-IN")}`
+        : `₹${minPrice.toLocaleString("en-IN")} - ₹${maxPrice.toLocaleString("en-IN")}`;
 
-    const title = product.seoTitle || `${product.title} | MasonArt`
-    const description = product.seoDescription ||
+    const title = product.seoTitle || `${product.title} | MasonArt`;
+    const description =
+      product.seoDescription ||
       product.shortDescription ||
-      `Shop ${product.title} at MasonArt. ${priceText}. Premium quality poster available in multiple sizes and frames.`
-    const productUrl = `https://masonart.com/posters/${product.slug}`
-    const imageUrl = primaryImage?.url || 'https://masonart.com/og-default.jpg'
-    const imageAlt = primaryImage?.alt || product.title
+      `Shop ${product.title} at MasonArt. ${priceText}. Premium quality poster available in multiple sizes and frames.`;
+    const productUrl = `https://masonart.com/posters/${product.slug}`;
+    const imageUrl = primaryImage?.url || "https://masonart.com/og-default.jpg";
+    const imageAlt = primaryImage?.alt || product.title;
 
     // Build keywords from product attributes
     const keywords = [
       product.title,
       ...(product.styles || []),
       ...(product.subjects || []),
-      'poster',
-      'wall art',
-      'MasonArt',
-    ].filter(Boolean).join(', ')
+      "poster",
+      "wall art",
+      "MasonArt",
+    ]
+      .filter(Boolean)
+      .join(", ");
 
     return {
       meta: [
         // Basic meta tags
         { title },
-        { name: 'description', content: description },
-        { name: 'keywords', content: keywords },
-        { name: 'robots', content: 'index, follow' },
+        { name: "description", content: description },
+        { name: "keywords", content: keywords },
+        { name: "robots", content: "index, follow" },
 
         // Open Graph meta tags
-        { property: 'og:title', content: product.title },
-        { property: 'og:description', content: description },
-        { property: 'og:type', content: 'product' },
-        { property: 'og:url', content: productUrl },
-        { property: 'og:site_name', content: 'MasonArt' },
-        { property: 'og:image', content: imageUrl },
-        { property: 'og:image:secure_url', content: imageUrl },
-        { property: 'og:image:alt', content: imageAlt },
-        { property: 'og:image:type', content: 'image/jpeg' },
-        { property: 'og:image:width', content: '1200' },
-        { property: 'og:image:height', content: '630' },
-        { property: 'og:locale', content: 'en_IN' },
+        { property: "og:title", content: product.title },
+        { property: "og:description", content: description },
+        { property: "og:type", content: "product" },
+        { property: "og:url", content: productUrl },
+        { property: "og:site_name", content: "MasonArt" },
+        { property: "og:image", content: imageUrl },
+        { property: "og:image:secure_url", content: imageUrl },
+        { property: "og:image:alt", content: imageAlt },
+        { property: "og:image:type", content: "image/jpeg" },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:locale", content: "en_IN" },
 
         // Product-specific Open Graph tags
-        { property: 'product:price:amount', content: String(minPrice) },
-        { property: 'product:price:currency', content: 'INR' },
-        { property: 'product:availability', content: product.variants.some(v => v.isAvailable) ? 'in stock' : 'out of stock' },
-        { property: 'product:condition', content: 'new' },
-        { property: 'product:brand', content: 'MasonArt' },
-        ...(product.sku ? [{ property: 'product:retailer_item_id', content: product.sku }] : []),
+        { property: "product:price:amount", content: String(minPrice) },
+        { property: "product:price:currency", content: "INR" },
+        {
+          property: "product:availability",
+          content: product.variants.some((v) => v.isAvailable) ? "in stock" : "out of stock",
+        },
+        { property: "product:condition", content: "new" },
+        { property: "product:brand", content: "MasonArt" },
+        ...(product.sku ? [{ property: "product:retailer_item_id", content: product.sku }] : []),
 
         // Twitter Card meta tags
-        { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:site', content: '@masonart' },
-        { name: 'twitter:creator', content: '@masonart' },
-        { name: 'twitter:title', content: product.title },
-        { name: 'twitter:description', content: description },
-        { name: 'twitter:image', content: imageUrl },
-        { name: 'twitter:image:alt', content: imageAlt },
-        { name: 'twitter:label1', content: 'Price' },
-        { name: 'twitter:data1', content: priceText },
-        { name: 'twitter:label2', content: 'Availability' },
-        { name: 'twitter:data2', content: product.variants.some(v => v.isAvailable) ? 'In Stock' : 'Out of Stock' },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:site", content: "@masonart" },
+        { name: "twitter:creator", content: "@masonart" },
+        { name: "twitter:title", content: product.title },
+        { name: "twitter:description", content: description },
+        { name: "twitter:image", content: imageUrl },
+        { name: "twitter:image:alt", content: imageAlt },
+        { name: "twitter:label1", content: "Price" },
+        { name: "twitter:data1", content: priceText },
+        { name: "twitter:label2", content: "Availability" },
+        {
+          name: "twitter:data2",
+          content: product.variants.some((v) => v.isAvailable) ? "In Stock" : "Out of Stock",
+        },
       ],
       links: [
         {
-          rel: 'canonical',
+          rel: "canonical",
           href: productUrl,
         },
       ],
-    }
+    };
   },
   component: ProductPage,
   pendingComponent: ProductPageLoading,
   notFoundComponent: ProductNotFound,
-})
+});
 
 // ============================================================================
 // Page Components
 // ============================================================================
 
 function ProductPage() {
-  const { product } = Route.useLoaderData()
+  const { product } = Route.useLoaderData();
 
   return (
     <>
@@ -287,7 +303,7 @@ function ProductPage() {
       {/* Related Products Section (placeholder) */}
       <RelatedProductsSection />
     </>
-  )
+  );
 }
 
 function ProductPageLoading() {
@@ -305,7 +321,7 @@ function ProductPageLoading() {
       <ProductDetailSkeleton />
       <ProductReviewsSkeleton />
     </>
-  )
+  );
 }
 
 function ProductNotFound() {
@@ -322,7 +338,7 @@ function ProductNotFound() {
         Browse All Products
       </a>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -333,7 +349,7 @@ function ProductNotFound() {
  * Breadcrumb navigation
  */
 function Breadcrumb({ product }: { product: ProductDetailData }) {
-  const category = product.styles?.[0] || 'all'
+  const category = product.styles?.[0] || "all";
 
   return (
     <nav className="container-wide py-4" aria-label="Breadcrumb">
@@ -355,7 +371,7 @@ function Breadcrumb({ product }: { product: ProductDetailData }) {
             href={`/posters?styles=${category}`}
             className="text-muted-foreground hover:text-foreground capitalize"
           >
-            {category.replace(/-/g, ' ')}
+            {category.replace(/-/g, " ")}
           </a>
         </li>
         <li className="text-muted-foreground">/</li>
@@ -364,7 +380,7 @@ function Breadcrumb({ product }: { product: ProductDetailData }) {
         </li>
       </ol>
     </nav>
-  )
+  );
 }
 
 /**
@@ -373,53 +389,54 @@ function Breadcrumb({ product }: { product: ProductDetailData }) {
  * generated from trusted API data, not user input.
  */
 function ProductJsonLd({ product }: { product: ProductDetailData }) {
-  const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0]
+  const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0];
 
   // Calculate price range
   const prices = product.variants.map((v) =>
-    typeof v.price === 'string' ? parseFloat(v.price) : v.price
-  )
-  const minPrice = Math.min(...prices)
-  const maxPrice = Math.max(...prices)
+    typeof v.price === "string" ? parseFloat(v.price) : v.price
+  );
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
 
   // Check availability
-  const hasAvailableVariants = product.variants.some((v) => v.isAvailable)
+  const hasAvailableVariants = product.variants.some((v) => v.isAvailable);
 
   const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
+    "@context": "https://schema.org",
+    "@type": "Product",
     name: product.title,
     description: product.shortDescription || product.description,
     image: product.images.map((img) => img.url),
     sku: product.sku,
     brand: {
-      '@type': 'Brand',
-      name: 'MasonArt',
+      "@type": "Brand",
+      name: "MasonArt",
     },
     offers: {
-      '@type': 'AggregateOffer',
+      "@type": "AggregateOffer",
       lowPrice: minPrice,
       highPrice: maxPrice,
-      priceCurrency: 'INR',
+      priceCurrency: "INR",
       availability: hasAvailableVariants
-        ? 'https://schema.org/InStock'
-        : 'https://schema.org/OutOfStock',
-      itemCondition: 'https://schema.org/NewCondition',
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
       seller: {
-        '@type': 'Organization',
-        name: 'MasonArt',
+        "@type": "Organization",
+        name: "MasonArt",
       },
     },
-    ...(product.rating && product.rating.reviewCount > 0 && {
-      aggregateRating: {
-        '@type': 'AggregateRating',
-        ratingValue: product.rating.averageRating,
-        reviewCount: product.rating.reviewCount,
-      },
-    }),
+    ...(product.rating &&
+      product.rating.reviewCount > 0 && {
+        aggregateRating: {
+          "@type": "AggregateRating",
+          ratingValue: product.rating.averageRating,
+          reviewCount: product.rating.reviewCount,
+        },
+      }),
     ...(product.artist && {
       creator: {
-        '@type': 'Person',
+        "@type": "Person",
         name: product.artist.name,
       },
     }),
@@ -427,14 +444,14 @@ function ProductJsonLd({ product }: { product: ProductDetailData }) {
       image: primaryImage.url,
     }),
     url: `https://masonart.com/posters/${product.slug}`,
-  }
+  };
 
   return (
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
-  )
+  );
 }
 
 /**
@@ -459,5 +476,5 @@ function RelatedProductsSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

@@ -7,8 +7,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Package,
   Settings,
@@ -19,29 +19,29 @@ import {
   MapPin,
   Wallet,
   Bell,
-} from 'lucide-react'
-import { cn, formatDate, getInitials } from '~/lib/utils'
-import { ordersApi } from '~/lib/api'
-import { signOut } from '~/lib/auth-client'
-import { OrderList, type Order } from '~/components/account/OrderList'
+} from "lucide-react";
+import { cn, formatDate, getInitials } from "~/lib/utils";
+import { ordersApi } from "~/lib/api";
+import { signOut } from "~/lib/auth-client";
+import { OrderList, type Order } from "~/components/account/OrderList";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/_authed/account/')({
+export const Route = createFileRoute("/_authed/account/")({
   head: () => ({
     meta: [
-      { title: 'My Account | MasonArt' },
+      { title: "My Account | MasonArt" },
       {
-        name: 'description',
-        content: 'Manage your MasonArt account, view orders, and update your preferences.',
+        name: "description",
+        content: "Manage your MasonArt account, view orders, and update your preferences.",
       },
-      { name: 'robots', content: 'noindex' },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: AccountDashboardPage,
-})
+});
 
 // ============================================================================
 // Types
@@ -49,11 +49,11 @@ export const Route = createFileRoute('/_authed/account/')({
 
 // User profile type matching the session user from Better Auth
 interface UserProfile {
-  id: string
-  name: string
-  email: string
-  image?: string | null
-  createdAt: Date
+  id: string;
+  name: string;
+  email: string;
+  image?: string | null;
+  createdAt: Date;
 }
 
 // ============================================================================
@@ -61,103 +61,103 @@ interface UserProfile {
 // ============================================================================
 
 interface QuickAction {
-  title: string
-  description: string
-  icon: typeof Package
-  href: string
-  color: string
-  bgColor: string
+  title: string;
+  description: string;
+  icon: typeof Package;
+  href: string;
+  color: string;
+  bgColor: string;
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    title: 'My Wallet',
-    description: 'Add funds for AI generation',
+    title: "My Wallet",
+    description: "Add funds for AI generation",
     icon: Wallet,
-    href: '/account/wallet',
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-100',
+    href: "/account/wallet",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-100",
   },
   {
-    title: 'My Orders',
-    description: 'Track and manage your orders',
+    title: "My Orders",
+    description: "Track and manage your orders",
     icon: Package,
-    href: '/account/orders',
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
+    href: "/account/orders",
+    color: "text-blue-600",
+    bgColor: "bg-blue-100",
   },
   {
-    title: 'AI Creations',
-    description: 'View your AI-generated art',
+    title: "AI Creations",
+    description: "View your AI-generated art",
     icon: Sparkles,
-    href: '/account/ai-creations',
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
+    href: "/account/ai-creations",
+    color: "text-purple-600",
+    bgColor: "bg-purple-100",
   },
   {
-    title: 'Saved Addresses',
-    description: 'Manage delivery addresses',
+    title: "Saved Addresses",
+    description: "Manage delivery addresses",
     icon: MapPin,
-    href: '/account/addresses',
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
+    href: "/account/addresses",
+    color: "text-green-600",
+    bgColor: "bg-green-100",
   },
   {
-    title: 'Notifications',
-    description: 'Email & SMS preferences',
+    title: "Notifications",
+    description: "Email & SMS preferences",
     icon: Bell,
-    href: '/account/notifications',
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-100',
+    href: "/account/notifications",
+    color: "text-amber-600",
+    bgColor: "bg-amber-100",
   },
   {
-    title: 'Account Settings',
-    description: 'Update profile & preferences',
+    title: "Account Settings",
+    description: "Update profile & preferences",
     icon: Settings,
-    href: '/account/settings',
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
+    href: "/account/settings",
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
   },
-]
+];
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function AccountDashboardPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   // Get user from route context (set by _authed layout's beforeLoad)
-  const { user } = Route.useRouteContext()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [isLoadingOrders, setIsLoadingOrders] = useState(true)
-  const [ordersError, setOrdersError] = useState<string | null>(null)
+  const { user } = Route.useRouteContext();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
 
   // Fetch recent orders
   useEffect(() => {
     async function fetchOrders() {
       try {
-        const response = await ordersApi.list({ page: 1, pageSize: 3 })
-        setOrders(response.items || [])
+        const response = await ordersApi.list({ page: 1, pageSize: 3 });
+        setOrders(response.items || []);
       } catch (err) {
-        setOrdersError(err instanceof Error ? err.message : 'Failed to load orders')
+        setOrdersError(err instanceof Error ? err.message : "Failed to load orders");
       } finally {
-        setIsLoadingOrders(false)
+        setIsLoadingOrders(false);
       }
     }
 
-    fetchOrders()
-  }, [])
+    fetchOrders();
+  }, []);
 
   // Handle sign out using Better Auth client
   const handleSignOut = async () => {
     try {
-      await signOut()
-      navigate({ to: '/' })
+      await signOut();
+      navigate({ to: "/" });
     } catch {
       // Still navigate away on error
-      navigate({ to: '/' })
+      navigate({ to: "/" });
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -165,9 +165,7 @@ function AccountDashboardPage() {
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-foreground sm:text-3xl">My Account</h1>
-          <p className="mt-2 text-muted-foreground">
-            Manage your orders, profile, and preferences
-          </p>
+          <p className="mt-2 text-muted-foreground">Manage your orders, profile, and preferences</p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -233,7 +231,7 @@ function AccountDashboardPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -241,12 +239,12 @@ function AccountDashboardPage() {
 // ============================================================================
 
 interface ProfileCardProps {
-  user: UserProfile
-  onSignOut: () => void
+  user: UserProfile;
+  onSignOut: () => void;
 }
 
 function ProfileCard({ user, onSignOut }: ProfileCardProps) {
-  const initials = getInitials(user.name || user.email)
+  const initials = getInitials(user.name || user.email);
 
   return (
     <div className="rounded-xl border border-border bg-card p-6">
@@ -254,11 +252,7 @@ function ProfileCard({ user, onSignOut }: ProfileCardProps) {
         {/* Avatar */}
         <div className="relative">
           {user.image ? (
-            <img
-              src={user.image}
-              alt={user.name}
-              className="h-16 w-16 rounded-full object-cover"
-            />
+            <img src={user.image} alt={user.name} className="h-16 w-16 rounded-full object-cover" />
           ) : (
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-xl font-bold text-brand-600">
               {initials}
@@ -268,12 +262,10 @@ function ProfileCard({ user, onSignOut }: ProfileCardProps) {
 
         {/* User Info */}
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-semibold text-foreground truncate">
-            {user.name || 'User'}
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground truncate">{user.name || "User"}</h2>
           <p className="text-sm text-muted-foreground truncate">{user.email}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Member since {formatDate(user.createdAt, { month: 'short', year: 'numeric' })}
+            Member since {formatDate(user.createdAt, { month: "short", year: "numeric" })}
           </p>
         </div>
 
@@ -297,7 +289,7 @@ function ProfileCard({ user, onSignOut }: ProfileCardProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -305,21 +297,19 @@ function ProfileCard({ user, onSignOut }: ProfileCardProps) {
 // ============================================================================
 
 interface QuickActionCardProps {
-  action: QuickAction
+  action: QuickAction;
 }
 
 function QuickActionCard({ action }: QuickActionCardProps) {
-  const Icon = action.icon
+  const Icon = action.icon;
 
   return (
     <a
       href={action.href}
       className="flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-all hover:border-brand-300 hover:shadow-sm"
     >
-      <div
-        className={cn('flex h-10 w-10 items-center justify-center rounded-lg', action.bgColor)}
-      >
-        <Icon className={cn('h-5 w-5', action.color)} />
+      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", action.bgColor)}>
+        <Icon className={cn("h-5 w-5", action.color)} />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground">{action.title}</p>
@@ -327,5 +317,5 @@ function QuickActionCard({ action }: QuickActionCardProps) {
       </div>
       <ChevronRight className="h-4 w-4 text-muted-foreground" />
     </a>
-  )
+  );
 }

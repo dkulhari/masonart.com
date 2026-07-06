@@ -19,10 +19,7 @@ import {
 } from "./approval";
 import { sendEmail } from "./email";
 import { createChildLogger } from "../lib/logger";
-import {
-  getApprovalDeadlineReminderTemplate,
-  type ApprovalEmailContext,
-} from "./email-templates";
+import { getApprovalDeadlineReminderTemplate, type ApprovalEmailContext } from "./email-templates";
 
 const logger = createChildLogger({ service: "approval-deadline" });
 
@@ -48,8 +45,7 @@ const REMINDER_HOURS_BEFORE_DEADLINE = 24;
 /**
  * Base URL for approval pages
  */
-const APPROVAL_BASE_URL =
-  process.env.APP_URL || "https://masonart.com";
+const APPROVAL_BASE_URL = process.env.APP_URL || "https://masonart.com";
 
 // ============================================================================
 // Service Functions
@@ -66,9 +62,7 @@ export async function sendDeadlineReminders(): Promise<{
 
   try {
     // Get approvals approaching deadline
-    const approvals = await getApprovalsNearDeadline(
-      REMINDER_HOURS_BEFORE_DEADLINE
-    );
+    const approvals = await getApprovalsNearDeadline(REMINDER_HOURS_BEFORE_DEADLINE);
 
     logger.info({ count: approvals.length }, "Found approvals approaching deadline");
 
@@ -95,10 +89,7 @@ export async function sendDeadlineReminders(): Promise<{
         const recipientEmail = order.userId
           ? (
               await db.query.users.findFirst({
-                where: eq(
-                  (await import("../database/schema/users")).users.id,
-                  order.userId
-                ),
+                where: eq((await import("../database/schema/users")).users.id, order.userId),
               })
             )?.email
           : order.guestEmail;
@@ -148,21 +139,16 @@ export async function sendDeadlineReminders(): Promise<{
           result.sent++;
           logger.info({ approvalId: approval.id }, "Sent reminder for approval");
         } else {
-          result.errors.push(
-            `Failed to send email for ${approval.id}: ${emailResult.error}`
-          );
+          result.errors.push(`Failed to send email for ${approval.id}: ${emailResult.error}`);
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
+        const message = error instanceof Error ? error.message : "Unknown error";
         result.errors.push(`Error processing approval ${approval.id}: ${message}`);
       }
     }
   } catch (error) {
     logger.error({ err: error }, "Error sending reminders");
-    result.errors.push(
-      error instanceof Error ? error.message : "Unknown error"
-    );
+    result.errors.push(error instanceof Error ? error.message : "Unknown error");
   }
 
   return result;
@@ -188,9 +174,7 @@ export async function processExpiredApprovals(): Promise<{
     // For now, the order can proceed to shipping when approval expires
   } catch (error) {
     logger.error({ err: error }, "Error expiring approvals");
-    result.errors.push(
-      error instanceof Error ? error.message : "Unknown error"
-    );
+    result.errors.push(error instanceof Error ? error.message : "Unknown error");
   }
 
   return result;

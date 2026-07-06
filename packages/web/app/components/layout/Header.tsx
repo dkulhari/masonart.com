@@ -1,7 +1,7 @@
-import { Link } from '@tanstack/react-router'
-import { Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
-import { useState } from 'react'
-import { useCartItemCount, useCartHydration } from '~/stores/cart'
+import { Link } from "@tanstack/react-router";
+import { Menu, ShoppingCart, User, X, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { useCartItemCount, useCartHydration } from "~/stores/cart";
 
 /**
  * Header component for the MasonArt e-commerce platform.
@@ -9,31 +9,27 @@ import { useCartItemCount, useCartHydration } from '~/stores/cart'
  * Responsive design with mobile hamburger menu.
  */
 export function Header() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const isHydrated = useCartHydration()
-  const cartItemCount = useCartItemCount()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isHydrated = useCartHydration();
+  const cartItemCount = useCartItemCount();
 
   // Only show cart count after hydration to avoid SSR mismatch
-  const displayCartCount = isHydrated ? cartItemCount : 0
+  const displayCartCount = isHydrated ? cartItemCount : 0;
 
   const toggleMobileMenu = () => {
-    setIsMobileMenuOpen((prev) => !prev)
-  }
+    setIsMobileMenuOpen((prev) => !prev);
+  };
 
   const closeMobileMenu = () => {
-    setIsMobileMenuOpen(false)
-  }
+    setIsMobileMenuOpen(false);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container-wide">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link
-            to="/"
-            className="flex items-center space-x-2"
-            onClick={closeMobileMenu}
-          >
+          <Link to="/" className="flex items-center space-x-2" onClick={closeMobileMenu}>
             <span className="text-xl font-bold tracking-tight text-foreground">
               Mason<span className="text-primary">Art</span>
             </span>
@@ -61,12 +57,12 @@ export function Header() {
             <Link
               to="/cart"
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ''}`}
+              aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ""}`}
             >
               <ShoppingCart className="h-5 w-5" />
               {displayCartCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                  {displayCartCount > 99 ? '99+' : displayCartCount}
+                  {displayCartCount > 99 ? "99+" : displayCartCount}
                 </span>
               )}
             </Link>
@@ -84,12 +80,12 @@ export function Header() {
             <Link
               to="/cart"
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ''}`}
+              aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ""}`}
             >
               <ShoppingCart className="h-5 w-5" />
               {displayCartCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                  {displayCartCount > 99 ? '99+' : displayCartCount}
+                  {displayCartCount > 99 ? "99+" : displayCartCount}
                 </span>
               )}
             </Link>
@@ -97,14 +93,10 @@ export function Header() {
               type="button"
               onClick={toggleMobileMenu}
               className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={isMobileMenuOpen}
             >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
@@ -136,7 +128,7 @@ export function Header() {
         )}
       </div>
     </header>
-  )
+  );
 }
 
 /**
@@ -147,9 +139,9 @@ function NavLink({
   children,
   onClick,
 }: {
-  to: string
-  children: React.ReactNode
-  onClick?: () => void
+  to: string;
+  children: React.ReactNode;
+  onClick?: () => void;
 }) {
   return (
     <Link
@@ -157,12 +149,12 @@ function NavLink({
       onClick={onClick}
       className="flex items-center text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       activeProps={{
-        className: 'text-foreground',
+        className: "text-foreground",
       }}
     >
       {children}
     </Link>
-  )
+  );
 }
 
 /**
@@ -173,9 +165,9 @@ function MobileNavLink({
   children,
   onClick,
 }: {
-  to: string
-  children: React.ReactNode
-  onClick?: () => void
+  to: string;
+  children: React.ReactNode;
+  onClick?: () => void;
 }) {
   return (
     <Link
@@ -183,10 +175,10 @@ function MobileNavLink({
       onClick={onClick}
       className="flex items-center px-2 py-2 text-base font-medium text-muted-foreground transition-colors hover:text-foreground"
       activeProps={{
-        className: 'text-foreground',
+        className: "text-foreground",
       }}
     >
       {children}
     </Link>
-  )
+  );
 }

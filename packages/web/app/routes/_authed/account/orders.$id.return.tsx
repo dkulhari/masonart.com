@@ -7,46 +7,40 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import {
-  ArrowLeft,
-  Loader2,
-  AlertCircle,
-  RefreshCw,
-  RotateCcw,
-} from 'lucide-react'
-import { authApi, ordersApi, returnsApi, type ReturnRequest } from '~/lib/api'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, Loader2, AlertCircle, RefreshCw, RotateCcw } from "lucide-react";
+import { authApi, ordersApi, returnsApi, type ReturnRequest } from "~/lib/api";
 import {
   ReturnEligibilityCheck,
   ReturnRequestForm,
   ReturnStatusCard,
   ReturnPolicyDisplay,
-} from '~/components/returns'
+} from "~/components/returns";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/_authed/account/orders/$id/return')({
+export const Route = createFileRoute("/_authed/account/orders/$id/return")({
   head: () => ({
     meta: [
-      { title: 'Request Return | MasonArt' },
-      { name: 'description', content: 'Request a return for your order.' },
-      { name: 'robots', content: 'noindex' },
+      { title: "Request Return | MasonArt" },
+      { name: "description", content: "Request a return for your order." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: ReturnRequestPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface OrderBasicInfo {
-  id: string
-  orderNumber: string
-  status: string
+  id: string;
+  orderNumber: string;
+  status: string;
 }
 
 // ============================================================================
@@ -54,107 +48,107 @@ interface OrderBasicInfo {
 // ============================================================================
 
 function ReturnRequestPage() {
-  const navigate = useNavigate()
-  const params = Route.useParams()
-  const orderId = params.id
+  const navigate = useNavigate();
+  const params = Route.useParams();
+  const orderId = params.id;
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
-  const [order, setOrder] = useState<OrderBasicInfo | null>(null)
-  const [returns, setReturns] = useState<ReturnRequest[]>([])
-  const [canRequestReturn, setCanRequestReturn] = useState(false)
-  const [eligibilityMessage, setEligibilityMessage] = useState<string | undefined>()
-  const [daysRemaining, setDaysRemaining] = useState<number | undefined>()
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isCancelling, setIsCancelling] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [order, setOrder] = useState<OrderBasicInfo | null>(null);
+  const [returns, setReturns] = useState<ReturnRequest[]>([]);
+  const [canRequestReturn, setCanRequestReturn] = useState(false);
+  const [eligibilityMessage, setEligibilityMessage] = useState<string | undefined>();
+  const [daysRemaining, setDaysRemaining] = useState<number | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Check authentication
   useEffect(() => {
     async function checkAuth() {
       try {
-        const session = await authApi.getSession()
+        const session = await authApi.getSession();
         if (!session?.user) {
           navigate({
-            to: '/auth/login',
+            to: "/auth/login",
             search: { redirect: `/account/orders/${orderId}/return` },
-          })
-          return
+          });
+          return;
         }
-        setIsAuthenticated(true)
+        setIsAuthenticated(true);
       } catch {
         navigate({
-          to: '/auth/login',
+          to: "/auth/login",
           search: { redirect: `/account/orders/${orderId}/return` },
-        })
+        });
       }
     }
 
-    checkAuth()
-  }, [navigate, orderId])
+    checkAuth();
+  }, [navigate, orderId]);
 
   // Fetch order and return data
   const fetchData = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) return;
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
       // Fetch order basic info and returns in parallel
       const [orderData, returnsData] = await Promise.all([
         ordersApi.getById(orderId),
         returnsApi.getOrderReturns(orderId),
-      ])
+      ]);
 
       if (!orderData) {
-        setError('Order not found')
-        return
+        setError("Order not found");
+        return;
       }
 
       setOrder({
         id: orderData.id,
         orderNumber: orderData.orderNumber,
         status: orderData.status,
-      })
-      setReturns(returnsData.returns)
-      setCanRequestReturn(returnsData.canRequestReturn)
-      setEligibilityMessage(returnsData.eligibilityMessage)
-      setDaysRemaining(returnsData.daysRemaining)
+      });
+      setReturns(returnsData.returns);
+      setCanRequestReturn(returnsData.canRequestReturn);
+      setEligibilityMessage(returnsData.eligibilityMessage);
+      setDaysRemaining(returnsData.daysRemaining);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data')
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [isAuthenticated, orderId])
+  }, [isAuthenticated, orderId]);
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    fetchData();
+  }, [fetchData]);
 
   // Handle return creation success
-  const handleReturnSuccess = useCallback(
-    (newReturn: ReturnRequest) => {
-      // Add the new return to the list and disable form
-      setReturns((prev) => [newReturn, ...prev])
-      setCanRequestReturn(false)
-      setEligibilityMessage('A return request already exists for this order')
-    },
-    []
-  )
+  const handleReturnSuccess = useCallback((newReturn: ReturnRequest) => {
+    // Add the new return to the list and disable form
+    setReturns((prev) => [newReturn, ...prev]);
+    setCanRequestReturn(false);
+    setEligibilityMessage("A return request already exists for this order");
+  }, []);
 
   // Handle return cancellation
-  const handleCancelReturn = useCallback(async (returnId: string) => {
-    setIsCancelling(true)
-    try {
-      await returnsApi.cancelReturn(returnId)
-      // Refresh data
-      await fetchData()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to cancel return')
-    } finally {
-      setIsCancelling(false)
-    }
-  }, [fetchData])
+  const handleCancelReturn = useCallback(
+    async (returnId: string) => {
+      setIsCancelling(true);
+      try {
+        await returnsApi.cancelReturn(returnId);
+        // Refresh data
+        await fetchData();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to cancel return");
+      } finally {
+        setIsCancelling(false);
+      }
+    },
+    [fetchData]
+  );
 
   // Loading state while checking auth
   if (isAuthenticated === null) {
@@ -165,7 +159,7 @@ function ReturnRequestPage() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Loading state
@@ -183,7 +177,7 @@ function ReturnRequestPage() {
           <ReturnPageSkeleton />
         </div>
       </div>
-    )
+    );
   }
 
   // Error state
@@ -201,7 +195,7 @@ function ReturnRequestPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
             <h2 className="mt-4 text-lg font-semibold text-red-900">
-              {error || 'Order not found'}
+              {error || "Order not found"}
             </h2>
             <p className="mt-2 text-sm text-red-700">
               We couldn&apos;t load the return information. Please try again.
@@ -216,13 +210,11 @@ function ReturnRequestPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Check if there's an active (non-closed/rejected) return
-  const activeReturn = returns.find(
-    (r) => !['rejected', 'closed'].includes(r.status)
-  )
+  const activeReturn = returns.find((r) => !["rejected", "closed"].includes(r.status));
 
   return (
     <div className="min-h-screen bg-background">
@@ -242,9 +234,7 @@ function ReturnRequestPage() {
             <RotateCcw className="h-7 w-7 text-brand-500" />
             Request Return
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Order {order.orderNumber}
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Order {order.orderNumber}</p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -282,23 +272,20 @@ function ReturnRequestPage() {
                   Submit Return Request
                 </h2>
                 <div className="rounded-xl border border-border bg-card p-6">
-                  <ReturnRequestForm
-                    orderId={orderId}
-                    onSuccess={handleReturnSuccess}
-                  />
+                  <ReturnRequestForm orderId={orderId} onSuccess={handleReturnSuccess} />
                 </div>
               </div>
             )}
 
             {/* Previous Return Requests (closed/rejected) */}
-            {returns.filter((r) => ['rejected', 'closed'].includes(r.status)).length > 0 && (
+            {returns.filter((r) => ["rejected", "closed"].includes(r.status)).length > 0 && (
               <div>
                 <h2 className="mb-4 text-lg font-semibold text-foreground">
                   Previous Return Requests
                 </h2>
                 <div className="space-y-4">
                   {returns
-                    .filter((r) => ['rejected', 'closed'].includes(r.status))
+                    .filter((r) => ["rejected", "closed"].includes(r.status))
                     .map((returnRequest) => (
                       <ReturnStatusCard
                         key={returnRequest.id}
@@ -320,7 +307,8 @@ function ReturnRequestPage() {
             <div className="rounded-xl border border-border bg-muted/30 p-4">
               <h3 className="text-sm font-semibold text-foreground">Need Help?</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                If you have questions about our return policy or need assistance with your return, please contact our support team.
+                If you have questions about our return policy or need assistance with your return,
+                please contact our support team.
               </p>
               <a
                 href="/contact"
@@ -333,7 +321,7 @@ function ReturnRequestPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -365,7 +353,7 @@ function ReturnPageSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default ReturnRequestPage
+export default ReturnRequestPage;

@@ -72,10 +72,7 @@ beforeAll(async () => {
       isDatabaseAvailable = false;
     }
   } catch (error) {
-    console.log(
-      "Could not initialize app for testing:",
-      (error as Error).message
-    );
+    console.log("Could not initialize app for testing:", (error as Error).message);
     isDatabaseAvailable = false;
   }
 }, 10000);
@@ -134,12 +131,8 @@ describe("Admin Shipments Validation Schemas", () => {
     it("should validate orderId as UUID", async () => {
       const { listShipmentsSchema } = await import("../../../src/routes/admin/shipments");
 
-      expect(
-        listShipmentsSchema.safeParse({ orderId: VALID_UUID }).success
-      ).toBe(true);
-      expect(
-        listShipmentsSchema.safeParse({ orderId: INVALID_UUID }).success
-      ).toBe(false);
+      expect(listShipmentsSchema.safeParse({ orderId: VALID_UUID }).success).toBe(true);
+      expect(listShipmentsSchema.safeParse({ orderId: INVALID_UUID }).success).toBe(false);
     });
 
     it("should validate sortBy enum values", async () => {
@@ -165,23 +158,15 @@ describe("Admin Shipments Validation Schemas", () => {
     it("should validate required carrier field", async () => {
       const { createShipmentSchema } = await import("../../../src/routes/admin/shipments");
 
-      expect(
-        createShipmentSchema.safeParse({ carrier: "USPS" }).success
-      ).toBe(true);
-      expect(
-        createShipmentSchema.safeParse({}).success
-      ).toBe(false);
+      expect(createShipmentSchema.safeParse({ carrier: "USPS" }).success).toBe(true);
+      expect(createShipmentSchema.safeParse({}).success).toBe(false);
     });
 
     it("should validate carrier max length", async () => {
       const { createShipmentSchema } = await import("../../../src/routes/admin/shipments");
 
-      expect(
-        createShipmentSchema.safeParse({ carrier: "a".repeat(101) }).success
-      ).toBe(false);
-      expect(
-        createShipmentSchema.safeParse({ carrier: "a".repeat(100) }).success
-      ).toBe(true);
+      expect(createShipmentSchema.safeParse({ carrier: "a".repeat(101) }).success).toBe(false);
+      expect(createShipmentSchema.safeParse({ carrier: "a".repeat(100) }).success).toBe(true);
     });
 
     it("should allow optional shippingOptionId as UUID", async () => {
@@ -256,28 +241,20 @@ describe("Admin Shipments Validation Schemas", () => {
     it("should allow setting trackingNumber to null", async () => {
       const { updateShipmentSchema } = await import("../../../src/routes/admin/shipments");
 
-      expect(
-        updateShipmentSchema.safeParse({ trackingNumber: null }).success
-      ).toBe(true);
+      expect(updateShipmentSchema.safeParse({ trackingNumber: null }).success).toBe(true);
     });
 
     it("should allow setting notes to null", async () => {
       const { updateShipmentSchema } = await import("../../../src/routes/admin/shipments");
 
-      expect(
-        updateShipmentSchema.safeParse({ notes: null }).success
-      ).toBe(true);
+      expect(updateShipmentSchema.safeParse({ notes: null }).success).toBe(true);
     });
 
     it("should validate trackingUrl max length", async () => {
       const { updateShipmentSchema } = await import("../../../src/routes/admin/shipments");
 
-      expect(
-        updateShipmentSchema.safeParse({ trackingUrl: "a".repeat(501) }).success
-      ).toBe(false);
-      expect(
-        updateShipmentSchema.safeParse({ trackingUrl: "a".repeat(500) }).success
-      ).toBe(true);
+      expect(updateShipmentSchema.safeParse({ trackingUrl: "a".repeat(501) }).success).toBe(false);
+      expect(updateShipmentSchema.safeParse({ trackingUrl: "a".repeat(500) }).success).toBe(true);
     });
   });
 });

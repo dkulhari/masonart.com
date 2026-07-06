@@ -6,8 +6,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState } from 'react'
-import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
+import { useState } from "react";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import {
   User,
   Mail,
@@ -18,10 +18,10 @@ import {
   AlertCircle,
   Loader2,
   Check,
-} from 'lucide-react'
-import { z } from 'zod'
-import { cn, isValidEmail } from '~/lib/utils'
-import { signIn, signUp } from '~/lib/auth-client'
+} from "lucide-react";
+import { z } from "zod";
+import { cn, isValidEmail } from "~/lib/utils";
+import { signIn, signUp } from "~/lib/auth-client";
 
 // ============================================================================
 // Route Definition
@@ -29,40 +29,41 @@ import { signIn, signUp } from '~/lib/auth-client'
 
 const searchParamsSchema = z.object({
   redirect: z.string().optional(),
-})
+});
 
-export const Route = createFileRoute('/auth/register')({
+export const Route = createFileRoute("/auth/register")({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'Create Account | MasonArt' },
+      { title: "Create Account | MasonArt" },
       {
-        name: 'description',
-        content: 'Create a MasonArt account to save your favorites, track orders, and get personalized recommendations.',
+        name: "description",
+        content:
+          "Create a MasonArt account to save your favorites, track orders, and get personalized recommendations.",
       },
-      { name: 'robots', content: 'noindex' },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: RegisterPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface FormData {
-  name: string
-  email: string
-  password: string
-  confirmPassword: string
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
 }
 
 interface FormErrors {
-  name?: string
-  email?: string
-  password?: string
-  confirmPassword?: string
-  general?: string
+  name?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+  general?: string;
 }
 
 // ============================================================================
@@ -70,158 +71,158 @@ interface FormErrors {
 // ============================================================================
 
 interface PasswordRequirement {
-  label: string
-  validator: (password: string) => boolean
+  label: string;
+  validator: (password: string) => boolean;
 }
 
 const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
-  { label: 'At least 8 characters', validator: (p) => p.length >= 8 },
-  { label: 'Contains a number', validator: (p) => /\d/.test(p) },
-  { label: 'Contains a lowercase letter', validator: (p) => /[a-z]/.test(p) },
-  { label: 'Contains an uppercase letter', validator: (p) => /[A-Z]/.test(p) },
-]
+  { label: "At least 8 characters", validator: (p) => p.length >= 8 },
+  { label: "Contains a number", validator: (p) => /\d/.test(p) },
+  { label: "Contains a lowercase letter", validator: (p) => /[a-z]/.test(p) },
+  { label: "Contains an uppercase letter", validator: (p) => /[A-Z]/.test(p) },
+];
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function RegisterPage() {
-  const navigate = useNavigate()
-  const search = useSearch({ from: '/auth/register' })
-  const redirectUrl = search.redirect || '/'
+  const navigate = useNavigate();
+  const search = useSearch({ from: "/auth/register" });
+  const redirectUrl = search.redirect || "/";
 
   // Form state
   const [formData, setFormData] = useState<FormData>({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [touched, setTouched] = useState<Record<string, boolean>>({})
-  const [errors, setErrors] = useState<FormErrors>({})
-  const [isLoading, setIsLoading] = useState(false)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   // Check if password meets all requirements
   const passwordMeetsRequirements = PASSWORD_REQUIREMENTS.every((req) =>
     req.validator(formData.password)
-  )
+  );
 
   // Validate form
   const validateForm = (data: FormData): FormErrors => {
-    const newErrors: FormErrors = {}
+    const newErrors: FormErrors = {};
 
     if (!data.name.trim()) {
-      newErrors.name = 'Name is required'
+      newErrors.name = "Name is required";
     } else if (data.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters'
+      newErrors.name = "Name must be at least 2 characters";
     }
 
     if (!data.email.trim()) {
-      newErrors.email = 'Email is required'
+      newErrors.email = "Email is required";
     } else if (!isValidEmail(data.email)) {
-      newErrors.email = 'Please enter a valid email address'
+      newErrors.email = "Please enter a valid email address";
     }
 
     if (!data.password) {
-      newErrors.password = 'Password is required'
+      newErrors.password = "Password is required";
     } else if (!passwordMeetsRequirements) {
-      newErrors.password = 'Password does not meet requirements'
+      newErrors.password = "Password does not meet requirements";
     }
 
     if (!data.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password'
+      newErrors.confirmPassword = "Please confirm your password";
     } else if (data.password !== data.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match'
+      newErrors.confirmPassword = "Passwords do not match";
     }
 
-    return newErrors
-  }
+    return newErrors;
+  };
 
   // Handle field change
   const handleChange = (field: keyof FormData, value: string) => {
-    const newData = { ...formData, [field]: value }
-    setFormData(newData)
+    const newData = { ...formData, [field]: value };
+    setFormData(newData);
 
     // Clear general error on any input change
     if (errors.general) {
-      setErrors((prev) => ({ ...prev, general: undefined }))
+      setErrors((prev) => ({ ...prev, general: undefined }));
     }
-  }
+  };
 
   // Handle field blur
   const handleBlur = (field: keyof FormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }))
-    const newErrors = validateForm(formData)
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const newErrors = validateForm(formData);
     setErrors((prev) => ({
       ...prev,
       [field]: newErrors[field],
-    }))
-  }
+    }));
+  };
 
   // Get field error (only show if touched)
   const getFieldError = (field: keyof FormErrors) => {
-    return touched[field] ? errors[field] : undefined
-  }
+    return touched[field] ? errors[field] : undefined;
+  };
 
   // Handle form submit
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     // Touch all fields
-    setTouched({ name: true, email: true, password: true, confirmPassword: true })
+    setTouched({ name: true, email: true, password: true, confirmPassword: true });
 
     // Validate
-    const validationErrors = validateForm(formData)
-    setErrors(validationErrors)
+    const validationErrors = validateForm(formData);
+    setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
-      return
+      return;
     }
 
-    setIsLoading(true)
-    setErrors({})
+    setIsLoading(true);
+    setErrors({});
 
     try {
       const result = await signUp.email({
         name: formData.name,
         email: formData.email,
         password: formData.password,
-      })
+      });
 
       if (result.error) {
-        setErrors({ general: result.error.message || 'Registration failed' })
-        return
+        setErrors({ general: result.error.message || "Registration failed" });
+        return;
       }
 
       // Redirect to login with success message
       navigate({
-        to: '/auth/login',
+        to: "/auth/login",
         search: {
           redirect: redirectUrl,
           registered: true,
         },
-      })
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Registration failed'
-      setErrors({ general: message })
+      const message = error instanceof Error ? error.message : "Registration failed";
+      setErrors({ general: message });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Handle Google sign-in
   const handleGoogleSignIn = async () => {
-    setIsGoogleLoading(true)
+    setIsGoogleLoading(true);
     await signIn.social({
-      provider: 'google',
+      provider: "google",
       callbackURL: redirectUrl,
-    })
-  }
+    });
+  };
 
-  const isFormValid = Object.keys(validateForm(formData)).length === 0
+  const isFormValid = Object.keys(validateForm(formData)).length === 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -247,9 +248,9 @@ function RegisterPage() {
               onClick={handleGoogleSignIn}
               disabled={isGoogleLoading || isLoading}
               className={cn(
-                'flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium text-foreground transition-colors',
-                'hover:bg-muted focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                'disabled:cursor-not-allowed disabled:opacity-50'
+                "flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium text-foreground transition-colors",
+                "hover:bg-muted focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
+                "disabled:cursor-not-allowed disabled:opacity-50"
               )}
             >
               {isGoogleLoading ? (
@@ -305,23 +306,23 @@ function RegisterPage() {
                     type="text"
                     id="name"
                     value={formData.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
-                    onBlur={() => handleBlur('name')}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                    onBlur={() => handleBlur("name")}
                     placeholder="Your full name"
                     autoComplete="name"
                     disabled={isLoading}
                     className={cn(
-                      'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                      getFieldError('name')
-                        ? 'border-red-500 focus:ring-red-500'
-                        : 'border-input hover:border-brand-300'
+                      "w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors",
+                      "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
+                      "disabled:cursor-not-allowed disabled:opacity-50",
+                      getFieldError("name")
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-input hover:border-brand-300"
                     )}
                   />
                 </div>
-                {getFieldError('name') && (
-                  <p className="mt-1 text-xs text-red-500">{getFieldError('name')}</p>
+                {getFieldError("name") && (
+                  <p className="mt-1 text-xs text-red-500">{getFieldError("name")}</p>
                 )}
               </div>
 
@@ -336,49 +337,52 @@ function RegisterPage() {
                     type="email"
                     id="email"
                     value={formData.email}
-                    onChange={(e) => handleChange('email', e.target.value)}
-                    onBlur={() => handleBlur('email')}
+                    onChange={(e) => handleChange("email", e.target.value)}
+                    onBlur={() => handleBlur("email")}
                     placeholder="your@email.com"
                     autoComplete="email"
                     disabled={isLoading}
                     className={cn(
-                      'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                      getFieldError('email')
-                        ? 'border-red-500 focus:ring-red-500'
-                        : 'border-input hover:border-brand-300'
+                      "w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors",
+                      "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
+                      "disabled:cursor-not-allowed disabled:opacity-50",
+                      getFieldError("email")
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-input hover:border-brand-300"
                     )}
                   />
                 </div>
-                {getFieldError('email') && (
-                  <p className="mt-1 text-xs text-red-500">{getFieldError('email')}</p>
+                {getFieldError("email") && (
+                  <p className="mt-1 text-xs text-red-500">{getFieldError("email")}</p>
                 )}
               </div>
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-foreground">
+                <label
+                  htmlFor="password"
+                  className="mb-1.5 block text-sm font-medium text-foreground"
+                >
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     id="password"
                     value={formData.password}
-                    onChange={(e) => handleChange('password', e.target.value)}
-                    onBlur={() => handleBlur('password')}
+                    onChange={(e) => handleChange("password", e.target.value)}
+                    onBlur={() => handleBlur("password")}
                     placeholder="Create a password"
                     autoComplete="new-password"
                     disabled={isLoading}
                     className={cn(
-                      'w-full rounded-lg border bg-background py-2.5 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                      getFieldError('password')
-                        ? 'border-red-500 focus:ring-red-500'
-                        : 'border-input hover:border-brand-300'
+                      "w-full rounded-lg border bg-background py-2.5 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition-colors",
+                      "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
+                      "disabled:cursor-not-allowed disabled:opacity-50",
+                      getFieldError("password")
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-input hover:border-brand-300"
                     )}
                   />
                   <button
@@ -387,39 +391,35 @@ function RegisterPage() {
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     tabIndex={-1}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {getFieldError('password') && (
-                  <p className="mt-1 text-xs text-red-500">{getFieldError('password')}</p>
+                {getFieldError("password") && (
+                  <p className="mt-1 text-xs text-red-500">{getFieldError("password")}</p>
                 )}
 
                 {/* Password Requirements */}
                 {formData.password && (
                   <div className="mt-2 space-y-1">
                     {PASSWORD_REQUIREMENTS.map((req, index) => {
-                      const isMet = req.validator(formData.password)
+                      const isMet = req.validator(formData.password);
                       return (
                         <div
                           key={index}
                           className={cn(
-                            'flex items-center gap-2 text-xs',
-                            isMet ? 'text-green-600' : 'text-muted-foreground'
+                            "flex items-center gap-2 text-xs",
+                            isMet ? "text-green-600" : "text-muted-foreground"
                           )}
                         >
                           <Check
                             className={cn(
-                              'h-3.5 w-3.5',
-                              isMet ? 'text-green-500' : 'text-muted-foreground/50'
+                              "h-3.5 w-3.5",
+                              isMet ? "text-green-500" : "text-muted-foreground/50"
                             )}
                           />
                           {req.label}
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 )}
@@ -427,27 +427,30 @@ function RegisterPage() {
 
               {/* Confirm Password */}
               <div>
-                <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-foreground">
+                <label
+                  htmlFor="confirmPassword"
+                  className="mb-1.5 block text-sm font-medium text-foreground"
+                >
                   Confirm Password
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
-                    type={showConfirmPassword ? 'text' : 'password'}
+                    type={showConfirmPassword ? "text" : "password"}
                     id="confirmPassword"
                     value={formData.confirmPassword}
-                    onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                    onBlur={() => handleBlur('confirmPassword')}
+                    onChange={(e) => handleChange("confirmPassword", e.target.value)}
+                    onBlur={() => handleBlur("confirmPassword")}
                     placeholder="Confirm your password"
                     autoComplete="new-password"
                     disabled={isLoading}
                     className={cn(
-                      'w-full rounded-lg border bg-background py-2.5 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                      'disabled:cursor-not-allowed disabled:opacity-50',
-                      getFieldError('confirmPassword')
-                        ? 'border-red-500 focus:ring-red-500'
-                        : 'border-input hover:border-brand-300'
+                      "w-full rounded-lg border bg-background py-2.5 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition-colors",
+                      "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
+                      "disabled:cursor-not-allowed disabled:opacity-50",
+                      getFieldError("confirmPassword")
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-input hover:border-brand-300"
                     )}
                   />
                   <button
@@ -463,8 +466,8 @@ function RegisterPage() {
                     )}
                   </button>
                 </div>
-                {getFieldError('confirmPassword') && (
-                  <p className="mt-1 text-xs text-red-500">{getFieldError('confirmPassword')}</p>
+                {getFieldError("confirmPassword") && (
+                  <p className="mt-1 text-xs text-red-500">{getFieldError("confirmPassword")}</p>
                 )}
               </div>
 
@@ -473,11 +476,11 @@ function RegisterPage() {
                 type="submit"
                 disabled={isLoading || !isFormValid}
                 className={cn(
-                  'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
-                  'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                  "flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
                   isFormValid && !isLoading
-                    ? 'bg-brand-500 text-white hover:bg-brand-600'
-                    : 'cursor-not-allowed bg-muted text-muted-foreground'
+                    ? "bg-brand-500 text-white hover:bg-brand-600"
+                    : "cursor-not-allowed bg-muted text-muted-foreground"
                 )}
               >
                 {isLoading ? (
@@ -497,9 +500,9 @@ function RegisterPage() {
 
           {/* Sign In Link */}
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <a
-              href={`/auth/login${redirectUrl !== '/' ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`}
+              href={`/auth/login${redirectUrl !== "/" ? `?redirect=${encodeURIComponent(redirectUrl)}` : ""}`}
               className="font-medium text-brand-600 hover:text-brand-700"
             >
               Sign in
@@ -508,11 +511,11 @@ function RegisterPage() {
 
           {/* Terms */}
           <p className="mt-4 text-center text-xs text-muted-foreground">
-            By creating an account, you agree to our{' '}
+            By creating an account, you agree to our{" "}
             <a href="/terms" className="underline hover:text-foreground">
               Terms of Service
-            </a>{' '}
-            and{' '}
+            </a>{" "}
+            and{" "}
             <a href="/privacy" className="underline hover:text-foreground">
               Privacy Policy
             </a>
@@ -520,5 +523,5 @@ function RegisterPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

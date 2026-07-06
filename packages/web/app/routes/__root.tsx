@@ -1,18 +1,13 @@
 /// <reference types="vite/client" />
-import {
-  HeadContent,
-  Outlet,
-  Scripts,
-  createRootRouteWithContext,
-} from '@tanstack/react-router'
-import { createServerFn } from '@tanstack/react-start'
-import { getRequest } from '@tanstack/react-start/server'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type * as React from 'react'
-import { Header } from '~/components/layout/Header'
-import { Footer } from '~/components/layout/Footer'
-import globalsCss from '~/styles/globals.css?url'
-import type { Session } from '~/lib/auth-client'
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type * as React from "react";
+import { Header } from "~/components/layout/Header";
+import { Footer } from "~/components/layout/Footer";
+import globalsCss from "~/styles/globals.css?url";
+import type { Session } from "~/lib/auth-client";
 
 /**
  * Create a QueryClient with SSR-friendly defaults
@@ -26,11 +21,11 @@ function makeQueryClient() {
         staleTime: 60 * 1000, // 1 minute
       },
     },
-  })
+  });
 }
 
 // Browser-only singleton QueryClient
-let browserQueryClient: QueryClient | undefined = undefined
+let browserQueryClient: QueryClient | undefined = undefined;
 
 /**
  * Get or create QueryClient
@@ -38,13 +33,13 @@ let browserQueryClient: QueryClient | undefined = undefined
  * - Browser: Use singleton (to preserve cache across navigations)
  */
 function getQueryClient() {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     // Server: always make a new query client
-    return makeQueryClient()
+    return makeQueryClient();
   } else {
     // Browser: make a new query client if we don't already have one
-    if (!browserQueryClient) browserQueryClient = makeQueryClient()
-    return browserQueryClient
+    if (!browserQueryClient) browserQueryClient = makeQueryClient();
+    return browserQueryClient;
   }
 }
 
@@ -52,39 +47,39 @@ function getQueryClient() {
  * Router context interface containing authenticated user session
  */
 interface RouterContext {
-  session: Session | null
+  session: Session | null;
 }
 
 /**
  * Server function to fetch the user session
  * This runs on the server where we have access to cookies
  */
-const fetchSession = createServerFn({ method: 'GET' }).handler(async () => {
+const fetchSession = createServerFn({ method: "GET" }).handler(async () => {
   try {
-    const request = getRequest()
+    const request = getRequest();
     if (!request) {
-      return null
+      return null;
     }
 
     // Make server-side request to the auth API with cookies
-    const apiUrl = process.env.VITE_API_URL || 'http://localhost:3000'
+    const apiUrl = process.env.VITE_API_URL || "http://localhost:3000";
     const response = await fetch(`${apiUrl}/api/auth/get-session`, {
       headers: {
-        cookie: request.headers.get('cookie') || '',
+        cookie: request.headers.get("cookie") || "",
       },
-    })
+    });
 
     if (!response.ok) {
-      return null
+      return null;
     }
 
-    const session = await response.json()
-    return session as Session
+    const session = await response.json();
+    return session as Session;
   } catch (error) {
-    console.error('Failed to fetch session:', error)
-    return null
+    console.error("Failed to fetch session:", error);
+    return null;
   }
-})
+});
 
 /**
  * Root route configuration for the MasonArt e-commerce application.
@@ -93,95 +88,95 @@ const fetchSession = createServerFn({ method: 'GET' }).handler(async () => {
  */
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: async () => {
-    const session = await fetchSession()
-    return { session }
+    const session = await fetchSession();
+    return { session };
   },
   head: () => ({
     meta: [
       {
-        charSet: 'utf-8',
+        charSet: "utf-8",
       },
       {
-        name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
       },
       {
-        title: 'MasonArt | Premium Posters & Frames',
+        title: "MasonArt | Premium Posters & Frames",
       },
       {
-        name: 'description',
+        name: "description",
         content:
-          'Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection of wall art for your space.',
+          "Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection of wall art for your space.",
       },
       {
-        property: 'og:title',
-        content: 'MasonArt | Premium Posters & Frames',
+        property: "og:title",
+        content: "MasonArt | Premium Posters & Frames",
       },
       {
-        property: 'og:description',
+        property: "og:description",
         content:
-          'Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection.',
+          "Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection.",
       },
       {
-        property: 'og:type',
-        content: 'website',
+        property: "og:type",
+        content: "website",
       },
       {
-        property: 'og:site_name',
-        content: 'MasonArt',
+        property: "og:site_name",
+        content: "MasonArt",
       },
       {
-        name: 'twitter:card',
-        content: 'summary_large_image',
+        name: "twitter:card",
+        content: "summary_large_image",
       },
       {
-        name: 'twitter:title',
-        content: 'MasonArt | Premium Posters & Frames',
+        name: "twitter:title",
+        content: "MasonArt | Premium Posters & Frames",
       },
       {
-        name: 'twitter:description',
+        name: "twitter:description",
         content:
-          'Discover premium posters and custom frames. Create unique AI-generated art for your space.',
+          "Discover premium posters and custom frames. Create unique AI-generated art for your space.",
       },
       {
-        name: 'theme-color',
-        content: '#f97316',
+        name: "theme-color",
+        content: "#f97316",
       },
     ],
     links: [
-      { rel: 'stylesheet', href: globalsCss },
-      { rel: 'icon', href: '/favicon.ico' },
+      { rel: "stylesheet", href: globalsCss },
+      { rel: "icon", href: "/favicon.ico" },
       {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '32x32',
-        href: '/favicon-32x32.png',
+        rel: "icon",
+        type: "image/png",
+        sizes: "32x32",
+        href: "/favicon-32x32.png",
       },
       {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '16x16',
-        href: '/favicon-16x16.png',
+        rel: "icon",
+        type: "image/png",
+        sizes: "16x16",
+        href: "/favicon-16x16.png",
       },
       {
-        rel: 'apple-touch-icon',
-        sizes: '180x180',
-        href: '/apple-touch-icon.png',
+        rel: "apple-touch-icon",
+        sizes: "180x180",
+        href: "/apple-touch-icon.png",
       },
-      { rel: 'manifest', href: '/site.webmanifest' },
+      { rel: "manifest", href: "/site.webmanifest" },
     ],
   }),
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
-})
+});
 
 /**
  * Root component that renders the main application layout.
  * Wraps all child routes with QueryClientProvider and the consistent header/footer.
  */
 function RootComponent() {
-  const queryClient = getQueryClient()
+  const queryClient = getQueryClient();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -189,7 +184,7 @@ function RootComponent() {
         <Outlet />
       </RootDocument>
     </QueryClientProvider>
-  )
+  );
 }
 
 /**
@@ -211,7 +206,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
-  )
+  );
 }
 
 /**
@@ -234,7 +229,7 @@ function NotFoundComponent() {
         Go Home
       </a>
     </div>
-  )
+  );
 }
 
 /**
@@ -246,9 +241,7 @@ function ErrorComponent({ error }: { error: Error }) {
   return (
     <div className="container-wide flex flex-col items-center justify-center py-20">
       <h1 className="text-4xl font-bold text-destructive">Error</h1>
-      <p className="mt-4 text-lg text-muted-foreground">
-        Something went wrong
-      </p>
+      <p className="mt-4 text-lg text-muted-foreground">Something went wrong</p>
       <pre className="mt-4 max-w-lg overflow-auto rounded-md bg-muted p-4 text-sm">
         {error.message}
       </pre>
@@ -259,5 +252,5 @@ function ErrorComponent({ error }: { error: Error }) {
         Go Home
       </a>
     </div>
-  )
+  );
 }

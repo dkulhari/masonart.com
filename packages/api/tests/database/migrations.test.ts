@@ -8,23 +8,23 @@
  * Runtime tests can be skipped by setting SKIP_DB_RUNTIME_TESTS=true
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import postgres from 'postgres';
-import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
-import { join, resolve } from 'path';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import postgres from "postgres";
+import { existsSync, readFileSync, statSync, readdirSync } from "fs";
+import { join, resolve } from "path";
 
 // Check if we should skip database runtime tests
-const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
+const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === "true";
 
 // Track database availability
 let isDatabaseAvailable = false;
 let client: ReturnType<typeof postgres> | null = null;
 
 // Resolve paths relative to API package root
-const API_ROOT = resolve(__dirname, '../..');
-const DRIZZLE_CONFIG_PATH = join(API_ROOT, 'drizzle.config.ts');
-const SCHEMA_DIR = join(API_ROOT, 'src/database/schema');
-const MIGRATIONS_DIR = join(API_ROOT, 'src/database/migrations');
+const API_ROOT = resolve(__dirname, "../..");
+const DRIZZLE_CONFIG_PATH = join(API_ROOT, "drizzle.config.ts");
+const SCHEMA_DIR = join(API_ROOT, "src/database/schema");
+const MIGRATIONS_DIR = join(API_ROOT, "src/database/migrations");
 
 // Helper to check if tests should be skipped
 const shouldSkip = () => SKIP_TESTS || !isDatabaseAvailable;
@@ -51,24 +51,58 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
 
   // Create all enums (using DO blocks since PostgreSQL doesn't support IF NOT EXISTS for types)
   const enums = [
-    { name: 'product_status', values: ['draft', 'active', 'archived'] },
-    { name: 'product_orientation', values: ['square', 'portrait', 'landscape', 'panoramic', 'round'] },
-    { name: 'user_role', values: ['admin', 'customer', 'trade'] },
-    { name: 'trade_account_status', values: ['pending', 'approved', 'rejected'] },
-    { name: 'order_status', values: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'] },
-    { name: 'payment_status', values: ['pending', 'paid', 'failed', 'refunded'] },
-    { name: 'payment_method', values: ['razorpay', 'stripe', 'cod', 'upi'] },
-    { name: 'photo_approval_status', values: ['pending', 'sent', 'approved', 'changes_requested'] },
-    { name: 'address_type', values: ['home', 'office', 'other'] },
-    { name: 'ai_generation_status', values: ['pending', 'processing', 'completed', 'failed', 'cancelled'] },
-    { name: 'ai_model', values: ['sdxl', 'sd-2-1', 'dalle-3', 'midjourney', 'stable-diffusion-xl-lightning'] },
-    { name: 'aspect_ratio', values: ['1:1', '4:5', '3:4', '2:3', '4:3', '16:9', '21:9'] },
-    { name: 'style_preset', values: ['wabi-sabi', 'abstract-expression', 'botanical', 'vintage-poster', 'minimalist', 'geometric', 'watercolor', 'line-art', 'pop-art', 'surrealism'] },
-    { name: 'moderation_status', values: ['pending', 'approved', 'rejected', 'flagged'] },
+    { name: "product_status", values: ["draft", "active", "archived"] },
+    {
+      name: "product_orientation",
+      values: ["square", "portrait", "landscape", "panoramic", "round"],
+    },
+    { name: "user_role", values: ["admin", "customer", "trade"] },
+    { name: "trade_account_status", values: ["pending", "approved", "rejected"] },
+    {
+      name: "order_status",
+      values: [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "refunded",
+      ],
+    },
+    { name: "payment_status", values: ["pending", "paid", "failed", "refunded"] },
+    { name: "payment_method", values: ["razorpay", "stripe", "cod", "upi"] },
+    { name: "photo_approval_status", values: ["pending", "sent", "approved", "changes_requested"] },
+    { name: "address_type", values: ["home", "office", "other"] },
+    {
+      name: "ai_generation_status",
+      values: ["pending", "processing", "completed", "failed", "cancelled"],
+    },
+    {
+      name: "ai_model",
+      values: ["sdxl", "sd-2-1", "dalle-3", "midjourney", "stable-diffusion-xl-lightning"],
+    },
+    { name: "aspect_ratio", values: ["1:1", "4:5", "3:4", "2:3", "4:3", "16:9", "21:9"] },
+    {
+      name: "style_preset",
+      values: [
+        "wabi-sabi",
+        "abstract-expression",
+        "botanical",
+        "vintage-poster",
+        "minimalist",
+        "geometric",
+        "watercolor",
+        "line-art",
+        "pop-art",
+        "surrealism",
+      ],
+    },
+    { name: "moderation_status", values: ["pending", "approved", "rejected", "flagged"] },
   ];
 
   for (const enumDef of enums) {
-    const values = enumDef.values.map(v => `'${v}'`).join(', ');
+    const values = enumDef.values.map((v) => `'${v}'`).join(", ");
     await sql.unsafe(`
       DO $$ BEGIN
         CREATE TYPE ${enumDef.name} AS ENUM (${values});
@@ -265,13 +299,15 @@ async function runMigrations(sql: ReturnType<typeof postgres>) {
 
 beforeAll(async () => {
   if (SKIP_TESTS) {
-    console.log('⏭️  Skipping database migration tests (SKIP_DB_RUNTIME_TESTS=true)');
+    console.log("⏭️  Skipping database migration tests (SKIP_DB_RUNTIME_TESTS=true)");
     return;
   }
 
   try {
     // Use test database URL or fall back to development
-    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    const databaseUrl =
+      process.env.DATABASE_URL ||
+      "postgresql://poster_app:dev_password@localhost:5433/poster_app_test";
     client = postgres(databaseUrl, {
       max: 1,
       connect_timeout: 5,
@@ -284,9 +320,9 @@ beforeAll(async () => {
 
     // Run migrations to set up the database
     await runMigrations(client!);
-    console.log('✅ Database connection established and migrations applied');
+    console.log("✅ Database connection established and migrations applied");
   } catch (error) {
-    console.log('⚠️  Database not available, migration runtime tests will be skipped');
+    console.log("⚠️  Database not available, migration runtime tests will be skipped");
     isDatabaseAvailable = false;
     if (client) {
       try {
@@ -313,107 +349,107 @@ afterAll(async () => {
 // Drizzle Configuration Tests (No Database Required)
 // ============================================================================
 
-describe('Drizzle Configuration', () => {
-  describe('drizzle.config.ts', () => {
-    it('should exist at API package root', () => {
+describe("Drizzle Configuration", () => {
+  describe("drizzle.config.ts", () => {
+    it("should exist at API package root", () => {
       expect(existsSync(DRIZZLE_CONFIG_PATH)).toBe(true);
     });
 
-    it('should be a file (not directory)', () => {
+    it("should be a file (not directory)", () => {
       const stats = statSync(DRIZZLE_CONFIG_PATH);
       expect(stats.isFile()).toBe(true);
     });
 
-    it('should have non-empty content', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
+    it("should have non-empty content", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
       expect(content.length).toBeGreaterThan(0);
     });
 
-    it('should define config using defineConfig', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
-      expect(content).toContain('defineConfig');
+    it("should define config using defineConfig", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
+      expect(content).toContain("defineConfig");
     });
 
-    it('should specify schema location', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
-      expect(content).toContain('schema:');
-      expect(content).toContain('./src/database/schema');
+    it("should specify schema location", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
+      expect(content).toContain("schema:");
+      expect(content).toContain("./src/database/schema");
     });
 
-    it('should specify migrations output directory', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
-      expect(content).toContain('out:');
-      expect(content).toContain('./src/database/migrations');
+    it("should specify migrations output directory", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
+      expect(content).toContain("out:");
+      expect(content).toContain("./src/database/migrations");
     });
 
-    it('should specify postgresql dialect', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
-      expect(content).toContain('dialect:');
-      expect(content).toContain('postgresql');
+    it("should specify postgresql dialect", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
+      expect(content).toContain("dialect:");
+      expect(content).toContain("postgresql");
     });
 
-    it('should specify database credentials from environment', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
-      expect(content).toContain('dbCredentials');
-      expect(content).toContain('DATABASE_URL');
+    it("should specify database credentials from environment", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
+      expect(content).toContain("dbCredentials");
+      expect(content).toContain("DATABASE_URL");
     });
 
-    it('should have strict mode enabled', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
-      expect(content).toContain('strict:');
-      expect(content).toContain('true');
+    it("should have strict mode enabled", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
+      expect(content).toContain("strict:");
+      expect(content).toContain("true");
     });
 
-    it('should have verbose mode enabled for debugging', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
-      expect(content).toContain('verbose:');
-      expect(content).toContain('true');
+    it("should have verbose mode enabled for debugging", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
+      expect(content).toContain("verbose:");
+      expect(content).toContain("true");
     });
 
-    it('should specify casing convention', () => {
-      const content = readFileSync(DRIZZLE_CONFIG_PATH, 'utf-8');
-      expect(content).toContain('casing:');
-      expect(content).toContain('snake_case');
+    it("should specify casing convention", () => {
+      const content = readFileSync(DRIZZLE_CONFIG_PATH, "utf-8");
+      expect(content).toContain("casing:");
+      expect(content).toContain("snake_case");
     });
   });
 
-  describe('Package Scripts', () => {
-    it('should have db:generate script', () => {
-      const packageJson = JSON.parse(readFileSync(join(API_ROOT, 'package.json'), 'utf-8'));
-      expect(packageJson.scripts).toHaveProperty('db:generate');
-      expect(packageJson.scripts['db:generate']).toContain('drizzle-kit');
-      expect(packageJson.scripts['db:generate']).toContain('generate');
+  describe("Package Scripts", () => {
+    it("should have db:generate script", () => {
+      const packageJson = JSON.parse(readFileSync(join(API_ROOT, "package.json"), "utf-8"));
+      expect(packageJson.scripts).toHaveProperty("db:generate");
+      expect(packageJson.scripts["db:generate"]).toContain("drizzle-kit");
+      expect(packageJson.scripts["db:generate"]).toContain("generate");
     });
 
-    it('should have db:migrate script', () => {
-      const packageJson = JSON.parse(readFileSync(join(API_ROOT, 'package.json'), 'utf-8'));
-      expect(packageJson.scripts).toHaveProperty('db:migrate');
-      expect(packageJson.scripts['db:migrate']).toContain('drizzle-kit');
-      expect(packageJson.scripts['db:migrate']).toContain('migrate');
+    it("should have db:migrate script", () => {
+      const packageJson = JSON.parse(readFileSync(join(API_ROOT, "package.json"), "utf-8"));
+      expect(packageJson.scripts).toHaveProperty("db:migrate");
+      expect(packageJson.scripts["db:migrate"]).toContain("drizzle-kit");
+      expect(packageJson.scripts["db:migrate"]).toContain("migrate");
     });
 
-    it('should have db:push script', () => {
-      const packageJson = JSON.parse(readFileSync(join(API_ROOT, 'package.json'), 'utf-8'));
-      expect(packageJson.scripts).toHaveProperty('db:push');
-      expect(packageJson.scripts['db:push']).toContain('drizzle-kit');
-      expect(packageJson.scripts['db:push']).toContain('push');
+    it("should have db:push script", () => {
+      const packageJson = JSON.parse(readFileSync(join(API_ROOT, "package.json"), "utf-8"));
+      expect(packageJson.scripts).toHaveProperty("db:push");
+      expect(packageJson.scripts["db:push"]).toContain("drizzle-kit");
+      expect(packageJson.scripts["db:push"]).toContain("push");
     });
 
-    it('should have db:studio script', () => {
-      const packageJson = JSON.parse(readFileSync(join(API_ROOT, 'package.json'), 'utf-8'));
-      expect(packageJson.scripts).toHaveProperty('db:studio');
-      expect(packageJson.scripts['db:studio']).toContain('drizzle-kit');
-      expect(packageJson.scripts['db:studio']).toContain('studio');
+    it("should have db:studio script", () => {
+      const packageJson = JSON.parse(readFileSync(join(API_ROOT, "package.json"), "utf-8"));
+      expect(packageJson.scripts).toHaveProperty("db:studio");
+      expect(packageJson.scripts["db:studio"]).toContain("drizzle-kit");
+      expect(packageJson.scripts["db:studio"]).toContain("studio");
     });
 
-    it('should have drizzle-kit as devDependency', () => {
-      const packageJson = JSON.parse(readFileSync(join(API_ROOT, 'package.json'), 'utf-8'));
-      expect(packageJson.devDependencies).toHaveProperty('drizzle-kit');
+    it("should have drizzle-kit as devDependency", () => {
+      const packageJson = JSON.parse(readFileSync(join(API_ROOT, "package.json"), "utf-8"));
+      expect(packageJson.devDependencies).toHaveProperty("drizzle-kit");
     });
 
-    it('should have drizzle-orm as dependency', () => {
-      const packageJson = JSON.parse(readFileSync(join(API_ROOT, 'package.json'), 'utf-8'));
-      expect(packageJson.dependencies).toHaveProperty('drizzle-orm');
+    it("should have drizzle-orm as dependency", () => {
+      const packageJson = JSON.parse(readFileSync(join(API_ROOT, "package.json"), "utf-8"));
+      expect(packageJson.dependencies).toHaveProperty("drizzle-orm");
     });
   });
 });
@@ -422,65 +458,65 @@ describe('Drizzle Configuration', () => {
 // Schema Directory Structure Tests (No Database Required)
 // ============================================================================
 
-describe('Schema Directory Structure', () => {
-  describe('Schema Directory', () => {
-    it('should exist', () => {
+describe("Schema Directory Structure", () => {
+  describe("Schema Directory", () => {
+    it("should exist", () => {
       expect(existsSync(SCHEMA_DIR)).toBe(true);
     });
 
-    it('should be a directory', () => {
+    it("should be a directory", () => {
       const stats = statSync(SCHEMA_DIR);
       expect(stats.isDirectory()).toBe(true);
     });
 
-    it('should have index.ts file', () => {
-      expect(existsSync(join(SCHEMA_DIR, 'index.ts'))).toBe(true);
+    it("should have index.ts file", () => {
+      expect(existsSync(join(SCHEMA_DIR, "index.ts"))).toBe(true);
     });
 
-    it('should have products.ts schema file', () => {
-      expect(existsSync(join(SCHEMA_DIR, 'products.ts'))).toBe(true);
+    it("should have products.ts schema file", () => {
+      expect(existsSync(join(SCHEMA_DIR, "products.ts"))).toBe(true);
     });
 
-    it('should have users.ts schema file', () => {
-      expect(existsSync(join(SCHEMA_DIR, 'users.ts'))).toBe(true);
+    it("should have users.ts schema file", () => {
+      expect(existsSync(join(SCHEMA_DIR, "users.ts"))).toBe(true);
     });
 
-    it('should have orders.ts schema file', () => {
-      expect(existsSync(join(SCHEMA_DIR, 'orders.ts'))).toBe(true);
+    it("should have orders.ts schema file", () => {
+      expect(existsSync(join(SCHEMA_DIR, "orders.ts"))).toBe(true);
     });
 
-    it('should have cart.ts schema file', () => {
-      expect(existsSync(join(SCHEMA_DIR, 'cart.ts'))).toBe(true);
+    it("should have cart.ts schema file", () => {
+      expect(existsSync(join(SCHEMA_DIR, "cart.ts"))).toBe(true);
     });
 
-    it('should have ai-generations.ts schema file', () => {
-      expect(existsSync(join(SCHEMA_DIR, 'ai-generations.ts'))).toBe(true);
+    it("should have ai-generations.ts schema file", () => {
+      expect(existsSync(join(SCHEMA_DIR, "ai-generations.ts"))).toBe(true);
     });
   });
 
-  describe('Migrations Directory (when exists)', () => {
-    it('should check if migrations directory exists', () => {
+  describe("Migrations Directory (when exists)", () => {
+    it("should check if migrations directory exists", () => {
       const exists = existsSync(MIGRATIONS_DIR);
       if (exists) {
-        console.log('✅ Migrations directory exists at:', MIGRATIONS_DIR);
+        console.log("✅ Migrations directory exists at:", MIGRATIONS_DIR);
         const stats = statSync(MIGRATIONS_DIR);
         expect(stats.isDirectory()).toBe(true);
         const files = readdirSync(MIGRATIONS_DIR);
         console.log(`   Found ${files.length} migration files`);
       } else {
-        console.log('ℹ️  Migrations directory does not exist (using db:push mode)');
+        console.log("ℹ️  Migrations directory does not exist (using db:push mode)");
       }
       expect(true).toBe(true);
     });
 
-    it('should validate migration files if directory exists', () => {
+    it("should validate migration files if directory exists", () => {
       if (!existsSync(MIGRATIONS_DIR)) {
-        console.log('ℹ️  Skipping - migrations directory does not exist');
+        console.log("ℹ️  Skipping - migrations directory does not exist");
         return;
       }
       const files = readdirSync(MIGRATIONS_DIR);
-      const sqlFiles = files.filter(f => f.endsWith('.sql'));
-      const metaDir = join(MIGRATIONS_DIR, 'meta');
+      const sqlFiles = files.filter((f) => f.endsWith(".sql"));
+      const metaDir = join(MIGRATIONS_DIR, "meta");
       if (sqlFiles.length > 0) {
         console.log(`✅ Found ${sqlFiles.length} SQL migration files`);
         if (existsSync(metaDir)) {
@@ -497,9 +533,9 @@ describe('Schema Directory Structure', () => {
 // Database Migration Runtime Tests (Require Database)
 // ============================================================================
 
-describe('Database Migrations', () => {
-  describe('Database Extensions', () => {
-    it.skipIf(shouldSkip())('should have uuid-ossp extension enabled', async () => {
+describe("Database Migrations", () => {
+  describe("Database Extensions", () => {
+    it.skipIf(shouldSkip())("should have uuid-ossp extension enabled", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_extension WHERE extname = 'uuid-ossp'
@@ -508,16 +544,18 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should be able to generate UUIDs', async () => {
+    it.skipIf(shouldSkip())("should be able to generate UUIDs", async () => {
       const result = await client!`SELECT gen_random_uuid() as id`;
       expect(result[0].id).toBeDefined();
-      expect(typeof result[0].id).toBe('string');
-      expect(result[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(typeof result[0].id).toBe("string");
+      expect(result[0].id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
     });
   });
 
-  describe('Enum Types', () => {
-    it.skipIf(shouldSkip())('should have product_status enum', async () => {
+  describe("Enum Types", () => {
+    it.skipIf(shouldSkip())("should have product_status enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'product_status'
@@ -526,7 +564,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have product_orientation enum', async () => {
+    it.skipIf(shouldSkip())("should have product_orientation enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'product_orientation'
@@ -535,7 +573,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have user_role enum', async () => {
+    it.skipIf(shouldSkip())("should have user_role enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'user_role'
@@ -544,7 +582,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have order_status enum', async () => {
+    it.skipIf(shouldSkip())("should have order_status enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'order_status'
@@ -553,7 +591,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have payment_status enum', async () => {
+    it.skipIf(shouldSkip())("should have payment_status enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'payment_status'
@@ -562,7 +600,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have payment_method enum', async () => {
+    it.skipIf(shouldSkip())("should have payment_method enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'payment_method'
@@ -571,7 +609,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have address_type enum', async () => {
+    it.skipIf(shouldSkip())("should have address_type enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'address_type'
@@ -580,7 +618,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have ai_generation_status enum', async () => {
+    it.skipIf(shouldSkip())("should have ai_generation_status enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'ai_generation_status'
@@ -589,7 +627,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have ai_model enum', async () => {
+    it.skipIf(shouldSkip())("should have ai_model enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'ai_model'
@@ -598,7 +636,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have aspect_ratio enum', async () => {
+    it.skipIf(shouldSkip())("should have aspect_ratio enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'aspect_ratio'
@@ -607,7 +645,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have style_preset enum', async () => {
+    it.skipIf(shouldSkip())("should have style_preset enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'style_preset'
@@ -616,7 +654,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have moderation_status enum', async () => {
+    it.skipIf(shouldSkip())("should have moderation_status enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'moderation_status'
@@ -625,7 +663,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have trade_account_status enum', async () => {
+    it.skipIf(shouldSkip())("should have trade_account_status enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'trade_account_status'
@@ -634,7 +672,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have photo_approval_status enum', async () => {
+    it.skipIf(shouldSkip())("should have photo_approval_status enum", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM pg_type WHERE typname = 'photo_approval_status'
@@ -644,8 +682,8 @@ describe('Database Migrations', () => {
     });
   });
 
-  describe('Core Tables', () => {
-    it.skipIf(shouldSkip())('should have products table', async () => {
+  describe("Core Tables", () => {
+    it.skipIf(shouldSkip())("should have products table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -655,7 +693,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have product_variants table', async () => {
+    it.skipIf(shouldSkip())("should have product_variants table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -665,7 +703,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have frames table', async () => {
+    it.skipIf(shouldSkip())("should have frames table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -675,7 +713,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have users table', async () => {
+    it.skipIf(shouldSkip())("should have users table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -685,7 +723,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have addresses table', async () => {
+    it.skipIf(shouldSkip())("should have addresses table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -695,7 +733,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have sessions table', async () => {
+    it.skipIf(shouldSkip())("should have sessions table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -705,7 +743,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have orders table', async () => {
+    it.skipIf(shouldSkip())("should have orders table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -715,7 +753,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have order_items table', async () => {
+    it.skipIf(shouldSkip())("should have order_items table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -725,7 +763,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have cart_items table', async () => {
+    it.skipIf(shouldSkip())("should have cart_items table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -735,7 +773,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have ai_generations table', async () => {
+    it.skipIf(shouldSkip())("should have ai_generations table", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.tables
@@ -746,8 +784,8 @@ describe('Database Migrations', () => {
     });
   });
 
-  describe('Products Table Structure', () => {
-    it.skipIf(shouldSkip())('should have all required columns', async () => {
+  describe("Products Table Structure", () => {
+    it.skipIf(shouldSkip())("should have all required columns", async () => {
       const result = await client!`
         SELECT column_name, data_type, is_nullable, column_default
         FROM information_schema.columns
@@ -755,28 +793,28 @@ describe('Database Migrations', () => {
         ORDER BY ordinal_position
       `;
 
-      const columns = result.map(r => r.column_name);
-      expect(columns).toContain('id');
-      expect(columns).toContain('sku');
-      expect(columns).toContain('title');
-      expect(columns).toContain('slug');
-      expect(columns).toContain('description');
-      expect(columns).toContain('base_price');
-      expect(columns).toContain('styles');
-      expect(columns).toContain('subjects');
-      expect(columns).toContain('colors');
-      expect(columns).toContain('orientation');
-      expect(columns).toContain('artist_id');
-      expect(columns).toContain('images');
-      expect(columns).toContain('seo_title');
-      expect(columns).toContain('seo_description');
-      expect(columns).toContain('status');
-      expect(columns).toContain('featured_order');
-      expect(columns).toContain('created_at');
-      expect(columns).toContain('updated_at');
+      const columns = result.map((r) => r.column_name);
+      expect(columns).toContain("id");
+      expect(columns).toContain("sku");
+      expect(columns).toContain("title");
+      expect(columns).toContain("slug");
+      expect(columns).toContain("description");
+      expect(columns).toContain("base_price");
+      expect(columns).toContain("styles");
+      expect(columns).toContain("subjects");
+      expect(columns).toContain("colors");
+      expect(columns).toContain("orientation");
+      expect(columns).toContain("artist_id");
+      expect(columns).toContain("images");
+      expect(columns).toContain("seo_title");
+      expect(columns).toContain("seo_description");
+      expect(columns).toContain("status");
+      expect(columns).toContain("featured_order");
+      expect(columns).toContain("created_at");
+      expect(columns).toContain("updated_at");
     });
 
-    it.skipIf(shouldSkip())('should have unique constraint on sku', async () => {
+    it.skipIf(shouldSkip())("should have unique constraint on sku", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints
@@ -788,7 +826,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have unique constraint on slug', async () => {
+    it.skipIf(shouldSkip())("should have unique constraint on slug", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints
@@ -800,7 +838,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have primary key on id', async () => {
+    it.skipIf(shouldSkip())("should have primary key on id", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints
@@ -812,8 +850,8 @@ describe('Database Migrations', () => {
     });
   });
 
-  describe('Users Table Structure', () => {
-    it.skipIf(shouldSkip())('should have all required columns', async () => {
+  describe("Users Table Structure", () => {
+    it.skipIf(shouldSkip())("should have all required columns", async () => {
       const result = await client!`
         SELECT column_name
         FROM information_schema.columns
@@ -821,22 +859,22 @@ describe('Database Migrations', () => {
         ORDER BY ordinal_position
       `;
 
-      const columns = result.map(r => r.column_name);
-      expect(columns).toContain('id');
-      expect(columns).toContain('email');
-      expect(columns).toContain('name');
-      expect(columns).toContain('phone');
-      expect(columns).toContain('password_hash');
-      expect(columns).toContain('role');
-      expect(columns).toContain('email_verified');
-      expect(columns).toContain('phone_verified');
-      expect(columns).toContain('avatar_url');
-      expect(columns).toContain('preferences');
-      expect(columns).toContain('created_at');
-      expect(columns).toContain('updated_at');
+      const columns = result.map((r) => r.column_name);
+      expect(columns).toContain("id");
+      expect(columns).toContain("email");
+      expect(columns).toContain("name");
+      expect(columns).toContain("phone");
+      expect(columns).toContain("password_hash");
+      expect(columns).toContain("role");
+      expect(columns).toContain("email_verified");
+      expect(columns).toContain("phone_verified");
+      expect(columns).toContain("avatar_url");
+      expect(columns).toContain("preferences");
+      expect(columns).toContain("created_at");
+      expect(columns).toContain("updated_at");
     });
 
-    it.skipIf(shouldSkip())('should have unique constraint on email', async () => {
+    it.skipIf(shouldSkip())("should have unique constraint on email", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints
@@ -849,8 +887,8 @@ describe('Database Migrations', () => {
     });
   });
 
-  describe('Orders Table Structure', () => {
-    it.skipIf(shouldSkip())('should have all required columns', async () => {
+  describe("Orders Table Structure", () => {
+    it.skipIf(shouldSkip())("should have all required columns", async () => {
       const result = await client!`
         SELECT column_name
         FROM information_schema.columns
@@ -858,24 +896,24 @@ describe('Database Migrations', () => {
         ORDER BY ordinal_position
       `;
 
-      const columns = result.map(r => r.column_name);
-      expect(columns).toContain('id');
-      expect(columns).toContain('user_id');
-      expect(columns).toContain('order_number');
-      expect(columns).toContain('status');
-      expect(columns).toContain('subtotal');
-      expect(columns).toContain('tax');
-      expect(columns).toContain('shipping_cost');
-      expect(columns).toContain('discount');
-      expect(columns).toContain('total');
-      expect(columns).toContain('payment_status');
-      expect(columns).toContain('payment_method');
-      expect(columns).toContain('payment_id');
-      expect(columns).toContain('shipping_address');
-      expect(columns).toContain('billing_address');
+      const columns = result.map((r) => r.column_name);
+      expect(columns).toContain("id");
+      expect(columns).toContain("user_id");
+      expect(columns).toContain("order_number");
+      expect(columns).toContain("status");
+      expect(columns).toContain("subtotal");
+      expect(columns).toContain("tax");
+      expect(columns).toContain("shipping_cost");
+      expect(columns).toContain("discount");
+      expect(columns).toContain("total");
+      expect(columns).toContain("payment_status");
+      expect(columns).toContain("payment_method");
+      expect(columns).toContain("payment_id");
+      expect(columns).toContain("shipping_address");
+      expect(columns).toContain("billing_address");
     });
 
-    it.skipIf(shouldSkip())('should have unique constraint on order_number', async () => {
+    it.skipIf(shouldSkip())("should have unique constraint on order_number", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints
@@ -888,9 +926,11 @@ describe('Database Migrations', () => {
     });
   });
 
-  describe('Foreign Key Relationships', () => {
-    it.skipIf(shouldSkip())('should have foreign key from product_variants to products', async () => {
-      const result = await client!`
+  describe("Foreign Key Relationships", () => {
+    it.skipIf(shouldSkip())(
+      "should have foreign key from product_variants to products",
+      async () => {
+        const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
           JOIN information_schema.constraint_column_usage ccu
@@ -900,10 +940,11 @@ describe('Database Migrations', () => {
           AND ccu.table_name = 'products'
         ) as exists
       `;
-      expect(result[0].exists).toBe(true);
-    });
+        expect(result[0].exists).toBe(true);
+      }
+    );
 
-    it.skipIf(shouldSkip())('should have foreign key from addresses to users', async () => {
+    it.skipIf(shouldSkip())("should have foreign key from addresses to users", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
@@ -917,7 +958,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have foreign key from sessions to users', async () => {
+    it.skipIf(shouldSkip())("should have foreign key from sessions to users", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
@@ -931,7 +972,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have foreign key from orders to users', async () => {
+    it.skipIf(shouldSkip())("should have foreign key from orders to users", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
@@ -945,7 +986,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have foreign key from order_items to orders', async () => {
+    it.skipIf(shouldSkip())("should have foreign key from order_items to orders", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
@@ -959,7 +1000,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have foreign key from order_items to products', async () => {
+    it.skipIf(shouldSkip())("should have foreign key from order_items to products", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
@@ -973,7 +1014,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have foreign key from cart_items to users', async () => {
+    it.skipIf(shouldSkip())("should have foreign key from cart_items to users", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
@@ -987,7 +1028,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have foreign key from cart_items to products', async () => {
+    it.skipIf(shouldSkip())("should have foreign key from cart_items to products", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
@@ -1001,7 +1042,7 @@ describe('Database Migrations', () => {
       expect(result[0].exists).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have foreign key from ai_generations to users', async () => {
+    it.skipIf(shouldSkip())("should have foreign key from ai_generations to users", async () => {
       const result = await client!`
         SELECT EXISTS (
           SELECT 1 FROM information_schema.table_constraints tc
@@ -1016,90 +1057,90 @@ describe('Database Migrations', () => {
     });
   });
 
-  describe('Data Types', () => {
-    it.skipIf(shouldSkip())('should use UUID for primary keys', async () => {
+  describe("Data Types", () => {
+    it.skipIf(shouldSkip())("should use UUID for primary keys", async () => {
       const result = await client!`
         SELECT column_name, data_type
         FROM information_schema.columns
         WHERE table_name = 'products' AND column_name = 'id'
       `;
-      expect(result[0].data_type).toBe('uuid');
+      expect(result[0].data_type).toBe("uuid");
     });
 
-    it.skipIf(shouldSkip())('should use JSONB for JSON columns', async () => {
+    it.skipIf(shouldSkip())("should use JSONB for JSON columns", async () => {
       const result = await client!`
         SELECT column_name, data_type
         FROM information_schema.columns
         WHERE table_name = 'products' AND column_name = 'styles'
       `;
-      expect(result[0].data_type).toBe('jsonb');
+      expect(result[0].data_type).toBe("jsonb");
     });
 
-    it.skipIf(shouldSkip())('should use DECIMAL for monetary values', async () => {
+    it.skipIf(shouldSkip())("should use DECIMAL for monetary values", async () => {
       const result = await client!`
         SELECT column_name, data_type, numeric_precision, numeric_scale
         FROM information_schema.columns
         WHERE table_name = 'products' AND column_name = 'base_price'
       `;
-      expect(result[0].data_type).toBe('numeric');
+      expect(result[0].data_type).toBe("numeric");
       expect(result[0].numeric_precision).toBe(10);
       expect(result[0].numeric_scale).toBe(2);
     });
 
-    it.skipIf(shouldSkip())('should use TIMESTAMP for date/time columns', async () => {
+    it.skipIf(shouldSkip())("should use TIMESTAMP for date/time columns", async () => {
       const result = await client!`
         SELECT column_name, data_type
         FROM information_schema.columns
         WHERE table_name = 'products' AND column_name = 'created_at'
       `;
-      expect(result[0].data_type).toBe('timestamp without time zone');
+      expect(result[0].data_type).toBe("timestamp without time zone");
     });
   });
 
-  describe('Default Values', () => {
-    it.skipIf(shouldSkip())('should have default for created_at', async () => {
+  describe("Default Values", () => {
+    it.skipIf(shouldSkip())("should have default for created_at", async () => {
       const result = await client!`
         SELECT column_default
         FROM information_schema.columns
         WHERE table_name = 'products' AND column_name = 'created_at'
       `;
       expect(result[0].column_default).toBeTruthy();
-      expect(result[0].column_default).toContain('now()');
+      expect(result[0].column_default).toContain("now()");
     });
 
-    it.skipIf(shouldSkip())('should have default for updated_at', async () => {
+    it.skipIf(shouldSkip())("should have default for updated_at", async () => {
       const result = await client!`
         SELECT column_default
         FROM information_schema.columns
         WHERE table_name = 'products' AND column_name = 'updated_at'
       `;
       expect(result[0].column_default).toBeTruthy();
-      expect(result[0].column_default).toContain('now()');
+      expect(result[0].column_default).toContain("now()");
     });
 
-    it.skipIf(shouldSkip())('should have default for user role', async () => {
+    it.skipIf(shouldSkip())("should have default for user role", async () => {
       const result = await client!`
         SELECT column_default
         FROM information_schema.columns
         WHERE table_name = 'users' AND column_name = 'role'
       `;
       expect(result[0].column_default).toBeTruthy();
-      expect(result[0].column_default).toContain('customer');
+      expect(result[0].column_default).toContain("customer");
     });
 
-    it.skipIf(shouldSkip())('should have default for product status', async () => {
+    it.skipIf(shouldSkip())("should have default for product status", async () => {
       const result = await client!`
         SELECT column_default
         FROM information_schema.columns
         WHERE table_name = 'products' AND column_name = 'status'
       `;
       expect(result[0].column_default).toBeTruthy();
-      expect(result[0].column_default).toContain('draft');
+      expect(result[0].column_default).toContain("draft");
     });
   });
 
-  describe('Cascade Behavior', () => {
-    it.skipIf(shouldSkip())('should have CASCADE delete for product_variants', async () => {
+  describe("Cascade Behavior", () => {
+    it.skipIf(shouldSkip())("should have CASCADE delete for product_variants", async () => {
       const result = await client!`
         SELECT rc.delete_rule
         FROM information_schema.referential_constraints rc
@@ -1108,10 +1149,10 @@ describe('Database Migrations', () => {
         WHERE tc.table_name = 'product_variants'
         AND tc.constraint_type = 'FOREIGN KEY'
       `;
-      expect(result.some(r => r.delete_rule === 'CASCADE')).toBe(true);
+      expect(result.some((r) => r.delete_rule === "CASCADE")).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have CASCADE delete for addresses', async () => {
+    it.skipIf(shouldSkip())("should have CASCADE delete for addresses", async () => {
       const result = await client!`
         SELECT rc.delete_rule
         FROM information_schema.referential_constraints rc
@@ -1120,10 +1161,10 @@ describe('Database Migrations', () => {
         WHERE tc.table_name = 'addresses'
         AND tc.constraint_type = 'FOREIGN KEY'
       `;
-      expect(result.some(r => r.delete_rule === 'CASCADE')).toBe(true);
+      expect(result.some((r) => r.delete_rule === "CASCADE")).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should have CASCADE delete for sessions', async () => {
+    it.skipIf(shouldSkip())("should have CASCADE delete for sessions", async () => {
       const result = await client!`
         SELECT rc.delete_rule
         FROM information_schema.referential_constraints rc
@@ -1132,12 +1173,12 @@ describe('Database Migrations', () => {
         WHERE tc.table_name = 'sessions'
         AND tc.constraint_type = 'FOREIGN KEY'
       `;
-      expect(result.some(r => r.delete_rule === 'CASCADE')).toBe(true);
+      expect(result.some((r) => r.delete_rule === "CASCADE")).toBe(true);
     });
   });
 
-  describe('Schema Integrity', () => {
-    it.skipIf(shouldSkip())('should have consistent table count', async () => {
+  describe("Schema Integrity", () => {
+    it.skipIf(shouldSkip())("should have consistent table count", async () => {
       const result = await client!`
         SELECT COUNT(*) as count
         FROM information_schema.tables
@@ -1148,7 +1189,7 @@ describe('Database Migrations', () => {
       expect(Number(result[0].count)).toBeGreaterThanOrEqual(10);
     });
 
-    it.skipIf(shouldSkip())('should have consistent enum count', async () => {
+    it.skipIf(shouldSkip())("should have consistent enum count", async () => {
       const result = await client!`
         SELECT COUNT(*) as count
         FROM pg_type
@@ -1164,7 +1205,7 @@ describe('Database Migrations', () => {
       expect(Number(result[0].count)).toBeGreaterThanOrEqual(14);
     });
 
-    it.skipIf(shouldSkip())('should have foreign key constraints', async () => {
+    it.skipIf(shouldSkip())("should have foreign key constraints", async () => {
       const result = await client!`
         SELECT COUNT(*) as count
         FROM information_schema.table_constraints
@@ -1175,7 +1216,7 @@ describe('Database Migrations', () => {
       expect(Number(result[0].count)).toBeGreaterThanOrEqual(9);
     });
 
-    it.skipIf(shouldSkip())('should have unique constraints', async () => {
+    it.skipIf(shouldSkip())("should have unique constraints", async () => {
       const result = await client!`
         SELECT COUNT(*) as count
         FROM information_schema.table_constraints
@@ -1187,8 +1228,8 @@ describe('Database Migrations', () => {
     });
   });
 
-  describe('Migration Idempotency', () => {
-    it.skipIf(shouldSkip())('should be able to check table existence without errors', async () => {
+  describe("Migration Idempotency", () => {
+    it.skipIf(shouldSkip())("should be able to check table existence without errors", async () => {
       const checkTable = async (tableName: string) => {
         const result = await client!`
           SELECT EXISTS (
@@ -1199,12 +1240,12 @@ describe('Database Migrations', () => {
         return result[0].exists;
       };
 
-      expect(await checkTable('products')).toBe(true);
-      expect(await checkTable('users')).toBe(true);
-      expect(await checkTable('orders')).toBe(true);
+      expect(await checkTable("products")).toBe(true);
+      expect(await checkTable("users")).toBe(true);
+      expect(await checkTable("orders")).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should be able to check enum existence without errors', async () => {
+    it.skipIf(shouldSkip())("should be able to check enum existence without errors", async () => {
       const checkEnum = async (enumName: string) => {
         const result = await client!`
           SELECT EXISTS (
@@ -1214,22 +1255,22 @@ describe('Database Migrations', () => {
         return result[0].exists;
       };
 
-      expect(await checkEnum('product_status')).toBe(true);
-      expect(await checkEnum('user_role')).toBe(true);
-      expect(await checkEnum('order_status')).toBe(true);
+      expect(await checkEnum("product_status")).toBe(true);
+      expect(await checkEnum("user_role")).toBe(true);
+      expect(await checkEnum("order_status")).toBe(true);
     });
   });
 
-  describe('Database Health', () => {
-    it.skipIf(shouldSkip())('should be able to perform basic queries', async () => {
+  describe("Database Health", () => {
+    it.skipIf(shouldSkip())("should be able to perform basic queries", async () => {
       const result = await client!`SELECT 1 as result`;
       expect(result[0].result).toBe(1);
     });
 
-    it.skipIf(shouldSkip())('should have proper transaction support', async () => {
+    it.skipIf(shouldSkip())("should have proper transaction support", async () => {
       let success = false;
       try {
-        await client!.begin(async sql => {
+        await client!.begin(async (sql) => {
           await sql`SELECT 1`;
           success = true;
         });
@@ -1239,7 +1280,7 @@ describe('Database Migrations', () => {
       expect(success).toBe(true);
     });
 
-    it.skipIf(shouldSkip())('should support concurrent queries', async () => {
+    it.skipIf(shouldSkip())("should support concurrent queries", async () => {
       const queries = [
         client!`SELECT 1 as result`,
         client!`SELECT 2 as result`,

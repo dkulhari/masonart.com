@@ -7,53 +7,53 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
-import { MessageSquare, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { StarRating } from './StarRating'
+import { useState, useCallback } from "react";
+import { MessageSquare, Loader2, CheckCircle, AlertCircle, X } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { StarRating } from "./StarRating";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ReviewFormData {
-  rating: number
-  title: string
-  content: string
+  rating: number;
+  title: string;
+  content: string;
 }
 
 export interface ReviewFormErrors {
-  rating?: string
-  title?: string
-  content?: string
+  rating?: string;
+  title?: string;
+  content?: string;
 }
 
 export interface ReviewFormProps {
   /** Product ID - only used for display, not for API calls */
-  productId?: string
+  productId?: string;
   /** Callback when form is submitted successfully */
-  onSuccess?: (data: ReviewFormData) => void
+  onSuccess?: (data: ReviewFormData) => void;
   /** Callback when form is cancelled */
-  onCancel?: () => void
+  onCancel?: () => void;
   /** Submit handler - required for modal usage (direct API call deprecated) */
-  onSubmit?: (data: ReviewFormData) => Promise<void>
+  onSubmit?: (data: ReviewFormData) => Promise<void>;
   /** Whether user is authenticated */
-  isAuthenticated?: boolean
+  isAuthenticated?: boolean;
   /** Custom className */
-  className?: string
+  className?: string;
   /** Initial form data (for editing) */
-  initialData?: Partial<ReviewFormData>
+  initialData?: Partial<ReviewFormData>;
   /** Whether to show as modal or inline */
-  variant?: 'modal' | 'inline'
+  variant?: "modal" | "inline";
 }
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const TITLE_MAX_LENGTH = 255
-const CONTENT_MIN_LENGTH = 10
-const CONTENT_MAX_LENGTH = 5000
+const TITLE_MAX_LENGTH = 255;
+const CONTENT_MIN_LENGTH = 10;
+const CONTENT_MAX_LENGTH = 5000;
 
 // ============================================================================
 // Component
@@ -77,144 +77,150 @@ export function ReviewForm({
   isAuthenticated = false,
   className,
   initialData,
-  variant = 'inline',
+  variant = "inline",
 }: ReviewFormProps) {
   // Prop validation warnings
-  if (!onSubmit && typeof productId === 'undefined') {
-    console.warn('ReviewForm: Either onSubmit or productId must be provided')
+  if (!onSubmit && typeof productId === "undefined") {
+    console.warn("ReviewForm: Either onSubmit or productId must be provided");
   }
 
   // Form state
   const [formData, setFormData] = useState<ReviewFormData>({
     rating: initialData?.rating ?? 0,
-    title: initialData?.title ?? '',
-    content: initialData?.content ?? '',
-  })
+    title: initialData?.title ?? "",
+    content: initialData?.content ?? "",
+  });
 
-  const [touched, setTouched] = useState<Record<string, boolean>>({})
-  const [errors, setErrors] = useState<ReviewFormErrors>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<ReviewFormErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Validate form data
   const validateForm = useCallback((data: ReviewFormData): ReviewFormErrors => {
-    const newErrors: ReviewFormErrors = {}
+    const newErrors: ReviewFormErrors = {};
 
     if (data.rating === 0) {
-      newErrors.rating = 'Please select a rating'
+      newErrors.rating = "Please select a rating";
     }
 
     if (data.title && data.title.length > TITLE_MAX_LENGTH) {
-      newErrors.title = `Title must be ${TITLE_MAX_LENGTH} characters or less`
+      newErrors.title = `Title must be ${TITLE_MAX_LENGTH} characters or less`;
     }
 
     if (!data.content.trim()) {
-      newErrors.content = 'Review content is required'
+      newErrors.content = "Review content is required";
     } else if (data.content.trim().length < CONTENT_MIN_LENGTH) {
-      newErrors.content = `Review must be at least ${CONTENT_MIN_LENGTH} characters`
+      newErrors.content = `Review must be at least ${CONTENT_MIN_LENGTH} characters`;
     } else if (data.content.length > CONTENT_MAX_LENGTH) {
-      newErrors.content = `Review must be ${CONTENT_MAX_LENGTH} characters or less`
+      newErrors.content = `Review must be ${CONTENT_MAX_LENGTH} characters or less`;
     }
 
-    return newErrors
-  }, [])
+    return newErrors;
+  }, []);
 
   // Check if form is valid
   const isFormValid = useCallback(() => {
-    const validationErrors = validateForm(formData)
-    return Object.keys(validationErrors).length === 0
-  }, [formData, validateForm])
+    const validationErrors = validateForm(formData);
+    return Object.keys(validationErrors).length === 0;
+  }, [formData, validateForm]);
 
   // Handle rating change
   const handleRatingChange = useCallback((rating: number) => {
-    setFormData((prev) => ({ ...prev, rating }))
-    setTouched((prev) => ({ ...prev, rating: true }))
+    setFormData((prev) => ({ ...prev, rating }));
+    setTouched((prev) => ({ ...prev, rating: true }));
     setErrors((prev) => {
-      const newErrors = { ...prev }
+      const newErrors = { ...prev };
       if (rating > 0) {
-        delete newErrors.rating
+        delete newErrors.rating;
       }
-      return newErrors
-    })
-  }, [])
+      return newErrors;
+    });
+  }, []);
 
   // Handle field change
-  const handleChange = useCallback((field: keyof ReviewFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+  const handleChange = useCallback(
+    (field: keyof ReviewFormData, value: string) => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
 
-    // Clear submit status on change
-    if (submitStatus !== 'idle') {
-      setSubmitStatus('idle')
-      setSubmitError(null)
-    }
-  }, [submitStatus])
+      // Clear submit status on change
+      if (submitStatus !== "idle") {
+        setSubmitStatus("idle");
+        setSubmitError(null);
+      }
+    },
+    [submitStatus]
+  );
 
   // Handle field blur
-  const handleBlur = useCallback((field: keyof ReviewFormData) => {
-    setTouched((prev) => ({ ...prev, [field]: true }))
-    const newErrors = validateForm(formData)
-    setErrors(newErrors)
-  }, [formData, validateForm])
+  const handleBlur = useCallback(
+    (field: keyof ReviewFormData) => {
+      setTouched((prev) => ({ ...prev, [field]: true }));
+      const newErrors = validateForm(formData);
+      setErrors(newErrors);
+    },
+    [formData, validateForm]
+  );
 
   // Get field error (only show if touched)
   const getFieldError = (field: keyof ReviewFormErrors) => {
-    return touched[field] ? errors[field] : undefined
-  }
+    return touched[field] ? errors[field] : undefined;
+  };
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     // Mark all fields as touched
-    setTouched({ rating: true, title: true, content: true })
+    setTouched({ rating: true, title: true, content: true });
 
     // Validate
-    const validationErrors = validateForm(formData)
-    setErrors(validationErrors)
+    const validationErrors = validateForm(formData);
+    setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
-      return
+      return;
     }
 
-    setIsSubmitting(true)
-    setSubmitError(null)
+    setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       if (onSubmit) {
-        await onSubmit(formData)
+        await onSubmit(formData);
       } else {
         // Direct product review creation deprecated - onSubmit required
-        console.warn('ReviewForm: onSubmit prop required - direct product review creation deprecated')
-        throw new Error('Review submission requires onSubmit handler')
+        console.warn(
+          "ReviewForm: onSubmit prop required - direct product review creation deprecated"
+        );
+        throw new Error("Review submission requires onSubmit handler");
       }
 
-      setSubmitStatus('success')
-      onSuccess?.(formData)
+      setSubmitStatus("success");
+      onSuccess?.(formData);
 
       // Reset form after success
       setTimeout(() => {
-        setFormData({ rating: 0, title: '', content: '' })
-        setTouched({})
-        setSubmitStatus('idle')
-      }, 2000)
+        setFormData({ rating: 0, title: "", content: "" });
+        setTouched({});
+        setSubmitStatus("idle");
+      }, 2000);
     } catch (error) {
-      setSubmitStatus('error')
-      setSubmitError(error instanceof Error ? error.message : 'Failed to submit review')
+      setSubmitStatus("error");
+      setSubmitError(error instanceof Error ? error.message : "Failed to submit review");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   // Show login prompt for unauthenticated users
   if (!isAuthenticated) {
     return (
-      <div className={cn('rounded-lg border border-border bg-card p-6', className)}>
+      <div className={cn("rounded-lg border border-border bg-card p-6", className)}>
         <div className="flex flex-col items-center text-center">
           <MessageSquare className="h-10 w-10 text-muted-foreground/50" />
-          <h3 className="mt-4 text-lg font-medium text-foreground">
-            Sign in to write a review
-          </h3>
+          <h3 className="mt-4 text-lg font-medium text-foreground">Sign in to write a review</h3>
           <p className="mt-2 text-sm text-muted-foreground">
             You need to be logged in to share your experience with this product.
           </p>
@@ -226,46 +232,46 @@ export function ReviewForm({
           </a>
         </div>
       </div>
-    )
+    );
   }
 
   // Success state
-  if (submitStatus === 'success') {
+  if (submitStatus === "success") {
     return (
-      <div className={cn('rounded-lg border border-green-200 bg-green-50 p-6', className)}>
+      <div className={cn("rounded-lg border border-green-200 bg-green-50 p-6", className)}>
         <div className="flex flex-col items-center text-center">
           <CheckCircle className="h-10 w-10 text-green-500" />
-          <h3 className="mt-4 text-lg font-medium text-green-900">
-            Thank you for your review!
-          </h3>
+          <h3 className="mt-4 text-lg font-medium text-green-900">Thank you for your review!</h3>
           <p className="mt-2 text-sm text-green-700">
             Your review has been submitted and will be visible after approval.
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-card',
-        variant === 'modal' ? 'p-0' : 'p-6',
+        "rounded-lg border border-border bg-card",
+        variant === "modal" ? "p-0" : "p-6",
         className
       )}
     >
       {/* Header */}
-      <div className={cn(
-        'flex items-center justify-between',
-        variant === 'modal' ? 'border-b border-border px-6 py-4' : 'mb-6'
-      )}>
+      <div
+        className={cn(
+          "flex items-center justify-between",
+          variant === "modal" ? "border-b border-border px-6 py-4" : "mb-6"
+        )}
+      >
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
             <MessageSquare className="h-5 w-5" />
           </div>
           <h2 className="text-lg font-semibold text-foreground">Write a Review</h2>
         </div>
-        {onCancel && variant === 'modal' && (
+        {onCancel && variant === "modal" && (
           <button
             type="button"
             onClick={onCancel}
@@ -278,21 +284,20 @@ export function ReviewForm({
       </div>
 
       {/* Error Banner */}
-      {submitStatus === 'error' && submitError && (
-        <div className={cn(
-          'flex items-center gap-3 border-b border-red-200 bg-red-50 px-6 py-3',
-          variant !== 'modal' && 'mx-0 mb-4 rounded-lg border'
-        )}>
+      {submitStatus === "error" && submitError && (
+        <div
+          className={cn(
+            "flex items-center gap-3 border-b border-red-200 bg-red-50 px-6 py-3",
+            variant !== "modal" && "mx-0 mb-4 rounded-lg border"
+          )}
+        >
           <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
           <p className="text-sm text-red-700">{submitError}</p>
         </div>
       )}
 
       {/* Form */}
-      <form
-        onSubmit={handleSubmit}
-        className={variant === 'modal' ? 'p-6' : ''}
-      >
+      <form onSubmit={handleSubmit} className={variant === "modal" ? "p-6" : ""}>
         <div className="space-y-5">
           {/* Star Rating */}
           <div>
@@ -305,8 +310,8 @@ export function ReviewForm({
               onRatingChange={handleRatingChange}
               size="lg"
             />
-            {getFieldError('rating') && (
-              <p className="mt-1.5 text-xs text-red-500">{getFieldError('rating')}</p>
+            {getFieldError("rating") && (
+              <p className="mt-1.5 text-xs text-red-500">{getFieldError("rating")}</p>
             )}
           </div>
 
@@ -324,20 +329,20 @@ export function ReviewForm({
               type="text"
               id="review-title"
               value={formData.title}
-              onChange={(e) => handleChange('title', e.target.value)}
-              onBlur={() => handleBlur('title')}
+              onChange={(e) => handleChange("title", e.target.value)}
+              onBlur={() => handleBlur("title")}
               placeholder="Summarize your experience"
               maxLength={TITLE_MAX_LENGTH}
               className={cn(
-                'w-full rounded-lg border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-                getFieldError('title')
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-input hover:border-muted-foreground'
+                "w-full rounded-lg border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors",
+                "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                getFieldError("title")
+                  ? "border-red-500 focus:ring-red-500"
+                  : "border-input hover:border-muted-foreground"
               )}
             />
-            {getFieldError('title') && (
-              <p className="mt-1 text-xs text-red-500">{getFieldError('title')}</p>
+            {getFieldError("title") && (
+              <p className="mt-1 text-xs text-red-500">{getFieldError("title")}</p>
             )}
           </div>
 
@@ -349,12 +354,12 @@ export function ReviewForm({
               </label>
               <span
                 className={cn(
-                  'text-xs',
+                  "text-xs",
                   formData.content.length > CONTENT_MAX_LENGTH
-                    ? 'text-red-500'
+                    ? "text-red-500"
                     : formData.content.length < CONTENT_MIN_LENGTH && touched.content
-                      ? 'text-amber-500'
-                      : 'text-muted-foreground'
+                      ? "text-amber-500"
+                      : "text-muted-foreground"
                 )}
               >
                 {formData.content.length}/{CONTENT_MAX_LENGTH}
@@ -363,20 +368,20 @@ export function ReviewForm({
             <textarea
               id="review-content"
               value={formData.content}
-              onChange={(e) => handleChange('content', e.target.value)}
-              onBlur={() => handleBlur('content')}
+              onChange={(e) => handleChange("content", e.target.value)}
+              onBlur={() => handleBlur("content")}
               placeholder="Share your experience with this product..."
               rows={5}
               className={cn(
-                'w-full resize-none rounded-lg border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-                getFieldError('content')
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-input hover:border-muted-foreground'
+                "w-full resize-none rounded-lg border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors",
+                "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                getFieldError("content")
+                  ? "border-red-500 focus:ring-red-500"
+                  : "border-input hover:border-muted-foreground"
               )}
             />
-            {getFieldError('content') && (
-              <p className="mt-1 text-xs text-red-500">{getFieldError('content')}</p>
+            {getFieldError("content") && (
+              <p className="mt-1 text-xs text-red-500">{getFieldError("content")}</p>
             )}
             <p className="mt-1.5 text-xs text-muted-foreground">
               Minimum {CONTENT_MIN_LENGTH} characters required
@@ -385,10 +390,12 @@ export function ReviewForm({
         </div>
 
         {/* Actions */}
-        <div className={cn(
-          'flex items-center gap-3',
-          variant === 'modal' ? 'mt-6 border-t border-border pt-6' : 'mt-6'
-        )}>
+        <div
+          className={cn(
+            "flex items-center gap-3",
+            variant === "modal" ? "mt-6 border-t border-border pt-6" : "mt-6"
+          )}
+        >
           {onCancel && (
             <button
               type="button"
@@ -402,10 +409,10 @@ export function ReviewForm({
             type="submit"
             disabled={isSubmitting || !isFormValid()}
             className={cn(
-              'flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-colors sm:flex-none',
+              "flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-colors sm:flex-none",
               isSubmitting || !isFormValid()
-                ? 'cursor-not-allowed bg-muted text-muted-foreground'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                ? "cursor-not-allowed bg-muted text-muted-foreground"
+                : "bg-primary text-primary-foreground hover:bg-primary/90"
             )}
           >
             {isSubmitting ? (
@@ -414,13 +421,13 @@ export function ReviewForm({
                 Submitting...
               </>
             ) : (
-              'Submit Review'
+              "Submit Review"
             )}
           </button>
         </div>
       </form>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -429,7 +436,7 @@ export function ReviewForm({
 
 export function ReviewFormSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('animate-pulse rounded-lg border border-border bg-card p-6', className)}>
+    <div className={cn("animate-pulse rounded-lg border border-border bg-card p-6", className)}>
       <div className="mb-6 flex items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-muted" />
         <div className="h-6 w-32 rounded bg-muted" />
@@ -460,11 +467,11 @@ export function ReviewFormSkeleton({ className }: { className?: string }) {
         <div className="h-10 w-32 rounded-lg bg-muted" />
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Default Export
 // ============================================================================
 
-export default ReviewForm
+export default ReviewForm;

@@ -9,13 +9,13 @@
  */
 
 // Export all size-related constants and helpers
-export * from './sizes.js';
+export * from "./sizes.js";
 
 // Export all frame-related constants and helpers
-export * from './frames.js';
+export * from "./frames.js";
 
 // Export all style-related constants and helpers
-export * from './styles.js';
+export * from "./styles.js";
 
 // Constants version
-export const CONSTANTS_VERSION = '1.0.0';
+export const CONSTANTS_VERSION = "1.0.0";

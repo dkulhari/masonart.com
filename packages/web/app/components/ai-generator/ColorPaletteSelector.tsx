@@ -11,46 +11,37 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
-import {
-  Palette,
-  Plus,
-  Check,
-  Trash2,
-  Save,
-  X,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { useState, useCallback } from "react";
+import { Palette, Plus, Check, Trash2, Save, X, ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ColorPalette {
-  id: string
-  name: string
-  colors: string[]
-  isSystem?: boolean
-  isDefault?: boolean
+  id: string;
+  name: string;
+  colors: string[];
+  isSystem?: boolean;
+  isDefault?: boolean;
 }
 
 export interface ColorPaletteSelectorProps {
   /** Selected palette colors */
-  selectedColors: string[]
+  selectedColors: string[];
   /** Callback when colors change */
-  onColorsChange: (colors: string[]) => void
+  onColorsChange: (colors: string[]) => void;
   /** User's saved palettes */
-  userPalettes?: ColorPalette[]
+  userPalettes?: ColorPalette[];
   /** Callback when user saves a new palette */
-  onSavePalette?: (name: string, colors: string[]) => void
+  onSavePalette?: (name: string, colors: string[]) => void;
   /** Callback when user deletes a palette */
-  onDeletePalette?: (id: string) => void
+  onDeletePalette?: (id: string) => void;
   /** Whether the selector is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Custom className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -59,57 +50,57 @@ export interface ColorPaletteSelectorProps {
 
 const SYSTEM_PALETTES: ColorPalette[] = [
   {
-    id: 'preset-warm',
-    name: 'Warm',
-    colors: ['#FF5733', '#FFC300', '#FF8D1A', '#FF6B6B', '#FFE66D'],
+    id: "preset-warm",
+    name: "Warm",
+    colors: ["#FF5733", "#FFC300", "#FF8D1A", "#FF6B6B", "#FFE66D"],
     isSystem: true,
   },
   {
-    id: 'preset-cool',
-    name: 'Cool',
-    colors: ['#4A90D9', '#5BC0DE', '#7B68EE', '#20B2AA', '#87CEEB'],
+    id: "preset-cool",
+    name: "Cool",
+    colors: ["#4A90D9", "#5BC0DE", "#7B68EE", "#20B2AA", "#87CEEB"],
     isSystem: true,
   },
   {
-    id: 'preset-neutral',
-    name: 'Neutral',
-    colors: ['#A0A0A0', '#D3D3D3', '#F5F5DC', '#C4B7A6', '#E8E8E8'],
+    id: "preset-neutral",
+    name: "Neutral",
+    colors: ["#A0A0A0", "#D3D3D3", "#F5F5DC", "#C4B7A6", "#E8E8E8"],
     isSystem: true,
   },
   {
-    id: 'preset-vibrant',
-    name: 'Vibrant',
-    colors: ['#FF0080', '#00FF00', '#0080FF', '#FFFF00', '#FF00FF'],
+    id: "preset-vibrant",
+    name: "Vibrant",
+    colors: ["#FF0080", "#00FF00", "#0080FF", "#FFFF00", "#FF00FF"],
     isSystem: true,
   },
   {
-    id: 'preset-muted',
-    name: 'Muted',
-    colors: ['#D4A5A5', '#A8C8A8', '#B8B8D4', '#D4C8A5', '#C8C8C8'],
+    id: "preset-muted",
+    name: "Muted",
+    colors: ["#D4A5A5", "#A8C8A8", "#B8B8D4", "#D4C8A5", "#C8C8C8"],
     isSystem: true,
   },
   {
-    id: 'preset-earth',
-    name: 'Earth Tones',
-    colors: ['#8B4513', '#556B2F', '#D2B48C', '#BC8F8F', '#6B4423'],
+    id: "preset-earth",
+    name: "Earth Tones",
+    colors: ["#8B4513", "#556B2F", "#D2B48C", "#BC8F8F", "#6B4423"],
     isSystem: true,
   },
   {
-    id: 'preset-pastel',
-    name: 'Pastel',
-    colors: ['#FFB3BA', '#BAFFC9', '#BAE1FF', '#FFFFBA', '#E0BBE4'],
+    id: "preset-pastel",
+    name: "Pastel",
+    colors: ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA", "#E0BBE4"],
     isSystem: true,
   },
   {
-    id: 'preset-monochrome',
-    name: 'Monochrome',
-    colors: ['#000000', '#333333', '#666666', '#999999', '#CCCCCC'],
+    id: "preset-monochrome",
+    name: "Monochrome",
+    colors: ["#000000", "#333333", "#666666", "#999999", "#CCCCCC"],
     isSystem: true,
   },
-]
+];
 
-const MAX_CUSTOM_COLORS = 8
-const MIN_CUSTOM_COLORS = 3
+const MAX_CUSTOM_COLORS = 8;
+const MIN_CUSTOM_COLORS = 3;
 
 // ============================================================================
 // Component
@@ -127,71 +118,71 @@ export function ColorPaletteSelector({
   disabled = false,
   className,
 }: ColorPaletteSelectorProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [showCustomEditor, setShowCustomEditor] = useState(false)
-  const [customColors, setCustomColors] = useState<string[]>(['#FF5733', '#FFC300', '#00FF00'])
-  const [newPaletteName, setNewPaletteName] = useState('')
-  const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null)
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showCustomEditor, setShowCustomEditor] = useState(false);
+  const [customColors, setCustomColors] = useState<string[]>(["#FF5733", "#FFC300", "#00FF00"]);
+  const [newPaletteName, setNewPaletteName] = useState("");
+  const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null);
 
   // Check if current colors match a palette
   const matchingPalette = [...SYSTEM_PALETTES, ...userPalettes].find(
     (p) => JSON.stringify(p.colors) === JSON.stringify(selectedColors)
-  )
+  );
 
   const handlePaletteSelect = useCallback(
     (palette: ColorPalette) => {
-      if (disabled) return
-      setSelectedPaletteId(palette.id)
-      onColorsChange(palette.colors)
-      setShowCustomEditor(false)
+      if (disabled) return;
+      setSelectedPaletteId(palette.id);
+      onColorsChange(palette.colors);
+      setShowCustomEditor(false);
     },
     [disabled, onColorsChange]
-  )
+  );
 
   const handleClearSelection = useCallback(() => {
-    if (disabled) return
-    setSelectedPaletteId(null)
-    onColorsChange([])
-  }, [disabled, onColorsChange])
+    if (disabled) return;
+    setSelectedPaletteId(null);
+    onColorsChange([]);
+  }, [disabled, onColorsChange]);
 
   const handleCustomColorChange = useCallback(
     (index: number, color: string) => {
-      const newColors = [...customColors]
-      newColors[index] = color
-      setCustomColors(newColors)
+      const newColors = [...customColors];
+      newColors[index] = color;
+      setCustomColors(newColors);
     },
     [customColors]
-  )
+  );
 
   const handleAddCustomColor = useCallback(() => {
     if (customColors.length < MAX_CUSTOM_COLORS) {
-      setCustomColors([...customColors, '#808080'])
+      setCustomColors([...customColors, "#808080"]);
     }
-  }, [customColors])
+  }, [customColors]);
 
   const handleRemoveCustomColor = useCallback(
     (index: number) => {
       if (customColors.length > MIN_CUSTOM_COLORS) {
-        setCustomColors(customColors.filter((_, i) => i !== index))
+        setCustomColors(customColors.filter((_, i) => i !== index));
       }
     },
     [customColors]
-  )
+  );
 
   const handleApplyCustomColors = useCallback(() => {
-    setSelectedPaletteId(null)
-    onColorsChange(customColors)
-  }, [customColors, onColorsChange])
+    setSelectedPaletteId(null);
+    onColorsChange(customColors);
+  }, [customColors, onColorsChange]);
 
   const handleSavePalette = useCallback(() => {
     if (onSavePalette && newPaletteName.trim() && customColors.length >= MIN_CUSTOM_COLORS) {
-      onSavePalette(newPaletteName.trim(), customColors)
-      setNewPaletteName('')
+      onSavePalette(newPaletteName.trim(), customColors);
+      setNewPaletteName("");
     }
-  }, [onSavePalette, newPaletteName, customColors])
+  }, [onSavePalette, newPaletteName, customColors]);
 
   return (
-    <div className={cn('flex flex-col gap-3', className)}>
+    <div className={cn("flex flex-col gap-3", className)}>
       {/* Header */}
       <button
         type="button"
@@ -201,12 +192,10 @@ export function ColorPaletteSelector({
       >
         <div className="flex items-center gap-2">
           <Palette className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-foreground">
-            Color Palette
-          </span>
+          <span className="text-sm font-medium text-foreground">Color Palette</span>
           {selectedColors.length > 0 && (
             <span className="text-xs text-muted-foreground">
-              ({matchingPalette?.name || 'Custom'})
+              ({matchingPalette?.name || "Custom"})
             </span>
           )}
         </div>
@@ -244,9 +233,7 @@ export function ColorPaletteSelector({
         <div className="flex flex-col gap-4 rounded-lg border border-border p-4">
           {/* System Palettes */}
           <div className="flex flex-col gap-2">
-            <h4 className="text-xs font-medium text-muted-foreground uppercase">
-              Preset Palettes
-            </h4>
+            <h4 className="text-xs font-medium text-muted-foreground uppercase">Preset Palettes</h4>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {SYSTEM_PALETTES.map((palette) => (
                 <button
@@ -255,11 +242,11 @@ export function ColorPaletteSelector({
                   onClick={() => handlePaletteSelect(palette)}
                   disabled={disabled}
                   className={cn(
-                    'flex flex-col gap-1 rounded-lg border p-2 transition-all',
-                    'disabled:cursor-not-allowed disabled:opacity-50',
+                    "flex flex-col gap-1 rounded-lg border p-2 transition-all",
+                    "disabled:cursor-not-allowed disabled:opacity-50",
                     selectedPaletteId === palette.id
-                      ? 'border-primary ring-2 ring-primary ring-offset-1'
-                      : 'border-border hover:border-muted-foreground'
+                      ? "border-primary ring-2 ring-primary ring-offset-1"
+                      : "border-border hover:border-muted-foreground"
                   )}
                 >
                   <div className="flex gap-0.5">
@@ -271,9 +258,7 @@ export function ColorPaletteSelector({
                       />
                     ))}
                   </div>
-                  <span className="text-[10px] font-medium text-foreground">
-                    {palette.name}
-                  </span>
+                  <span className="text-[10px] font-medium text-foreground">{palette.name}</span>
                 </button>
               ))}
             </div>
@@ -282,18 +267,16 @@ export function ColorPaletteSelector({
           {/* User Palettes */}
           {userPalettes.length > 0 && (
             <div className="flex flex-col gap-2">
-              <h4 className="text-xs font-medium text-muted-foreground uppercase">
-                My Palettes
-              </h4>
+              <h4 className="text-xs font-medium text-muted-foreground uppercase">My Palettes</h4>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {userPalettes.map((palette) => (
                   <div
                     key={palette.id}
                     className={cn(
-                      'group relative flex flex-col gap-1 rounded-lg border p-2 transition-all',
+                      "group relative flex flex-col gap-1 rounded-lg border p-2 transition-all",
                       selectedPaletteId === palette.id
-                        ? 'border-primary ring-2 ring-primary ring-offset-1'
-                        : 'border-border hover:border-muted-foreground'
+                        ? "border-primary ring-2 ring-primary ring-offset-1"
+                        : "border-border hover:border-muted-foreground"
                     )}
                   >
                     <button
@@ -338,7 +321,7 @@ export function ColorPaletteSelector({
               className="flex items-center gap-2 text-xs font-medium text-primary hover:underline"
             >
               <Plus className="h-3 w-3" />
-              {showCustomEditor ? 'Hide Custom Editor' : 'Create Custom Palette'}
+              {showCustomEditor ? "Hide Custom Editor" : "Create Custom Palette"}
             </button>
 
             {showCustomEditor && (
@@ -403,7 +386,11 @@ export function ColorPaletteSelector({
                       <button
                         type="button"
                         onClick={handleSavePalette}
-                        disabled={disabled || !newPaletteName.trim() || customColors.length < MIN_CUSTOM_COLORS}
+                        disabled={
+                          disabled ||
+                          !newPaletteName.trim() ||
+                          customColors.length < MIN_CUSTOM_COLORS
+                        }
                         className="flex items-center gap-1 rounded border border-input px-2 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
                       >
                         <Save className="h-3 w-3" />
@@ -434,7 +421,7 @@ export function ColorPaletteSelector({
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default ColorPaletteSelector
+export default ColorPaletteSelector;

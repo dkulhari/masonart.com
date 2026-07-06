@@ -10,16 +10,16 @@
  * @see packages/api/src/routes/notification-preferences.ts
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
-import { Hono } from 'hono';
-import '../setup';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
+import { Hono } from "hono";
+import "../setup";
 
 // ============================================================================
 // Mock Setup
 // ============================================================================
 
 // Mock the database module
-vi.mock('../../src/database', () => ({
+vi.mock("../../src/database", () => ({
   db: {
     query: {
       notificationPreferences: {
@@ -42,33 +42,33 @@ vi.mock('../../src/database', () => ({
 }));
 
 // Mock auth middleware
-vi.mock('../../src/middleware/auth', () => ({
+vi.mock("../../src/middleware/auth", () => ({
   requireAuth: vi.fn((c, next) => {
     // Check for mock auth header
-    const authUser = c.req.header('X-Test-User');
+    const authUser = c.req.header("X-Test-User");
     if (authUser) {
-      c.set('user', JSON.parse(authUser));
+      c.set("user", JSON.parse(authUser));
       return next();
     }
-    return c.json({ error: 'Unauthorized' }, 401);
+    return c.json({ error: "Unauthorized" }, 401);
   }),
 }));
 
-import { db } from '../../src/database';
+import { db } from "../../src/database";
 
 // ============================================================================
 // Test Data
 // ============================================================================
 
 const mockUser = {
-  id: 'user-123',
-  email: 'user@example.com',
-  name: 'Test User',
+  id: "user-123",
+  email: "user@example.com",
+  name: "Test User",
 };
 
 const mockPreferences = {
-  id: 'pref-123',
-  userId: 'user-123',
+  id: "pref-123",
+  userId: "user-123",
   emailOrderConfirmation: true,
   emailShipped: true,
   emailOutForDelivery: true,
@@ -77,13 +77,13 @@ const mockPreferences = {
   smsShipped: false,
   smsOutForDelivery: false,
   smsDelivered: false,
-  createdAt: new Date('2024-02-08'),
-  updatedAt: new Date('2024-02-08'),
+  createdAt: new Date("2024-02-08"),
+  updatedAt: new Date("2024-02-08"),
 };
 
 const defaultPreferences = {
-  id: 'pref-new',
-  userId: 'user-123',
+  id: "pref-new",
+  userId: "user-123",
   emailOrderConfirmation: true,
   emailShipped: true,
   emailOutForDelivery: true,
@@ -104,18 +104,19 @@ let app: Hono | null = null;
 
 beforeAll(async () => {
   try {
-    const { notificationPreferencesApp } = await import('../../src/routes/notification-preferences');
+    const { notificationPreferencesApp } =
+      await import("../../src/routes/notification-preferences");
     app = new Hono();
-    app.route('/api/notification-preferences', notificationPreferencesApp);
+    app.route("/api/notification-preferences", notificationPreferencesApp);
   } catch (error) {
-    console.log('Could not initialize notification preferences routes:', (error as Error).message);
+    console.log("Could not initialize notification preferences routes:", (error as Error).message);
     app = null;
   }
 }, 10000);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -127,8 +128,8 @@ afterEach(() => {
  */
 function authHeaders(user = mockUser) {
   return {
-    'X-Test-User': JSON.stringify(user),
-    'Content-Type': 'application/json',
+    "X-Test-User": JSON.stringify(user),
+    "Content-Type": "application/json",
   };
 }
 
@@ -136,56 +137,58 @@ function authHeaders(user = mockUser) {
 // Authentication Tests
 // ============================================================================
 
-describe('Notification Preferences - Authentication', () => {
-  it('should require authentication for GET', async () => {
+describe("Notification Preferences - Authentication", () => {
+  it("should require authentication for GET", async () => {
     if (!app) return;
 
-    const res = await app.request('/api/notification-preferences');
+    const res = await app.request("/api/notification-preferences");
 
     expect(res.status).toBe(401);
   });
 
-  it('should require authentication for PATCH', async () => {
+  it("should require authentication for PATCH", async () => {
     if (!app) return;
 
-    const res = await app.request('/api/notification-preferences', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/notification-preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ emailOrderConfirmation: false }),
     });
 
     expect(res.status).toBe(401);
   });
 
-  it('should allow authenticated GET request', async () => {
+  it("should allow authenticated GET request", async () => {
     if (!app) return;
 
     vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
-    const res = await app.request('/api/notification-preferences', {
+    const res = await app.request("/api/notification-preferences", {
       headers: authHeaders(),
     });
 
     expect(res.status).toBe(200);
   });
 
-  it('should allow authenticated PATCH request', async () => {
+  it("should allow authenticated PATCH request", async () => {
     if (!app) return;
 
     vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
     vi.mocked(db.update).mockReturnValueOnce({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{
-            ...mockPreferences,
-            emailOrderConfirmation: false,
-          }]),
+          returning: vi.fn().mockResolvedValue([
+            {
+              ...mockPreferences,
+              emailOrderConfirmation: false,
+            },
+          ]),
         }),
       }),
     } as any);
 
-    const res = await app.request('/api/notification-preferences', {
-      method: 'PATCH',
+    const res = await app.request("/api/notification-preferences", {
+      method: "PATCH",
       headers: authHeaders(),
       body: JSON.stringify({ emailOrderConfirmation: false }),
     });
@@ -198,14 +201,14 @@ describe('Notification Preferences - Authentication', () => {
 // GET Preferences Tests
 // ============================================================================
 
-describe('GET /api/notification-preferences', () => {
-  describe('Existing User with Preferences', () => {
-    it('should return existing preferences', async () => {
+describe("GET /api/notification-preferences", () => {
+  describe("Existing User with Preferences", () => {
+    it("should return existing preferences", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
-      const res = await app.request('/api/notification-preferences', {
+      const res = await app.request("/api/notification-preferences", {
         headers: authHeaders(),
       });
 
@@ -214,12 +217,12 @@ describe('GET /api/notification-preferences', () => {
       expect(data.preferences).toBeDefined();
     });
 
-    it('should return formatted email preferences', async () => {
+    it("should return formatted email preferences", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
-      const res = await app.request('/api/notification-preferences', {
+      const res = await app.request("/api/notification-preferences", {
         headers: authHeaders(),
       });
 
@@ -232,12 +235,12 @@ describe('GET /api/notification-preferences', () => {
       });
     });
 
-    it('should return formatted SMS preferences', async () => {
+    it("should return formatted SMS preferences", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
-      const res = await app.request('/api/notification-preferences', {
+      const res = await app.request("/api/notification-preferences", {
         headers: authHeaders(),
       });
 
@@ -250,12 +253,12 @@ describe('GET /api/notification-preferences', () => {
       });
     });
 
-    it('should include updatedAt timestamp', async () => {
+    it("should include updatedAt timestamp", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
-      const res = await app.request('/api/notification-preferences', {
+      const res = await app.request("/api/notification-preferences", {
         headers: authHeaders(),
       });
 
@@ -264,8 +267,8 @@ describe('GET /api/notification-preferences', () => {
     });
   });
 
-  describe('New User without Preferences', () => {
-    it('should create default preferences for new user', async () => {
+  describe("New User without Preferences", () => {
+    it("should create default preferences for new user", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(null);
@@ -275,7 +278,7 @@ describe('GET /api/notification-preferences', () => {
         }),
       } as any);
 
-      const res = await app.request('/api/notification-preferences', {
+      const res = await app.request("/api/notification-preferences", {
         headers: authHeaders(),
       });
 
@@ -283,7 +286,7 @@ describe('GET /api/notification-preferences', () => {
       expect(db.insert).toHaveBeenCalled();
     });
 
-    it('should return default preferences with email enabled', async () => {
+    it("should return default preferences with email enabled", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(null);
@@ -293,7 +296,7 @@ describe('GET /api/notification-preferences', () => {
         }),
       } as any);
 
-      const res = await app.request('/api/notification-preferences', {
+      const res = await app.request("/api/notification-preferences", {
         headers: authHeaders(),
       });
 
@@ -302,7 +305,7 @@ describe('GET /api/notification-preferences', () => {
       expect(data.preferences.email.shipped).toBe(true);
     });
 
-    it('should return default preferences with SMS disabled', async () => {
+    it("should return default preferences with SMS disabled", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(null);
@@ -312,7 +315,7 @@ describe('GET /api/notification-preferences', () => {
         }),
       } as any);
 
-      const res = await app.request('/api/notification-preferences', {
+      const res = await app.request("/api/notification-preferences", {
         headers: authHeaders(),
       });
 
@@ -322,21 +325,21 @@ describe('GET /api/notification-preferences', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle database errors', async () => {
+  describe("Error Handling", () => {
+    it("should handle database errors", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockRejectedValueOnce(
-        new Error('DB connection failed')
+        new Error("DB connection failed")
       );
 
-      const res = await app.request('/api/notification-preferences', {
+      const res = await app.request("/api/notification-preferences", {
         headers: authHeaders(),
       });
 
       expect(res.status).toBe(500);
       const data = await res.json();
-      expect(data.code).toBe('GET_ERROR');
+      expect(data.code).toBe("GET_ERROR");
     });
   });
 });
@@ -345,9 +348,9 @@ describe('GET /api/notification-preferences', () => {
 // PATCH Preferences Tests
 // ============================================================================
 
-describe('PATCH /api/notification-preferences', () => {
-  describe('Update Existing Preferences', () => {
-    it('should update single email preference', async () => {
+describe("PATCH /api/notification-preferences", () => {
+  describe("Update Existing Preferences", () => {
+    it("should update single email preference", async () => {
       if (!app) return;
 
       const updatedPrefs = { ...mockPreferences, emailOrderConfirmation: false };
@@ -360,8 +363,8 @@ describe('PATCH /api/notification-preferences', () => {
         }),
       } as any);
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ emailOrderConfirmation: false }),
       });
@@ -371,7 +374,7 @@ describe('PATCH /api/notification-preferences', () => {
       expect(data.preferences.email.orderConfirmation).toBe(false);
     });
 
-    it('should update multiple preferences at once', async () => {
+    it("should update multiple preferences at once", async () => {
       if (!app) return;
 
       const updatedPrefs = {
@@ -388,8 +391,8 @@ describe('PATCH /api/notification-preferences', () => {
         }),
       } as any);
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({
           emailShipped: false,
@@ -403,7 +406,7 @@ describe('PATCH /api/notification-preferences', () => {
       expect(data.preferences.sms.orderConfirmation).toBe(true);
     });
 
-    it('should return success message', async () => {
+    it("should return success message", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
@@ -415,19 +418,19 @@ describe('PATCH /api/notification-preferences', () => {
         }),
       } as any);
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ emailDelivered: true }),
       });
 
       const data = await res.json();
-      expect(data.message).toBe('Notification preferences updated');
+      expect(data.message).toBe("Notification preferences updated");
     });
   });
 
-  describe('Create Preferences for New User', () => {
-    it('should create preferences with updates for new user', async () => {
+  describe("Create Preferences for New User", () => {
+    it("should create preferences with updates for new user", async () => {
       if (!app) return;
 
       const newPrefs = { ...defaultPreferences, emailOrderConfirmation: false };
@@ -438,8 +441,8 @@ describe('PATCH /api/notification-preferences', () => {
         }),
       } as any);
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ emailOrderConfirmation: false }),
       });
@@ -449,38 +452,38 @@ describe('PATCH /api/notification-preferences', () => {
     });
   });
 
-  describe('Validation Errors', () => {
-    it('should reject empty update object', async () => {
+  describe("Validation Errors", () => {
+    it("should reject empty update object", async () => {
       if (!app) return;
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({}),
       });
 
       expect(res.status).toBe(400);
       const data = await res.json();
-      expect(data.code).toBe('NO_UPDATES');
+      expect(data.code).toBe("NO_UPDATES");
     });
 
-    it('should reject invalid boolean values', async () => {
+    it("should reject invalid boolean values", async () => {
       if (!app) return;
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
-        body: JSON.stringify({ emailOrderConfirmation: 'yes' }),
+        body: JSON.stringify({ emailOrderConfirmation: "yes" }),
       });
 
       expect(res.status).toBe(400);
     });
 
-    it('should reject unknown preference keys', async () => {
+    it("should reject unknown preference keys", async () => {
       if (!app) return;
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ unknownPreference: true }),
       });
@@ -489,36 +492,36 @@ describe('PATCH /api/notification-preferences', () => {
       expect(res.status).toBe(400);
     });
 
-    it('should reject invalid JSON body', async () => {
+    it("should reject invalid JSON body", async () => {
       if (!app) return;
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
-        body: 'invalid json',
+        body: "invalid json",
       });
 
       expect(res.status).toBe(400);
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle database errors on update', async () => {
+  describe("Error Handling", () => {
+    it("should handle database errors on update", async () => {
       if (!app) return;
 
       vi.mocked(db.query.notificationPreferences.findFirst).mockRejectedValueOnce(
-        new Error('DB error')
+        new Error("DB error")
       );
 
-      const res = await app.request('/api/notification-preferences', {
-        method: 'PATCH',
+      const res = await app.request("/api/notification-preferences", {
+        method: "PATCH",
         headers: authHeaders(),
         body: JSON.stringify({ emailOrderConfirmation: false }),
       });
 
       expect(res.status).toBe(500);
       const data = await res.json();
-      expect(data.code).toBe('UPDATE_ERROR');
+      expect(data.code).toBe("UPDATE_ERROR");
     });
   });
 });
@@ -527,22 +530,17 @@ describe('PATCH /api/notification-preferences', () => {
 // All Preference Fields Tests
 // ============================================================================
 
-describe('Notification Preference Fields', () => {
+describe("Notification Preference Fields", () => {
   const allEmailFields = [
-    'emailOrderConfirmation',
-    'emailShipped',
-    'emailOutForDelivery',
-    'emailDelivered',
+    "emailOrderConfirmation",
+    "emailShipped",
+    "emailOutForDelivery",
+    "emailDelivered",
   ];
 
-  const allSmsFields = [
-    'smsOrderConfirmation',
-    'smsShipped',
-    'smsOutForDelivery',
-    'smsDelivered',
-  ];
+  const allSmsFields = ["smsOrderConfirmation", "smsShipped", "smsOutForDelivery", "smsDelivered"];
 
-  it.each(allEmailFields)('should accept %s preference update', async (field) => {
+  it.each(allEmailFields)("should accept %s preference update", async (field) => {
     if (!app) return;
 
     const updatedPrefs = { ...mockPreferences, [field]: false };
@@ -555,8 +553,8 @@ describe('Notification Preference Fields', () => {
       }),
     } as any);
 
-    const res = await app.request('/api/notification-preferences', {
-      method: 'PATCH',
+    const res = await app.request("/api/notification-preferences", {
+      method: "PATCH",
       headers: authHeaders(),
       body: JSON.stringify({ [field]: false }),
     });
@@ -564,7 +562,7 @@ describe('Notification Preference Fields', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each(allSmsFields)('should accept %s preference update', async (field) => {
+  it.each(allSmsFields)("should accept %s preference update", async (field) => {
     if (!app) return;
 
     const updatedPrefs = { ...mockPreferences, [field]: true };
@@ -577,8 +575,8 @@ describe('Notification Preference Fields', () => {
       }),
     } as any);
 
-    const res = await app.request('/api/notification-preferences', {
-      method: 'PATCH',
+    const res = await app.request("/api/notification-preferences", {
+      method: "PATCH",
       headers: authHeaders(),
       body: JSON.stringify({ [field]: true }),
     });
@@ -591,34 +589,34 @@ describe('Notification Preference Fields', () => {
 // Response Format Tests
 // ============================================================================
 
-describe('Response Format', () => {
-  it('should return JSON content type', async () => {
+describe("Response Format", () => {
+  it("should return JSON content type", async () => {
     if (!app) return;
 
     vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
-    const res = await app.request('/api/notification-preferences', {
+    const res = await app.request("/api/notification-preferences", {
       headers: authHeaders(),
     });
 
-    const contentType = res.headers.get('content-type');
-    expect(contentType).toContain('application/json');
+    const contentType = res.headers.get("content-type");
+    expect(contentType).toContain("application/json");
   });
 
-  it('should have nested email and sms structure', async () => {
+  it("should have nested email and sms structure", async () => {
     if (!app) return;
 
     vi.mocked(db.query.notificationPreferences.findFirst).mockResolvedValueOnce(mockPreferences);
 
-    const res = await app.request('/api/notification-preferences', {
+    const res = await app.request("/api/notification-preferences", {
       headers: authHeaders(),
     });
 
     const data = await res.json();
-    expect(data.preferences).toHaveProperty('email');
-    expect(data.preferences).toHaveProperty('sms');
-    expect(data.preferences.email).toHaveProperty('orderConfirmation');
-    expect(data.preferences.sms).toHaveProperty('orderConfirmation');
+    expect(data.preferences).toHaveProperty("email");
+    expect(data.preferences).toHaveProperty("sms");
+    expect(data.preferences.email).toHaveProperty("orderConfirmation");
+    expect(data.preferences.sms).toHaveProperty("orderConfirmation");
   });
 });
 
@@ -626,14 +624,15 @@ describe('Response Format', () => {
 // Service Exports Tests
 // ============================================================================
 
-describe('Notification Preferences Routes Exports', () => {
-  it('should export notificationPreferencesApp', async () => {
-    const module = await import('../../src/routes/notification-preferences');
-    expect(module).toHaveProperty('notificationPreferencesApp');
+describe("Notification Preferences Routes Exports", () => {
+  it("should export notificationPreferencesApp", async () => {
+    const module = await import("../../src/routes/notification-preferences");
+    expect(module).toHaveProperty("notificationPreferencesApp");
   });
 
-  it('should be a Hono app instance', async () => {
-    const { notificationPreferencesApp } = await import('../../src/routes/notification-preferences');
-    expect(typeof notificationPreferencesApp.fetch).toBe('function');
+  it("should be a Hono app instance", async () => {
+    const { notificationPreferencesApp } =
+      await import("../../src/routes/notification-preferences");
+    expect(typeof notificationPreferencesApp.fetch).toBe("function");
   });
 });

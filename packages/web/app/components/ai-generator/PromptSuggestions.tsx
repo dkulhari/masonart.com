@@ -11,44 +11,44 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
-import { Sparkles, RefreshCw, TrendingUp } from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { useState, useCallback } from "react";
+import { Sparkles, RefreshCw, TrendingUp } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface PromptSuggestion {
-  id: string
-  text: string
-  isPopular?: boolean
-  tags?: string[]
+  id: string;
+  text: string;
+  isPopular?: boolean;
+  tags?: string[];
 }
 
 export interface PromptSuggestionsProps {
   /** Current style preset for contextual suggestions */
-  stylePreset?: string
+  stylePreset?: string;
   /** Suggestions to display */
-  suggestions: PromptSuggestion[]
+  suggestions: PromptSuggestion[];
   /** Callback when suggestion is clicked */
-  onSuggestionClick: (text: string) => void
+  onSuggestionClick: (text: string) => void;
   /** Callback to refresh/shuffle suggestions */
-  onRefresh?: () => void
+  onRefresh?: () => void;
   /** Whether suggestions are loading */
-  isLoading?: boolean
+  isLoading?: boolean;
   /** Whether the component is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Custom className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const MAX_VISIBLE_SUGGESTIONS = 6
-const SKELETON_COUNT = 4
+const MAX_VISIBLE_SUGGESTIONS = 6;
+const SKELETON_COUNT = 4;
 
 // ============================================================================
 // Component
@@ -66,43 +66,41 @@ export function PromptSuggestions({
   disabled = false,
   className,
 }: PromptSuggestionsProps) {
-  const [clickedId, setClickedId] = useState<string | null>(null)
+  const [clickedId, setClickedId] = useState<string | null>(null);
 
-  const visibleSuggestions = suggestions.slice(0, MAX_VISIBLE_SUGGESTIONS)
+  const visibleSuggestions = suggestions.slice(0, MAX_VISIBLE_SUGGESTIONS);
 
   const handleClick = useCallback(
     (suggestion: PromptSuggestion) => {
-      if (disabled || isLoading) return
+      if (disabled || isLoading) return;
 
-      setClickedId(suggestion.id)
-      onSuggestionClick(suggestion.text)
+      setClickedId(suggestion.id);
+      onSuggestionClick(suggestion.text);
 
       // Reset animation after delay
-      setTimeout(() => setClickedId(null), 300)
+      setTimeout(() => setClickedId(null), 300);
     },
     [disabled, isLoading, onSuggestionClick]
-  )
+  );
 
   const handleRefresh = useCallback(() => {
-    if (disabled || isLoading || !onRefresh) return
-    onRefresh()
-  }, [disabled, isLoading, onRefresh])
+    if (disabled || isLoading || !onRefresh) return;
+    onRefresh();
+  }, [disabled, isLoading, onRefresh]);
 
   if (suggestions.length === 0 && !isLoading) {
-    return null
+    return null;
   }
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
+    <div className={cn("flex flex-col gap-2", className)}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Sparkles className="h-3 w-3 text-primary" />
           <span className="text-xs font-medium text-muted-foreground">
             Suggestions
-            {stylePreset && (
-              <span className="ml-1 text-primary">for {stylePreset}</span>
-            )}
+            {stylePreset && <span className="ml-1 text-primary">for {stylePreset}</span>}
           </span>
         </div>
         {onRefresh && (
@@ -113,9 +111,7 @@ export function PromptSuggestions({
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
             title="Get new suggestions"
           >
-            <RefreshCw
-              className={cn('h-3 w-3', isLoading && 'animate-spin')}
-            />
+            <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
             <span className="sr-only">Shuffle</span>
           </button>
         )}
@@ -123,39 +119,35 @@ export function PromptSuggestions({
 
       {/* Suggestions */}
       <div className="flex flex-wrap gap-2">
-        {isLoading ? (
-          // Skeleton loading state
-          Array.from({ length: SKELETON_COUNT }).map((_, index) => (
-            <div
-              key={`skeleton-${index}`}
-              className="h-7 animate-pulse rounded-full bg-muted"
-              style={{ width: `${80 + Math.random() * 60}px` }}
-            />
-          ))
-        ) : (
-          visibleSuggestions.map((suggestion) => (
-            <button
-              key={suggestion.id}
-              type="button"
-              onClick={() => handleClick(suggestion)}
-              disabled={disabled}
-              className={cn(
-                'group flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-all',
-                'hover:border-primary hover:bg-primary/5',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-                clickedId === suggestion.id && 'scale-95 bg-primary/10',
-                suggestion.isPopular
-                  ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950'
-                  : 'border-border bg-background'
-              )}
-            >
-              {suggestion.isPopular && (
-                <TrendingUp className="h-3 w-3 text-amber-600" />
-              )}
-              <span className="max-w-[200px] truncate">{suggestion.text}</span>
-            </button>
-          ))
-        )}
+        {isLoading
+          ? // Skeleton loading state
+            Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+              <div
+                key={`skeleton-${index}`}
+                className="h-7 animate-pulse rounded-full bg-muted"
+                style={{ width: `${80 + Math.random() * 60}px` }}
+              />
+            ))
+          : visibleSuggestions.map((suggestion) => (
+              <button
+                key={suggestion.id}
+                type="button"
+                onClick={() => handleClick(suggestion)}
+                disabled={disabled}
+                className={cn(
+                  "group flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-all",
+                  "hover:border-primary hover:bg-primary/5",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                  clickedId === suggestion.id && "scale-95 bg-primary/10",
+                  suggestion.isPopular
+                    ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950"
+                    : "border-border bg-background"
+                )}
+              >
+                {suggestion.isPopular && <TrendingUp className="h-3 w-3 text-amber-600" />}
+                <span className="max-w-[200px] truncate">{suggestion.text}</span>
+              </button>
+            ))}
       </div>
 
       {/* Help text */}
@@ -163,7 +155,7 @@ export function PromptSuggestions({
         Click a suggestion to add it to your prompt
       </p>
     </div>
-  )
+  );
 }
 
-export default PromptSuggestions
+export default PromptSuggestions;

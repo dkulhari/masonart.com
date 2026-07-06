@@ -8,37 +8,37 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useEffect, useMemo } from 'react'
-import { Truck, Zap, Clock, Check, AlertCircle, Loader2 } from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
-import { api } from '~/lib/api'
+import { useState, useEffect, useMemo } from "react";
+import { Truck, Zap, Clock, Check, AlertCircle, Loader2 } from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import { api } from "~/lib/api";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ShippingOptionData {
-  id: string
-  name: string
-  carrier: string
-  baseCost: string
-  finalCost: number
-  estimatedDaysMin: number
-  estimatedDaysMax: number
-  isFree: boolean
+  id: string;
+  name: string;
+  carrier: string;
+  baseCost: string;
+  finalCost: number;
+  estimatedDaysMin: number;
+  estimatedDaysMax: number;
+  isFree: boolean;
 }
 
 export interface ShippingSelectorProps {
   /** Cart subtotal for calculating shipping */
-  cartTotal: number
+  cartTotal: number;
   /** Currently selected shipping option ID */
-  selectedOptionId: string | null
+  selectedOptionId: string | null;
   /** Callback when shipping option is selected */
-  onSelect: (option: ShippingOptionData) => void
+  onSelect: (option: ShippingOptionData) => void;
   /** Optional postal code for region-specific rates */
-  postalCode?: string
+  postalCode?: string;
   /** Additional class names */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -49,14 +49,17 @@ const CARRIER_ICONS: Record<string, React.ComponentType<{ className?: string }>>
   default: Truck,
   express: Zap,
   standard: Truck,
-}
+};
 
-function getCarrierIcon(carrier: string, name: string): React.ComponentType<{ className?: string }> {
-  const lowerName = name.toLowerCase()
-  if (lowerName.includes('express') || lowerName.includes('priority')) {
-    return Zap
+function getCarrierIcon(
+  carrier: string,
+  name: string
+): React.ComponentType<{ className?: string }> {
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes("express") || lowerName.includes("priority")) {
+    return Zap;
   }
-  return CARRIER_ICONS[carrier.toLowerCase()] ?? CARRIER_ICONS.default ?? Truck
+  return CARRIER_ICONS[carrier.toLowerCase()] ?? CARRIER_ICONS.default ?? Truck;
 }
 
 // ============================================================================
@@ -64,11 +67,11 @@ function getCarrierIcon(carrier: string, name: string): React.ComponentType<{ cl
 // ============================================================================
 
 interface ShippingOptionCardProps {
-  option: ShippingOptionData
-  isSelected: boolean
-  isFastest: boolean
-  isCheapest: boolean
-  onSelect: () => void
+  option: ShippingOptionData;
+  isSelected: boolean;
+  isFastest: boolean;
+  isCheapest: boolean;
+  onSelect: () => void;
 }
 
 function ShippingOptionCard({
@@ -78,18 +81,21 @@ function ShippingOptionCard({
   isCheapest,
   onSelect,
 }: ShippingOptionCardProps) {
-  const CarrierIcon = getCarrierIcon(option.carrier, option.name)
-  const estimatedDelivery = formatEstimatedDelivery(option.estimatedDaysMin, option.estimatedDaysMax)
+  const CarrierIcon = getCarrierIcon(option.carrier, option.name);
+  const estimatedDelivery = formatEstimatedDelivery(
+    option.estimatedDaysMin,
+    option.estimatedDaysMax
+  );
 
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        'w-full rounded-lg border p-4 text-left transition-all duration-200',
+        "w-full rounded-lg border p-4 text-left transition-all duration-200",
         isSelected
-          ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-          : 'border-border bg-background hover:border-brand-300 hover:shadow-sm'
+          ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500"
+          : "border-border bg-background hover:border-brand-300 hover:shadow-sm"
       )}
       aria-pressed={isSelected}
     >
@@ -97,8 +103,8 @@ function ShippingOptionCard({
         {/* Carrier Icon */}
         <div
           className={cn(
-            'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg',
-            isSelected ? 'bg-brand-100 text-brand-600' : 'bg-muted text-muted-foreground'
+            "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg",
+            isSelected ? "bg-brand-100 text-brand-600" : "bg-muted text-muted-foreground"
           )}
         >
           <CarrierIcon className="h-5 w-5" />
@@ -139,15 +145,22 @@ function ShippingOptionCard({
 
         {/* Price and Selection */}
         <div className="flex items-center gap-3">
-          <span className={cn('text-right font-semibold', option.isFree ? 'text-green-600' : 'text-foreground')}>
-            {option.isFree ? 'FREE' : formatPrice(option.finalCost)}
+          <span
+            className={cn(
+              "text-right font-semibold",
+              option.isFree ? "text-green-600" : "text-foreground"
+            )}
+          >
+            {option.isFree ? "FREE" : formatPrice(option.finalCost)}
           </span>
 
           {/* Radio Button */}
           <div
             className={cn(
-              'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-              isSelected ? 'border-brand-500 bg-brand-500' : 'border-muted-foreground/30 bg-transparent'
+              "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+              isSelected
+                ? "border-brand-500 bg-brand-500"
+                : "border-muted-foreground/30 bg-transparent"
             )}
           >
             {isSelected && <div className="h-2 w-2 rounded-full bg-white" />}
@@ -155,7 +168,7 @@ function ShippingOptionCard({
         </div>
       </div>
     </button>
-  )
+  );
 }
 
 // ============================================================================
@@ -166,44 +179,44 @@ function ShippingOptionCard({
  * Format estimated delivery date range
  */
 function formatEstimatedDelivery(minDays: number, maxDays: number): string {
-  const today = new Date()
+  const today = new Date();
 
   // Calculate delivery dates
-  const minDate = addBusinessDays(today, minDays)
-  const maxDate = addBusinessDays(today, maxDays)
+  const minDate = addBusinessDays(today, minDays);
+  const maxDate = addBusinessDays(today, maxDays);
 
   // Format dates
-  const formatOptions: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  const formatOptions: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
 
   if (minDays === maxDays) {
-    return minDate.toLocaleDateString('en-IN', formatOptions)
+    return minDate.toLocaleDateString("en-IN", formatOptions);
   }
 
   // Check if same month
   if (minDate.getMonth() === maxDate.getMonth()) {
-    return `${minDate.getDate()}-${maxDate.toLocaleDateString('en-IN', formatOptions)}`
+    return `${minDate.getDate()}-${maxDate.toLocaleDateString("en-IN", formatOptions)}`;
   }
 
-  return `${minDate.toLocaleDateString('en-IN', formatOptions)} - ${maxDate.toLocaleDateString('en-IN', formatOptions)}`
+  return `${minDate.toLocaleDateString("en-IN", formatOptions)} - ${maxDate.toLocaleDateString("en-IN", formatOptions)}`;
 }
 
 /**
  * Add business days to a date (excludes weekends)
  */
 function addBusinessDays(date: Date, days: number): Date {
-  const result = new Date(date)
-  let remaining = days
+  const result = new Date(date);
+  let remaining = days;
 
   while (remaining > 0) {
-    result.setDate(result.getDate() + 1)
-    const dayOfWeek = result.getDay()
+    result.setDate(result.getDate() + 1);
+    const dayOfWeek = result.getDay();
     // Skip weekends (0 = Sunday, 6 = Saturday)
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      remaining--
+      remaining--;
     }
   }
 
-  return result
+  return result;
 }
 
 // ============================================================================
@@ -217,81 +230,81 @@ export function ShippingSelector({
   postalCode,
   className,
 }: ShippingSelectorProps) {
-  const [options, setOptions] = useState<ShippingOptionData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [freeShippingThreshold, setFreeShippingThreshold] = useState(1000)
-  const [qualifiesForFreeShipping, setQualifiesForFreeShipping] = useState(false)
+  const [options, setOptions] = useState<ShippingOptionData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(1000);
+  const [qualifiesForFreeShipping, setQualifiesForFreeShipping] = useState(false);
 
   // Fetch shipping options
   useEffect(() => {
     async function fetchShippingOptions() {
-      setIsLoading(true)
-      setError(null)
+      setIsLoading(true);
+      setError(null);
 
       try {
         const response = await api.shipping.getEstimate({
           cartTotal,
           zipCode: postalCode,
-        })
+        });
 
-        setOptions(response.options)
-        setFreeShippingThreshold(response.freeShippingThreshold)
-        setQualifiesForFreeShipping(response.qualifiesForFreeShipping)
+        setOptions(response.options);
+        setFreeShippingThreshold(response.freeShippingThreshold);
+        setQualifiesForFreeShipping(response.qualifiesForFreeShipping);
 
         // Auto-select first option if none selected
-        const firstOption = response.options[0]
+        const firstOption = response.options[0];
         if (!selectedOptionId && firstOption) {
-          onSelect(firstOption)
+          onSelect(firstOption);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load shipping options')
+        setError(err instanceof Error ? err.message : "Failed to load shipping options");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchShippingOptions()
-  }, [cartTotal, postalCode])
+    fetchShippingOptions();
+  }, [cartTotal, postalCode]);
 
   // Determine fastest and cheapest options
   const { fastestId, cheapestId } = useMemo(() => {
-    if (options.length === 0) return { fastestId: null, cheapestId: null }
+    if (options.length === 0) return { fastestId: null, cheapestId: null };
 
-    const sorted = [...options]
+    const sorted = [...options];
 
     // Fastest = lowest max days
     const fastest = sorted.reduce((min, opt) =>
       opt.estimatedDaysMax < min.estimatedDaysMax ? opt : min
-    )
+    );
 
     // Cheapest = lowest non-free cost (or first free)
     const cheapest = sorted.reduce((min, opt) => {
-      if (opt.isFree) return opt
-      if (min.isFree) return min
-      return opt.finalCost < min.finalCost ? opt : min
-    })
+      if (opt.isFree) return opt;
+      if (min.isFree) return min;
+      return opt.finalCost < min.finalCost ? opt : min;
+    });
 
     return {
       fastestId: fastest.id,
       cheapestId: cheapest.id !== fastest.id ? cheapest.id : null,
-    }
-  }, [options])
+    };
+  }, [options]);
 
   // Loading state
   if (isLoading) {
     return (
-      <div className={cn('flex items-center justify-center py-8', className)}>
+      <div className={cn("flex items-center justify-center py-8", className)}>
         <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
         <span className="ml-2 text-sm text-muted-foreground">Loading shipping options...</span>
       </div>
-    )
+    );
   }
 
   // Error state
   if (error) {
     return (
-      <div className={cn('rounded-lg border border-red-200 bg-red-50 p-4', className)}>
+      <div className={cn("rounded-lg border border-red-200 bg-red-50 p-4", className)}>
         <div className="flex items-center gap-2 text-red-700">
           <AlertCircle className="h-5 w-5" />
           <span className="font-medium">Failed to load shipping options</span>
@@ -305,13 +318,13 @@ export function ShippingSelector({
           Try again
         </button>
       </div>
-    )
+    );
   }
 
   // No options available
   if (options.length === 0) {
     return (
-      <div className={cn('rounded-lg border border-amber-200 bg-amber-50 p-4', className)}>
+      <div className={cn("rounded-lg border border-amber-200 bg-amber-50 p-4", className)}>
         <div className="flex items-center gap-2 text-amber-700">
           <AlertCircle className="h-5 w-5" />
           <span className="font-medium">No shipping options available</span>
@@ -320,11 +333,11 @@ export function ShippingSelector({
           Please check your delivery address or contact support.
         </p>
       </div>
-    )
+    );
   }
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn("space-y-3", className)}>
       {/* Shipping Options List */}
       {options.map((option) => (
         <ShippingOptionCard
@@ -367,8 +380,8 @@ export function ShippingSelector({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // Export types for use in checkout
-export type { ShippingOptionData as SelectedShippingOption }
+export type { ShippingOptionData as SelectedShippingOption };

@@ -46,11 +46,13 @@ ToolSearch: "+ticketrack list"
 ```
 
 Then call:
+
 ```
 mcp__ticketrack__listFeatures
 ```
 
 **If ToolSearch returns no ticketrack tools OR listFeatures fails:**
+
 ```
 ❌ TickeTrack MCP Not Available
 
@@ -79,6 +81,7 @@ Read the plan file and extract:
    - Brief description of what the task does
 
 **Feature name derivation:**
+
 - From `--feature-name` arg if provided
 - Otherwise from plan title: `# Google Gemini Direct Provider` → `gemini-direct-provider`
 
@@ -100,17 +103,20 @@ mcp__plugin_claude-mem_mcp-search__search
 ```
 
 **Search priority:**
+
 1. File paths mentioned in task (most specific)
 2. Task title keywords
 3. Feature name + date range
 
 **After finding observations, fetch full content:**
+
 ```
 mcp__plugin_claude-mem_mcp-search__get_observations
   ids: [<observation-id-1>, <observation-id-2>]
 ```
 
 **Extract from observations:**
+
 - Commit hashes and messages
 - Files changed
 - Work summaries
@@ -122,22 +128,26 @@ mcp__plugin_claude-mem_mcp-search__get_observations
 
 **1. From claude-mem observations:**
 Look for commit patterns in observation `facts` and `narrative` fields:
+
 - 7-8 character hex hashes (e.g., `b2cab8de`, `cc7b27c3`)
 - Conventional commit messages (e.g., `feat(ai): implement gemini...`)
 - Patterns like "committed", "commit hash", "git commit"
 
 **2. From git log (fallback):**
 If claude-mem doesn't have commit info, use git log with file paths from the task:
+
 ```bash
 git log --oneline --all -- <file-path-1> <file-path-2>
 ```
 
 This returns commits that touched those specific files. Match by:
+
 - Date range (around when superpowers plan was executed)
 - Commit message keywords matching task description
 - Author (if known)
 
 **3. Example extraction:**
+
 ```
 # From observation narrative:
 "Committed changes with cc7b27c3 - feat(ai): implement gemini image generation"
@@ -174,6 +184,7 @@ mcp__ticketrack__createFeature:
 For each task in the plan:
 
 **5a. Create ticket:**
+
 ```yaml
 mcp__ticketrack__createTicket:
   featureName: <feature-name>
@@ -190,6 +201,7 @@ mcp__ticketrack__createTicket:
 ```
 
 **5b. Mark as done:**
+
 ```yaml
 mcp__ticketrack__updateTicketStatus:
   ticketId: <id>
@@ -197,6 +209,7 @@ mcp__ticketrack__updateTicketStatus:
 ```
 
 **5c. Add completion comment with claude-mem context:**
+
 ```yaml
 mcp__ticketrack__addComment:
   ticketId: <id>
@@ -244,22 +257,22 @@ Next Steps:
 
 Infer labels from file paths in tasks:
 
-| File Path Pattern | Labels |
-|-------------------|--------|
-| `*/database/*`, `*/schema/*`, `*.sql` | `database`, `schema` |
-| `*/routes/*`, `*/services/*`, `*/api/*` | `backend`, `api` |
-| `*/components/*`, `*/app/routes/*`, `*.tsx` | `frontend`, `ui` |
-| `*/tests/*`, `*.test.ts`, `*.spec.ts` | `testing` |
-| `docs/*`, `*.md` | `docs` |
-| `package.json`, `*.config.*` | `config` |
+| File Path Pattern                           | Labels               |
+| ------------------------------------------- | -------------------- |
+| `*/database/*`, `*/schema/*`, `*.sql`       | `database`, `schema` |
+| `*/routes/*`, `*/services/*`, `*/api/*`     | `backend`, `api`     |
+| `*/components/*`, `*/app/routes/*`, `*.tsx` | `frontend`, `ui`     |
+| `*/tests/*`, `*.test.ts`, `*.spec.ts`       | `testing`            |
+| `docs/*`, `*.md`                            | `docs`               |
+| `package.json`, `*.config.*`                | `config`             |
 
 ## Error Handling
 
-| Error | Response |
-|-------|----------|
-| TickeTrack MCP unavailable | **STOP** - Display connection error, do not proceed |
-| Plan file not found | "Plan file not found: {path}" |
-| Feature already exists | "Feature '{name}' already exists. Use --feature-name to specify different name." |
-| No tasks found in plan | "No tasks found in plan. Expected '## Task N:' format." |
-| No claude-mem observations | Create ticket without commit info, note in summary |
-| MCP tool failure | Report error, continue with remaining tasks |
+| Error                      | Response                                                                         |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| TickeTrack MCP unavailable | **STOP** - Display connection error, do not proceed                              |
+| Plan file not found        | "Plan file not found: {path}"                                                    |
+| Feature already exists     | "Feature '{name}' already exists. Use --feature-name to specify different name." |
+| No tasks found in plan     | "No tasks found in plan. Expected '## Task N:' format."                          |
+| No claude-mem observations | Create ticket without commit info, note in summary                               |
+| MCP tool failure           | Report error, continue with remaining tasks                                      |

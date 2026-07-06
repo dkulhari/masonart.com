@@ -122,7 +122,8 @@ export interface AIProviderConfig {
  */
 export const REPLICATE_MODELS = {
   sdxl: "stability-ai/sdxl:7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc",
-  sdxlLightning: "bytedance/sdxl-lightning-4step:5f24084160c9089501c1b3545d9be3c27883ae2239b6f412990e82d4a6210f8f",
+  sdxlLightning:
+    "bytedance/sdxl-lightning-4step:5f24084160c9089501c1b3545d9be3c27883ae2239b6f412990e82d4a6210f8f",
   flux: "black-forest-labs/flux-schnell",
   fluxPro: "black-forest-labs/flux-pro",
 } as const;
@@ -264,10 +265,7 @@ export async function generateImages(
     colorPalette: input.colorPalette,
   });
 
-  const negativePrompt = constructNegativePrompt(
-    input.stylePreset,
-    input.negativePrompt
-  );
+  const negativePrompt = constructNegativePrompt(input.stylePreset, input.negativePrompt);
 
   // Get dimensions for the provider
   const dimensions = getImageDimensions(input.aspectRatio, provider);
@@ -299,8 +297,8 @@ export async function generateImages(
 
       case "fal-ai": {
         // Auto-select Nano Banana Pro for typography style (superior text rendering)
-        const falModel = input.falModel ||
-          (input.stylePreset === "typography" ? "nanoBananaPro" : "fluxSchnell");
+        const falModel =
+          input.falModel || (input.stylePreset === "typography" ? "nanoBananaPro" : "fluxSchnell");
         images = await generateWithFalAI(
           config,
           enhancedPrompt,
@@ -408,7 +406,11 @@ async function generateWithReplicate(
     };
 
     // Poll for completion
-    const result = await pollReplicatePrediction(config.apiKey, prediction.urls.get, config.timeout);
+    const result = await pollReplicatePrediction(
+      config.apiKey,
+      prediction.urls.get,
+      config.timeout
+    );
 
     if (result.status === "succeeded" && result.output && Array.isArray(result.output)) {
       const imageUrl = result.output[0] as string;
@@ -1001,4 +1003,3 @@ export function validateGenerationInput(input: AIGenerationInput): {
     errors,
   };
 }
-

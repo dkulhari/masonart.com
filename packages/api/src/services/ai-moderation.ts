@@ -36,9 +36,7 @@ export interface ReviewResult {
  * Check if a prompt is safe to generate
  * Uses database banned terms + fallback to default terms
  */
-export async function checkPromptSafety(
-  prompt: string
-): Promise<PromptSafetyResult> {
+export async function checkPromptSafety(prompt: string): Promise<PromptSafetyResult> {
   // Get default banned terms first (always available)
   let bannedTerms: Array<{
     pattern: string;
@@ -55,9 +53,7 @@ export async function checkPromptSafety(
   // Try to get banned terms from database (dynamic import to avoid initialization error)
   try {
     const { db } = await import("../database");
-    const { aiBannedPrompts } = await import(
-      "../database/schema/ai-generations"
-    );
+    const { aiBannedPrompts } = await import("../database/schema/ai-generations");
     const { eq } = await import("drizzle-orm");
 
     const dbTerms = await db
@@ -125,13 +121,7 @@ export async function approveGeneration(
   reviewerId: string,
   notes?: string
 ): Promise<ReviewResult> {
-  return reviewGeneration(
-    generationId,
-    reviewerId,
-    "approved",
-    undefined,
-    notes
-  );
+  return reviewGeneration(generationId, reviewerId, "approved", undefined, notes);
 }
 
 /**
@@ -143,13 +133,7 @@ export async function rejectGeneration(
   category: AIRejectionCategory,
   reason: string
 ): Promise<ReviewResult> {
-  return reviewGeneration(
-    generationId,
-    reviewerId,
-    "rejected",
-    category,
-    reason
-  );
+  return reviewGeneration(generationId, reviewerId, "rejected", category, reason);
 }
 
 /**
@@ -160,13 +144,7 @@ export async function flagGeneration(
   reviewerId: string,
   reason: string
 ): Promise<ReviewResult> {
-  return reviewGeneration(
-    generationId,
-    reviewerId,
-    "flagged",
-    undefined,
-    reason
-  );
+  return reviewGeneration(generationId, reviewerId, "flagged", undefined, reason);
 }
 
 /**
@@ -183,9 +161,7 @@ export async function reviewGeneration(
   const { db } = await import("../database");
   const { eq } = await import("drizzle-orm");
   const { aiGenerations } = await import("../database/schema/ai-generations");
-  const { aiGenerationReviews } = await import(
-    "../database/schema/ai-generation-reviews"
-  );
+  const { aiGenerationReviews } = await import("../database/schema/ai-generation-reviews");
   // Get current generation with user info
   const generation = await db.query.aiGenerations.findFirst({
     where: eq(aiGenerations.id, generationId),
@@ -210,11 +186,7 @@ export async function reviewGeneration(
   await db
     .update(aiGenerations)
     .set({
-      moderationStatus: newStatus as
-        | "pending_review"
-        | "approved"
-        | "rejected"
-        | "flagged",
+      moderationStatus: newStatus as "pending_review" | "approved" | "rejected" | "flagged",
       moderatedAt: new Date(),
       moderatedBy: reviewerId,
       rejectionReason: action === "rejected" ? reason : null,
@@ -287,10 +259,8 @@ async function sendModerationNotification(
   const { eq } = await import("drizzle-orm");
   const { users } = await import("../database/schema/users");
   const { sendEmail } = await import("./email");
-  const {
-    getAIGenerationApprovedTemplate,
-    getAIGenerationRejectedTemplate,
-  } = await import("./email-templates");
+  const { getAIGenerationApprovedTemplate, getAIGenerationRejectedTemplate } =
+    await import("./email-templates");
 
   // Get user email
   const user = await db.query.users.findFirst({

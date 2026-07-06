@@ -58,17 +58,21 @@ Create an expanded description based on user input and codebase analysis:
 
 ```markdown
 ## Overview
+
 {Expanded description of what the feature does and why}
 
 ## Goals
+
 - {Primary goal}
 - {Secondary goals}
 
 ## Scope
+
 - **In scope**: {What this feature includes}
 - **Out of scope**: {What this feature does NOT include}
 
 ## Technical Considerations
+
 - {Key integration points}
 - {Potential challenges}
 - {Dependencies on existing systems}
@@ -92,10 +96,12 @@ mcp__ticketrack__createFeature:
 Present the created feature description to the user and ask if they want to refine it:
 
 Use `AskUserQuestion` to ask:
+
 - "Does this description capture your intent?"
 - Options: "Looks good", "Needs changes"
 
 **If user wants changes**:
+
 1. Ask what they want to modify
 2. Update the description via `mcp__ticketrack__editFeature`
 3. Show the updated version
@@ -104,6 +110,7 @@ Use `AskUserQuestion` to ask:
 ### Step 6: Display Summary
 
 Output a summary showing:
+
 - Feature name
 - Final description
 - Next steps

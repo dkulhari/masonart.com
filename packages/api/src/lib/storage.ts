@@ -14,9 +14,9 @@ import {
   ListObjectsV2Command,
   CopyObjectCommand,
   type PutObjectCommandInput,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { processImage, type ProcessedImage } from './image-processing';
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { processImage, type ProcessedImage } from "./image-processing";
 
 // ============================================================================
 // S3 Client Configuration
@@ -27,7 +27,7 @@ import { processImage, type ProcessedImage } from './image-processing';
  * Works with AWS S3, Cloudflare R2, and MinIO
  */
 const s3 = new S3Client({
-  region: 'auto',
+  region: "auto",
   endpoint: process.env.R2_ENDPOINT,
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY!,
@@ -36,8 +36,8 @@ const s3 = new S3Client({
   forcePathStyle: true, // Required for MinIO and some S3-compatible services
 });
 
-const BUCKET = process.env.R2_BUCKET || 'poster-app-dev';
-const CDN_URL = process.env.CDN_URL || '';
+const BUCKET = process.env.R2_BUCKET || "poster-app-dev";
+const CDN_URL = process.env.CDN_URL || "";
 
 // ============================================================================
 // Storage Paths
@@ -47,26 +47,22 @@ const CDN_URL = process.env.CDN_URL || '';
  * Storage path prefixes for different content types
  */
 export const StoragePaths = {
-  PRODUCTS: 'products/',
-  AI_GENERATIONS: 'ai-generations/',
-  AI_REFERENCE_IMAGES: 'ai-reference-images/',
-  USER_UPLOADS: 'user-uploads/',
-  AVATARS: 'avatars/',
-  FRAMES: 'frames/',
-  TEMP: 'temp/',
+  PRODUCTS: "products/",
+  AI_GENERATIONS: "ai-generations/",
+  AI_REFERENCE_IMAGES: "ai-reference-images/",
+  USER_UPLOADS: "user-uploads/",
+  AVATARS: "avatars/",
+  FRAMES: "frames/",
+  TEMP: "temp/",
 } as const;
 
 /**
  * Generate a unique file key
  */
-function generateFileKey(
-  prefix: string,
-  filename: string,
-  userId?: string
-): string {
+function generateFileKey(prefix: string, filename: string, userId?: string): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
-  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
 
   if (userId) {
     return `${prefix}${userId}/${timestamp}-${random}-${sanitizedFilename}`;
@@ -111,7 +107,7 @@ export async function uploadFile(
     Body: buffer,
     ContentType: options.contentType,
     Metadata: options.metadata,
-    CacheControl: options.cacheControl || 'public, max-age=31536000', // 1 year
+    CacheControl: options.cacheControl || "public, max-age=31536000", // 1 year
   };
 
   await s3.send(new PutObjectCommand(command));
@@ -180,7 +176,7 @@ export async function uploadOptimizedImage(
   const prefix = options?.prefix || StoragePaths.PRODUCTS;
   const baseKey = generateFileKey(prefix, filename, options?.userId);
   // Remove extension from base key for variant naming
-  const keyWithoutExt = baseKey.replace(/\.[^.]+$/, '');
+  const keyWithoutExt = baseKey.replace(/\.[^.]+$/, "");
 
   // Process image: convert to WebP + generate responsive variants
   const processed: ProcessedImage = await processImage(buffer);
@@ -188,7 +184,7 @@ export async function uploadOptimizedImage(
   // Upload original as WebP
   const webpKey = `${keyWithoutExt}.webp`;
   await uploadFile(processed.original.buffer, webpKey, {
-    contentType: 'image/webp',
+    contentType: "image/webp",
     metadata: options?.metadata,
   });
 
@@ -199,11 +195,11 @@ export async function uploadOptimizedImage(
   });
 
   // Upload responsive variants
-  const variants: OptimizedUploadResult['variants'] = [];
+  const variants: OptimizedUploadResult["variants"] = [];
   for (const variant of processed.variants) {
     const variantKey = `${keyWithoutExt}${variant.suffix}.webp`;
     await uploadFile(variant.buffer, variantKey, {
-      contentType: 'image/webp',
+      contentType: "image/webp",
       metadata: options?.metadata,
     });
     variants.push({
@@ -235,7 +231,7 @@ export async function uploadAIGeneration(
   const key = `${StoragePaths.AI_GENERATIONS}${userId}/${generationId}/${index}.png`;
 
   return uploadFile(buffer, key, {
-    contentType: 'image/png',
+    contentType: "image/png",
     metadata: {
       generationId,
       userId,
@@ -252,12 +248,12 @@ export async function uploadAvatar(
   userId: string,
   contentType: string
 ): Promise<UploadResult> {
-  const extension = contentType.split('/')[1] || 'jpg';
+  const extension = contentType.split("/")[1] || "jpg";
   const key = `${StoragePaths.AVATARS}${userId}/avatar.${extension}`;
 
   return uploadFile(buffer, key, {
     contentType,
-    cacheControl: 'public, max-age=86400', // 1 day (avatars may change)
+    cacheControl: "public, max-age=86400", // 1 day (avatars may change)
   });
 }
 
@@ -277,7 +273,7 @@ export async function uploadReferenceImage(
 
   const result = await uploadFile(buffer, key, {
     contentType,
-    cacheControl: 'private, max-age=86400', // 24 hours
+    cacheControl: "private, max-age=86400", // 24 hours
     metadata: {
       userId,
       uploadedAt: new Date().toISOString(),
@@ -444,10 +440,7 @@ export async function getPresignedDownloadUrl(
 /**
  * Copy a file to a new location
  */
-export async function copyFile(
-  sourceKey: string,
-  destinationKey: string
-): Promise<UploadResult> {
+export async function copyFile(sourceKey: string, destinationKey: string): Promise<UploadResult> {
   await s3.send(
     new CopyObjectCommand({
       Bucket: BUCKET,
@@ -466,10 +459,7 @@ export async function copyFile(
 /**
  * Move a file to a new location (copy + delete)
  */
-export async function moveFile(
-  sourceKey: string,
-  destinationKey: string
-): Promise<UploadResult> {
+export async function moveFile(sourceKey: string, destinationKey: string): Promise<UploadResult> {
   const result = await copyFile(sourceKey, destinationKey);
   await deleteFile(sourceKey);
   return result;
@@ -511,13 +501,7 @@ export async function listFiles(
  * Validate image file type
  */
 export function isValidImageType(contentType: string): boolean {
-  const validTypes = [
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-  ];
+  const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
   return validTypes.includes(contentType.toLowerCase());
 }
 
@@ -526,22 +510,19 @@ export function isValidImageType(contentType: string): boolean {
  */
 export function getExtensionFromContentType(contentType: string): string {
   const map: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
   };
-  return map[contentType.toLowerCase()] || 'jpg';
+  return map[contentType.toLowerCase()] || "jpg";
 }
 
 /**
  * Validate file size
  */
-export function isValidFileSize(
-  sizeBytes: number,
-  maxSizeMB: number = 10
-): boolean {
+export function isValidFileSize(sizeBytes: number, maxSizeMB: number = 10): boolean {
   return sizeBytes <= maxSizeMB * 1024 * 1024;
 }
 

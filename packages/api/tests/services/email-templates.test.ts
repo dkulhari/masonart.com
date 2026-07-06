@@ -10,8 +10,8 @@
  * @see packages/api/src/services/email-templates.ts
  */
 
-import { describe, it, expect } from 'vitest';
-import '../setup';
+import { describe, it, expect } from "vitest";
+import "../setup";
 
 // ============================================================================
 // Service Imports
@@ -23,54 +23,54 @@ import {
   getOutForDeliveryTemplate,
   getDeliveredTemplate,
   type EmailTemplate,
-} from '../../src/services/email-templates';
-import type { Order } from '../../src/database/schema/orders';
+} from "../../src/services/email-templates";
+import type { Order } from "../../src/database/schema/orders";
 
 // ============================================================================
 // Test Data
 // ============================================================================
 
 const createMockOrder = (overrides: Partial<Order> = {}): Order => ({
-  id: 'order-123',
-  orderNumber: 'MA-2024-001234',
-  userId: 'user-123',
+  id: "order-123",
+  orderNumber: "MA-2024-001234",
+  userId: "user-123",
   guestEmail: null,
   guestPhone: null,
-  status: 'confirmed',
+  status: "confirmed",
   itemCount: 2,
-  subtotal: '2999.00',
-  shippingCost: '0.00',
-  tax: '0.00',
-  discount: '0.00',
-  total: '2999.00',
-  paymentStatus: 'paid',
-  paymentMethod: 'card',
-  paymentId: 'pay_123',
+  subtotal: "2999.00",
+  shippingCost: "0.00",
+  tax: "0.00",
+  discount: "0.00",
+  total: "2999.00",
+  paymentStatus: "paid",
+  paymentMethod: "card",
+  paymentId: "pay_123",
   shippingAddress: {
-    fullName: 'John Doe',
-    phone: '9876543210',
-    addressLine1: '123 Main Street',
-    addressLine2: 'Apartment 4B',
-    landmark: 'Near City Mall',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    postalCode: '400001',
-    country: 'India',
+    fullName: "John Doe",
+    phone: "9876543210",
+    addressLine1: "123 Main Street",
+    addressLine2: "Apartment 4B",
+    landmark: "Near City Mall",
+    city: "Mumbai",
+    state: "Maharashtra",
+    postalCode: "400001",
+    country: "India",
   },
   billingAddress: null,
   shippingDetails: {
-    carrier: 'blue_dart',
-    trackingNumber: 'BD123456789',
-    trackingUrl: 'https://bluedart.com/track/BD123456789',
-    estimatedDelivery: new Date('2024-02-15'),
-    shippedAt: new Date('2024-02-10'),
+    carrier: "blue_dart",
+    trackingNumber: "BD123456789",
+    trackingUrl: "https://bluedart.com/track/BD123456789",
+    estimatedDelivery: new Date("2024-02-15"),
+    shippedAt: new Date("2024-02-10"),
     deliveredAt: null,
   },
   notes: null,
   trackingToken: null,
   trackingTokenExpiresAt: null,
-  createdAt: new Date('2024-02-08'),
-  updatedAt: new Date('2024-02-08'),
+  createdAt: new Date("2024-02-08"),
+  updatedAt: new Date("2024-02-08"),
   ...overrides,
 });
 
@@ -78,45 +78,45 @@ const createMockOrder = (overrides: Partial<Order> = {}): Order => ({
 // Template Structure Tests
 // ============================================================================
 
-describe('Email Templates', () => {
-  describe('Template Structure', () => {
-    it('should return EmailTemplate structure for order confirmation', () => {
+describe("Email Templates", () => {
+  describe("Template Structure", () => {
+    it("should return EmailTemplate structure for order confirmation", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template).toHaveProperty('subject');
-      expect(template).toHaveProperty('html');
-      expect(template).toHaveProperty('text');
-      expect(typeof template.subject).toBe('string');
-      expect(typeof template.html).toBe('string');
-      expect(typeof template.text).toBe('string');
+      expect(template).toHaveProperty("subject");
+      expect(template).toHaveProperty("html");
+      expect(template).toHaveProperty("text");
+      expect(typeof template.subject).toBe("string");
+      expect(typeof template.html).toBe("string");
+      expect(typeof template.text).toBe("string");
     });
 
-    it('should return EmailTemplate structure for shipped', () => {
+    it("should return EmailTemplate structure for shipped", () => {
       const order = createMockOrder();
       const template = getShippedTemplate(order);
 
-      expect(template).toHaveProperty('subject');
-      expect(template).toHaveProperty('html');
-      expect(template).toHaveProperty('text');
+      expect(template).toHaveProperty("subject");
+      expect(template).toHaveProperty("html");
+      expect(template).toHaveProperty("text");
     });
 
-    it('should return EmailTemplate structure for out for delivery', () => {
+    it("should return EmailTemplate structure for out for delivery", () => {
       const order = createMockOrder();
       const template = getOutForDeliveryTemplate(order);
 
-      expect(template).toHaveProperty('subject');
-      expect(template).toHaveProperty('html');
-      expect(template).toHaveProperty('text');
+      expect(template).toHaveProperty("subject");
+      expect(template).toHaveProperty("html");
+      expect(template).toHaveProperty("text");
     });
 
-    it('should return EmailTemplate structure for delivered', () => {
+    it("should return EmailTemplate structure for delivered", () => {
       const order = createMockOrder();
       const template = getDeliveredTemplate(order);
 
-      expect(template).toHaveProperty('subject');
-      expect(template).toHaveProperty('html');
-      expect(template).toHaveProperty('text');
+      expect(template).toHaveProperty("subject");
+      expect(template).toHaveProperty("html");
+      expect(template).toHaveProperty("text");
     });
   });
 
@@ -124,87 +124,87 @@ describe('Email Templates', () => {
   // Order Confirmation Template Tests
   // ==========================================================================
 
-  describe('getOrderConfirmationTemplate', () => {
-    it('should include order number in subject', () => {
+  describe("getOrderConfirmationTemplate", () => {
+    it("should include order number in subject", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
       expect(template.subject).toContain(order.orderNumber);
-      expect(template.subject.toLowerCase()).toContain('confirmed');
+      expect(template.subject.toLowerCase()).toContain("confirmed");
     });
 
-    it('should include customer name in HTML', () => {
+    it("should include customer name in HTML", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('John Doe');
+      expect(template.html).toContain("John Doe");
     });
 
-    it('should include order number in HTML', () => {
+    it("should include order number in HTML", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
       expect(template.html).toContain(order.orderNumber);
     });
 
-    it('should include item count in HTML', () => {
+    it("should include item count in HTML", () => {
       const order = createMockOrder({ itemCount: 3 });
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('3');
+      expect(template.html).toContain("3");
     });
 
-    it('should include formatted total in HTML', () => {
+    it("should include formatted total in HTML", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
       // Should contain currency formatted total (INR)
-      expect(template.html).toContain('2,999');
+      expect(template.html).toContain("2,999");
     });
 
-    it('should include shipping address in HTML', () => {
+    it("should include shipping address in HTML", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('123 Main Street');
-      expect(template.html).toContain('Mumbai');
-      expect(template.html).toContain('Maharashtra');
-      expect(template.html).toContain('400001');
+      expect(template.html).toContain("123 Main Street");
+      expect(template.html).toContain("Mumbai");
+      expect(template.html).toContain("Maharashtra");
+      expect(template.html).toContain("400001");
     });
 
-    it('should include view order link', () => {
+    it("should include view order link", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
       expect(template.html).toContain(`masonart.com/orders/${order.orderNumber}`);
     });
 
-    it('should have plain text version with order details', () => {
+    it("should have plain text version with order details", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
       expect(template.text).toContain(order.orderNumber);
-      expect(template.text).toContain('John Doe');
+      expect(template.text).toContain("John Doe");
     });
 
-    it('should handle order without customer name', () => {
+    it("should handle order without customer name", () => {
       const order = createMockOrder({
         shippingAddress: {
           ...createMockOrder().shippingAddress!,
-          fullName: '',
+          fullName: "",
         },
       });
       const template = getOrderConfirmationTemplate(order);
 
       // Should fall back to "there"
-      expect(template.html).toContain('there');
+      expect(template.html).toContain("there");
     });
 
-    it('should include MasonArt branding', () => {
+    it("should include MasonArt branding", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('MASONART');
+      expect(template.html).toContain("MASONART");
     });
   });
 
@@ -212,37 +212,37 @@ describe('Email Templates', () => {
   // Shipped Template Tests
   // ==========================================================================
 
-  describe('getShippedTemplate', () => {
-    it('should include order number in subject', () => {
+  describe("getShippedTemplate", () => {
+    it("should include order number in subject", () => {
       const order = createMockOrder();
       const template = getShippedTemplate(order);
 
       expect(template.subject).toContain(order.orderNumber);
-      expect(template.subject.toLowerCase()).toContain('shipped');
+      expect(template.subject.toLowerCase()).toContain("shipped");
     });
 
-    it('should include tracking information in HTML', () => {
+    it("should include tracking information in HTML", () => {
       const order = createMockOrder();
       const template = getShippedTemplate(order);
 
-      expect(template.html).toContain('BD123456789');
+      expect(template.html).toContain("BD123456789");
     });
 
-    it('should include carrier information', () => {
+    it("should include carrier information", () => {
       const order = createMockOrder();
       const template = getShippedTemplate(order);
 
-      expect(template.html).toContain('blue_dart');
+      expect(template.html).toContain("blue_dart");
     });
 
-    it('should include tracking URL', () => {
+    it("should include tracking URL", () => {
       const order = createMockOrder();
       const template = getShippedTemplate(order);
 
-      expect(template.html).toContain('bluedart.com/track/BD123456789');
+      expect(template.html).toContain("bluedart.com/track/BD123456789");
     });
 
-    it('should handle order without tracking URL', () => {
+    it("should handle order without tracking URL", () => {
       const order = createMockOrder({
         shippingDetails: {
           ...createMockOrder().shippingDetails!,
@@ -255,7 +255,7 @@ describe('Email Templates', () => {
       expect(template.html).toContain(`masonart.com/track/${order.orderNumber}`);
     });
 
-    it('should handle order without tracking number', () => {
+    it("should handle order without tracking number", () => {
       const order = createMockOrder({
         shippingDetails: {
           ...createMockOrder().shippingDetails!,
@@ -265,22 +265,22 @@ describe('Email Templates', () => {
       const template = getShippedTemplate(order);
 
       // Should still render successfully
-      expect(template.subject).toContain('Shipped');
+      expect(template.subject).toContain("Shipped");
     });
 
-    it('should include estimated delivery when available', () => {
+    it("should include estimated delivery when available", () => {
       const order = createMockOrder();
       const template = getShippedTemplate(order);
 
       // Should contain formatted date
-      expect(template.html).toContain('Estimated Delivery');
+      expect(template.html).toContain("Estimated Delivery");
     });
 
-    it('should have plain text with tracking info', () => {
+    it("should have plain text with tracking info", () => {
       const order = createMockOrder();
       const template = getShippedTemplate(order);
 
-      expect(template.text).toContain('BD123456789');
+      expect(template.text).toContain("BD123456789");
       expect(template.text).toContain(order.orderNumber);
     });
   });
@@ -289,43 +289,43 @@ describe('Email Templates', () => {
   // Out for Delivery Template Tests
   // ==========================================================================
 
-  describe('getOutForDeliveryTemplate', () => {
-    it('should include order number in subject', () => {
+  describe("getOutForDeliveryTemplate", () => {
+    it("should include order number in subject", () => {
       const order = createMockOrder();
       const template = getOutForDeliveryTemplate(order);
 
       expect(template.subject).toContain(order.orderNumber);
-      expect(template.subject.toLowerCase()).toContain('delivery');
+      expect(template.subject.toLowerCase()).toContain("delivery");
     });
 
-    it('should include urgent delivery message', () => {
+    it("should include urgent delivery message", () => {
       const order = createMockOrder();
       const template = getOutForDeliveryTemplate(order);
 
-      expect(template.html.toLowerCase()).toContain('today');
+      expect(template.html.toLowerCase()).toContain("today");
     });
 
-    it('should include shipping address', () => {
+    it("should include shipping address", () => {
       const order = createMockOrder();
       const template = getOutForDeliveryTemplate(order);
 
-      expect(template.html).toContain('123 Main Street');
-      expect(template.html).toContain('Mumbai');
+      expect(template.html).toContain("123 Main Street");
+      expect(template.html).toContain("Mumbai");
     });
 
-    it('should include track delivery button', () => {
+    it("should include track delivery button", () => {
       const order = createMockOrder();
       const template = getOutForDeliveryTemplate(order);
 
-      expect(template.html).toContain('Track');
+      expect(template.html).toContain("Track");
     });
 
-    it('should have plain text version', () => {
+    it("should have plain text version", () => {
       const order = createMockOrder();
       const template = getOutForDeliveryTemplate(order);
 
       expect(template.text).toContain(order.orderNumber);
-      expect(template.text.toLowerCase()).toContain('today');
+      expect(template.text.toLowerCase()).toContain("today");
     });
   });
 
@@ -333,43 +333,43 @@ describe('Email Templates', () => {
   // Delivered Template Tests
   // ==========================================================================
 
-  describe('getDeliveredTemplate', () => {
-    it('should include order number in subject', () => {
+  describe("getDeliveredTemplate", () => {
+    it("should include order number in subject", () => {
       const order = createMockOrder();
       const template = getDeliveredTemplate(order);
 
       expect(template.subject).toContain(order.orderNumber);
-      expect(template.subject.toLowerCase()).toContain('delivered');
+      expect(template.subject.toLowerCase()).toContain("delivered");
     });
 
-    it('should include review link', () => {
+    it("should include review link", () => {
       const order = createMockOrder();
       const template = getDeliveredTemplate(order);
 
-      expect(template.html).toContain('reviews/new');
+      expect(template.html).toContain("reviews/new");
       expect(template.html).toContain(order.orderNumber);
     });
 
-    it('should include social sharing prompt', () => {
+    it("should include social sharing prompt", () => {
       const order = createMockOrder();
       const template = getDeliveredTemplate(order);
 
-      expect(template.html.toLowerCase()).toContain('instagram');
-      expect(template.html).toContain('@masonart');
+      expect(template.html.toLowerCase()).toContain("instagram");
+      expect(template.html).toContain("@masonart");
     });
 
-    it('should include customer name', () => {
+    it("should include customer name", () => {
       const order = createMockOrder();
       const template = getDeliveredTemplate(order);
 
-      expect(template.html).toContain('John Doe');
+      expect(template.html).toContain("John Doe");
     });
 
-    it('should have plain text with review link', () => {
+    it("should have plain text with review link", () => {
       const order = createMockOrder();
       const template = getDeliveredTemplate(order);
 
-      expect(template.text).toContain('reviews/new');
+      expect(template.text).toContain("reviews/new");
       expect(template.text).toContain(order.orderNumber);
     });
   });
@@ -378,48 +378,48 @@ describe('Email Templates', () => {
   // HTML Structure Tests
   // ==========================================================================
 
-  describe('HTML Structure', () => {
-    it('should have valid HTML structure', () => {
+  describe("HTML Structure", () => {
+    it("should have valid HTML structure", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('<!DOCTYPE html>');
-      expect(template.html).toContain('<html');
-      expect(template.html).toContain('</html>');
-      expect(template.html).toContain('<head>');
-      expect(template.html).toContain('<body>');
+      expect(template.html).toContain("<!DOCTYPE html>");
+      expect(template.html).toContain("<html");
+      expect(template.html).toContain("</html>");
+      expect(template.html).toContain("<head>");
+      expect(template.html).toContain("<body>");
     });
 
-    it('should have responsive meta viewport', () => {
+    it("should have responsive meta viewport", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('viewport');
-      expect(template.html).toContain('width=device-width');
+      expect(template.html).toContain("viewport");
+      expect(template.html).toContain("width=device-width");
     });
 
-    it('should have CSS styles embedded', () => {
+    it("should have CSS styles embedded", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('<style>');
-      expect(template.html).toContain('</style>');
+      expect(template.html).toContain("<style>");
+      expect(template.html).toContain("</style>");
     });
 
-    it('should have media queries for mobile', () => {
+    it("should have media queries for mobile", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('@media');
-      expect(template.html).toContain('600px');
+      expect(template.html).toContain("@media");
+      expect(template.html).toContain("600px");
     });
 
-    it('should have footer with social links', () => {
+    it("should have footer with social links", () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('instagram.com/masonart');
-      expect(template.html).toContain('support@masonart.com');
+      expect(template.html).toContain("instagram.com/masonart");
+      expect(template.html).toContain("support@masonart.com");
     });
   });
 
@@ -427,8 +427,8 @@ describe('Email Templates', () => {
   // Edge Cases
   // ==========================================================================
 
-  describe('Edge Cases', () => {
-    it('should handle null shipping address', () => {
+  describe("Edge Cases", () => {
+    it("should handle null shipping address", () => {
       const order = createMockOrder({ shippingAddress: null });
 
       // Should not throw
@@ -438,75 +438,75 @@ describe('Email Templates', () => {
       expect(() => getDeliveredTemplate(order)).not.toThrow();
     });
 
-    it('should handle null shipping details', () => {
+    it("should handle null shipping details", () => {
       const order = createMockOrder({ shippingDetails: null });
 
       expect(() => getShippedTemplate(order)).not.toThrow();
       const template = getShippedTemplate(order);
-      expect(template.html).toContain('our carrier partner');
+      expect(template.html).toContain("our carrier partner");
     });
 
-    it('should handle very large order totals', () => {
-      const order = createMockOrder({ total: '9999999.00' });
+    it("should handle very large order totals", () => {
+      const order = createMockOrder({ total: "9999999.00" });
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('99,99,999'); // Indian format
+      expect(template.html).toContain("99,99,999"); // Indian format
     });
 
-    it('should handle zero item count', () => {
+    it("should handle zero item count", () => {
       const order = createMockOrder({ itemCount: 0 });
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('0 item');
+      expect(template.html).toContain("0 item");
     });
 
-    it('should handle single item grammatically', () => {
+    it("should handle single item grammatically", () => {
       const order = createMockOrder({ itemCount: 1 });
       const template = getOrderConfirmationTemplate(order);
 
       // Should use "item" not "items"
-      expect(template.html).toContain('1 item');
-      expect(template.html).not.toContain('1 items');
+      expect(template.html).toContain("1 item");
+      expect(template.html).not.toContain("1 items");
     });
 
-    it('should handle multiple items grammatically', () => {
+    it("should handle multiple items grammatically", () => {
       const order = createMockOrder({ itemCount: 5 });
       const template = getOrderConfirmationTemplate(order);
 
       // Should use "items" for plural
-      expect(template.html).toContain('5 items');
+      expect(template.html).toContain("5 items");
     });
 
-    it('should handle special characters in customer name', () => {
+    it("should handle special characters in customer name", () => {
       const order = createMockOrder({
         shippingAddress: {
           ...createMockOrder().shippingAddress!,
-          fullName: 'José García-López',
+          fullName: "José García-López",
         },
       });
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('José García-López');
+      expect(template.html).toContain("José García-López");
     });
 
-    it('should handle address with missing optional fields', () => {
+    it("should handle address with missing optional fields", () => {
       const order = createMockOrder({
         shippingAddress: {
-          fullName: 'John Doe',
-          phone: '9876543210',
-          addressLine1: '123 Main Street',
+          fullName: "John Doe",
+          phone: "9876543210",
+          addressLine1: "123 Main Street",
           addressLine2: null,
           landmark: null,
-          city: 'Mumbai',
-          state: 'Maharashtra',
-          postalCode: '400001',
-          country: 'India',
+          city: "Mumbai",
+          state: "Maharashtra",
+          postalCode: "400001",
+          country: "India",
         },
       });
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('123 Main Street');
-      expect(template.html).toContain('Mumbai');
+      expect(template.html).toContain("123 Main Street");
+      expect(template.html).toContain("Mumbai");
     });
   });
 
@@ -514,25 +514,25 @@ describe('Email Templates', () => {
   // Service Exports Tests
   // ==========================================================================
 
-  describe('Service Exports', () => {
-    it('should export getOrderConfirmationTemplate function', async () => {
-      const templates = await import('../../src/services/email-templates');
-      expect(typeof templates.getOrderConfirmationTemplate).toBe('function');
+  describe("Service Exports", () => {
+    it("should export getOrderConfirmationTemplate function", async () => {
+      const templates = await import("../../src/services/email-templates");
+      expect(typeof templates.getOrderConfirmationTemplate).toBe("function");
     });
 
-    it('should export getShippedTemplate function', async () => {
-      const templates = await import('../../src/services/email-templates');
-      expect(typeof templates.getShippedTemplate).toBe('function');
+    it("should export getShippedTemplate function", async () => {
+      const templates = await import("../../src/services/email-templates");
+      expect(typeof templates.getShippedTemplate).toBe("function");
     });
 
-    it('should export getOutForDeliveryTemplate function', async () => {
-      const templates = await import('../../src/services/email-templates');
-      expect(typeof templates.getOutForDeliveryTemplate).toBe('function');
+    it("should export getOutForDeliveryTemplate function", async () => {
+      const templates = await import("../../src/services/email-templates");
+      expect(typeof templates.getOutForDeliveryTemplate).toBe("function");
     });
 
-    it('should export getDeliveredTemplate function', async () => {
-      const templates = await import('../../src/services/email-templates');
-      expect(typeof templates.getDeliveredTemplate).toBe('function');
+    it("should export getDeliveredTemplate function", async () => {
+      const templates = await import("../../src/services/email-templates");
+      expect(typeof templates.getDeliveredTemplate).toBe("function");
     });
   });
 });

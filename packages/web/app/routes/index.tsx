@@ -11,26 +11,18 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute } from '@tanstack/react-router'
-import { createServerFn } from '@tanstack/react-start'
-import {
-  ArrowRight,
-  Sparkles,
-  Truck,
-  Shield,
-  Palette,
-  Star,
-  ChevronRight,
-} from 'lucide-react'
-import { productsApi } from '~/lib/api'
-import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
+import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { ArrowRight, Sparkles, Truck, Shield, Palette, Star, ChevronRight } from "lucide-react";
+import { productsApi } from "~/lib/api";
+import { ProductCard, type ProductCardData } from "~/components/product/ProductCard";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface HomePageData {
-  featuredProducts: ProductCardData[]
+  featuredProducts: ProductCardData[];
 }
 
 // ============================================================================
@@ -41,58 +33,58 @@ export interface HomePageData {
  * Fetch featured products for the home page
  * Uses SSR for SEO and fast initial page load
  */
-const getHomePageData = createServerFn({ method: 'GET' }).handler(
+const getHomePageData = createServerFn({ method: "GET" }).handler(
   async (): Promise<HomePageData> => {
     try {
       // Fetch featured products from API
-      const featuredResponse = await productsApi.featured({ limit: 8 })
+      const featuredResponse = await productsApi.featured({ limit: 8 });
       return {
         featuredProducts: featuredResponse.products || [],
-      }
+      };
     } catch (error) {
       // Return empty data on error to allow graceful fallback
       return {
         featuredProducts: [],
-      }
+      };
     }
   }
-)
+);
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute("/")({
   loader: async () => {
-    return getHomePageData()
+    return getHomePageData();
   },
   head: () => ({
     meta: [
-      { title: 'MasonArt | Premium Posters & Custom Frames' },
+      { title: "MasonArt | Premium Posters & Custom Frames" },
       {
-        name: 'description',
+        name: "description",
         content:
-          'Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection of wall art to transform your space.',
+          "Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection of wall art to transform your space.",
       },
-      { property: 'og:title', content: 'MasonArt | Premium Posters & Custom Frames' },
+      { property: "og:title", content: "MasonArt | Premium Posters & Custom Frames" },
       {
-        property: 'og:description',
+        property: "og:description",
         content:
-          'Discover premium posters and custom frames. Create unique AI-generated art for your space.',
+          "Discover premium posters and custom frames. Create unique AI-generated art for your space.",
       },
-      { property: 'og:type', content: 'website' },
-      { name: 'twitter:card', content: 'summary_large_image' },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: HomePage,
-})
+});
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function HomePage() {
-  const { featuredProducts } = Route.useLoaderData()
+  const { featuredProducts } = Route.useLoaderData();
 
   return (
     <div className="flex flex-col">
@@ -114,7 +106,7 @@ function HomePage() {
       {/* Newsletter Section */}
       <NewsletterSection />
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -140,15 +132,13 @@ function HeroSection() {
 
           {/* Headline */}
           <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-            Transform Your Space with{' '}
-            <span className="gradient-text">Premium Art</span>
+            Transform Your Space with <span className="gradient-text">Premium Art</span>
           </h1>
 
           {/* Subheadline */}
           <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
-            Discover our curated collection of stunning posters and custom frames.
-            Create unique AI-generated art or choose from hundreds of designs
-            crafted by talented artists.
+            Discover our curated collection of stunning posters and custom frames. Create unique
+            AI-generated art or choose from hundreds of designs crafted by talented artists.
           </p>
 
           {/* CTA Buttons */}
@@ -174,10 +164,7 @@ function HeroSection() {
             <div className="flex items-center gap-2">
               <div className="flex -space-x-1">
                 {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className="h-4 w-4 fill-yellow-400 text-yellow-400"
-                  />
+                  <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
               <span>4.9/5 from 2,000+ reviews</span>
@@ -194,7 +181,7 @@ function HeroSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 // ============================================================================
@@ -202,7 +189,7 @@ function HeroSection() {
 // ============================================================================
 
 interface FeaturedProductsSectionProps {
-  products: ProductCardData[]
+  products: ProductCardData[];
 }
 
 function FeaturedProductsSection({ products }: FeaturedProductsSectionProps) {
@@ -232,11 +219,7 @@ function FeaturedProductsSection({ products }: FeaturedProductsSectionProps) {
         {products.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
             {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                uniformAspectRatio="aspect-[3/4]"
-              />
+              <ProductCard key={product.id} product={product} uniformAspectRatio="aspect-[3/4]" />
             ))}
           </div>
         ) : (
@@ -255,7 +238,7 @@ function FeaturedProductsSection({ products }: FeaturedProductsSectionProps) {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 // ============================================================================
@@ -266,9 +249,7 @@ function ProductsPlaceholder() {
   return (
     <div className="rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 p-12 text-center">
       <Palette className="mx-auto h-12 w-12 text-muted-foreground/50" />
-      <h3 className="mt-4 text-lg font-medium text-foreground">
-        Coming Soon
-      </h3>
+      <h3 className="mt-4 text-lg font-medium text-foreground">Coming Soon</h3>
       <p className="mt-2 text-muted-foreground">
         Our featured collection is being curated. Check back soon for amazing posters!
       </p>
@@ -280,7 +261,7 @@ function ProductsPlaceholder() {
         Create your own with AI in the meantime
       </a>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -289,34 +270,34 @@ function ProductsPlaceholder() {
 
 const categories = [
   {
-    name: 'Abstract',
-    slug: 'abstract',
-    description: 'Bold, expressive art pieces',
-    image: '/images/categories/abstract.jpg',
-    color: 'from-purple-600/70 to-pink-600/70',
+    name: "Abstract",
+    slug: "abstract",
+    description: "Bold, expressive art pieces",
+    image: "/images/categories/abstract.jpg",
+    color: "from-purple-600/70 to-pink-600/70",
   },
   {
-    name: 'Nature',
-    slug: 'nature',
-    description: 'Serene landscapes & botanicals',
-    image: '/images/categories/nature.jpg',
-    color: 'from-green-600/70 to-teal-600/70',
+    name: "Nature",
+    slug: "nature",
+    description: "Serene landscapes & botanicals",
+    image: "/images/categories/nature.jpg",
+    color: "from-green-600/70 to-teal-600/70",
   },
   {
-    name: 'Minimalist',
-    slug: 'minimalist',
-    description: 'Clean lines, simple beauty',
-    image: '/images/categories/minimalist.jpg',
-    color: 'from-gray-600/70 to-slate-600/70',
+    name: "Minimalist",
+    slug: "minimalist",
+    description: "Clean lines, simple beauty",
+    image: "/images/categories/minimalist.jpg",
+    color: "from-gray-600/70 to-slate-600/70",
   },
   {
-    name: 'Typography',
-    slug: 'typography',
-    description: 'Words that inspire',
-    image: '/images/categories/typography.jpg',
-    color: 'from-amber-600/70 to-orange-600/70',
+    name: "Typography",
+    slug: "typography",
+    description: "Words that inspire",
+    image: "/images/categories/typography.jpg",
+    color: "from-amber-600/70 to-orange-600/70",
   },
-]
+];
 
 function CategoriesSection() {
   return (
@@ -348,7 +329,7 @@ function CategoriesSection() {
                 loading="lazy"
                 onError={(e) => {
                   // Hide broken image, gradient overlay handles the visual
-                  e.currentTarget.style.display = 'none'
+                  e.currentTarget.style.display = "none";
                 }}
               />
 
@@ -359,12 +340,8 @@ function CategoriesSection() {
 
               {/* Text content */}
               <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-white">
-                <h3 className="text-lg font-bold sm:text-xl">
-                  {category.name}
-                </h3>
-                <p className="mt-1 text-sm text-white/80">
-                  {category.description}
-                </p>
+                <h3 className="text-lg font-bold sm:text-xl">{category.name}</h3>
+                <p className="mt-1 text-sm text-white/80">{category.description}</p>
                 <span className="mt-3 inline-flex items-center text-sm font-medium opacity-0 transition-opacity group-hover:opacity-100">
                   Explore
                   <ChevronRight className="ml-1 h-4 w-4" />
@@ -375,7 +352,7 @@ function CategoriesSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 // ============================================================================
@@ -406,17 +383,16 @@ function AIGeneratorSection() {
             Create Your Own Masterpiece
           </h2>
           <p className="mt-4 text-lg text-white/80">
-            Use our AI-powered poster generator to create unique, one-of-a-kind
-            artwork. Simply describe your vision, choose a style, and watch your
-            idea come to life.
+            Use our AI-powered poster generator to create unique, one-of-a-kind artwork. Simply
+            describe your vision, choose a style, and watch your idea come to life.
           </p>
 
           {/* Features */}
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {[
-              { title: 'Easy to use', desc: 'No design skills needed' },
-              { title: 'Multiple styles', desc: 'From abstract to realistic' },
-              { title: 'Print ready', desc: 'High-quality output' },
+              { title: "Easy to use", desc: "No design skills needed" },
+              { title: "Multiple styles", desc: "From abstract to realistic" },
+              { title: "Print ready", desc: "High-quality output" },
             ].map((feature) => (
               <div key={feature.title} className="rounded-lg bg-white/10 p-4 backdrop-blur">
                 <p className="font-semibold text-white">{feature.title}</p>
@@ -436,7 +412,7 @@ function AIGeneratorSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 // ============================================================================
@@ -446,29 +422,25 @@ function AIGeneratorSection() {
 const valueProps = [
   {
     icon: Palette,
-    title: 'Premium Quality',
-    description:
-      'Museum-grade paper and archival inks ensure your prints last a lifetime.',
+    title: "Premium Quality",
+    description: "Museum-grade paper and archival inks ensure your prints last a lifetime.",
   },
   {
     icon: Truck,
-    title: 'Free Shipping',
-    description:
-      'Enjoy free delivery on all orders over ₹999, delivered right to your door.',
+    title: "Free Shipping",
+    description: "Enjoy free delivery on all orders over ₹999, delivered right to your door.",
   },
   {
     icon: Shield,
-    title: '30-Day Returns',
-    description:
-      "Not satisfied? Return within 30 days for a full refund, no questions asked.",
+    title: "30-Day Returns",
+    description: "Not satisfied? Return within 30 days for a full refund, no questions asked.",
   },
   {
     icon: Sparkles,
-    title: 'AI-Powered Creation',
-    description:
-      'Create custom artwork with our state-of-the-art AI poster generator.',
+    title: "AI-Powered Creation",
+    description: "Create custom artwork with our state-of-the-art AI poster generator.",
   },
-]
+];
 
 function ValuePropsSection() {
   return (
@@ -494,18 +466,14 @@ function ValuePropsSection() {
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-100 text-brand-600 transition-colors group-hover:bg-brand-500 group-hover:text-white">
                 <prop.icon className="h-6 w-6" />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">
-                {prop.title}
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {prop.description}
-              </p>
+              <h3 className="text-lg font-semibold text-foreground">{prop.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{prop.description}</p>
             </div>
           ))}
         </div>
       </div>
     </section>
-  )
+  );
 }
 
 // ============================================================================
@@ -521,15 +489,15 @@ function NewsletterSection() {
             Stay Inspired
           </h2>
           <p className="mt-2 text-muted-foreground">
-            Subscribe to receive updates on new collections, exclusive offers, and
-            design inspiration.
+            Subscribe to receive updates on new collections, exclusive offers, and design
+            inspiration.
           </p>
 
           {/* Newsletter Form */}
           <form
             className="mt-8 flex flex-col gap-3 sm:flex-row sm:gap-0"
             onSubmit={(e) => {
-              e.preventDefault()
+              e.preventDefault();
               // Newsletter signup will be implemented later
             }}
           >
@@ -553,5 +521,5 @@ function NewsletterSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

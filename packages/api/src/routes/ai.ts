@@ -40,19 +40,12 @@ import {
   type AuthVariables,
   type OptionalAuthVariables,
 } from "../middleware/auth";
-import {
-  requireSufficientFunds,
-  type WalletVariables,
-} from "../middleware/wallet";
+import { requireSufficientFunds, type WalletVariables } from "../middleware/wallet";
 import { deductFromWallet } from "../services/wallet";
 import { checkPromptSafety } from "../services/ai-moderation";
 import { addAIGenerationJob } from "../queues/ai-generation";
 import { getCached, setCached, CacheKeys, redis } from "../lib/redis";
-import {
-  uploadReferenceImage,
-  isValidImageType,
-  isValidFileSize,
-} from "../lib/storage";
+import { uploadReferenceImage, isValidImageType, isValidFileSize } from "../lib/storage";
 
 // ============================================================================
 // Constants
@@ -82,7 +75,13 @@ const createGenerationSchema = z.object({
   customPaletteId: z.string().uuid().optional(),
   referenceImageUrl: z.string().url().optional(),
   referenceImageWeight: z.coerce.number().min(0.1).max(1.0).optional().default(0.5),
-  variationCount: z.coerce.number().int().min(1).max(MAX_VARIATION_COUNT).optional().default(DEFAULT_VARIATION_COUNT),
+  variationCount: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_VARIATION_COUNT)
+    .optional()
+    .default(DEFAULT_VARIATION_COUNT),
   modelProvider: z.enum(aiModelProviderEnum.enumValues).optional().default("stable-diffusion"),
   seed: z.coerce.number().int().min(0).max(2147483647).optional(),
 });
@@ -92,7 +91,13 @@ const createGenerationSchema = z.object({
  */
 const listGenerationsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
-  pageSize: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional().default(DEFAULT_PAGE_SIZE),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PAGE_SIZE)
+    .optional()
+    .default(DEFAULT_PAGE_SIZE),
   status: z.enum(["queued", "processing", "completed", "failed", "cancelled"]).optional(),
   stylePreset: z.enum(aiStylePresetEnum.enumValues).optional(),
 });
@@ -102,7 +107,13 @@ const listGenerationsQuerySchema = z.object({
  */
 const galleryQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
-  pageSize: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional().default(DEFAULT_PAGE_SIZE),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PAGE_SIZE)
+    .optional()
+    .default(DEFAULT_PAGE_SIZE),
   stylePreset: z.enum(aiStylePresetEnum.enumValues).optional(),
   sortBy: z.enum(["recent", "popular"]).optional().default("recent"),
 });
@@ -144,7 +155,11 @@ const createPaletteSchema = z.object({
  */
 const updatePaletteSchema = z.object({
   name: z.string().min(1).max(50).trim().optional(),
-  colors: z.array(z.string().regex(hexColorRegex, "Invalid hex color format")).min(3).max(8).optional(),
+  colors: z
+    .array(z.string().regex(hexColorRegex, "Invalid hex color format"))
+    .min(3)
+    .max(8)
+    .optional(),
   isDefault: z.boolean().optional(),
 });
 
@@ -163,8 +178,8 @@ const REFERENCE_IMAGE_COST_MULTIPLIER = 1.2; // 20% more for img2img
 // ============================================================================
 
 const UPSCALE_COST_PAISE = {
-  "2x": 200,  // ₹2.00 for 2x upscale
-  "4x": 400,  // ₹4.00 for 4x upscale
+  "2x": 200, // ₹2.00 for 2x upscale
+  "4x": 400, // ₹4.00 for 4x upscale
 } as const;
 
 type UpscaleMultiplier = "2x" | "4x";
@@ -173,7 +188,9 @@ type UpscaleMultiplier = "2x" | "4x";
 // Route Handler
 // ============================================================================
 
-const aiApp = new Hono<{ Variables: (AuthVariables & Partial<WalletVariables>) | OptionalAuthVariables }>();
+const aiApp = new Hono<{
+  Variables: (AuthVariables & Partial<WalletVariables>) | OptionalAuthVariables;
+}>();
 
 // ============================================================================
 // POST /api/ai/generate - Create Generation Request
@@ -308,7 +325,7 @@ aiApp.post(
           jobId: job.id,
           payment: {
             usedFreeGeneration,
-            amountCharged: usedFreeGeneration ? 0 : generationCost?.userPricePaise ?? 0,
+            amountCharged: usedFreeGeneration ? 0 : (generationCost?.userPricePaise ?? 0),
             transactionId: walletTransactionId,
           },
         },
@@ -421,10 +438,7 @@ aiApp.get("/generations/:id", requireAuth, async (c) => {
 
   try {
     const generation = await db.query.aiGenerations.findFirst({
-      where: and(
-        eq(aiGenerations.id, id),
-        eq(aiGenerations.userId, user.id)
-      ),
+      where: and(eq(aiGenerations.id, id), eq(aiGenerations.userId, user.id)),
     });
 
     if (!generation) {
@@ -493,10 +507,7 @@ aiApp.post(
     try {
       // Get the generation
       const generation = await db.query.aiGenerations.findFirst({
-        where: and(
-          eq(aiGenerations.id, id),
-          eq(aiGenerations.userId, user.id)
-        ),
+        where: and(eq(aiGenerations.id, id), eq(aiGenerations.userId, user.id)),
       });
 
       if (!generation) {
@@ -570,10 +581,7 @@ aiApp.patch(
     try {
       // Verify ownership
       const generation = await db.query.aiGenerations.findFirst({
-        where: and(
-          eq(aiGenerations.id, id),
-          eq(aiGenerations.userId, user.id)
-        ),
+        where: and(eq(aiGenerations.id, id), eq(aiGenerations.userId, user.id)),
         columns: { id: true, status: true, isFlagged: true, moderationStatus: true },
       });
 
@@ -645,10 +653,7 @@ aiApp.delete("/generations/:id", requireAuth, async (c) => {
   try {
     // Verify ownership
     const generation = await db.query.aiGenerations.findFirst({
-      where: and(
-        eq(aiGenerations.id, id),
-        eq(aiGenerations.userId, user.id)
-      ),
+      where: and(eq(aiGenerations.id, id), eq(aiGenerations.userId, user.id)),
       columns: { id: true, status: true, isPurchased: true },
     });
 
@@ -695,111 +700,105 @@ aiApp.delete("/generations/:id", requireAuth, async (c) => {
 // GET /api/ai/gallery - Public Gallery
 // ============================================================================
 
-aiApp.get(
-  "/gallery",
-  optionalAuth,
-  zValidator("query", galleryQuerySchema),
-  async (c) => {
-    const { page, pageSize, stylePreset, sortBy } = c.req.valid("query");
+aiApp.get("/gallery", optionalAuth, zValidator("query", galleryQuerySchema), async (c) => {
+  const { page, pageSize, stylePreset, sortBy } = c.req.valid("query");
 
-    // Build cache key
-    const cacheKey = `${CacheKeys.AI_GENERATION}gallery:${JSON.stringify({ page, pageSize, stylePreset, sortBy })}`;
+  // Build cache key
+  const cacheKey = `${CacheKeys.AI_GENERATION}gallery:${JSON.stringify({ page, pageSize, stylePreset, sortBy })}`;
 
-    // Try cache
-    const cached = await getCached<{ items: unknown[]; total: number }>(cacheKey);
-    if (cached) {
-      return c.json({
-        ...cached,
-        page,
-        pageSize,
-        totalPages: Math.ceil(cached.total / pageSize),
-        hasNextPage: page * pageSize < cached.total,
-        hasPreviousPage: page > 1,
-        fromCache: true,
-      });
-    }
-
-    try {
-      // Build where conditions for public gallery
-      const conditions = [
-        eq(aiGenerations.visibility, "public"),
-        eq(aiGenerations.status, "completed"),
-        eq(aiGenerations.isFlagged, false),
-      ];
-
-      if (stylePreset) {
-        conditions.push(eq(aiGenerations.stylePreset, stylePreset));
-      }
-
-      // Calculate offset
-      const offset = (page - 1) * pageSize;
-
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(aiGenerations)
-        .where(and(...conditions));
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Determine sort order
-      const orderBy = sortBy === "popular"
-        ? desc(aiGenerations.likesCount)
-        : desc(aiGenerations.createdAt);
-
-      // Get public generations
-      const generations = await db
-        .select({
-          id: aiGenerations.id,
-          promptText: aiGenerations.promptText,
-          stylePreset: aiGenerations.stylePreset,
-          aspectRatio: aiGenerations.aspectRatio,
-          selectedImageUrl: aiGenerations.selectedImageUrl,
-          images: aiGenerations.images,
-          likesCount: aiGenerations.likesCount,
-          viewsCount: aiGenerations.viewsCount,
-          createdAt: aiGenerations.createdAt,
-        })
-        .from(aiGenerations)
-        .where(and(...conditions))
-        .orderBy(orderBy)
-        .limit(pageSize)
-        .offset(offset);
-
-      // Process results (return thumbnail from first/selected image)
-      const items = generations.map((gen) => {
-        const images = gen.images || [];
-        const displayImage = gen.selectedImageUrl || images[0]?.thumbnailUrl || images[0]?.imageUrl;
-        return {
-          id: gen.id,
-          promptText: gen.promptText,
-          stylePreset: gen.stylePreset,
-          aspectRatio: gen.aspectRatio,
-          imageUrl: displayImage,
-          likesCount: gen.likesCount,
-          viewsCount: gen.viewsCount,
-          createdAt: gen.createdAt,
-        };
-      });
-
-      // Cache the result
-      await setCached(cacheKey, { items, total }, CACHE_TTL_GALLERY);
-
-      return c.json({
-        items,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return c.json({ error: `Failed to fetch gallery: ${errorMessage}` }, 500);
-    }
+  // Try cache
+  const cached = await getCached<{ items: unknown[]; total: number }>(cacheKey);
+  if (cached) {
+    return c.json({
+      ...cached,
+      page,
+      pageSize,
+      totalPages: Math.ceil(cached.total / pageSize),
+      hasNextPage: page * pageSize < cached.total,
+      hasPreviousPage: page > 1,
+      fromCache: true,
+    });
   }
-);
+
+  try {
+    // Build where conditions for public gallery
+    const conditions = [
+      eq(aiGenerations.visibility, "public"),
+      eq(aiGenerations.status, "completed"),
+      eq(aiGenerations.isFlagged, false),
+    ];
+
+    if (stylePreset) {
+      conditions.push(eq(aiGenerations.stylePreset, stylePreset));
+    }
+
+    // Calculate offset
+    const offset = (page - 1) * pageSize;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(aiGenerations)
+      .where(and(...conditions));
+
+    const total = countResult[0]?.count ?? 0;
+
+    // Determine sort order
+    const orderBy =
+      sortBy === "popular" ? desc(aiGenerations.likesCount) : desc(aiGenerations.createdAt);
+
+    // Get public generations
+    const generations = await db
+      .select({
+        id: aiGenerations.id,
+        promptText: aiGenerations.promptText,
+        stylePreset: aiGenerations.stylePreset,
+        aspectRatio: aiGenerations.aspectRatio,
+        selectedImageUrl: aiGenerations.selectedImageUrl,
+        images: aiGenerations.images,
+        likesCount: aiGenerations.likesCount,
+        viewsCount: aiGenerations.viewsCount,
+        createdAt: aiGenerations.createdAt,
+      })
+      .from(aiGenerations)
+      .where(and(...conditions))
+      .orderBy(orderBy)
+      .limit(pageSize)
+      .offset(offset);
+
+    // Process results (return thumbnail from first/selected image)
+    const items = generations.map((gen) => {
+      const images = gen.images || [];
+      const displayImage = gen.selectedImageUrl || images[0]?.thumbnailUrl || images[0]?.imageUrl;
+      return {
+        id: gen.id,
+        promptText: gen.promptText,
+        stylePreset: gen.stylePreset,
+        aspectRatio: gen.aspectRatio,
+        imageUrl: displayImage,
+        likesCount: gen.likesCount,
+        viewsCount: gen.viewsCount,
+        createdAt: gen.createdAt,
+      };
+    });
+
+    // Cache the result
+    await setCached(cacheKey, { items, total }, CACHE_TTL_GALLERY);
+
+    return c.json({
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to fetch gallery: ${errorMessage}` }, 500);
+  }
+});
 
 // ============================================================================
 // GET /api/ai/status/:id - Get Job Status (for polling)
@@ -817,10 +816,7 @@ aiApp.get("/status/:id", requireAuth, async (c) => {
   try {
     // Get generation to verify ownership and get current status
     const generation = await db.query.aiGenerations.findFirst({
-      where: and(
-        eq(aiGenerations.id, id),
-        eq(aiGenerations.userId, user.id)
-      ),
+      where: and(eq(aiGenerations.id, id), eq(aiGenerations.userId, user.id)),
       columns: {
         id: true,
         status: true,
@@ -918,7 +914,7 @@ const CURATED_SUGGESTIONS: Record<string, string[]> = {
     "Gestural marks dancing in space",
     "Raw energy translated into color",
   ],
-  "botanical": [
+  botanical: [
     "Exotic orchids in scientific detail",
     "Wild meadow flowers arrangement",
     "Tropical monstera leaf study",
@@ -950,7 +946,7 @@ const CURATED_SUGGESTIONS: Record<string, string[]> = {
     "Celebrity portrait transformation",
     "Consumer culture commentary",
   ],
-  "watercolor": [
+  watercolor: [
     "Loose coastal landscape painting",
     "Delicate cherry blossoms in spring",
     "Mountain reflection in still lake",
@@ -958,7 +954,7 @@ const CURATED_SUGGESTIONS: Record<string, string[]> = {
     "Garden path through flowers",
     "Rainy city evening atmosphere",
   ],
-  "photography": [
+  photography: [
     "Golden hour portrait with natural light",
     "Dramatic landscape at sunset",
     "Urban architecture in fog",
@@ -974,7 +970,7 @@ const CURATED_SUGGESTIONS: Record<string, string[]> = {
     "Hand-drawn city skyline",
     "Elegant calligraphy letters",
   ],
-  "typography": [
+  typography: [
     "Inspirational quote in elegant script",
     "Bold motivational word poster",
     "Vintage lettering announcement",
@@ -1006,7 +1002,7 @@ const CURATED_SUGGESTIONS: Record<string, string[]> = {
     "Monochrome landscape simplification",
     "Essential forms only",
   ],
-  "impressionist": [
+  impressionist: [
     "Water lilies at golden hour",
     "Sunlit meadow with figures",
     "Coastal cliffs in afternoon light",
@@ -1065,18 +1061,12 @@ aiApp.post("/reference-image", requireAuth, async (c) => {
 
     // Validate file type
     if (!isValidImageType(file.type)) {
-      return c.json(
-        { error: "Invalid file type. Supported: JPEG, PNG, WebP" },
-        400
-      );
+      return c.json({ error: "Invalid file type. Supported: JPEG, PNG, WebP" }, 400);
     }
 
     // Validate file size
     if (!isValidFileSize(file.size, MAX_REFERENCE_IMAGE_SIZE_MB)) {
-      return c.json(
-        { error: `File size must be less than ${MAX_REFERENCE_IMAGE_SIZE_MB}MB` },
-        400
-      );
+      return c.json({ error: `File size must be less than ${MAX_REFERENCE_IMAGE_SIZE_MB}MB` }, 400);
     }
 
     // Convert file to buffer
@@ -1115,7 +1105,8 @@ aiApp.get("/reference-image-info", async (c) => {
     maxDimension: MAX_REFERENCE_IMAGE_DIMENSION,
     supportedFormats: ["image/jpeg", "image/png", "image/webp"],
     costMultiplier: REFERENCE_IMAGE_COST_MULTIPLIER,
-    costExplanation: "Using a reference image adds 20% to generation cost due to additional processing",
+    costExplanation:
+      "Using a reference image adds 20% to generation cost due to additional processing",
     weightRange: {
       min: 0.1,
       max: 1.0,
@@ -1140,70 +1131,61 @@ const suggestionsQuerySchema = z.object({
   shuffle: z.coerce.boolean().optional().default(true),
 });
 
-aiApp.get(
-  "/suggestions",
-  optionalAuth,
-  zValidator("query", suggestionsQuerySchema),
-  async (c) => {
-    const { stylePreset, limit, shuffle } = c.req.valid("query");
+aiApp.get("/suggestions", optionalAuth, zValidator("query", suggestionsQuerySchema), async (c) => {
+  const { stylePreset, limit, shuffle } = c.req.valid("query");
 
-    try {
-      // Get curated suggestions for the style
-      let suggestions: string[];
-      if (stylePreset && CURATED_SUGGESTIONS[stylePreset]) {
-        suggestions = [...CURATED_SUGGESTIONS[stylePreset]];
-      } else {
-        suggestions = [...DEFAULT_SUGGESTIONS];
-      }
-
-      // Shuffle if requested
-      if (shuffle) {
-        for (let i = suggestions.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [suggestions[i], suggestions[j]] = [suggestions[j], suggestions[i]];
-        }
-      }
-
-      // Limit results
-      suggestions = suggestions.slice(0, limit);
-
-      // Try to get popular prompts from database
-      let popularPrompts: string[] = [];
-      try {
-        const popularResults = await db
-          .select({
-            prompt: aiPromptSuggestions.prompt,
-          })
-          .from(aiPromptSuggestions)
-          .where(
-            stylePreset
-              ? eq(aiPromptSuggestions.stylePreset, stylePreset)
-              : sql`1=1`
-          )
-          .orderBy(desc(aiPromptSuggestions.usageCount))
-          .limit(3);
-
-        popularPrompts = popularResults.map((r) => r.prompt);
-      } catch {
-        // Database not available, continue without popular prompts
-      }
-
-      return c.json({
-        stylePreset: stylePreset || "all",
-        suggestions,
-        popular: popularPrompts,
-        categories: {
-          nature: ["landscape", "flowers", "mountains", "ocean", "forest"],
-          abstract: ["shapes", "colors", "patterns", "geometric", "fluid"],
-          lifestyle: ["food", "travel", "fashion", "interior", "coffee"],
-        },
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return c.json({ error: `Failed to get suggestions: ${errorMessage}` }, 500);
+  try {
+    // Get curated suggestions for the style
+    let suggestions: string[];
+    if (stylePreset && CURATED_SUGGESTIONS[stylePreset]) {
+      suggestions = [...CURATED_SUGGESTIONS[stylePreset]];
+    } else {
+      suggestions = [...DEFAULT_SUGGESTIONS];
     }
+
+    // Shuffle if requested
+    if (shuffle) {
+      for (let i = suggestions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [suggestions[i], suggestions[j]] = [suggestions[j], suggestions[i]];
+      }
+    }
+
+    // Limit results
+    suggestions = suggestions.slice(0, limit);
+
+    // Try to get popular prompts from database
+    let popularPrompts: string[] = [];
+    try {
+      const popularResults = await db
+        .select({
+          prompt: aiPromptSuggestions.prompt,
+        })
+        .from(aiPromptSuggestions)
+        .where(stylePreset ? eq(aiPromptSuggestions.stylePreset, stylePreset) : sql`1=1`)
+        .orderBy(desc(aiPromptSuggestions.usageCount))
+        .limit(3);
+
+      popularPrompts = popularResults.map((r) => r.prompt);
+    } catch {
+      // Database not available, continue without popular prompts
+    }
+
+    return c.json({
+      stylePreset: stylePreset || "all",
+      suggestions,
+      popular: popularPrompts,
+      categories: {
+        nature: ["landscape", "flowers", "mountains", "ocean", "forest"],
+        abstract: ["shapes", "colors", "patterns", "geometric", "fluid"],
+        lifestyle: ["food", "travel", "fashion", "interior", "coffee"],
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to get suggestions: ${errorMessage}` }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/ai/suggestions/featured - Get Featured/Trending Suggestions
@@ -1319,10 +1301,7 @@ aiApp.post(
     try {
       // Get the generation
       const generation = await db.query.aiGenerations.findFirst({
-        where: and(
-          eq(aiGenerations.id, id),
-          eq(aiGenerations.userId, user.id)
-        ),
+        where: and(eq(aiGenerations.id, id), eq(aiGenerations.userId, user.id)),
       });
 
       if (!generation) {
@@ -1350,8 +1329,10 @@ aiApp.post(
       }
 
       // Check if already upscaled at this level
-      if (imageToUpscale.upscaleStatus === "completed" &&
-          imageToUpscale.upscaleMultiplier === (input.multiplier === "2x" ? 2 : 4)) {
+      if (
+        imageToUpscale.upscaleStatus === "completed" &&
+        imageToUpscale.upscaleMultiplier === (input.multiplier === "2x" ? 2 : 4)
+      ) {
         return c.json({
           message: "Image already upscaled at this level",
           upscaledImageUrl: imageToUpscale.upscaledImageUrl,
@@ -1425,10 +1406,7 @@ aiApp.get("/generations/:id/upscale-status", requireAuth, async (c) => {
 
   try {
     const generation = await db.query.aiGenerations.findFirst({
-      where: and(
-        eq(aiGenerations.id, id),
-        eq(aiGenerations.userId, user.id)
-      ),
+      where: and(eq(aiGenerations.id, id), eq(aiGenerations.userId, user.id)),
       columns: {
         id: true,
         images: true,
@@ -1504,59 +1482,46 @@ aiApp.get("/upscale-info", async (c) => {
 // POST /api/ai/palettes - Create Color Palette
 // ============================================================================
 
-aiApp.post(
-  "/palettes",
-  requireAuth,
-  zValidator("json", createPaletteSchema),
-  async (c) => {
-    const user = c.get("user") as AuthVariables["user"];
-    const input = c.req.valid("json");
+aiApp.post("/palettes", requireAuth, zValidator("json", createPaletteSchema), async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+  const input = c.req.valid("json");
 
-    try {
-      // Check palette limit
-      const existingCount = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(userColorPalettes)
-        .where(eq(userColorPalettes.userId, user.id));
+  try {
+    // Check palette limit
+    const existingCount = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(userColorPalettes)
+      .where(eq(userColorPalettes.userId, user.id));
 
-      if ((existingCount[0]?.count ?? 0) >= MAX_PALETTES_PER_USER) {
-        return c.json(
-          { error: `Maximum ${MAX_PALETTES_PER_USER} palettes allowed per user` },
-          400
-        );
-      }
-
-      // If setting as default, unset other defaults first
-      if (input.isDefault) {
-        await db
-          .update(userColorPalettes)
-          .set({ isDefault: false })
-          .where(
-            and(
-              eq(userColorPalettes.userId, user.id),
-              eq(userColorPalettes.isDefault, true)
-            )
-          );
-      }
-
-      // Create the palette
-      const [palette] = await db
-        .insert(userColorPalettes)
-        .values({
-          userId: user.id,
-          name: input.name,
-          colors: input.colors,
-          isDefault: input.isDefault,
-        })
-        .returning();
-
-      return c.json({ palette }, 201);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return c.json({ error: `Failed to create palette: ${errorMessage}` }, 500);
+    if ((existingCount[0]?.count ?? 0) >= MAX_PALETTES_PER_USER) {
+      return c.json({ error: `Maximum ${MAX_PALETTES_PER_USER} palettes allowed per user` }, 400);
     }
+
+    // If setting as default, unset other defaults first
+    if (input.isDefault) {
+      await db
+        .update(userColorPalettes)
+        .set({ isDefault: false })
+        .where(and(eq(userColorPalettes.userId, user.id), eq(userColorPalettes.isDefault, true)));
+    }
+
+    // Create the palette
+    const [palette] = await db
+      .insert(userColorPalettes)
+      .values({
+        userId: user.id,
+        name: input.name,
+        colors: input.colors,
+        isDefault: input.isDefault,
+      })
+      .returning();
+
+    return c.json({ palette }, 201);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to create palette: ${errorMessage}` }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/ai/palettes - List User's Palettes
@@ -1574,14 +1539,54 @@ aiApp.get("/palettes", requireAuth, async (c) => {
 
     // Also return preset color moods as system palettes
     const systemPalettes = [
-      { id: "preset-warm", name: "Warm", colors: ["#FF5733", "#FFC300", "#FF8D1A", "#FF6B6B", "#FFE66D"], isSystem: true },
-      { id: "preset-cool", name: "Cool", colors: ["#4A90D9", "#5BC0DE", "#7B68EE", "#20B2AA", "#87CEEB"], isSystem: true },
-      { id: "preset-neutral", name: "Neutral", colors: ["#A0A0A0", "#D3D3D3", "#F5F5DC", "#C4B7A6", "#E8E8E8"], isSystem: true },
-      { id: "preset-vibrant", name: "Vibrant", colors: ["#FF0080", "#00FF00", "#0080FF", "#FFFF00", "#FF00FF"], isSystem: true },
-      { id: "preset-muted", name: "Muted", colors: ["#D4A5A5", "#A8C8A8", "#B8B8D4", "#D4C8A5", "#C8C8C8"], isSystem: true },
-      { id: "preset-earth", name: "Earth Tones", colors: ["#8B4513", "#556B2F", "#D2B48C", "#BC8F8F", "#6B4423"], isSystem: true },
-      { id: "preset-pastel", name: "Pastel", colors: ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA", "#E0BBE4"], isSystem: true },
-      { id: "preset-monochrome", name: "Monochrome", colors: ["#000000", "#333333", "#666666", "#999999", "#CCCCCC"], isSystem: true },
+      {
+        id: "preset-warm",
+        name: "Warm",
+        colors: ["#FF5733", "#FFC300", "#FF8D1A", "#FF6B6B", "#FFE66D"],
+        isSystem: true,
+      },
+      {
+        id: "preset-cool",
+        name: "Cool",
+        colors: ["#4A90D9", "#5BC0DE", "#7B68EE", "#20B2AA", "#87CEEB"],
+        isSystem: true,
+      },
+      {
+        id: "preset-neutral",
+        name: "Neutral",
+        colors: ["#A0A0A0", "#D3D3D3", "#F5F5DC", "#C4B7A6", "#E8E8E8"],
+        isSystem: true,
+      },
+      {
+        id: "preset-vibrant",
+        name: "Vibrant",
+        colors: ["#FF0080", "#00FF00", "#0080FF", "#FFFF00", "#FF00FF"],
+        isSystem: true,
+      },
+      {
+        id: "preset-muted",
+        name: "Muted",
+        colors: ["#D4A5A5", "#A8C8A8", "#B8B8D4", "#D4C8A5", "#C8C8C8"],
+        isSystem: true,
+      },
+      {
+        id: "preset-earth",
+        name: "Earth Tones",
+        colors: ["#8B4513", "#556B2F", "#D2B48C", "#BC8F8F", "#6B4423"],
+        isSystem: true,
+      },
+      {
+        id: "preset-pastel",
+        name: "Pastel",
+        colors: ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA", "#E0BBE4"],
+        isSystem: true,
+      },
+      {
+        id: "preset-monochrome",
+        name: "Monochrome",
+        colors: ["#000000", "#333333", "#666666", "#999999", "#CCCCCC"],
+        isSystem: true,
+      },
     ];
 
     return c.json({
@@ -1611,10 +1616,7 @@ aiApp.get("/palettes/:id", requireAuth, async (c) => {
 
   try {
     const palette = await db.query.userColorPalettes.findFirst({
-      where: and(
-        eq(userColorPalettes.id, id),
-        eq(userColorPalettes.userId, user.id)
-      ),
+      where: and(eq(userColorPalettes.id, id), eq(userColorPalettes.userId, user.id)),
     });
 
     if (!palette) {
@@ -1632,68 +1634,60 @@ aiApp.get("/palettes/:id", requireAuth, async (c) => {
 // PATCH /api/ai/palettes/:id - Update Palette
 // ============================================================================
 
-aiApp.patch(
-  "/palettes/:id",
-  requireAuth,
-  zValidator("json", updatePaletteSchema),
-  async (c) => {
-    const user = c.get("user") as AuthVariables["user"];
-    const { id } = c.req.param();
-    const input = c.req.valid("json");
+aiApp.patch("/palettes/:id", requireAuth, zValidator("json", updatePaletteSchema), async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+  const { id } = c.req.param();
+  const input = c.req.valid("json");
 
-    // Validate UUID format
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-      return c.json({ error: "Invalid palette ID format" }, 400);
-    }
-
-    try {
-      // Verify ownership
-      const existing = await db.query.userColorPalettes.findFirst({
-        where: and(
-          eq(userColorPalettes.id, id),
-          eq(userColorPalettes.userId, user.id)
-        ),
-      });
-
-      if (!existing) {
-        return c.json({ error: "Palette not found" }, 404);
-      }
-
-      // If setting as default, unset other defaults first
-      if (input.isDefault) {
-        await db
-          .update(userColorPalettes)
-          .set({ isDefault: false })
-          .where(
-            and(
-              eq(userColorPalettes.userId, user.id),
-              eq(userColorPalettes.isDefault, true),
-              sql`${userColorPalettes.id} != ${id}`
-            )
-          );
-      }
-
-      // Build update object
-      const updateData: Partial<typeof input> & { updatedAt?: Date } = {};
-      if (input.name !== undefined) updateData.name = input.name;
-      if (input.colors !== undefined) updateData.colors = input.colors;
-      if (input.isDefault !== undefined) updateData.isDefault = input.isDefault;
-      updateData.updatedAt = new Date();
-
-      // Update the palette
-      const [updated] = await db
-        .update(userColorPalettes)
-        .set(updateData)
-        .where(eq(userColorPalettes.id, id))
-        .returning();
-
-      return c.json({ palette: updated });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return c.json({ error: `Failed to update palette: ${errorMessage}` }, 500);
-    }
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: "Invalid palette ID format" }, 400);
   }
-);
+
+  try {
+    // Verify ownership
+    const existing = await db.query.userColorPalettes.findFirst({
+      where: and(eq(userColorPalettes.id, id), eq(userColorPalettes.userId, user.id)),
+    });
+
+    if (!existing) {
+      return c.json({ error: "Palette not found" }, 404);
+    }
+
+    // If setting as default, unset other defaults first
+    if (input.isDefault) {
+      await db
+        .update(userColorPalettes)
+        .set({ isDefault: false })
+        .where(
+          and(
+            eq(userColorPalettes.userId, user.id),
+            eq(userColorPalettes.isDefault, true),
+            sql`${userColorPalettes.id} != ${id}`
+          )
+        );
+    }
+
+    // Build update object
+    const updateData: Partial<typeof input> & { updatedAt?: Date } = {};
+    if (input.name !== undefined) updateData.name = input.name;
+    if (input.colors !== undefined) updateData.colors = input.colors;
+    if (input.isDefault !== undefined) updateData.isDefault = input.isDefault;
+    updateData.updatedAt = new Date();
+
+    // Update the palette
+    const [updated] = await db
+      .update(userColorPalettes)
+      .set(updateData)
+      .where(eq(userColorPalettes.id, id))
+      .returning();
+
+    return c.json({ palette: updated });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to update palette: ${errorMessage}` }, 500);
+  }
+});
 
 // ============================================================================
 // DELETE /api/ai/palettes/:id - Delete Palette
@@ -1711,10 +1705,7 @@ aiApp.delete("/palettes/:id", requireAuth, async (c) => {
   try {
     // Verify ownership
     const existing = await db.query.userColorPalettes.findFirst({
-      where: and(
-        eq(userColorPalettes.id, id),
-        eq(userColorPalettes.userId, user.id)
-      ),
+      where: and(eq(userColorPalettes.id, id), eq(userColorPalettes.userId, user.id)),
       columns: { id: true },
     });
 

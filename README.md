@@ -37,28 +37,33 @@ masonart/
 ## Getting Started
 
 1. **Clone the repository:**
+
    ```bash
    git clone <repository-url>
    cd masonart
    ```
 
 2. **Install dependencies:**
+
    ```bash
    bun install
    ```
 
 3. **Set up environment variables:**
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
 4. **Start Docker services (PostgreSQL & Redis):**
+
    ```bash
    docker compose up -d
    ```
 
 5. **Run database migrations:**
+
    ```bash
    cd packages/api
    bun run db:push
@@ -72,14 +77,14 @@ masonart/
 
 ## Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `bun run dev` | Start all development servers |
-| `bun run build` | Build all packages |
-| `bun run lint` | Run linters |
-| `bun run typecheck` | Run TypeScript type checking |
-| `bun run format` | Format code with Prettier |
-| `bun run clean` | Clean build artifacts |
+| Command             | Description                   |
+| ------------------- | ----------------------------- |
+| `bun run dev`       | Start all development servers |
+| `bun run build`     | Build all packages            |
+| `bun run lint`      | Run linters                   |
+| `bun run typecheck` | Run TypeScript type checking  |
+| `bun run format`    | Format code with Prettier     |
+| `bun run clean`     | Clean build artifacts         |
 
 ---
 
@@ -87,12 +92,12 @@ masonart/
 
 MasonArt uses a comprehensive testing strategy with multiple layers:
 
-| Layer | Framework | Location |
-|-------|-----------|----------|
-| **E2E Testing** | [Playwright](https://playwright.dev/) | `tests/e2e/` |
-| **Integration Testing** | [Vitest](https://vitest.dev/) | `tests/integration/` |
-| **API Unit Testing** | [Vitest](https://vitest.dev/) | `packages/api/tests/` |
-| **Web Unit Testing** | [Vitest](https://vitest.dev/) + Testing Library | `packages/web/tests/` |
+| Layer                   | Framework                                       | Location              |
+| ----------------------- | ----------------------------------------------- | --------------------- |
+| **E2E Testing**         | [Playwright](https://playwright.dev/)           | `tests/e2e/`          |
+| **Integration Testing** | [Vitest](https://vitest.dev/)                   | `tests/integration/`  |
+| **API Unit Testing**    | [Vitest](https://vitest.dev/)                   | `packages/api/tests/` |
+| **Web Unit Testing**    | [Vitest](https://vitest.dev/) + Testing Library | `packages/web/tests/` |
 
 ### Quick Start
 
@@ -217,6 +222,7 @@ The Playwright configuration (`playwright.config.ts`) supports:
 - **Flexible server management:** Auto-start or use existing server
 
 Key environment variables:
+
 - `SKIP_E2E_SERVER=true` - Skip automatic server startup
 - `E2E_BASE_URL=<url>` - Override the base URL (default: http://localhost:3001)
 - `CI=true` - Enable CI-specific settings (retries, single worker)
@@ -281,13 +287,13 @@ packages/web/tests/
 **E2E Test Example (Playwright):**
 
 ```typescript
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test.describe('Product Listing', () => {
-  test('should display products', async ({ page }) => {
-    await page.goto('/products');
-    await expect(page.getByRole('heading', { name: 'Products' })).toBeVisible();
-    await expect(page.getByTestId('product-card')).toHaveCount(12);
+test.describe("Product Listing", () => {
+  test("should display products", async ({ page }) => {
+    await page.goto("/products");
+    await expect(page.getByRole("heading", { name: "Products" })).toBeVisible();
+    await expect(page.getByTestId("product-card")).toHaveCount(12);
   });
 });
 ```
@@ -295,12 +301,12 @@ test.describe('Product Listing', () => {
 **API Test Example (Vitest):**
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import { app } from '../src/index';
+import { describe, it, expect } from "vitest";
+import { app } from "../src/index";
 
-describe('Products API', () => {
-  it('should return products list', async () => {
-    const res = await app.request('/api/products');
+describe("Products API", () => {
+  it("should return products list", async () => {
+    const res = await app.request("/api/products");
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);

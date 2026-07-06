@@ -26,11 +26,7 @@ import {
 } from "../../database/schema/shipping";
 import { orders, type OrderStatus } from "../../database/schema/orders";
 import { users } from "../../database/schema/users";
-import {
-  requireAuth,
-  requireAdmin,
-  type AuthVariables,
-} from "../../middleware/auth";
+import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
 import { generateTrackingUrl } from "../shipments";
 
 // ============================================================================
@@ -97,132 +93,137 @@ adminShipmentsApp.use("*", requireAdmin);
 // GET /api/admin/shipments - List All Shipments
 // ============================================================================
 
-adminShipmentsApp.get(
-  "/",
-  zValidator("query", listShipmentsSchema),
-  async (c) => {
-    const { status, orderId, dateFrom, dateTo, page, pageSize, sortBy, sortOrder: order } = c.req.valid("query");
+adminShipmentsApp.get("/", zValidator("query", listShipmentsSchema), async (c) => {
+  const {
+    status,
+    orderId,
+    dateFrom,
+    dateTo,
+    page,
+    pageSize,
+    sortBy,
+    sortOrder: order,
+  } = c.req.valid("query");
 
-    try {
-      // Build where conditions
-      const conditions: ReturnType<typeof eq>[] = [];
+  try {
+    // Build where conditions
+    const conditions: ReturnType<typeof eq>[] = [];
 
-      if (status) {
-        conditions.push(eq(orderShipments.status, status as ShipmentStatus));
-      }
+    if (status) {
+      conditions.push(eq(orderShipments.status, status as ShipmentStatus));
+    }
 
-      if (orderId) {
-        conditions.push(eq(orderShipments.orderId, orderId));
-      }
+    if (orderId) {
+      conditions.push(eq(orderShipments.orderId, orderId));
+    }
 
-      if (dateFrom) {
-        conditions.push(gte(orderShipments.createdAt, new Date(dateFrom)));
-      }
+    if (dateFrom) {
+      conditions.push(gte(orderShipments.createdAt, new Date(dateFrom)));
+    }
 
-      if (dateTo) {
-        conditions.push(lte(orderShipments.createdAt, new Date(dateTo)));
-      }
+    if (dateTo) {
+      conditions.push(lte(orderShipments.createdAt, new Date(dateTo)));
+    }
 
-      // Build sort order
-      const orderFn = order === "asc" ? asc : desc;
-      const orderByColumn = {
-        createdAt: orderShipments.createdAt,
+    // Build sort order
+    const orderFn = order === "asc" ? asc : desc;
+    const orderByColumn = {
+      createdAt: orderShipments.createdAt,
+      status: orderShipments.status,
+      shippedAt: orderShipments.shippedAt,
+    }[sortBy];
+
+    const offset = (page - 1) * pageSize;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(orderShipments)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    const total = countResult[0]?.count ?? 0;
+
+    // Get shipments with order info
+    const shipmentsList = await db
+      .select({
+        id: orderShipments.id,
+        orderId: orderShipments.orderId,
+        trackingNumber: orderShipments.trackingNumber,
+        carrier: orderShipments.carrier,
+        trackingUrl: orderShipments.trackingUrl,
         status: orderShipments.status,
         shippedAt: orderShipments.shippedAt,
-      }[sortBy];
-
-      const offset = (page - 1) * pageSize;
-
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(orderShipments)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Get shipments with order info
-      const shipmentsList = await db
-        .select({
-          id: orderShipments.id,
-          orderId: orderShipments.orderId,
-          trackingNumber: orderShipments.trackingNumber,
-          carrier: orderShipments.carrier,
-          trackingUrl: orderShipments.trackingUrl,
-          status: orderShipments.status,
-          shippedAt: orderShipments.shippedAt,
-          estimatedDeliveryAt: orderShipments.estimatedDeliveryAt,
-          deliveredAt: orderShipments.deliveredAt,
-          notes: orderShipments.notes,
-          createdAt: orderShipments.createdAt,
-          updatedAt: orderShipments.updatedAt,
-          order: {
-            id: orders.id,
-            orderNumber: orders.orderNumber,
-            status: orders.status,
-            userId: orders.userId,
-          },
-          shippingOption: {
-            id: shippingOptions.id,
-            name: shippingOptions.name,
-            carrier: shippingOptions.carrier,
-          },
-        })
-        .from(orderShipments)
-        .innerJoin(orders, eq(orderShipments.orderId, orders.id))
-        .leftJoin(shippingOptions, eq(orderShipments.shippingOptionId, shippingOptions.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(orderFn(orderByColumn))
-        .limit(pageSize)
-        .offset(offset);
-
-      // Get user info for orders
-      const userIds = [...new Set(shipmentsList.map((s) => s.order.userId).filter(Boolean))];
-      let userMap: Record<string, { id: string; name: string | null; email: string }> = {};
-
-      if (userIds.length > 0) {
-        const userList = await db
-          .select({
-            id: users.id,
-            name: users.name,
-            email: users.email,
-          })
-          .from(users)
-          .where(sql`${users.id} = ANY(${userIds})`);
-
-        userMap = userList.reduce(
-          (acc, user) => {
-            acc[user.id] = user;
-            return acc;
-          },
-          {} as Record<string, { id: string; name: string | null; email: string }>
-        );
-      }
-
-      // Add user info to shipments
-      const shipmentsWithUsers = shipmentsList.map((shipment) => ({
-        ...shipment,
+        estimatedDeliveryAt: orderShipments.estimatedDeliveryAt,
+        deliveredAt: orderShipments.deliveredAt,
+        notes: orderShipments.notes,
+        createdAt: orderShipments.createdAt,
+        updatedAt: orderShipments.updatedAt,
         order: {
-          ...shipment.order,
-          customer: shipment.order.userId ? userMap[shipment.order.userId] || null : null,
+          id: orders.id,
+          orderNumber: orders.orderNumber,
+          status: orders.status,
+          userId: orders.userId,
         },
-      }));
+        shippingOption: {
+          id: shippingOptions.id,
+          name: shippingOptions.name,
+          carrier: shippingOptions.carrier,
+        },
+      })
+      .from(orderShipments)
+      .innerJoin(orders, eq(orderShipments.orderId, orders.id))
+      .leftJoin(shippingOptions, eq(orderShipments.shippingOptionId, shippingOptions.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(orderFn(orderByColumn))
+      .limit(pageSize)
+      .offset(offset);
 
-      return c.json({
-        items: shipmentsWithUsers,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      console.error("Error fetching shipments:", error);
-      return c.json({ error: "Failed to fetch shipments" }, 500);
+    // Get user info for orders
+    const userIds = [...new Set(shipmentsList.map((s) => s.order.userId).filter(Boolean))];
+    let userMap: Record<string, { id: string; name: string | null; email: string }> = {};
+
+    if (userIds.length > 0) {
+      const userList = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        })
+        .from(users)
+        .where(sql`${users.id} = ANY(${userIds})`);
+
+      userMap = userList.reduce(
+        (acc, user) => {
+          acc[user.id] = user;
+          return acc;
+        },
+        {} as Record<string, { id: string; name: string | null; email: string }>
+      );
     }
+
+    // Add user info to shipments
+    const shipmentsWithUsers = shipmentsList.map((shipment) => ({
+      ...shipment,
+      order: {
+        ...shipment.order,
+        customer: shipment.order.userId ? userMap[shipment.order.userId] || null : null,
+      },
+    }));
+
+    return c.json({
+      items: shipmentsWithUsers,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    console.error("Error fetching shipments:", error);
+    return c.json({ error: "Failed to fetch shipments" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/admin/shipments/:id - Get Shipment Details
@@ -380,9 +381,7 @@ adminShipmentsApp.post(
           carrier: data.carrier,
           trackingUrl,
           status: "pending",
-          estimatedDeliveryAt: data.estimatedDeliveryAt
-            ? new Date(data.estimatedDeliveryAt)
-            : null,
+          estimatedDeliveryAt: data.estimatedDeliveryAt ? new Date(data.estimatedDeliveryAt) : null,
           notes: data.notes || null,
         })
         .returning();
@@ -416,130 +415,123 @@ adminShipmentsApp.post(
 // PATCH /api/admin/shipments/:id - Update Shipment
 // ============================================================================
 
-adminShipmentsApp.patch(
-  "/:id",
-  zValidator("json", updateShipmentSchema),
-  async (c) => {
-    const shipmentId = c.req.param("id");
-    const updates = c.req.valid("json");
+adminShipmentsApp.patch("/:id", zValidator("json", updateShipmentSchema), async (c) => {
+  const shipmentId = c.req.param("id");
+  const updates = c.req.valid("json");
 
-    // Validate UUID format
-    if (!shipmentId || !/^[0-9a-f-]{36}$/i.test(shipmentId)) {
-      return c.json({ error: "Invalid shipment ID" }, 400);
-    }
-
-    // Must provide at least one field to update
-    if (Object.keys(updates).length === 0) {
-      return c.json({ error: "No updates provided" }, 400);
-    }
-
-    try {
-      // Get existing shipment
-      const existingResult = await db
-        .select({
-          id: orderShipments.id,
-          orderId: orderShipments.orderId,
-          status: orderShipments.status,
-          carrier: orderShipments.carrier,
-        })
-        .from(orderShipments)
-        .where(eq(orderShipments.id, shipmentId))
-        .limit(1);
-
-      if (!existingResult.length) {
-        return c.json({ error: "Shipment not found" }, 404);
-      }
-
-      const existing = existingResult[0];
-
-      // Build update object
-      const updateData: Record<string, unknown> = {};
-
-      if (updates.trackingNumber !== undefined) {
-        updateData.trackingNumber = updates.trackingNumber;
-        // Auto-generate tracking URL if we have a new tracking number
-        if (updates.trackingNumber && !updates.trackingUrl) {
-          updateData.trackingUrl = generateTrackingUrl(existing.carrier, updates.trackingNumber);
-        }
-      }
-
-      if (updates.trackingUrl !== undefined) {
-        updateData.trackingUrl = updates.trackingUrl;
-      }
-
-      if (updates.status !== undefined) {
-        updateData.status = updates.status;
-
-        // Update timestamps based on status
-        if (updates.status === "shipped" && existing.status !== "shipped") {
-          updateData.shippedAt = new Date();
-        }
-        if (updates.status === "delivered" && existing.status !== "delivered") {
-          updateData.deliveredAt = new Date();
-        }
-      }
-
-      if (updates.estimatedDeliveryAt !== undefined) {
-        updateData.estimatedDeliveryAt = updates.estimatedDeliveryAt
-          ? new Date(updates.estimatedDeliveryAt)
-          : null;
-      }
-
-      if (updates.notes !== undefined) {
-        updateData.notes = updates.notes;
-      }
-
-      // Update the shipment
-      const [updatedShipment] = await db
-        .update(orderShipments)
-        .set({
-          ...updateData,
-          updatedAt: new Date(),
-        })
-        .where(eq(orderShipments.id, shipmentId))
-        .returning();
-
-      // Update order status if shipment status changed
-      if (updates.status) {
-        let newOrderStatus: OrderStatus | null = null;
-
-        if (updates.status === "shipped") {
-          newOrderStatus = "shipped";
-        } else if (updates.status === "out_for_delivery") {
-          newOrderStatus = "out_for_delivery";
-        } else if (updates.status === "delivered") {
-          newOrderStatus = "delivered";
-        }
-
-        if (newOrderStatus) {
-          const orderUpdateData: Record<string, unknown> = {
-            status: newOrderStatus,
-            updatedAt: new Date(),
-          };
-
-          if (newOrderStatus === "shipped") {
-            orderUpdateData.shippedAt = new Date();
-          } else if (newOrderStatus === "delivered") {
-            orderUpdateData.deliveredAt = new Date();
-          }
-
-          await db
-            .update(orders)
-            .set(orderUpdateData)
-            .where(eq(orders.id, existing.orderId));
-        }
-      }
-
-      return c.json({
-        message: "Shipment updated successfully",
-        shipment: updatedShipment,
-      });
-    } catch (error) {
-      console.error("Error updating shipment:", error);
-      return c.json({ error: "Failed to update shipment" }, 500);
-    }
+  // Validate UUID format
+  if (!shipmentId || !/^[0-9a-f-]{36}$/i.test(shipmentId)) {
+    return c.json({ error: "Invalid shipment ID" }, 400);
   }
-);
+
+  // Must provide at least one field to update
+  if (Object.keys(updates).length === 0) {
+    return c.json({ error: "No updates provided" }, 400);
+  }
+
+  try {
+    // Get existing shipment
+    const existingResult = await db
+      .select({
+        id: orderShipments.id,
+        orderId: orderShipments.orderId,
+        status: orderShipments.status,
+        carrier: orderShipments.carrier,
+      })
+      .from(orderShipments)
+      .where(eq(orderShipments.id, shipmentId))
+      .limit(1);
+
+    if (!existingResult.length) {
+      return c.json({ error: "Shipment not found" }, 404);
+    }
+
+    const existing = existingResult[0];
+
+    // Build update object
+    const updateData: Record<string, unknown> = {};
+
+    if (updates.trackingNumber !== undefined) {
+      updateData.trackingNumber = updates.trackingNumber;
+      // Auto-generate tracking URL if we have a new tracking number
+      if (updates.trackingNumber && !updates.trackingUrl) {
+        updateData.trackingUrl = generateTrackingUrl(existing.carrier, updates.trackingNumber);
+      }
+    }
+
+    if (updates.trackingUrl !== undefined) {
+      updateData.trackingUrl = updates.trackingUrl;
+    }
+
+    if (updates.status !== undefined) {
+      updateData.status = updates.status;
+
+      // Update timestamps based on status
+      if (updates.status === "shipped" && existing.status !== "shipped") {
+        updateData.shippedAt = new Date();
+      }
+      if (updates.status === "delivered" && existing.status !== "delivered") {
+        updateData.deliveredAt = new Date();
+      }
+    }
+
+    if (updates.estimatedDeliveryAt !== undefined) {
+      updateData.estimatedDeliveryAt = updates.estimatedDeliveryAt
+        ? new Date(updates.estimatedDeliveryAt)
+        : null;
+    }
+
+    if (updates.notes !== undefined) {
+      updateData.notes = updates.notes;
+    }
+
+    // Update the shipment
+    const [updatedShipment] = await db
+      .update(orderShipments)
+      .set({
+        ...updateData,
+        updatedAt: new Date(),
+      })
+      .where(eq(orderShipments.id, shipmentId))
+      .returning();
+
+    // Update order status if shipment status changed
+    if (updates.status) {
+      let newOrderStatus: OrderStatus | null = null;
+
+      if (updates.status === "shipped") {
+        newOrderStatus = "shipped";
+      } else if (updates.status === "out_for_delivery") {
+        newOrderStatus = "out_for_delivery";
+      } else if (updates.status === "delivered") {
+        newOrderStatus = "delivered";
+      }
+
+      if (newOrderStatus) {
+        const orderUpdateData: Record<string, unknown> = {
+          status: newOrderStatus,
+          updatedAt: new Date(),
+        };
+
+        if (newOrderStatus === "shipped") {
+          orderUpdateData.shippedAt = new Date();
+        } else if (newOrderStatus === "delivered") {
+          orderUpdateData.deliveredAt = new Date();
+        }
+
+        await db.update(orders).set(orderUpdateData).where(eq(orders.id, existing.orderId));
+      }
+    }
+
+    return c.json({
+      message: "Shipment updated successfully",
+      shipment: updatedShipment,
+    });
+  } catch (error) {
+    console.error("Error updating shipment:", error);
+    return c.json({ error: "Failed to update shipment" }, 500);
+  }
+});
 
 // ============================================================================
 // POST /api/admin/shipments/:id/mark-delivered - Mark Shipment as Delivered
@@ -610,10 +602,5 @@ adminShipmentsApp.post("/:id/mark-delivered", async (c) => {
 });
 
 // Export the router and schemas
-export {
-  adminShipmentsApp,
-  listShipmentsSchema,
-  createShipmentSchema,
-  updateShipmentSchema,
-};
+export { adminShipmentsApp, listShipmentsSchema, createShipmentSchema, updateShipmentSchema };
 export default adminShipmentsApp;

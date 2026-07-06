@@ -17,65 +17,65 @@ import {
   AlertCircle,
   ShoppingBag,
   ArrowRight,
-} from 'lucide-react'
-import { cn, formatPrice, formatDate } from '~/lib/utils'
+} from "lucide-react";
+import { cn, formatPrice, formatDate } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface OrderItem {
-  id: string
-  productTitle: string
-  thumbnailUrl?: string
-  sizeLabel?: string
-  frameName?: string
-  quantity: number
-  unitPrice: number
-  framePrice?: number
+  id: string;
+  productTitle: string;
+  thumbnailUrl?: string;
+  sizeLabel?: string;
+  frameName?: string;
+  quantity: number;
+  unitPrice: number;
+  framePrice?: number;
 }
 
 export interface Order {
-  id: string
-  orderNumber: string
-  status: OrderStatus
-  createdAt: string
-  total: number
-  subtotal: number
-  shippingCost: number
-  discountAmount?: number
-  items?: OrderItem[]
-  itemCount?: number
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  createdAt: string;
+  total: number;
+  subtotal: number;
+  shippingCost: number;
+  discountAmount?: number;
+  items?: OrderItem[];
+  itemCount?: number;
   shippingAddress?: {
-    fullName: string
-    city: string
-    state: string
-  }
-  estimatedDelivery?: string
+    fullName: string;
+    city: string;
+    state: string;
+  };
+  estimatedDelivery?: string;
 }
 
 export type OrderStatus =
-  | 'pending_payment'
-  | 'confirmed'
-  | 'processing'
-  | 'shipped'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded'
+  | "pending_payment"
+  | "confirmed"
+  | "processing"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "refunded";
 
 export interface OrderListProps {
   /** List of orders to display */
-  orders: Order[]
+  orders: Order[];
   /** Whether the list is loading */
-  isLoading?: boolean
+  isLoading?: boolean;
   /** Error message if any */
-  error?: string | null
+  error?: string | null;
   /** Show compact version (less details) */
-  compact?: boolean
+  compact?: boolean;
   /** Maximum number of orders to show (for dashboard preview) */
-  limit?: number
+  limit?: number;
   /** Optional className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -83,56 +83,56 @@ export interface OrderListProps {
 // ============================================================================
 
 interface StatusConfig {
-  label: string
-  icon: typeof Package
-  color: string
-  bgColor: string
+  label: string;
+  icon: typeof Package;
+  color: string;
+  bgColor: string;
 }
 
 const STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
   pending_payment: {
-    label: 'Pending Payment',
+    label: "Pending Payment",
     icon: Clock,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-100',
+    color: "text-amber-600",
+    bgColor: "bg-amber-100",
   },
   confirmed: {
-    label: 'Confirmed',
+    label: "Confirmed",
     icon: CheckCircle,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
+    color: "text-blue-600",
+    bgColor: "bg-blue-100",
   },
   processing: {
-    label: 'Processing',
+    label: "Processing",
     icon: Package,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
+    color: "text-purple-600",
+    bgColor: "bg-purple-100",
   },
   shipped: {
-    label: 'Shipped',
+    label: "Shipped",
     icon: Truck,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
+    color: "text-blue-600",
+    bgColor: "bg-blue-100",
   },
   delivered: {
-    label: 'Delivered',
+    label: "Delivered",
     icon: CheckCircle,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
+    color: "text-green-600",
+    bgColor: "bg-green-100",
   },
   cancelled: {
-    label: 'Cancelled',
+    label: "Cancelled",
     icon: XCircle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
+    color: "text-red-600",
+    bgColor: "bg-red-100",
   },
   refunded: {
-    label: 'Refunded',
+    label: "Refunded",
     icon: AlertCircle,
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
   },
-}
+};
 
 // ============================================================================
 // OrderList Component
@@ -159,40 +159,40 @@ export function OrderList({
   // Loading state
   if (isLoading) {
     return (
-      <div className={cn('space-y-4', className)}>
+      <div className={cn("space-y-4", className)}>
         {Array.from({ length: limit || 3 }).map((_, i) => (
           <OrderCardSkeleton key={i} compact={compact} />
         ))}
       </div>
-    )
+    );
   }
 
   // Error state
   if (error) {
     return (
-      <div className={cn('rounded-xl border border-red-200 bg-red-50 p-6 text-center', className)}>
+      <div className={cn("rounded-xl border border-red-200 bg-red-50 p-6 text-center", className)}>
         <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
         <h3 className="mt-4 text-lg font-semibold text-red-900">Unable to load orders</h3>
         <p className="mt-2 text-sm text-red-700">{error}</p>
       </div>
-    )
+    );
   }
 
   // Empty state
   if (orders.length === 0) {
-    return <EmptyOrdersState className={className} />
+    return <EmptyOrdersState className={className} />;
   }
 
   // Apply limit if specified
-  const displayOrders = limit ? orders.slice(0, limit) : orders
+  const displayOrders = limit ? orders.slice(0, limit) : orders;
 
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn("space-y-4", className)}>
       {displayOrders.map((order) => (
         <OrderCard key={order.id} order={order} compact={compact} />
       ))}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -200,21 +200,21 @@ export function OrderList({
 // ============================================================================
 
 interface OrderCardProps {
-  order: Order
-  compact?: boolean
+  order: Order;
+  compact?: boolean;
 }
 
 function OrderCard({ order, compact = false }: OrderCardProps) {
-  const statusConfig = STATUS_CONFIG[order.status] || STATUS_CONFIG.confirmed
-  const StatusIcon = statusConfig.icon
-  const itemCount = order.itemCount || order.items?.length || 0
+  const statusConfig = STATUS_CONFIG[order.status] || STATUS_CONFIG.confirmed;
+  const StatusIcon = statusConfig.icon;
+  const itemCount = order.itemCount || order.items?.length || 0;
 
   return (
     <a
       href={`/account/orders/${order.orderNumber}`}
       className={cn(
-        'block rounded-xl border border-border bg-card transition-all hover:border-brand-300 hover:shadow-md',
-        compact ? 'p-4' : 'p-4 sm:p-6'
+        "block rounded-xl border border-border bg-card transition-all hover:border-brand-300 hover:shadow-md",
+        compact ? "p-4" : "p-4 sm:p-6"
       )}
     >
       {/* Header */}
@@ -232,7 +232,7 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
         {/* Status Badge */}
         <div
           className={cn(
-            'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium',
+            "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
             statusConfig.bgColor,
             statusConfig.color
           )}
@@ -279,13 +279,13 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
               {order.items?.[0]?.productTitle}
               {(order.items?.length ?? 0) > 1 && (
                 <span className="text-muted-foreground">
-                  {' '}
+                  {" "}
                   and {(order.items?.length ?? 1) - 1} more
                 </span>
               )}
             </p>
             <p className="text-xs text-muted-foreground">
-              {itemCount} {itemCount === 1 ? 'item' : 'items'}
+              {itemCount} {itemCount === 1 ? "item" : "items"}
             </p>
           </div>
         </div>
@@ -294,7 +294,7 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
       {/* Compact item count */}
       {compact && (
         <p className="mt-2 text-sm text-muted-foreground">
-          {itemCount} {itemCount === 1 ? 'item' : 'items'}
+          {itemCount} {itemCount === 1 ? "item" : "items"}
         </p>
       )}
 
@@ -302,11 +302,13 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
       <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
         <div>
           <p className="text-sm font-semibold text-foreground">{formatPrice(order.total)}</p>
-          {order.estimatedDelivery && order.status !== 'delivered' && order.status !== 'cancelled' && (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Est. delivery: {order.estimatedDelivery}
-            </p>
-          )}
+          {order.estimatedDelivery &&
+            order.status !== "delivered" &&
+            order.status !== "cancelled" && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Est. delivery: {order.estimatedDelivery}
+              </p>
+            )}
         </div>
 
         <div className="flex items-center gap-1 text-sm font-medium text-brand-600">
@@ -315,7 +317,7 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
         </div>
       </div>
     </a>
-  )
+  );
 }
 
 // ============================================================================
@@ -323,15 +325,15 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
 // ============================================================================
 
 interface OrderCardSkeletonProps {
-  compact?: boolean
+  compact?: boolean;
 }
 
 export function OrderCardSkeleton({ compact = false }: OrderCardSkeletonProps) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded-xl border border-border bg-card',
-        compact ? 'p-4' : 'p-4 sm:p-6'
+        "animate-pulse rounded-xl border border-border bg-card",
+        compact ? "p-4" : "p-4 sm:p-6"
       )}
     >
       {/* Header */}
@@ -371,7 +373,7 @@ export function OrderCardSkeleton({ compact = false }: OrderCardSkeletonProps) {
         <div className="h-4 w-24 rounded bg-muted" />
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -379,12 +381,12 @@ export function OrderCardSkeleton({ compact = false }: OrderCardSkeletonProps) {
 // ============================================================================
 
 interface EmptyOrdersStateProps {
-  className?: string
+  className?: string;
 }
 
 function EmptyOrdersState({ className }: EmptyOrdersStateProps) {
   return (
-    <div className={cn('rounded-xl border border-border bg-card p-8 text-center', className)}>
+    <div className={cn("rounded-xl border border-border bg-card p-8 text-center", className)}>
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
         <ShoppingBag className="h-8 w-8 text-muted-foreground" />
       </div>
@@ -400,11 +402,11 @@ function EmptyOrdersState({ className }: EmptyOrdersStateProps) {
         <ArrowRight className="h-4 w-4" />
       </a>
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Exports
 // ============================================================================
 
-export default OrderList
+export default OrderList;

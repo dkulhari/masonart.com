@@ -34,6 +34,7 @@ $ARGUMENTS: <ticket-id | feature-name> [--dry-run]
 - `--dry-run`: Show what would be added without actually adding comments
 
 **Examples:**
+
 ```bash
 /tt-add-commits 159                      # Single ticket
 /tt-add-commits gemini-direct-provider   # All tickets in feature
@@ -58,6 +59,7 @@ Then call `mcp__ticketrack__listFeatures`. Fail if unavailable.
 ### Step 2: Filter Tickets Needing Commits
 
 For each ticket, check existing comments for commit info:
+
 - Look for patterns: `` `[a-f0-9]{7,8}` `` (commit hash)
 - Look for keywords: "Commit:", "commit hash", "committed"
 
@@ -69,26 +71,31 @@ For each ticket, check existing comments for commit info:
 Parse ticket description for file paths in `## Files` section.
 
 **3b. Search claude-mem:**
+
 ```yaml
 mcp__plugin_claude-mem_mcp-search__search:
   query: "<file-path-1> <file-path-2> commit"
 ```
 
 Look for commit patterns in observation facts/narrative:
+
 - 7-8 character hex hashes
 - Conventional commit messages (`feat:`, `fix:`, etc.)
 
 **3c. Search git log (fallback):**
+
 ```bash
 git log --oneline --since="2026-01-01" -- <file-path-1> <file-path-2>
 ```
 
 Match commits by:
+
 - File paths from ticket
 - Date range (ticket created date ± 7 days)
 - Commit message keywords matching ticket title
 
 **3d. Deduplicate and validate:**
+
 - Remove duplicate hashes
 - Verify hashes exist: `git cat-file -t <hash>`
 - Get full commit message: `git log -1 --format="%s" <hash>`
@@ -142,6 +149,7 @@ Tickets needing manual review:
 ### From claude-mem observations:
 
 Look for patterns in `facts` and `narrative` fields:
+
 ```
 Patterns:
 - "Committed changes with <hash>"
@@ -163,6 +171,7 @@ git log --oneline --all --grep="<ticket-title-keywords>"
 ### Validation:
 
 Before adding, verify each hash:
+
 ```bash
 git cat-file -t <hash>  # Should return "commit"
 ```
@@ -172,10 +181,10 @@ git cat-file -t <hash>  # Should return "commit"
 ```markdown
 🔗 **Commit Info** (auto-added by tt-add-commits)
 
-| Hash | Message |
-|------|---------|
+| Hash       | Message                                     |
+| ---------- | ------------------------------------------- |
 | `cc7b27c3` | feat(ai): implement gemini image generation |
-| `a6125eed` | test(ai): add failing test for gemini |
+| `a6125eed` | test(ai): add failing test for gemini       |
 
 **Source**: git log + claude-mem #2327
 ```
@@ -204,14 +213,14 @@ Run without --dry-run to apply changes.
 
 ## Error Handling
 
-| Error | Response |
-|-------|----------|
-| TickeTrack MCP unavailable | **STOP** - Display connection error |
-| Ticket not found | "Ticket #{id} not found" |
-| Feature not found | "Feature '{name}' not found" |
-| Git not available | Fall back to claude-mem only |
-| No commits found | Note in summary, continue to next ticket |
-| Invalid hash | Skip that hash, log warning |
+| Error                      | Response                                 |
+| -------------------------- | ---------------------------------------- |
+| TickeTrack MCP unavailable | **STOP** - Display connection error      |
+| Ticket not found           | "Ticket #{id} not found"                 |
+| Feature not found          | "Feature '{name}' not found"             |
+| Git not available          | Fall back to claude-mem only             |
+| No commits found           | Note in summary, continue to next ticket |
+| Invalid hash               | Skip that hash, log warning              |
 
 ## Idempotency
 

@@ -10,19 +10,12 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useCallback, useEffect } from 'react'
-import {
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from 'lucide-react'
-import { productsApi, type ProductFilters as ProductFiltersType } from '~/lib/api'
-import { cn } from '~/lib/utils'
-import {
-  ProductGrid,
-  ProductGridEmptyState,
-} from '~/components/product/ProductGrid'
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState, useCallback, useEffect } from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { productsApi, type ProductFilters as ProductFiltersType } from "~/lib/api";
+import { cn } from "~/lib/utils";
+import { ProductGrid, ProductGridEmptyState } from "~/components/product/ProductGrid";
 import {
   ProductFilters,
   MobileFilterButton,
@@ -30,40 +23,40 @@ import {
   type Orientation,
   type SortOption,
   type SortOrder,
-} from '~/components/product/ProductFilters'
-import type { ProductCardData } from '~/components/product/ProductCard'
+} from "~/components/product/ProductFilters";
+import type { ProductCardData } from "~/components/product/ProductCard";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface PostersPageData {
-  products: ProductCardData[]
+  products: ProductCardData[];
   pagination: {
-    page: number
-    pageSize: number
-    total: number
-    totalPages: number
-    hasNextPage: boolean
-    hasPreviousPage: boolean
-  }
-  filters: FilterState
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+  filters: FilterState;
 }
 
 // Search params schema for URL state
 export interface PostersSearchParams {
-  page?: number
-  styles?: string
-  subjects?: string
-  colors?: string
-  rooms?: string
-  orientation?: Orientation
-  priceMin?: number
-  priceMax?: number
-  isAiGenerated?: boolean
-  isFeatured?: boolean
-  sortBy?: SortOption
-  sortOrder?: SortOrder
+  page?: number;
+  styles?: string;
+  subjects?: string;
+  colors?: string;
+  rooms?: string;
+  orientation?: Orientation;
+  priceMin?: number;
+  priceMax?: number;
+  isAiGenerated?: boolean;
+  isFeatured?: boolean;
+  sortBy?: SortOption;
+  sortOrder?: SortOrder;
 }
 
 // ============================================================================
@@ -79,22 +72,22 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
     const apiParams: ProductFiltersType = {
       page: params.page || 1,
       pageSize: 24,
-      sortBy: params.sortBy || 'createdAt',
-      sortOrder: params.sortOrder || 'desc',
-    }
+      sortBy: params.sortBy || "createdAt",
+      sortOrder: params.sortOrder || "desc",
+    };
 
     // Add filter params
-    if (params.styles) apiParams.styles = params.styles
-    if (params.subjects) apiParams.subjects = params.subjects
-    if (params.colors) apiParams.colors = params.colors
-    if (params.rooms) apiParams.rooms = params.rooms
-    if (params.orientation) apiParams.orientation = params.orientation
-    if (params.priceMin) apiParams.priceMin = params.priceMin
-    if (params.priceMax) apiParams.priceMax = params.priceMax
-    if (params.isAiGenerated !== undefined) apiParams.isAiGenerated = params.isAiGenerated
-    if (params.isFeatured !== undefined) apiParams.isFeatured = params.isFeatured
+    if (params.styles) apiParams.styles = params.styles;
+    if (params.subjects) apiParams.subjects = params.subjects;
+    if (params.colors) apiParams.colors = params.colors;
+    if (params.rooms) apiParams.rooms = params.rooms;
+    if (params.orientation) apiParams.orientation = params.orientation;
+    if (params.priceMin) apiParams.priceMin = params.priceMin;
+    if (params.priceMax) apiParams.priceMax = params.priceMax;
+    if (params.isAiGenerated !== undefined) apiParams.isAiGenerated = params.isAiGenerated;
+    if (params.isFeatured !== undefined) apiParams.isFeatured = params.isFeatured;
 
-    const response = await productsApi.list(apiParams)
+    const response = await productsApi.list(apiParams);
 
     // Transform API response to page data
     const products: ProductCardData[] = (response.items || []).map(
@@ -103,13 +96,13 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         title: item.title as string,
         slug: item.slug as string,
         basePrice: item.basePrice as string,
-        images: (item.images as ProductCardData['images']) || [],
-        orientation: (item.orientation as ProductCardData['orientation']) || 'portrait',
+        images: (item.images as ProductCardData["images"]) || [],
+        orientation: (item.orientation as ProductCardData["orientation"]) || "portrait",
         styles: item.styles as string[] | undefined,
         isFeatured: item.isFeatured as boolean | undefined,
         isAiGenerated: item.isAiGenerated as boolean | undefined,
       })
-    )
+    );
 
     return {
       products,
@@ -122,19 +115,19 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         hasPreviousPage: response.hasPreviousPage || false,
       },
       filters: {
-        styles: params.styles?.split(',').filter(Boolean) || [],
-        subjects: params.subjects?.split(',').filter(Boolean) || [],
-        colors: params.colors?.split(',').filter(Boolean) || [],
-        rooms: params.rooms?.split(',').filter(Boolean) || [],
+        styles: params.styles?.split(",").filter(Boolean) || [],
+        subjects: params.subjects?.split(",").filter(Boolean) || [],
+        colors: params.colors?.split(",").filter(Boolean) || [],
+        rooms: params.rooms?.split(",").filter(Boolean) || [],
         orientation: params.orientation,
         priceMin: params.priceMin,
         priceMax: params.priceMax,
         isAiGenerated: params.isAiGenerated,
         isFeatured: params.isFeatured,
-        sortBy: params.sortBy || 'createdAt',
-        sortOrder: params.sortOrder || 'desc',
+        sortBy: params.sortBy || "createdAt",
+        sortOrder: params.sortOrder || "desc",
       },
-    }
+    };
   } catch {
     // Return empty data on error
     return {
@@ -152,10 +145,10 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         subjects: [],
         colors: [],
         rooms: [],
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
+        sortBy: "createdAt",
+        sortOrder: "desc",
       },
-    }
+    };
   }
 }
 
@@ -163,7 +156,7 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/posters/')({
+export const Route = createFileRoute("/posters/")({
   validateSearch: (search: Record<string, unknown>): PostersSearchParams => {
     return {
       page: search.page ? Number(search.page) : undefined,
@@ -174,122 +167,123 @@ export const Route = createFileRoute('/posters/')({
       orientation: search.orientation as Orientation | undefined,
       priceMin: search.priceMin ? Number(search.priceMin) : undefined,
       priceMax: search.priceMax ? Number(search.priceMax) : undefined,
-      isAiGenerated: search.isAiGenerated === true || search.isAiGenerated === 'true' ? true : undefined,
-      isFeatured: search.isFeatured === true || search.isFeatured === 'true' ? true : undefined,
+      isAiGenerated:
+        search.isAiGenerated === true || search.isAiGenerated === "true" ? true : undefined,
+      isFeatured: search.isFeatured === true || search.isFeatured === "true" ? true : undefined,
       sortBy: search.sortBy as SortOption | undefined,
       sortOrder: search.sortOrder as SortOrder | undefined,
-    }
+    };
   },
   loaderDeps: ({ search }) => ({ search }),
   loader: async ({ deps }) => {
-    return fetchPostersData(deps.search)
+    return fetchPostersData(deps.search);
   },
   // Force loader to re-run when search params change (fixes client-side navigation)
   shouldReload: () => true,
   head: ({ loaderData }) => {
-    const defaultDescription = 'Browse our collection of premium posters.'
-    const defaultTitle = 'Shop Posters | MasonArt'
+    const defaultDescription = "Browse our collection of premium posters.";
+    const defaultTitle = "Shop Posters | MasonArt";
 
     if (!loaderData) {
       return {
-        meta: [
-          { title: defaultTitle },
-          { name: 'description', content: defaultDescription },
-        ],
-      }
+        meta: [{ title: defaultTitle }, { name: "description", content: defaultDescription }],
+      };
     }
 
-    const { pagination, filters, products } = loaderData
+    const { pagination, filters, products } = loaderData;
     const activeFiltersCount =
       filters.styles.length +
       filters.subjects.length +
       filters.colors.length +
       filters.rooms.length +
-      (filters.orientation ? 1 : 0)
+      (filters.orientation ? 1 : 0);
 
     // Build dynamic title based on filters
-    let title = 'Shop Posters'
-    const firstStyle = filters.styles[0]
+    let title = "Shop Posters";
+    const firstStyle = filters.styles[0];
     if (filters.styles.length === 1 && firstStyle) {
-      title = `${firstStyle.replace(/-/g, ' ').replace(/\b\w/g, (char: string) => char.toUpperCase())} Posters`
+      title = `${firstStyle.replace(/-/g, " ").replace(/\b\w/g, (char: string) => char.toUpperCase())} Posters`;
     }
-    title += ' | MasonArt'
+    title += " | MasonArt";
 
-    const description = activeFiltersCount > 0
-      ? `Browse our curated collection of ${pagination.total} posters. Filter by style, subject, color, and more.`
-      : 'Discover premium posters for your space. Browse our curated collection of wall art, from abstract to minimalist, nature to typography.'
+    const description =
+      activeFiltersCount > 0
+        ? `Browse our curated collection of ${pagination.total} posters. Filter by style, subject, color, and more.`
+        : "Discover premium posters for your space. Browse our curated collection of wall art, from abstract to minimalist, nature to typography.";
 
     // Use first product image as OG image, or fall back to default
-    const firstProductImage = products[0]?.images?.[0]?.url
-    const ogImage = firstProductImage || 'https://masonart.com/og-posters-collection.jpg'
+    const firstProductImage = products[0]?.images?.[0]?.url;
+    const ogImage = firstProductImage || "https://masonart.com/og-posters-collection.jpg";
 
     // Build keywords from active filters
     const keywords = [
-      'posters',
-      'wall art',
-      'prints',
+      "posters",
+      "wall art",
+      "prints",
       ...filters.styles,
       ...filters.subjects,
-      'home decor',
-      'MasonArt',
-    ].filter(Boolean).join(', ')
+      "home decor",
+      "MasonArt",
+    ]
+      .filter(Boolean)
+      .join(", ");
 
     // Build canonical URL (without pagination for SEO)
-    const canonicalUrl = 'https://masonart.com/posters'
+    const canonicalUrl = "https://masonart.com/posters";
 
     return {
       meta: [
         // Basic meta tags
         { title },
-        { name: 'description', content: description },
-        { name: 'keywords', content: keywords },
-        { name: 'robots', content: pagination.page > 1 ? 'noindex, follow' : 'index, follow' },
+        { name: "description", content: description },
+        { name: "keywords", content: keywords },
+        { name: "robots", content: pagination.page > 1 ? "noindex, follow" : "index, follow" },
 
         // Open Graph meta tags
-        { property: 'og:title', content: title },
-        { property: 'og:description', content: description },
-        { property: 'og:type', content: 'website' },
-        { property: 'og:url', content: canonicalUrl },
-        { property: 'og:site_name', content: 'MasonArt' },
-        { property: 'og:image', content: ogImage },
-        { property: 'og:image:secure_url', content: ogImage },
-        { property: 'og:image:alt', content: 'MasonArt Poster Collection' },
-        { property: 'og:image:type', content: 'image/jpeg' },
-        { property: 'og:image:width', content: '1200' },
-        { property: 'og:image:height', content: '630' },
-        { property: 'og:locale', content: 'en_IN' },
+        { property: "og:title", content: title },
+        { property: "og:description", content: description },
+        { property: "og:type", content: "website" },
+        { property: "og:url", content: canonicalUrl },
+        { property: "og:site_name", content: "MasonArt" },
+        { property: "og:image", content: ogImage },
+        { property: "og:image:secure_url", content: ogImage },
+        { property: "og:image:alt", content: "MasonArt Poster Collection" },
+        { property: "og:image:type", content: "image/jpeg" },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:locale", content: "en_IN" },
 
         // Twitter Card meta tags
-        { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:site', content: '@masonart' },
-        { name: 'twitter:creator', content: '@masonart' },
-        { name: 'twitter:title', content: title },
-        { name: 'twitter:description', content: description },
-        { name: 'twitter:image', content: ogImage },
-        { name: 'twitter:image:alt', content: 'MasonArt Poster Collection' },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:site", content: "@masonart" },
+        { name: "twitter:creator", content: "@masonart" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: description },
+        { name: "twitter:image", content: ogImage },
+        { name: "twitter:image:alt", content: "MasonArt Poster Collection" },
       ],
       links: [
         {
-          rel: 'canonical',
+          rel: "canonical",
           href: canonicalUrl,
         },
       ],
-    }
+    };
   },
   component: PostersPage,
-})
+});
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function PostersPage() {
-  const loaderData = Route.useLoaderData()
-  const search = Route.useSearch()
-  const navigate = useNavigate()
+  const loaderData = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = useNavigate();
 
   // Handle case where loader data might be undefined
-  const products = loaderData?.products ?? []
+  const products = loaderData?.products ?? [];
   const pagination = loaderData?.pagination ?? {
     page: 1,
     pageSize: 24,
@@ -297,78 +291,78 @@ function PostersPage() {
     totalPages: 0,
     hasNextPage: false,
     hasPreviousPage: false,
-  }
+  };
   const initialFilters = loaderData?.filters ?? {
     styles: [],
     subjects: [],
     colors: [],
     rooms: [],
-    sortBy: 'createdAt' as const,
-    sortOrder: 'desc' as const,
-  }
+    sortBy: "createdAt" as const,
+    sortOrder: "desc" as const,
+  };
 
   // Local filter state (synced with URL)
-  const [filters, setFilters] = useState<FilterState>(initialFilters)
-  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
+  const [filters, setFilters] = useState<FilterState>(initialFilters);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
   // Sync filters when URL changes
   useEffect(() => {
-    setFilters(initialFilters)
-  }, [initialFilters])
+    setFilters(initialFilters);
+  }, [initialFilters]);
 
   // Handle filter changes - update URL
   const handleFiltersChange = useCallback(
     (newFilters: FilterState) => {
-      setFilters(newFilters)
+      setFilters(newFilters);
 
       // Build new search params
       const newSearch: PostersSearchParams = {
         page: 1, // Reset to page 1 when filters change
-      }
+      };
 
       if (newFilters.styles.length > 0) {
-        newSearch.styles = newFilters.styles.join(',')
+        newSearch.styles = newFilters.styles.join(",");
       }
       if (newFilters.subjects.length > 0) {
-        newSearch.subjects = newFilters.subjects.join(',')
+        newSearch.subjects = newFilters.subjects.join(",");
       }
       if (newFilters.colors.length > 0) {
-        newSearch.colors = newFilters.colors.join(',')
+        newSearch.colors = newFilters.colors.join(",");
       }
       if (newFilters.rooms.length > 0) {
-        newSearch.rooms = newFilters.rooms.join(',')
+        newSearch.rooms = newFilters.rooms.join(",");
       }
       if (newFilters.orientation) {
-        newSearch.orientation = newFilters.orientation
+        newSearch.orientation = newFilters.orientation;
       }
       if (newFilters.priceMin !== undefined) {
-        newSearch.priceMin = newFilters.priceMin
+        newSearch.priceMin = newFilters.priceMin;
       }
       if (newFilters.priceMax !== undefined) {
-        newSearch.priceMax = newFilters.priceMax
+        newSearch.priceMax = newFilters.priceMax;
       }
       if (newFilters.isAiGenerated !== undefined) {
-        newSearch.isAiGenerated = newFilters.isAiGenerated
+        newSearch.isAiGenerated = newFilters.isAiGenerated;
       }
       if (newFilters.isFeatured !== undefined) {
-        newSearch.isFeatured = newFilters.isFeatured
+        newSearch.isFeatured = newFilters.isFeatured;
       }
-      if (newFilters.sortBy && newFilters.sortBy !== 'createdAt') {
-        newSearch.sortBy = newFilters.sortBy
+      if (newFilters.sortBy && newFilters.sortBy !== "createdAt") {
+        newSearch.sortBy = newFilters.sortBy;
       }
-      if (newFilters.sortOrder && newFilters.sortOrder !== 'desc') {
-        newSearch.sortOrder = newFilters.sortOrder
+      if (newFilters.sortOrder && newFilters.sortOrder !== "desc") {
+        newSearch.sortOrder = newFilters.sortOrder;
       }
 
       // Navigate with new search params
       navigate({
-        to: '/posters',
+        to: "/posters",
         search: newSearch,
         replace: true,
-      })
+      });
     },
     [navigate]
-  )
+  );
 
   // Handle page change
   const handlePageChange = useCallback(
@@ -377,20 +371,20 @@ function PostersPage() {
       const newSearch: PostersSearchParams = {
         ...search,
         page: newPage > 1 ? newPage : undefined, // Only include page param if > 1
-      }
+      };
 
       // Remove undefined values to keep URL clean
       const cleanSearch = Object.fromEntries(
         Object.entries(newSearch).filter(([, v]) => v !== undefined)
-      ) as PostersSearchParams
+      ) as PostersSearchParams;
 
       navigate({
-        to: '/posters',
+        to: "/posters",
         search: cleanSearch,
-      })
+      });
     },
     [navigate, search]
-  )
+  );
 
   // Count active filters for badge
   const activeFilterCount =
@@ -401,15 +395,12 @@ function PostersPage() {
     (filters.orientation ? 1 : 0) +
     (filters.priceMin !== undefined ? 1 : 0) +
     (filters.priceMax !== undefined ? 1 : 0) +
-    (filters.isAiGenerated !== undefined ? 1 : 0)
+    (filters.isAiGenerated !== undefined ? 1 : 0);
 
   return (
     <div className="flex flex-col">
       {/* Page Header */}
-      <PageHeader
-        totalProducts={pagination.total}
-        activeFilterCount={activeFilterCount}
-      />
+      <PageHeader totalProducts={pagination.total} activeFilterCount={activeFilterCount} />
 
       {/* Main Content */}
       <div className="container-wide py-6 lg:py-8">
@@ -417,10 +408,7 @@ function PostersPage() {
           {/* Desktop Filters Sidebar */}
           <aside className="hidden w-64 shrink-0 lg:block">
             <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border border-border">
-              <ProductFilters
-                filters={filters}
-                onFiltersChange={handleFiltersChange}
-              />
+              <ProductFilters filters={filters} onFiltersChange={handleFiltersChange} />
             </div>
           </aside>
 
@@ -439,16 +427,16 @@ function PostersPage() {
                   filters={filters}
                   onRemoveFilter={(key, value) => {
                     if (Array.isArray(filters[key])) {
-                      const currentValues = filters[key] as string[]
+                      const currentValues = filters[key] as string[];
                       handleFiltersChange({
                         ...filters,
                         [key]: currentValues.filter((v) => v !== value),
-                      })
+                      });
                     } else {
                       handleFiltersChange({
                         ...filters,
                         [key]: undefined,
-                      })
+                      });
                     }
                   }}
                   onClearAll={() =>
@@ -462,8 +450,8 @@ function PostersPage() {
                       priceMax: undefined,
                       isAiGenerated: undefined,
                       isFeatured: undefined,
-                      sortBy: 'createdAt',
-                      sortOrder: 'desc',
+                      sortBy: "createdAt",
+                      sortOrder: "desc",
                     })
                   }
                 />
@@ -477,16 +465,16 @@ function PostersPage() {
                   filters={filters}
                   onRemoveFilter={(key, value) => {
                     if (Array.isArray(filters[key])) {
-                      const currentValues = filters[key] as string[]
+                      const currentValues = filters[key] as string[];
                       handleFiltersChange({
                         ...filters,
                         [key]: currentValues.filter((v) => v !== value),
-                      })
+                      });
                     } else {
                       handleFiltersChange({
                         ...filters,
                         [key]: undefined,
-                      })
+                      });
                     }
                   }}
                   onClearAll={() =>
@@ -500,8 +488,8 @@ function PostersPage() {
                       priceMax: undefined,
                       isAiGenerated: undefined,
                       isFeatured: undefined,
-                      sortBy: 'createdAt',
-                      sortOrder: 'desc',
+                      sortBy: "createdAt",
+                      sortOrder: "desc",
                     })
                   }
                 />
@@ -547,7 +535,7 @@ function PostersPage() {
         onFiltersChange={handleFiltersChange}
       />
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -555,8 +543,8 @@ function PostersPage() {
 // ============================================================================
 
 interface PageHeaderProps {
-  totalProducts: number
-  activeFilterCount: number
+  totalProducts: number;
+  activeFilterCount: number;
 }
 
 function PageHeader({ totalProducts, activeFilterCount }: PageHeaderProps) {
@@ -569,16 +557,16 @@ function PageHeader({ totalProducts, activeFilterCount }: PageHeaderProps) {
         <p className="mt-2 text-muted-foreground">
           {totalProducts > 0 ? (
             <>
-              Showing {totalProducts} product{totalProducts !== 1 && 's'}
-              {activeFilterCount > 0 && ' matching your filters'}
+              Showing {totalProducts} product{totalProducts !== 1 && "s"}
+              {activeFilterCount > 0 && " matching your filters"}
             </>
           ) : (
-            'Browse our collection of premium posters'
+            "Browse our collection of premium posters"
           )}
         </p>
       </div>
     </section>
-  )
+  );
 }
 
 // ============================================================================
@@ -586,80 +574,76 @@ function PageHeader({ totalProducts, activeFilterCount }: PageHeaderProps) {
 // ============================================================================
 
 interface ActiveFilterTagsProps {
-  filters: FilterState
-  onRemoveFilter: (key: keyof FilterState, value?: string) => void
-  onClearAll: () => void
+  filters: FilterState;
+  onRemoveFilter: (key: keyof FilterState, value?: string) => void;
+  onClearAll: () => void;
 }
 
-function ActiveFilterTags({
-  filters,
-  onRemoveFilter,
-  onClearAll,
-}: ActiveFilterTagsProps) {
+function ActiveFilterTags({ filters, onRemoveFilter, onClearAll }: ActiveFilterTagsProps) {
   const tags: Array<{
-    key: keyof FilterState
-    value: string
-    label: string
-  }> = []
+    key: keyof FilterState;
+    value: string;
+    label: string;
+  }> = [];
 
   // Build tags array from filters
   filters.styles.forEach((style) => {
     tags.push({
-      key: 'styles',
+      key: "styles",
       value: style,
-      label: style.replace(/-/g, ' '),
-    })
-  })
+      label: style.replace(/-/g, " "),
+    });
+  });
 
   filters.subjects.forEach((subject) => {
     tags.push({
-      key: 'subjects',
+      key: "subjects",
       value: subject,
-      label: subject.replace(/-/g, ' '),
-    })
-  })
+      label: subject.replace(/-/g, " "),
+    });
+  });
 
   filters.colors.forEach((color) => {
     tags.push({
-      key: 'colors',
+      key: "colors",
       value: color,
-      label: color.replace(/-/g, ' '),
-    })
-  })
+      label: color.replace(/-/g, " "),
+    });
+  });
 
   filters.rooms.forEach((room) => {
     tags.push({
-      key: 'rooms',
+      key: "rooms",
       value: room,
-      label: room.replace(/-/g, ' '),
-    })
-  })
+      label: room.replace(/-/g, " "),
+    });
+  });
 
   if (filters.orientation) {
     tags.push({
-      key: 'orientation',
+      key: "orientation",
       value: filters.orientation,
       label: filters.orientation,
-    })
+    });
   }
 
   if (filters.isAiGenerated !== undefined) {
     tags.push({
-      key: 'isAiGenerated',
-      value: 'true',
-      label: 'AI Generated',
-    })
+      key: "isAiGenerated",
+      value: "true",
+      label: "AI Generated",
+    });
   }
 
   if (filters.isFeatured !== undefined) {
     tags.push({
-      key: 'isFeatured',
-      value: 'true',
-      label: 'Featured',
-    })
+      key: "isFeatured",
+      value: "true",
+      label: "Featured",
+    });
   }
 
-  if (tags.length === 0) return null
+  if (tags.length === 0) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -683,7 +667,7 @@ function ActiveFilterTags({
         Clear all
       </button>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -691,11 +675,11 @@ function ActiveFilterTags({
 // ============================================================================
 
 interface PaginationProps {
-  currentPage: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-  onPageChange: (page: number) => void
+  currentPage: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  onPageChange: (page: number) => void;
 }
 
 function Pagination({
@@ -707,60 +691,57 @@ function Pagination({
 }: PaginationProps) {
   // Generate page numbers to show
   const getPageNumbers = () => {
-    const pages: (number | 'ellipsis')[] = []
-    const showEllipsis = totalPages > 7
+    const pages: (number | "ellipsis")[] = [];
+    const showEllipsis = totalPages > 7;
 
     if (!showEllipsis) {
       // Show all pages
       for (let i = 1; i <= totalPages; i++) {
-        pages.push(i)
+        pages.push(i);
       }
     } else {
       // Always show first page
-      pages.push(1)
+      pages.push(1);
 
       if (currentPage > 3) {
-        pages.push('ellipsis')
+        pages.push("ellipsis");
       }
 
       // Show pages around current
-      const start = Math.max(2, currentPage - 1)
-      const end = Math.min(totalPages - 1, currentPage + 1)
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
 
       for (let i = start; i <= end; i++) {
         if (!pages.includes(i)) {
-          pages.push(i)
+          pages.push(i);
         }
       }
 
       if (currentPage < totalPages - 2) {
-        pages.push('ellipsis')
+        pages.push("ellipsis");
       }
 
       // Always show last page
       if (!pages.includes(totalPages)) {
-        pages.push(totalPages)
+        pages.push(totalPages);
       }
     }
 
-    return pages
-  }
+    return pages;
+  };
 
   return (
-    <nav
-      className="mt-12 flex items-center justify-center gap-1"
-      aria-label="Pagination"
-    >
+    <nav className="mt-12 flex items-center justify-center gap-1" aria-label="Pagination">
       {/* Previous Button */}
       <button
         type="button"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={!hasPreviousPage}
         className={cn(
-          'flex h-10 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
+          "flex h-10 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors",
           hasPreviousPage
-            ? 'border-border hover:bg-accent'
-            : 'cursor-not-allowed border-border/50 text-muted-foreground'
+            ? "border-border hover:bg-accent"
+            : "cursor-not-allowed border-border/50 text-muted-foreground"
         )}
         aria-label="Go to previous page"
       >
@@ -771,7 +752,7 @@ function Pagination({
       {/* Page Numbers */}
       <div className="flex items-center gap-1">
         {getPageNumbers().map((page, index) =>
-          page === 'ellipsis' ? (
+          page === "ellipsis" ? (
             <span
               key={`ellipsis-${index}`}
               className="flex h-10 w-10 items-center justify-center text-muted-foreground"
@@ -784,13 +765,11 @@ function Pagination({
               type="button"
               onClick={() => onPageChange(page)}
               className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium transition-colors',
-                page === currentPage
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-accent'
+                "flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium transition-colors",
+                page === currentPage ? "bg-primary text-primary-foreground" : "hover:bg-accent"
               )}
               aria-label={`Go to page ${page}`}
-              aria-current={page === currentPage ? 'page' : undefined}
+              aria-current={page === currentPage ? "page" : undefined}
             >
               {page}
             </button>
@@ -804,10 +783,10 @@ function Pagination({
         onClick={() => onPageChange(currentPage + 1)}
         disabled={!hasNextPage}
         className={cn(
-          'flex h-10 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
+          "flex h-10 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors",
           hasNextPage
-            ? 'border-border hover:bg-accent'
-            : 'cursor-not-allowed border-border/50 text-muted-foreground'
+            ? "border-border hover:bg-accent"
+            : "cursor-not-allowed border-border/50 text-muted-foreground"
         )}
         aria-label="Go to next page"
       >
@@ -815,7 +794,7 @@ function Pagination({
         <ChevronRight className="h-4 w-4" />
       </button>
     </nav>
-  )
+  );
 }
 
 // ============================================================================
@@ -823,10 +802,10 @@ function Pagination({
 // ============================================================================
 
 interface MobileFiltersSheetProps {
-  isOpen: boolean
-  onClose: () => void
-  filters: FilterState
-  onFiltersChange: (filters: FilterState) => void
+  isOpen: boolean;
+  onClose: () => void;
+  filters: FilterState;
+  onFiltersChange: (filters: FilterState) => void;
 }
 
 function MobileFiltersSheet({
@@ -838,17 +817,17 @@ function MobileFiltersSheet({
   // Prevent body scroll when sheet is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden'
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = ''
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isOpen])
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <>
@@ -874,5 +853,5 @@ function MobileFiltersSheet({
         />
       </div>
     </>
-  )
+  );
 }

@@ -299,8 +299,7 @@ Thank you for choosing MasonArt!
  */
 export function getShippedTemplate(order: Order): EmailTemplate {
   const trackingUrl =
-    order.shippingDetails?.trackingUrl ||
-    `https://masonart.com/track/${order.orderNumber}`;
+    order.shippingDetails?.trackingUrl || `https://masonart.com/track/${order.orderNumber}`;
   const carrier = order.shippingDetails?.carrier || "our carrier partner";
   const trackingNumber = order.shippingDetails?.trackingNumber || "";
   const estimatedDelivery = order.shippingDetails?.estimatedDelivery;
@@ -374,8 +373,7 @@ Thank you for choosing MasonArt!
  */
 export function getOutForDeliveryTemplate(order: Order): EmailTemplate {
   const trackingUrl =
-    order.shippingDetails?.trackingUrl ||
-    `https://masonart.com/track/${order.orderNumber}`;
+    order.shippingDetails?.trackingUrl || `https://masonart.com/track/${order.orderNumber}`;
 
   const content = `
     <div class="content">
@@ -521,9 +519,7 @@ export interface ApprovalEmailContext {
  * Photo Ready for Review Email Template
  * Sent when admin uploads production photos for customer review
  */
-export function getPhotoReadyForReviewTemplate(
-  context: ApprovalEmailContext
-): EmailTemplate {
+export function getPhotoReadyForReviewTemplate(context: ApprovalEmailContext): EmailTemplate {
   const { approval, order, orderItem, photos, approvalUrl } = context;
   const customerName = order.shippingAddress?.fullName || "there";
   const productTitle = orderItem.snapshot?.title || "your custom item";
@@ -556,12 +552,16 @@ export function getPhotoReadyForReviewTemplate(
           <span class="label">Item</span>
           <span class="value">${productTitle}</span>
         </div>
-        ${orderItem.snapshot?.sizeLabel ? `
+        ${
+          orderItem.snapshot?.sizeLabel
+            ? `
         <div class="order-detail">
           <span class="label">Size</span>
           <span class="value">${orderItem.snapshot.sizeLabel}</span>
         </div>
-        ` : ""}
+        `
+            : ""
+        }
         <div class="order-detail">
           <span class="label">Review Deadline</span>
           <span class="value">${approval.deadlineAt ? formatDate(approval.deadlineAt) : "7 days from now"}</span>
@@ -607,9 +607,7 @@ Thank you for choosing MasonArt!
  * Changes Requested Response Email Template
  * Sent when admin responds to customer's change request with new photos
  */
-export function getChangesRequestedResponseTemplate(
-  context: ApprovalEmailContext
-): EmailTemplate {
+export function getChangesRequestedResponseTemplate(context: ApprovalEmailContext): EmailTemplate {
   const { order, orderItem, photos, approvalUrl } = context;
   const customerName = order.shippingAddress?.fullName || "there";
   const productTitle = orderItem.snapshot?.title || "your custom item";
@@ -679,9 +677,7 @@ Thank you for choosing MasonArt!
  * Approval Confirmed Email Template
  * Sent when customer approves production for shipping
  */
-export function getApprovalConfirmedTemplate(
-  context: ApprovalEmailContext
-): EmailTemplate {
+export function getApprovalConfirmedTemplate(context: ApprovalEmailContext): EmailTemplate {
   const { order, orderItem } = context;
   const customerName = order.shippingAddress?.fullName || "there";
   const productTitle = orderItem.snapshot?.title || "your custom item";
@@ -758,9 +754,7 @@ Thank you for choosing MasonArt!
  * Approval Deadline Reminder Email Template
  * Sent when approval deadline is approaching
  */
-export function getApprovalDeadlineReminderTemplate(
-  context: ApprovalEmailContext
-): EmailTemplate {
+export function getApprovalDeadlineReminderTemplate(context: ApprovalEmailContext): EmailTemplate {
   const { approval, order, orderItem, approvalUrl } = context;
   const customerName = order.shippingAddress?.fullName || "there";
   const productTitle = orderItem.snapshot?.title || "your custom item";
@@ -845,14 +839,11 @@ export interface AIModerationEmailContext {
  * AI Generation Approved Email Template
  * Sent when an AI-generated image passes moderation
  */
-export function getAIGenerationApprovedTemplate(
-  context: AIModerationEmailContext
-): EmailTemplate {
+export function getAIGenerationApprovedTemplate(context: AIModerationEmailContext): EmailTemplate {
   const { userName, generationId, promptText, stylePreset, imageUrl } = context;
   const displayName = userName || "there";
-  const truncatedPrompt = promptText.length > 100
-    ? promptText.substring(0, 100) + "..."
-    : promptText;
+  const truncatedPrompt =
+    promptText.length > 100 ? promptText.substring(0, 100) + "..." : promptText;
 
   const content = `
     <div class="content">
@@ -860,17 +851,24 @@ export function getAIGenerationApprovedTemplate(
       <p>Hi ${displayName},</p>
       <p>Great news! Your AI-generated artwork has been reviewed and approved. You can now add it to your cart and share it in the gallery.</p>
 
-      ${imageUrl ? `
+      ${
+        imageUrl
+          ? `
       <div style="text-align: center; margin: 24px 0;">
         <img src="${imageUrl}" alt="Your AI Creation" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
       </div>
-      ` : ''}
+      `
+          : ""
+      }
 
       <div class="order-box">
         <h3>Creation Details</h3>
         <div class="order-detail">
           <span class="label">Style</span>
-          <span class="value">${stylePreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+          <span class="value">${stylePreset
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ")}</span>
         </div>
         <div class="order-detail">
           <span class="label">Prompt</span>
@@ -900,7 +898,10 @@ Hi ${displayName},
 Great news! Your AI-generated artwork has been reviewed and approved. You can now add it to your cart and share it in the gallery.
 
 Creation Details:
-- Style: ${stylePreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+- Style: ${stylePreset
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")}
 - Prompt: ${truncatedPrompt}
 - Status: Approved ✓
 
@@ -930,13 +931,15 @@ export function getAIGenerationRejectedTemplate(
 ): EmailTemplate {
   const { userName, promptText, stylePreset, rejectionReason, rejectionCategory } = context;
   const displayName = userName || "there";
-  const truncatedPrompt = promptText.length > 100
-    ? promptText.substring(0, 100) + "..."
-    : promptText;
+  const truncatedPrompt =
+    promptText.length > 100 ? promptText.substring(0, 100) + "..." : promptText;
 
   const categoryDisplay = rejectionCategory
-    ? rejectionCategory.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-    : 'Content Policy';
+    ? rejectionCategory
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")
+    : "Content Policy";
 
   const content = `
     <div class="content">
@@ -955,7 +958,10 @@ export function getAIGenerationRejectedTemplate(
         <h3>Creation Details</h3>
         <div class="order-detail">
           <span class="label">Style</span>
-          <span class="value">${stylePreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</span>
+          <span class="value">${stylePreset
+            .split("-")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ")}</span>
         </div>
         <div class="order-detail">
           <span class="label">Prompt</span>
@@ -990,7 +996,10 @@ Reason: ${categoryDisplay}
 ${rejectionReason}
 
 Creation Details:
-- Style: ${stylePreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+- Style: ${stylePreset
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")}
 - Prompt: ${truncatedPrompt}
 - Status: Not Approved
 

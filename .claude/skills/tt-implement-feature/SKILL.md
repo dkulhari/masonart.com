@@ -31,6 +31,7 @@ Delivers an entire feature by automatically implementing all tickets in order.
 2. **User explicitly interrupts**: User sends a message or cancels
 
 **DO NOT stop to:**
+
 - Ask "should I continue?" - YES, always continue
 - Ask "is this approach okay?" - Make the decision and proceed
 - Confirm before each ticket - Just do it
@@ -39,6 +40,7 @@ Delivers an entire feature by automatically implementing all tickets in order.
 ### Handling Failures
 
 **Build/Test failures:**
+
 1. Attempt to fix (up to 7 attempts)
 2. If still failing after 7 attempts:
    - Check if ticket is in critical path (blocks other tickets)
@@ -47,6 +49,7 @@ Delivers an entire feature by automatically implementing all tickets in order.
 3. **Never stop the session** - always continue to next ticket
 
 **Skipped ticket comment format:**
+
 ```
 mcp__ticketrack__addComment:
   ticketId: {id}
@@ -63,6 +66,7 @@ mcp__ticketrack__addComment:
 ### Session Completion
 
 The session ends when **no tickets remain in `todo` status** for the feature. This means:
+
 - All tickets are either `done` or `in-progress` (stuck)
 - Summary includes both successes AND failures
 
@@ -72,16 +76,17 @@ The session ends when **no tickets remain in `todo` status** for the feature. Th
 
 This skill **delegates to tt-work-ticket** for per-ticket operations:
 
-| Operation | Source |
-|-----------|--------|
-| File context gathering | → tt-work-ticket Step 4 |
+| Operation               | Source                                              |
+| ----------------------- | --------------------------------------------------- |
+| File context gathering  | → tt-work-ticket Step 4                             |
 | Implementation guidance | → tt-work-ticket "Implementation Guidance by Label" |
-| Testing requirements | → tt-work-ticket "Testing Strategy (Per Ticket)" |
-| Design decision docs | → tt-work-ticket "During Implementation" |
-| Bug root cause docs | → tt-work-ticket "For Bug Tickets" |
-| Per-ticket commits | → tt-work-ticket Steps 7-9 |
+| Testing requirements    | → tt-work-ticket "Testing Strategy (Per Ticket)"    |
+| Design decision docs    | → tt-work-ticket "During Implementation"            |
+| Bug root cause docs     | → tt-work-ticket "For Bug Tickets"                  |
+| Per-ticket commits      | → tt-work-ticket Steps 7-9                          |
 
 **tt-work-ticket is the source of truth** for these patterns. This skill adds:
+
 - Automated looping through all tickets
 - No user prompts (continuous execution)
 - E2E tests at feature completion
@@ -131,6 +136,7 @@ mcp__ticketrack__listFeatures
 ```
 
 Find the feature and extract:
+
 - Feature description
 - Implementation plan
 
@@ -152,6 +158,7 @@ If no tickets: "Feature has no tickets. Run /tt-create-tickets {name} first."
 Parse the implementation plan to determine phase order.
 
 **Ordering Rules**:
+
 1. Phase 1 (Database) tickets first
 2. Phase 2 (Backend) tickets second
 3. Phase 3 (Frontend) tickets third
@@ -211,6 +218,7 @@ The key difference: tt-implement-feature doesn't pause for user input after gath
 
 Use the implementation steps and testing requirements defined in tt-work-ticket's
 "Implementation Guidance by Label" section for:
+
 - Database/Schema tickets
 - Backend/API tickets
 - Frontend/UI tickets
@@ -220,6 +228,7 @@ Also follow tt-work-ticket's "Testing Strategy (Per Ticket)" table for test requ
 Do NOT duplicate those patterns here - tt-work-ticket is the source of truth.
 
 **Key differences from tt-work-ticket:**
+
 1. No pause for user input - proceed directly to implementation
 2. Continue to next ticket after completion
 
@@ -230,6 +239,7 @@ Use Edit, Write, and other tools to make changes.
 **→ Follow `/tt-work-ticket` "During Implementation: Document Design Decisions"**
 
 For significant decisions during implementation:
+
 ```
 mcp__ticketrack__addComment:
   ticketId: {id}
@@ -243,6 +253,7 @@ mcp__ticketrack__addComment:
 **→ Follow `/tt-work-ticket` "For Bug Tickets"**
 
 Document the root cause before fixing:
+
 ```
 mcp__ticketrack__addComment:
   ticketId: {id}
@@ -263,6 +274,7 @@ Discover and run the project's build/test commands:
 3. **Run build** to verify compilation/type-checking passes
 
 If tests fail:
+
 - Attempt to fix
 - If unable to fix after 2 attempts, pause and report
 
@@ -287,6 +299,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ```
 
 **Commit Types**:
+
 - `feat`: New feature/functionality
 - `fix`: Bug fix
 - `refactor`: Code restructuring
@@ -313,6 +326,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 **Action 1**: `mcp__ticketrack__updateTicketStatus` with `newStatus: "done"`
 
 **Action 2**: `mcp__ticketrack__addComment` with completion details:
+
 ```
 ✅ **Completed**
 
@@ -346,6 +360,7 @@ After all tickets are implemented, create E2E tests for the feature:
 **6a. Identify E2E Test Needs**
 
 Based on the feature, determine what E2E tests are needed:
+
 - **New pages**: Create page-level E2E tests (`tests/e2e/{feature}.spec.ts`)
 - **User flows**: Create flow tests (`tests/e2e/flows/{feature}.spec.ts`)
 - **Manual test docs**: Create documentation (`docs/manual-tests/{feature}.md`)
@@ -354,15 +369,15 @@ Based on the feature, determine what E2E tests are needed:
 
 ```typescript
 // tests/e2e/{feature}.spec.ts
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test.describe('{Feature Name}', () => {
+test.describe("{Feature Name}", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/{feature-path}', { waitUntil: 'networkidle' });
+    await page.goto("/{feature-path}", { waitUntil: "networkidle" });
   });
 
-  test('should display {main element}', async ({ page }) => {
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  test("should display {main element}", async ({ page }) => {
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
   // Add tests for key user interactions
@@ -372,10 +387,11 @@ test.describe('{Feature Name}', () => {
 **6c. Create Flow Tests (if applicable)**
 
 For features with multi-step user journeys:
+
 ```typescript
 // tests/e2e/flows/{feature}.spec.ts
-test.describe('{Feature} Flow', () => {
-  test('should complete {journey name}', async ({ page }) => {
+test.describe("{Feature} Flow", () => {
+  test("should complete {journey name}", async ({ page }) => {
     // Step 1: Start
     // Step 2: Action
     // Step 3: Verify result
@@ -403,6 +419,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 After processing all tickets and E2E tests:
 
 **If all done**:
+
 ```
 🎉 Feature '{name}' fully implemented!
 
@@ -424,6 +441,7 @@ After processing all tickets and E2E tests:
 ```
 
 **If some skipped**:
+
 ```
 ⚠️ Feature '{name}' partially implemented
 
@@ -451,6 +469,7 @@ If interrupted (user cancels, error occurs):
 ## Safety Checks
 
 Before making changes:
+
 - Verify we're on a feature branch (warn if on main)
 - Check for uncommitted changes (warn if dirty)
 - Confirm with user before starting if there are concerns

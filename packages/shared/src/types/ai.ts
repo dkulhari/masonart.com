@@ -5,7 +5,7 @@
  * generation history, and community gallery based on the requirements specification.
  */
 
-import type { PosterOrientation, ProductColor } from './product';
+import type { PosterOrientation, ProductColor } from "./product";
 
 // ============================================================================
 // Enums & Literal Types
@@ -16,79 +16,60 @@ import type { PosterOrientation, ProductColor } from './product';
  */
 export type AIStylePreset =
   // Original 10 presets
-  | 'wabi-sabi'
-  | 'abstract-expression'
-  | 'botanical'
-  | 'geometric-modern'
-  | 'vintage-poster'
-  | 'pop-art'
-  | 'watercolor'
-  | 'photography'
-  | 'line-art'
-  | 'typography'
+  | "wabi-sabi"
+  | "abstract-expression"
+  | "botanical"
+  | "geometric-modern"
+  | "vintage-poster"
+  | "pop-art"
+  | "watercolor"
+  | "photography"
+  | "line-art"
+  | "typography"
   // 5 new presets added in full-ai-generator feature
-  | 'ink-wash'
-  | 'digital-art'
-  | 'minimalist-modern'
-  | 'impressionist'
-  | 'art-deco';
+  | "ink-wash"
+  | "digital-art"
+  | "minimalist-modern"
+  | "impressionist"
+  | "art-deco";
 
 /**
  * Aspect ratio options for AI generation
  */
-export type AIAspectRatio =
-  | 'square'
-  | 'portrait'
-  | 'landscape'
-  | 'panoramic';
+export type AIAspectRatio = "square" | "portrait" | "landscape" | "panoramic";
 
 /**
  * Color mood options for AI generation
  */
 export type AIColorMood =
-  | 'warm'
-  | 'cool'
-  | 'neutral'
-  | 'vibrant'
-  | 'muted'
-  | 'monochrome'
-  | 'earth-tones'
-  | 'pastel';
+  | "warm"
+  | "cool"
+  | "neutral"
+  | "vibrant"
+  | "muted"
+  | "monochrome"
+  | "earth-tones"
+  | "pastel";
 
 /**
  * AI generation status
  */
-export type AIGenerationStatus =
-  | 'queued'
-  | 'processing'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+export type AIGenerationStatus = "queued" | "processing" | "completed" | "failed" | "cancelled";
 
 /**
  * User subscription tier for AI generation
  */
-export type AISubscriptionTier =
-  | 'guest'
-  | 'free'
-  | 'premium'
-  | 'unlimited';
+export type AISubscriptionTier = "guest" | "free" | "premium" | "unlimited";
 
 /**
  * AI model provider options
  */
-export type AIModelProvider =
-  | 'stable-diffusion'
-  | 'dall-e-3'
-  | 'midjourney';
+export type AIModelProvider = "stable-diffusion" | "dall-e-3" | "midjourney";
 
 /**
  * Gallery visibility options
  */
-export type GalleryVisibility =
-  | 'private'
-  | 'public'
-  | 'unlisted';
+export type GalleryVisibility = "private" | "public" | "unlisted";
 
 // ============================================================================
 // Generation Input Types
@@ -145,7 +126,7 @@ export interface AIGenerationRequest {
 /**
  * Upscale status for images
  */
-export type AIUpscaleStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type AIUpscaleStatus = "pending" | "processing" | "completed" | "failed";
 
 /**
  * Upscale multiplier options
@@ -302,7 +283,7 @@ export interface GalleryFilters {
   onlyPurchased?: boolean;
   creatorUserId?: string;
   searchQuery?: string;
-  sortBy?: 'recent' | 'popular' | 'most-liked';
+  sortBy?: "recent" | "popular" | "most-liked";
 }
 
 /**
@@ -331,7 +312,7 @@ export interface AIUsageTierLimits {
   /** Generations per day (for free) or per month (for premium) */
   generationsLimit: number;
   /** Period for the limit */
-  limitPeriod: 'session' | 'day' | 'month';
+  limitPeriod: "session" | "day" | "month";
   /** Max variations per generation */
   maxVariations: number;
   /** Whether watermark is shown on preview */
@@ -405,7 +386,7 @@ export interface AIGenerationJob {
   /** User ID */
   userId?: string;
   /** Job status */
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  status: "queued" | "processing" | "completed" | "failed";
   /** Priority (lower = higher priority) */
   priority: number;
   /** Retry count */

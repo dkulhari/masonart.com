@@ -33,10 +33,8 @@ export const productKeys = {
   all: ["products"] as const,
   lists: () => [...productKeys.all, "list"] as const,
   list: (filters?: ProductFilters) => [...productKeys.lists(), filters] as const,
-  search: (params: ProductSearchParams) =>
-    [...productKeys.all, "search", params] as const,
-  featured: (params?: FeaturedProductsParams) =>
-    [...productKeys.all, "featured", params] as const,
+  search: (params: ProductSearchParams) => [...productKeys.all, "search", params] as const,
+  featured: (params?: FeaturedProductsParams) => [...productKeys.all, "featured", params] as const,
   details: () => [...productKeys.all, "detail"] as const,
   detail: (slug: string) => [...productKeys.details(), slug] as const,
   variants: (slug: string) => [...productKeys.detail(slug), "variants"] as const,
@@ -155,10 +153,7 @@ export interface ProductsListResponse {
  */
 export function useProducts(
   filters?: ProductFilters,
-  options?: Omit<
-    UseQueryOptions<ProductsListResponse, Error>,
-    "queryKey" | "queryFn"
-  >
+  options?: Omit<UseQueryOptions<ProductsListResponse, Error>, "queryKey" | "queryFn">
 ) {
   return useQuery({
     queryKey: productKeys.list(filters),
@@ -199,8 +194,7 @@ export function useInfiniteProducts(
         page: pageParam as number,
       }) as Promise<ProductsListResponse>,
     initialPageParam: 1,
-    getNextPageParam: (lastPage) =>
-      lastPage.hasNextPage ? lastPage.page + 1 : undefined,
+    getNextPageParam: (lastPage) => (lastPage.hasNextPage ? lastPage.page + 1 : undefined),
     staleTime: 1000 * 60 * 5, // 5 minutes
     ...options,
   });
@@ -220,10 +214,7 @@ export function useInfiniteProducts(
  */
 export function useProductSearch(
   params: ProductSearchParams,
-  options?: Omit<
-    UseQueryOptions<ProductsListResponse, Error>,
-    "queryKey" | "queryFn"
-  >
+  options?: Omit<UseQueryOptions<ProductsListResponse, Error>, "queryKey" | "queryFn">
 ) {
   return useQuery({
     queryKey: productKeys.search(params),
@@ -244,10 +235,7 @@ export function useProductSearch(
  */
 export function useFeaturedProducts(
   params?: FeaturedProductsParams,
-  options?: Omit<
-    UseQueryOptions<ProductListItem[], Error>,
-    "queryKey" | "queryFn"
-  >
+  options?: Omit<UseQueryOptions<ProductListItem[], Error>, "queryKey" | "queryFn">
 ) {
   return useQuery({
     queryKey: productKeys.featured(params),
@@ -270,10 +258,7 @@ export function useFeaturedProducts(
  */
 export function useProduct(
   slug: string,
-  options?: Omit<
-    UseQueryOptions<ProductDetail | null, Error>,
-    "queryKey" | "queryFn"
-  >
+  options?: Omit<UseQueryOptions<ProductDetail | null, Error>, "queryKey" | "queryFn">
 ) {
   return useQuery({
     queryKey: productKeys.detail(slug),
@@ -294,10 +279,7 @@ export function useProduct(
  */
 export function useProductVariants(
   slug: string,
-  options?: Omit<
-    UseQueryOptions<ProductVariant[], Error>,
-    "queryKey" | "queryFn"
-  >
+  options?: Omit<UseQueryOptions<ProductVariant[], Error>, "queryKey" | "queryFn">
 ) {
   return useQuery({
     queryKey: productKeys.variants(slug),
@@ -337,10 +319,7 @@ export function useFrames(
  */
 export function useProductsByIds(
   ids: string[],
-  options?: Omit<
-    UseQueryOptions<ProductListItem[], Error>,
-    "queryKey" | "queryFn"
-  >
+  options?: Omit<UseQueryOptions<ProductListItem[], Error>, "queryKey" | "queryFn">
 ) {
   return useQuery({
     queryKey: productKeys.byIds(ids),
@@ -412,27 +391,20 @@ export async function prefetchProduct(
 /**
  * Invalidate all product caches
  */
-export function invalidateAllProducts(
-  queryClient: ReturnType<typeof useQueryClient>
-) {
+export function invalidateAllProducts(queryClient: ReturnType<typeof useQueryClient>) {
   return queryClient.invalidateQueries({ queryKey: productKeys.all });
 }
 
 /**
  * Invalidate product list caches
  */
-export function invalidateProductLists(
-  queryClient: ReturnType<typeof useQueryClient>
-) {
+export function invalidateProductLists(queryClient: ReturnType<typeof useQueryClient>) {
   return queryClient.invalidateQueries({ queryKey: productKeys.lists() });
 }
 
 /**
  * Invalidate a specific product cache
  */
-export function invalidateProduct(
-  queryClient: ReturnType<typeof useQueryClient>,
-  slug: string
-) {
+export function invalidateProduct(queryClient: ReturnType<typeof useQueryClient>, slug: string) {
   return queryClient.invalidateQueries({ queryKey: productKeys.detail(slug) });
 }

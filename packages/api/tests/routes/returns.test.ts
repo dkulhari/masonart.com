@@ -70,10 +70,7 @@ beforeAll(async () => {
       isDatabaseAvailable = false;
     }
   } catch (error) {
-    console.log(
-      "Could not initialize app for testing:",
-      (error as Error).message
-    );
+    console.log("Could not initialize app for testing:", (error as Error).message);
     isDatabaseAvailable = false;
   }
 }, 10000);
@@ -218,13 +215,10 @@ describe("Returns Validation Schemas", () => {
       const { createReturnSchema } = await import("../../src/routes/returns");
 
       expect(createReturnSchema.safeParse({}).success).toBe(false);
-      expect(
-        createReturnSchema.safeParse({ reason: "defective" }).success
-      ).toBe(false);
-      expect(
-        createReturnSchema.safeParse({ reasonDetails: "Valid details here" })
-          .success
-      ).toBe(false);
+      expect(createReturnSchema.safeParse({ reason: "defective" }).success).toBe(false);
+      expect(createReturnSchema.safeParse({ reasonDetails: "Valid details here" }).success).toBe(
+        false
+      );
     });
   });
 });

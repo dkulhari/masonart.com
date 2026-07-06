@@ -77,8 +77,8 @@ async function loginUser(
       throw new Error("Login timed out - page was closed");
     }
     // Check for error message
-    const errorVisible = await page.locator('text=Sign in failed').isVisible();
-    const invalidVisible = await page.locator('text=Invalid email or password').isVisible();
+    const errorVisible = await page.locator("text=Sign in failed").isVisible();
+    const invalidVisible = await page.locator("text=Invalid email or password").isVisible();
     if (errorVisible || invalidVisible) {
       return false;
     }
@@ -97,12 +97,12 @@ async function registerUser(
   await page.waitForLoadState("networkidle");
 
   // Fill registration form
-  await page.locator('input#name').fill(credentials.name);
-  await page.locator('input#email').fill(credentials.email);
-  await page.locator('input#password').fill(credentials.password);
+  await page.locator("input#name").fill(credentials.name);
+  await page.locator("input#email").fill(credentials.email);
+  await page.locator("input#password").fill(credentials.password);
 
   // Fill confirm password if present
-  const confirmPassword = page.locator('input#confirmPassword');
+  const confirmPassword = page.locator("input#confirmPassword");
   if ((await confirmPassword.count()) > 0) {
     await confirmPassword.fill(credentials.password);
   }
@@ -123,7 +123,10 @@ async function registerUser(
     const errorEl = page.locator(".bg-red-50, .text-red-700, [role='alert']").first();
     if (await errorEl.isVisible()) {
       const errorText = await errorEl.textContent();
-      if (errorText?.toLowerCase().includes("already") || errorText?.toLowerCase().includes("exists")) {
+      if (
+        errorText?.toLowerCase().includes("already") ||
+        errorText?.toLowerCase().includes("exists")
+      ) {
         console.log(`[Auth Setup] User already exists: ${credentials.email}`);
         return false;
       }

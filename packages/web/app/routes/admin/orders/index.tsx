@@ -10,17 +10,17 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { z } from 'zod'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
+import { RefreshCw, AlertCircle, Download, Calendar } from "lucide-react";
+import { cn, getApiUrl } from "~/lib/utils";
 import {
-  RefreshCw,
-  AlertCircle,
-  Download,
-  Calendar,
-} from 'lucide-react'
-import { cn, getApiUrl } from '~/lib/utils'
-import { OrdersTable, OrdersTableSkeleton, type AdminOrder, type OrderStatus } from '~/components/admin/OrdersTable'
+  OrdersTable,
+  OrdersTableSkeleton,
+  type AdminOrder,
+  type OrderStatus,
+} from "~/components/admin/OrdersTable";
 
 // ============================================================================
 // Route Configuration
@@ -31,70 +31,73 @@ const searchParamsSchema = z.object({
   pageSize: z.coerce.number().positive().max(100).optional().default(20),
   status: z
     .enum([
-      'pending',
-      'pending_payment',
-      'confirmed',
-      'processing',
-      'shipped',
-      'out_for_delivery',
-      'delivered',
-      'cancelled',
-      'refund_requested',
-      'refunded',
-      'failed',
+      "pending",
+      "pending_payment",
+      "confirmed",
+      "processing",
+      "shipped",
+      "out_for_delivery",
+      "delivered",
+      "cancelled",
+      "refund_requested",
+      "refunded",
+      "failed",
     ])
     .optional(),
   paymentStatus: z
     .enum([
-      'pending',
-      'processing',
-      'paid',
-      'failed',
-      'refunded',
-      'partially_refunded',
-      'cancelled',
+      "pending",
+      "processing",
+      "paid",
+      "failed",
+      "refunded",
+      "partially_refunded",
+      "cancelled",
     ])
     .optional(),
   search: z.string().optional(),
-  sortBy: z.enum(['createdAt', 'updatedAt', 'total', 'orderNumber']).optional().default('createdAt'),
-  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
+  sortBy: z
+    .enum(["createdAt", "updatedAt", "total", "orderNumber"])
+    .optional()
+    .default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
-})
+});
 
-type SearchParams = z.infer<typeof searchParamsSchema>
+type SearchParams = z.infer<typeof searchParamsSchema>;
 
-export const Route = createFileRoute('/admin/orders/')({
+export const Route = createFileRoute("/admin/orders/")({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Orders | Admin | MasonArt' },
-      { name: 'robots', content: 'noindex, nofollow' },
+      { title: "Orders | Admin | MasonArt" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: AdminOrdersPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface PaginatedResponse {
-  items: AdminOrder[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
+  items: AdminOrder[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 interface OrderStats {
-  byStatus: Record<string, number>
-  byPaymentStatus: Record<string, number>
-  totalRevenue: string
-  todayOrders: number
-  monthRevenue: string
+  byStatus: Record<string, number>;
+  byPaymentStatus: Record<string, number>;
+  totalRevenue: string;
+  todayOrders: number;
+  monthRevenue: string;
 }
 
 // ============================================================================
@@ -102,65 +105,62 @@ interface OrderStats {
 // ============================================================================
 
 async function fetchOrders(params: SearchParams): Promise<PaginatedResponse> {
-  const queryParams = new URLSearchParams()
+  const queryParams = new URLSearchParams();
 
-  queryParams.set('page', String(params.page))
-  queryParams.set('pageSize', String(params.pageSize))
-  queryParams.set('sortBy', params.sortBy)
-  queryParams.set('sortOrder', params.sortOrder)
+  queryParams.set("page", String(params.page));
+  queryParams.set("pageSize", String(params.pageSize));
+  queryParams.set("sortBy", params.sortBy);
+  queryParams.set("sortOrder", params.sortOrder);
 
   if (params.status) {
-    queryParams.set('status', params.status)
+    queryParams.set("status", params.status);
   }
 
   if (params.paymentStatus) {
-    queryParams.set('paymentStatus', params.paymentStatus)
+    queryParams.set("paymentStatus", params.paymentStatus);
   }
 
   if (params.search) {
-    queryParams.set('search', params.search)
+    queryParams.set("search", params.search);
   }
 
   if (params.dateFrom) {
-    queryParams.set('dateFrom', params.dateFrom)
+    queryParams.set("dateFrom", params.dateFrom);
   }
 
   if (params.dateTo) {
-    queryParams.set('dateTo', params.dateTo)
+    queryParams.set("dateTo", params.dateTo);
   }
 
-  const response = await fetch(
-    `${getApiUrl()}/api/admin/orders?${queryParams.toString()}`,
-    {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  )
+  const response = await fetch(`${getApiUrl()}/api/admin/orders?${queryParams.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch orders')
+    throw new Error("Failed to fetch orders");
   }
 
-  return response.json()
+  return response.json();
 }
 
 async function fetchOrderStats(): Promise<OrderStats> {
   const response = await fetch(`${getApiUrl()}/api/admin/orders/stats`, {
-    method: 'GET',
-    credentials: 'include',
+    method: "GET",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-  })
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch order statistics')
+    throw new Error("Failed to fetch order statistics");
   }
 
-  return response.json()
+  return response.json();
 }
 
 async function updateOrderStatus(
@@ -169,33 +169,33 @@ async function updateOrderStatus(
   reason?: string
 ): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/orders/${orderId}/status`, {
-    method: 'PATCH',
-    credentials: 'include',
+    method: "PATCH",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ status, reason }),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to update order status')
+    const error = await response.json();
+    throw new Error(error.error || "Failed to update order status");
   }
 }
 
 async function initiateRefund(orderId: string, reason: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/orders/${orderId}/refund`, {
-    method: 'POST',
-    credentials: 'include',
+    method: "POST",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ reason }),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to initiate refund')
+    const error = await response.json();
+    throw new Error(error.error || "Failed to initiate refund");
   }
 }
 
@@ -204,11 +204,11 @@ async function initiateRefund(orderId: string, reason: string): Promise<void> {
 // ============================================================================
 
 function AdminOrdersPage() {
-  const navigate = useNavigate()
-  const searchParams = Route.useSearch()
+  const navigate = useNavigate();
+  const searchParams = Route.useSearch();
 
-  const [orders, setOrders] = useState<AdminOrder[]>([])
-  const [stats, setStats] = useState<OrderStats | null>(null)
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [stats, setStats] = useState<OrderStats | null>(null);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -216,17 +216,17 @@ function AdminOrdersPage() {
     totalPages: 0,
     hasNextPage: false,
     hasPreviousPage: false,
-  })
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch orders
   const loadOrders = useCallback(async () => {
     try {
-      setError(null)
-      const data = await fetchOrders(searchParams)
-      setOrders(data.items)
+      setError(null);
+      const data = await fetchOrders(searchParams);
+      setOrders(data.items);
       setPagination({
         total: data.total,
         page: data.page,
@@ -234,42 +234,42 @@ function AdminOrdersPage() {
         totalPages: data.totalPages,
         hasNextPage: data.hasNextPage,
         hasPreviousPage: data.hasPreviousPage,
-      })
+      });
     } catch (err) {
-      setError('Failed to load orders. Please try again.')
+      setError("Failed to load orders. Please try again.");
     } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [searchParams])
+  }, [searchParams]);
 
   // Fetch stats
   const loadStats = useCallback(async () => {
     try {
-      const data = await fetchOrderStats()
-      setStats(data)
+      const data = await fetchOrderStats();
+      setStats(data);
     } catch (err) {
       // Stats are non-critical, so we don't show an error
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    setIsLoading(true)
-    loadOrders()
-    loadStats()
-  }, [loadOrders, loadStats])
+    setIsLoading(true);
+    loadOrders();
+    loadStats();
+  }, [loadOrders, loadStats]);
 
   // Refresh handler
   const handleRefresh = () => {
-    setIsRefreshing(true)
-    loadOrders()
-    loadStats()
-  }
+    setIsRefreshing(true);
+    loadOrders();
+    loadStats();
+  };
 
   // Update URL params
   const updateSearch = (updates: Partial<SearchParams>) => {
     navigate({
-      to: '/admin/orders',
+      to: "/admin/orders",
       search: (prev: SearchParams) => ({
         ...prev,
         ...updates,
@@ -281,86 +281,86 @@ function AdminOrdersPage() {
             ? 1
             : prev.page),
       }),
-    })
-  }
+    });
+  };
 
   // Navigation handlers
   const handleViewOrder = (order: AdminOrder) => {
     navigate({
-      to: '/admin/orders/$id',
+      to: "/admin/orders/$id",
       params: { id: order.id },
-    })
-  }
+    });
+  };
 
   // Status update handler
   const handleUpdateStatus = async (order: AdminOrder) => {
     const newStatus = prompt(
-      'Enter new status (pending, confirmed, processing, shipped, delivered, cancelled):'
-    )
-    if (!newStatus) return
+      "Enter new status (pending, confirmed, processing, shipped, delivered, cancelled):"
+    );
+    if (!newStatus) return;
 
     const validStatuses: OrderStatus[] = [
-      'pending',
-      'pending_payment',
-      'confirmed',
-      'processing',
-      'shipped',
-      'out_for_delivery',
-      'delivered',
-      'cancelled',
-      'refund_requested',
-      'refunded',
-      'failed',
-    ]
+      "pending",
+      "pending_payment",
+      "confirmed",
+      "processing",
+      "shipped",
+      "out_for_delivery",
+      "delivered",
+      "cancelled",
+      "refund_requested",
+      "refunded",
+      "failed",
+    ];
 
     if (!validStatuses.includes(newStatus as OrderStatus)) {
-      setError('Invalid status. Please enter a valid status.')
-      return
+      setError("Invalid status. Please enter a valid status.");
+      return;
     }
 
     try {
-      await updateOrderStatus(order.id, newStatus as OrderStatus)
-      loadOrders()
+      await updateOrderStatus(order.id, newStatus as OrderStatus);
+      loadOrders();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update order status.')
+      setError(err instanceof Error ? err.message : "Failed to update order status.");
     }
-  }
+  };
 
   // Cancel handler
   const handleCancelOrder = async (order: AdminOrder) => {
     if (!confirm(`Are you sure you want to cancel order ${order.orderNumber}?`)) {
-      return
+      return;
     }
 
     try {
-      await updateOrderStatus(order.id, 'cancelled', 'Cancelled by admin')
-      loadOrders()
+      await updateOrderStatus(order.id, "cancelled", "Cancelled by admin");
+      loadOrders();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to cancel order.')
+      setError(err instanceof Error ? err.message : "Failed to cancel order.");
     }
-  }
+  };
 
   // Refund handler
   const handleRefundOrder = async (order: AdminOrder) => {
-    const reason = prompt('Enter refund reason:')
-    if (!reason) return
+    const reason = prompt("Enter refund reason:");
+    if (!reason) return;
 
     try {
-      await initiateRefund(order.id, reason)
-      loadOrders()
+      await initiateRefund(order.id, reason);
+      loadOrders();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate refund.')
+      setError(err instanceof Error ? err.message : "Failed to initiate refund.");
     }
-  }
+  };
 
   // Format currency
   const formatCurrency = (value: string) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
       maximumFractionDigits: 0,
-    }).format(parseFloat(value))
-  }
+    }).format(parseFloat(value));
+  };
 
   return (
     <div className="space-y-6">
@@ -379,14 +379,14 @@ function AdminOrdersPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <input
               type="date"
-              value={searchParams.dateFrom || ''}
+              value={searchParams.dateFrom || ""}
               onChange={(e) => updateSearch({ dateFrom: e.target.value || undefined })}
               className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
             <span className="text-muted-foreground">to</span>
             <input
               type="date"
-              value={searchParams.dateTo || ''}
+              value={searchParams.dateTo || ""}
               onChange={(e) => updateSearch({ dateTo: e.target.value || undefined })}
               className="h-10 rounded-lg border border-border bg-background px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
@@ -398,13 +398,13 @@ function AdminOrdersPage() {
             disabled={isLoading || isRefreshing}
             className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           >
-            <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
           {/* Export Button (placeholder) */}
           <button
-            onClick={() => alert('Export functionality coming soon')}
+            onClick={() => alert("Export functionality coming soon")}
             className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             <Download className="h-4 w-4" />
@@ -502,7 +502,7 @@ function AdminOrdersPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -510,34 +510,34 @@ function AdminOrdersPage() {
 // ============================================================================
 
 interface StatCardProps {
-  label: string
-  value: string
-  subtext: string
-  variant?: 'default' | 'success' | 'warning' | 'info'
+  label: string;
+  value: string;
+  subtext: string;
+  variant?: "default" | "success" | "warning" | "info";
 }
 
-function StatCard({ label, value, subtext, variant = 'default' }: StatCardProps) {
+function StatCard({ label, value, subtext, variant = "default" }: StatCardProps) {
   const variants = {
-    default: 'border-border',
-    success: 'border-green-200 bg-green-50/50',
-    warning: 'border-amber-200 bg-amber-50/50',
-    info: 'border-blue-200 bg-blue-50/50',
-  }
+    default: "border-border",
+    success: "border-green-200 bg-green-50/50",
+    warning: "border-amber-200 bg-amber-50/50",
+    info: "border-blue-200 bg-blue-50/50",
+  };
 
   const textVariants = {
-    default: 'text-foreground',
-    success: 'text-green-700',
-    warning: 'text-amber-700',
-    info: 'text-blue-700',
-  }
+    default: "text-foreground",
+    success: "text-green-700",
+    warning: "text-amber-700",
+    info: "text-blue-700",
+  };
 
   return (
-    <div className={cn('rounded-xl border bg-card p-4', variants[variant])}>
+    <div className={cn("rounded-xl border bg-card p-4", variants[variant])}>
       <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 text-2xl font-bold', textVariants[variant])}>{value}</p>
+      <p className={cn("mt-1 text-2xl font-bold", textVariants[variant])}>{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{subtext}</p>
     </div>
-  )
+  );
 }
 
-export default AdminOrdersPage
+export default AdminOrdersPage;

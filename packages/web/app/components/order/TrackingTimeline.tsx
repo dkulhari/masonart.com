@@ -7,17 +7,9 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import {
-  Clock,
-  Tag,
-  Package,
-  Truck,
-  MapPin,
-  CheckCircle,
-  Circle,
-} from 'lucide-react'
-import { cn, formatDate } from '~/lib/utils'
-import type { TrackingTimelineStep } from '~/lib/api'
+import { Clock, Tag, Package, Truck, MapPin, CheckCircle, Circle } from "lucide-react";
+import { cn, formatDate } from "~/lib/utils";
+import type { TrackingTimelineStep } from "~/lib/api";
 
 // ============================================================================
 // Types
@@ -25,15 +17,15 @@ import type { TrackingTimelineStep } from '~/lib/api'
 
 export interface TrackingTimelineProps {
   /** Current status */
-  currentStatus: string
+  currentStatus: string;
   /** Timeline steps */
-  steps: TrackingTimelineStep[]
+  steps: TrackingTimelineStep[];
   /** Estimated delivery date */
-  estimatedDelivery: string | null
+  estimatedDelivery: string | null;
   /** Show compact version */
-  compact?: boolean
+  compact?: boolean;
   /** Optional className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -47,7 +39,7 @@ const STEP_ICONS: Record<string, typeof Clock> = {
   in_transit: Truck,
   out_for_delivery: MapPin,
   delivered: CheckCircle,
-}
+};
 
 // ============================================================================
 // Component
@@ -73,73 +65,69 @@ export function TrackingTimeline({
   // Find the current step index
   const currentStepIndex = steps.findIndex(
     (step) => !step.completed && steps.some((s) => s.completed)
-  )
+  );
 
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn("relative", className)}>
       {/* Timeline */}
       <div className="relative">
         {steps.map((step, index) => {
-          const Icon = STEP_ICONS[step.status] || Circle
-          const isCompleted = step.completed
+          const Icon = STEP_ICONS[step.status] || Circle;
+          const isCompleted = step.completed;
           const isCurrent =
             index === currentStepIndex ||
-            (currentStepIndex === -1 && step.status === currentStatus)
-          const isLast = index === steps.length - 1
+            (currentStepIndex === -1 && step.status === currentStatus);
+          const isLast = index === steps.length - 1;
 
           return (
             <div
               key={step.status}
-              className={cn(
-                'relative flex',
-                compact ? 'pb-4' : 'pb-6',
-                isLast && 'pb-0'
-              )}
+              className={cn("relative flex", compact ? "pb-4" : "pb-6", isLast && "pb-0")}
             >
               {/* Connector line */}
               {!isLast && (
                 <div
                   className={cn(
-                    'absolute left-4 top-8 w-0.5',
-                    compact ? 'h-8' : 'h-12',
-                    isCompleted ? 'bg-brand-500' : 'bg-border'
+                    "absolute left-4 top-8 w-0.5",
+                    compact ? "h-8" : "h-12",
+                    isCompleted ? "bg-brand-500" : "bg-border"
                   )}
-                  style={{ transform: 'translateX(-50%)' }}
+                  style={{ transform: "translateX(-50%)" }}
                 />
               )}
 
               {/* Step icon */}
               <div
                 className={cn(
-                  'relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2',
+                  "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2",
                   isCompleted
-                    ? 'border-brand-500 bg-brand-500 text-white'
+                    ? "border-brand-500 bg-brand-500 text-white"
                     : isCurrent
-                      ? 'border-brand-500 bg-background text-brand-500'
-                      : 'border-border bg-background text-muted-foreground'
+                      ? "border-brand-500 bg-background text-brand-500"
+                      : "border-border bg-background text-muted-foreground"
                 )}
               >
                 <Icon className="h-4 w-4" />
               </div>
 
               {/* Step content */}
-              <div className={cn('ml-4 flex-1', compact ? 'pt-0.5' : 'pt-1')}>
+              <div className={cn("ml-4 flex-1", compact ? "pt-0.5" : "pt-1")}>
                 <p
                   className={cn(
-                    'font-medium',
-                    compact ? 'text-sm' : 'text-base',
+                    "font-medium",
+                    compact ? "text-sm" : "text-base",
                     isCompleted
-                      ? 'text-foreground'
+                      ? "text-foreground"
                       : isCurrent
-                        ? 'text-brand-600'
-                        : 'text-muted-foreground'
+                        ? "text-brand-600"
+                        : "text-muted-foreground"
                   )}
                 >
                   {step.label}
                 </p>
                 {step.timestamp && (
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {formatDate(step.timestamp, { hour: 'numeric', minute: 'numeric' })}
+                    {formatDate(step.timestamp, { hour: "numeric", minute: "numeric" })}
                   </p>
                 )}
                 {!compact && isCurrent && !isCompleted && estimatedDelivery && (
@@ -149,15 +137,15 @@ export function TrackingTimeline({
                 )}
               </div>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Exports
 // ============================================================================
 
-export default TrackingTimeline
+export default TrackingTimeline;

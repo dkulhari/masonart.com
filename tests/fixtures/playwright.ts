@@ -4,10 +4,10 @@
  * Provides utilities for E2E testing with Playwright
  */
 
-import type { Page, BrowserContext } from '@playwright/test';
-import type { User } from './users';
-import type { Product } from './products';
-import type { Order } from './orders';
+import type { Page, BrowserContext } from "@playwright/test";
+import type { User } from "./users";
+import type { Product } from "./products";
+import type { Order } from "./orders";
 
 /**
  * Test data seed configuration
@@ -23,57 +23,57 @@ export interface TestSeedConfig {
  * Common test user credentials
  * All test users use the same password for simplicity
  */
-const TEST_PASSWORD = 'TestPassword123!';
+const TEST_PASSWORD = "TestPassword123!";
 
 export const testCredentials = {
   // Primary customer
   customer: {
-    email: 'test-customer@example.com',
+    email: "test-customer@example.com",
     password: TEST_PASSWORD,
-    name: 'Test Customer',
+    name: "Test Customer",
   },
   // Additional customers for cart independence testing
   customer2: {
-    email: 'test-customer-2@example.com',
+    email: "test-customer-2@example.com",
     password: TEST_PASSWORD,
-    name: 'Alice Tester',
+    name: "Alice Tester",
   },
   customer3: {
-    email: 'test-customer-3@example.com',
+    email: "test-customer-3@example.com",
     password: TEST_PASSWORD,
-    name: 'Bob Buyer',
+    name: "Bob Buyer",
   },
   customer4: {
-    email: 'test-customer-4@example.com',
+    email: "test-customer-4@example.com",
     password: TEST_PASSWORD,
-    name: 'Carol Checkout',
+    name: "Carol Checkout",
   },
   customer5: {
-    email: 'test-customer-5@example.com',
+    email: "test-customer-5@example.com",
     password: TEST_PASSWORD,
-    name: 'Dave Demo',
+    name: "Dave Demo",
   },
   // Admins
   admin: {
-    email: 'test-admin@masonart.com',
+    email: "test-admin@masonart.com",
     password: TEST_PASSWORD,
-    name: 'Test Admin',
+    name: "Test Admin",
   },
   admin2: {
-    email: 'test-admin-2@masonart.com',
+    email: "test-admin-2@masonart.com",
     password: TEST_PASSWORD,
-    name: 'Admin Secondary',
+    name: "Admin Secondary",
   },
   // Trade users
   trade: {
-    email: 'test-trade@interior.com',
+    email: "test-trade@interior.com",
     password: TEST_PASSWORD,
-    name: 'Test Trade User',
+    name: "Test Trade User",
   },
   tradePending: {
-    email: 'test-trade-pending@interior.com',
+    email: "test-trade-pending@interior.com",
     password: TEST_PASSWORD,
-    name: 'Pending Trade',
+    name: "Pending Trade",
   },
 };
 
@@ -81,25 +81,25 @@ export const testCredentials = {
  * Common test URLs
  */
 export const testUrls = {
-  home: '/',
-  products: '/products',
+  home: "/",
+  products: "/products",
   product: (slug: string) => `/products/${slug}`,
-  cart: '/cart',
-  checkout: '/checkout',
-  login: '/login',
-  register: '/register',
-  account: '/account',
-  orders: '/account/orders',
+  cart: "/cart",
+  checkout: "/checkout",
+  login: "/login",
+  register: "/register",
+  account: "/account",
+  orders: "/account/orders",
   order: (id: string) => `/account/orders/${id}`,
-  aiGenerator: '/create',
-  aiHistory: '/account/creations',
+  aiGenerator: "/create",
+  aiHistory: "/account/creations",
   admin: {
-    dashboard: '/admin',
-    products: '/admin/products',
+    dashboard: "/admin",
+    products: "/admin/products",
     product: (id: string) => `/admin/products/${id}`,
-    orders: '/admin/orders',
+    orders: "/admin/orders",
     order: (id: string) => `/admin/orders/${id}`,
-    users: '/admin/users',
+    users: "/admin/users",
   },
 };
 
@@ -116,7 +116,10 @@ export const viewports = {
 /**
  * Wait for a specific network state
  */
-export async function waitForNetwork(page: Page, state: 'load' | 'domcontentloaded' | 'networkidle' = 'networkidle'): Promise<void> {
+export async function waitForNetwork(
+  page: Page,
+  state: "load" | "domcontentloaded" | "networkidle" = "networkidle"
+): Promise<void> {
   await page.waitForLoadState(state);
 }
 
@@ -124,14 +127,12 @@ export async function waitForNetwork(page: Page, state: 'load' | 'domcontentload
  * Wait for API response
  */
 export async function waitForApiResponse(page: Page, urlPattern: string | RegExp): Promise<void> {
-  await page.waitForResponse(
-    (response) => {
-      if (typeof urlPattern === 'string') {
-        return response.url().includes(urlPattern);
-      }
-      return urlPattern.test(response.url());
+  await page.waitForResponse((response) => {
+    if (typeof urlPattern === "string") {
+      return response.url().includes(urlPattern);
     }
-  );
+    return urlPattern.test(response.url());
+  });
 }
 
 /**
@@ -151,9 +152,15 @@ export async function fillRegistrationForm(
 ): Promise<void> {
   await page.fill('[data-testid="name-input"], input[name="name"], #name', data.name);
   await page.fill('[data-testid="email-input"], input[name="email"], #email', data.email);
-  await page.fill('[data-testid="password-input"], input[name="password"], #password', data.password);
+  await page.fill(
+    '[data-testid="password-input"], input[name="password"], #password',
+    data.password
+  );
   if (data.confirmPassword) {
-    await page.fill('[data-testid="confirm-password-input"], input[name="confirmPassword"], #confirmPassword', data.confirmPassword);
+    await page.fill(
+      '[data-testid="confirm-password-input"], input[name="confirmPassword"], #confirmPassword',
+      data.confirmPassword
+    );
   }
 }
 
@@ -175,9 +182,15 @@ export async function fillShippingForm(
 ): Promise<void> {
   await page.fill('[data-testid="full-name"], input[name="fullName"]', address.fullName);
   await page.fill('[data-testid="phone"], input[name="phone"]', address.phone);
-  await page.fill('[data-testid="address-line1"], input[name="addressLine1"]', address.addressLine1);
+  await page.fill(
+    '[data-testid="address-line1"], input[name="addressLine1"]',
+    address.addressLine1
+  );
   if (address.addressLine2) {
-    await page.fill('[data-testid="address-line2"], input[name="addressLine2"]', address.addressLine2);
+    await page.fill(
+      '[data-testid="address-line2"], input[name="addressLine2"]',
+      address.addressLine2
+    );
   }
   await page.fill('[data-testid="city"], input[name="city"]', address.city);
   await page.fill('[data-testid="state"], input[name="state"]', address.state);
@@ -223,7 +236,7 @@ export async function navigateAndAddToCart(
   options?: { quantity?: number; size?: string; frame?: string }
 ): Promise<void> {
   await page.goto(testUrls.product(productSlug));
-  await waitForNetwork(page, 'load');
+  await waitForNetwork(page, "load");
   await addToCart(page, options);
 }
 
@@ -236,7 +249,9 @@ export async function login(
 ): Promise<void> {
   await page.goto(testUrls.login);
   await fillLoginForm(page, credentials.email, credentials.password);
-  await page.click('[data-testid="login-button"], button[type="submit"]:has-text("Login"), button[type="submit"]:has-text("Sign In")');
+  await page.click(
+    '[data-testid="login-button"], button[type="submit"]:has-text("Login"), button[type="submit"]:has-text("Sign In")'
+  );
   await waitForNetwork(page);
 }
 
@@ -245,7 +260,9 @@ export async function login(
  */
 export async function logout(page: Page): Promise<void> {
   // Try clicking logout button/link
-  const logoutButton = page.locator('[data-testid="logout-button"], a:has-text("Logout"), button:has-text("Logout")');
+  const logoutButton = page.locator(
+    '[data-testid="logout-button"], a:has-text("Logout"), button:has-text("Logout")'
+  );
   if (await logoutButton.isVisible()) {
     await logoutButton.click();
   } else {
@@ -278,7 +295,7 @@ export async function getCartCount(page: Page): Promise<number> {
  */
 export async function clearCart(page: Page): Promise<void> {
   await page.goto(testUrls.cart);
-  await waitForNetwork(page, 'load');
+  await waitForNetwork(page, "load");
 
   // Click clear cart or remove all items
   const clearButton = page.locator('[data-testid="clear-cart"], button:has-text("Clear Cart")');
@@ -288,7 +305,9 @@ export async function clearCart(page: Page): Promise<void> {
   } else {
     // Remove items one by one
     while (true) {
-      const removeButton = page.locator('[data-testid="remove-item"], button:has-text("Remove")').first();
+      const removeButton = page
+        .locator('[data-testid="remove-item"], button:has-text("Remove")')
+        .first();
       if (!(await removeButton.isVisible())) break;
       await removeButton.click();
       await waitForNetwork(page);
@@ -300,11 +319,8 @@ export async function clearCart(page: Page): Promise<void> {
  * Take screenshot with timestamp
  * Returns a Uint8Array (Buffer in Node.js)
  */
-export async function takeTimestampedScreenshot(
-  page: Page,
-  name: string
-): Promise<Uint8Array> {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+export async function takeTimestampedScreenshot(page: Page, name: string): Promise<Uint8Array> {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   return page.screenshot({
     path: `test-results/screenshots/${name}-${timestamp}.png`,
     fullPage: true,
@@ -319,9 +335,9 @@ export async function checkBasicAccessibility(page: Page): Promise<{
   hasLabels: boolean;
   hasHeadings: boolean;
 }> {
-  const imagesWithoutAlt = await page.locator('img:not([alt])').count();
-  const inputsWithoutLabels = await page.locator('input:not([aria-label]):not([id])').count();
-  const hasHeadings = await page.locator('h1, h2, h3').count() > 0;
+  const imagesWithoutAlt = await page.locator("img:not([alt])").count();
+  const inputsWithoutLabels = await page.locator("input:not([aria-label]):not([id])").count();
+  const hasHeadings = (await page.locator("h1, h2, h3").count()) > 0;
 
   return {
     hasAltText: imagesWithoutAlt === 0,
@@ -345,7 +361,7 @@ export async function mockApiResponse(
   await page.route(urlPattern, async (route) => {
     await route.fulfill({
       status: response.status || 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: JSON.stringify(response.body || {}),
       headers: response.headers,
     });
@@ -365,14 +381,14 @@ export async function setupAuthenticatedSession(
 ): Promise<void> {
   await context.addCookies([
     {
-      name: 'session_token',
+      name: "session_token",
       value: sessionData.token,
-      domain: 'localhost',
-      path: '/',
+      domain: "localhost",
+      path: "/",
       expires: Date.now() / 1000 + 86400, // 24 hours
       httpOnly: true,
       secure: false,
-      sameSite: 'Lax',
+      sameSite: "Lax",
     },
   ]);
 }
@@ -380,14 +396,14 @@ export async function setupAuthenticatedSession(
 /**
  * Generate unique test identifiers
  */
-export function generateTestId(prefix: string = 'test'): string {
+export function generateTestId(prefix: string = "test"): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 }
 
 /**
  * Generate unique email for test user
  */
-export function generateTestEmail(prefix: string = 'test'): string {
+export function generateTestEmail(prefix: string = "test"): string {
   return `${prefix}_${Date.now()}@test.example.com`;
 }
 
@@ -424,7 +440,7 @@ export const assertions = {
    */
   async toastAppears(page: Page, text?: string): Promise<boolean> {
     const toast = page.locator('[data-testid="toast"], .toast, .notification, [role="alert"]');
-    await toast.waitFor({ state: 'visible', timeout: 5000 });
+    await toast.waitFor({ state: "visible", timeout: 5000 });
     if (text) {
       const content = await toast.textContent();
       return content?.includes(text) || false;
@@ -452,10 +468,10 @@ export const selectors = {
   addToCartButton: '[data-testid="add-to-cart"], button:has-text("Add to Cart")',
 
   // Forms
-  form: 'form',
-  input: 'input',
-  button: 'button',
-  select: 'select',
+  form: "form",
+  input: "input",
+  button: "button",
+  select: "select",
   submitButton: 'button[type="submit"]',
 
   // Cart

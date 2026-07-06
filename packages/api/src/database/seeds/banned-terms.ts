@@ -256,9 +256,7 @@ export const DEFAULT_BANNED_TERMS: BannedTermSeed[] = [
 /**
  * Get severity level value for comparison
  */
-export function getSeverityLevel(
-  severity: BannedTermSeed["severity"]
-): number {
+export function getSeverityLevel(severity: BannedTermSeed["severity"]): number {
   const levels: Record<BannedTermSeed["severity"], number> = {
     low: 1,
     medium: 2,

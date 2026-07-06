@@ -26,6 +26,7 @@ $ARGUMENTS: [<url-or-page>] [--ticket=<id>]
 - `--ticket=<id>`: Optional ticket ID to attach findings to
 
 **Examples**:
+
 - `/tt-debug-browser /checkout` - Inspect checkout page
 - `/tt-debug-browser /admin/orders --ticket=142` - Debug and attach to ticket
 - `/tt-debug-browser` - Interactive mode, asks what to debug
@@ -33,11 +34,13 @@ $ARGUMENTS: [<url-or-page>] [--ticket=<id>]
 ## Prerequisites
 
 Ensure dev servers are running:
+
 ```bash
 ./scripts/run-tests.sh setup
 ```
 
 This starts Docker, DB, and dev servers at:
+
 - Web: http://localhost:3001
 - API: http://localhost:3000
 
@@ -46,6 +49,7 @@ This starts Docker, DB, and dev servers at:
 ### Step 1: Parse Arguments
 
 If no URL provided, ask user:
+
 ```
 What would you like to debug?
 - Checkout flow
@@ -89,6 +93,7 @@ Read the snapshot and provide analysis:
 Based on the page, offer relevant actions:
 
 **For checkout/payment pages:**
+
 ```bash
 # Check cart state
 agent-browser get text "[data-testid='cart-summary']"
@@ -101,6 +106,7 @@ agent-browser get attr "button[type='submit']" "disabled"
 ```
 
 **For admin pages:**
+
 ```bash
 # Check table data loaded
 agent-browser get count "table tbody tr"
@@ -113,6 +119,7 @@ agent-browser get text ".pagination-info"
 ```
 
 **For auth issues:**
+
 ```bash
 # Check if logged in
 agent-browser get text "[data-testid='user-menu']"
@@ -188,9 +195,9 @@ Output structured findings:
 
 If ticket ID provided, add comment:
 
-```yaml
+````yaml
 mcp__ticketrack__addComment:
-  ticketId: {ticket-id}
+  ticketId: { ticket-id }
   comment: |
     ## Browser Debug Session
 
@@ -207,19 +214,20 @@ mcp__ticketrack__addComment:
 
     ### Suggested Fix
     {suggestion}
-```
+````
 
 ## Saved Auth Profiles
 
 The skill uses persistent profiles to maintain login state:
 
-| Profile | Purpose | Path |
-|---------|---------|------|
-| customer | Customer login | `~/.masonart-customer` |
-| admin | Admin login | `~/.masonart-admin` |
-| guest | No auth (fresh) | (no profile) |
+| Profile  | Purpose         | Path                   |
+| -------- | --------------- | ---------------------- |
+| customer | Customer login  | `~/.masonart-customer` |
+| admin    | Admin login     | `~/.masonart-admin`    |
+| guest    | No auth (fresh) | (no profile)           |
 
 **To save a new profile:**
+
 ```bash
 # Login manually
 agent-browser --profile ~/.masonart-admin open http://localhost:3001/admin/login
@@ -233,11 +241,11 @@ agent-browser wait --url "**/admin/dashboard"
 
 ## Quick Commands
 
-| Command | Description |
-|---------|-------------|
-| `/tt-debug-browser /checkout` | Debug checkout page |
-| `/tt-debug-browser /admin` | Debug admin dashboard |
-| `/tt-debug-browser /cart` | Debug cart page |
+| Command                         | Description                |
+| ------------------------------- | -------------------------- |
+| `/tt-debug-browser /checkout`   | Debug checkout page        |
+| `/tt-debug-browser /admin`      | Debug admin dashboard      |
+| `/tt-debug-browser /cart`       | Debug cart page            |
 | `/tt-debug-browser --ticket=42` | Debug and attach to ticket |
 
 ## Integration with Other Skills

@@ -1,15 +1,7 @@
 // Reviews database schema for Product Reviews feature
 // Following the patterns defined in docs/poster-app-tech-stack.md
 
-import {
-  pgTable,
-  text,
-  integer,
-  timestamp,
-  uuid,
-  pgEnum,
-  index,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, uuid, pgEnum, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { products } from "./products";
 import { users } from "./users";
@@ -25,11 +17,7 @@ import { orderItems } from "./orders";
  * - approved: Review approved and visible on product page
  * - rejected: Review rejected by moderator
  */
-export const reviewStatusEnum = pgEnum("review_status", [
-  "pending",
-  "approved",
-  "rejected",
-]);
+export const reviewStatusEnum = pgEnum("review_status", ["pending", "approved", "rejected"]);
 
 // ============================================================================
 // Tables
@@ -85,10 +73,7 @@ export const reviews = pgTable(
     statusIdx: index("reviews_status_idx").on(table.status),
     createdAtIdx: index("reviews_created_at_idx").on(table.createdAt),
     // Composite index for listing approved reviews by product
-    productStatusIdx: index("reviews_product_status_idx").on(
-      table.productId,
-      table.status
-    ),
+    productStatusIdx: index("reviews_product_status_idx").on(table.productId, table.status),
   })
 );
 

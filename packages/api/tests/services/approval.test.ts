@@ -142,23 +142,32 @@ function setupMocks() {
   vi.clearAllMocks();
 
   // Setup default mock implementations
-  vi.mocked(db.insert).mockImplementation(() => ({
-    values: vi.fn(() => ({
-      returning: vi.fn(() => Promise.resolve([mockApproval])),
-    })),
-  }) as any);
+  vi.mocked(db.insert).mockImplementation(
+    () =>
+      ({
+        values: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve([mockApproval])),
+        })),
+      }) as any
+  );
 
-  vi.mocked(db.update).mockImplementation(() => ({
-    set: vi.fn(() => ({
-      where: vi.fn(() => ({
-        returning: vi.fn(() => Promise.resolve([mockApproval])),
-      })),
-    })),
-  }) as any);
+  vi.mocked(db.update).mockImplementation(
+    () =>
+      ({
+        set: vi.fn(() => ({
+          where: vi.fn(() => ({
+            returning: vi.fn(() => Promise.resolve([mockApproval])),
+          })),
+        })),
+      }) as any
+  );
 
-  vi.mocked(db.delete).mockImplementation(() => ({
-    where: vi.fn(() => Promise.resolve()),
-  }) as any);
+  vi.mocked(db.delete).mockImplementation(
+    () =>
+      ({
+        where: vi.fn(() => Promise.resolve()),
+      }) as any
+  );
 }
 
 // ============================================================================
@@ -178,9 +187,7 @@ describe("Approval Service", () => {
     it("should create an approval successfully", async () => {
       // Setup mocks
       vi.mocked(db.query.orders.findFirst).mockResolvedValue(mockOrder as any);
-      vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(
-        mockOrderItem as any
-      );
+      vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(mockOrderItem as any);
       vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
 
       const result = await createApproval({
@@ -220,12 +227,8 @@ describe("Approval Service", () => {
 
     it("should fail if approval already exists", async () => {
       vi.mocked(db.query.orders.findFirst).mockResolvedValue(mockOrder as any);
-      vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(
-        mockOrderItem as any
-      );
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(
-        mockApproval as any
-      );
+      vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(mockOrderItem as any);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(mockApproval as any);
 
       const result = await createApproval({
         orderId: "order-123",
@@ -238,9 +241,7 @@ describe("Approval Service", () => {
 
     it("should set deadline based on deadlineDays option", async () => {
       vi.mocked(db.query.orders.findFirst).mockResolvedValue(mockOrder as any);
-      vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(
-        mockOrderItem as any
-      );
+      vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(mockOrderItem as any);
       vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
 
       await createApproval({
@@ -256,9 +257,7 @@ describe("Approval Service", () => {
 
   describe("uploadPhotos", () => {
     it("should upload photos successfully", async () => {
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(
-        mockApproval as any
-      );
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(mockApproval as any);
 
       vi.mocked(db.insert).mockImplementation(() => ({
         values: vi.fn(() => ({
@@ -507,9 +506,7 @@ describe("Approval Service", () => {
 
   describe("getOrderApprovals", () => {
     it("should return all approvals for an order", async () => {
-      vi.mocked(db.query.productionApprovals.findMany).mockResolvedValue([
-        mockApproval,
-      ] as any);
+      vi.mocked(db.query.productionApprovals.findMany).mockResolvedValue([mockApproval] as any);
 
       const result = await getOrderApprovals("order-123");
 
@@ -528,9 +525,7 @@ describe("Approval Service", () => {
 
   describe("getApprovalsByStatus", () => {
     it("should return approvals filtered by status", async () => {
-      vi.mocked(db.query.productionApprovals.findMany).mockResolvedValue([
-        mockApproval,
-      ] as any);
+      vi.mocked(db.query.productionApprovals.findMany).mockResolvedValue([mockApproval] as any);
 
       const result = await getApprovalsByStatus("pending_upload");
 
@@ -574,9 +569,7 @@ describe("Approval Service", () => {
       vi.mocked(db.update).mockImplementation(() => ({
         set: vi.fn(() => ({
           where: vi.fn(() => ({
-            returning: vi.fn(() =>
-              Promise.resolve([{ id: "approval-1" }, { id: "approval-2" }])
-            ),
+            returning: vi.fn(() => Promise.resolve([{ id: "approval-1" }, { id: "approval-2" }])),
           })),
         })),
       }));
@@ -602,11 +595,7 @@ describe("Approval Service", () => {
         })),
       }));
 
-      const result = await addAdminComment(
-        "approval-123",
-        "admin-123",
-        "New photos uploaded"
-      );
+      const result = await addAdminComment("approval-123", "admin-123", "New photos uploaded");
 
       expect(result).toBeDefined();
       expect(result?.authorType).toBe("admin");
@@ -626,9 +615,7 @@ describe("Approval Service", () => {
 describe("Approval Token Generation", () => {
   it("should generate tokens with apv_ prefix", async () => {
     vi.mocked(db.query.orders.findFirst).mockResolvedValue(mockOrder as any);
-    vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(
-      mockOrderItem as any
-    );
+    vi.mocked(db.query.orderItems.findFirst).mockResolvedValue(mockOrderItem as any);
     vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
 
     let capturedToken: string | undefined;

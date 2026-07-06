@@ -5,159 +5,150 @@
  * These schemas match the types defined in ../types/product.ts
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 // ============================================================================
 // Enum Schemas
 // ============================================================================
 
 export const posterStyleSchema = z.enum([
-  'wabi-sabi',
-  'minimalist',
-  'abstract',
-  'modern-contemporary',
-  'vintage',
-  'retro',
-  'pop-art',
-  'bohemian',
-  'surrealist',
-  'photographic',
-  'typography',
-  'quotes',
-  'texture-art',
+  "wabi-sabi",
+  "minimalist",
+  "abstract",
+  "modern-contemporary",
+  "vintage",
+  "retro",
+  "pop-art",
+  "bohemian",
+  "surrealist",
+  "photographic",
+  "typography",
+  "quotes",
+  "texture-art",
 ]);
 
 export const posterSubjectSchema = z.enum([
-  'nature-landscape',
-  'flowers-botanical',
-  'animals',
-  'abstract-geometric',
-  'people-portraits',
-  'city-architecture',
-  'sea-ocean',
-  'mountains',
-  'motivational',
-  'ai-generated',
+  "nature-landscape",
+  "flowers-botanical",
+  "animals",
+  "abstract-geometric",
+  "people-portraits",
+  "city-architecture",
+  "sea-ocean",
+  "mountains",
+  "motivational",
+  "ai-generated",
 ]);
 
 export const productColorSchema = z.enum([
-  'black',
-  'white',
-  'beige',
-  'neutral',
-  'blue',
-  'green',
-  'gold',
-  'pink',
-  'red',
-  'grey',
-  'black-white',
-  'colorful',
-  'multi',
-  'earth-tones',
+  "black",
+  "white",
+  "beige",
+  "neutral",
+  "blue",
+  "green",
+  "gold",
+  "pink",
+  "red",
+  "grey",
+  "black-white",
+  "colorful",
+  "multi",
+  "earth-tones",
 ]);
 
 export const posterOrientationSchema = z.enum([
-  'square',
-  'portrait',
-  'landscape',
-  'panoramic',
-  'round',
-  'circular',
-  'diptych',
-  'triptych',
+  "square",
+  "portrait",
+  "landscape",
+  "panoramic",
+  "round",
+  "circular",
+  "diptych",
+  "triptych",
 ]);
 
 export const roomTypeSchema = z.enum([
-  'living-room',
-  'bedroom',
-  'office',
-  'kitchen-dining',
-  'kids-room',
-  'bathroom',
-  'entryway',
+  "living-room",
+  "bedroom",
+  "office",
+  "kitchen-dining",
+  "kids-room",
+  "bathroom",
+  "entryway",
 ]);
 
-export const priceTierSchema = z.union([
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-  z.literal(4),
-]);
+export const priceTierSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
 
 export const frameTypeSchema = z.enum([
-  'poster-only',
-  'stretched-canvas',
-  'black-frame',
-  'white-frame',
-  'natural-wood-frame',
-  'dark-wood-frame',
-  'gold-frame',
-  'silver-frame',
-  'floating-frame',
+  "poster-only",
+  "stretched-canvas",
+  "black-frame",
+  "white-frame",
+  "natural-wood-frame",
+  "dark-wood-frame",
+  "gold-frame",
+  "silver-frame",
+  "floating-frame",
 ]);
 
 export const matOptionSchema = z.enum([
-  'no-mat',
-  'white-mat',
-  'off-white-mat',
-  'black-mat',
-  'double-mat',
+  "no-mat",
+  "white-mat",
+  "off-white-mat",
+  "black-mat",
+  "double-mat",
 ]);
 
 export const glassOptionSchema = z.enum([
-  'standard-glass',
-  'non-glare-glass',
-  'acrylic',
-  'plexiglass',
-  'museum-glass',
+  "standard-glass",
+  "non-glare-glass",
+  "acrylic",
+  "plexiglass",
+  "museum-glass",
 ]);
 
 export const productStatusSchema = z.enum([
-  'draft',
-  'active',
-  'out-of-stock',
-  'discontinued',
-  'coming-soon',
+  "draft",
+  "active",
+  "out-of-stock",
+  "discontinued",
+  "coming-soon",
 ]);
 
 export const collectionTypeSchema = z.enum([
-  'new-arrivals',
-  'best-sellers',
-  'staff-picks',
-  'seasonal',
-  'sale',
-  'ai-generated-gallery',
+  "new-arrivals",
+  "best-sellers",
+  "staff-picks",
+  "seasonal",
+  "sale",
+  "ai-generated-gallery",
 ]);
 
-export const sizeUnitSchema = z.enum(['inches', 'cm']);
+export const sizeUnitSchema = z.enum(["inches", "cm"]);
 
-export const sizeCategorySchema = z.enum([
-  'square',
-  'portrait-landscape',
-  'panoramic',
-]);
+export const sizeCategorySchema = z.enum(["square", "portrait-landscape", "panoramic"]);
 
 export const productImageTypeSchema = z.enum([
-  'main',
-  'detail',
-  'texture',
-  'room-mockup',
-  'frame-preview',
-  '360-view',
+  "main",
+  "detail",
+  "texture",
+  "room-mockup",
+  "frame-preview",
+  "360-view",
 ]);
 
 export const productSortFieldSchema = z.enum([
-  'createdAt',
-  'updatedAt',
-  'title',
-  'minPrice',
-  'maxPrice',
-  'rating',
-  'popularity',
+  "createdAt",
+  "updatedAt",
+  "title",
+  "minPrice",
+  "maxPrice",
+  "rating",
+  "popularity",
 ]);
 
-export const sortDirectionSchema = z.enum(['asc', 'desc']);
+export const sortDirectionSchema = z.enum(["asc", "desc"]);
 
 // ============================================================================
 // Size Schemas
@@ -180,7 +171,7 @@ export const productSizeSchema = z.object({
 // ============================================================================
 
 export const priceModifierSchema = z.object({
-  type: z.enum(['percentage', 'fixed']),
+  type: z.enum(["percentage", "fixed"]),
   value: z.number(),
   currency: z.string().optional(),
 });
@@ -237,7 +228,11 @@ export const artistSocialLinksSchema = z.object({
 export const artistSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(100),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
+  slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9-]+$/),
   bio: z.string().max(5000),
   profileImageUrl: z.string().url().optional(),
   socialLinks: artistSocialLinksSchema.optional(),
@@ -306,7 +301,11 @@ export const productSchema = z.object({
   id: z.string().min(1),
   sku: z.string().min(1).max(50),
   title: z.string().min(1).max(200),
-  slug: z.string().min(1).max(200).regex(/^[a-z0-9-]+$/),
+  slug: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[a-z0-9-]+$/),
   description: z.string().max(10000),
   shortDescription: z.string().max(500).optional(),
 
@@ -434,7 +433,11 @@ export const paginatedProductsSchema = z.object({
 export const collectionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(100),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
+  slug: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9-]+$/),
   description: z.string().max(2000),
   type: collectionTypeSchema,
   coverImageUrl: z.string().url().optional(),

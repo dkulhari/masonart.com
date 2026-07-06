@@ -6,13 +6,13 @@
  * caching, error handling, and cache invalidation.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderHook, waitFor, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 
 // Mock the API module before importing hooks
-vi.mock('~/lib/api', () => ({
+vi.mock("~/lib/api", () => ({
   cartApi: {
     get: vi.fn(),
     addItem: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock('~/lib/api', () => ({
     clear: vi.fn(),
     merge: vi.fn(),
   },
-  getApiUrl: vi.fn(() => 'http://localhost:3000'),
+  getApiUrl: vi.fn(() => "http://localhost:3000"),
 }));
 
 // Import after mock
@@ -42,8 +42,8 @@ import {
   type ServerCart,
   type ServerCartItem,
   type CartOperationResult,
-} from '~/hooks/useCart';
-import { cartApi } from '~/lib/api';
+} from "~/hooks/useCart";
+import { cartApi } from "~/lib/api";
 
 // Test utilities
 const createQueryClient = () =>
@@ -61,84 +61,80 @@ const createQueryClient = () =>
 
 const createWrapper = (queryClient: QueryClient) => {
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 };
 
 // Mock data
 const mockCartItem: ServerCartItem = {
-  id: 'item-1',
-  cartId: 'cart-1',
-  productId: 'prod-1',
-  variantId: 'var-1',
+  id: "item-1",
+  cartId: "cart-1",
+  productId: "prod-1",
+  variantId: "var-1",
   frameId: null,
   quantity: 2,
-  unitPrice: '1500.00',
-  framePrice: '0',
-  totalPrice: '3000.00',
+  unitPrice: "1500.00",
+  framePrice: "0",
+  totalPrice: "3000.00",
   customizations: null,
   isAiGenerated: false,
   aiGenerationId: null,
   aiDetails: null,
   savedForLater: false,
   reservedUntil: null,
-  addedAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
+  addedAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
   product: {
-    id: 'prod-1',
-    title: 'Ocean Waves Abstract',
-    slug: 'ocean-waves-abstract',
-    images: [{ url: 'https://cdn.example.com/ocean-waves.jpg' }],
+    id: "prod-1",
+    title: "Ocean Waves Abstract",
+    slug: "ocean-waves-abstract",
+    images: [{ url: "https://cdn.example.com/ocean-waves.jpg" }],
   },
   variant: {
-    id: 'var-1',
+    id: "var-1",
     sizeLabel: '12" x 18"',
     widthInches: 12,
     heightInches: 18,
-    price: '1500.00',
+    price: "1500.00",
   },
 };
 
 const mockCart: ServerCart = {
-  id: 'cart-1',
-  userId: 'user-1',
+  id: "cart-1",
+  userId: "user-1",
   guestSessionId: null,
   itemCount: 2,
-  subtotal: '3000.00',
+  subtotal: "3000.00",
   couponCode: null,
-  discountAmount: '0',
-  createdAt: '2024-01-01T00:00:00Z',
-  updatedAt: '2024-01-01T00:00:00Z',
+  discountAmount: "0",
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
   expiresAt: null,
   items: [mockCartItem],
 };
 
 const mockCartOperationResult: CartOperationResult = {
   success: true,
-  message: 'Operation successful',
+  message: "Operation successful",
   cart: mockCart,
   item: mockCartItem,
 };
 
-describe('useCart Hooks - Query Keys', () => {
-  it('should generate correct all cart key', () => {
-    expect(cartKeys.all).toEqual(['cart']);
+describe("useCart Hooks - Query Keys", () => {
+  it("should generate correct all cart key", () => {
+    expect(cartKeys.all).toEqual(["cart"]);
   });
 
-  it('should generate correct detail key', () => {
-    expect(cartKeys.detail()).toEqual(['cart', 'detail']);
+  it("should generate correct detail key", () => {
+    expect(cartKeys.detail()).toEqual(["cart", "detail"]);
   });
 
-  it('should generate correct items key', () => {
-    expect(cartKeys.items()).toEqual(['cart', 'items']);
+  it("should generate correct items key", () => {
+    expect(cartKeys.items()).toEqual(["cart", "items"]);
   });
 });
 
-describe('useServerCart Hook', () => {
+describe("useServerCart Hook", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -150,7 +146,7 @@ describe('useServerCart Hook', () => {
     queryClient.clear();
   });
 
-  it('should fetch cart successfully', async () => {
+  it("should fetch cart successfully", async () => {
     (cartApi.get as any).mockResolvedValueOnce(mockCart);
 
     const { result } = renderHook(() => useServerCart(), {
@@ -167,25 +163,25 @@ describe('useServerCart Hook', () => {
     expect(cartApi.get).toHaveBeenCalled();
   });
 
-  it('should handle fetch error', async () => {
-    const error = new Error('Failed to fetch cart');
+  it("should handle fetch error", async () => {
+    const error = new Error("Failed to fetch cart");
     (cartApi.get as any).mockRejectedValue(error);
 
-    const { result } = renderHook(
-      () => useServerCart({ retry: false }),
-      {
-        wrapper: createWrapper(queryClient),
-      }
+    const { result } = renderHook(() => useServerCart({ retry: false }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(
+      () => {
+        expect(result.current.isError).toBe(true);
+      },
+      { timeout: 2000 }
     );
 
-    await waitFor(() => {
-      expect(result.current.isError).toBe(true);
-    }, { timeout: 2000 });
-
-    expect(result.current.error?.message).toBe('Failed to fetch cart');
+    expect(result.current.error?.message).toBe("Failed to fetch cart");
   });
 
-  it('should use stale time of 1 minute', async () => {
+  it("should use stale time of 1 minute", async () => {
     (cartApi.get as any).mockResolvedValueOnce(mockCart);
 
     const { result } = renderHook(() => useServerCart(), {
@@ -199,8 +195,8 @@ describe('useServerCart Hook', () => {
     expect(result.current.isStale).toBe(false);
   });
 
-  it('should retry only once on failure', async () => {
-    const error = new Error('Network error');
+  it("should retry only once on failure", async () => {
+    const error = new Error("Network error");
     (cartApi.get as any).mockRejectedValue(error);
 
     const customQueryClient = new QueryClient({
@@ -216,14 +212,17 @@ describe('useServerCart Hook', () => {
       wrapper: createWrapper(customQueryClient),
     });
 
-    await waitFor(() => {
-      expect(result.current.isError).toBe(true);
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(result.current.isError).toBe(true);
+      },
+      { timeout: 5000 }
+    );
 
     customQueryClient.clear();
   });
 
-  it('should support custom query options', async () => {
+  it("should support custom query options", async () => {
     (cartApi.get as any).mockResolvedValueOnce(mockCart);
 
     const { result } = renderHook(
@@ -244,7 +243,7 @@ describe('useServerCart Hook', () => {
     expect(result.current.data).toEqual(mockCart);
   });
 
-  it('should not fetch when disabled', async () => {
+  it("should not fetch when disabled", async () => {
     const { result } = renderHook(
       () =>
         useServerCart({
@@ -261,7 +260,7 @@ describe('useServerCart Hook', () => {
   });
 });
 
-describe('useAddToCart Hook', () => {
+describe("useAddToCart Hook", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -275,7 +274,7 @@ describe('useAddToCart Hook', () => {
     queryClient.clear();
   });
 
-  it('should add item to cart', async () => {
+  it("should add item to cart", async () => {
     (cartApi.addItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useAddToCart(), {
@@ -284,8 +283,8 @@ describe('useAddToCart Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        productId: 'prod-2',
-        variantId: 'var-2',
+        productId: "prod-2",
+        variantId: "var-2",
         quantity: 1,
       });
     });
@@ -295,13 +294,13 @@ describe('useAddToCart Hook', () => {
     });
 
     expect(cartApi.addItem).toHaveBeenCalledWith({
-      productId: 'prod-2',
-      variantId: 'var-2',
+      productId: "prod-2",
+      variantId: "var-2",
       quantity: 1,
     });
   });
 
-  it('should add item with frame', async () => {
+  it("should add item with frame", async () => {
     (cartApi.addItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useAddToCart(), {
@@ -310,9 +309,9 @@ describe('useAddToCart Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        productId: 'prod-2',
-        variantId: 'var-2',
-        frameId: 'frame-1',
+        productId: "prod-2",
+        variantId: "var-2",
+        frameId: "frame-1",
         quantity: 1,
       });
     });
@@ -322,14 +321,14 @@ describe('useAddToCart Hook', () => {
     });
 
     expect(cartApi.addItem).toHaveBeenCalledWith({
-      productId: 'prod-2',
-      variantId: 'var-2',
-      frameId: 'frame-1',
+      productId: "prod-2",
+      variantId: "var-2",
+      frameId: "frame-1",
       quantity: 1,
     });
   });
 
-  it('should add AI-generated item', async () => {
+  it("should add AI-generated item", async () => {
     (cartApi.addItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useAddToCart(), {
@@ -337,18 +336,18 @@ describe('useAddToCart Hook', () => {
     });
 
     const aiDetails = {
-      generationId: 'gen-1',
-      prompt: 'A beautiful sunset',
-      stylePreset: 'minimalist',
+      generationId: "gen-1",
+      prompt: "A beautiful sunset",
+      stylePreset: "minimalist",
     };
 
     await act(async () => {
       result.current.mutate({
-        productId: 'prod-ai',
-        variantId: 'var-ai',
+        productId: "prod-ai",
+        variantId: "var-ai",
         quantity: 1,
         isAiGenerated: true,
-        aiGenerationId: 'gen-1',
+        aiGenerationId: "gen-1",
         aiDetails,
       });
     });
@@ -360,13 +359,13 @@ describe('useAddToCart Hook', () => {
     expect(cartApi.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         isAiGenerated: true,
-        aiGenerationId: 'gen-1',
+        aiGenerationId: "gen-1",
         aiDetails,
       })
     );
   });
 
-  it('should perform optimistic update', async () => {
+  it("should perform optimistic update", async () => {
     let itemCountDuringMutation = 0;
 
     (cartApi.addItem as any).mockImplementation(async () => {
@@ -382,8 +381,8 @@ describe('useAddToCart Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        productId: 'prod-2',
-        variantId: 'var-2',
+        productId: "prod-2",
+        variantId: "var-2",
         quantity: 1,
       });
     });
@@ -396,8 +395,8 @@ describe('useAddToCart Hook', () => {
     expect(itemCountDuringMutation).toBe(3); // 2 + 1
   });
 
-  it('should handle mutation error and set error state', async () => {
-    const error = new Error('Failed to add item');
+  it("should handle mutation error and set error state", async () => {
+    const error = new Error("Failed to add item");
     (cartApi.addItem as any).mockRejectedValueOnce(error);
 
     const { result } = renderHook(() => useAddToCart(), {
@@ -406,8 +405,8 @@ describe('useAddToCart Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        productId: 'prod-2',
-        variantId: 'var-2',
+        productId: "prod-2",
+        variantId: "var-2",
         quantity: 1,
       });
     });
@@ -417,13 +416,13 @@ describe('useAddToCart Hook', () => {
     });
 
     // Error should be captured
-    expect(result.current.error?.message).toBe('Failed to add item');
+    expect(result.current.error?.message).toBe("Failed to add item");
     // Mutation should not be in success state
     expect(result.current.isSuccess).toBe(false);
   });
 
-  it('should invalidate cart on success', async () => {
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+  it("should invalidate cart on success", async () => {
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     (cartApi.addItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useAddToCart(), {
@@ -432,8 +431,8 @@ describe('useAddToCart Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        productId: 'prod-2',
-        variantId: 'var-2',
+        productId: "prod-2",
+        variantId: "var-2",
         quantity: 1,
       });
     });
@@ -445,8 +444,8 @@ describe('useAddToCart Hook', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: cartKeys.detail() });
   });
 
-  it('should handle mutation error', async () => {
-    const error = new Error('Product out of stock');
+  it("should handle mutation error", async () => {
+    const error = new Error("Product out of stock");
     (cartApi.addItem as any).mockRejectedValueOnce(error);
 
     const { result } = renderHook(() => useAddToCart(), {
@@ -455,8 +454,8 @@ describe('useAddToCart Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        productId: 'prod-2',
-        variantId: 'var-2',
+        productId: "prod-2",
+        variantId: "var-2",
         quantity: 1,
       });
     });
@@ -465,11 +464,11 @@ describe('useAddToCart Hook', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error?.message).toBe('Product out of stock');
+    expect(result.current.error?.message).toBe("Product out of stock");
   });
 });
 
-describe('useUpdateCartItem Hook', () => {
+describe("useUpdateCartItem Hook", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -482,7 +481,7 @@ describe('useUpdateCartItem Hook', () => {
     queryClient.clear();
   });
 
-  it('should update item quantity', async () => {
+  it("should update item quantity", async () => {
     (cartApi.updateItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useUpdateCartItem(), {
@@ -491,7 +490,7 @@ describe('useUpdateCartItem Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        id: 'item-1',
+        id: "item-1",
         data: { quantity: 5 },
       });
     });
@@ -500,10 +499,10 @@ describe('useUpdateCartItem Hook', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(cartApi.updateItem).toHaveBeenCalledWith('item-1', { quantity: 5 });
+    expect(cartApi.updateItem).toHaveBeenCalledWith("item-1", { quantity: 5 });
   });
 
-  it('should update item frame', async () => {
+  it("should update item frame", async () => {
     (cartApi.updateItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useUpdateCartItem(), {
@@ -512,8 +511,8 @@ describe('useUpdateCartItem Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        id: 'item-1',
-        data: { frameId: 'frame-2' },
+        id: "item-1",
+        data: { frameId: "frame-2" },
       });
     });
 
@@ -521,10 +520,10 @@ describe('useUpdateCartItem Hook', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(cartApi.updateItem).toHaveBeenCalledWith('item-1', { frameId: 'frame-2' });
+    expect(cartApi.updateItem).toHaveBeenCalledWith("item-1", { frameId: "frame-2" });
   });
 
-  it('should update save for later status', async () => {
+  it("should update save for later status", async () => {
     (cartApi.updateItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useUpdateCartItem(), {
@@ -533,7 +532,7 @@ describe('useUpdateCartItem Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        id: 'item-1',
+        id: "item-1",
         data: { isSavedForLater: true },
       });
     });
@@ -542,14 +541,14 @@ describe('useUpdateCartItem Hook', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(cartApi.updateItem).toHaveBeenCalledWith('item-1', { isSavedForLater: true });
+    expect(cartApi.updateItem).toHaveBeenCalledWith("item-1", { isSavedForLater: true });
   });
 
-  it('should perform optimistic update', async () => {
+  it("should perform optimistic update", async () => {
     (cartApi.updateItem as any).mockImplementation(async () => {
       // Check optimistic update was applied
       const cachedCart = queryClient.getQueryData<ServerCart>(cartKeys.detail());
-      const updatedItem = cachedCart?.items.find((i) => i.id === 'item-1');
+      const updatedItem = cachedCart?.items.find((i) => i.id === "item-1");
       expect(updatedItem?.quantity).toBe(10);
       return mockCartOperationResult;
     });
@@ -560,7 +559,7 @@ describe('useUpdateCartItem Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        id: 'item-1',
+        id: "item-1",
         data: { quantity: 10 },
       });
     });
@@ -570,8 +569,8 @@ describe('useUpdateCartItem Hook', () => {
     });
   });
 
-  it('should handle update error and set error state', async () => {
-    const error = new Error('Invalid quantity');
+  it("should handle update error and set error state", async () => {
+    const error = new Error("Invalid quantity");
     (cartApi.updateItem as any).mockRejectedValueOnce(error);
 
     const { result } = renderHook(() => useUpdateCartItem(), {
@@ -580,7 +579,7 @@ describe('useUpdateCartItem Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        id: 'item-1',
+        id: "item-1",
         data: { quantity: 100 },
       });
     });
@@ -590,12 +589,12 @@ describe('useUpdateCartItem Hook', () => {
     });
 
     // Error should be captured
-    expect(result.current.error?.message).toBe('Invalid quantity');
+    expect(result.current.error?.message).toBe("Invalid quantity");
     expect(result.current.isSuccess).toBe(false);
   });
 
-  it('should invalidate cart on success', async () => {
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+  it("should invalidate cart on success", async () => {
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     (cartApi.updateItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useUpdateCartItem(), {
@@ -604,7 +603,7 @@ describe('useUpdateCartItem Hook', () => {
 
     await act(async () => {
       result.current.mutate({
-        id: 'item-1',
+        id: "item-1",
         data: { quantity: 5 },
       });
     });
@@ -617,7 +616,7 @@ describe('useUpdateCartItem Hook', () => {
   });
 });
 
-describe('useRemoveFromCart Hook', () => {
+describe("useRemoveFromCart Hook", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -630,7 +629,7 @@ describe('useRemoveFromCart Hook', () => {
     queryClient.clear();
   });
 
-  it('should remove item from cart', async () => {
+  it("should remove item from cart", async () => {
     (cartApi.removeItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useRemoveFromCart(), {
@@ -638,21 +637,21 @@ describe('useRemoveFromCart Hook', () => {
     });
 
     await act(async () => {
-      result.current.mutate('item-1');
+      result.current.mutate("item-1");
     });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(cartApi.removeItem).toHaveBeenCalledWith('item-1');
+    expect(cartApi.removeItem).toHaveBeenCalledWith("item-1");
   });
 
-  it('should perform optimistic removal', async () => {
+  it("should perform optimistic removal", async () => {
     (cartApi.removeItem as any).mockImplementation(async () => {
       // Check item was removed optimistically
       const cachedCart = queryClient.getQueryData<ServerCart>(cartKeys.detail());
-      const item = cachedCart?.items.find((i) => i.id === 'item-1');
+      const item = cachedCart?.items.find((i) => i.id === "item-1");
       expect(item).toBeUndefined();
       return mockCartOperationResult;
     });
@@ -662,7 +661,7 @@ describe('useRemoveFromCart Hook', () => {
     });
 
     await act(async () => {
-      result.current.mutate('item-1');
+      result.current.mutate("item-1");
     });
 
     await waitFor(() => {
@@ -670,7 +669,7 @@ describe('useRemoveFromCart Hook', () => {
     });
   });
 
-  it('should decrement item count optimistically', async () => {
+  it("should decrement item count optimistically", async () => {
     (cartApi.removeItem as any).mockImplementation(async () => {
       const cachedCart = queryClient.getQueryData<ServerCart>(cartKeys.detail());
       expect(cachedCart?.itemCount).toBe(0); // 2 - 2 (item quantity)
@@ -682,7 +681,7 @@ describe('useRemoveFromCart Hook', () => {
     });
 
     await act(async () => {
-      result.current.mutate('item-1');
+      result.current.mutate("item-1");
     });
 
     await waitFor(() => {
@@ -690,8 +689,8 @@ describe('useRemoveFromCart Hook', () => {
     });
   });
 
-  it('should handle remove error and set error state', async () => {
-    const error = new Error('Item not found');
+  it("should handle remove error and set error state", async () => {
+    const error = new Error("Item not found");
     (cartApi.removeItem as any).mockRejectedValueOnce(error);
 
     const { result } = renderHook(() => useRemoveFromCart(), {
@@ -699,7 +698,7 @@ describe('useRemoveFromCart Hook', () => {
     });
 
     await act(async () => {
-      result.current.mutate('item-1');
+      result.current.mutate("item-1");
     });
 
     await waitFor(() => {
@@ -707,12 +706,12 @@ describe('useRemoveFromCart Hook', () => {
     });
 
     // Error should be captured
-    expect(result.current.error?.message).toBe('Item not found');
+    expect(result.current.error?.message).toBe("Item not found");
     expect(result.current.isSuccess).toBe(false);
   });
 
-  it('should invalidate cart on success', async () => {
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+  it("should invalidate cart on success", async () => {
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     (cartApi.removeItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useRemoveFromCart(), {
@@ -720,7 +719,7 @@ describe('useRemoveFromCart Hook', () => {
     });
 
     await act(async () => {
-      result.current.mutate('item-1');
+      result.current.mutate("item-1");
     });
 
     await waitFor(() => {
@@ -731,7 +730,7 @@ describe('useRemoveFromCart Hook', () => {
   });
 });
 
-describe('useClearCart Hook', () => {
+describe("useClearCart Hook", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -744,7 +743,7 @@ describe('useClearCart Hook', () => {
     queryClient.clear();
   });
 
-  it('should clear entire cart', async () => {
+  it("should clear entire cart", async () => {
     (cartApi.clear as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useClearCart(), {
@@ -762,12 +761,12 @@ describe('useClearCart Hook', () => {
     expect(cartApi.clear).toHaveBeenCalled();
   });
 
-  it('should perform optimistic clear', async () => {
+  it("should perform optimistic clear", async () => {
     (cartApi.clear as any).mockImplementation(async () => {
       const cachedCart = queryClient.getQueryData<ServerCart>(cartKeys.detail());
       expect(cachedCart?.items).toHaveLength(0);
       expect(cachedCart?.itemCount).toBe(0);
-      expect(cachedCart?.subtotal).toBe('0');
+      expect(cachedCart?.subtotal).toBe("0");
       return mockCartOperationResult;
     });
 
@@ -784,8 +783,8 @@ describe('useClearCart Hook', () => {
     });
   });
 
-  it('should handle clear error and set error state', async () => {
-    const error = new Error('Server error');
+  it("should handle clear error and set error state", async () => {
+    const error = new Error("Server error");
     (cartApi.clear as any).mockRejectedValueOnce(error);
 
     const { result } = renderHook(() => useClearCart(), {
@@ -801,12 +800,12 @@ describe('useClearCart Hook', () => {
     });
 
     // Error should be captured
-    expect(result.current.error?.message).toBe('Server error');
+    expect(result.current.error?.message).toBe("Server error");
     expect(result.current.isSuccess).toBe(false);
   });
 
-  it('should invalidate cart on success', async () => {
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+  it("should invalidate cart on success", async () => {
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     (cartApi.clear as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useClearCart(), {
@@ -825,7 +824,7 @@ describe('useClearCart Hook', () => {
   });
 });
 
-describe('useMergeCart Hook', () => {
+describe("useMergeCart Hook", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -837,7 +836,7 @@ describe('useMergeCart Hook', () => {
     queryClient.clear();
   });
 
-  it('should merge guest cart into user cart', async () => {
+  it("should merge guest cart into user cart", async () => {
     (cartApi.merge as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useMergeCart(), {
@@ -845,18 +844,18 @@ describe('useMergeCart Hook', () => {
     });
 
     await act(async () => {
-      result.current.mutate('guest-session-123');
+      result.current.mutate("guest-session-123");
     });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(cartApi.merge).toHaveBeenCalledWith('guest-session-123');
+    expect(cartApi.merge).toHaveBeenCalledWith("guest-session-123");
   });
 
-  it('should handle merge error', async () => {
-    const error = new Error('Merge failed');
+  it("should handle merge error", async () => {
+    const error = new Error("Merge failed");
     (cartApi.merge as any).mockRejectedValueOnce(error);
 
     const { result } = renderHook(() => useMergeCart(), {
@@ -864,18 +863,18 @@ describe('useMergeCart Hook', () => {
     });
 
     await act(async () => {
-      result.current.mutate('guest-session-123');
+      result.current.mutate("guest-session-123");
     });
 
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error?.message).toBe('Merge failed');
+    expect(result.current.error?.message).toBe("Merge failed");
   });
 
-  it('should invalidate cart on success', async () => {
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+  it("should invalidate cart on success", async () => {
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     (cartApi.merge as any).mockResolvedValueOnce(mockCartOperationResult);
 
     const { result } = renderHook(() => useMergeCart(), {
@@ -883,7 +882,7 @@ describe('useMergeCart Hook', () => {
     });
 
     await act(async () => {
-      result.current.mutate('guest-session-123');
+      result.current.mutate("guest-session-123");
     });
 
     await waitFor(() => {
@@ -894,7 +893,7 @@ describe('useMergeCart Hook', () => {
   });
 });
 
-describe('Utility Hooks', () => {
+describe("Utility Hooks", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -906,8 +905,8 @@ describe('Utility Hooks', () => {
     queryClient.clear();
   });
 
-  describe('useIsCartSyncing', () => {
-    it('should return false when not syncing', async () => {
+  describe("useIsCartSyncing", () => {
+    it("should return false when not syncing", async () => {
       queryClient.setQueryData(cartKeys.detail(), mockCart);
 
       const { result } = renderHook(() => useIsCartSyncing(), {
@@ -917,7 +916,7 @@ describe('Utility Hooks', () => {
       expect(result.current).toBe(false);
     });
 
-    it('should track isPending state during mutations', async () => {
+    it("should track isPending state during mutations", async () => {
       queryClient.setQueryData(cartKeys.detail(), mockCart);
 
       // Track all pending states during mutation lifecycle
@@ -941,8 +940,8 @@ describe('Utility Hooks', () => {
       // Start mutation
       await act(async () => {
         result.current.mutate({
-          productId: 'prod-1',
-          variantId: 'var-1',
+          productId: "prod-1",
+          variantId: "var-1",
           quantity: 1,
         });
       });
@@ -956,8 +955,8 @@ describe('Utility Hooks', () => {
     });
   });
 
-  describe('useServerCartItemCount', () => {
-    it('should return item count from cart', async () => {
+  describe("useServerCartItemCount", () => {
+    it("should return item count from cart", async () => {
       (cartApi.get as any).mockResolvedValueOnce(mockCart);
 
       const { result } = renderHook(() => useServerCartItemCount(), {
@@ -969,22 +968,18 @@ describe('Utility Hooks', () => {
       });
     });
 
-    it('should return 0 when cart is not loaded', () => {
-      const { result } = renderHook(
-        () =>
-          useServerCartItemCount(),
-        {
-          wrapper: createWrapper(queryClient),
-        }
-      );
+    it("should return 0 when cart is not loaded", () => {
+      const { result } = renderHook(() => useServerCartItemCount(), {
+        wrapper: createWrapper(queryClient),
+      });
 
       // Before cart is loaded
       expect(result.current).toBe(0);
     });
   });
 
-  describe('useServerCartSubtotal', () => {
-    it('should return subtotal from cart', async () => {
+  describe("useServerCartSubtotal", () => {
+    it("should return subtotal from cart", async () => {
       (cartApi.get as any).mockResolvedValueOnce(mockCart);
 
       const { result } = renderHook(() => useServerCartSubtotal(), {
@@ -992,25 +987,21 @@ describe('Utility Hooks', () => {
       });
 
       await waitFor(() => {
-        expect(result.current).toBe('3000.00');
+        expect(result.current).toBe("3000.00");
       });
     });
 
     it('should return "0" when cart is not loaded', () => {
-      const { result } = renderHook(
-        () =>
-          useServerCartSubtotal(),
-        {
-          wrapper: createWrapper(queryClient),
-        }
-      );
+      const { result } = renderHook(() => useServerCartSubtotal(), {
+        wrapper: createWrapper(queryClient),
+      });
 
-      expect(result.current).toBe('0');
+      expect(result.current).toBe("0");
     });
   });
 });
 
-describe('Cache Helper Functions', () => {
+describe("Cache Helper Functions", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -1022,9 +1013,9 @@ describe('Cache Helper Functions', () => {
     queryClient.clear();
   });
 
-  describe('invalidateCart', () => {
-    it('should invalidate all cart caches', async () => {
-      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+  describe("invalidateCart", () => {
+    it("should invalidate all cart caches", async () => {
+      const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
       await invalidateCart(queryClient);
 
@@ -1032,15 +1023,15 @@ describe('Cache Helper Functions', () => {
     });
   });
 
-  describe('setCartData', () => {
-    it('should set cart data directly', () => {
+  describe("setCartData", () => {
+    it("should set cart data directly", () => {
       setCartData(queryClient, mockCart);
 
       const cachedData = queryClient.getQueryData<ServerCart>(cartKeys.detail());
       expect(cachedData).toEqual(mockCart);
     });
 
-    it('should overwrite existing cart data', () => {
+    it("should overwrite existing cart data", () => {
       const initialCart = { ...mockCart, itemCount: 5 };
       queryClient.setQueryData(cartKeys.detail(), initialCart);
 
@@ -1051,22 +1042,22 @@ describe('Cache Helper Functions', () => {
     });
   });
 
-  describe('getCachedCart', () => {
-    it('should return cached cart data', () => {
+  describe("getCachedCart", () => {
+    it("should return cached cart data", () => {
       queryClient.setQueryData(cartKeys.detail(), mockCart);
 
       const cachedData = getCachedCart(queryClient);
       expect(cachedData).toEqual(mockCart);
     });
 
-    it('should return undefined when no cache', () => {
+    it("should return undefined when no cache", () => {
       const cachedData = getCachedCart(queryClient);
       expect(cachedData).toBeUndefined();
     });
   });
 });
 
-describe('Edge Cases', () => {
+describe("Edge Cases", () => {
   let queryClient: QueryClient;
 
   beforeEach(() => {
@@ -1078,12 +1069,12 @@ describe('Edge Cases', () => {
     queryClient.clear();
   });
 
-  it('should handle empty cart', async () => {
+  it("should handle empty cart", async () => {
     const emptyCart: ServerCart = {
       ...mockCart,
       items: [],
       itemCount: 0,
-      subtotal: '0',
+      subtotal: "0",
     };
     (cartApi.get as any).mockResolvedValueOnce(emptyCart);
 
@@ -1099,11 +1090,11 @@ describe('Edge Cases', () => {
     expect(result.current.data?.itemCount).toBe(0);
   });
 
-  it('should handle guest cart', async () => {
+  it("should handle guest cart", async () => {
     const guestCart: ServerCart = {
       ...mockCart,
       userId: null,
-      guestSessionId: 'guest-123',
+      guestSessionId: "guest-123",
     };
     (cartApi.get as any).mockResolvedValueOnce(guestCart);
 
@@ -1116,14 +1107,14 @@ describe('Edge Cases', () => {
     });
 
     expect(result.current.data?.userId).toBeNull();
-    expect(result.current.data?.guestSessionId).toBe('guest-123');
+    expect(result.current.data?.guestSessionId).toBe("guest-123");
   });
 
-  it('should handle cart with coupon', async () => {
+  it("should handle cart with coupon", async () => {
     const cartWithCoupon: ServerCart = {
       ...mockCart,
-      couponCode: 'SAVE20',
-      discountAmount: '600.00',
+      couponCode: "SAVE20",
+      discountAmount: "600.00",
     };
     (cartApi.get as any).mockResolvedValueOnce(cartWithCoupon);
 
@@ -1135,29 +1126,29 @@ describe('Edge Cases', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data?.couponCode).toBe('SAVE20');
-    expect(result.current.data?.discountAmount).toBe('600.00');
+    expect(result.current.data?.couponCode).toBe("SAVE20");
+    expect(result.current.data?.discountAmount).toBe("600.00");
   });
 
-  it('should handle network timeout', async () => {
-    const error = new Error('Request timeout');
+  it("should handle network timeout", async () => {
+    const error = new Error("Request timeout");
     (cartApi.get as any).mockRejectedValue(error);
 
-    const { result } = renderHook(
-      () => useServerCart({ retry: false }),
-      {
-        wrapper: createWrapper(queryClient),
-      }
+    const { result } = renderHook(() => useServerCart({ retry: false }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(
+      () => {
+        expect(result.current.isError).toBe(true);
+      },
+      { timeout: 2000 }
     );
 
-    await waitFor(() => {
-      expect(result.current.isError).toBe(true);
-    }, { timeout: 2000 });
-
-    expect(result.current.error?.message).toBe('Request timeout');
+    expect(result.current.error?.message).toBe("Request timeout");
   });
 
-  it('should handle optimistic update when no previous cart exists', async () => {
+  it("should handle optimistic update when no previous cart exists", async () => {
     // Don't pre-populate cache
     (cartApi.addItem as any).mockResolvedValueOnce(mockCartOperationResult);
 
@@ -1167,8 +1158,8 @@ describe('Edge Cases', () => {
 
     await act(async () => {
       result.current.mutate({
-        productId: 'prod-1',
-        variantId: 'var-1',
+        productId: "prod-1",
+        variantId: "var-1",
         quantity: 1,
       });
     });
@@ -1181,7 +1172,7 @@ describe('Edge Cases', () => {
     expect(cartApi.addItem).toHaveBeenCalled();
   });
 
-  it('should handle rapid mutations', async () => {
+  it("should handle rapid mutations", async () => {
     queryClient.setQueryData(cartKeys.detail(), mockCart);
     (cartApi.updateItem as any).mockResolvedValue(mockCartOperationResult);
 
@@ -1191,9 +1182,9 @@ describe('Edge Cases', () => {
 
     // Rapid fire multiple mutations
     await act(async () => {
-      result.current.mutate({ id: 'item-1', data: { quantity: 3 } });
-      result.current.mutate({ id: 'item-1', data: { quantity: 4 } });
-      result.current.mutate({ id: 'item-1', data: { quantity: 5 } });
+      result.current.mutate({ id: "item-1", data: { quantity: 3 } });
+      result.current.mutate({ id: "item-1", data: { quantity: 4 } });
+      result.current.mutate({ id: "item-1", data: { quantity: 5 } });
     });
 
     await waitFor(() => {
@@ -1202,22 +1193,22 @@ describe('Edge Cases', () => {
   });
 });
 
-describe('Types Export', () => {
-  it('should export ServerCart type', () => {
+describe("Types Export", () => {
+  it("should export ServerCart type", () => {
     const cart: ServerCart = mockCart;
-    expect(cart.id).toBe('cart-1');
+    expect(cart.id).toBe("cart-1");
     expect(cart.items).toHaveLength(1);
   });
 
-  it('should export ServerCartItem type', () => {
+  it("should export ServerCartItem type", () => {
     const item: ServerCartItem = mockCartItem;
-    expect(item.id).toBe('item-1');
+    expect(item.id).toBe("item-1");
     expect(item.quantity).toBe(2);
   });
 
-  it('should export CartOperationResult type', () => {
+  it("should export CartOperationResult type", () => {
     const result: CartOperationResult = mockCartOperationResult;
     expect(result.success).toBe(true);
-    expect(result.message).toBe('Operation successful');
+    expect(result.message).toBe("Operation successful");
   });
 });

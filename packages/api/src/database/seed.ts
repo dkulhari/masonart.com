@@ -493,8 +493,7 @@ const sampleProducts: NewProduct[] = [
     sku: "POP-002",
     title: "Comic Burst",
     slug: "comic-burst",
-    description:
-      "Classic comic book style explosion with halftone dots and bold primary colors.",
+    description: "Classic comic book style explosion with halftone dots and bold primary colors.",
     basePrice: "899.00",
     styles: ["pop-art", "retro"],
     subjects: ["abstract-geometric"],
@@ -764,8 +763,7 @@ const sampleProducts: NewProduct[] = [
     sku: "PHO-001",
     title: "Ocean Horizon",
     slug: "ocean-horizon",
-    description:
-      "Serene ocean view at golden hour. The perfect meeting of sea and sky.",
+    description: "Serene ocean view at golden hour. The perfect meeting of sea and sky.",
     basePrice: "1499.00",
     styles: ["photographic"],
     subjects: ["sea-ocean", "nature-landscape"],
@@ -943,8 +941,7 @@ const sampleProducts: NewProduct[] = [
     sku: "QUO-002",
     title: "Create Every Day",
     slug: "create-every-day",
-    description:
-      "Inspiration for makers and creators. Bold lettering that sparks creativity.",
+    description: "Inspiration for makers and creators. Bold lettering that sparks creativity.",
     basePrice: "649.00",
     styles: ["quotes", "typography"],
     subjects: ["motivational"],
@@ -1208,8 +1205,7 @@ const sampleProducts: NewProduct[] = [
       },
     ] as ProductImage[],
     seoTitle: "Digital Cosmos AI Art | Space-Inspired Generated Art",
-    seoDescription:
-      "AI-generated cosmic art blending nebulae with digital fractals.",
+    seoDescription: "AI-generated cosmic art blending nebulae with digital fractals.",
     status: "active",
     isFeatured: true,
     featuredOrder: 10,
@@ -1240,8 +1236,7 @@ const sampleProducts: NewProduct[] = [
       },
     ] as ProductImage[],
     seoTitle: "Synthetic Nature AI Art | Botanical Generated Art",
-    seoDescription:
-      "AI-generated botanical art reimagining nature through algorithms.",
+    seoDescription: "AI-generated botanical art reimagining nature through algorithms.",
     status: "active",
     isFeatured: false,
     isAiGenerated: true,
@@ -1251,10 +1246,7 @@ const sampleProducts: NewProduct[] = [
 /**
  * Variant sizes for products based on orientation
  */
-const variantsByOrientation: Record<
-  string,
-  Omit<NewProductVariant, "productId">[]
-> = {
+const variantsByOrientation: Record<string, Omit<NewProductVariant, "productId">[]> = {
   square: [
     {
       sizeLabel: '12" x 12"',
@@ -1473,8 +1465,7 @@ const sampleFrames: NewFrame[] = [
   {
     name: "Natural Oak",
     type: "oak",
-    description:
-      "Warm natural oak frame with visible grain. Brings organic warmth to any room.",
+    description: "Warm natural oak frame with visible grain. Brings organic warmth to any room.",
     material: "Oak Wood",
     thickness: "1.00",
     color: "Natural Oak",
@@ -1488,8 +1479,7 @@ const sampleFrames: NewFrame[] = [
   {
     name: "Rich Walnut",
     type: "walnut",
-    description:
-      "Deep walnut frame with elegant grain patterns. Adds sophistication and depth.",
+    description: "Deep walnut frame with elegant grain patterns. Adds sophistication and depth.",
     material: "Walnut Wood",
     thickness: "1.00",
     color: "Dark Walnut",
@@ -1584,8 +1574,7 @@ async function seedProducts(): Promise<void> {
 
     // Get variants for this orientation
     const variantTemplates =
-      variantsByOrientation[insertedProduct.orientation] ||
-      variantsByOrientation.portrait;
+      variantsByOrientation[insertedProduct.orientation] || variantsByOrientation.portrait;
 
     if (!variantTemplates) {
       console.error(`  No variant templates found for orientation: ${insertedProduct.orientation}`);
@@ -1594,15 +1583,13 @@ async function seedProducts(): Promise<void> {
 
     // Calculate actual prices and insert variants
     const basePrice = parseFloat(productData.basePrice);
-    const variantsToInsert: NewProductVariant[] = variantTemplates.map(
-      (template) => ({
-        ...template,
-        productId: insertedProduct.id,
-        // Calculate final price: base price + size addition
-        price: (basePrice + parseFloat(template.price)).toFixed(2),
-        variantSku: `${productData.sku}-${template.widthInches}x${template.heightInches}`,
-      })
-    );
+    const variantsToInsert: NewProductVariant[] = variantTemplates.map((template) => ({
+      ...template,
+      productId: insertedProduct.id,
+      // Calculate final price: base price + size addition
+      price: (basePrice + parseFloat(template.price)).toFixed(2),
+      variantSku: `${productData.sku}-${template.widthInches}x${template.heightInches}`,
+    }));
 
     await db.insert(productVariants).values(variantsToInsert);
     console.log(`    Added ${variantsToInsert.length} variants`);
@@ -1645,9 +1632,7 @@ async function seed(): Promise<void> {
     // Summary
     console.log("Summary:");
     console.log(`  - Products: ${sampleProducts.length}`);
-    console.log(
-      `  - Variants: ${sampleProducts.length * 4} (approx 4 per product)`
-    );
+    console.log(`  - Variants: ${sampleProducts.length * 4} (approx 4 per product)`);
     console.log(`  - Frames: ${sampleFrames.length}`);
     console.log("");
   } catch (error) {

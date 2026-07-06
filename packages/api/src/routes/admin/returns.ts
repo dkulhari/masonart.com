@@ -29,11 +29,7 @@ import {
 } from "../../database/schema/returns";
 import { orders, type PaymentStatus } from "../../database/schema/orders";
 import { users } from "../../database/schema/users";
-import {
-  requireAuth,
-  requireAdmin,
-  type AuthVariables,
-} from "../../middleware/auth";
+import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
 
 // ============================================================================
 // Constants
@@ -105,142 +101,138 @@ adminReturnsApp.use("*", requireAdmin);
 // GET /api/admin/returns - List All Return Requests
 // ============================================================================
 
-adminReturnsApp.get(
-  "/",
-  zValidator("query", listReturnsSchema),
-  async (c) => {
-    const {
-      status,
-      reason,
-      userId,
-      orderId,
-      dateFrom,
-      dateTo,
+adminReturnsApp.get("/", zValidator("query", listReturnsSchema), async (c) => {
+  const {
+    status,
+    reason,
+    userId,
+    orderId,
+    dateFrom,
+    dateTo,
+    page,
+    pageSize,
+    sortBy,
+    sortOrder: order,
+  } = c.req.valid("query");
+
+  try {
+    // Build where conditions
+    const conditions: ReturnType<typeof eq>[] = [];
+
+    if (status) {
+      conditions.push(eq(returnRequests.status, status as ReturnStatus));
+    }
+
+    if (reason) {
+      conditions.push(eq(returnRequests.reason, reason));
+    }
+
+    if (userId) {
+      conditions.push(eq(returnRequests.userId, userId));
+    }
+
+    if (orderId) {
+      conditions.push(eq(returnRequests.orderId, orderId));
+    }
+
+    if (dateFrom) {
+      conditions.push(gte(returnRequests.requestedAt, new Date(dateFrom)));
+    }
+
+    if (dateTo) {
+      conditions.push(lte(returnRequests.requestedAt, new Date(dateTo)));
+    }
+
+    // Build sort order
+    const orderFn = order === "asc" ? asc : desc;
+    const orderByColumn = {
+      requestedAt: returnRequests.requestedAt,
+      status: returnRequests.status,
+      createdAt: returnRequests.createdAt,
+    }[sortBy];
+
+    const offset = (page - 1) * pageSize;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(returnRequests)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    const total = countResult[0]?.count ?? 0;
+
+    // Get return requests with order info
+    const returnsList = await db
+      .select({
+        id: returnRequests.id,
+        orderId: returnRequests.orderId,
+        userId: returnRequests.userId,
+        reason: returnRequests.reason,
+        reasonDetails: returnRequests.reasonDetails,
+        status: returnRequests.status,
+        requestedAt: returnRequests.requestedAt,
+        approvedAt: returnRequests.approvedAt,
+        processedAt: returnRequests.processedAt,
+        refundAmount: returnRequests.refundAmount,
+        adminNotes: returnRequests.adminNotes,
+        createdAt: returnRequests.createdAt,
+        order: {
+          id: orders.id,
+          orderNumber: orders.orderNumber,
+          total: orders.total,
+          status: orders.status,
+        },
+      })
+      .from(returnRequests)
+      .innerJoin(orders, eq(returnRequests.orderId, orders.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(orderFn(orderByColumn))
+      .limit(pageSize)
+      .offset(offset);
+
+    // Get user info
+    const userIds = [...new Set(returnsList.map((r) => r.userId))];
+    let userMap: Record<string, { id: string; name: string | null; email: string }> = {};
+
+    if (userIds.length > 0) {
+      const userList = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        })
+        .from(users)
+        .where(sql`${users.id} = ANY(${userIds})`);
+
+      userMap = userList.reduce(
+        (acc, user) => {
+          acc[user.id] = user;
+          return acc;
+        },
+        {} as Record<string, { id: string; name: string | null; email: string }>
+      );
+    }
+
+    // Add user info to returns
+    const returnsWithUsers = returnsList.map((returnReq) => ({
+      ...returnReq,
+      customer: userMap[returnReq.userId] || null,
+    }));
+
+    return c.json({
+      items: returnsWithUsers,
+      total,
       page,
       pageSize,
-      sortBy,
-      sortOrder: order,
-    } = c.req.valid("query");
-
-    try {
-      // Build where conditions
-      const conditions: ReturnType<typeof eq>[] = [];
-
-      if (status) {
-        conditions.push(eq(returnRequests.status, status as ReturnStatus));
-      }
-
-      if (reason) {
-        conditions.push(eq(returnRequests.reason, reason));
-      }
-
-      if (userId) {
-        conditions.push(eq(returnRequests.userId, userId));
-      }
-
-      if (orderId) {
-        conditions.push(eq(returnRequests.orderId, orderId));
-      }
-
-      if (dateFrom) {
-        conditions.push(gte(returnRequests.requestedAt, new Date(dateFrom)));
-      }
-
-      if (dateTo) {
-        conditions.push(lte(returnRequests.requestedAt, new Date(dateTo)));
-      }
-
-      // Build sort order
-      const orderFn = order === "asc" ? asc : desc;
-      const orderByColumn = {
-        requestedAt: returnRequests.requestedAt,
-        status: returnRequests.status,
-        createdAt: returnRequests.createdAt,
-      }[sortBy];
-
-      const offset = (page - 1) * pageSize;
-
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(returnRequests)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Get return requests with order info
-      const returnsList = await db
-        .select({
-          id: returnRequests.id,
-          orderId: returnRequests.orderId,
-          userId: returnRequests.userId,
-          reason: returnRequests.reason,
-          reasonDetails: returnRequests.reasonDetails,
-          status: returnRequests.status,
-          requestedAt: returnRequests.requestedAt,
-          approvedAt: returnRequests.approvedAt,
-          processedAt: returnRequests.processedAt,
-          refundAmount: returnRequests.refundAmount,
-          adminNotes: returnRequests.adminNotes,
-          createdAt: returnRequests.createdAt,
-          order: {
-            id: orders.id,
-            orderNumber: orders.orderNumber,
-            total: orders.total,
-            status: orders.status,
-          },
-        })
-        .from(returnRequests)
-        .innerJoin(orders, eq(returnRequests.orderId, orders.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(orderFn(orderByColumn))
-        .limit(pageSize)
-        .offset(offset);
-
-      // Get user info
-      const userIds = [...new Set(returnsList.map((r) => r.userId))];
-      let userMap: Record<string, { id: string; name: string | null; email: string }> = {};
-
-      if (userIds.length > 0) {
-        const userList = await db
-          .select({
-            id: users.id,
-            name: users.name,
-            email: users.email,
-          })
-          .from(users)
-          .where(sql`${users.id} = ANY(${userIds})`);
-
-        userMap = userList.reduce(
-          (acc, user) => {
-            acc[user.id] = user;
-            return acc;
-          },
-          {} as Record<string, { id: string; name: string | null; email: string }>
-        );
-      }
-
-      // Add user info to returns
-      const returnsWithUsers = returnsList.map((returnReq) => ({
-        ...returnReq,
-        customer: userMap[returnReq.userId] || null,
-      }));
-
-      return c.json({
-        items: returnsWithUsers,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      console.error("Error fetching return requests:", error);
-      return c.json({ error: "Failed to fetch return requests" }, 500);
-    }
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    console.error("Error fetching return requests:", error);
+    return c.json({ error: "Failed to fetch return requests" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/admin/returns/stats - Get Return Statistics
@@ -401,77 +393,73 @@ adminReturnsApp.get("/:id", async (c) => {
 // PATCH /api/admin/returns/:id - Update Return Request
 // ============================================================================
 
-adminReturnsApp.patch(
-  "/:id",
-  zValidator("json", updateReturnSchema),
-  async (c) => {
-    const returnId = c.req.param("id");
-    const updates = c.req.valid("json");
+adminReturnsApp.patch("/:id", zValidator("json", updateReturnSchema), async (c) => {
+  const returnId = c.req.param("id");
+  const updates = c.req.valid("json");
 
-    // Validate UUID format
-    if (!returnId || !/^[0-9a-f-]{36}$/i.test(returnId)) {
-      return c.json({ error: "Invalid return ID" }, 400);
-    }
-
-    // Must provide at least one field to update
-    if (Object.keys(updates).length === 0) {
-      return c.json({ error: "No updates provided" }, 400);
-    }
-
-    try {
-      // Check if return exists
-      const existingResult = await db
-        .select({ id: returnRequests.id, status: returnRequests.status })
-        .from(returnRequests)
-        .where(eq(returnRequests.id, returnId))
-        .limit(1);
-
-      if (!existingResult.length) {
-        return c.json({ error: "Return request not found" }, 404);
-      }
-
-      // Build update object
-      const updateData: Record<string, unknown> = {};
-
-      if (updates.status !== undefined) {
-        updateData.status = updates.status;
-
-        // Update timestamps based on status
-        if (updates.status === "approved") {
-          updateData.approvedAt = new Date();
-        } else if (updates.status === "refunded") {
-          updateData.processedAt = new Date();
-        }
-      }
-
-      if (updates.adminNotes !== undefined) {
-        updateData.adminNotes = updates.adminNotes;
-      }
-
-      if (updates.refundAmount !== undefined) {
-        updateData.refundAmount = updates.refundAmount.toFixed(2);
-      }
-
-      // Update the return request
-      const [updatedReturn] = await db
-        .update(returnRequests)
-        .set({
-          ...updateData,
-          updatedAt: new Date(),
-        })
-        .where(eq(returnRequests.id, returnId))
-        .returning();
-
-      return c.json({
-        message: "Return request updated successfully",
-        return: updatedReturn,
-      });
-    } catch (error) {
-      console.error("Error updating return request:", error);
-      return c.json({ error: "Failed to update return request" }, 500);
-    }
+  // Validate UUID format
+  if (!returnId || !/^[0-9a-f-]{36}$/i.test(returnId)) {
+    return c.json({ error: "Invalid return ID" }, 400);
   }
-);
+
+  // Must provide at least one field to update
+  if (Object.keys(updates).length === 0) {
+    return c.json({ error: "No updates provided" }, 400);
+  }
+
+  try {
+    // Check if return exists
+    const existingResult = await db
+      .select({ id: returnRequests.id, status: returnRequests.status })
+      .from(returnRequests)
+      .where(eq(returnRequests.id, returnId))
+      .limit(1);
+
+    if (!existingResult.length) {
+      return c.json({ error: "Return request not found" }, 404);
+    }
+
+    // Build update object
+    const updateData: Record<string, unknown> = {};
+
+    if (updates.status !== undefined) {
+      updateData.status = updates.status;
+
+      // Update timestamps based on status
+      if (updates.status === "approved") {
+        updateData.approvedAt = new Date();
+      } else if (updates.status === "refunded") {
+        updateData.processedAt = new Date();
+      }
+    }
+
+    if (updates.adminNotes !== undefined) {
+      updateData.adminNotes = updates.adminNotes;
+    }
+
+    if (updates.refundAmount !== undefined) {
+      updateData.refundAmount = updates.refundAmount.toFixed(2);
+    }
+
+    // Update the return request
+    const [updatedReturn] = await db
+      .update(returnRequests)
+      .set({
+        ...updateData,
+        updatedAt: new Date(),
+      })
+      .where(eq(returnRequests.id, returnId))
+      .returning();
+
+    return c.json({
+      message: "Return request updated successfully",
+      return: updatedReturn,
+    });
+  } catch (error) {
+    console.error("Error updating return request:", error);
+    return c.json({ error: "Failed to update return request" }, 500);
+  }
+});
 
 // ============================================================================
 // POST /api/admin/returns/:id/approve - Approve Return Request
@@ -547,170 +535,162 @@ adminReturnsApp.post("/:id/approve", async (c) => {
 // POST /api/admin/returns/:id/reject - Reject Return Request
 // ============================================================================
 
-adminReturnsApp.post(
-  "/:id/reject",
-  zValidator("json", rejectReturnSchema),
-  async (c) => {
-    const returnId = c.req.param("id");
-    const { reason } = c.req.valid("json");
+adminReturnsApp.post("/:id/reject", zValidator("json", rejectReturnSchema), async (c) => {
+  const returnId = c.req.param("id");
+  const { reason } = c.req.valid("json");
 
-    // Validate UUID format
-    if (!returnId || !/^[0-9a-f-]{36}$/i.test(returnId)) {
-      return c.json({ error: "Invalid return ID" }, 400);
-    }
-
-    try {
-      // Get existing return
-      const existingResult = await db
-        .select({
-          id: returnRequests.id,
-          status: returnRequests.status,
-        })
-        .from(returnRequests)
-        .where(eq(returnRequests.id, returnId))
-        .limit(1);
-
-      if (!existingResult.length) {
-        return c.json({ error: "Return request not found" }, 404);
-      }
-
-      const existing = existingResult[0];
-
-      // Can only reject pending returns
-      if (existing.status !== "pending") {
-        return c.json(
-          {
-            error: `Cannot reject return request with status '${existing.status}'. Only pending requests can be rejected.`,
-          },
-          400
-        );
-      }
-
-      // Update the return request
-      const [rejectedReturn] = await db
-        .update(returnRequests)
-        .set({
-          status: "rejected",
-          adminNotes: reason,
-          updatedAt: new Date(),
-        })
-        .where(eq(returnRequests.id, returnId))
-        .returning();
-
-      return c.json({
-        message: "Return request rejected",
-        return: rejectedReturn,
-      });
-    } catch (error) {
-      console.error("Error rejecting return request:", error);
-      return c.json({ error: "Failed to reject return request" }, 500);
-    }
+  // Validate UUID format
+  if (!returnId || !/^[0-9a-f-]{36}$/i.test(returnId)) {
+    return c.json({ error: "Invalid return ID" }, 400);
   }
-);
+
+  try {
+    // Get existing return
+    const existingResult = await db
+      .select({
+        id: returnRequests.id,
+        status: returnRequests.status,
+      })
+      .from(returnRequests)
+      .where(eq(returnRequests.id, returnId))
+      .limit(1);
+
+    if (!existingResult.length) {
+      return c.json({ error: "Return request not found" }, 404);
+    }
+
+    const existing = existingResult[0];
+
+    // Can only reject pending returns
+    if (existing.status !== "pending") {
+      return c.json(
+        {
+          error: `Cannot reject return request with status '${existing.status}'. Only pending requests can be rejected.`,
+        },
+        400
+      );
+    }
+
+    // Update the return request
+    const [rejectedReturn] = await db
+      .update(returnRequests)
+      .set({
+        status: "rejected",
+        adminNotes: reason,
+        updatedAt: new Date(),
+      })
+      .where(eq(returnRequests.id, returnId))
+      .returning();
+
+    return c.json({
+      message: "Return request rejected",
+      return: rejectedReturn,
+    });
+  } catch (error) {
+    console.error("Error rejecting return request:", error);
+    return c.json({ error: "Failed to reject return request" }, 500);
+  }
+});
 
 // ============================================================================
 // POST /api/admin/returns/:id/process-refund - Process Refund
 // ============================================================================
 
-adminReturnsApp.post(
-  "/:id/process-refund",
-  zValidator("json", processRefundSchema),
-  async (c) => {
-    const returnId = c.req.param("id");
-    const { refundAmount, refundType } = c.req.valid("json");
+adminReturnsApp.post("/:id/process-refund", zValidator("json", processRefundSchema), async (c) => {
+  const returnId = c.req.param("id");
+  const { refundAmount, refundType } = c.req.valid("json");
 
-    // Validate UUID format
-    if (!returnId || !/^[0-9a-f-]{36}$/i.test(returnId)) {
-      return c.json({ error: "Invalid return ID" }, 400);
-    }
-
-    try {
-      // Get existing return with order info
-      const existingResult = await db
-        .select({
-          id: returnRequests.id,
-          status: returnRequests.status,
-          orderId: returnRequests.orderId,
-          order: {
-            id: orders.id,
-            total: orders.total,
-          },
-        })
-        .from(returnRequests)
-        .innerJoin(orders, eq(returnRequests.orderId, orders.id))
-        .where(eq(returnRequests.id, returnId))
-        .limit(1);
-
-      if (!existingResult.length) {
-        return c.json({ error: "Return request not found" }, 404);
-      }
-
-      const existing = existingResult[0];
-
-      // Can only process refund for approved/received returns
-      const refundableStatuses: ReturnStatus[] = ["approved", "shipped_back", "received"];
-      if (!refundableStatuses.includes(existing.status as ReturnStatus)) {
-        return c.json(
-          {
-            error: `Cannot process refund for return request with status '${existing.status}'. Return must be approved first.`,
-          },
-          400
-        );
-      }
-
-      // Validate refund amount against order total
-      const orderTotal = parseFloat(existing.order.total);
-      if (refundAmount > orderTotal) {
-        return c.json(
-          {
-            error: `Refund amount (${refundAmount}) cannot exceed order total (${orderTotal})`,
-          },
-          400
-        );
-      }
-
-      const now = new Date();
-
-      // Update the return request
-      const [refundedReturn] = await db
-        .update(returnRequests)
-        .set({
-          status: "refunded",
-          refundAmount: refundAmount.toFixed(2),
-          processedAt: now,
-          updatedAt: now,
-        })
-        .where(eq(returnRequests.id, returnId))
-        .returning();
-
-      // Update order payment status
-      const newPaymentStatus: PaymentStatus =
-        refundAmount >= orderTotal ? "refunded" : "partially_refunded";
-
-      await db
-        .update(orders)
-        .set({
-          status: "refunded",
-          paymentStatus: newPaymentStatus,
-          updatedAt: now,
-        })
-        .where(eq(orders.id, existing.orderId));
-
-      return c.json({
-        message: "Refund processed successfully",
-        return: refundedReturn,
-        refund: {
-          amount: refundAmount,
-          type: refundType,
-          processedAt: now.toISOString(),
-        },
-      });
-    } catch (error) {
-      console.error("Error processing refund:", error);
-      return c.json({ error: "Failed to process refund" }, 500);
-    }
+  // Validate UUID format
+  if (!returnId || !/^[0-9a-f-]{36}$/i.test(returnId)) {
+    return c.json({ error: "Invalid return ID" }, 400);
   }
-);
+
+  try {
+    // Get existing return with order info
+    const existingResult = await db
+      .select({
+        id: returnRequests.id,
+        status: returnRequests.status,
+        orderId: returnRequests.orderId,
+        order: {
+          id: orders.id,
+          total: orders.total,
+        },
+      })
+      .from(returnRequests)
+      .innerJoin(orders, eq(returnRequests.orderId, orders.id))
+      .where(eq(returnRequests.id, returnId))
+      .limit(1);
+
+    if (!existingResult.length) {
+      return c.json({ error: "Return request not found" }, 404);
+    }
+
+    const existing = existingResult[0];
+
+    // Can only process refund for approved/received returns
+    const refundableStatuses: ReturnStatus[] = ["approved", "shipped_back", "received"];
+    if (!refundableStatuses.includes(existing.status as ReturnStatus)) {
+      return c.json(
+        {
+          error: `Cannot process refund for return request with status '${existing.status}'. Return must be approved first.`,
+        },
+        400
+      );
+    }
+
+    // Validate refund amount against order total
+    const orderTotal = parseFloat(existing.order.total);
+    if (refundAmount > orderTotal) {
+      return c.json(
+        {
+          error: `Refund amount (${refundAmount}) cannot exceed order total (${orderTotal})`,
+        },
+        400
+      );
+    }
+
+    const now = new Date();
+
+    // Update the return request
+    const [refundedReturn] = await db
+      .update(returnRequests)
+      .set({
+        status: "refunded",
+        refundAmount: refundAmount.toFixed(2),
+        processedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(returnRequests.id, returnId))
+      .returning();
+
+    // Update order payment status
+    const newPaymentStatus: PaymentStatus =
+      refundAmount >= orderTotal ? "refunded" : "partially_refunded";
+
+    await db
+      .update(orders)
+      .set({
+        status: "refunded",
+        paymentStatus: newPaymentStatus,
+        updatedAt: now,
+      })
+      .where(eq(orders.id, existing.orderId));
+
+    return c.json({
+      message: "Refund processed successfully",
+      return: refundedReturn,
+      refund: {
+        amount: refundAmount,
+        type: refundType,
+        processedAt: now.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Error processing refund:", error);
+    return c.json({ error: "Failed to process refund" }, 500);
+  }
+});
 
 // Export the router and schemas
 export {

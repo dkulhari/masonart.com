@@ -7,8 +7,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   Bell,
   Mail,
@@ -21,45 +21,45 @@ import {
   Truck,
   MapPin,
   Home,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { notificationPreferencesApi, type NotificationPreferencesResponse } from '~/lib/api'
+} from "lucide-react";
+import { cn } from "~/lib/utils";
+import { notificationPreferencesApi, type NotificationPreferencesResponse } from "~/lib/api";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/_authed/account/notifications')({
+export const Route = createFileRoute("/_authed/account/notifications")({
   head: () => ({
     meta: [
-      { title: 'Notification Preferences | MasonArt' },
-      { name: 'description', content: 'Manage your email and SMS notification preferences.' },
-      { name: 'robots', content: 'noindex' },
+      { title: "Notification Preferences | MasonArt" },
+      { name: "description", content: "Manage your email and SMS notification preferences." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: NotificationPreferencesPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface NotificationToggleProps {
-  id: string
-  label: string
-  description: string
-  enabled: boolean
-  isLoading: boolean
-  onChange: (enabled: boolean) => void
+  id: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+  isLoading: boolean;
+  onChange: (enabled: boolean) => void;
 }
 
 interface NotificationGroup {
-  id: string
-  label: string
-  description: string
-  icon: typeof Package
-  emailKey: keyof NotificationPreferencesResponse['preferences']['email']
-  smsKey: keyof NotificationPreferencesResponse['preferences']['sms']
+  id: string;
+  label: string;
+  description: string;
+  icon: typeof Package;
+  emailKey: keyof NotificationPreferencesResponse["preferences"]["email"];
+  smsKey: keyof NotificationPreferencesResponse["preferences"]["sms"];
 }
 
 // ============================================================================
@@ -68,127 +68,129 @@ interface NotificationGroup {
 
 const NOTIFICATION_GROUPS: NotificationGroup[] = [
   {
-    id: 'orderConfirmation',
-    label: 'Order Confirmation',
-    description: 'When your order is placed and confirmed',
+    id: "orderConfirmation",
+    label: "Order Confirmation",
+    description: "When your order is placed and confirmed",
     icon: Package,
-    emailKey: 'orderConfirmation',
-    smsKey: 'orderConfirmation',
+    emailKey: "orderConfirmation",
+    smsKey: "orderConfirmation",
   },
   {
-    id: 'shipped',
-    label: 'Order Shipped',
-    description: 'When your order is shipped with tracking info',
+    id: "shipped",
+    label: "Order Shipped",
+    description: "When your order is shipped with tracking info",
     icon: Truck,
-    emailKey: 'shipped',
-    smsKey: 'shipped',
+    emailKey: "shipped",
+    smsKey: "shipped",
   },
   {
-    id: 'outForDelivery',
-    label: 'Out for Delivery',
-    description: 'When your order is out for delivery',
+    id: "outForDelivery",
+    label: "Out for Delivery",
+    description: "When your order is out for delivery",
     icon: MapPin,
-    emailKey: 'outForDelivery',
-    smsKey: 'outForDelivery',
+    emailKey: "outForDelivery",
+    smsKey: "outForDelivery",
   },
   {
-    id: 'delivered',
-    label: 'Delivered',
-    description: 'When your order has been delivered',
+    id: "delivered",
+    label: "Delivered",
+    description: "When your order has been delivered",
     icon: Home,
-    emailKey: 'delivered',
-    smsKey: 'delivered',
+    emailKey: "delivered",
+    smsKey: "delivered",
   },
-]
+];
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function NotificationPreferencesPage() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [preferences, setPreferences] = useState<NotificationPreferencesResponse['preferences'] | null>(null)
-  const [loadingToggles, setLoadingToggles] = useState<Set<string>>(new Set())
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<
+    NotificationPreferencesResponse["preferences"] | null
+  >(null);
+  const [loadingToggles, setLoadingToggles] = useState<Set<string>>(new Set());
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Fetch preferences on mount
   useEffect(() => {
     async function fetchPreferences() {
       try {
-        const response = await notificationPreferencesApi.get()
-        setPreferences(response.preferences)
+        const response = await notificationPreferencesApi.get();
+        setPreferences(response.preferences);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load preferences')
+        setError(err instanceof Error ? err.message : "Failed to load preferences");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchPreferences()
-  }, [])
+    fetchPreferences();
+  }, []);
 
   // Handle preference toggle with optimistic update
-  const handleToggle = useCallback(async (
-    channel: 'email' | 'sms',
-    key: string,
-    enabled: boolean
-  ) => {
-    if (!preferences) return
+  const handleToggle = useCallback(
+    async (channel: "email" | "sms", key: string, enabled: boolean) => {
+      if (!preferences) return;
 
-    const toggleKey = `${channel}${key.charAt(0).toUpperCase() + key.slice(1)}`
-    const toggleId = `${channel}-${key}`
+      const toggleKey = `${channel}${key.charAt(0).toUpperCase() + key.slice(1)}`;
+      const toggleId = `${channel}-${key}`;
 
-    // Store previous value for rollback
-    const previousValue = channel === 'email'
-      ? preferences.email[key as keyof typeof preferences.email]
-      : preferences.sms[key as keyof typeof preferences.sms]
+      // Store previous value for rollback
+      const previousValue =
+        channel === "email"
+          ? preferences.email[key as keyof typeof preferences.email]
+          : preferences.sms[key as keyof typeof preferences.sms];
 
-    // Optimistic update
-    setPreferences((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        [channel]: {
-          ...prev[channel],
-          [key]: enabled,
-        },
-      }
-    })
-
-    // Set loading state for this toggle
-    setLoadingToggles((prev) => new Set(prev).add(toggleId))
-    setError(null)
-    setSuccessMessage(null)
-
-    try {
-      await notificationPreferencesApi.update({
-        [toggleKey]: enabled,
-      } as Record<string, boolean>)
-
-      setSuccessMessage('Preferences updated')
-      setTimeout(() => setSuccessMessage(null), 3000)
-    } catch (err) {
-      // Rollback on error
+      // Optimistic update
       setPreferences((prev) => {
-        if (!prev) return prev
+        if (!prev) return prev;
         return {
           ...prev,
           [channel]: {
             ...prev[channel],
-            [key]: previousValue,
+            [key]: enabled,
           },
-        }
-      })
-      setError(err instanceof Error ? err.message : 'Failed to update preferences')
-    } finally {
-      setLoadingToggles((prev) => {
-        const next = new Set(prev)
-        next.delete(toggleId)
-        return next
-      })
-    }
-  }, [preferences])
+        };
+      });
+
+      // Set loading state for this toggle
+      setLoadingToggles((prev) => new Set(prev).add(toggleId));
+      setError(null);
+      setSuccessMessage(null);
+
+      try {
+        await notificationPreferencesApi.update({
+          [toggleKey]: enabled,
+        } as Record<string, boolean>);
+
+        setSuccessMessage("Preferences updated");
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } catch (err) {
+        // Rollback on error
+        setPreferences((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            [channel]: {
+              ...prev[channel],
+              [key]: previousValue,
+            },
+          };
+        });
+        setError(err instanceof Error ? err.message : "Failed to update preferences");
+      } finally {
+        setLoadingToggles((prev) => {
+          const next = new Set(prev);
+          next.delete(toggleId);
+          return next;
+        });
+      }
+    },
+    [preferences]
+  );
 
   // Loading state
   if (isLoading) {
@@ -203,7 +205,7 @@ function NotificationPreferencesPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Error state (initial load failed)
@@ -218,7 +220,7 @@ function NotificationPreferencesPage() {
                 Unable to Load Preferences
               </h2>
               <p className="mt-2 text-sm text-red-700">
-                {error || 'Something went wrong. Please try again.'}
+                {error || "Something went wrong. Please try again."}
               </p>
               <button
                 onClick={() => window.location.reload()}
@@ -230,7 +232,7 @@ function NotificationPreferencesPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -253,9 +255,7 @@ function NotificationPreferencesPage() {
                 <Bell className="h-6 w-6 text-brand-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  Notification Preferences
-                </h1>
+                <h1 className="text-2xl font-bold text-foreground">Notification Preferences</h1>
                 <p className="text-sm text-muted-foreground">
                   Choose how you want to be notified about your orders
                 </p>
@@ -298,7 +298,7 @@ function NotificationPreferencesPage() {
                     description={group.description}
                     enabled={preferences.email[group.emailKey]}
                     isLoading={loadingToggles.has(`email-${group.emailKey}`)}
-                    onChange={(enabled) => handleToggle('email', group.emailKey, enabled)}
+                    onChange={(enabled) => handleToggle("email", group.emailKey, enabled)}
                   />
                 ))}
               </div>
@@ -322,7 +322,7 @@ function NotificationPreferencesPage() {
                     description={group.description}
                     enabled={preferences.sms[group.smsKey]}
                     isLoading={loadingToggles.has(`sms-${group.smsKey}`)}
-                    onChange={(enabled) => handleToggle('sms', group.smsKey, enabled)}
+                    onChange={(enabled) => handleToggle("sms", group.smsKey, enabled)}
                   />
                 ))}
               </div>
@@ -333,15 +333,15 @@ function NotificationPreferencesPage() {
               <h3 className="text-sm font-semibold text-foreground">About Notifications</h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 Email notifications are sent to your account email address. SMS notifications
-                require a verified phone number. Important order and security notifications
-                may still be sent regardless of these preferences.
+                require a verified phone number. Important order and security notifications may
+                still be sent regardless of these preferences.
               </p>
             </div>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -372,14 +372,14 @@ function NotificationToggle({
         disabled={isLoading}
         onClick={() => onChange(!enabled)}
         className={cn(
-          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-          enabled ? 'bg-brand-500' : 'bg-muted'
+          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          enabled ? "bg-brand-500" : "bg-muted"
         )}
       >
         <span
           className={cn(
-            'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out',
-            enabled ? 'translate-x-5' : 'translate-x-0'
+            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
+            enabled ? "translate-x-5" : "translate-x-0"
           )}
         >
           {isLoading && (
@@ -390,7 +390,7 @@ function NotificationToggle({
         </span>
       </button>
     </div>
-  )
+  );
 }
 
-export default NotificationPreferencesPage
+export default NotificationPreferencesPage;

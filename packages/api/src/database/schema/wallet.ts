@@ -131,18 +131,12 @@ export const walletTransactions = pgTable(
     userIdIdx: index("wallet_transactions_user_id_idx").on(table.userId),
     typeIdx: index("wallet_transactions_type_idx").on(table.type),
     statusIdx: index("wallet_transactions_status_idx").on(table.status),
-    razorpayOrderIdx: index("wallet_transactions_razorpay_order_idx").on(
-      table.razorpayOrderId
-    ),
+    razorpayOrderIdx: index("wallet_transactions_razorpay_order_idx").on(table.razorpayOrderId),
     razorpayPaymentIdx: index("wallet_transactions_razorpay_payment_idx").on(
       table.razorpayPaymentId
     ),
-    aiGenerationIdx: index("wallet_transactions_ai_generation_idx").on(
-      table.aiGenerationId
-    ),
-    createdAtIdx: index("wallet_transactions_created_at_idx").on(
-      table.createdAt
-    ),
+    aiGenerationIdx: index("wallet_transactions_ai_generation_idx").on(table.aiGenerationId),
+    createdAtIdx: index("wallet_transactions_created_at_idx").on(table.createdAt),
     userTypeStatusIdx: index("wallet_transactions_user_type_status_idx").on(
       table.userId,
       table.type,
@@ -207,32 +201,26 @@ export const walletPricingConfig = pgTable(
 /**
  * Wallet transactions relations
  */
-export const walletTransactionsRelations = relations(
-  walletTransactions,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [walletTransactions.userId],
-      references: [users.id],
-    }),
-    aiGeneration: one(aiGenerations, {
-      fields: [walletTransactions.aiGenerationId],
-      references: [aiGenerations.id],
-    }),
-  })
-);
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  user: one(users, {
+    fields: [walletTransactions.userId],
+    references: [users.id],
+  }),
+  aiGeneration: one(aiGenerations, {
+    fields: [walletTransactions.aiGenerationId],
+    references: [aiGenerations.id],
+  }),
+}));
 
 /**
  * Wallet pricing config relations
  */
-export const walletPricingConfigRelations = relations(
-  walletPricingConfig,
-  ({ one }) => ({
-    creator: one(users, {
-      fields: [walletPricingConfig.createdBy],
-      references: [users.id],
-    }),
-  })
-);
+export const walletPricingConfigRelations = relations(walletPricingConfig, ({ one }) => ({
+  creator: one(users, {
+    fields: [walletPricingConfig.createdBy],
+    references: [users.id],
+  }),
+}));
 
 // ============================================================================
 // Type Exports (inferred from schema)
@@ -244,10 +232,8 @@ export type NewWalletTransaction = typeof walletTransactions.$inferInsert;
 export type WalletPricingConfig = typeof walletPricingConfig.$inferSelect;
 export type NewWalletPricingConfig = typeof walletPricingConfig.$inferInsert;
 
-export type WalletTransactionType =
-  (typeof walletTransactionTypeEnum.enumValues)[number];
-export type WalletTransactionStatus =
-  (typeof walletTransactionStatusEnum.enumValues)[number];
+export type WalletTransactionType = (typeof walletTransactionTypeEnum.enumValues)[number];
+export type WalletTransactionStatus = (typeof walletTransactionStatusEnum.enumValues)[number];
 
 // ============================================================================
 // Constants

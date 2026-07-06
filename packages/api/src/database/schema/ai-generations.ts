@@ -190,9 +190,7 @@ export const aiGenerations = pgTable(
     status: aiGenerationStatusEnum("status").default("queued").notNull(),
 
     // AI model info
-    modelProvider: aiModelProviderEnum("model_provider")
-      .default("stable-diffusion")
-      .notNull(),
+    modelProvider: aiModelProviderEnum("model_provider").default("stable-diffusion").notNull(),
     modelVersion: text("model_version"),
     modelConfig: jsonb("model_config").$type<AIModelConfig>(),
 
@@ -205,9 +203,7 @@ export const aiGenerations = pgTable(
     selectedImageUrl: text("selected_image_url"),
 
     // Gallery visibility
-    visibility: aiGalleryVisibilityEnum("visibility")
-      .default("private")
-      .notNull(),
+    visibility: aiGalleryVisibilityEnum("visibility").default("private").notNull(),
 
     // Engagement metrics
     likesCount: integer("likes_count").default(0).notNull(),
@@ -266,27 +262,18 @@ export const aiGenerations = pgTable(
     userIdIdx: index("ai_generations_user_id_idx").on(table.userId),
     sessionIdIdx: index("ai_generations_session_id_idx").on(table.sessionId),
     statusIdx: index("ai_generations_status_idx").on(table.status),
-    stylePresetIdx: index("ai_generations_style_preset_idx").on(
-      table.stylePreset
-    ),
+    stylePresetIdx: index("ai_generations_style_preset_idx").on(table.stylePreset),
     visibilityIdx: index("ai_generations_visibility_idx").on(table.visibility),
     createdAtIdx: index("ai_generations_created_at_idx").on(table.createdAt),
-    isPurchasedIdx: index("ai_generations_is_purchased_idx").on(
-      table.isPurchased
-    ),
+    isPurchasedIdx: index("ai_generations_is_purchased_idx").on(table.isPurchased),
     productIdIdx: index("ai_generations_product_id_idx").on(table.productId),
     publicGalleryIdx: index("ai_generations_public_gallery_idx").on(
       table.visibility,
       table.status,
       table.likesCount
     ),
-    needsReviewIdx: index("ai_generations_needs_review_idx").on(
-      table.needsReview,
-      table.isFlagged
-    ),
-    moderationStatusIdx: index("ai_generations_moderation_status_idx").on(
-      table.moderationStatus
-    ),
+    needsReviewIdx: index("ai_generations_needs_review_idx").on(table.needsReview, table.isFlagged),
+    moderationStatusIdx: index("ai_generations_moderation_status_idx").on(table.moderationStatus),
   })
 );
 
@@ -306,15 +293,10 @@ export const aiGenerationLikes = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    generationIdIdx: index("ai_generation_likes_generation_id_idx").on(
-      table.generationId
-    ),
+    generationIdIdx: index("ai_generation_likes_generation_id_idx").on(table.generationId),
     userIdIdx: index("ai_generation_likes_user_id_idx").on(table.userId),
     // Unique constraint: one like per user per generation
-    uniqueLikeIdx: index("ai_generation_likes_unique_idx").on(
-      table.generationId,
-      table.userId
-    ),
+    uniqueLikeIdx: index("ai_generation_likes_unique_idx").on(table.generationId, table.userId),
   })
 );
 
@@ -370,9 +352,7 @@ export const aiUsageTracking = pgTable(
 
     // Usage counts
     generationsCount: integer("generations_count").default(0).notNull(),
-    successfulGenerations: integer("successful_generations")
-      .default(0)
-      .notNull(),
+    successfulGenerations: integer("successful_generations").default(0).notNull(),
     failedGenerations: integer("failed_generations").default(0).notNull(),
 
     // Cost tracking
@@ -394,9 +374,7 @@ export const aiUsageTracking = pgTable(
       table.periodStart,
       table.periodEnd
     ),
-    periodTypeIdx: index("ai_usage_tracking_period_type_idx").on(
-      table.periodType
-    ),
+    periodTypeIdx: index("ai_usage_tracking_period_type_idx").on(table.periodType),
   })
 );
 
@@ -425,10 +403,7 @@ export const userColorPalettes = pgTable(
   },
   (table) => ({
     userIdIdx: index("user_color_palettes_user_id_idx").on(table.userId),
-    isDefaultIdx: index("user_color_palettes_is_default_idx").on(
-      table.userId,
-      table.isDefault
-    ),
+    isDefaultIdx: index("user_color_palettes_is_default_idx").on(table.userId, table.isDefault),
   })
 );
 
@@ -464,14 +439,9 @@ export const aiPromptSuggestions = pgTable(
       .notNull(),
   },
   (table) => ({
-    stylePresetIdx: index("ai_prompt_suggestions_style_preset_idx").on(
-      table.stylePreset
-    ),
+    stylePresetIdx: index("ai_prompt_suggestions_style_preset_idx").on(table.stylePreset),
     sourceIdx: index("ai_prompt_suggestions_source_idx").on(table.source),
-    activeIdx: index("ai_prompt_suggestions_active_idx").on(
-      table.isActive,
-      table.stylePreset
-    ),
+    activeIdx: index("ai_prompt_suggestions_active_idx").on(table.isActive, table.stylePreset),
   })
 );
 
@@ -482,88 +452,70 @@ export const aiPromptSuggestions = pgTable(
 /**
  * AI generations relations
  */
-export const aiGenerationsRelations = relations(
-  aiGenerations,
-  ({ one, many }) => ({
-    user: one(users, {
-      fields: [aiGenerations.userId],
-      references: [users.id],
-    }),
-    product: one(products, {
-      fields: [aiGenerations.productId],
-      references: [products.id],
-    }),
-    order: one(orders, {
-      fields: [aiGenerations.orderId],
-      references: [orders.id],
-    }),
-    likes: many(aiGenerationLikes),
-  })
-);
+export const aiGenerationsRelations = relations(aiGenerations, ({ one, many }) => ({
+  user: one(users, {
+    fields: [aiGenerations.userId],
+    references: [users.id],
+  }),
+  product: one(products, {
+    fields: [aiGenerations.productId],
+    references: [products.id],
+  }),
+  order: one(orders, {
+    fields: [aiGenerations.orderId],
+    references: [orders.id],
+  }),
+  likes: many(aiGenerationLikes),
+}));
 
 /**
  * AI generation likes relations
  */
-export const aiGenerationLikesRelations = relations(
-  aiGenerationLikes,
-  ({ one }) => ({
-    generation: one(aiGenerations, {
-      fields: [aiGenerationLikes.generationId],
-      references: [aiGenerations.id],
-    }),
-    user: one(users, {
-      fields: [aiGenerationLikes.userId],
-      references: [users.id],
-    }),
-  })
-);
+export const aiGenerationLikesRelations = relations(aiGenerationLikes, ({ one }) => ({
+  generation: one(aiGenerations, {
+    fields: [aiGenerationLikes.generationId],
+    references: [aiGenerations.id],
+  }),
+  user: one(users, {
+    fields: [aiGenerationLikes.userId],
+    references: [users.id],
+  }),
+}));
 
 /**
  * AI banned prompts relations
  */
-export const aiBannedPromptsRelations = relations(
-  aiBannedPrompts,
-  ({ one }) => ({
-    creator: one(users, {
-      fields: [aiBannedPrompts.createdBy],
-      references: [users.id],
-    }),
-  })
-);
+export const aiBannedPromptsRelations = relations(aiBannedPrompts, ({ one }) => ({
+  creator: one(users, {
+    fields: [aiBannedPrompts.createdBy],
+    references: [users.id],
+  }),
+}));
 
 /**
  * AI usage tracking relations
  */
-export const aiUsageTrackingRelations = relations(
-  aiUsageTracking,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [aiUsageTracking.userId],
-      references: [users.id],
-    }),
-  })
-);
+export const aiUsageTrackingRelations = relations(aiUsageTracking, ({ one }) => ({
+  user: one(users, {
+    fields: [aiUsageTracking.userId],
+    references: [users.id],
+  }),
+}));
 
 /**
  * User color palettes relations
  */
-export const userColorPalettesRelations = relations(
-  userColorPalettes,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [userColorPalettes.userId],
-      references: [users.id],
-    }),
-  })
-);
+export const userColorPalettesRelations = relations(userColorPalettes, ({ one }) => ({
+  user: one(users, {
+    fields: [userColorPalettes.userId],
+    references: [users.id],
+  }),
+}));
 
 /**
  * AI prompt suggestions relations (no user relation - system-managed)
  */
-export const aiPromptSuggestionsRelations = relations(
-  aiPromptSuggestions,
-  () => ({})
-);
+export const aiPromptSuggestionsRelations = relations(aiPromptSuggestions, () => ({}));
 
 // ============================================================================
 // Type Exports (inferred from schema)
@@ -581,12 +533,9 @@ export type NewAIBannedPrompt = typeof aiBannedPrompts.$inferInsert;
 export type AIUsageTracking = typeof aiUsageTracking.$inferSelect;
 export type NewAIUsageTracking = typeof aiUsageTracking.$inferInsert;
 
-export type AIGenerationStatus =
-  (typeof aiGenerationStatusEnum.enumValues)[number];
-export type AIModelProvider =
-  (typeof aiModelProviderEnum.enumValues)[number];
-export type AIGalleryVisibility =
-  (typeof aiGalleryVisibilityEnum.enumValues)[number];
+export type AIGenerationStatus = (typeof aiGenerationStatusEnum.enumValues)[number];
+export type AIModelProvider = (typeof aiModelProviderEnum.enumValues)[number];
+export type AIGalleryVisibility = (typeof aiGalleryVisibilityEnum.enumValues)[number];
 export type AIStylePreset = (typeof aiStylePresetEnum.enumValues)[number];
 export type AIAspectRatio = (typeof aiAspectRatioEnum.enumValues)[number];
 

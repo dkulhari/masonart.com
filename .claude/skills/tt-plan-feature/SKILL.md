@@ -42,6 +42,7 @@ If feature has a plan, ask user: "Feature already has a plan. Do you want to reg
 ### Step 2: Analyze Feature Requirements
 
 Parse the feature description to understand:
+
 - Core functionality needed
 - User-facing features
 - Data requirements
@@ -54,6 +55,7 @@ Dynamically detect the project's architecture. Do NOT assume specific paths.
 **Step 3a: Detect Project Type**
 
 Use Glob to find key indicators:
+
 ```
 - package.json, pnpm-workspace.yaml, lerna.json → monorepo?
 - Cargo.toml, go.mod, requirements.txt → language/framework
@@ -65,6 +67,7 @@ Use Glob to find key indicators:
 **Step 3b: Find Database Layer**
 
 Search for database-related files:
+
 ```
 - Glob: **/schema.{ts,js,prisma}, **/models/*.{ts,js,py}
 - Glob: **/migrations/**, **/drizzle/**, **/prisma/**
@@ -74,6 +77,7 @@ Search for database-related files:
 **Step 3c: Find API/Backend Layer**
 
 Search for API patterns:
+
 ```
 - Glob: **/routes/**/*.{ts,js}, **/api/**/*.{ts,js}
 - Glob: **/controllers/**/*.{ts,js}, **/handlers/**/*.{ts,js}
@@ -83,6 +87,7 @@ Search for API patterns:
 **Step 3d: Find Frontend Layer**
 
 Search for UI components:
+
 ```
 - Glob: **/components/**/*.{tsx,jsx,vue,svelte}
 - Glob: **/pages/**/*.{tsx,jsx}, **/app/**/*.{tsx,jsx}
@@ -92,6 +97,7 @@ Search for UI components:
 **Step 3e: Find Test Patterns**
 
 Search for test files:
+
 ```
 - Glob: **/*.test.{ts,js}, **/*.spec.{ts,js}
 - Glob: **/tests/**/*.{ts,js}, **/__tests__/**/*.{ts,js}
@@ -100,6 +106,7 @@ Search for test files:
 **Step 3f: Read Representative Files**
 
 Read 1-2 files from each discovered layer to understand:
+
 - Naming conventions
 - Code patterns
 - Framework-specific idioms
@@ -109,6 +116,7 @@ Read 1-2 files from each discovered layer to understand:
 Create a phased plan based on feature requirements AND the discovered project structure.
 
 **Adapt Phases to Project**:
+
 - Only include phases relevant to the project (e.g., skip "Frontend" for backend-only projects)
 - Use actual paths discovered in Step 3
 - Reference actual patterns found in the codebase
@@ -117,47 +125,57 @@ Create a phased plan based on feature requirements AND the discovered project st
 
 ```markdown
 ## Overview
+
 {Feature description - preserve original}
 
 ## Testing Strategy
 
-| Level | Scope | What to Test | Tool |
-|-------|-------|--------------|------|
-| Unit | Per ticket | Schema validation, service functions, hooks, stores | Vitest |
-| Integration | Per ticket | API routes, middleware, database operations | Vitest + supertest |
-| Component | Per ticket | Complex React components (if applicable) | Testing Library |
-| E2E | Per feature | Full pages, user flows (after all tickets complete) | Playwright |
+| Level       | Scope       | What to Test                                        | Tool               |
+| ----------- | ----------- | --------------------------------------------------- | ------------------ |
+| Unit        | Per ticket  | Schema validation, service functions, hooks, stores | Vitest             |
+| Integration | Per ticket  | API routes, middleware, database operations         | Vitest + supertest |
+| Component   | Per ticket  | Complex React components (if applicable)            | Testing Library    |
+| E2E         | Per feature | Full pages, user flows (after all tickets complete) | Playwright         |
 
 ## Implementation Plan
 
 **Note**: Each task includes unit/integration tests. E2E tests are added at feature completion.
 
 ### Phase 1: {Layer Name - e.g., "Database Schema", "Data Models"}
+
 Location: {actual path discovered}
 Pattern: {pattern observed in codebase}
+
 - [ ] {Specific task 1} (+ unit tests)
 - [ ] {Specific task 2} (+ unit tests)
 
 ### Phase 2: {Layer Name - e.g., "Backend API", "Services"}
+
 Location: {actual path discovered}
 Pattern: {pattern observed in codebase}
+
 - [ ] {Specific task 1} (+ route tests)
 - [ ] {Specific task 2} (+ route tests)
 
 ### Phase 3: {Layer Name - e.g., "Frontend", "UI Components"}
+
 Location: {actual path discovered}
 Pattern: {pattern observed in codebase}
+
 - [ ] {Specific task 1} (+ component tests if complex)
 - [ ] {Specific task 2} (+ component tests if complex)
 
 ### Final Phase: E2E Tests
+
 Location: {e2e test path, e.g., tests/e2e/}
 Pattern: {e2e test pattern observed}
+
 - [ ] Page-level E2E tests for new pages
 - [ ] Flow tests for user journeys
 - [ ] Manual test documentation
 
 ## Technical Notes
+
 - Project type: {detected type}
 - Key frameworks: {detected frameworks}
 - Patterns to follow: {observed patterns}
@@ -165,10 +183,12 @@ Pattern: {e2e test pattern observed}
 - E2E test location: {e2e test path discovered}
 
 ## Dependencies
+
 {External dependencies, other features this builds on}
 ```
 
 **Guidelines for Plan Generation**:
+
 - Be specific: "Create reviews table with userId, productId, rating, comment" not "Create database tables"
 - Follow existing patterns: Use the patterns discovered in Step 3
 - Use actual paths: Reference real directories from the project
@@ -179,6 +199,7 @@ Pattern: {e2e test pattern observed}
 ### Step 5: Review Plan with User
 
 Present the generated plan and ask if it looks correct:
+
 - Use `AskUserQuestion` with options: "Looks good", "Needs adjustments"
 - If adjustments needed, ask what to change and regenerate
 
@@ -195,6 +216,7 @@ mcp__ticketrack__editFeature:
 ### Step 7: Display Summary
 
 Show the generated plan to the user with:
+
 - Summary of phases
 - Detected project structure
 - Estimated ticket count

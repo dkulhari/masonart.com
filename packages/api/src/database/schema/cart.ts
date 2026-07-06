@@ -66,9 +66,7 @@ export const carts = pgTable(
 
     // Denormalized totals for performance (recalculated on item changes)
     itemCount: integer("item_count").default(0).notNull(),
-    subtotal: decimal("subtotal", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    subtotal: decimal("subtotal", { precision: 10, scale: 2 }).default("0.00").notNull(),
 
     // Coupon/discount applied to cart
     couponCode: text("coupon_code"),
@@ -94,9 +92,7 @@ export const carts = pgTable(
     sessionIdIdx: index("carts_session_id_idx").on(table.sessionId),
     activeIdx: index("carts_active_idx").on(table.isActive),
     expiresAtIdx: index("carts_expires_at_idx").on(table.expiresAt),
-    lastActivityAtIdx: index("carts_last_activity_at_idx").on(
-      table.lastActivityAt
-    ),
+    lastActivityAtIdx: index("carts_last_activity_at_idx").on(table.lastActivityAt),
   })
 );
 
@@ -129,9 +125,7 @@ export const cartItems = pgTable(
 
     // Pricing at time of adding to cart (for comparison/validation)
     unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(), // Variant base price
-    framePrice: decimal("frame_price", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(), // Frame price addition
+    framePrice: decimal("frame_price", { precision: 10, scale: 2 }).default("0.00").notNull(), // Frame price addition
     lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(), // (unitPrice + framePrice) * quantity
 
     // AI generation reference (for AI-generated posters)
@@ -165,9 +159,7 @@ export const cartItems = pgTable(
       table.cartId,
       table.isSavedForLater
     ),
-    reservedUntilIdx: index("cart_items_reserved_until_idx").on(
-      table.reservedUntil
-    ),
+    reservedUntilIdx: index("cart_items_reserved_until_idx").on(table.reservedUntil),
   })
 );
 

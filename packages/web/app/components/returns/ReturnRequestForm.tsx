@@ -6,10 +6,10 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState } from 'react'
-import { Loader2, Send, CheckCircle, AlertCircle } from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { returnsApi, type ReturnReason, type ReturnRequest } from '~/lib/api'
+import { useState } from "react";
+import { Loader2, Send, CheckCircle, AlertCircle } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { returnsApi, type ReturnReason, type ReturnRequest } from "~/lib/api";
 
 // ============================================================================
 // Types
@@ -17,13 +17,13 @@ import { returnsApi, type ReturnReason, type ReturnRequest } from '~/lib/api'
 
 export interface ReturnRequestFormProps {
   /** Order ID to create return for */
-  orderId: string
+  orderId: string;
   /** Callback when return is successfully created */
-  onSuccess?: (returnRequest: ReturnRequest) => void
+  onSuccess?: (returnRequest: ReturnRequest) => void;
   /** Callback when form is cancelled */
-  onCancel?: () => void
+  onCancel?: () => void;
   /** Optional className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -31,51 +31,51 @@ export interface ReturnRequestFormProps {
 // ============================================================================
 
 interface ReasonOption {
-  value: ReturnReason
-  label: string
-  description: string
+  value: ReturnReason;
+  label: string;
+  description: string;
 }
 
 const RETURN_REASONS: ReasonOption[] = [
   {
-    value: 'defective',
-    label: 'Defective Product',
-    description: 'The product has a manufacturing defect or is not working properly',
+    value: "defective",
+    label: "Defective Product",
+    description: "The product has a manufacturing defect or is not working properly",
   },
   {
-    value: 'wrong_item',
-    label: 'Wrong Item Received',
-    description: 'I received a different product than what I ordered',
+    value: "wrong_item",
+    label: "Wrong Item Received",
+    description: "I received a different product than what I ordered",
   },
   {
-    value: 'not_as_described',
-    label: 'Not as Described',
-    description: 'The product does not match the description or images shown',
+    value: "not_as_described",
+    label: "Not as Described",
+    description: "The product does not match the description or images shown",
   },
   {
-    value: 'damaged_in_transit',
-    label: 'Damaged in Transit',
-    description: 'The product arrived damaged due to shipping',
+    value: "damaged_in_transit",
+    label: "Damaged in Transit",
+    description: "The product arrived damaged due to shipping",
   },
   {
-    value: 'changed_mind',
-    label: 'Changed My Mind',
-    description: 'I no longer want or need this product',
+    value: "changed_mind",
+    label: "Changed My Mind",
+    description: "I no longer want or need this product",
   },
   {
-    value: 'late_delivery',
-    label: 'Late Delivery',
-    description: 'The product arrived significantly later than expected',
+    value: "late_delivery",
+    label: "Late Delivery",
+    description: "The product arrived significantly later than expected",
   },
   {
-    value: 'other',
-    label: 'Other Reason',
-    description: 'Another reason not listed above',
+    value: "other",
+    label: "Other Reason",
+    description: "Another reason not listed above",
   },
-]
+];
 
-const MIN_DETAILS_LENGTH = 10
-const MAX_DETAILS_LENGTH = 2000
+const MIN_DETAILS_LENGTH = 10;
+const MAX_DETAILS_LENGTH = 2000;
 
 // ============================================================================
 // Component
@@ -96,57 +96,55 @@ export function ReturnRequestForm({
   onCancel,
   className,
 }: ReturnRequestFormProps) {
-  const [reason, setReason] = useState<ReturnReason | ''>('')
-  const [reasonDetails, setReasonDetails] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [createdReturn, setCreatedReturn] = useState<ReturnRequest | null>(null)
+  const [reason, setReason] = useState<ReturnReason | "">("");
+  const [reasonDetails, setReasonDetails] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [createdReturn, setCreatedReturn] = useState<ReturnRequest | null>(null);
 
   // Validation
-  const detailsLength = reasonDetails.trim().length
-  const isDetailsValid = detailsLength >= MIN_DETAILS_LENGTH && detailsLength <= MAX_DETAILS_LENGTH
-  const canSubmit = reason !== '' && isDetailsValid && !isSubmitting
+  const detailsLength = reasonDetails.trim().length;
+  const isDetailsValid = detailsLength >= MIN_DETAILS_LENGTH && detailsLength <= MAX_DETAILS_LENGTH;
+  const canSubmit = reason !== "" && isDetailsValid && !isSubmitting;
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!canSubmit) return
+    if (!canSubmit) return;
 
-    setIsSubmitting(true)
-    setError(null)
+    setIsSubmitting(true);
+    setError(null);
 
     try {
       const response = await returnsApi.createReturn(orderId, {
         reason: reason as ReturnReason,
         reasonDetails: reasonDetails.trim(),
-      })
+      });
 
-      setSuccess(true)
-      setCreatedReturn(response.return)
-      onSuccess?.(response.return)
+      setSuccess(true);
+      setCreatedReturn(response.return);
+      onSuccess?.(response.return);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit return request')
+      setError(err instanceof Error ? err.message : "Failed to submit return request");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   // Success state
   if (success && createdReturn) {
     return (
-      <div className={cn('rounded-xl border border-green-200 bg-green-50 p-6', className)}>
+      <div className={cn("rounded-xl border border-green-200 bg-green-50 p-6", className)}>
         <div className="text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
             <CheckCircle className="h-6 w-6 text-green-600" />
           </div>
-          <h3 className="mt-4 text-lg font-semibold text-green-900">
-            Return Request Submitted
-          </h3>
+          <h3 className="mt-4 text-lg font-semibold text-green-900">Return Request Submitted</h3>
           <p className="mt-2 text-sm text-green-700">
-            Your return request has been submitted successfully. We&apos;ll review it and get
-            back to you soon.
+            Your return request has been submitted successfully. We&apos;ll review it and get back
+            to you soon.
           </p>
           <div className="mt-4 rounded-lg border border-green-200 bg-white p-3">
             <p className="text-sm text-muted-foreground">Request ID</p>
@@ -156,11 +154,11 @@ export function ReturnRequestForm({
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cn('space-y-6', className)}>
+    <form onSubmit={handleSubmit} className={cn("space-y-6", className)}>
       {/* Error message */}
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -179,10 +177,10 @@ export function ReturnRequestForm({
             <label
               key={option.value}
               className={cn(
-                'flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
                 reason === option.value
-                  ? 'border-brand-500 bg-brand-50'
-                  : 'border-border hover:border-brand-300 hover:bg-muted/50'
+                  ? "border-brand-500 bg-brand-50"
+                  : "border-border hover:border-brand-300 hover:bg-muted/50"
               )}
             >
               <input
@@ -196,8 +194,8 @@ export function ReturnRequestForm({
               <div className="flex-1">
                 <p
                   className={cn(
-                    'text-sm font-medium',
-                    reason === option.value ? 'text-brand-700' : 'text-foreground'
+                    "text-sm font-medium",
+                    reason === option.value ? "text-brand-700" : "text-foreground"
                   )}
                 >
                   {option.label}
@@ -222,16 +220,16 @@ export function ReturnRequestForm({
           rows={4}
           maxLength={MAX_DETAILS_LENGTH}
           className={cn(
-            'w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20',
-            !isDetailsValid && detailsLength > 0 ? 'border-red-300' : 'border-border'
+            "w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20",
+            !isDetailsValid && detailsLength > 0 ? "border-red-300" : "border-border"
           )}
         />
         <div className="mt-1 flex items-center justify-between text-xs">
           <span
             className={cn(
               detailsLength > 0 && detailsLength < MIN_DETAILS_LENGTH
-                ? 'text-red-500'
-                : 'text-muted-foreground'
+                ? "text-red-500"
+                : "text-muted-foreground"
             )}
           >
             {detailsLength < MIN_DETAILS_LENGTH
@@ -257,10 +255,8 @@ export function ReturnRequestForm({
           type="submit"
           disabled={!canSubmit}
           className={cn(
-            'inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2 text-sm font-medium text-white transition-colors',
-            canSubmit
-              ? 'bg-brand-500 hover:bg-brand-600'
-              : 'cursor-not-allowed bg-brand-300'
+            "inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2 text-sm font-medium text-white transition-colors",
+            canSubmit ? "bg-brand-500 hover:bg-brand-600" : "cursor-not-allowed bg-brand-300"
           )}
         >
           {isSubmitting ? (
@@ -277,12 +273,12 @@ export function ReturnRequestForm({
         </button>
       </div>
     </form>
-  )
+  );
 }
 
 // ============================================================================
 // Exports
 // ============================================================================
 
-export { RETURN_REASONS, MIN_DETAILS_LENGTH, MAX_DETAILS_LENGTH }
-export default ReturnRequestForm
+export { RETURN_REASONS, MIN_DETAILS_LENGTH, MAX_DETAILS_LENGTH };
+export default ReturnRequestForm;

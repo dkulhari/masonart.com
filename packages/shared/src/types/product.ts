@@ -13,78 +13,78 @@
  * Poster style categories
  */
 export type PosterStyle =
-  | 'wabi-sabi'
-  | 'minimalist'
-  | 'abstract'
-  | 'modern-contemporary'
-  | 'vintage'
-  | 'retro'
-  | 'pop-art'
-  | 'bohemian'
-  | 'surrealist'
-  | 'photographic'
-  | 'typography'
-  | 'quotes'
-  | 'texture-art';
+  | "wabi-sabi"
+  | "minimalist"
+  | "abstract"
+  | "modern-contemporary"
+  | "vintage"
+  | "retro"
+  | "pop-art"
+  | "bohemian"
+  | "surrealist"
+  | "photographic"
+  | "typography"
+  | "quotes"
+  | "texture-art";
 
 /**
  * Poster subject categories
  */
 export type PosterSubject =
-  | 'nature-landscape'
-  | 'flowers-botanical'
-  | 'animals'
-  | 'abstract-geometric'
-  | 'people-portraits'
-  | 'city-architecture'
-  | 'sea-ocean'
-  | 'mountains'
-  | 'motivational'
-  | 'ai-generated';
+  | "nature-landscape"
+  | "flowers-botanical"
+  | "animals"
+  | "abstract-geometric"
+  | "people-portraits"
+  | "city-architecture"
+  | "sea-ocean"
+  | "mountains"
+  | "motivational"
+  | "ai-generated";
 
 /**
  * Product color options
  */
 export type ProductColor =
-  | 'black'
-  | 'white'
-  | 'beige'
-  | 'neutral'
-  | 'blue'
-  | 'green'
-  | 'gold'
-  | 'pink'
-  | 'red'
-  | 'grey'
-  | 'black-white'
-  | 'colorful'
-  | 'multi'
-  | 'earth-tones';
+  | "black"
+  | "white"
+  | "beige"
+  | "neutral"
+  | "blue"
+  | "green"
+  | "gold"
+  | "pink"
+  | "red"
+  | "grey"
+  | "black-white"
+  | "colorful"
+  | "multi"
+  | "earth-tones";
 
 /**
  * Poster orientation types
  */
 export type PosterOrientation =
-  | 'square'
-  | 'portrait'
-  | 'landscape'
-  | 'panoramic'
-  | 'round'
-  | 'circular'
-  | 'diptych'
-  | 'triptych';
+  | "square"
+  | "portrait"
+  | "landscape"
+  | "panoramic"
+  | "round"
+  | "circular"
+  | "diptych"
+  | "triptych";
 
 /**
  * Room suggestion categories
  */
 export type RoomType =
-  | 'living-room'
-  | 'bedroom'
-  | 'office'
-  | 'kitchen-dining'
-  | 'kids-room'
-  | 'bathroom'
-  | 'entryway';
+  | "living-room"
+  | "bedroom"
+  | "office"
+  | "kitchen-dining"
+  | "kids-room"
+  | "bathroom"
+  | "entryway";
 
 /**
  * Price tier levels
@@ -95,56 +95,46 @@ export type PriceTier = 1 | 2 | 3 | 4;
  * Frame type options
  */
 export type FrameType =
-  | 'poster-only'
-  | 'stretched-canvas'
-  | 'black-frame'
-  | 'white-frame'
-  | 'natural-wood-frame'
-  | 'dark-wood-frame'
-  | 'gold-frame'
-  | 'silver-frame'
-  | 'floating-frame';
+  | "poster-only"
+  | "stretched-canvas"
+  | "black-frame"
+  | "white-frame"
+  | "natural-wood-frame"
+  | "dark-wood-frame"
+  | "gold-frame"
+  | "silver-frame"
+  | "floating-frame";
 
 /**
  * Mat/mount options for framed products
  */
-export type MatOption =
-  | 'no-mat'
-  | 'white-mat'
-  | 'off-white-mat'
-  | 'black-mat'
-  | 'double-mat';
+export type MatOption = "no-mat" | "white-mat" | "off-white-mat" | "black-mat" | "double-mat";
 
 /**
  * Glass/acrylic options for framed products
  */
 export type GlassOption =
-  | 'standard-glass'
-  | 'non-glare-glass'
-  | 'acrylic'
-  | 'plexiglass'
-  | 'museum-glass';
+  | "standard-glass"
+  | "non-glare-glass"
+  | "acrylic"
+  | "plexiglass"
+  | "museum-glass";
 
 /**
  * Product status for inventory management
  */
-export type ProductStatus =
-  | 'draft'
-  | 'active'
-  | 'out-of-stock'
-  | 'discontinued'
-  | 'coming-soon';
+export type ProductStatus = "draft" | "active" | "out-of-stock" | "discontinued" | "coming-soon";
 
 /**
  * Collection types
  */
 export type CollectionType =
-  | 'new-arrivals'
-  | 'best-sellers'
-  | 'staff-picks'
-  | 'seasonal'
-  | 'sale'
-  | 'ai-generated-gallery';
+  | "new-arrivals"
+  | "best-sellers"
+  | "staff-picks"
+  | "seasonal"
+  | "sale"
+  | "ai-generated-gallery";
 
 // ============================================================================
 // Size Types
@@ -153,12 +143,12 @@ export type CollectionType =
 /**
  * Unit of measurement for sizes
  */
-export type SizeUnit = 'inches' | 'cm';
+export type SizeUnit = "inches" | "cm";
 
 /**
  * Size category based on orientation
  */
-export type SizeCategory = 'square' | 'portrait-landscape' | 'panoramic';
+export type SizeCategory = "square" | "portrait-landscape" | "panoramic";
 
 /**
  * Product size definition
@@ -193,7 +183,7 @@ export interface ProductSize {
  */
 export interface PriceModifier {
   /** Type of modifier: percentage or fixed amount */
-  type: 'percentage' | 'fixed';
+  type: "percentage" | "fixed";
   /** Value of the modifier */
   value: number;
   /** Currency for fixed modifiers */
@@ -315,12 +305,12 @@ export interface Artist {
  * Image type for product images
  */
 export type ProductImageType =
-  | 'main'
-  | 'detail'
-  | 'texture'
-  | 'room-mockup'
-  | 'frame-preview'
-  | '360-view';
+  | "main"
+  | "detail"
+  | "texture"
+  | "room-mockup"
+  | "frame-preview"
+  | "360-view";
 
 /**
  * Product image definition
@@ -445,7 +435,7 @@ export interface Product {
   /** Artist ID */
   artistId?: string;
   /** Artist details (denormalized for display) */
-  artist?: Pick<Artist, 'id' | 'name' | 'slug' | 'profileImageUrl'>;
+  artist?: Pick<Artist, "id" | "name" | "slug" | "profileImageUrl">;
 
   // Related products
   /** Related product IDs */
@@ -492,7 +482,7 @@ export interface ProductListItem {
   rating?: ProductRating;
   isFeatured: boolean;
   isAIGenerated: boolean;
-  artist?: Pick<Artist, 'id' | 'name' | 'slug'>;
+  artist?: Pick<Artist, "id" | "name" | "slug">;
 }
 
 /**
@@ -518,15 +508,15 @@ export interface ProductFilters {
  * Product sort options
  */
 export type ProductSortField =
-  | 'createdAt'
-  | 'updatedAt'
-  | 'title'
-  | 'minPrice'
-  | 'maxPrice'
-  | 'rating'
-  | 'popularity';
+  | "createdAt"
+  | "updatedAt"
+  | "title"
+  | "minPrice"
+  | "maxPrice"
+  | "rating"
+  | "popularity";
 
-export type SortDirection = 'asc' | 'desc';
+export type SortDirection = "asc" | "desc";
 
 export interface ProductSort {
   field: ProductSortField;

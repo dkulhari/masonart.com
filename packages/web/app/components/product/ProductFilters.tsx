@@ -8,64 +8,58 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
-import {
-  X,
-  SlidersHorizontal,
-  ChevronDown,
-  ChevronUp,
-  Check,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { useState, useCallback } from "react";
+import { X, SlidersHorizontal, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type Orientation = 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
-export type SortOption = 'createdAt' | 'updatedAt' | 'title' | 'basePrice' | 'featuredOrder'
-export type SortOrder = 'asc' | 'desc'
+export type Orientation = "square" | "portrait" | "landscape" | "panoramic" | "round";
+export type SortOption = "createdAt" | "updatedAt" | "title" | "basePrice" | "featuredOrder";
+export type SortOrder = "asc" | "desc";
 
 export interface FilterState {
-  styles: string[]
-  subjects: string[]
-  colors: string[]
-  rooms: string[]
-  orientation?: Orientation
-  priceMin?: number
-  priceMax?: number
-  isAiGenerated?: boolean
-  isFeatured?: boolean
-  sortBy?: SortOption
-  sortOrder?: SortOrder
+  styles: string[];
+  subjects: string[];
+  colors: string[];
+  rooms: string[];
+  orientation?: Orientation;
+  priceMin?: number;
+  priceMax?: number;
+  isAiGenerated?: boolean;
+  isFeatured?: boolean;
+  sortBy?: SortOption;
+  sortOrder?: SortOrder;
 }
 
 export interface FilterOption {
-  id: string
-  name: string
-  description?: string
-  hex?: string
+  id: string;
+  name: string;
+  description?: string;
+  hex?: string;
 }
 
 export interface ProductFiltersProps {
   /** Current filter state */
-  filters: FilterState
+  filters: FilterState;
   /** Callback when filters change */
-  onFiltersChange: (filters: FilterState) => void
+  onFiltersChange: (filters: FilterState) => void;
   /** Available style options */
-  styleOptions?: FilterOption[]
+  styleOptions?: FilterOption[];
   /** Available subject options */
-  subjectOptions?: FilterOption[]
+  subjectOptions?: FilterOption[];
   /** Available color options */
-  colorOptions?: FilterOption[]
+  colorOptions?: FilterOption[];
   /** Available room options */
-  roomOptions?: FilterOption[]
+  roomOptions?: FilterOption[];
   /** Whether to show in mobile mode */
-  isMobile?: boolean
+  isMobile?: boolean;
   /** Callback to close mobile filters */
-  onClose?: () => void
+  onClose?: () => void;
   /** Custom className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -73,71 +67,71 @@ export interface ProductFiltersProps {
 // ============================================================================
 
 const DEFAULT_STYLE_OPTIONS: FilterOption[] = [
-  { id: 'wabi-sabi', name: 'Wabi-Sabi' },
-  { id: 'minimalist', name: 'Minimalist' },
-  { id: 'abstract', name: 'Abstract' },
-  { id: 'modern-contemporary', name: 'Modern Contemporary' },
-  { id: 'vintage', name: 'Vintage' },
-  { id: 'retro', name: 'Retro' },
-  { id: 'pop-art', name: 'Pop Art' },
-  { id: 'bohemian', name: 'Bohemian' },
-  { id: 'photographic', name: 'Photographic' },
-  { id: 'typography', name: 'Typography' },
-]
+  { id: "wabi-sabi", name: "Wabi-Sabi" },
+  { id: "minimalist", name: "Minimalist" },
+  { id: "abstract", name: "Abstract" },
+  { id: "modern-contemporary", name: "Modern Contemporary" },
+  { id: "vintage", name: "Vintage" },
+  { id: "retro", name: "Retro" },
+  { id: "pop-art", name: "Pop Art" },
+  { id: "bohemian", name: "Bohemian" },
+  { id: "photographic", name: "Photographic" },
+  { id: "typography", name: "Typography" },
+];
 
 const DEFAULT_SUBJECT_OPTIONS: FilterOption[] = [
-  { id: 'nature-landscape', name: 'Nature & Landscape' },
-  { id: 'flowers-botanical', name: 'Flowers & Botanical' },
-  { id: 'animals', name: 'Animals' },
-  { id: 'abstract-geometric', name: 'Abstract & Geometric' },
-  { id: 'people-portraits', name: 'People & Portraits' },
-  { id: 'city-architecture', name: 'City & Architecture' },
-  { id: 'sea-ocean', name: 'Sea & Ocean' },
-  { id: 'mountains', name: 'Mountains' },
-  { id: 'motivational', name: 'Motivational' },
-]
+  { id: "nature-landscape", name: "Nature & Landscape" },
+  { id: "flowers-botanical", name: "Flowers & Botanical" },
+  { id: "animals", name: "Animals" },
+  { id: "abstract-geometric", name: "Abstract & Geometric" },
+  { id: "people-portraits", name: "People & Portraits" },
+  { id: "city-architecture", name: "City & Architecture" },
+  { id: "sea-ocean", name: "Sea & Ocean" },
+  { id: "mountains", name: "Mountains" },
+  { id: "motivational", name: "Motivational" },
+];
 
 const DEFAULT_COLOR_OPTIONS: FilterOption[] = [
-  { id: 'black', name: 'Black', hex: '#000000' },
-  { id: 'white', name: 'White', hex: '#FFFFFF' },
-  { id: 'beige', name: 'Beige', hex: '#F5F5DC' },
-  { id: 'neutral', name: 'Neutral', hex: '#D3D3D3' },
-  { id: 'blue', name: 'Blue', hex: '#4169E1' },
-  { id: 'green', name: 'Green', hex: '#228B22' },
-  { id: 'gold', name: 'Gold', hex: '#FFD700' },
-  { id: 'pink', name: 'Pink', hex: '#FF69B4' },
-  { id: 'red', name: 'Red', hex: '#DC143C' },
-  { id: 'grey', name: 'Grey', hex: '#808080' },
-  { id: 'black-white', name: 'Black & White', hex: '#000000' },
-  { id: 'colorful', name: 'Colorful', hex: '#FF6B6B' },
-  { id: 'earth-tones', name: 'Earth Tones', hex: '#8B4513' },
-]
+  { id: "black", name: "Black", hex: "#000000" },
+  { id: "white", name: "White", hex: "#FFFFFF" },
+  { id: "beige", name: "Beige", hex: "#F5F5DC" },
+  { id: "neutral", name: "Neutral", hex: "#D3D3D3" },
+  { id: "blue", name: "Blue", hex: "#4169E1" },
+  { id: "green", name: "Green", hex: "#228B22" },
+  { id: "gold", name: "Gold", hex: "#FFD700" },
+  { id: "pink", name: "Pink", hex: "#FF69B4" },
+  { id: "red", name: "Red", hex: "#DC143C" },
+  { id: "grey", name: "Grey", hex: "#808080" },
+  { id: "black-white", name: "Black & White", hex: "#000000" },
+  { id: "colorful", name: "Colorful", hex: "#FF6B6B" },
+  { id: "earth-tones", name: "Earth Tones", hex: "#8B4513" },
+];
 
 const DEFAULT_ROOM_OPTIONS: FilterOption[] = [
-  { id: 'living-room', name: 'Living Room' },
-  { id: 'bedroom', name: 'Bedroom' },
-  { id: 'office', name: 'Office' },
-  { id: 'kitchen-dining', name: 'Kitchen & Dining' },
-  { id: 'kids-room', name: 'Kids Room' },
-  { id: 'bathroom', name: 'Bathroom' },
-  { id: 'entryway', name: 'Entryway' },
-]
+  { id: "living-room", name: "Living Room" },
+  { id: "bedroom", name: "Bedroom" },
+  { id: "office", name: "Office" },
+  { id: "kitchen-dining", name: "Kitchen & Dining" },
+  { id: "kids-room", name: "Kids Room" },
+  { id: "bathroom", name: "Bathroom" },
+  { id: "entryway", name: "Entryway" },
+];
 
 const ORIENTATION_OPTIONS: FilterOption[] = [
-  { id: 'square', name: 'Square' },
-  { id: 'portrait', name: 'Portrait' },
-  { id: 'landscape', name: 'Landscape' },
-  { id: 'panoramic', name: 'Panoramic' },
-]
+  { id: "square", name: "Square" },
+  { id: "portrait", name: "Portrait" },
+  { id: "landscape", name: "Landscape" },
+  { id: "panoramic", name: "Panoramic" },
+];
 
 const SORT_OPTIONS = [
-  { id: 'createdAt-desc', label: 'Newest First' },
-  { id: 'createdAt-asc', label: 'Oldest First' },
-  { id: 'basePrice-asc', label: 'Price: Low to High' },
-  { id: 'basePrice-desc', label: 'Price: High to Low' },
-  { id: 'title-asc', label: 'Name: A to Z' },
-  { id: 'title-desc', label: 'Name: Z to A' },
-]
+  { id: "createdAt-desc", label: "Newest First" },
+  { id: "createdAt-asc", label: "Oldest First" },
+  { id: "basePrice-asc", label: "Price: Low to High" },
+  { id: "basePrice-desc", label: "Price: High to Low" },
+  { id: "title-asc", label: "Name: A to Z" },
+  { id: "title-desc", label: "Name: Z to A" },
+];
 
 // ============================================================================
 // Component
@@ -159,35 +153,35 @@ export function ProductFilters({
 }: ProductFiltersProps) {
   // Track which sections are expanded
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['styles', 'subjects', 'orientation', 'sort'])
-  )
+    new Set(["styles", "subjects", "orientation", "sort"])
+  );
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSections((prev) => {
-      const newSet = new Set(prev)
+      const newSet = new Set(prev);
       if (newSet.has(section)) {
-        newSet.delete(section)
+        newSet.delete(section);
       } else {
-        newSet.add(section)
+        newSet.add(section);
       }
-      return newSet
-    })
-  }, [])
+      return newSet;
+    });
+  }, []);
 
   // Toggle a multi-select filter value
   const toggleMultiFilter = useCallback(
     (key: keyof FilterState, value: string) => {
-      const currentValues = (filters[key] as string[]) || []
+      const currentValues = (filters[key] as string[]) || [];
       const newValues = currentValues.includes(value)
         ? currentValues.filter((v) => v !== value)
-        : [...currentValues, value]
+        : [...currentValues, value];
       onFiltersChange({
         ...filters,
         [key]: newValues,
-      })
+      });
     },
     [filters, onFiltersChange]
-  )
+  );
 
   // Set a single-select filter value
   const setSingleFilter = useCallback(
@@ -195,23 +189,23 @@ export function ProductFilters({
       onFiltersChange({
         ...filters,
         [key]: value,
-      })
+      });
     },
     [filters, onFiltersChange]
-  )
+  );
 
   // Handle sort change
   const handleSortChange = useCallback(
     (sortId: string) => {
-      const [sortBy, sortOrder] = sortId.split('-') as [SortOption, SortOrder]
+      const [sortBy, sortOrder] = sortId.split("-") as [SortOption, SortOrder];
       onFiltersChange({
         ...filters,
         sortBy,
         sortOrder,
-      })
+      });
     },
     [filters, onFiltersChange]
-  )
+  );
 
   // Clear all filters
   const clearAllFilters = useCallback(() => {
@@ -225,10 +219,10 @@ export function ProductFilters({
       priceMax: undefined,
       isAiGenerated: undefined,
       isFeatured: undefined,
-      sortBy: 'createdAt',
-      sortOrder: 'desc',
-    })
-  }, [onFiltersChange])
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  }, [onFiltersChange]);
 
   // Count active filters
   const activeFilterCount =
@@ -239,18 +233,12 @@ export function ProductFilters({
     (filters.orientation ? 1 : 0) +
     (filters.priceMin !== undefined ? 1 : 0) +
     (filters.priceMax !== undefined ? 1 : 0) +
-    (filters.isAiGenerated !== undefined ? 1 : 0)
+    (filters.isAiGenerated !== undefined ? 1 : 0);
 
-  const currentSortId = `${filters.sortBy || 'createdAt'}-${filters.sortOrder || 'desc'}`
+  const currentSortId = `${filters.sortBy || "createdAt"}-${filters.sortOrder || "desc"}`;
 
   return (
-    <div
-      className={cn(
-        'flex flex-col bg-background',
-        isMobile && 'h-full',
-        className
-      )}
-    >
+    <div className={cn("flex flex-col bg-background", isMobile && "h-full", className)}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border p-4">
         <div className="flex items-center gap-2">
@@ -291,7 +279,7 @@ export function ProductFilters({
         <FilterSection
           title="Sort By"
           sectionKey="sort"
-          isExpanded={expandedSections.has('sort')}
+          isExpanded={expandedSections.has("sort")}
           onToggle={toggleSection}
         >
           <div className="space-y-1">
@@ -301,16 +289,14 @@ export function ProductFilters({
                 type="button"
                 onClick={() => handleSortChange(option.id)}
                 className={cn(
-                  'flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors',
+                  "flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors",
                   currentSortId === option.id
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'hover:bg-accent'
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "hover:bg-accent"
                 )}
               >
                 {option.label}
-                {currentSortId === option.id && (
-                  <Check className="h-4 w-4" />
-                )}
+                {currentSortId === option.id && <Check className="h-4 w-4" />}
               </button>
             ))}
           </div>
@@ -320,7 +306,7 @@ export function ProductFilters({
         <FilterSection
           title="Orientation"
           sectionKey="orientation"
-          isExpanded={expandedSections.has('orientation')}
+          isExpanded={expandedSections.has("orientation")}
           onToggle={toggleSection}
         >
           <div className="flex flex-wrap gap-2">
@@ -330,15 +316,15 @@ export function ProductFilters({
                 type="button"
                 onClick={() =>
                   setSingleFilter(
-                    'orientation',
+                    "orientation",
                     filters.orientation === option.id ? undefined : option.id
                   )
                 }
                 className={cn(
-                  'rounded-full border px-3 py-1.5 text-sm transition-colors',
+                  "rounded-full border px-3 py-1.5 text-sm transition-colors",
                   filters.orientation === option.id
-                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                    : 'border-border hover:border-muted-foreground'
+                    ? "border-primary bg-primary/10 text-primary font-medium"
+                    : "border-border hover:border-muted-foreground"
                 )}
               >
                 {option.name}
@@ -351,7 +337,7 @@ export function ProductFilters({
         <FilterSection
           title="Style"
           sectionKey="styles"
-          isExpanded={expandedSections.has('styles')}
+          isExpanded={expandedSections.has("styles")}
           onToggle={toggleSection}
           activeCount={filters.styles.length}
         >
@@ -362,7 +348,7 @@ export function ProductFilters({
                 id={`style-${option.id}`}
                 label={option.name}
                 checked={filters.styles.includes(option.id)}
-                onChange={() => toggleMultiFilter('styles', option.id)}
+                onChange={() => toggleMultiFilter("styles", option.id)}
               />
             ))}
           </div>
@@ -372,7 +358,7 @@ export function ProductFilters({
         <FilterSection
           title="Subject"
           sectionKey="subjects"
-          isExpanded={expandedSections.has('subjects')}
+          isExpanded={expandedSections.has("subjects")}
           onToggle={toggleSection}
           activeCount={filters.subjects.length}
         >
@@ -383,7 +369,7 @@ export function ProductFilters({
                 id={`subject-${option.id}`}
                 label={option.name}
                 checked={filters.subjects.includes(option.id)}
-                onChange={() => toggleMultiFilter('subjects', option.id)}
+                onChange={() => toggleMultiFilter("subjects", option.id)}
               />
             ))}
           </div>
@@ -393,7 +379,7 @@ export function ProductFilters({
         <FilterSection
           title="Color"
           sectionKey="colors"
-          isExpanded={expandedSections.has('colors')}
+          isExpanded={expandedSections.has("colors")}
           onToggle={toggleSection}
           activeCount={filters.colors.length}
         >
@@ -402,12 +388,12 @@ export function ProductFilters({
               <button
                 key={option.id}
                 type="button"
-                onClick={() => toggleMultiFilter('colors', option.id)}
+                onClick={() => toggleMultiFilter("colors", option.id)}
                 className={cn(
-                  'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors',
+                  "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
                   filters.colors.includes(option.id)
-                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                    : 'border-border hover:border-muted-foreground'
+                    ? "border-primary bg-primary/10 text-primary font-medium"
+                    : "border-border hover:border-muted-foreground"
                 )}
               >
                 {option.hex && (
@@ -426,7 +412,7 @@ export function ProductFilters({
         <FilterSection
           title="Room"
           sectionKey="rooms"
-          isExpanded={expandedSections.has('rooms')}
+          isExpanded={expandedSections.has("rooms")}
           onToggle={toggleSection}
           activeCount={filters.rooms.length}
         >
@@ -437,7 +423,7 @@ export function ProductFilters({
                 id={`room-${option.id}`}
                 label={option.name}
                 checked={filters.rooms.includes(option.id)}
-                onChange={() => toggleMultiFilter('rooms', option.id)}
+                onChange={() => toggleMultiFilter("rooms", option.id)}
               />
             ))}
           </div>
@@ -447,7 +433,7 @@ export function ProductFilters({
         <FilterSection
           title="Special"
           sectionKey="special"
-          isExpanded={expandedSections.has('special')}
+          isExpanded={expandedSections.has("special")}
           onToggle={toggleSection}
         >
           <div className="space-y-1">
@@ -457,8 +443,8 @@ export function ProductFilters({
               checked={filters.isAiGenerated === true}
               onChange={() =>
                 setSingleFilter(
-                  'isAiGenerated',
-                  filters.isAiGenerated === true ? undefined : 'true' as unknown as string
+                  "isAiGenerated",
+                  filters.isAiGenerated === true ? undefined : ("true" as unknown as string)
                 )
               }
             />
@@ -468,8 +454,8 @@ export function ProductFilters({
               checked={filters.isFeatured === true}
               onChange={() =>
                 setSingleFilter(
-                  'isFeatured',
-                  filters.isFeatured === true ? undefined : 'true' as unknown as string
+                  "isFeatured",
+                  filters.isFeatured === true ? undefined : ("true" as unknown as string)
                 )
               }
             />
@@ -491,7 +477,7 @@ export function ProductFilters({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -499,12 +485,12 @@ export function ProductFilters({
 // ============================================================================
 
 interface FilterSectionProps {
-  title: string
-  sectionKey: string
-  isExpanded: boolean
-  onToggle: (key: string) => void
-  activeCount?: number
-  children: React.ReactNode
+  title: string;
+  sectionKey: string;
+  isExpanded: boolean;
+  onToggle: (key: string) => void;
+  activeCount?: number;
+  children: React.ReactNode;
 }
 
 function FilterSection({
@@ -539,7 +525,7 @@ function FilterSection({
       </button>
       {isExpanded && <div className="px-4 pb-4">{children}</div>}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -547,10 +533,10 @@ function FilterSection({
 // ============================================================================
 
 interface FilterCheckboxProps {
-  id: string
-  label: string
-  checked: boolean
-  onChange: () => void
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: () => void;
 }
 
 function FilterCheckbox({ id, label, checked, onChange }: FilterCheckboxProps) {
@@ -561,24 +547,18 @@ function FilterCheckbox({ id, label, checked, onChange }: FilterCheckboxProps) {
     >
       <div
         className={cn(
-          'flex h-5 w-5 items-center justify-center rounded border transition-colors',
+          "flex h-5 w-5 items-center justify-center rounded border transition-colors",
           checked
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-muted-foreground/30'
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-muted-foreground/30"
         )}
       >
         {checked && <Check className="h-3.5 w-3.5" />}
       </div>
-      <input
-        type="checkbox"
-        id={id}
-        checked={checked}
-        onChange={onChange}
-        className="sr-only"
-      />
+      <input type="checkbox" id={id} checked={checked} onChange={onChange} className="sr-only" />
       <span className="text-sm">{label}</span>
     </label>
-  )
+  );
 }
 
 // ============================================================================
@@ -586,9 +566,9 @@ function FilterCheckbox({ id, label, checked, onChange }: FilterCheckboxProps) {
 // ============================================================================
 
 export interface MobileFilterButtonProps {
-  activeCount?: number
-  onClick: () => void
-  className?: string
+  activeCount?: number;
+  onClick: () => void;
+  className?: string;
 }
 
 export function MobileFilterButton({
@@ -601,7 +581,7 @@ export function MobileFilterButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent',
+        "flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent",
         className
       )}
     >
@@ -613,7 +593,7 @@ export function MobileFilterButton({
         </span>
       )}
     </button>
-  )
+  );
 }
 
-export default ProductFilters
+export default ProductFilters;

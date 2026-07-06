@@ -4,14 +4,7 @@
  * Tracks all moderation actions on AI generations for audit trail.
  */
 
-import {
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  pgEnum,
-  index,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, pgEnum, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./users";
 import { aiGenerations } from "./ai-generations";
@@ -76,39 +69,29 @@ export const aiGenerationReviews = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    generationIdIdx: index("ai_generation_reviews_generation_id_idx").on(
-      table.generationId
-    ),
-    reviewerIdIdx: index("ai_generation_reviews_reviewer_id_idx").on(
-      table.reviewerId
-    ),
+    generationIdIdx: index("ai_generation_reviews_generation_id_idx").on(table.generationId),
+    reviewerIdIdx: index("ai_generation_reviews_reviewer_id_idx").on(table.reviewerId),
     actionIdx: index("ai_generation_reviews_action_idx").on(table.action),
-    createdAtIdx: index("ai_generation_reviews_created_at_idx").on(
-      table.createdAt
-    ),
+    createdAtIdx: index("ai_generation_reviews_created_at_idx").on(table.createdAt),
   })
 );
 
 /**
  * Relations
  */
-export const aiGenerationReviewsRelations = relations(
-  aiGenerationReviews,
-  ({ one }) => ({
-    generation: one(aiGenerations, {
-      fields: [aiGenerationReviews.generationId],
-      references: [aiGenerations.id],
-    }),
-    reviewer: one(users, {
-      fields: [aiGenerationReviews.reviewerId],
-      references: [users.id],
-    }),
-  })
-);
+export const aiGenerationReviewsRelations = relations(aiGenerationReviews, ({ one }) => ({
+  generation: one(aiGenerations, {
+    fields: [aiGenerationReviews.generationId],
+    references: [aiGenerations.id],
+  }),
+  reviewer: one(users, {
+    fields: [aiGenerationReviews.reviewerId],
+    references: [users.id],
+  }),
+}));
 
 // Type exports
 export type AIGenerationReview = typeof aiGenerationReviews.$inferSelect;
 export type NewAIGenerationReview = typeof aiGenerationReviews.$inferInsert;
 export type AIReviewAction = (typeof aiReviewActionEnum.enumValues)[number];
-export type AIRejectionCategory =
-  (typeof aiRejectionCategoryEnum.enumValues)[number];
+export type AIRejectionCategory = (typeof aiRejectionCategoryEnum.enumValues)[number];

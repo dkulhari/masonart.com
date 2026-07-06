@@ -25,9 +25,7 @@ export function initSentry(): void {
     environment,
     tracesSampleRate,
     release: process.env.SENTRY_RELEASE || "masonart-api@1.0.0",
-    integrations: [
-      Sentry.onUnhandledRejectionIntegration(),
-    ],
+    integrations: [Sentry.onUnhandledRejectionIntegration()],
     // Don't send in test environment
     enabled: environment !== "test",
     // Filter out health check errors

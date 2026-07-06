@@ -107,19 +107,13 @@ export const notificationPreferences = pgTable(
       .notNull(),
 
     // Email notification preferences (default: true)
-    emailOrderConfirmation: boolean("email_order_confirmation")
-      .default(true)
-      .notNull(),
+    emailOrderConfirmation: boolean("email_order_confirmation").default(true).notNull(),
     emailShipped: boolean("email_shipped").default(true).notNull(),
-    emailOutForDelivery: boolean("email_out_for_delivery")
-      .default(true)
-      .notNull(),
+    emailOutForDelivery: boolean("email_out_for_delivery").default(true).notNull(),
     emailDelivered: boolean("email_delivered").default(true).notNull(),
 
     // SMS notification preferences (default: false)
-    smsOrderConfirmation: boolean("sms_order_confirmation")
-      .default(false)
-      .notNull(),
+    smsOrderConfirmation: boolean("sms_order_confirmation").default(false).notNull(),
     smsShipped: boolean("sms_shipped").default(false).notNull(),
     smsOutForDelivery: boolean("sms_out_for_delivery").default(false).notNull(),
     smsDelivered: boolean("sms_delivered").default(false).notNull(),
@@ -132,9 +126,7 @@ export const notificationPreferences = pgTable(
       .notNull(),
   },
   (table) => ({
-    userIdUnique: unique("notification_preferences_user_id_unique").on(
-      table.userId
-    ),
+    userIdUnique: unique("notification_preferences_user_id_unique").on(table.userId),
     userIdIdx: index("notification_preferences_user_id_idx").on(table.userId),
   })
 );
@@ -156,15 +148,12 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
 /**
  * Notification preferences relations
  */
-export const notificationPreferencesRelations = relations(
-  notificationPreferences,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [notificationPreferences.userId],
-      references: [users.id],
-    }),
-  })
-);
+export const notificationPreferencesRelations = relations(notificationPreferences, ({ one }) => ({
+  user: one(users, {
+    fields: [notificationPreferences.userId],
+    references: [users.id],
+  }),
+}));
 
 // ============================================================================
 // Type Exports (inferred from schema)
@@ -174,11 +163,8 @@ export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
 
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
-export type NewNotificationPreference =
-  typeof notificationPreferences.$inferInsert;
+export type NewNotificationPreference = typeof notificationPreferences.$inferInsert;
 
 export type NotificationType = (typeof notificationTypeEnum.enumValues)[number];
-export type NotificationChannel =
-  (typeof notificationChannelEnum.enumValues)[number];
-export type NotificationStatus =
-  (typeof notificationStatusEnum.enumValues)[number];
+export type NotificationChannel = (typeof notificationChannelEnum.enumValues)[number];
+export type NotificationStatus = (typeof notificationStatusEnum.enumValues)[number];

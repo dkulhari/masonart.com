@@ -31,11 +31,7 @@ import {
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { getApiUrl } from "~/lib/utils";
-import {
-  StatsCard,
-  StatsCardGrid,
-  StatsCardSkeleton,
-} from "~/components/admin/StatsCard";
+import { StatsCard, StatsCardGrid, StatsCardSkeleton } from "~/components/admin/StatsCard";
 
 // ============================================================================
 // Route Configuration
@@ -132,9 +128,7 @@ const REJECTION_CATEGORIES = [
 // API Functions
 // ============================================================================
 
-async function fetchGenerations(
-  params: SearchParams
-): Promise<PaginatedResponse> {
+async function fetchGenerations(params: SearchParams): Promise<PaginatedResponse> {
   const queryParams = new URLSearchParams();
 
   queryParams.set("page", String(params.page));
@@ -153,16 +147,13 @@ async function fetchGenerations(
     queryParams.set("userId", params.userId);
   }
 
-  const response = await fetch(
-    `${getApiUrl()}/api/admin/ai-moderation?${queryParams.toString()}`,
-    {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const response = await fetch(`${getApiUrl()}/api/admin/ai-moderation?${queryParams.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
   if (!response.ok) {
     throw new Error("Failed to fetch generations");
@@ -196,17 +187,14 @@ async function moderateGeneration(
   reason?: string,
   category?: string
 ): Promise<void> {
-  const response = await fetch(
-    `${getApiUrl()}/api/admin/ai-moderation/${generationId}`,
-    {
-      method: "PATCH",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ action, reason, category }),
-    }
-  );
+  const response = await fetch(`${getApiUrl()}/api/admin/ai-moderation/${generationId}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action, reason, category }),
+  });
 
   if (!response.ok) {
     throw new Error("Failed to moderate generation");
@@ -261,9 +249,7 @@ function AdminAIModerationPage() {
   const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedGenerations, setSelectedGenerations] = useState<Set<string>>(
-    new Set()
-  );
+  const [selectedGenerations, setSelectedGenerations] = useState<Set<string>>(new Set());
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [rejectModal, setRejectModal] = useState<{
     generationId: string;
@@ -328,9 +314,7 @@ function AdminAIModerationPage() {
       search: {
         ...searchParams,
         ...updates,
-        page:
-          updates.page ||
-          (updates.status !== undefined ? 1 : searchParams.page),
+        page: updates.page || (updates.status !== undefined ? 1 : searchParams.page),
       },
     });
   };
@@ -360,12 +344,7 @@ function AdminAIModerationPage() {
 
     try {
       if (rejectModal.bulk) {
-        await bulkModerate(
-          Array.from(selectedGenerations),
-          "reject",
-          rejectReason,
-          rejectCategory
-        );
+        await bulkModerate(Array.from(selectedGenerations), "reject", rejectReason, rejectCategory);
         setSelectedGenerations(new Set());
       } else {
         await moderateGeneration(
@@ -387,11 +366,7 @@ function AdminAIModerationPage() {
   // Handle flag
   const handleFlag = async (generationId: string) => {
     try {
-      await moderateGeneration(
-        generationId,
-        "flagged",
-        "Flagged for senior review"
-      );
+      await moderateGeneration(generationId, "flagged", "Flagged for senior review");
       setIsRefreshing(true);
       await loadGenerations();
       await loadStats();
@@ -404,11 +379,7 @@ function AdminAIModerationPage() {
   const handleBulkApprove = async () => {
     if (selectedGenerations.size === 0) return;
 
-    if (
-      !confirm(
-        `Are you sure you want to approve ${selectedGenerations.size} generations?`
-      )
-    ) {
+    if (!confirm(`Are you sure you want to approve ${selectedGenerations.size} generations?`)) {
       return;
     }
 
@@ -452,10 +423,7 @@ function AdminAIModerationPage() {
   };
 
   // Status badge
-  const getStatusBadge = (
-    status: AIGeneration["moderationStatus"],
-    isFlagged: boolean
-  ) => {
+  const getStatusBadge = (status: AIGeneration["moderationStatus"], isFlagged: boolean) => {
     if (isFlagged && status !== "flagged") {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
@@ -503,18 +471,14 @@ function AdminAIModerationPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">AI Moderation</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Review and moderate AI-generated content
-          </p>
+          <p className="mt-1 text-sm text-gray-500">Review and moderate AI-generated content</p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
         >
-          <RefreshCw
-            className={cn("h-4 w-4", isRefreshing && "animate-spin")}
-          />
+          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
           Refresh
         </button>
       </div>
@@ -564,9 +528,7 @@ function AdminAIModerationPage() {
 
       {/* Avg Review Time */}
       {!isStatsLoading && avgReviewTime > 0 && (
-        <p className="text-sm text-gray-500">
-          Average review time: {avgReviewTime} minutes
-        </p>
+        <p className="text-sm text-gray-500">Average review time: {avgReviewTime} minutes</p>
       )}
 
       {/* Error Banner */}
@@ -602,9 +564,7 @@ function AdminAIModerationPage() {
 
         <select
           value={searchParams.sortBy}
-          onChange={(e) =>
-            updateSearch({ sortBy: e.target.value as SearchParams["sortBy"] })
-          }
+          onChange={(e) => updateSearch({ sortBy: e.target.value as SearchParams["sortBy"] })}
           className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="oldest">Oldest First (FIFO)</option>
@@ -614,9 +574,7 @@ function AdminAIModerationPage() {
         {/* Bulk Actions */}
         {selectedGenerations.size > 0 && (
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm text-gray-600">
-              {selectedGenerations.size} selected
-            </span>
+            <span className="text-sm text-gray-600">{selectedGenerations.size} selected</span>
             <button
               onClick={handleBulkApprove}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100"
@@ -639,10 +597,7 @@ function AdminAIModerationPage() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse"
-            >
+            <div key={i} className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse">
               <div className="aspect-square bg-gray-200 rounded-lg mb-4" />
               <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
               <div className="h-3 bg-gray-200 rounded w-1/2" />
@@ -652,9 +607,7 @@ function AdminAIModerationPage() {
       ) : generations.length === 0 ? (
         <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
           <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">
-            No generations found
-          </h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-1">No generations found</h3>
           <p className="text-sm text-gray-500">
             {searchParams.status === "pending_review"
               ? "All caught up! No pending reviews."
@@ -688,14 +641,9 @@ function AdminAIModerationPage() {
               >
                 {/* Image */}
                 <div className="relative aspect-square bg-gray-100">
-                  {generation.images[0]?.thumbnailUrl ||
-                  generation.selectedImageUrl ? (
+                  {generation.images[0]?.thumbnailUrl || generation.selectedImageUrl ? (
                     <img
-                      src={
-                        generation.images[0]?.thumbnailUrl ||
-                        generation.selectedImageUrl ||
-                        ""
-                      }
+                      src={generation.images[0]?.thumbnailUrl || generation.selectedImageUrl || ""}
                       alt="AI Generated"
                       className="w-full h-full object-cover"
                     />
@@ -719,9 +667,7 @@ function AdminAIModerationPage() {
                   <button
                     onClick={() =>
                       setPreviewImage(
-                        generation.images[0]?.imageUrl ||
-                          generation.selectedImageUrl ||
-                          ""
+                        generation.images[0]?.imageUrl || generation.selectedImageUrl || ""
                       )
                     }
                     className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-lg hover:bg-black/70"
@@ -731,18 +677,13 @@ function AdminAIModerationPage() {
 
                   {/* Status badge */}
                   <div className="absolute bottom-2 left-2">
-                    {getStatusBadge(
-                      generation.moderationStatus,
-                      generation.isFlagged
-                    )}
+                    {getStatusBadge(generation.moderationStatus, generation.isFlagged)}
                   </div>
                 </div>
 
                 {/* Content */}
                 <div className="p-4 space-y-3">
-                  <p className="text-sm text-gray-700 line-clamp-2">
-                    {generation.promptText}
-                  </p>
+                  <p className="text-sm text-gray-700 line-clamp-2">{generation.promptText}</p>
 
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span className="px-2 py-0.5 bg-gray-100 rounded">
@@ -809,8 +750,8 @@ function AdminAIModerationPage() {
         <div className="flex items-center justify-between border-t pt-4">
           <p className="text-sm text-gray-600">
             Showing {(pagination.page - 1) * pagination.pageSize + 1} -{" "}
-            {Math.min(pagination.page * pagination.pageSize, pagination.total)}{" "}
-            of {pagination.total}
+            {Math.min(pagination.page * pagination.pageSize, pagination.total)} of{" "}
+            {pagination.total}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -870,9 +811,7 @@ function AdminAIModerationPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
                 <select
                   value={rejectCategory}
                   onChange={(e) => setRejectCategory(e.target.value)}
@@ -888,9 +827,7 @@ function AdminAIModerationPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reason *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reason *</label>
                 <textarea
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}

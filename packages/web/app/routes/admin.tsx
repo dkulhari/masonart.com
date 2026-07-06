@@ -12,64 +12,61 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
-import { ShieldAlert } from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { AdminSidebar, MobileAdminHeader } from '~/components/admin/AdminSidebar'
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { ShieldAlert } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { AdminSidebar, MobileAdminHeader } from "~/components/admin/AdminSidebar";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/admin')({
+export const Route = createFileRoute("/admin")({
   beforeLoad: async ({ context, location }) => {
     // Check if user is authenticated using session from root context
     if (!context.session?.user) {
       // Not logged in - redirect to login with redirect param
       throw redirect({
-        to: '/auth/login',
+        to: "/auth/login",
         search: {
           redirect: location.href,
         },
-      })
+      });
     }
 
-    const userRole = context.session.user.role?.toLowerCase()
+    const userRole = context.session.user.role?.toLowerCase();
 
     // Check for admin or super-admin role
-    if (userRole !== 'admin' && userRole !== 'super-admin') {
+    if (userRole !== "admin" && userRole !== "super-admin") {
       // User is authenticated but not an admin - return flag for component
       return {
         user: context.session.user,
         isUnauthorized: true,
-      }
+      };
     }
 
     // User is admin - pass to component
     return {
       user: context.session.user,
       isUnauthorized: false,
-    }
+    };
   },
   head: () => ({
-    meta: [
-      { title: 'Admin Panel | MasonArt' },
-      { name: 'robots', content: 'noindex, nofollow' },
-    ],
+    meta: [{ title: "Admin Panel | MasonArt" }, { name: "robots", content: "noindex, nofollow" }],
   }),
   component: AdminLayout,
-})
+});
 
 // ============================================================================
 // Admin Layout Component
 // ============================================================================
 
 function AdminLayout() {
-  const { user, isUnauthorized } = Route.useRouteContext()
+  const { user, isUnauthorized } = Route.useRouteContext();
 
   // Unauthorized state (non-admin user)
   if (isUnauthorized) {
-    return <UnauthorizedScreen />
+    return <UnauthorizedScreen />;
   }
 
   // Authorized admin user
@@ -95,11 +92,11 @@ function AdminLayout() {
       {/* Main Content Area */}
       <main
         className={cn(
-          'min-h-screen transition-all duration-300',
+          "min-h-screen transition-all duration-300",
           // Desktop: offset for sidebar (default expanded width)
-          'lg:ml-64',
+          "lg:ml-64",
           // Mobile: add top padding for fixed header
-          'pt-16 lg:pt-0'
+          "pt-16 lg:pt-0"
         )}
       >
         <div className="p-4 lg:p-6">
@@ -107,7 +104,7 @@ function AdminLayout() {
         </div>
       </main>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -123,8 +120,8 @@ function UnauthorizedScreen() {
         </div>
         <h1 className="mt-6 text-2xl font-bold text-foreground">Access Denied</h1>
         <p className="mt-2 text-muted-foreground">
-          You don&apos;t have permission to access the admin panel. Please contact
-          your administrator if you believe this is a mistake.
+          You don&apos;t have permission to access the admin panel. Please contact your
+          administrator if you believe this is a mistake.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <a
@@ -142,7 +139,7 @@ function UnauthorizedScreen() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default AdminLayout
+export default AdminLayout;

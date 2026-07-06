@@ -8,16 +8,16 @@
  * - AI generation schemas
  */
 
-export const SCHEMAS_VERSION = '1.0.0';
+export const SCHEMAS_VERSION = "1.0.0";
 
 // Product schemas
-export * from './product';
+export * from "./product";
 
 // Order schemas
-export * from './order';
+export * from "./order";
 
 // User schemas
-export * from './user';
+export * from "./user";
 
 // AI generation schemas
-export * from './ai';
+export * from "./ai";

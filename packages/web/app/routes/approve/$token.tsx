@@ -7,8 +7,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState, useCallback, useRef } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   Loader2,
   AlertCircle,
@@ -25,59 +25,63 @@ import {
   Timer,
   Send,
   AlertTriangle,
-} from 'lucide-react'
-import { cn, getApiUrl } from '~/lib/utils'
+} from "lucide-react";
+import { cn, getApiUrl } from "~/lib/utils";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
- 
-export const Route = createFileRoute('/approve/$token' as any)({
+export const Route = createFileRoute("/approve/$token" as any)({
   head: () => ({
     meta: [
-      { title: 'Review Your Production Photos | MasonArt' },
-      { name: 'description', content: 'Review and approve your custom poster production photos.' },
-      { name: 'robots', content: 'noindex' },
+      { title: "Review Your Production Photos | MasonArt" },
+      { name: "description", content: "Review and approve your custom poster production photos." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: ApprovalPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type ApprovalStatus = 'pending_upload' | 'pending_approval' | 'changes_requested' | 'approved' | 'expired'
+type ApprovalStatus =
+  | "pending_upload"
+  | "pending_approval"
+  | "changes_requested"
+  | "approved"
+  | "expired";
 
 interface ApprovalPhoto {
-  id: string
-  url: string
-  thumbnailUrl?: string
+  id: string;
+  url: string;
+  thumbnailUrl?: string;
 }
 
 interface ApprovalComment {
-  id: string
-  authorType: 'admin' | 'customer'
-  comment: string
-  createdAt: string
+  id: string;
+  authorType: "admin" | "customer";
+  comment: string;
+  createdAt: string;
 }
 
 interface ApprovalData {
-  id: string
-  status: ApprovalStatus
-  deadlineAt?: string | null
-  approvedAt?: string | null
-  photos: ApprovalPhoto[]
-  comments: ApprovalComment[]
+  id: string;
+  status: ApprovalStatus;
+  deadlineAt?: string | null;
+  approvedAt?: string | null;
+  photos: ApprovalPhoto[];
+  comments: ApprovalComment[];
   order?: {
-    orderNumber: string
-    status: string
-  } | null
+    orderNumber: string;
+    status: string;
+  } | null;
   orderItem?: {
-    title?: string
-    sizeLabel?: string
-  } | null
+    title?: string;
+    sizeLabel?: string;
+  } | null;
 }
 
 // ============================================================================
@@ -86,42 +90,42 @@ interface ApprovalData {
 
 async function fetchApproval(token: string): Promise<ApprovalData> {
   const response = await fetch(`${getApiUrl()}/api/approvals/${token}`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  })
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
 
   if (!response.ok) {
-    const error = await response.json() as { error?: string }
-    throw new Error(error.error || 'Failed to load approval')
+    const error = (await response.json()) as { error?: string };
+    throw new Error(error.error || "Failed to load approval");
   }
 
-  const result = await response.json() as { success: boolean; data: ApprovalData }
-  return result.data
+  const result = (await response.json()) as { success: boolean; data: ApprovalData };
+  return result.data;
 }
 
 async function submitChangeRequest(token: string, comment: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/approvals/${token}/changes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ comment }),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json() as { error?: string }
-    throw new Error(error.error || 'Failed to submit change request')
+    const error = (await response.json()) as { error?: string };
+    throw new Error(error.error || "Failed to submit change request");
   }
 }
 
 async function approveProduction(token: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/approvals/${token}/approve`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({}),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json() as { error?: string }
-    throw new Error(error.error || 'Failed to approve')
+    const error = (await response.json()) as { error?: string };
+    throw new Error(error.error || "Failed to approve");
   }
 }
 
@@ -131,123 +135,123 @@ async function approveProduction(token: string): Promise<void> {
 
 const STATUS_CONFIG: Record<ApprovalStatus, { label: string; color: string; bgColor: string }> = {
   pending_upload: {
-    label: 'Awaiting Photos',
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
+    label: "Awaiting Photos",
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
   },
   pending_approval: {
-    label: 'Ready for Review',
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-100',
+    label: "Ready for Review",
+    color: "text-amber-600",
+    bgColor: "bg-amber-100",
   },
   changes_requested: {
-    label: 'Changes Requested',
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
+    label: "Changes Requested",
+    color: "text-orange-600",
+    bgColor: "bg-orange-100",
   },
   approved: {
-    label: 'Approved',
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
+    label: "Approved",
+    color: "text-green-600",
+    bgColor: "bg-green-100",
   },
   expired: {
-    label: 'Expired',
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
+    label: "Expired",
+    color: "text-red-600",
+    bgColor: "bg-red-100",
   },
-}
+};
 
 // ============================================================================
 // Photo Gallery Modal
 // ============================================================================
 
 interface GalleryModalProps {
-  photos: ApprovalPhoto[]
-  currentIndex: number
-  onClose: () => void
-  onNavigate: (index: number) => void
+  photos: ApprovalPhoto[];
+  currentIndex: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
 }
 
 function GalleryModal({ photos, currentIndex, onClose, onNavigate }: GalleryModalProps) {
-  const [zoom, setZoom] = useState(1)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const lastPositionRef = useRef({ x: 0, y: 0 })
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const lastPositionRef = useRef({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const currentPhoto = photos[currentIndex]
+  const currentPhoto = photos[currentIndex];
 
-  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.5, 4))
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.5, 4));
   const handleZoomOut = () => {
     setZoom((z) => {
-      const newZoom = Math.max(z - 0.5, 1)
-      if (newZoom === 1) setPosition({ x: 0, y: 0 })
-      return newZoom
-    })
-  }
+      const newZoom = Math.max(z - 0.5, 1);
+      if (newZoom === 1) setPosition({ x: 0, y: 0 });
+      return newZoom;
+    });
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom > 1) {
-      setIsDragging(true)
-      lastPositionRef.current = { x: e.clientX - position.x, y: e.clientY - position.y }
+      setIsDragging(true);
+      lastPositionRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
     }
-  }
+  };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging && zoom > 1) {
       setPosition({
         x: e.clientX - lastPositionRef.current.x,
         y: e.clientY - lastPositionRef.current.y,
-      })
+      });
     }
-  }
+  };
 
-  const handleMouseUp = () => setIsDragging(false)
+  const handleMouseUp = () => setIsDragging(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0]
+    const touch = e.touches[0];
     if (zoom > 1 && e.touches.length === 1 && touch) {
-      setIsDragging(true)
+      setIsDragging(true);
       lastPositionRef.current = {
         x: touch.clientX - position.x,
         y: touch.clientY - position.y,
-      }
+      };
     }
-  }
+  };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    const touch = e.touches[0]
+    const touch = e.touches[0];
     if (isDragging && zoom > 1 && e.touches.length === 1 && touch) {
       setPosition({
         x: touch.clientX - lastPositionRef.current.x,
         y: touch.clientY - lastPositionRef.current.y,
-      })
+      });
     }
-  }
+  };
 
-  const handleTouchEnd = () => setIsDragging(false)
+  const handleTouchEnd = () => setIsDragging(false);
 
   // Reset zoom when changing photos
   useEffect(() => {
-    setZoom(1)
-    setPosition({ x: 0, y: 0 })
-  }, [currentIndex])
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+  }, [currentIndex]);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1)
-      if (e.key === 'ArrowRight' && currentIndex < photos.length - 1) onNavigate(currentIndex + 1)
-      if (e.key === '+' || e.key === '=') handleZoomIn()
-      if (e.key === '-') handleZoomOut()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentIndex, photos.length, onClose, onNavigate])
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && currentIndex > 0) onNavigate(currentIndex - 1);
+      if (e.key === "ArrowRight" && currentIndex < photos.length - 1) onNavigate(currentIndex + 1);
+      if (e.key === "+" || e.key === "=") handleZoomIn();
+      if (e.key === "-") handleZoomOut();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, photos.length, onClose, onNavigate]);
 
   // Guard after hooks so the hook order stays stable across renders
-  if (!currentPhoto) return null
+  if (!currentPhoto) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95">
@@ -268,7 +272,9 @@ function GalleryModal({ photos, currentIndex, onClose, onNavigate }: GalleryModa
         >
           <ZoomOut className="h-5 w-5" />
         </button>
-        <span className="min-w-[3rem] text-center text-sm text-white">{Math.round(zoom * 100)}%</span>
+        <span className="min-w-[3rem] text-center text-sm text-white">
+          {Math.round(zoom * 100)}%
+        </span>
         <button
           onClick={handleZoomIn}
           disabled={zoom >= 4}
@@ -316,7 +322,7 @@ function GalleryModal({ photos, currentIndex, onClose, onNavigate }: GalleryModa
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+        style={{ cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : "default" }}
       >
         <img
           src={currentPhoto.url}
@@ -329,7 +335,7 @@ function GalleryModal({ photos, currentIndex, onClose, onNavigate }: GalleryModa
         />
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -337,11 +343,11 @@ function GalleryModal({ photos, currentIndex, onClose, onNavigate }: GalleryModa
 // ============================================================================
 
 interface CommentsTimelineProps {
-  comments: ApprovalComment[]
+  comments: ApprovalComment[];
 }
 
 function CommentsTimeline({ comments }: CommentsTimelineProps) {
-  if (comments.length === 0) return null
+  if (comments.length === 0) return null;
 
   return (
     <div className="space-y-4">
@@ -351,38 +357,35 @@ function CommentsTimeline({ comments }: CommentsTimelineProps) {
       </h3>
       <div className="space-y-3">
         {comments.map((comment) => {
-          const isAdmin = comment.authorType === 'admin'
+          const isAdmin = comment.authorType === "admin";
           return (
             <div
               key={comment.id}
               className={cn(
-                'rounded-lg p-4',
-                isAdmin ? 'bg-blue-50 border border-blue-100' : 'bg-gray-50 border border-gray-100'
+                "rounded-lg p-4",
+                isAdmin ? "bg-blue-50 border border-blue-100" : "bg-gray-50 border border-gray-100"
               )}
             >
               <div className="mb-2 flex items-center justify-between">
                 <span
-                  className={cn(
-                    'text-sm font-medium',
-                    isAdmin ? 'text-blue-700' : 'text-gray-700'
-                  )}
+                  className={cn("text-sm font-medium", isAdmin ? "text-blue-700" : "text-gray-700")}
                 >
-                  {isAdmin ? 'MasonArt Team' : 'You'}
+                  {isAdmin ? "MasonArt Team" : "You"}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {new Date(comment.createdAt).toLocaleString('en-IN', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
+                  {new Date(comment.createdAt).toLocaleString("en-IN", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
                   })}
                 </span>
               </div>
               <p className="text-sm text-foreground whitespace-pre-wrap">{comment.comment}</p>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -390,88 +393,92 @@ function CommentsTimeline({ comments }: CommentsTimelineProps) {
 // ============================================================================
 
 function ApprovalPage() {
-  const params = Route.useParams() as { token: string }
+  const params = Route.useParams() as { token: string };
 
-  const [approval, setApproval] = useState<ApprovalData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null)
-  const [changeComment, setChangeComment] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showChangeForm, setShowChangeForm] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [approval, setApproval] = useState<ApprovalData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [changeComment, setChangeComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showChangeForm, setShowChangeForm] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadApproval = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const data = await fetchApproval(params.token)
-      setApproval(data)
+      const data = await fetchApproval(params.token);
+      setApproval(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load approval')
+      setError(err instanceof Error ? err.message : "Failed to load approval");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [params.token])
+  }, [params.token]);
 
   useEffect(() => {
-    loadApproval()
-  }, [loadApproval])
+    loadApproval();
+  }, [loadApproval]);
 
   const handleRequestChanges = async () => {
-    if (!changeComment.trim()) return
+    if (!changeComment.trim()) return;
 
-    setIsSubmitting(true)
-    setError(null)
+    setIsSubmitting(true);
+    setError(null);
     try {
-      await submitChangeRequest(params.token, changeComment)
-      setChangeComment('')
-      setShowChangeForm(false)
-      setSuccessMessage('Change request submitted successfully!')
-      await loadApproval()
+      await submitChangeRequest(params.token, changeComment);
+      setChangeComment("");
+      setShowChangeForm(false);
+      setSuccessMessage("Change request submitted successfully!");
+      await loadApproval();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit change request')
+      setError(err instanceof Error ? err.message : "Failed to submit change request");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const handleApprove = async () => {
-    if (!window.confirm('Are you sure you want to approve these photos? Your order will proceed to shipping.')) {
-      return
+    if (
+      !window.confirm(
+        "Are you sure you want to approve these photos? Your order will proceed to shipping."
+      )
+    ) {
+      return;
     }
 
-    setIsSubmitting(true)
-    setError(null)
+    setIsSubmitting(true);
+    setError(null);
     try {
-      await approveProduction(params.token)
-      setSuccessMessage('Approved! Your order will proceed to shipping.')
-      await loadApproval()
+      await approveProduction(params.token);
+      setSuccessMessage("Approved! Your order will proceed to shipping.");
+      await loadApproval();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to approve')
+      setError(err instanceof Error ? err.message : "Failed to approve");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const getDeadlineInfo = () => {
-    if (!approval?.deadlineAt) return null
+    if (!approval?.deadlineAt) return null;
 
-    const deadline = new Date(approval.deadlineAt)
-    const now = new Date()
-    const hoursRemaining = Math.max(0, (deadline.getTime() - now.getTime()) / (1000 * 60 * 60))
+    const deadline = new Date(approval.deadlineAt);
+    const now = new Date();
+    const hoursRemaining = Math.max(0, (deadline.getTime() - now.getTime()) / (1000 * 60 * 60));
 
     if (hoursRemaining <= 0) {
-      return { text: 'Deadline passed', urgent: true }
+      return { text: "Deadline passed", urgent: true };
     }
 
     if (hoursRemaining <= 24) {
-      return { text: `${Math.ceil(hoursRemaining)} hours remaining`, urgent: true }
+      return { text: `${Math.ceil(hoursRemaining)} hours remaining`, urgent: true };
     }
 
-    const days = Math.ceil(hoursRemaining / 24)
-    return { text: `${days} days remaining`, urgent: false }
-  }
+    const days = Math.ceil(hoursRemaining / 24);
+    return { text: `${days} days remaining`, urgent: false };
+  };
 
   // Loading state
   if (loading) {
@@ -482,7 +489,7 @@ function ApprovalPage() {
           <p className="mt-4 text-muted-foreground">Loading approval...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Error state
@@ -501,17 +508,18 @@ function ApprovalPage() {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!approval) return null
+  if (!approval) return null;
 
-  const statusConfig = STATUS_CONFIG[approval.status]
-  const deadlineInfo = getDeadlineInfo()
-  const canTakeAction = approval.status === 'pending_approval' || approval.status === 'changes_requested'
-  const isApproved = approval.status === 'approved'
-  const isExpired = approval.status === 'expired'
-  const isPendingUpload = approval.status === 'pending_upload'
+  const statusConfig = STATUS_CONFIG[approval.status];
+  const deadlineInfo = getDeadlineInfo();
+  const canTakeAction =
+    approval.status === "pending_approval" || approval.status === "changes_requested";
+  const isApproved = approval.status === "approved";
+  const isExpired = approval.status === "expired";
+  const isPendingUpload = approval.status === "pending_upload";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -536,7 +544,7 @@ function ApprovalPage() {
             <div className="flex flex-wrap items-center gap-3">
               <span
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium',
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium",
                   statusConfig.bgColor,
                   statusConfig.color
                 )}
@@ -548,10 +556,8 @@ function ApprovalPage() {
               {deadlineInfo && !isApproved && !isExpired && (
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm',
-                    deadlineInfo.urgent
-                      ? 'bg-red-100 text-red-700'
-                      : 'bg-gray-100 text-gray-700'
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm",
+                    deadlineInfo.urgent ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"
                   )}
                 >
                   <Timer className="h-4 w-4" />
@@ -648,21 +654,15 @@ function ApprovalPage() {
             {isApproved && (
               <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
                 <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
-                <h2 className="mt-3 text-lg font-semibold text-green-800">
-                  Photos Approved!
-                </h2>
-                <p className="mt-1 text-green-700">
-                  Your order is now proceeding to shipping.
-                </p>
+                <h2 className="mt-3 text-lg font-semibold text-green-800">Photos Approved!</h2>
+                <p className="mt-1 text-green-700">Your order is now proceeding to shipping.</p>
               </div>
             )}
 
             {/* Change Request Form */}
             {showChangeForm ? (
               <div className="rounded-xl border border-border bg-white p-6">
-                <h3 className="mb-4 text-lg font-semibold text-foreground">
-                  Request Changes
-                </h3>
+                <h3 className="mb-4 text-lg font-semibold text-foreground">Request Changes</h3>
                 <textarea
                   value={changeComment}
                   onChange={(e) => setChangeComment(e.target.value)}
@@ -685,8 +685,8 @@ function ApprovalPage() {
                   </button>
                   <button
                     onClick={() => {
-                      setShowChangeForm(false)
-                      setChangeComment('')
+                      setShowChangeForm(false);
+                      setChangeComment("");
                     }}
                     disabled={isSubmitting}
                     className="rounded-lg border border-border px-6 py-3 font-medium text-foreground transition-colors hover:bg-gray-50"
@@ -734,11 +734,10 @@ function ApprovalPage() {
         {isExpired && (
           <div className="mt-8 rounded-xl border border-red-200 bg-red-50 p-6 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-red-600" />
-            <h2 className="mt-3 text-lg font-semibold text-red-800">
-              Approval Deadline Passed
-            </h2>
+            <h2 className="mt-3 text-lg font-semibold text-red-800">Approval Deadline Passed</h2>
             <p className="mt-1 text-red-700">
-              The approval deadline has passed. Your order will proceed to shipping with the current photos.
+              The approval deadline has passed. Your order will proceed to shipping with the current
+              photos.
             </p>
           </div>
         )}
@@ -747,17 +746,16 @@ function ApprovalPage() {
         {isApproved && (
           <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-6 text-center">
             <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
-            <h2 className="mt-3 text-lg font-semibold text-green-800">
-              Photos Approved!
-            </h2>
+            <h2 className="mt-3 text-lg font-semibold text-green-800">Photos Approved!</h2>
             <p className="mt-1 text-green-700">
               Your order is now proceeding to shipping. Thank you!
             </p>
             {approval.approvedAt && (
               <p className="mt-2 text-sm text-green-600">
-                Approved on {new Date(approval.approvedAt).toLocaleString('en-IN', {
-                  dateStyle: 'long',
-                  timeStyle: 'short',
+                Approved on{" "}
+                {new Date(approval.approvedAt).toLocaleString("en-IN", {
+                  dateStyle: "long",
+                  timeStyle: "short",
                 })}
               </p>
             )}
@@ -772,7 +770,9 @@ function ApprovalPage() {
               <div>
                 <p className="font-medium text-foreground">{approval.orderItem.title}</p>
                 {approval.orderItem.sizeLabel && (
-                  <p className="text-sm text-muted-foreground">Size: {approval.orderItem.sizeLabel}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Size: {approval.orderItem.sizeLabel}
+                  </p>
                 )}
               </div>
             </div>
@@ -790,7 +790,7 @@ function ApprovalPage() {
         />
       )}
     </div>
-  )
+  );
 }
 
-export default ApprovalPage
+export default ApprovalPage;

@@ -94,9 +94,7 @@ describe("Approval Order Integration", () => {
   describe("createApprovalsForOrder", () => {
     it("should create approvals for AI-generated items only", async () => {
       // Setup mocks - createApproval internally verifies order and order item exist
-      vi.mocked(db.query.orderItems.findMany).mockResolvedValue([
-        mockAiGeneratedItem as any,
-      ]);
+      vi.mocked(db.query.orderItems.findMany).mockResolvedValue([mockAiGeneratedItem as any]);
       // First call checks for existing approval in createApprovalsForOrder
       // Second call is in createApproval to check if order item belongs to order
       vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(null);
@@ -117,12 +115,8 @@ describe("Approval Order Integration", () => {
     });
 
     it("should skip items that already have approvals", async () => {
-      vi.mocked(db.query.orderItems.findMany).mockResolvedValue([
-        mockAiGeneratedItem as any,
-      ]);
-      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(
-        mockApproval as any
-      );
+      vi.mocked(db.query.orderItems.findMany).mockResolvedValue([mockAiGeneratedItem as any]);
+      vi.mocked(db.query.productionApprovals.findFirst).mockResolvedValue(mockApproval as any);
 
       const result = await createApprovalsForOrder(mockOrderId);
 
@@ -142,9 +136,7 @@ describe("Approval Order Integration", () => {
     });
 
     it("should handle database errors gracefully", async () => {
-      vi.mocked(db.query.orderItems.findMany).mockRejectedValue(
-        new Error("Database error")
-      );
+      vi.mocked(db.query.orderItems.findMany).mockRejectedValue(new Error("Database error"));
 
       const result = await createApprovalsForOrder(mockOrderId);
 

@@ -87,76 +87,98 @@ productReviewsApp.use("*", optionalAuth);
 /**
  * GET /api/products/:productId/reviews - List reviews for a product
  */
-productReviewsApp.get(
-  "/",
-  zValidator("query", listReviewsQuerySchema),
-  async (c) => {
-    const productId = c.req.param("productId");
-    const { page, pageSize, sortBy } = c.req.valid("query");
-    const user = c.get("user");
+productReviewsApp.get("/", zValidator("query", listReviewsQuerySchema), async (c) => {
+  const productId = c.req.param("productId");
+  const { page, pageSize, sortBy } = c.req.valid("query");
+  const user = c.get("user");
 
-    // Validate productId is a valid UUID
-    if (!productId || !/^[0-9a-f-]{36}$/i.test(productId)) {
-      return c.json({ error: "Invalid product ID" }, 400);
+  // Validate productId is a valid UUID
+  if (!productId || !/^[0-9a-f-]{36}$/i.test(productId)) {
+    return c.json({ error: "Invalid product ID" }, 400);
+  }
+
+  // Build cache key
+  const cacheKey = `${REVIEW_CACHE_PREFIX}product:${productId}:${page}:${pageSize}:${sortBy}`;
+
+  // Try cache first (only for non-authenticated requests)
+  if (!user) {
+    const cached = await getCached<{ items: unknown[]; total: number }>(cacheKey);
+    if (cached) {
+      return c.json({
+        ...cached,
+        page,
+        pageSize,
+        totalPages: Math.ceil(cached.total / pageSize),
+        hasNextPage: page * pageSize < cached.total,
+        hasPreviousPage: page > 1,
+        fromCache: true,
+      });
+    }
+  }
+
+  try {
+    // Check if product exists
+    const product = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.id, productId))
+      .limit(1);
+
+    if (!product.length) {
+      return c.json({ error: "Product not found" }, 404);
     }
 
-    // Build cache key
-    const cacheKey = `${REVIEW_CACHE_PREFIX}product:${productId}:${page}:${pageSize}:${sortBy}`;
+    // Build sort order
+    const orderBy = {
+      newest: desc(reviews.createdAt),
+      highest: desc(reviews.rating),
+      lowest: asc(reviews.rating),
+    }[sortBy];
 
-    // Try cache first (only for non-authenticated requests)
-    if (!user) {
-      const cached = await getCached<{ items: unknown[]; total: number }>(cacheKey);
-      if (cached) {
-        return c.json({
-          ...cached,
-          page,
-          pageSize,
-          totalPages: Math.ceil(cached.total / pageSize),
-          hasNextPage: page * pageSize < cached.total,
-          hasPreviousPage: page > 1,
-          fromCache: true,
-        });
-      }
-    }
+    // Base condition: approved reviews for this product
+    const baseCondition = and(
+      eq(reviews.productId, productId),
+      eq(reviews.status, "approved" as ReviewStatus)
+    );
 
-    try {
-      // Check if product exists
-      const product = await db
-        .select({ id: products.id })
-        .from(products)
-        .where(eq(products.id, productId))
-        .limit(1);
+    // Get total count of approved reviews
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(reviews)
+      .where(baseCondition);
 
-      if (!product.length) {
-        return c.json({ error: "Product not found" }, 404);
-      }
+    const total = countResult[0]?.count ?? 0;
 
-      // Build sort order
-      const orderBy = {
-        newest: desc(reviews.createdAt),
-        highest: desc(reviews.rating),
-        lowest: asc(reviews.rating),
-      }[sortBy];
+    // Calculate offset
+    const offset = (page - 1) * pageSize;
 
-      // Base condition: approved reviews for this product
-      const baseCondition = and(
-        eq(reviews.productId, productId),
-        eq(reviews.status, "approved" as ReviewStatus)
-      );
+    // Get approved reviews with author info
+    const reviewList = await db
+      .select({
+        id: reviews.id,
+        productId: reviews.productId,
+        rating: reviews.rating,
+        title: reviews.title,
+        content: reviews.content,
+        status: reviews.status,
+        createdAt: reviews.createdAt,
+        updatedAt: reviews.updatedAt,
+        author: {
+          id: users.id,
+          name: users.name,
+        },
+      })
+      .from(reviews)
+      .leftJoin(users, eq(reviews.userId, users.id))
+      .where(baseCondition)
+      .orderBy(orderBy)
+      .limit(pageSize)
+      .offset(offset);
 
-      // Get total count of approved reviews
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(reviews)
-        .where(baseCondition);
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Calculate offset
-      const offset = (page - 1) * pageSize;
-
-      // Get approved reviews with author info
-      const reviewList = await db
+    // If user is logged in, also fetch their own pending reviews for this product
+    let userPendingReviews: typeof reviewList = [];
+    if (user) {
+      userPendingReviews = await db
         .select({
           id: reviews.id,
           productId: reviews.productId,
@@ -173,63 +195,37 @@ productReviewsApp.get(
         })
         .from(reviews)
         .leftJoin(users, eq(reviews.userId, users.id))
-        .where(baseCondition)
-        .orderBy(orderBy)
-        .limit(pageSize)
-        .offset(offset);
-
-      // If user is logged in, also fetch their own pending reviews for this product
-      let userPendingReviews: typeof reviewList = [];
-      if (user) {
-        userPendingReviews = await db
-          .select({
-            id: reviews.id,
-            productId: reviews.productId,
-            rating: reviews.rating,
-            title: reviews.title,
-            content: reviews.content,
-            status: reviews.status,
-            createdAt: reviews.createdAt,
-            updatedAt: reviews.updatedAt,
-            author: {
-              id: users.id,
-              name: users.name,
-            },
-          })
-          .from(reviews)
-          .leftJoin(users, eq(reviews.userId, users.id))
-          .where(
-            and(
-              eq(reviews.productId, productId),
-              eq(reviews.userId, user.id),
-              eq(reviews.status, "pending" as ReviewStatus)
-            )
-          );
-      }
-
-      const result = {
-        items: reviewList,
-        userPendingReviews: user ? userPendingReviews : undefined,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      };
-
-      // Cache the result (only for non-authenticated requests)
-      if (!user) {
-        await setCached(cacheKey, { items: reviewList, total }, CACHE_TTL_REVIEWS);
-      }
-
-      return c.json(result);
-    } catch (error) {
-      console.error("Error fetching reviews:", error);
-      return c.json({ error: "Failed to fetch reviews" }, 500);
+        .where(
+          and(
+            eq(reviews.productId, productId),
+            eq(reviews.userId, user.id),
+            eq(reviews.status, "pending" as ReviewStatus)
+          )
+        );
     }
+
+    const result = {
+      items: reviewList,
+      userPendingReviews: user ? userPendingReviews : undefined,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    };
+
+    // Cache the result (only for non-authenticated requests)
+    if (!user) {
+      await setCached(cacheKey, { items: reviewList, total }, CACHE_TTL_REVIEWS);
+    }
+
+    return c.json(result);
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    return c.json({ error: "Failed to fetch reviews" }, 500);
   }
-);
+});
 
 // Individual review routes
 const reviewsApp = new Hono<{ Variables: OptionalAuthVariables }>();
@@ -296,77 +292,73 @@ protectedReviewsApp.use("*", requireAuth);
 /**
  * PATCH /api/reviews/:reviewId - Update own review
  */
-protectedReviewsApp.patch(
-  "/:reviewId",
-  zValidator("json", updateReviewSchema),
-  async (c) => {
-    const reviewId = c.req.param("reviewId");
-    const updates = c.req.valid("json");
-    const user = c.get("user");
+protectedReviewsApp.patch("/:reviewId", zValidator("json", updateReviewSchema), async (c) => {
+  const reviewId = c.req.param("reviewId");
+  const updates = c.req.valid("json");
+  const user = c.get("user");
 
-    // Validate reviewId
-    if (!reviewId || !/^[0-9a-f-]{36}$/i.test(reviewId)) {
-      return c.json({ error: "Invalid review ID" }, 400);
-    }
-
-    // Must provide at least one field to update
-    if (!updates.rating && !updates.title && !updates.content) {
-      return c.json({ error: "No updates provided" }, 400);
-    }
-
-    try {
-      // Get the existing review
-      const existingReview = await db
-        .select({
-          id: reviews.id,
-          userId: reviews.userId,
-          productId: reviews.productId,
-        })
-        .from(reviews)
-        .where(eq(reviews.id, reviewId))
-        .limit(1);
-
-      if (!existingReview.length) {
-        return c.json({ error: "Review not found" }, 404);
-      }
-
-      // Check ownership - only owner can update
-      if (!canAccess(user, existingReview[0]!.userId)) {
-        throw new HTTPException(403, { message: "You can only update your own reviews" });
-      }
-
-      // Update the review and reset status to pending
-      const [updatedReview] = await db
-        .update(reviews)
-        .set({
-          ...updates,
-          status: "pending", // Reset to pending for re-moderation
-          updatedAt: new Date(),
-        })
-        .where(eq(reviews.id, reviewId))
-        .returning();
-
-      // Invalidate cache
-      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0]!.productId}:*`);
-
-      return c.json({
-        message: "Review updated successfully",
-        review: {
-          id: updatedReview!.id,
-          rating: updatedReview!.rating,
-          title: updatedReview!.title,
-          content: updatedReview!.content,
-          status: updatedReview!.status,
-          updatedAt: updatedReview!.updatedAt,
-        },
-      });
-    } catch (error) {
-      if (error instanceof HTTPException) throw error;
-      console.error("Error updating review:", error);
-      return c.json({ error: "Failed to update review" }, 500);
-    }
+  // Validate reviewId
+  if (!reviewId || !/^[0-9a-f-]{36}$/i.test(reviewId)) {
+    return c.json({ error: "Invalid review ID" }, 400);
   }
-);
+
+  // Must provide at least one field to update
+  if (!updates.rating && !updates.title && !updates.content) {
+    return c.json({ error: "No updates provided" }, 400);
+  }
+
+  try {
+    // Get the existing review
+    const existingReview = await db
+      .select({
+        id: reviews.id,
+        userId: reviews.userId,
+        productId: reviews.productId,
+      })
+      .from(reviews)
+      .where(eq(reviews.id, reviewId))
+      .limit(1);
+
+    if (!existingReview.length) {
+      return c.json({ error: "Review not found" }, 404);
+    }
+
+    // Check ownership - only owner can update
+    if (!canAccess(user, existingReview[0]!.userId)) {
+      throw new HTTPException(403, { message: "You can only update your own reviews" });
+    }
+
+    // Update the review and reset status to pending
+    const [updatedReview] = await db
+      .update(reviews)
+      .set({
+        ...updates,
+        status: "pending", // Reset to pending for re-moderation
+        updatedAt: new Date(),
+      })
+      .where(eq(reviews.id, reviewId))
+      .returning();
+
+    // Invalidate cache
+    await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0]!.productId}:*`);
+
+    return c.json({
+      message: "Review updated successfully",
+      review: {
+        id: updatedReview!.id,
+        rating: updatedReview!.rating,
+        title: updatedReview!.title,
+        content: updatedReview!.content,
+        status: updatedReview!.status,
+        updatedAt: updatedReview!.updatedAt,
+      },
+    });
+  } catch (error) {
+    if (error instanceof HTTPException) throw error;
+    console.error("Error updating review:", error);
+    return c.json({ error: "Failed to update review" }, 500);
+  }
+});
 
 /**
  * DELETE /api/reviews/:reviewId - Delete own review

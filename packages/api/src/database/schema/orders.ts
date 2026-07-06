@@ -152,9 +152,7 @@ export const orders = pgTable(
     paymentDetails: jsonb("payment_details").$type<OrderPaymentDetails>(),
 
     // Shipping address (immutable snapshot)
-    shippingAddress: jsonb("shipping_address")
-      .$type<OrderShippingAddress>()
-      .notNull(),
+    shippingAddress: jsonb("shipping_address").$type<OrderShippingAddress>().notNull(),
     billingAddressId: uuid("billing_address_id").references(() => addresses.id, {
       onDelete: "set null",
     }),
@@ -162,15 +160,11 @@ export const orders = pgTable(
     // Shipping details
     shippingDetails: jsonb("shipping_details").$type<OrderShippingDetails>(),
     shippingMethod: text("shipping_method"), // e.g., "standard", "express"
-    shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("0.00").notNull(),
 
     // Pricing breakdown
     subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // Sum of item prices
-    discount: decimal("discount", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00").notNull(),
     tax: decimal("tax", { precision: 10, scale: 2 }).default("0.00").notNull(),
     total: decimal("total", { precision: 10, scale: 2 }).notNull(), // Final amount
 
@@ -181,9 +175,7 @@ export const orders = pgTable(
       .notNull(),
 
     // Trade discount (for trade program members)
-    tradeDiscount: decimal("trade_discount", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    tradeDiscount: decimal("trade_discount", { precision: 10, scale: 2 }).default("0.00").notNull(),
 
     // Currency (for future multi-currency support)
     currency: text("currency").default("INR").notNull(),
@@ -248,16 +240,12 @@ export const orderItems = pgTable(
 
     // Pricing at time of purchase
     unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(), // Price per unit (variant + frame)
-    framePrice: decimal("frame_price", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    framePrice: decimal("frame_price", { precision: 10, scale: 2 }).default("0.00").notNull(),
     quantity: integer("quantity").default(1).notNull(),
     lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(), // unitPrice * quantity
 
     // Discount applied to this item
-    itemDiscount: decimal("item_discount", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    itemDiscount: decimal("item_discount", { precision: 10, scale: 2 }).default("0.00").notNull(),
 
     // AI generation reference (for AI-generated posters)
     aiGenerationId: uuid("ai_generation_id"),

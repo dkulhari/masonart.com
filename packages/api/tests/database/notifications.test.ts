@@ -56,9 +56,7 @@ beforeAll(async () => {
     isDatabaseAvailable = true;
     db = drizzle(client);
 
-    console.log(
-      "✅ Database connection established for notifications schema tests"
-    );
+    console.log("✅ Database connection established for notifications schema tests");
   } catch (error) {
     console.log("⚠️  Database not available, runtime tests will be skipped");
     isDatabaseAvailable = false;
@@ -212,22 +210,19 @@ describe("Notifications Table Schema", () => {
   });
 
   describe("Notification Channel Enum", () => {
-    dbTest(
-      "should have notification_channel enum with correct values",
-      async () => {
-        const result = await client!`
+    dbTest("should have notification_channel enum with correct values", async () => {
+      const result = await client!`
         SELECT enumlabel FROM pg_enum
         JOIN pg_type ON pg_enum.enumtypid = pg_type.oid
         WHERE pg_type.typname = 'notification_channel'
         ORDER BY enumsortorder
       `;
 
-        const enumValues = result.map((row: any) => row.enumlabel);
-        expect(enumValues).toContain("email");
-        expect(enumValues).toContain("sms");
-        expect(enumValues).toHaveLength(2);
-      }
-    );
+      const enumValues = result.map((row: any) => row.enumlabel);
+      expect(enumValues).toContain("email");
+      expect(enumValues).toContain("sms");
+      expect(enumValues).toHaveLength(2);
+    });
 
     it("should export notificationChannelEnum with correct enumValues", () => {
       expect(notificationChannelEnum.enumValues).toContain("email");
@@ -242,23 +237,20 @@ describe("Notifications Table Schema", () => {
   });
 
   describe("Notification Status Enum", () => {
-    dbTest(
-      "should have notification_status enum with correct values",
-      async () => {
-        const result = await client!`
+    dbTest("should have notification_status enum with correct values", async () => {
+      const result = await client!`
         SELECT enumlabel FROM pg_enum
         JOIN pg_type ON pg_enum.enumtypid = pg_type.oid
         WHERE pg_type.typname = 'notification_status'
         ORDER BY enumsortorder
       `;
 
-        const enumValues = result.map((row: any) => row.enumlabel);
-        expect(enumValues).toContain("pending");
-        expect(enumValues).toContain("sent");
-        expect(enumValues).toContain("failed");
-        expect(enumValues).toHaveLength(3);
-      }
-    );
+      const enumValues = result.map((row: any) => row.enumlabel);
+      expect(enumValues).toContain("pending");
+      expect(enumValues).toContain("sent");
+      expect(enumValues).toContain("failed");
+      expect(enumValues).toHaveLength(3);
+    });
 
     it("should export notificationStatusEnum with correct enumValues", () => {
       expect(notificationStatusEnum.enumValues).toContain("pending");

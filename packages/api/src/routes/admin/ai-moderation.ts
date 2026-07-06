@@ -25,11 +25,7 @@ import {
   aiRejectionCategoryEnum,
 } from "../../database/schema/ai-generation-reviews";
 import { users } from "../../database/schema/users";
-import {
-  requireAuth,
-  requireAdmin,
-  type AuthVariables,
-} from "../../middleware/auth";
+import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
 import {
   approveGeneration,
   rejectGeneration,
@@ -59,12 +55,7 @@ const listModerationQueueSchema = z.object({
     .optional()
     .default("pending_review"),
   page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(MAX_PAGE_SIZE)
-    .default(DEFAULT_PAGE_SIZE),
+  pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   sortBy: z.enum(["newest", "oldest"]).default("oldest"), // Oldest first for FIFO queue
   stylePreset: z.string().optional(),
   userId: z.string().optional(),
@@ -102,98 +93,87 @@ adminModerationApp.use("*", requireAdmin);
 // GET /api/admin/ai-moderation - List Moderation Queue
 // ============================================================================
 
-adminModerationApp.get(
-  "/",
-  zValidator("query", listModerationQueueSchema),
-  async (c) => {
-    const { status, page, pageSize, sortBy, stylePreset, userId } =
-      c.req.valid("query");
+adminModerationApp.get("/", zValidator("query", listModerationQueueSchema), async (c) => {
+  const { status, page, pageSize, sortBy, stylePreset, userId } = c.req.valid("query");
 
-    try {
-      // Build where conditions
-      const conditions: ReturnType<typeof eq>[] = [];
+  try {
+    // Build where conditions
+    const conditions: ReturnType<typeof eq>[] = [];
 
-      if (status) {
-        conditions.push(
-          eq(
-            aiGenerations.moderationStatus,
-            status as "pending_review" | "approved" | "rejected" | "flagged"
-          )
-        );
-      }
-
-      if (stylePreset) {
-        conditions.push(eq(aiGenerations.stylePreset, stylePreset as any));
-      }
-
-      if (userId) {
-        conditions.push(eq(aiGenerations.userId, userId));
-      }
-
-      // Build sort order
-      const orderBy =
-        sortBy === "oldest"
-          ? asc(aiGenerations.createdAt)
-          : desc(aiGenerations.createdAt);
-
-      // Calculate offset
-      const offset = (page - 1) * pageSize;
-
-      // Query generations with user info
-      const generations = await db
-        .select({
-          id: aiGenerations.id,
-          promptText: aiGenerations.promptText,
-          stylePreset: aiGenerations.stylePreset,
-          aspectRatio: aiGenerations.aspectRatio,
-          status: aiGenerations.status,
-          moderationStatus: aiGenerations.moderationStatus,
-          moderationResult: aiGenerations.moderationResult,
-          isFlagged: aiGenerations.isFlagged,
-          images: aiGenerations.images,
-          selectedImageUrl: aiGenerations.selectedImageUrl,
-          createdAt: aiGenerations.createdAt,
-          userId: aiGenerations.userId,
-          userName: users.name,
-          userEmail: users.email,
-        })
-        .from(aiGenerations)
-        .leftJoin(users, eq(aiGenerations.userId, users.id))
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(orderBy)
-        .limit(pageSize)
-        .offset(offset);
-
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(aiGenerations)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-      const total = countResult[0]?.count || 0;
-      const totalPages = Math.ceil(total / pageSize);
-
-      return c.json({
-        generations,
-        pagination: {
-          page,
-          pageSize,
-          total,
-          totalPages,
-          hasNext: page < totalPages,
-          hasPrev: page > 1,
-        },
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json(
-        { error: `Failed to fetch moderation queue: ${errorMessage}` },
-        500
+    if (status) {
+      conditions.push(
+        eq(
+          aiGenerations.moderationStatus,
+          status as "pending_review" | "approved" | "rejected" | "flagged"
+        )
       );
     }
+
+    if (stylePreset) {
+      conditions.push(eq(aiGenerations.stylePreset, stylePreset as any));
+    }
+
+    if (userId) {
+      conditions.push(eq(aiGenerations.userId, userId));
+    }
+
+    // Build sort order
+    const orderBy =
+      sortBy === "oldest" ? asc(aiGenerations.createdAt) : desc(aiGenerations.createdAt);
+
+    // Calculate offset
+    const offset = (page - 1) * pageSize;
+
+    // Query generations with user info
+    const generations = await db
+      .select({
+        id: aiGenerations.id,
+        promptText: aiGenerations.promptText,
+        stylePreset: aiGenerations.stylePreset,
+        aspectRatio: aiGenerations.aspectRatio,
+        status: aiGenerations.status,
+        moderationStatus: aiGenerations.moderationStatus,
+        moderationResult: aiGenerations.moderationResult,
+        isFlagged: aiGenerations.isFlagged,
+        images: aiGenerations.images,
+        selectedImageUrl: aiGenerations.selectedImageUrl,
+        createdAt: aiGenerations.createdAt,
+        userId: aiGenerations.userId,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(aiGenerations)
+      .leftJoin(users, eq(aiGenerations.userId, users.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(orderBy)
+      .limit(pageSize)
+      .offset(offset);
+
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(aiGenerations)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    const total = countResult[0]?.count || 0;
+    const totalPages = Math.ceil(total / pageSize);
+
+    return c.json({
+      generations,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to fetch moderation queue: ${errorMessage}` }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/admin/ai-moderation/stats - Get Moderation Statistics
@@ -211,16 +191,14 @@ adminModerationApp.get("/stats", async (c) => {
         AND moderated_at > NOW() - INTERVAL '30 days'
     `);
 
-    const avgReviewTimeMinutes =
-      (avgTimeResult as any)[0]?.avg_time_minutes || 0;
+    const avgReviewTimeMinutes = (avgTimeResult as any)[0]?.avg_time_minutes || 0;
 
     return c.json({
       stats,
       avgReviewTimeMinutes: Math.round(avgReviewTimeMinutes),
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return c.json({ error: `Failed to fetch stats: ${errorMessage}` }, 500);
   }
 });
@@ -233,9 +211,7 @@ adminModerationApp.get("/:id", async (c) => {
   const { id } = c.req.param();
 
   // Validate UUID format
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-  ) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     return c.json({ error: "Invalid generation ID format" }, 400);
   }
 
@@ -294,12 +270,8 @@ adminModerationApp.get("/:id", async (c) => {
       reviewHistory,
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    return c.json(
-      { error: `Failed to fetch generation: ${errorMessage}` },
-      500
-    );
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to fetch generation: ${errorMessage}` }, 500);
   }
 });
 
@@ -307,119 +279,99 @@ adminModerationApp.get("/:id", async (c) => {
 // PATCH /api/admin/ai-moderation/:id - Moderate Generation
 // ============================================================================
 
-adminModerationApp.patch(
-  "/:id",
-  zValidator("json", moderateGenerationSchema),
-  async (c) => {
-    const user = c.get("user") as AuthVariables["user"];
-    const { id } = c.req.param();
-    const { action, reason, category } = c.req.valid("json");
+adminModerationApp.patch("/:id", zValidator("json", moderateGenerationSchema), async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+  const { id } = c.req.param();
+  const { action, reason, category } = c.req.valid("json");
 
-    // Validate UUID format
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-    ) {
-      return c.json({ error: "Invalid generation ID format" }, 400);
-    }
-
-    // Require reason for rejection
-    if (action === "rejected" && !reason) {
-      return c.json({ error: "Reason is required for rejection" }, 400);
-    }
-
-    // Require category for rejection
-    if (action === "rejected" && !category) {
-      return c.json({ error: "Category is required for rejection" }, 400);
-    }
-
-    try {
-      let result;
-
-      switch (action) {
-        case "approved":
-          result = await approveGeneration(id, user.id, reason);
-          break;
-        case "rejected":
-          result = await rejectGeneration(id, user.id, category!, reason!);
-          break;
-        case "flagged":
-          result = await flagGeneration(id, user.id, reason || "Flagged for senior review");
-          break;
-      }
-
-      return c.json({
-        message: `Generation ${action} successfully`,
-        result,
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json(
-        { error: `Failed to moderate generation: ${errorMessage}` },
-        500
-      );
-    }
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: "Invalid generation ID format" }, 400);
   }
-);
+
+  // Require reason for rejection
+  if (action === "rejected" && !reason) {
+    return c.json({ error: "Reason is required for rejection" }, 400);
+  }
+
+  // Require category for rejection
+  if (action === "rejected" && !category) {
+    return c.json({ error: "Category is required for rejection" }, 400);
+  }
+
+  try {
+    let result;
+
+    switch (action) {
+      case "approved":
+        result = await approveGeneration(id, user.id, reason);
+        break;
+      case "rejected":
+        result = await rejectGeneration(id, user.id, category!, reason!);
+        break;
+      case "flagged":
+        result = await flagGeneration(id, user.id, reason || "Flagged for senior review");
+        break;
+    }
+
+    return c.json({
+      message: `Generation ${action} successfully`,
+      result,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to moderate generation: ${errorMessage}` }, 500);
+  }
+});
 
 // ============================================================================
 // POST /api/admin/ai-moderation/bulk-approve - Bulk Approve
 // ============================================================================
 
-adminModerationApp.post(
-  "/bulk-approve",
-  zValidator("json", bulkModerationSchema),
-  async (c) => {
-    const user = c.get("user") as AuthVariables["user"];
-    const { generationIds } = c.req.valid("json");
+adminModerationApp.post("/bulk-approve", zValidator("json", bulkModerationSchema), async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+  const { generationIds } = c.req.valid("json");
 
-    try {
-      const result = await bulkApprove(generationIds, user.id);
+  try {
+    const result = await bulkApprove(generationIds, user.id);
 
-      return c.json({
-        message: `Bulk approve completed`,
-        result,
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json({ error: `Bulk approve failed: ${errorMessage}` }, 500);
-    }
+    return c.json({
+      message: `Bulk approve completed`,
+      result,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Bulk approve failed: ${errorMessage}` }, 500);
   }
-);
+});
 
 // ============================================================================
 // POST /api/admin/ai-moderation/bulk-reject - Bulk Reject
 // ============================================================================
 
-adminModerationApp.post(
-  "/bulk-reject",
-  zValidator("json", bulkModerationSchema),
-  async (c) => {
-    const user = c.get("user") as AuthVariables["user"];
-    const { generationIds, reason, category } = c.req.valid("json");
+adminModerationApp.post("/bulk-reject", zValidator("json", bulkModerationSchema), async (c) => {
+  const user = c.get("user") as AuthVariables["user"];
+  const { generationIds, reason, category } = c.req.valid("json");
 
-    if (!reason) {
-      return c.json({ error: "Reason is required for bulk rejection" }, 400);
-    }
-
-    if (!category) {
-      return c.json({ error: "Category is required for bulk rejection" }, 400);
-    }
-
-    try {
-      const result = await bulkReject(generationIds, user.id, category, reason);
-
-      return c.json({
-        message: `Bulk reject completed`,
-        result,
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json({ error: `Bulk reject failed: ${errorMessage}` }, 500);
-    }
+  if (!reason) {
+    return c.json({ error: "Reason is required for bulk rejection" }, 400);
   }
-);
+
+  if (!category) {
+    return c.json({ error: "Category is required for bulk rejection" }, 400);
+  }
+
+  try {
+    const result = await bulkReject(generationIds, user.id, category, reason);
+
+    return c.json({
+      message: `Bulk reject completed`,
+      result,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Bulk reject failed: ${errorMessage}` }, 500);
+  }
+});
 
 export { adminModerationApp };

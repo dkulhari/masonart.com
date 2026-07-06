@@ -16,10 +16,10 @@ import {
   Ban,
   ChevronDown,
   ChevronUp,
-} from 'lucide-react'
-import { cn, formatDate, formatPrice } from '~/lib/utils'
-import type { ReturnRequest, ReturnStatus } from '~/lib/api'
-import { useState } from 'react'
+} from "lucide-react";
+import { cn, formatDate, formatPrice } from "~/lib/utils";
+import type { ReturnRequest, ReturnStatus } from "~/lib/api";
+import { useState } from "react";
 
 // ============================================================================
 // Types
@@ -27,17 +27,17 @@ import { useState } from 'react'
 
 export interface ReturnStatusCardProps {
   /** Return request data */
-  returnRequest: ReturnRequest
+  returnRequest: ReturnRequest;
   /** Optional order number for display */
-  orderNumber?: string
+  orderNumber?: string;
   /** Show expanded details by default */
-  defaultExpanded?: boolean
+  defaultExpanded?: boolean;
   /** Callback when cancel is requested */
-  onCancel?: () => void
+  onCancel?: () => void;
   /** Whether cancellation is in progress */
-  isCancelling?: boolean
+  isCancelling?: boolean;
   /** Optional className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -45,81 +45,81 @@ export interface ReturnStatusCardProps {
 // ============================================================================
 
 interface StatusConfig {
-  label: string
-  icon: typeof Clock
-  color: string
-  bgColor: string
-  borderColor: string
+  label: string;
+  icon: typeof Clock;
+  color: string;
+  bgColor: string;
+  borderColor: string;
 }
 
 const STATUS_CONFIG: Record<ReturnStatus, StatusConfig> = {
   pending: {
-    label: 'Pending Review',
+    label: "Pending Review",
     icon: Clock,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50',
-    borderColor: 'border-amber-200',
+    color: "text-amber-600",
+    bgColor: "bg-amber-50",
+    borderColor: "border-amber-200",
   },
   approved: {
-    label: 'Approved',
+    label: "Approved",
     icon: CheckCircle,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-200',
+    color: "text-green-600",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
   },
   rejected: {
-    label: 'Rejected',
+    label: "Rejected",
     icon: XCircle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-50',
-    borderColor: 'border-red-200',
+    color: "text-red-600",
+    bgColor: "bg-red-50",
+    borderColor: "border-red-200",
   },
   shipped_back: {
-    label: 'Item Shipped Back',
+    label: "Item Shipped Back",
     icon: Truck,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
+    borderColor: "border-blue-200",
   },
   received: {
-    label: 'Item Received',
+    label: "Item Received",
     icon: Package,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-50',
-    borderColor: 'border-indigo-200',
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50",
+    borderColor: "border-indigo-200",
   },
   processing: {
-    label: 'Processing Refund',
+    label: "Processing Refund",
     icon: CreditCard,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-    borderColor: 'border-purple-200',
+    color: "text-purple-600",
+    bgColor: "bg-purple-50",
+    borderColor: "border-purple-200",
   },
   refunded: {
-    label: 'Refunded',
+    label: "Refunded",
     icon: CheckCircle,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-200',
+    color: "text-green-600",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
   },
   closed: {
-    label: 'Closed',
+    label: "Closed",
     icon: Ban,
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-50',
-    borderColor: 'border-gray-200',
+    color: "text-gray-600",
+    bgColor: "bg-gray-50",
+    borderColor: "border-gray-200",
   },
-}
+};
 
 // Timeline steps in order
 const TIMELINE_STEPS: { status: ReturnStatus; label: string }[] = [
-  { status: 'pending', label: 'Request Submitted' },
-  { status: 'approved', label: 'Approved' },
-  { status: 'shipped_back', label: 'Item Shipped Back' },
-  { status: 'received', label: 'Item Received' },
-  { status: 'processing', label: 'Processing' },
-  { status: 'refunded', label: 'Refunded' },
-]
+  { status: "pending", label: "Request Submitted" },
+  { status: "approved", label: "Approved" },
+  { status: "shipped_back", label: "Item Shipped Back" },
+  { status: "received", label: "Item Received" },
+  { status: "processing", label: "Processing" },
+  { status: "refunded", label: "Refunded" },
+];
 
 // Status order for timeline calculation
 const STATUS_ORDER: Record<ReturnStatus, number> = {
@@ -131,21 +131,21 @@ const STATUS_ORDER: Record<ReturnStatus, number> = {
   processing: 4,
   refunded: 5,
   closed: -1, // Closed is a terminal state
-}
+};
 
 // ============================================================================
 // Reason Labels
 // ============================================================================
 
 const REASON_LABELS: Record<string, string> = {
-  defective: 'Defective Product',
-  wrong_item: 'Wrong Item Received',
-  not_as_described: 'Not as Described',
-  changed_mind: 'Changed Mind',
-  damaged_in_transit: 'Damaged in Transit',
-  late_delivery: 'Late Delivery',
-  other: 'Other',
-}
+  defective: "Defective Product",
+  wrong_item: "Wrong Item Received",
+  not_as_described: "Not as Described",
+  changed_mind: "Changed Mind",
+  damaged_in_transit: "Damaged in Transit",
+  late_delivery: "Late Delivery",
+  other: "Other",
+};
 
 // ============================================================================
 // Component
@@ -165,37 +165,31 @@ export function ReturnStatusCard({
   isCancelling = false,
   className,
 }: ReturnStatusCardProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  const statusConfig = STATUS_CONFIG[returnRequest.status] || STATUS_CONFIG.pending
-  const StatusIcon = statusConfig.icon
-  const currentStatusOrder = STATUS_ORDER[returnRequest.status]
-  const canCancel = returnRequest.status === 'pending'
+  const statusConfig = STATUS_CONFIG[returnRequest.status] || STATUS_CONFIG.pending;
+  const StatusIcon = statusConfig.icon;
+  const currentStatusOrder = STATUS_ORDER[returnRequest.status];
+  const canCancel = returnRequest.status === "pending";
 
   return (
-    <div
-      className={cn(
-        'overflow-hidden rounded-xl border',
-        statusConfig.borderColor,
-        className
-      )}
-    >
+    <div className={cn("overflow-hidden rounded-xl border", statusConfig.borderColor, className)}>
       {/* Header (clickable) */}
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className={cn(
-          'flex w-full items-center justify-between p-4 text-left transition-colors',
+          "flex w-full items-center justify-between p-4 text-left transition-colors",
           statusConfig.bgColor,
-          'hover:opacity-90'
+          "hover:opacity-90"
         )}
       >
         <div className="flex items-center gap-3">
-          <div className={cn('flex h-10 w-10 items-center justify-center rounded-full bg-white')}>
-            <StatusIcon className={cn('h-5 w-5', statusConfig.color)} />
+          <div className={cn("flex h-10 w-10 items-center justify-center rounded-full bg-white")}>
+            <StatusIcon className={cn("h-5 w-5", statusConfig.color)} />
           </div>
           <div>
-            <p className={cn('font-medium', statusConfig.color)}>{statusConfig.label}</p>
+            <p className={cn("font-medium", statusConfig.color)}>{statusConfig.label}</p>
             <p className="text-sm text-muted-foreground">
               {orderNumber ? `Order ${orderNumber}` : `Return ID: ${returnRequest.id.slice(0, 8)}`}
             </p>
@@ -203,7 +197,7 @@ export function ReturnStatusCard({
         </div>
 
         <div className="flex items-center gap-3">
-          {returnRequest.refundAmount && returnRequest.status === 'refunded' && (
+          {returnRequest.refundAmount && returnRequest.status === "refunded" && (
             <div className="hidden text-right sm:block">
               <p className="text-sm text-muted-foreground">Refund Amount</p>
               <p className="font-semibold text-green-600">
@@ -223,7 +217,7 @@ export function ReturnStatusCard({
       {isExpanded && (
         <div className="border-t border-border bg-card p-4">
           {/* Refund amount for mobile */}
-          {returnRequest.refundAmount && returnRequest.status === 'refunded' && (
+          {returnRequest.refundAmount && returnRequest.status === "refunded" && (
             <div className="mb-4 rounded-lg bg-green-50 p-3 sm:hidden">
               <p className="text-sm text-muted-foreground">Refund Amount</p>
               <p className="text-lg font-semibold text-green-600">
@@ -242,21 +236,21 @@ export function ReturnStatusCard({
           </div>
 
           {/* Timeline (only for non-terminal states or refunded) */}
-          {(currentStatusOrder >= 0 || returnRequest.status === 'refunded') && (
+          {(currentStatusOrder >= 0 || returnRequest.status === "refunded") && (
             <div className="mb-4">
               <p className="mb-3 text-sm font-medium text-foreground">Progress</p>
               <div className="space-y-0">
                 {TIMELINE_STEPS.map((step, index) => {
-                  const stepOrder = STATUS_ORDER[step.status]
-                  const isCompleted = stepOrder <= currentStatusOrder
-                  const isCurrent = step.status === returnRequest.status
-                  const isLast = index === TIMELINE_STEPS.length - 1
+                  const stepOrder = STATUS_ORDER[step.status];
+                  const isCompleted = stepOrder <= currentStatusOrder;
+                  const isCurrent = step.status === returnRequest.status;
+                  const isLast = index === TIMELINE_STEPS.length - 1;
 
                   // Get timestamp for this step
-                  let timestamp: string | null = null
-                  if (step.status === 'pending') timestamp = returnRequest.requestedAt
-                  if (step.status === 'approved') timestamp = returnRequest.approvedAt
-                  if (step.status === 'refunded') timestamp = returnRequest.processedAt
+                  let timestamp: string | null = null;
+                  if (step.status === "pending") timestamp = returnRequest.requestedAt;
+                  if (step.status === "approved") timestamp = returnRequest.approvedAt;
+                  if (step.status === "refunded") timestamp = returnRequest.processedAt;
 
                   return (
                     <div key={step.status} className="relative flex pb-4 last:pb-0">
@@ -264,10 +258,10 @@ export function ReturnStatusCard({
                       {!isLast && (
                         <div
                           className={cn(
-                            'absolute left-[11px] top-6 h-full w-0.5',
+                            "absolute left-[11px] top-6 h-full w-0.5",
                             isCompleted && stepOrder < currentStatusOrder
-                              ? 'bg-brand-500'
-                              : 'bg-border'
+                              ? "bg-brand-500"
+                              : "bg-border"
                           )}
                         />
                       )}
@@ -275,12 +269,12 @@ export function ReturnStatusCard({
                       {/* Step indicator */}
                       <div
                         className={cn(
-                          'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2',
+                          "relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2",
                           isCompleted
-                            ? 'border-brand-500 bg-brand-500 text-white'
+                            ? "border-brand-500 bg-brand-500 text-white"
                             : isCurrent
-                              ? 'border-brand-500 bg-white text-brand-500'
-                              : 'border-border bg-background text-muted-foreground'
+                              ? "border-brand-500 bg-white text-brand-500"
+                              : "border-border bg-background text-muted-foreground"
                         )}
                       >
                         {isCompleted ? (
@@ -294,8 +288,8 @@ export function ReturnStatusCard({
                       <div className="ml-3">
                         <p
                           className={cn(
-                            'text-sm font-medium',
-                            isCompleted || isCurrent ? 'text-foreground' : 'text-muted-foreground'
+                            "text-sm font-medium",
+                            isCompleted || isCurrent ? "text-foreground" : "text-muted-foreground"
                           )}
                         >
                           {step.label}
@@ -305,14 +299,14 @@ export function ReturnStatusCard({
                         )}
                       </div>
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
           )}
 
           {/* Rejected message */}
-          {returnRequest.status === 'rejected' && returnRequest.adminNotes && (
+          {returnRequest.status === "rejected" && returnRequest.adminNotes && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
               <p className="text-sm font-medium text-red-800">Rejection Reason</p>
               <p className="mt-1 text-sm text-red-700">{returnRequest.adminNotes}</p>
@@ -350,12 +344,12 @@ export function ReturnStatusCard({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Exports
 // ============================================================================
 
-export { STATUS_CONFIG, REASON_LABELS }
-export default ReturnStatusCard
+export { STATUS_CONFIG, REASON_LABELS };
+export default ReturnStatusCard;

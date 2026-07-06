@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 /**
  * Authentication Pages E2E Tests
@@ -16,47 +16,47 @@ import { test, expect } from '@playwright/test';
 // Login Page Tests
 // ============================================================================
 
-test.describe('Login Page', () => {
+test.describe("Login Page", () => {
   // ==========================================================================
   // Page Header and Branding
   // ==========================================================================
 
-  test.describe('Page Header', () => {
+  test.describe("Page Header", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
     });
 
-    test('should display MasonArt logo/brand', async ({ page }) => {
+    test("should display MasonArt logo/brand", async ({ page }) => {
       const logo = page.locator('h1:has-text("MasonArt")');
       await expect(logo).toBeVisible();
     });
 
-    test('should have brand color in logo text', async ({ page }) => {
+    test("should have brand color in logo text", async ({ page }) => {
       const brandSpan = page.locator('h1 span.text-brand-500:has-text("Art")');
       await expect(brandSpan).toBeVisible();
     });
 
-    test('should display welcome message', async ({ page }) => {
-      const message = page.locator('text=Welcome back');
+    test("should display welcome message", async ({ page }) => {
+      const message = page.locator("text=Welcome back");
       await expect(message).toBeVisible();
     });
 
-    test('should have correct page title', async ({ page }) => {
+    test("should have correct page title", async ({ page }) => {
       await expect(page).toHaveTitle(/Sign In.*MasonArt/);
     });
 
-    test('should have noindex robots meta tag', async ({ page }) => {
-      const robots = await page.locator('meta[name="robots"]').getAttribute('content');
-      expect(robots).toContain('noindex');
+    test("should have noindex robots meta tag", async ({ page }) => {
+      const robots = await page.locator('meta[name="robots"]').getAttribute("content");
+      expect(robots).toContain("noindex");
     });
 
-    test('should have meta description', async ({ page }) => {
-      const description = await page.locator('meta[name="description"]').getAttribute('content');
+    test("should have meta description", async ({ page }) => {
+      const description = await page.locator('meta[name="description"]').getAttribute("content");
       expect(description).toBeTruthy();
-      expect(description).toContain('Sign in');
+      expect(description).toContain("Sign in");
     });
 
-    test('should link logo to home page', async ({ page }) => {
+    test("should link logo to home page", async ({ page }) => {
       const logoLink = page.locator('a[href="/"]').first();
       await expect(logoLink).toBeVisible();
     });
@@ -66,28 +66,28 @@ test.describe('Login Page', () => {
   // Google OAuth
   // ==========================================================================
 
-  test.describe('Google OAuth', () => {
+  test.describe("Google OAuth", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
     });
 
-    test('should display Continue with Google button', async ({ page }) => {
+    test("should display Continue with Google button", async ({ page }) => {
       const googleButton = page.locator('button:has-text("Continue with Google")');
       await expect(googleButton).toBeVisible();
     });
 
-    test('should display Google icon in button', async ({ page }) => {
+    test("should display Google icon in button", async ({ page }) => {
       const googleIcon = page.locator('button:has-text("Continue with Google") svg');
       await expect(googleIcon).toBeVisible();
     });
 
     test('should have divider with "or" text', async ({ page }) => {
-      const divider = page.getByText('or', { exact: true });
+      const divider = page.getByText("or", { exact: true });
       await expect(divider).toBeVisible();
     });
 
-    test('should have divider lines', async ({ page }) => {
-      const dividerLines = page.locator('.h-px.bg-border');
+    test("should have divider lines", async ({ page }) => {
+      const dividerLines = page.locator(".h-px.bg-border");
       const count = await dividerLines.count();
       expect(count).toBeGreaterThanOrEqual(2);
     });
@@ -97,41 +97,41 @@ test.describe('Login Page', () => {
   // Email Field
   // ==========================================================================
 
-  test.describe('Email Field', () => {
+  test.describe("Email Field", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
     });
 
-    test('should display email label', async ({ page }) => {
+    test("should display email label", async ({ page }) => {
       const label = page.locator('label[for="email"]');
       await expect(label).toBeVisible();
-      await expect(label).toContainText('Email');
+      await expect(label).toContainText("Email");
     });
 
-    test('should display email input field', async ({ page }) => {
-      const input = page.locator('#email');
+    test("should display email input field", async ({ page }) => {
+      const input = page.locator("#email");
       await expect(input).toBeVisible();
     });
 
-    test('should have email placeholder', async ({ page }) => {
-      const input = page.locator('#email');
-      await expect(input).toHaveAttribute('placeholder', 'your@email.com');
+    test("should have email placeholder", async ({ page }) => {
+      const input = page.locator("#email");
+      await expect(input).toHaveAttribute("placeholder", "your@email.com");
     });
 
-    test('should have email autocomplete', async ({ page }) => {
-      const input = page.locator('#email');
-      await expect(input).toHaveAttribute('autocomplete', 'email');
+    test("should have email autocomplete", async ({ page }) => {
+      const input = page.locator("#email");
+      await expect(input).toHaveAttribute("autocomplete", "email");
     });
 
-    test('should have email type', async ({ page }) => {
-      const input = page.locator('#email');
-      await expect(input).toHaveAttribute('type', 'email');
+    test("should have email type", async ({ page }) => {
+      const input = page.locator("#email");
+      await expect(input).toHaveAttribute("type", "email");
     });
 
-    test('should display mail icon', async ({ page }) => {
+    test("should display mail icon", async ({ page }) => {
       // Icon should be in the email field container
-      const emailContainer = page.locator('#email').locator('..');
-      const icon = emailContainer.locator('svg');
+      const emailContainer = page.locator("#email").locator("..");
+      const icon = emailContainer.locator("svg");
       await expect(icon).toBeVisible();
     });
   });
@@ -140,72 +140,72 @@ test.describe('Login Page', () => {
   // Password Field
   // ==========================================================================
 
-  test.describe('Password Field', () => {
+  test.describe("Password Field", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
     });
 
-    test('should display password label', async ({ page }) => {
+    test("should display password label", async ({ page }) => {
       const label = page.locator('label[for="password"]');
       await expect(label).toBeVisible();
-      await expect(label).toContainText('Password');
+      await expect(label).toContainText("Password");
     });
 
-    test('should display password input field', async ({ page }) => {
-      const input = page.locator('#password');
+    test("should display password input field", async ({ page }) => {
+      const input = page.locator("#password");
       await expect(input).toBeVisible();
     });
 
-    test('should have password placeholder', async ({ page }) => {
-      const input = page.locator('#password');
-      await expect(input).toHaveAttribute('placeholder', 'Enter your password');
+    test("should have password placeholder", async ({ page }) => {
+      const input = page.locator("#password");
+      await expect(input).toHaveAttribute("placeholder", "Enter your password");
     });
 
-    test('should have password autocomplete', async ({ page }) => {
-      const input = page.locator('#password');
-      await expect(input).toHaveAttribute('autocomplete', 'current-password');
+    test("should have password autocomplete", async ({ page }) => {
+      const input = page.locator("#password");
+      await expect(input).toHaveAttribute("autocomplete", "current-password");
     });
 
-    test('should have password type by default', async ({ page }) => {
-      const input = page.locator('#password');
-      await expect(input).toHaveAttribute('type', 'password');
+    test("should have password type by default", async ({ page }) => {
+      const input = page.locator("#password");
+      await expect(input).toHaveAttribute("type", "password");
     });
 
-    test('should display lock icon', async ({ page }) => {
-      const passwordContainer = page.locator('#password').locator('..');
-      const icons = passwordContainer.locator('svg');
+    test("should display lock icon", async ({ page }) => {
+      const passwordContainer = page.locator("#password").locator("..");
+      const icons = passwordContainer.locator("svg");
       const count = await icons.count();
       expect(count).toBeGreaterThanOrEqual(1);
     });
 
-    test('should display show/hide password toggle', async ({ page }) => {
-      const toggle = page.locator('#password').locator('..').locator('button');
+    test("should display show/hide password toggle", async ({ page }) => {
+      const toggle = page.locator("#password").locator("..").locator("button");
       await expect(toggle).toBeVisible();
     });
 
-    test('should toggle password visibility when clicking eye icon', async ({ page }) => {
+    test("should toggle password visibility when clicking eye icon", async ({ page }) => {
       // Wait for hydration before interacting
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState("networkidle");
 
-      const input = page.locator('#password');
-      const toggle = page.locator('#password').locator('..').locator('button');
+      const input = page.locator("#password");
+      const toggle = page.locator("#password").locator("..").locator("button");
 
       // Initially password type
-      await expect(input).toHaveAttribute('type', 'password');
+      await expect(input).toHaveAttribute("type", "password");
 
       // Click toggle
       await toggle.click();
-      await expect(input).toHaveAttribute('type', 'text', { timeout: 5000 });
+      await expect(input).toHaveAttribute("type", "text", { timeout: 5000 });
 
       // Click again to hide
       await toggle.click();
-      await expect(input).toHaveAttribute('type', 'password', { timeout: 5000 });
+      await expect(input).toHaveAttribute("type", "password", { timeout: 5000 });
     });
 
-    test('should display Forgot password link', async ({ page }) => {
+    test("should display Forgot password link", async ({ page }) => {
       const link = page.locator('a[href="/auth/forgot-password"]');
       await expect(link).toBeVisible();
-      await expect(link).toContainText('Forgot password');
+      await expect(link).toContainText("Forgot password");
     });
   });
 
@@ -213,68 +213,68 @@ test.describe('Login Page', () => {
   // Form Validation
   // ==========================================================================
 
-  test.describe('Form Validation', () => {
+  test.describe("Form Validation", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/login");
+      await page.waitForLoadState("networkidle");
     });
 
-    test('should show error for empty email', async ({ page }) => {
-      const input = page.locator('#email');
+    test("should show error for empty email", async ({ page }) => {
+      const input = page.locator("#email");
       await input.focus();
       await input.blur();
 
-      const error = page.locator('text=Email is required');
+      const error = page.locator("text=Email is required");
       await expect(error).toBeVisible({ timeout: 5000 });
     });
 
-    test('should show error for invalid email format', async ({ page }) => {
-      const input = page.locator('#email');
-      await input.fill('invalid-email');
+    test("should show error for invalid email format", async ({ page }) => {
+      const input = page.locator("#email");
+      await input.fill("invalid-email");
       await input.blur();
 
-      const error = page.locator('text=Please enter a valid email address');
+      const error = page.locator("text=Please enter a valid email address");
       await expect(error).toBeVisible();
     });
 
-    test('should accept valid email', async ({ page }) => {
-      const input = page.locator('#email');
-      await input.fill('test@example.com');
+    test("should accept valid email", async ({ page }) => {
+      const input = page.locator("#email");
+      await input.fill("test@example.com");
       await input.blur();
 
-      const error = page.locator('text=Please enter a valid email address');
+      const error = page.locator("text=Please enter a valid email address");
       await expect(error).not.toBeVisible();
     });
 
-    test('should show error for empty password', async ({ page }) => {
-      const input = page.locator('#password');
+    test("should show error for empty password", async ({ page }) => {
+      const input = page.locator("#password");
       await input.focus();
       await input.blur();
 
-      const error = page.locator('text=Password is required');
+      const error = page.locator("text=Password is required");
       await expect(error).toBeVisible();
     });
 
-    test('should show error for short password', async ({ page }) => {
-      const input = page.locator('#password');
-      await input.fill('12345');
+    test("should show error for short password", async ({ page }) => {
+      const input = page.locator("#password");
+      await input.fill("12345");
       await input.blur();
 
-      const error = page.locator('text=Password must be at least 6 characters');
+      const error = page.locator("text=Password must be at least 6 characters");
       await expect(error).toBeVisible();
     });
 
-    test('should accept valid password (6+ chars)', async ({ page }) => {
-      const input = page.locator('#password');
-      await input.fill('validpassword');
+    test("should accept valid password (6+ chars)", async ({ page }) => {
+      const input = page.locator("#password");
+      await input.fill("validpassword");
       await input.blur();
 
-      const error = page.locator('text=Password must be at least 6 characters');
+      const error = page.locator("text=Password must be at least 6 characters");
       await expect(error).not.toBeVisible();
     });
 
-    test('should show error styling on invalid fields', async ({ page }) => {
-      const input = page.locator('#email');
+    test("should show error styling on invalid fields", async ({ page }) => {
+      const input = page.locator("#email");
       await input.focus();
       await input.blur();
 
@@ -287,55 +287,55 @@ test.describe('Login Page', () => {
   // Submit Button
   // ==========================================================================
 
-  test.describe('Submit Button', () => {
+  test.describe("Submit Button", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
     });
 
-    test('should display Sign In button', async ({ page }) => {
+    test("should display Sign In button", async ({ page }) => {
       const button = page.locator('button[type="submit"]:has-text("Sign In")');
       await expect(button).toBeVisible();
     });
 
-    test('should have arrow icon in button', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should have arrow icon in button", async ({ page }) => {
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
-      const icon = button.locator('svg');
+      const icon = button.locator("svg");
       await expect(icon).toBeVisible();
     });
 
-    test('should be disabled when form is invalid', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should be disabled when form is invalid", async ({ page }) => {
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
       await expect(button).toBeDisabled();
     });
 
-    test('should be enabled when form is valid', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+    test("should be enabled when form is valid", async ({ page }) => {
+      await page.waitForLoadState("networkidle");
 
-      await page.fill('#email', 'test@example.com');
-      await page.fill('#password', 'password123');
+      await page.fill("#email", "test@example.com");
+      await page.fill("#password", "password123");
 
-      const mainContent = page.locator('main');
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
       await expect(button).not.toBeDisabled({ timeout: 5000 });
     });
 
-    test('should have muted style when disabled', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+    test("should have muted style when disabled", async ({ page }) => {
+      await page.waitForLoadState("networkidle");
 
-      const mainContent = page.locator('main');
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
       await expect(button).toHaveClass(/bg-muted/);
     });
 
-    test('should have brand color when enabled', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+    test("should have brand color when enabled", async ({ page }) => {
+      await page.waitForLoadState("networkidle");
 
-      await page.fill('#email', 'test@example.com');
-      await page.fill('#password', 'password123');
+      await page.fill("#email", "test@example.com");
+      await page.fill("#password", "password123");
 
-      const mainContent = page.locator('main');
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Sign In")');
       await expect(button).toHaveClass(/bg-brand-500/, { timeout: 5000 });
     });
@@ -345,20 +345,20 @@ test.describe('Login Page', () => {
   // Navigation Links
   // ==========================================================================
 
-  test.describe('Navigation Links', () => {
+  test.describe("Navigation Links", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
     });
 
-    test('should display Create account link', async ({ page }) => {
+    test("should display Create account link", async ({ page }) => {
       const link = page.locator('a:has-text("Create account")');
       await expect(link).toBeVisible();
     });
 
-    test('should have correct link to register page', async ({ page }) => {
+    test("should have correct link to register page", async ({ page }) => {
       const link = page.locator('a:has-text("Create account")');
-      const href = await link.getAttribute('href');
-      expect(href).toContain('/auth/register');
+      const href = await link.getAttribute("href");
+      expect(href).toContain("/auth/register");
     });
 
     test('should display "Don\'t have an account?" text', async ({ page }) => {
@@ -366,27 +366,27 @@ test.describe('Login Page', () => {
       await expect(text).toBeVisible();
     });
 
-    test('should display Terms of Service link', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should display Terms of Service link", async ({ page }) => {
+      const mainContent = page.locator("main");
       const link = mainContent.locator('a[href="/terms"]');
       await expect(link).toBeVisible();
-      await expect(link).toContainText('Terms of Service');
+      await expect(link).toContainText("Terms of Service");
     });
 
-    test('should display Privacy Policy link', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should display Privacy Policy link", async ({ page }) => {
+      const mainContent = page.locator("main");
       const link = mainContent.locator('a[href="/privacy"]');
       await expect(link).toBeVisible();
-      await expect(link).toContainText('Privacy Policy');
+      await expect(link).toContainText("Privacy Policy");
     });
 
     test('should display "By signing in" terms text', async ({ page }) => {
-      const mainContent = page.locator('main');
-      const text = mainContent.locator('text=By signing in');
+      const mainContent = page.locator("main");
+      const text = mainContent.locator("text=By signing in");
       await expect(text).toBeVisible();
     });
 
-    test('should navigate to register page when clicking Create account', async ({ page }) => {
+    test("should navigate to register page when clicking Create account", async ({ page }) => {
       const link = page.locator('a:has-text("Create account")');
       await link.click();
       await expect(page).toHaveURL(/\/auth\/register/);
@@ -397,22 +397,22 @@ test.describe('Login Page', () => {
   // Redirect Handling
   // ==========================================================================
 
-  test.describe('Redirect Handling', () => {
-    test('should preserve redirect URL in register link', async ({ page }) => {
-      await page.goto('/auth/login?redirect=/checkout');
+  test.describe("Redirect Handling", () => {
+    test("should preserve redirect URL in register link", async ({ page }) => {
+      await page.goto("/auth/login?redirect=/checkout");
 
       const link = page.locator('a:has-text("Create account")');
-      const href = await link.getAttribute('href');
-      expect(href).toContain('/auth/register');
-      expect(href).toContain('redirect');
+      const href = await link.getAttribute("href");
+      expect(href).toContain("/auth/register");
+      expect(href).toContain("redirect");
     });
 
-    test('should not add redirect param when no redirect specified', async ({ page }) => {
-      await page.goto('/auth/login');
+    test("should not add redirect param when no redirect specified", async ({ page }) => {
+      await page.goto("/auth/login");
 
       const link = page.locator('a:has-text("Create account")');
-      const href = await link.getAttribute('href');
-      expect(href).toBe('/auth/register');
+      const href = await link.getAttribute("href");
+      expect(href).toBe("/auth/register");
     });
   });
 
@@ -420,25 +420,25 @@ test.describe('Login Page', () => {
   // Success Message
   // ==========================================================================
 
-  test.describe('Success Message After Registration', () => {
-    test('should display success message when registered=true', async ({ page }) => {
-      await page.goto('/auth/login?registered=true');
+  test.describe("Success Message After Registration", () => {
+    test("should display success message when registered=true", async ({ page }) => {
+      await page.goto("/auth/login?registered=true");
 
-      const message = page.locator('text=Account created successfully');
+      const message = page.locator("text=Account created successfully");
       await expect(message).toBeVisible();
     });
 
-    test('should display success icon with message', async ({ page }) => {
-      await page.goto('/auth/login?registered=true');
+    test("should display success icon with message", async ({ page }) => {
+      await page.goto("/auth/login?registered=true");
 
-      const container = page.locator('.bg-green-50');
+      const container = page.locator(".bg-green-50");
       await expect(container).toBeVisible();
     });
 
-    test('should not display success message normally', async ({ page }) => {
-      await page.goto('/auth/login');
+    test("should not display success message normally", async ({ page }) => {
+      await page.goto("/auth/login");
 
-      const message = page.locator('text=Account created successfully');
+      const message = page.locator("text=Account created successfully");
       await expect(message).not.toBeVisible();
     });
   });
@@ -447,40 +447,40 @@ test.describe('Login Page', () => {
   // Responsive Design
   // ==========================================================================
 
-  test.describe('Responsive Design', () => {
-    test('should display properly on mobile', async ({ page }) => {
+  test.describe("Responsive Design", () => {
+    test("should display properly on mobile", async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
 
-      const mainContent = page.locator('main');
-      const form = mainContent.locator('form');
+      const mainContent = page.locator("main");
+      const form = mainContent.locator("form");
       await expect(form).toBeVisible();
 
-      const emailInput = page.locator('#email');
+      const emailInput = page.locator("#email");
       await expect(emailInput).toBeVisible();
     });
 
-    test('should display properly on tablet', async ({ page }) => {
+    test("should display properly on tablet", async ({ page }) => {
       await page.setViewportSize({ width: 768, height: 1024 });
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
 
       const logo = page.locator('h1:has-text("MasonArt")');
       await expect(logo).toBeVisible();
     });
 
-    test('should display properly on desktop', async ({ page }) => {
+    test("should display properly on desktop", async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 800 });
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
 
-      const container = page.locator('.max-w-md');
+      const container = page.locator(".max-w-md");
       await expect(container).toBeVisible();
     });
 
-    test('should have centered layout', async ({ page }) => {
-      await page.goto('/auth/login');
+    test("should have centered layout", async ({ page }) => {
+      await page.goto("/auth/login");
 
       // Look for the specific page container with min-h-screen
-      const centerContainer = page.locator('.min-h-screen.items-center.justify-center');
+      const centerContainer = page.locator(".min-h-screen.items-center.justify-center");
       await expect(centerContainer).toBeVisible();
     });
   });
@@ -489,17 +489,17 @@ test.describe('Login Page', () => {
   // Accessibility
   // ==========================================================================
 
-  test.describe('Accessibility', () => {
+  test.describe("Accessibility", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
     });
 
-    test('should have proper heading hierarchy', async ({ page }) => {
-      const h1Count = await page.locator('h1').count();
+    test("should have proper heading hierarchy", async ({ page }) => {
+      const h1Count = await page.locator("h1").count();
       expect(h1Count).toBe(1);
     });
 
-    test('should have labels for all form inputs', async ({ page }) => {
+    test("should have labels for all form inputs", async ({ page }) => {
       const emailLabel = page.locator('label[for="email"]');
       const passwordLabel = page.locator('label[for="password"]');
 
@@ -507,29 +507,29 @@ test.describe('Login Page', () => {
       await expect(passwordLabel).toBeVisible();
     });
 
-    test('should be keyboard navigable', async ({ page }) => {
-      await page.keyboard.press('Tab');
+    test("should be keyboard navigable", async ({ page }) => {
+      await page.keyboard.press("Tab");
 
-      const focusedElement = page.locator(':focus');
+      const focusedElement = page.locator(":focus");
       await expect(focusedElement).toBeTruthy();
     });
 
-    test('should have focus ring on inputs', async ({ page }) => {
-      const input = page.locator('#email');
+    test("should have focus ring on inputs", async ({ page }) => {
+      const input = page.locator("#email");
       await input.focus();
 
       // Tailwind uses ring classes for focus
       await expect(input).toHaveClass(/focus:ring-2/);
     });
 
-    test('should show form errors accessibly', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+    test("should show form errors accessibly", async ({ page }) => {
+      await page.waitForLoadState("networkidle");
 
-      const input = page.locator('#email');
+      const input = page.locator("#email");
       await input.focus();
       await input.blur();
 
-      const error = page.locator('text=Email is required');
+      const error = page.locator("text=Email is required");
       await expect(error).toBeVisible({ timeout: 5000 });
     });
   });
@@ -538,25 +538,25 @@ test.describe('Login Page', () => {
   // Performance
   // ==========================================================================
 
-  test.describe('Performance', () => {
-    test('should load page within acceptable time', async ({ page }) => {
+  test.describe("Performance", () => {
+    test("should load page within acceptable time", async ({ page }) => {
       const startTime = Date.now();
-      await page.goto('/auth/login');
-      await expect(page.locator('h1')).toBeVisible();
+      await page.goto("/auth/login");
+      await expect(page.locator("h1")).toBeVisible();
 
       const loadTime = Date.now() - startTime;
       expect(loadTime).toBeLessThan(5000);
     });
 
-    test('should not have JavaScript errors', async ({ page }) => {
+    test("should not have JavaScript errors", async ({ page }) => {
       const errors: string[] = [];
-      page.on('pageerror', (error) => errors.push(error.message));
+      page.on("pageerror", (error) => errors.push(error.message));
 
-      await page.goto('/auth/login');
+      await page.goto("/auth/login");
       await page.waitForTimeout(1000);
 
       const criticalErrors = errors.filter(
-        (e) => !e.includes('Failed to fetch') && !e.includes('NetworkError')
+        (e) => !e.includes("Failed to fetch") && !e.includes("NetworkError")
       );
 
       expect(criticalErrors.length).toBe(0);
@@ -567,13 +567,13 @@ test.describe('Login Page', () => {
   // Phone Login Tab
   // ==========================================================================
 
-  test.describe('Phone Login Tab', () => {
+  test.describe("Phone Login Tab", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/login");
+      await page.waitForLoadState("networkidle");
     });
 
-    test('should display Email and Phone tabs', async ({ page }) => {
+    test("should display Email and Phone tabs", async ({ page }) => {
       const emailTab = page.locator('button:has-text("Email")');
       const phoneTab = page.locator('button:has-text("Phone")');
 
@@ -581,43 +581,43 @@ test.describe('Login Page', () => {
       await expect(phoneTab).toBeVisible();
     });
 
-    test('should have Email tab selected by default', async ({ page }) => {
+    test("should have Email tab selected by default", async ({ page }) => {
       const emailTab = page.locator('button:has-text("Email")');
       await expect(emailTab).toHaveClass(/bg-background/);
     });
 
-    test('should switch to Phone tab when clicked', async ({ page }) => {
+    test("should switch to Phone tab when clicked", async ({ page }) => {
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
       await expect(phoneTab).toHaveClass(/bg-background/);
     });
 
-    test('should show phone input when Phone tab is active', async ({ page }) => {
+    test("should show phone input when Phone tab is active", async ({ page }) => {
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
-      const phoneInput = page.locator('#phone');
+      const phoneInput = page.locator("#phone");
       await expect(phoneInput).toBeVisible();
     });
 
-    test('should hide email form when Phone tab is active', async ({ page }) => {
+    test("should hide email form when Phone tab is active", async ({ page }) => {
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
-      const emailInput = page.locator('#email');
+      const emailInput = page.locator("#email");
       await expect(emailInput).not.toBeVisible();
     });
 
-    test('should display +91 prefix for phone input', async ({ page }) => {
+    test("should display +91 prefix for phone input", async ({ page }) => {
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
-      const prefix = page.locator('text=+91');
+      const prefix = page.locator("text=+91");
       await expect(prefix).toBeVisible();
     });
 
-    test('should display Send OTP button', async ({ page }) => {
+    test("should display Send OTP button", async ({ page }) => {
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
@@ -625,20 +625,20 @@ test.describe('Login Page', () => {
       await expect(sendButton).toBeVisible();
     });
 
-    test('should have phone placeholder', async ({ page }) => {
+    test("should have phone placeholder", async ({ page }) => {
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
-      const phoneInput = page.locator('#phone');
-      await expect(phoneInput).toHaveAttribute('placeholder', '9876543210');
+      const phoneInput = page.locator("#phone");
+      await expect(phoneInput).toHaveAttribute("placeholder", "9876543210");
     });
 
-    test('should have tel type for phone input', async ({ page }) => {
+    test("should have tel type for phone input", async ({ page }) => {
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
-      const phoneInput = page.locator('#phone');
-      await expect(phoneInput).toHaveAttribute('type', 'tel');
+      const phoneInput = page.locator("#phone");
+      await expect(phoneInput).toHaveAttribute("type", "tel");
     });
   });
 
@@ -646,41 +646,41 @@ test.describe('Login Page', () => {
   // Phone Input Validation
   // ==========================================================================
 
-  test.describe('Phone Input Validation', () => {
+  test.describe("Phone Input Validation", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/login");
+      await page.waitForLoadState("networkidle");
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
     });
 
-    test('should accept valid 10-digit number', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+    test("should accept valid 10-digit number", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await expect(sendButton).not.toBeDisabled();
     });
 
-    test('should disable Send OTP for invalid phone', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('12345');
+    test("should disable Send OTP for invalid phone", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("12345");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await expect(sendButton).toBeDisabled();
     });
 
-    test('should only allow numeric input', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('abcd9876543210xyz');
+    test("should only allow numeric input", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("abcd9876543210xyz");
 
       const value = await phoneInput.inputValue();
-      expect(value).toBe('9876543210');
+      expect(value).toBe("9876543210");
     });
 
-    test('should limit input to 10 digits', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('98765432109999');
+    test("should limit input to 10 digits", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("98765432109999");
 
       const value = await phoneInput.inputValue();
       expect(value.length).toBeLessThanOrEqual(10);
@@ -691,53 +691,53 @@ test.describe('Login Page', () => {
   // OTP Flow
   // ==========================================================================
 
-  test.describe('OTP Flow', () => {
+  test.describe("OTP Flow", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/login");
+      await page.waitForLoadState("networkidle");
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
     });
 
-    test('should show OTP input after sending OTP', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+    test("should show OTP input after sending OTP", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await sendButton.click();
 
       // Wait for OTP form to appear
-      const otpInput = page.locator('#otp');
+      const otpInput = page.locator("#otp");
       await expect(otpInput).toBeVisible({ timeout: 10000 });
     });
 
-    test('should show success message after OTP sent', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+    test("should show success message after OTP sent", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await sendButton.click();
 
       // Wait for success message
-      const successMessage = page.locator('text=OTP sent to');
+      const successMessage = page.locator("text=OTP sent to");
       await expect(successMessage).toBeVisible({ timeout: 10000 });
     });
 
-    test('should mask phone number in success message', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+    test("should mask phone number in success message", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await sendButton.click();
 
       // Wait for success message with masked phone
-      const maskedPhone = page.locator('text=****');
+      const maskedPhone = page.locator("text=****");
       await expect(maskedPhone).toBeVisible({ timeout: 10000 });
     });
 
-    test('should display Verify & Sign In button', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+    test("should display Verify & Sign In button", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await sendButton.click();
@@ -747,9 +747,9 @@ test.describe('Login Page', () => {
       await expect(verifyButton).toBeVisible({ timeout: 10000 });
     });
 
-    test('should display Change number link', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+    test("should display Change number link", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await sendButton.click();
@@ -759,21 +759,21 @@ test.describe('Login Page', () => {
       await expect(changeLink).toBeVisible({ timeout: 10000 });
     });
 
-    test('should display Resend OTP link', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+    test("should display Resend OTP link", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await sendButton.click();
 
       // Wait for resend link (may have countdown)
-      const resendLink = page.getByRole('button', { name: /Resend/i });
+      const resendLink = page.getByRole("button", { name: /Resend/i });
       await expect(resendLink).toBeVisible({ timeout: 10000 });
     });
 
-    test('should go back to phone input when Change number clicked', async ({ page }) => {
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+    test("should go back to phone input when Change number clicked", async ({ page }) => {
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await sendButton.click();
@@ -791,69 +791,69 @@ test.describe('Login Page', () => {
   // OTP Input Validation
   // ==========================================================================
 
-  test.describe('OTP Input Validation', () => {
+  test.describe("OTP Input Validation", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/login');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/login");
+      await page.waitForLoadState("networkidle");
 
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
-      const phoneInput = page.locator('#phone');
-      await phoneInput.fill('9876543210');
+      const phoneInput = page.locator("#phone");
+      await phoneInput.fill("9876543210");
 
       const sendButton = page.locator('button:has-text("Send OTP")');
       await sendButton.click();
 
       // Wait for OTP form
-      await page.locator('#otp').waitFor({ timeout: 10000 });
+      await page.locator("#otp").waitFor({ timeout: 10000 });
     });
 
-    test('should have 6-digit OTP input', async ({ page }) => {
-      const otpInput = page.locator('#otp');
+    test("should have 6-digit OTP input", async ({ page }) => {
+      const otpInput = page.locator("#otp");
       await expect(otpInput).toBeVisible();
     });
 
-    test('should only allow numeric OTP input', async ({ page }) => {
-      const otpInput = page.locator('#otp');
-      await otpInput.fill('abc123def456');
+    test("should only allow numeric OTP input", async ({ page }) => {
+      const otpInput = page.locator("#otp");
+      await otpInput.fill("abc123def456");
 
       const value = await otpInput.inputValue();
-      expect(value).toBe('123456');
+      expect(value).toBe("123456");
     });
 
-    test('should limit OTP to 6 digits', async ({ page }) => {
-      const otpInput = page.locator('#otp');
-      await otpInput.fill('12345678');
+    test("should limit OTP to 6 digits", async ({ page }) => {
+      const otpInput = page.locator("#otp");
+      await otpInput.fill("12345678");
 
       const value = await otpInput.inputValue();
       expect(value.length).toBeLessThanOrEqual(6);
     });
 
-    test('should disable Verify button for incomplete OTP', async ({ page }) => {
-      const otpInput = page.locator('#otp');
-      await otpInput.fill('123');
+    test("should disable Verify button for incomplete OTP", async ({ page }) => {
+      const otpInput = page.locator("#otp");
+      await otpInput.fill("123");
 
       const verifyButton = page.locator('button:has-text("Verify & Sign In")');
       await expect(verifyButton).toBeDisabled();
     });
 
-    test('should enable Verify button for 6-digit OTP', async ({ page }) => {
-      const otpInput = page.locator('#otp');
-      await otpInput.fill('123456');
+    test("should enable Verify button for 6-digit OTP", async ({ page }) => {
+      const otpInput = page.locator("#otp");
+      await otpInput.fill("123456");
 
       const verifyButton = page.locator('button:has-text("Verify & Sign In")');
       await expect(verifyButton).not.toBeDisabled();
     });
 
-    test('should have numeric input mode', async ({ page }) => {
-      const otpInput = page.locator('#otp');
-      await expect(otpInput).toHaveAttribute('inputMode', 'numeric');
+    test("should have numeric input mode", async ({ page }) => {
+      const otpInput = page.locator("#otp");
+      await expect(otpInput).toHaveAttribute("inputMode", "numeric");
     });
 
-    test('should have one-time-code autocomplete', async ({ page }) => {
-      const otpInput = page.locator('#otp');
-      await expect(otpInput).toHaveAttribute('autocomplete', 'one-time-code');
+    test("should have one-time-code autocomplete", async ({ page }) => {
+      const otpInput = page.locator("#otp");
+      await expect(otpInput).toHaveAttribute("autocomplete", "one-time-code");
     });
   });
 
@@ -861,23 +861,23 @@ test.describe('Login Page', () => {
   // Phone Login Responsive Design
   // ==========================================================================
 
-  test.describe('Phone Login Responsive', () => {
-    test('should display phone login on mobile', async ({ page }) => {
+  test.describe("Phone Login Responsive", () => {
+    test("should display phone login on mobile", async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
-      await page.goto('/auth/login');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/login");
+      await page.waitForLoadState("networkidle");
 
       const phoneTab = page.locator('button:has-text("Phone")');
       await phoneTab.click();
 
-      const phoneInput = page.locator('#phone');
+      const phoneInput = page.locator("#phone");
       await expect(phoneInput).toBeVisible();
     });
 
-    test('should have proper tab styling on mobile', async ({ page }) => {
+    test("should have proper tab styling on mobile", async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
-      await page.goto('/auth/login');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/login");
+      await page.waitForLoadState("networkidle");
 
       const emailTab = page.locator('button:has-text("Email")');
       const phoneTab = page.locator('button:has-text("Phone")');
@@ -892,47 +892,47 @@ test.describe('Login Page', () => {
 // Register Page Tests
 // ============================================================================
 
-test.describe('Register Page', () => {
+test.describe("Register Page", () => {
   // ==========================================================================
   // Page Header and Branding
   // ==========================================================================
 
-  test.describe('Page Header', () => {
+  test.describe("Page Header", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
     });
 
-    test('should display MasonArt logo/brand', async ({ page }) => {
+    test("should display MasonArt logo/brand", async ({ page }) => {
       const logo = page.locator('h1:has-text("MasonArt")');
       await expect(logo).toBeVisible();
     });
 
-    test('should have brand color in logo text', async ({ page }) => {
+    test("should have brand color in logo text", async ({ page }) => {
       const brandSpan = page.locator('h1 span.text-brand-500:has-text("Art")');
       await expect(brandSpan).toBeVisible();
     });
 
-    test('should display create account message', async ({ page }) => {
-      const message = page.locator('text=Create your account to get started');
+    test("should display create account message", async ({ page }) => {
+      const message = page.locator("text=Create your account to get started");
       await expect(message).toBeVisible();
     });
 
-    test('should have correct page title', async ({ page }) => {
+    test("should have correct page title", async ({ page }) => {
       await expect(page).toHaveTitle(/Create Account.*MasonArt/);
     });
 
-    test('should have noindex robots meta tag', async ({ page }) => {
-      const robots = await page.locator('meta[name="robots"]').getAttribute('content');
-      expect(robots).toContain('noindex');
+    test("should have noindex robots meta tag", async ({ page }) => {
+      const robots = await page.locator('meta[name="robots"]').getAttribute("content");
+      expect(robots).toContain("noindex");
     });
 
-    test('should have meta description', async ({ page }) => {
-      const description = await page.locator('meta[name="description"]').getAttribute('content');
+    test("should have meta description", async ({ page }) => {
+      const description = await page.locator('meta[name="description"]').getAttribute("content");
       expect(description).toBeTruthy();
-      expect(description).toContain('Create');
+      expect(description).toContain("Create");
     });
 
-    test('should link logo to home page', async ({ page }) => {
+    test("should link logo to home page", async ({ page }) => {
       const logoLink = page.locator('a[href="/"]').first();
       await expect(logoLink).toBeVisible();
     });
@@ -942,23 +942,23 @@ test.describe('Register Page', () => {
   // Google OAuth
   // ==========================================================================
 
-  test.describe('Google OAuth', () => {
+  test.describe("Google OAuth", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
     });
 
-    test('should display Continue with Google button', async ({ page }) => {
+    test("should display Continue with Google button", async ({ page }) => {
       const googleButton = page.locator('button:has-text("Continue with Google")');
       await expect(googleButton).toBeVisible();
     });
 
-    test('should display Google icon in button', async ({ page }) => {
+    test("should display Google icon in button", async ({ page }) => {
       const googleIcon = page.locator('button:has-text("Continue with Google") svg');
       await expect(googleIcon).toBeVisible();
     });
 
     test('should have divider with "or sign up with email" text', async ({ page }) => {
-      const divider = page.locator('text=or sign up with email');
+      const divider = page.locator("text=or sign up with email");
       await expect(divider).toBeVisible();
     });
   });
@@ -967,35 +967,35 @@ test.describe('Register Page', () => {
   // Name Field
   // ==========================================================================
 
-  test.describe('Name Field', () => {
+  test.describe("Name Field", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
     });
 
-    test('should display Full Name label', async ({ page }) => {
+    test("should display Full Name label", async ({ page }) => {
       const label = page.locator('label[for="name"]');
       await expect(label).toBeVisible();
-      await expect(label).toContainText('Full Name');
+      await expect(label).toContainText("Full Name");
     });
 
-    test('should display name input field', async ({ page }) => {
-      const input = page.locator('#name');
+    test("should display name input field", async ({ page }) => {
+      const input = page.locator("#name");
       await expect(input).toBeVisible();
     });
 
-    test('should have name placeholder', async ({ page }) => {
-      const input = page.locator('#name');
-      await expect(input).toHaveAttribute('placeholder', 'Your full name');
+    test("should have name placeholder", async ({ page }) => {
+      const input = page.locator("#name");
+      await expect(input).toHaveAttribute("placeholder", "Your full name");
     });
 
-    test('should have name autocomplete', async ({ page }) => {
-      const input = page.locator('#name');
-      await expect(input).toHaveAttribute('autocomplete', 'name');
+    test("should have name autocomplete", async ({ page }) => {
+      const input = page.locator("#name");
+      await expect(input).toHaveAttribute("autocomplete", "name");
     });
 
-    test('should display user icon', async ({ page }) => {
-      const nameContainer = page.locator('#name').locator('..');
-      const icon = nameContainer.locator('svg');
+    test("should display user icon", async ({ page }) => {
+      const nameContainer = page.locator("#name").locator("..");
+      const icon = nameContainer.locator("svg");
       await expect(icon).toBeVisible();
     });
   });
@@ -1004,30 +1004,30 @@ test.describe('Register Page', () => {
   // Email Field
   // ==========================================================================
 
-  test.describe('Email Field', () => {
+  test.describe("Email Field", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
     });
 
-    test('should display email label', async ({ page }) => {
+    test("should display email label", async ({ page }) => {
       const label = page.locator('label[for="email"]');
       await expect(label).toBeVisible();
-      await expect(label).toContainText('Email');
+      await expect(label).toContainText("Email");
     });
 
-    test('should display email input field', async ({ page }) => {
-      const input = page.locator('#email');
+    test("should display email input field", async ({ page }) => {
+      const input = page.locator("#email");
       await expect(input).toBeVisible();
     });
 
-    test('should have email placeholder', async ({ page }) => {
-      const input = page.locator('#email');
-      await expect(input).toHaveAttribute('placeholder', 'your@email.com');
+    test("should have email placeholder", async ({ page }) => {
+      const input = page.locator("#email");
+      await expect(input).toHaveAttribute("placeholder", "your@email.com");
     });
 
-    test('should have email autocomplete', async ({ page }) => {
-      const input = page.locator('#email');
-      await expect(input).toHaveAttribute('autocomplete', 'email');
+    test("should have email autocomplete", async ({ page }) => {
+      const input = page.locator("#email");
+      await expect(input).toHaveAttribute("autocomplete", "email");
     });
   });
 
@@ -1035,51 +1035,51 @@ test.describe('Register Page', () => {
   // Password Field
   // ==========================================================================
 
-  test.describe('Password Field', () => {
+  test.describe("Password Field", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
     });
 
-    test('should display password label', async ({ page }) => {
+    test("should display password label", async ({ page }) => {
       const label = page.locator('label[for="password"]');
       await expect(label).toBeVisible();
-      await expect(label).toContainText('Password');
+      await expect(label).toContainText("Password");
     });
 
-    test('should display password input field', async ({ page }) => {
-      const input = page.locator('#password');
+    test("should display password input field", async ({ page }) => {
+      const input = page.locator("#password");
       await expect(input).toBeVisible();
     });
 
-    test('should have password placeholder', async ({ page }) => {
-      const input = page.locator('#password');
-      await expect(input).toHaveAttribute('placeholder', 'Create a password');
+    test("should have password placeholder", async ({ page }) => {
+      const input = page.locator("#password");
+      await expect(input).toHaveAttribute("placeholder", "Create a password");
     });
 
-    test('should have new-password autocomplete', async ({ page }) => {
-      const input = page.locator('#password');
-      await expect(input).toHaveAttribute('autocomplete', 'new-password');
+    test("should have new-password autocomplete", async ({ page }) => {
+      const input = page.locator("#password");
+      await expect(input).toHaveAttribute("autocomplete", "new-password");
     });
 
-    test('should have password type by default', async ({ page }) => {
-      const input = page.locator('#password');
-      await expect(input).toHaveAttribute('type', 'password');
+    test("should have password type by default", async ({ page }) => {
+      const input = page.locator("#password");
+      await expect(input).toHaveAttribute("type", "password");
     });
 
-    test('should toggle password visibility', async ({ page }) => {
+    test("should toggle password visibility", async ({ page }) => {
       // Wait for hydration before interacting
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState("networkidle");
 
-      const input = page.locator('#password');
-      const toggle = page.locator('#password').locator('..').locator('button');
+      const input = page.locator("#password");
+      const toggle = page.locator("#password").locator("..").locator("button");
 
-      await expect(input).toHaveAttribute('type', 'password');
-
-      await toggle.click();
-      await expect(input).toHaveAttribute('type', 'text', { timeout: 5000 });
+      await expect(input).toHaveAttribute("type", "password");
 
       await toggle.click();
-      await expect(input).toHaveAttribute('type', 'password', { timeout: 5000 });
+      await expect(input).toHaveAttribute("type", "text", { timeout: 5000 });
+
+      await toggle.click();
+      await expect(input).toHaveAttribute("type", "password", { timeout: 5000 });
     });
   });
 
@@ -1087,62 +1087,66 @@ test.describe('Register Page', () => {
   // Password Requirements
   // ==========================================================================
 
-  test.describe('Password Requirements', () => {
+  test.describe("Password Requirements", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/register");
+      await page.waitForLoadState("networkidle");
     });
 
-    test('should not display requirements initially', async ({ page }) => {
-      const requirements = page.locator('text=At least 8 characters');
+    test("should not display requirements initially", async ({ page }) => {
+      const requirements = page.locator("text=At least 8 characters");
       await expect(requirements).not.toBeVisible();
     });
 
-    test('should display requirements when password has input', async ({ page }) => {
-      const input = page.locator('#password');
-      await input.fill('a');
+    test("should display requirements when password has input", async ({ page }) => {
+      const input = page.locator("#password");
+      await input.fill("a");
 
-      const requirements = page.locator('text=At least 8 characters');
+      const requirements = page.locator("text=At least 8 characters");
       await expect(requirements).toBeVisible({ timeout: 5000 });
     });
 
-    test('should display all 4 password requirements', async ({ page }) => {
-      const input = page.locator('#password');
-      await input.fill('a');
+    test("should display all 4 password requirements", async ({ page }) => {
+      const input = page.locator("#password");
+      await input.fill("a");
 
-      await expect(page.locator('text=At least 8 characters')).toBeVisible();
-      await expect(page.locator('text=Contains a number')).toBeVisible();
-      await expect(page.locator('text=Contains a lowercase letter')).toBeVisible();
-      await expect(page.locator('text=Contains an uppercase letter')).toBeVisible();
+      await expect(page.locator("text=At least 8 characters")).toBeVisible();
+      await expect(page.locator("text=Contains a number")).toBeVisible();
+      await expect(page.locator("text=Contains a lowercase letter")).toBeVisible();
+      await expect(page.locator("text=Contains an uppercase letter")).toBeVisible();
     });
 
-    test('should show green checkmark for met requirements', async ({ page }) => {
-      const input = page.locator('#password');
-      await input.fill('a');
+    test("should show green checkmark for met requirements", async ({ page }) => {
+      const input = page.locator("#password");
+      await input.fill("a");
 
       // Lowercase is met, should be green
-      const lowercaseReq = page.locator('text=Contains a lowercase letter');
+      const lowercaseReq = page.locator("text=Contains a lowercase letter");
       await expect(lowercaseReq).toHaveClass(/text-green-600/);
     });
 
-    test('should show muted color for unmet requirements', async ({ page }) => {
-      const input = page.locator('#password');
-      await input.fill('a');
+    test("should show muted color for unmet requirements", async ({ page }) => {
+      const input = page.locator("#password");
+      await input.fill("a");
 
       // 8 chars is not met
-      const lengthReq = page.locator('text=At least 8 characters');
+      const lengthReq = page.locator("text=At least 8 characters");
       await expect(lengthReq).toHaveClass(/text-muted-foreground/);
     });
 
-    test('should mark all requirements green when valid password', async ({ page }) => {
-      const input = page.locator('#password');
-      await input.fill('Password1');
+    test("should mark all requirements green when valid password", async ({ page }) => {
+      const input = page.locator("#password");
+      await input.fill("Password1");
 
       // All requirements met
       await expect(page.locator('.text-green-600:has-text("At least 8 characters")')).toBeVisible();
       await expect(page.locator('.text-green-600:has-text("Contains a number")')).toBeVisible();
-      await expect(page.locator('.text-green-600:has-text("Contains a lowercase letter")')).toBeVisible();
-      await expect(page.locator('.text-green-600:has-text("Contains an uppercase letter")')).toBeVisible();
+      await expect(
+        page.locator('.text-green-600:has-text("Contains a lowercase letter")')
+      ).toBeVisible();
+      await expect(
+        page.locator('.text-green-600:has-text("Contains an uppercase letter")')
+      ).toBeVisible();
     });
   });
 
@@ -1150,41 +1154,41 @@ test.describe('Register Page', () => {
   // Confirm Password Field
   // ==========================================================================
 
-  test.describe('Confirm Password Field', () => {
+  test.describe("Confirm Password Field", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/register");
+      await page.waitForLoadState("networkidle");
     });
 
-    test('should display Confirm Password label', async ({ page }) => {
+    test("should display Confirm Password label", async ({ page }) => {
       const label = page.locator('label[for="confirmPassword"]');
       await expect(label).toBeVisible();
-      await expect(label).toContainText('Confirm Password');
+      await expect(label).toContainText("Confirm Password");
     });
 
-    test('should display confirm password input field', async ({ page }) => {
-      const input = page.locator('#confirmPassword');
+    test("should display confirm password input field", async ({ page }) => {
+      const input = page.locator("#confirmPassword");
       await expect(input).toBeVisible();
     });
 
-    test('should have confirm password placeholder', async ({ page }) => {
-      const input = page.locator('#confirmPassword');
-      await expect(input).toHaveAttribute('placeholder', 'Confirm your password');
+    test("should have confirm password placeholder", async ({ page }) => {
+      const input = page.locator("#confirmPassword");
+      await expect(input).toHaveAttribute("placeholder", "Confirm your password");
     });
 
-    test('should have new-password autocomplete', async ({ page }) => {
-      const input = page.locator('#confirmPassword');
-      await expect(input).toHaveAttribute('autocomplete', 'new-password');
+    test("should have new-password autocomplete", async ({ page }) => {
+      const input = page.locator("#confirmPassword");
+      await expect(input).toHaveAttribute("autocomplete", "new-password");
     });
 
-    test('should toggle confirm password visibility', async ({ page }) => {
-      const input = page.locator('#confirmPassword');
-      const toggle = page.locator('#confirmPassword').locator('..').locator('button');
+    test("should toggle confirm password visibility", async ({ page }) => {
+      const input = page.locator("#confirmPassword");
+      const toggle = page.locator("#confirmPassword").locator("..").locator("button");
 
-      await expect(input).toHaveAttribute('type', 'password');
+      await expect(input).toHaveAttribute("type", "password");
 
       await toggle.click();
-      await expect(input).toHaveAttribute('type', 'text');
+      await expect(input).toHaveAttribute("type", "text");
     });
   });
 
@@ -1192,101 +1196,101 @@ test.describe('Register Page', () => {
   // Form Validation
   // ==========================================================================
 
-  test.describe('Form Validation', () => {
+  test.describe("Form Validation", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/register");
+      await page.waitForLoadState("networkidle");
     });
 
-    test('should show error for empty name', async ({ page }) => {
-      const input = page.locator('#name');
+    test("should show error for empty name", async ({ page }) => {
+      const input = page.locator("#name");
       await input.focus();
       await input.blur();
 
-      const error = page.locator('text=Name is required');
+      const error = page.locator("text=Name is required");
       await expect(error).toBeVisible({ timeout: 5000 });
     });
 
-    test('should show error for short name', async ({ page }) => {
-      const input = page.locator('#name');
-      await input.fill('A');
+    test("should show error for short name", async ({ page }) => {
+      const input = page.locator("#name");
+      await input.fill("A");
       await input.blur();
 
-      const error = page.locator('text=Name must be at least 2 characters');
+      const error = page.locator("text=Name must be at least 2 characters");
       await expect(error).toBeVisible();
     });
 
-    test('should accept valid name', async ({ page }) => {
-      const input = page.locator('#name');
-      await input.fill('John Doe');
+    test("should accept valid name", async ({ page }) => {
+      const input = page.locator("#name");
+      await input.fill("John Doe");
       await input.blur();
 
-      const error = page.locator('text=Name is required');
+      const error = page.locator("text=Name is required");
       await expect(error).not.toBeVisible();
     });
 
-    test('should show error for empty email', async ({ page }) => {
-      const input = page.locator('#email');
+    test("should show error for empty email", async ({ page }) => {
+      const input = page.locator("#email");
       await input.focus();
       await input.blur();
 
-      const error = page.locator('text=Email is required');
+      const error = page.locator("text=Email is required");
       await expect(error).toBeVisible();
     });
 
-    test('should show error for invalid email', async ({ page }) => {
-      const input = page.locator('#email');
-      await input.fill('invalid-email');
+    test("should show error for invalid email", async ({ page }) => {
+      const input = page.locator("#email");
+      await input.fill("invalid-email");
       await input.blur();
 
-      const error = page.locator('text=Please enter a valid email address');
+      const error = page.locator("text=Please enter a valid email address");
       await expect(error).toBeVisible();
     });
 
-    test('should show error for empty password', async ({ page }) => {
-      const input = page.locator('#password');
+    test("should show error for empty password", async ({ page }) => {
+      const input = page.locator("#password");
       await input.focus();
       await input.blur();
 
-      const error = page.locator('text=Password is required');
+      const error = page.locator("text=Password is required");
       await expect(error).toBeVisible();
     });
 
-    test('should show error for weak password', async ({ page }) => {
-      const input = page.locator('#password');
-      await input.fill('weak');
+    test("should show error for weak password", async ({ page }) => {
+      const input = page.locator("#password");
+      await input.fill("weak");
       await input.blur();
 
-      const error = page.locator('text=Password does not meet requirements');
+      const error = page.locator("text=Password does not meet requirements");
       await expect(error).toBeVisible();
     });
 
-    test('should show error for empty confirm password', async ({ page }) => {
-      const input = page.locator('#confirmPassword');
+    test("should show error for empty confirm password", async ({ page }) => {
+      const input = page.locator("#confirmPassword");
       await input.focus();
       await input.blur();
 
-      const error = page.locator('text=Please confirm your password');
+      const error = page.locator("text=Please confirm your password");
       await expect(error).toBeVisible();
     });
 
-    test('should show error for mismatched passwords', async ({ page }) => {
-      await page.fill('#password', 'Password1');
-      const input = page.locator('#confirmPassword');
-      await input.fill('Password2');
+    test("should show error for mismatched passwords", async ({ page }) => {
+      await page.fill("#password", "Password1");
+      const input = page.locator("#confirmPassword");
+      await input.fill("Password2");
       await input.blur();
 
-      const error = page.locator('text=Passwords do not match');
+      const error = page.locator("text=Passwords do not match");
       await expect(error).toBeVisible();
     });
 
-    test('should accept matching passwords', async ({ page }) => {
-      await page.fill('#password', 'Password1');
-      const input = page.locator('#confirmPassword');
-      await input.fill('Password1');
+    test("should accept matching passwords", async ({ page }) => {
+      await page.fill("#password", "Password1");
+      const input = page.locator("#confirmPassword");
+      await input.fill("Password1");
       await input.blur();
 
-      const error = page.locator('text=Passwords do not match');
+      const error = page.locator("text=Passwords do not match");
       await expect(error).not.toBeVisible();
     });
   });
@@ -1295,61 +1299,61 @@ test.describe('Register Page', () => {
   // Submit Button
   // ==========================================================================
 
-  test.describe('Submit Button', () => {
+  test.describe("Submit Button", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
     });
 
-    test('should display Create Account button', async ({ page }) => {
+    test("should display Create Account button", async ({ page }) => {
       const button = page.locator('button[type="submit"]:has-text("Create Account")');
       await expect(button).toBeVisible();
     });
 
-    test('should have arrow icon in button', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should have arrow icon in button", async ({ page }) => {
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
-      const icon = button.locator('svg');
+      const icon = button.locator("svg");
       await expect(icon).toBeVisible();
     });
 
-    test('should be disabled when form is invalid', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+    test("should be disabled when form is invalid", async ({ page }) => {
+      await page.waitForLoadState("networkidle");
 
-      const mainContent = page.locator('main');
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
       await expect(button).toBeDisabled();
     });
 
-    test('should be enabled when form is valid', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+    test("should be enabled when form is valid", async ({ page }) => {
+      await page.waitForLoadState("networkidle");
 
-      await page.fill('#name', 'John Doe');
-      await page.fill('#email', 'john@example.com');
-      await page.fill('#password', 'Password1');
-      await page.fill('#confirmPassword', 'Password1');
+      await page.fill("#name", "John Doe");
+      await page.fill("#email", "john@example.com");
+      await page.fill("#password", "Password1");
+      await page.fill("#confirmPassword", "Password1");
 
-      const mainContent = page.locator('main');
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
       await expect(button).not.toBeDisabled({ timeout: 5000 });
     });
 
-    test('should have muted style when disabled', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+    test("should have muted style when disabled", async ({ page }) => {
+      await page.waitForLoadState("networkidle");
 
-      const mainContent = page.locator('main');
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
       await expect(button).toHaveClass(/bg-muted/);
     });
 
-    test('should have brand color when enabled', async ({ page }) => {
-      await page.waitForLoadState('networkidle');
+    test("should have brand color when enabled", async ({ page }) => {
+      await page.waitForLoadState("networkidle");
 
-      await page.fill('#name', 'John Doe');
-      await page.fill('#email', 'john@example.com');
-      await page.fill('#password', 'Password1');
-      await page.fill('#confirmPassword', 'Password1');
+      await page.fill("#name", "John Doe");
+      await page.fill("#email", "john@example.com");
+      await page.fill("#password", "Password1");
+      await page.fill("#confirmPassword", "Password1");
 
-      const mainContent = page.locator('main');
+      const mainContent = page.locator("main");
       const button = mainContent.locator('button[type="submit"]:has-text("Create Account")');
       await expect(button).toHaveClass(/bg-brand-500/, { timeout: 5000 });
     });
@@ -1359,50 +1363,50 @@ test.describe('Register Page', () => {
   // Navigation Links
   // ==========================================================================
 
-  test.describe('Navigation Links', () => {
+  test.describe("Navigation Links", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
     });
 
-    test('should display Sign in link', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should display Sign in link", async ({ page }) => {
+      const mainContent = page.locator("main");
       const link = mainContent.locator('a:has-text("Sign in")');
       await expect(link).toBeVisible();
     });
 
-    test('should have correct link to login page', async ({ page }) => {
+    test("should have correct link to login page", async ({ page }) => {
       const link = page.locator('a:has-text("Sign in")');
-      const href = await link.getAttribute('href');
-      expect(href).toContain('/auth/login');
+      const href = await link.getAttribute("href");
+      expect(href).toContain("/auth/login");
     });
 
     test('should display "Already have an account?" text', async ({ page }) => {
-      const text = page.locator('text=Already have an account?');
+      const text = page.locator("text=Already have an account?");
       await expect(text).toBeVisible();
     });
 
-    test('should display Terms of Service link', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should display Terms of Service link", async ({ page }) => {
+      const mainContent = page.locator("main");
       const link = mainContent.locator('a[href="/terms"]');
       await expect(link).toBeVisible();
-      await expect(link).toContainText('Terms of Service');
+      await expect(link).toContainText("Terms of Service");
     });
 
-    test('should display Privacy Policy link', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should display Privacy Policy link", async ({ page }) => {
+      const mainContent = page.locator("main");
       const link = mainContent.locator('a[href="/privacy"]');
       await expect(link).toBeVisible();
-      await expect(link).toContainText('Privacy Policy');
+      await expect(link).toContainText("Privacy Policy");
     });
 
     test('should display "By creating an account" terms text', async ({ page }) => {
-      const mainContent = page.locator('main');
-      const text = mainContent.locator('text=By creating an account');
+      const mainContent = page.locator("main");
+      const text = mainContent.locator("text=By creating an account");
       await expect(text).toBeVisible();
     });
 
-    test('should navigate to login page when clicking Sign in', async ({ page }) => {
-      const mainContent = page.locator('main');
+    test("should navigate to login page when clicking Sign in", async ({ page }) => {
+      const mainContent = page.locator("main");
       const link = mainContent.locator('a:has-text("Sign in")');
       await link.click();
       await expect(page).toHaveURL(/\/auth\/login/);
@@ -1413,22 +1417,22 @@ test.describe('Register Page', () => {
   // Redirect Handling
   // ==========================================================================
 
-  test.describe('Redirect Handling', () => {
-    test('should preserve redirect URL in login link', async ({ page }) => {
-      await page.goto('/auth/register?redirect=/checkout');
+  test.describe("Redirect Handling", () => {
+    test("should preserve redirect URL in login link", async ({ page }) => {
+      await page.goto("/auth/register?redirect=/checkout");
 
       const link = page.locator('a:has-text("Sign in")');
-      const href = await link.getAttribute('href');
-      expect(href).toContain('/auth/login');
-      expect(href).toContain('redirect');
+      const href = await link.getAttribute("href");
+      expect(href).toContain("/auth/login");
+      expect(href).toContain("redirect");
     });
 
-    test('should not add redirect param when no redirect specified', async ({ page }) => {
-      await page.goto('/auth/register');
+    test("should not add redirect param when no redirect specified", async ({ page }) => {
+      await page.goto("/auth/register");
 
       const link = page.locator('a:has-text("Sign in")');
-      const href = await link.getAttribute('href');
-      expect(href).toBe('/auth/login');
+      const href = await link.getAttribute("href");
+      expect(href).toBe("/auth/login");
     });
   });
 
@@ -1436,50 +1440,50 @@ test.describe('Register Page', () => {
   // Responsive Design
   // ==========================================================================
 
-  test.describe('Responsive Design', () => {
-    test('should display properly on mobile', async ({ page }) => {
+  test.describe("Responsive Design", () => {
+    test("should display properly on mobile", async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
 
-      const mainContent = page.locator('main');
-      const form = mainContent.locator('form');
+      const mainContent = page.locator("main");
+      const form = mainContent.locator("form");
       await expect(form).toBeVisible();
 
-      const nameInput = page.locator('#name');
+      const nameInput = page.locator("#name");
       await expect(nameInput).toBeVisible();
     });
 
-    test('should display properly on tablet', async ({ page }) => {
+    test("should display properly on tablet", async ({ page }) => {
       await page.setViewportSize({ width: 768, height: 1024 });
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
 
       const logo = page.locator('h1:has-text("MasonArt")');
       await expect(logo).toBeVisible();
     });
 
-    test('should display properly on desktop', async ({ page }) => {
+    test("should display properly on desktop", async ({ page }) => {
       await page.setViewportSize({ width: 1280, height: 800 });
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
 
-      const container = page.locator('.max-w-md');
+      const container = page.locator(".max-w-md");
       await expect(container).toBeVisible();
     });
 
-    test('should have centered layout', async ({ page }) => {
-      await page.goto('/auth/register');
+    test("should have centered layout", async ({ page }) => {
+      await page.goto("/auth/register");
 
-      const centerContainer = page.locator('.min-h-screen.items-center.justify-center');
+      const centerContainer = page.locator(".min-h-screen.items-center.justify-center");
       await expect(centerContainer).toBeVisible();
     });
 
-    test('should handle long password requirements list on mobile', async ({ page }) => {
+    test("should handle long password requirements list on mobile", async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 });
-      await page.goto('/auth/register');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/register");
+      await page.waitForLoadState("networkidle");
 
-      await page.fill('#password', 'a');
+      await page.fill("#password", "a");
 
-      const requirements = page.locator('text=At least 8 characters');
+      const requirements = page.locator("text=At least 8 characters");
       await expect(requirements).toBeVisible();
     });
   });
@@ -1488,18 +1492,18 @@ test.describe('Register Page', () => {
   // Accessibility
   // ==========================================================================
 
-  test.describe('Accessibility', () => {
+  test.describe("Accessibility", () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto('/auth/register');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/auth/register");
+      await page.waitForLoadState("networkidle");
     });
 
-    test('should have proper heading hierarchy', async ({ page }) => {
-      const h1Count = await page.locator('h1').count();
+    test("should have proper heading hierarchy", async ({ page }) => {
+      const h1Count = await page.locator("h1").count();
       expect(h1Count).toBe(1);
     });
 
-    test('should have labels for all form inputs', async ({ page }) => {
+    test("should have labels for all form inputs", async ({ page }) => {
       const nameLabel = page.locator('label[for="name"]');
       const emailLabel = page.locator('label[for="email"]');
       const passwordLabel = page.locator('label[for="password"]');
@@ -1511,27 +1515,27 @@ test.describe('Register Page', () => {
       await expect(confirmLabel).toBeVisible();
     });
 
-    test('should be keyboard navigable', async ({ page }) => {
-      await page.keyboard.press('Tab');
+    test("should be keyboard navigable", async ({ page }) => {
+      await page.keyboard.press("Tab");
 
-      const focusedElement = page.locator(':focus');
+      const focusedElement = page.locator(":focus");
       await expect(focusedElement).toBeTruthy();
     });
 
-    test('should show form errors accessibly', async ({ page }) => {
-      const input = page.locator('#name');
+    test("should show form errors accessibly", async ({ page }) => {
+      const input = page.locator("#name");
       await input.focus();
       await input.blur();
 
-      const error = page.locator('text=Name is required');
+      const error = page.locator("text=Name is required");
       await expect(error).toBeVisible();
     });
 
-    test('should have password requirements as accessible text', async ({ page }) => {
-      await page.fill('#password', 'a');
+    test("should have password requirements as accessible text", async ({ page }) => {
+      await page.fill("#password", "a");
 
       // Requirements should be visible text, not just icons
-      const reqText = page.locator('text=At least 8 characters');
+      const reqText = page.locator("text=At least 8 characters");
       await expect(reqText).toBeVisible();
     });
   });
@@ -1540,25 +1544,25 @@ test.describe('Register Page', () => {
   // Performance
   // ==========================================================================
 
-  test.describe('Performance', () => {
-    test('should load page within acceptable time', async ({ page }) => {
+  test.describe("Performance", () => {
+    test("should load page within acceptable time", async ({ page }) => {
       const startTime = Date.now();
-      await page.goto('/auth/register');
-      await expect(page.locator('h1')).toBeVisible();
+      await page.goto("/auth/register");
+      await expect(page.locator("h1")).toBeVisible();
 
       const loadTime = Date.now() - startTime;
       expect(loadTime).toBeLessThan(5000);
     });
 
-    test('should not have JavaScript errors', async ({ page }) => {
+    test("should not have JavaScript errors", async ({ page }) => {
       const errors: string[] = [];
-      page.on('pageerror', (error) => errors.push(error.message));
+      page.on("pageerror", (error) => errors.push(error.message));
 
-      await page.goto('/auth/register');
+      await page.goto("/auth/register");
       await page.waitForTimeout(1000);
 
       const criticalErrors = errors.filter(
-        (e) => !e.includes('Failed to fetch') && !e.includes('NetworkError')
+        (e) => !e.includes("Failed to fetch") && !e.includes("NetworkError")
       );
 
       expect(criticalErrors.length).toBe(0);
@@ -1570,9 +1574,9 @@ test.describe('Register Page', () => {
 // Cross-Page Navigation Tests
 // ============================================================================
 
-test.describe('Auth Page Navigation', () => {
-  test('should navigate from login to register and back', async ({ page }) => {
-    await page.goto('/auth/login');
+test.describe("Auth Page Navigation", () => {
+  test("should navigate from login to register and back", async ({ page }) => {
+    await page.goto("/auth/login");
 
     // Go to register
     const registerLink = page.locator('a:has-text("Create account")');
@@ -1585,8 +1589,8 @@ test.describe('Auth Page Navigation', () => {
     await expect(page).toHaveURL(/\/auth\/login/);
   });
 
-  test('should preserve redirect through navigation', async ({ page }) => {
-    await page.goto('/auth/login?redirect=/account');
+  test("should preserve redirect through navigation", async ({ page }) => {
+    await page.goto("/auth/login?redirect=/account");
 
     // Go to register
     const registerLink = page.locator('a:has-text("Create account")');
@@ -1594,8 +1598,8 @@ test.describe('Auth Page Navigation', () => {
     await expect(page).toHaveURL(/\/auth\/register.*redirect.*account/);
   });
 
-  test('should use browser back button correctly', async ({ page }) => {
-    await page.goto('/auth/login');
+  test("should use browser back button correctly", async ({ page }) => {
+    await page.goto("/auth/login");
     await page.locator('a:has-text("Create account")').click();
     await expect(page).toHaveURL(/\/auth\/register/);
 
@@ -1608,22 +1612,22 @@ test.describe('Auth Page Navigation', () => {
 // Error Handling Tests
 // ============================================================================
 
-test.describe('Auth Error Handling', () => {
-  test('should handle network errors gracefully on login page', async ({ page }) => {
-    await page.goto('/auth/login');
+test.describe("Auth Error Handling", () => {
+  test("should handle network errors gracefully on login page", async ({ page }) => {
+    await page.goto("/auth/login");
 
     // Page should load without crashing
-    const mainContent = page.locator('main');
-    const form = mainContent.locator('form');
+    const mainContent = page.locator("main");
+    const form = mainContent.locator("form");
     await expect(form).toBeVisible();
   });
 
-  test('should handle network errors gracefully on register page', async ({ page }) => {
-    await page.goto('/auth/register');
+  test("should handle network errors gracefully on register page", async ({ page }) => {
+    await page.goto("/auth/register");
 
     // Page should load without crashing
-    const mainContent = page.locator('main');
-    const form = mainContent.locator('form');
+    const mainContent = page.locator("main");
+    const form = mainContent.locator("form");
     await expect(form).toBeVisible();
   });
 });

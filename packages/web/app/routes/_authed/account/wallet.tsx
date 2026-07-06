@@ -6,8 +6,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   Wallet,
   Plus,
@@ -22,62 +22,58 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
-} from 'lucide-react'
-import { cn, formatDate } from '~/lib/utils'
-import {
-  walletApi,
-  type WalletBalance,
-  type WalletTransaction,
-} from '~/lib/api'
+} from "lucide-react";
+import { cn, formatDate } from "~/lib/utils";
+import { walletApi, type WalletBalance, type WalletTransaction } from "~/lib/api";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/_authed/account/wallet')({
+export const Route = createFileRoute("/_authed/account/wallet")({
   head: () => ({
     meta: [
-      { title: 'My Wallet | MasonArt' },
+      { title: "My Wallet | MasonArt" },
       {
-        name: 'description',
-        content: 'Add funds to your MasonArt wallet for AI art generation.',
+        name: "description",
+        content: "Add funds to your MasonArt wallet for AI art generation.",
       },
-      { name: 'robots', content: 'noindex' },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: WalletPage,
-})
+});
 
 // ============================================================================
 // Razorpay Types
 // ============================================================================
 
 interface RazorpayOptions {
-  key: string
-  amount: number
-  currency: string
-  name: string
-  description: string
-  order_id: string
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
   prefill: {
-    name?: string
-    email?: string
-    contact?: string
-  }
-  notes: Record<string, string>
+    name?: string;
+    email?: string;
+    contact?: string;
+  };
+  notes: Record<string, string>;
   theme: {
-    color: string
-  }
-  handler: (response: RazorpayResponse) => void
+    color: string;
+  };
+  handler: (response: RazorpayResponse) => void;
   modal: {
-    ondismiss: () => void
-  }
+    ondismiss: () => void;
+  };
 }
 
 interface RazorpayResponse {
-  razorpay_order_id: string
-  razorpay_payment_id: string
-  razorpay_signature: string
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
 }
 
 // Note: Window.Razorpay type is declared in AddFundsButton.tsx
@@ -87,86 +83,86 @@ interface RazorpayResponse {
 // ============================================================================
 
 function WalletPage() {
-  const [walletData, setWalletData] = useState<WalletBalance | null>(null)
-  const [transactions, setTransactions] = useState<WalletTransaction[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [customAmount, setCustomAmount] = useState('')
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
+  const [walletData, setWalletData] = useState<WalletBalance | null>(null);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [customAmount, setCustomAmount] = useState("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
 
   // Load Razorpay script
   useEffect(() => {
-    const script = document.createElement('script')
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-    script.async = true
-    document.body.appendChild(script)
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
 
     return () => {
-      document.body.removeChild(script)
-    }
-  }, [])
+      document.body.removeChild(script);
+    };
+  }, []);
 
   // Fetch wallet data
   const fetchWalletData = useCallback(async () => {
     try {
-      setIsLoading(true)
-      setError(null)
-      const data = await walletApi.getBalance()
-      setWalletData(data)
+      setIsLoading(true);
+      setError(null);
+      const data = await walletApi.getBalance();
+      setWalletData(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load wallet')
+      setError(err instanceof Error ? err.message : "Failed to load wallet");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [])
+  }, []);
 
   // Fetch transactions
   const fetchTransactions = useCallback(async (pageNum: number) => {
     try {
-      setIsLoadingTransactions(true)
+      setIsLoadingTransactions(true);
       const response = await walletApi.getTransactions({
         page: pageNum,
         pageSize: 10,
-      })
-      setTransactions(response.items)
-      setTotalPages(response.totalPages)
-      setPage(pageNum)
+      });
+      setTransactions(response.items);
+      setTotalPages(response.totalPages);
+      setPage(pageNum);
     } catch (err) {
-      console.error('Failed to fetch transactions:', err)
+      console.error("Failed to fetch transactions:", err);
     } finally {
-      setIsLoadingTransactions(false)
+      setIsLoadingTransactions(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    fetchWalletData()
-    fetchTransactions(1)
-  }, [fetchWalletData, fetchTransactions])
+    fetchWalletData();
+    fetchTransactions(1);
+  }, [fetchWalletData, fetchTransactions]);
 
   // Handle top-up
   const handleTopUp = async (amountPaise: number) => {
     if (!walletData?.isPaymentConfigured) {
-      setError('Payment gateway is not configured')
-      return
+      setError("Payment gateway is not configured");
+      return;
     }
 
     try {
-      setIsProcessingPayment(true)
-      setError(null)
+      setIsProcessingPayment(true);
+      setError(null);
 
       // Create top-up order
-      const order = await walletApi.createTopUp(amountPaise)
+      const order = await walletApi.createTopUp(amountPaise);
 
       // Open Razorpay checkout
       const options: RazorpayOptions = {
         key: order.keyId,
         amount: order.amount.paise,
         currency: order.currency,
-        name: 'MasonArt',
-        description: 'Wallet Top-up',
+        name: "MasonArt",
+        description: "Wallet Top-up",
         order_id: order.orderId,
         prefill: {
           name: order.prefill.name,
@@ -175,7 +171,7 @@ function WalletPage() {
         },
         notes: order.notes,
         theme: {
-          color: '#0F766E', // brand-600
+          color: "#0F766E", // brand-600
         },
         handler: async (response: RazorpayResponse) => {
           try {
@@ -184,48 +180,46 @@ function WalletPage() {
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
-            })
+            });
 
             // Refresh wallet data
-            await fetchWalletData()
-            await fetchTransactions(1)
+            await fetchWalletData();
+            await fetchTransactions(1);
           } catch (err) {
-            setError(
-              err instanceof Error ? err.message : 'Payment verification failed'
-            )
+            setError(err instanceof Error ? err.message : "Payment verification failed");
           } finally {
-            setIsProcessingPayment(false)
+            setIsProcessingPayment(false);
           }
         },
         modal: {
           ondismiss: () => {
-            setIsProcessingPayment(false)
+            setIsProcessingPayment(false);
           },
         },
-      }
+      };
 
-      const razorpay = new window.Razorpay(options)
-      razorpay.open()
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate payment')
-      setIsProcessingPayment(false)
+      setError(err instanceof Error ? err.message : "Failed to initiate payment");
+      setIsProcessingPayment(false);
     }
-  }
+  };
 
   // Handle custom amount top-up
   const handleCustomTopUp = () => {
-    const amount = parseFloat(customAmount)
+    const amount = parseFloat(customAmount);
     if (isNaN(amount) || amount < 100) {
-      setError('Minimum top-up amount is Rs 100')
-      return
+      setError("Minimum top-up amount is Rs 100");
+      return;
     }
     if (amount > 100000) {
-      setError('Maximum top-up amount is Rs 1,00,000')
-      return
+      setError("Maximum top-up amount is Rs 1,00,000");
+      return;
     }
-    handleTopUp(Math.round(amount * 100)) // Convert to paise
-    setCustomAmount('')
-  }
+    handleTopUp(Math.round(amount * 100)); // Convert to paise
+    setCustomAmount("");
+  };
 
   if (isLoading) {
     return (
@@ -238,7 +232,7 @@ function WalletPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -253,12 +247,8 @@ function WalletPage() {
             <ChevronLeft className="h-4 w-4" />
             Back to Account
           </a>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-            My Wallet
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Add funds to generate AI art
-          </p>
+          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">My Wallet</h1>
+          <p className="mt-2 text-muted-foreground">Add funds to generate AI art</p>
         </div>
 
         {/* Error Display */}
@@ -278,11 +268,9 @@ function WalletPage() {
             <div className="rounded-xl border border-border bg-gradient-to-br from-emerald-50 to-teal-50 p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Available Balance
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground">Available Balance</p>
                   <p className="mt-1 text-4xl font-bold text-foreground">
-                    {walletData?.balance.formatted || '₹0.00'}
+                    {walletData?.balance.formatted || "₹0.00"}
                   </p>
                 </div>
                 <div className="rounded-full bg-emerald-100 p-3">
@@ -296,8 +284,7 @@ function WalletPage() {
                   <Sparkles className="h-4 w-4 text-purple-600" />
                   <span className="text-sm font-medium text-purple-800">
                     {walletData.freeGenerationsRemaining} free generation
-                    {walletData.freeGenerationsRemaining !== 1 ? 's' : ''}{' '}
-                    remaining
+                    {walletData.freeGenerationsRemaining !== 1 ? "s" : ""} remaining
                   </span>
                 </div>
               )}
@@ -305,9 +292,7 @@ function WalletPage() {
 
             {/* Quick Top-up */}
             <div className="rounded-xl border border-border bg-card p-6">
-              <h2 className="mb-4 text-lg font-semibold text-foreground">
-                Add Funds
-              </h2>
+              <h2 className="mb-4 text-lg font-semibold text-foreground">Add Funds</h2>
 
               {/* Preset Amounts */}
               <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -359,18 +344,14 @@ function WalletPage() {
             {/* Transaction History */}
             <div className="rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-6 py-4">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Transaction History
-                </h2>
+                <h2 className="text-lg font-semibold text-foreground">Transaction History</h2>
                 <button
                   type="button"
                   onClick={() => fetchTransactions(page)}
                   disabled={isLoadingTransactions}
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  <RefreshCcw
-                    className={cn('h-4 w-4', isLoadingTransactions && 'animate-spin')}
-                  />
+                  <RefreshCcw className={cn("h-4 w-4", isLoadingTransactions && "animate-spin")} />
                 </button>
               </div>
 
@@ -395,9 +376,7 @@ function WalletPage() {
                     <p className="text-muted-foreground">No transactions yet</p>
                   </div>
                 ) : (
-                  transactions.map((tx) => (
-                    <TransactionRow key={tx.id} transaction={tx} />
-                  ))
+                  transactions.map((tx) => <TransactionRow key={tx.id} transaction={tx} />)
                 )}
               </div>
 
@@ -434,24 +413,18 @@ function WalletPage() {
           <div className="space-y-6">
             {/* Stats Card */}
             <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="mb-4 text-base font-semibold text-foreground">
-                Wallet Stats
-              </h3>
+              <h3 className="mb-4 text-base font-semibold text-foreground">Wallet Stats</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Total Added
-                  </span>
+                  <span className="text-sm text-muted-foreground">Total Added</span>
                   <span className="font-medium text-emerald-600">
-                    +₹{walletData?.stats.totalTopUpsRupees.toFixed(2) || '0.00'}
+                    +₹{walletData?.stats.totalTopUpsRupees.toFixed(2) || "0.00"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Total Spent
-                  </span>
+                  <span className="text-sm text-muted-foreground">Total Spent</span>
                   <span className="font-medium text-red-600">
-                    -₹{walletData?.stats.totalSpentRupees.toFixed(2) || '0.00'}
+                    -₹{walletData?.stats.totalSpentRupees.toFixed(2) || "0.00"}
                   </span>
                 </div>
               </div>
@@ -460,17 +433,15 @@ function WalletPage() {
             {/* Exchange Rate Info */}
             {walletData?.exchangeRate && (
               <div className="rounded-xl border border-border bg-muted/30 p-6">
-                <h3 className="mb-2 text-base font-semibold text-foreground">
-                  Exchange Rate
-                </h3>
+                <h3 className="mb-2 text-base font-semibold text-foreground">Exchange Rate</h3>
                 <p className="text-sm text-muted-foreground">
                   1 USD = ₹{walletData.exchangeRate.usdToInr.toFixed(2)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Last updated:{' '}
+                  Last updated:{" "}
                   {formatDate(new Date(walletData.exchangeRate.fetchedAt), {
-                    hour: '2-digit',
-                    minute: '2-digit',
+                    hour: "2-digit",
+                    minute: "2-digit",
                   })}
                 </p>
               </div>
@@ -478,9 +449,7 @@ function WalletPage() {
 
             {/* How it works */}
             <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="mb-4 text-base font-semibold text-foreground">
-                How it works
-              </h3>
+              <h3 className="mb-4 text-base font-semibold text-foreground">How it works</h3>
               <ol className="space-y-3 text-sm text-muted-foreground">
                 <li className="flex gap-3">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-medium text-emerald-700">
@@ -492,9 +461,7 @@ function WalletPage() {
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-medium text-emerald-700">
                     2
                   </span>
-                  <span>
-                    Generate AI art - cost is automatically deducted
-                  </span>
+                  <span>Generate AI art - cost is automatically deducted</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-medium text-emerald-700">
@@ -508,7 +475,7 @@ function WalletPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -516,73 +483,69 @@ function WalletPage() {
 // ============================================================================
 
 interface TransactionRowProps {
-  transaction: WalletTransaction
+  transaction: WalletTransaction;
 }
 
 function TransactionRow({ transaction }: TransactionRowProps) {
   const getIcon = () => {
     switch (transaction.type) {
-      case 'credit':
-        return <ArrowDownLeft className="h-5 w-5 text-emerald-600" />
-      case 'debit':
-        return <ArrowUpRight className="h-5 w-5 text-red-600" />
-      case 'refund':
-        return <RefreshCcw className="h-5 w-5 text-blue-600" />
-      case 'bonus':
-        return <Gift className="h-5 w-5 text-purple-600" />
+      case "credit":
+        return <ArrowDownLeft className="h-5 w-5 text-emerald-600" />;
+      case "debit":
+        return <ArrowUpRight className="h-5 w-5 text-red-600" />;
+      case "refund":
+        return <RefreshCcw className="h-5 w-5 text-blue-600" />;
+      case "bonus":
+        return <Gift className="h-5 w-5 text-purple-600" />;
       default:
-        return <Wallet className="h-5 w-5 text-gray-600" />
+        return <Wallet className="h-5 w-5 text-gray-600" />;
     }
-  }
+  };
 
   const getIconBg = () => {
     switch (transaction.type) {
-      case 'credit':
-        return 'bg-emerald-100'
-      case 'debit':
-        return 'bg-red-100'
-      case 'refund':
-        return 'bg-blue-100'
-      case 'bonus':
-        return 'bg-purple-100'
+      case "credit":
+        return "bg-emerald-100";
+      case "debit":
+        return "bg-red-100";
+      case "refund":
+        return "bg-blue-100";
+      case "bonus":
+        return "bg-purple-100";
       default:
-        return 'bg-gray-100'
+        return "bg-gray-100";
     }
-  }
+  };
 
   const getStatusIcon = () => {
     switch (transaction.status) {
-      case 'completed':
-        return <CheckCircle className="h-4 w-4 text-emerald-600" />
-      case 'failed':
-        return <XCircle className="h-4 w-4 text-red-600" />
-      case 'pending':
-        return <Clock className="h-4 w-4 text-yellow-600" />
+      case "completed":
+        return <CheckCircle className="h-4 w-4 text-emerald-600" />;
+      case "failed":
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      case "pending":
+        return <Clock className="h-4 w-4 text-yellow-600" />;
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   const isPositive =
-    transaction.type === 'credit' ||
-    transaction.type === 'refund' ||
-    transaction.type === 'bonus'
+    transaction.type === "credit" || transaction.type === "refund" || transaction.type === "bonus";
 
   return (
     <div className="flex items-center gap-4 px-6 py-4">
-      <div className={cn('rounded-full p-2.5', getIconBg())}>{getIcon()}</div>
+      <div className={cn("rounded-full p-2.5", getIconBg())}>{getIcon()}</div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-foreground truncate">
-          {transaction.description}
-        </p>
+        <p className="font-medium text-foreground truncate">{transaction.description}</p>
         <div className="flex items-center gap-2 mt-0.5">
           <span className="text-xs text-muted-foreground">
             {formatDate(new Date(transaction.createdAt), {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
             })}
           </span>
           {getStatusIcon()}
@@ -590,12 +553,7 @@ function TransactionRow({ transaction }: TransactionRowProps) {
       </div>
 
       <div className="text-right">
-        <p
-          className={cn(
-            'font-medium',
-            isPositive ? 'text-emerald-600' : 'text-red-600'
-          )}
-        >
+        <p className={cn("font-medium", isPositive ? "text-emerald-600" : "text-red-600")}>
           {transaction.amount.formatted}
         </p>
         <p className="text-xs text-muted-foreground">
@@ -603,5 +561,5 @@ function TransactionRow({ transaction }: TransactionRowProps) {
         </p>
       </div>
     </div>
-  )
+  );
 }

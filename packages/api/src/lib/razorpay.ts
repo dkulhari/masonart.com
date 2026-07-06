@@ -186,9 +186,7 @@ async function razorpayRequest<T>(
   endpoint: string,
   body?: unknown
 ): Promise<T> {
-  const auth = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString(
-    "base64"
-  );
+  const auth = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString("base64");
 
   const response = await fetch(`${RAZORPAY_API_URL}${endpoint}`, {
     method,
@@ -201,11 +199,7 @@ async function razorpayRequest<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new RazorpayError(
-      `Razorpay API error: ${response.status}`,
-      response.status,
-      error
-    );
+    throw new RazorpayError(`Razorpay API error: ${response.status}`, response.status, error);
   }
 
   return response.json() as Promise<T>;
@@ -236,9 +230,7 @@ export class RazorpayError extends Error {
 /**
  * Create a Razorpay order
  */
-export async function createRazorpayOrder(
-  input: CreateRazorpayOrderInput
-): Promise<RazorpayOrder> {
+export async function createRazorpayOrder(input: CreateRazorpayOrderInput): Promise<RazorpayOrder> {
   if (!isRazorpayConfigured()) {
     throw new RazorpayError("Razorpay is not configured");
   }
@@ -269,9 +261,7 @@ export async function getRazorpayOrder(orderId: string): Promise<RazorpayOrder> 
 /**
  * Get payment details by payment ID
  */
-export async function getRazorpayPayment(
-  paymentId: string
-): Promise<RazorpayPayment> {
+export async function getRazorpayPayment(paymentId: string): Promise<RazorpayPayment> {
   if (!isRazorpayConfigured()) {
     throw new RazorpayError("Razorpay is not configured");
   }
@@ -292,11 +282,10 @@ export async function capturePayment(
     throw new RazorpayError("Razorpay is not configured");
   }
 
-  return razorpayRequest<RazorpayPayment>(
-    "POST",
-    `/payments/${paymentId}/capture`,
-    { amount, currency }
-  );
+  return razorpayRequest<RazorpayPayment>("POST", `/payments/${paymentId}/capture`, {
+    amount,
+    currency,
+  });
 }
 
 // ============================================================================
@@ -306,9 +295,7 @@ export async function capturePayment(
 /**
  * Create a refund for a payment
  */
-export async function createRefund(
-  input: CreateRefundInput
-): Promise<RazorpayRefund> {
+export async function createRefund(input: CreateRefundInput): Promise<RazorpayRefund> {
   if (!isRazorpayConfigured()) {
     throw new RazorpayError("Razorpay is not configured");
   }
@@ -325,28 +312,18 @@ export async function createRefund(
     body.speed = input.speed;
   }
 
-  return razorpayRequest<RazorpayRefund>(
-    "POST",
-    `/payments/${input.paymentId}/refund`,
-    body
-  );
+  return razorpayRequest<RazorpayRefund>("POST", `/payments/${input.paymentId}/refund`, body);
 }
 
 /**
  * Get refund details
  */
-export async function getRefund(
-  paymentId: string,
-  refundId: string
-): Promise<RazorpayRefund> {
+export async function getRefund(paymentId: string, refundId: string): Promise<RazorpayRefund> {
   if (!isRazorpayConfigured()) {
     throw new RazorpayError("Razorpay is not configured");
   }
 
-  return razorpayRequest<RazorpayRefund>(
-    "GET",
-    `/payments/${paymentId}/refunds/${refundId}`
-  );
+  return razorpayRequest<RazorpayRefund>("GET", `/payments/${paymentId}/refunds/${refundId}`);
 }
 
 // ============================================================================
@@ -367,20 +344,14 @@ export function verifyPaymentSignature(input: PaymentVerificationInput): boolean
     .update(body)
     .digest("hex");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(expectedSignature),
-    Buffer.from(razorpaySignature)
-  );
+  return crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(razorpaySignature));
 }
 
 /**
  * Verify webhook signature
  * This should be called when receiving webhook events
  */
-export function verifyWebhookSignature(
-  body: string,
-  signature: string
-): boolean {
+export function verifyWebhookSignature(body: string, signature: string): boolean {
   if (!RAZORPAY_WEBHOOK_SECRET) {
     throw new RazorpayError("Webhook secret is not configured");
   }
@@ -391,10 +362,7 @@ export function verifyWebhookSignature(
     .digest("hex");
 
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature),
-      Buffer.from(signature)
-    );
+    return crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signature));
   } catch {
     return false;
   }
@@ -408,9 +376,7 @@ export function verifyWebhookSignature(
  * Convert amount to paise (Razorpay uses smallest currency unit)
  */
 export function toPaise(amountInRupees: number | string): number {
-  const amount = typeof amountInRupees === "string"
-    ? parseFloat(amountInRupees)
-    : amountInRupees;
+  const amount = typeof amountInRupees === "string" ? parseFloat(amountInRupees) : amountInRupees;
   return Math.round(amount * 100);
 }
 
@@ -462,7 +428,17 @@ export function extractPaymentDetails(payment: RazorpayPayment): {
 export const RAZORPAY_CHECKOUT_SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js";
 
 export const RAZORPAY_CURRENCIES = [
-  "INR", "USD", "EUR", "GBP", "SGD", "AED", "AUD", "CAD", "CNY", "JPY", "MYR"
+  "INR",
+  "USD",
+  "EUR",
+  "GBP",
+  "SGD",
+  "AED",
+  "AUD",
+  "CAD",
+  "CNY",
+  "JPY",
+  "MYR",
 ] as const;
 
-export type RazorpayCurrency = typeof RAZORPAY_CURRENCIES[number];
+export type RazorpayCurrency = (typeof RAZORPAY_CURRENCIES)[number];

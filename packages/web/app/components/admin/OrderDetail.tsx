@@ -11,7 +11,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState } from 'react'
+import { useState } from "react";
 import {
   Package,
   User,
@@ -28,145 +28,150 @@ import {
   RefreshCw,
   ImageIcon,
   Camera,
-} from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
-import type { OrderStatus, PaymentStatus } from './OrdersTable'
+} from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import type { OrderStatus, PaymentStatus } from "./OrdersTable";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface OrderItemSnapshot {
-  title?: string
-  sku?: string
-  sizeLabel?: string
-  imageUrl?: string
+  title?: string;
+  sku?: string;
+  sizeLabel?: string;
+  imageUrl?: string;
 }
 
 export interface OrderItem {
-  id: string
-  snapshot?: OrderItemSnapshot | null
-  unitPrice: string
-  framePrice: string
-  quantity: number
-  lineTotal: string
-  itemDiscount?: string | null
-  isAiGenerated: boolean
-  aiGenerationId?: string | null
-  customizations?: Record<string, unknown> | null
-  isFulfilled: boolean
-  fulfilledAt?: string | null
+  id: string;
+  snapshot?: OrderItemSnapshot | null;
+  unitPrice: string;
+  framePrice: string;
+  quantity: number;
+  lineTotal: string;
+  itemDiscount?: string | null;
+  isAiGenerated: boolean;
+  aiGenerationId?: string | null;
+  customizations?: Record<string, unknown> | null;
+  isFulfilled: boolean;
+  fulfilledAt?: string | null;
   product?: {
-    id: string
-    slug: string
-    title: string
-    images?: Array<{ url: string; alt?: string }> | null
-    sku: string
-  } | null
+    id: string;
+    slug: string;
+    title: string;
+    images?: Array<{ url: string; alt?: string }> | null;
+    sku: string;
+  } | null;
   variant?: {
-    id: string
-    sizeLabel: string
-    widthInches: number
-    heightInches: number
-    price: string
-  } | null
+    id: string;
+    sizeLabel: string;
+    widthInches: number;
+    heightInches: number;
+    price: string;
+  } | null;
   frame?: {
-    id: string
-    name: string
-    type: string
-  } | null
+    id: string;
+    name: string;
+    type: string;
+  } | null;
 }
 
 export interface ShippingAddress {
-  fullName: string
-  phone: string
-  addressLine1: string
-  addressLine2?: string
-  landmark?: string
-  city: string
-  state: string
-  postalCode: string
-  countryCode?: string
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2?: string;
+  landmark?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  countryCode?: string;
 }
 
 export interface ShippingDetails {
-  carrier?: string
-  trackingNumber?: string
-  trackingUrl?: string
-  awbNumber?: string
-  shipmentId?: string
-  estimatedDelivery?: string
+  carrier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  awbNumber?: string;
+  shipmentId?: string;
+  estimatedDelivery?: string;
 }
 
 export interface PaymentDetails {
-  method?: string
-  orderId?: string
-  paymentId?: string
-  refundId?: string
-  refundAmount?: number
-  refundedAt?: string
+  method?: string;
+  orderId?: string;
+  paymentId?: string;
+  refundId?: string;
+  refundAmount?: number;
+  refundedAt?: string;
 }
 
 export interface OrderCustomer {
-  id?: string
-  name?: string | null
-  email: string
-  phone?: string | null
+  id?: string;
+  name?: string | null;
+  email: string;
+  phone?: string | null;
 }
 
-export type ApprovalStatus = 'pending_upload' | 'pending_approval' | 'changes_requested' | 'approved' | 'expired'
+export type ApprovalStatus =
+  | "pending_upload"
+  | "pending_approval"
+  | "changes_requested"
+  | "approved"
+  | "expired";
 
 export interface OrderApproval {
-  id: string
-  orderItemId: string
-  status: ApprovalStatus
-  approvalToken: string
-  deadlineAt?: string | null
-  approvedAt?: string | null
-  createdAt: string
-  updatedAt: string
+  id: string;
+  orderItemId: string;
+  status: ApprovalStatus;
+  approvalToken: string;
+  deadlineAt?: string | null;
+  approvedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface FullOrder {
-  id: string
-  orderNumber: string
-  status: OrderStatus
-  paymentStatus: PaymentStatus
-  orderType: 'regular' | 'ai_generated' | 'trade'
-  customer?: OrderCustomer | null
-  shippingAddress?: ShippingAddress | null
-  shippingDetails?: ShippingDetails | null
-  shippingMethod?: string | null
-  shippingCost: string
-  subtotal: string
-  discount: string
-  tax: string
-  total: string
-  couponCode?: string | null
-  couponDiscount?: string | null
-  tradeDiscount?: string | null
-  itemCount: number
-  currency: string
-  customerNotes?: string | null
-  internalNotes?: string | null
-  paymentDetails?: PaymentDetails | null
-  items: OrderItem[]
-  approvals?: OrderApproval[]
-  createdAt: string
-  updatedAt: string
-  paidAt?: string | null
-  shippedAt?: string | null
-  deliveredAt?: string | null
-  cancelledAt?: string | null
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  orderType: "regular" | "ai_generated" | "trade";
+  customer?: OrderCustomer | null;
+  shippingAddress?: ShippingAddress | null;
+  shippingDetails?: ShippingDetails | null;
+  shippingMethod?: string | null;
+  shippingCost: string;
+  subtotal: string;
+  discount: string;
+  tax: string;
+  total: string;
+  couponCode?: string | null;
+  couponDiscount?: string | null;
+  tradeDiscount?: string | null;
+  itemCount: number;
+  currency: string;
+  customerNotes?: string | null;
+  internalNotes?: string | null;
+  paymentDetails?: PaymentDetails | null;
+  items: OrderItem[];
+  approvals?: OrderApproval[];
+  createdAt: string;
+  updatedAt: string;
+  paidAt?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+  cancelledAt?: string | null;
 }
 
 export interface OrderDetailProps {
-  order: FullOrder
-  onUpdateStatus?: (status: OrderStatus, reason?: string) => Promise<void>
-  onUpdateShipping?: (details: Partial<ShippingDetails>) => Promise<void>
-  onUpdateNotes?: (notes: string) => Promise<void>
-  onInitiateRefund?: (amount?: number, reason?: string) => Promise<void>
-  isUpdating?: boolean
+  order: FullOrder;
+  onUpdateStatus?: (status: OrderStatus, reason?: string) => Promise<void>;
+  onUpdateShipping?: (details: Partial<ShippingDetails>) => Promise<void>;
+  onUpdateNotes?: (notes: string) => Promise<void>;
+  onInitiateRefund?: (amount?: number, reason?: string) => Promise<void>;
+  isUpdating?: boolean;
 }
 
 // ============================================================================
@@ -175,105 +180,105 @@ export interface OrderDetailProps {
 
 function OrderStatusBadge({ status }: { status: OrderStatus }) {
   const styles: Record<OrderStatus, string> = {
-    pending: 'bg-amber-100 text-amber-700 border-amber-200',
-    pending_payment: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    confirmed: 'bg-blue-100 text-blue-700 border-blue-200',
-    processing: 'bg-purple-100 text-purple-700 border-purple-200',
-    shipped: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    out_for_delivery: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-    delivered: 'bg-green-100 text-green-700 border-green-200',
-    cancelled: 'bg-gray-100 text-gray-700 border-gray-200',
-    refund_requested: 'bg-orange-100 text-orange-700 border-orange-200',
-    refunded: 'bg-gray-100 text-gray-600 border-gray-200',
-    failed: 'bg-red-100 text-red-700 border-red-200',
-  }
+    pending: "bg-amber-100 text-amber-700 border-amber-200",
+    pending_payment: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    confirmed: "bg-blue-100 text-blue-700 border-blue-200",
+    processing: "bg-purple-100 text-purple-700 border-purple-200",
+    shipped: "bg-indigo-100 text-indigo-700 border-indigo-200",
+    out_for_delivery: "bg-cyan-100 text-cyan-700 border-cyan-200",
+    delivered: "bg-green-100 text-green-700 border-green-200",
+    cancelled: "bg-gray-100 text-gray-700 border-gray-200",
+    refund_requested: "bg-orange-100 text-orange-700 border-orange-200",
+    refunded: "bg-gray-100 text-gray-600 border-gray-200",
+    failed: "bg-red-100 text-red-700 border-red-200",
+  };
 
   const labels: Record<OrderStatus, string> = {
-    pending: 'Pending',
-    pending_payment: 'Payment Pending',
-    confirmed: 'Confirmed',
-    processing: 'Processing',
-    shipped: 'Shipped',
-    out_for_delivery: 'Out for Delivery',
-    delivered: 'Delivered',
-    cancelled: 'Cancelled',
-    refund_requested: 'Refund Requested',
-    refunded: 'Refunded',
-    failed: 'Failed',
-  }
+    pending: "Pending",
+    pending_payment: "Payment Pending",
+    confirmed: "Confirmed",
+    processing: "Processing",
+    shipped: "Shipped",
+    out_for_delivery: "Out for Delivery",
+    delivered: "Delivered",
+    cancelled: "Cancelled",
+    refund_requested: "Refund Requested",
+    refunded: "Refunded",
+    failed: "Failed",
+  };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium',
+        "inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium",
         styles[status]
       )}
     >
       {labels[status]}
     </span>
-  )
+  );
 }
 
 function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
   const styles: Record<ApprovalStatus, string> = {
-    pending_upload: 'bg-gray-100 text-gray-700 border-gray-200',
-    pending_approval: 'bg-amber-100 text-amber-700 border-amber-200',
-    changes_requested: 'bg-orange-100 text-orange-700 border-orange-200',
-    approved: 'bg-green-100 text-green-700 border-green-200',
-    expired: 'bg-red-100 text-red-700 border-red-200',
-  }
+    pending_upload: "bg-gray-100 text-gray-700 border-gray-200",
+    pending_approval: "bg-amber-100 text-amber-700 border-amber-200",
+    changes_requested: "bg-orange-100 text-orange-700 border-orange-200",
+    approved: "bg-green-100 text-green-700 border-green-200",
+    expired: "bg-red-100 text-red-700 border-red-200",
+  };
 
   const labels: Record<ApprovalStatus, string> = {
-    pending_upload: 'Awaiting Upload',
-    pending_approval: 'Pending Approval',
-    changes_requested: 'Changes Requested',
-    approved: 'Approved',
-    expired: 'Expired',
-  }
+    pending_upload: "Awaiting Upload",
+    pending_approval: "Pending Approval",
+    changes_requested: "Changes Requested",
+    approved: "Approved",
+    expired: "Expired",
+  };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium',
+        "inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium",
         styles[status]
       )}
     >
       {labels[status]}
     </span>
-  )
+  );
 }
 
 function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const styles: Record<PaymentStatus, string> = {
-    pending: 'bg-amber-100 text-amber-700 border-amber-200',
-    processing: 'bg-blue-100 text-blue-700 border-blue-200',
-    paid: 'bg-green-100 text-green-700 border-green-200',
-    failed: 'bg-red-100 text-red-700 border-red-200',
-    refunded: 'bg-gray-100 text-gray-600 border-gray-200',
-    partially_refunded: 'bg-orange-100 text-orange-700 border-orange-200',
-    cancelled: 'bg-gray-100 text-gray-600 border-gray-200',
-  }
+    pending: "bg-amber-100 text-amber-700 border-amber-200",
+    processing: "bg-blue-100 text-blue-700 border-blue-200",
+    paid: "bg-green-100 text-green-700 border-green-200",
+    failed: "bg-red-100 text-red-700 border-red-200",
+    refunded: "bg-gray-100 text-gray-600 border-gray-200",
+    partially_refunded: "bg-orange-100 text-orange-700 border-orange-200",
+    cancelled: "bg-gray-100 text-gray-600 border-gray-200",
+  };
 
   const labels: Record<PaymentStatus, string> = {
-    pending: 'Pending',
-    processing: 'Processing',
-    paid: 'Paid',
-    failed: 'Failed',
-    refunded: 'Refunded',
-    partially_refunded: 'Partial Refund',
-    cancelled: 'Cancelled',
-  }
+    pending: "Pending",
+    processing: "Processing",
+    paid: "Paid",
+    failed: "Failed",
+    refunded: "Refunded",
+    partially_refunded: "Partial Refund",
+    cancelled: "Cancelled",
+  };
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium',
+        "inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium",
         styles[status]
       )}
     >
       {labels[status]}
     </span>
-  )
+  );
 }
 
 // ============================================================================
@@ -284,32 +289,32 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
   // Compute overall status: show worst status if mixed
   const getOverallStatus = (): ApprovalStatus => {
     const statusPriority: ApprovalStatus[] = [
-      'expired',
-      'changes_requested',
-      'pending_upload',
-      'pending_approval',
-      'approved',
-    ]
+      "expired",
+      "changes_requested",
+      "pending_upload",
+      "pending_approval",
+      "approved",
+    ];
 
     for (const status of statusPriority) {
       if (approvals.some((a) => a.status === status)) {
-        return status
+        return status;
       }
     }
-    return 'pending_upload'
-  }
+    return "pending_upload";
+  };
 
-  const overallStatus = getOverallStatus()
+  const overallStatus = getOverallStatus();
   const pendingCount = approvals.filter(
-    (a) => a.status !== 'approved' && a.status !== 'expired'
-  ).length
-  const approvedCount = approvals.filter((a) => a.status === 'approved').length
+    (a) => a.status !== "approved" && a.status !== "expired"
+  ).length;
+  const approvedCount = approvals.filter((a) => a.status === "approved").length;
 
   // Find first non-approved approval to link to
   const firstPendingApproval = approvals.find(
-    (a) => a.status !== 'approved' && a.status !== 'expired'
-  )
-  const linkToApprovalId = firstPendingApproval?.id || approvals[0]?.id
+    (a) => a.status !== "approved" && a.status !== "expired"
+  );
+  const linkToApprovalId = firstPendingApproval?.id || approvals[0]?.id;
 
   return (
     <a
@@ -325,26 +330,20 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
         </span>
       )}
     </a>
-  )
+  );
 }
 
 // ============================================================================
 // Section Components
 // ============================================================================
 
-function SectionHeader({
-  icon: Icon,
-  title,
-}: {
-  icon: React.ElementType
-  title: string
-}) {
+function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
     <div className="flex items-center gap-2 border-b border-border pb-3">
       <Icon className="h-5 w-5 text-muted-foreground" />
       <h3 className="font-semibold text-foreground">{title}</h3>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -352,26 +351,21 @@ function SectionHeader({
 // ============================================================================
 
 function OrderItemRow({ item }: { item: OrderItem }) {
-  const snapshot = item.snapshot
-  const product = item.product
-  const variant = item.variant
-  const frame = item.frame
+  const snapshot = item.snapshot;
+  const product = item.product;
+  const variant = item.variant;
+  const frame = item.frame;
 
-  const title = snapshot?.title || product?.title || 'Product'
-  const imageUrl =
-    snapshot?.imageUrl || product?.images?.[0]?.url || null
-  const sizeLabel = snapshot?.sizeLabel || variant?.sizeLabel || ''
+  const title = snapshot?.title || product?.title || "Product";
+  const imageUrl = snapshot?.imageUrl || product?.images?.[0]?.url || null;
+  const sizeLabel = snapshot?.sizeLabel || variant?.sizeLabel || "";
 
   return (
     <div className="flex gap-4 py-3">
       {/* Image */}
       <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
         {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={title}
-            className="h-full w-full object-cover"
-          />
+          <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <ImageIcon className="h-6 w-6 text-muted-foreground" />
@@ -395,9 +389,7 @@ function OrderItemRow({ item }: { item: OrderItem }) {
             )}
           </div>
           <div className="text-right">
-            <p className="font-medium text-foreground">
-              {formatPrice(parseFloat(item.lineTotal))}
-            </p>
+            <p className="font-medium text-foreground">{formatPrice(parseFloat(item.lineTotal))}</p>
             <p className="text-sm text-muted-foreground">
               Qty: {item.quantity} × {formatPrice(parseFloat(item.unitPrice))}
             </p>
@@ -410,7 +402,7 @@ function OrderItemRow({ item }: { item: OrderItem }) {
             <span className="inline-flex items-center gap-1 text-xs text-green-600">
               <CheckCircle2 className="h-3 w-3" />
               Fulfilled
-              {item.fulfilledAt && ` on ${new Date(item.fulfilledAt).toLocaleDateString('en-IN')}`}
+              {item.fulfilledAt && ` on ${new Date(item.fulfilledAt).toLocaleDateString("en-IN")}`}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-xs text-amber-600">
@@ -421,7 +413,7 @@ function OrderItemRow({ item }: { item: OrderItem }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -429,10 +421,10 @@ function OrderItemRow({ item }: { item: OrderItem }) {
 // ============================================================================
 
 interface StatusUpdateModalProps {
-  currentStatus: OrderStatus
-  onUpdate: (status: OrderStatus, reason?: string) => void
-  onClose: () => void
-  isUpdating: boolean
+  currentStatus: OrderStatus;
+  onUpdate: (status: OrderStatus, reason?: string) => void;
+  onClose: () => void;
+  isUpdating: boolean;
 }
 
 function StatusUpdateModal({
@@ -441,22 +433,22 @@ function StatusUpdateModal({
   onClose,
   isUpdating,
 }: StatusUpdateModalProps) {
-  const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(currentStatus)
-  const [reason, setReason] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(currentStatus);
+  const [reason, setReason] = useState("");
 
   const statusOptions: OrderStatus[] = [
-    'pending',
-    'pending_payment',
-    'confirmed',
-    'processing',
-    'shipped',
-    'out_for_delivery',
-    'delivered',
-    'cancelled',
-    'refund_requested',
-    'refunded',
-    'failed',
-  ]
+    "pending",
+    "pending_payment",
+    "confirmed",
+    "processing",
+    "shipped",
+    "out_for_delivery",
+    "delivered",
+    "cancelled",
+    "refund_requested",
+    "refunded",
+    "failed",
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -473,16 +465,14 @@ function StatusUpdateModal({
             >
               {statusOptions.map((status) => (
                 <option key={status} value={status}>
-                  {status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                  {status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-foreground">
-              Reason (optional)
-            </label>
+            <label className="text-sm font-medium text-foreground">Reason (optional)</label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -508,12 +498,12 @@ function StatusUpdateModal({
             disabled={isUpdating || selectedStatus === currentStatus}
             className="flex-1 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
           >
-            {isUpdating ? 'Updating...' : 'Update Status'}
+            {isUpdating ? "Updating..." : "Update Status"}
           </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -521,10 +511,10 @@ function StatusUpdateModal({
 // ============================================================================
 
 interface ShippingUpdateModalProps {
-  currentDetails?: ShippingDetails | null
-  onUpdate: (details: Partial<ShippingDetails>) => void
-  onClose: () => void
-  isUpdating: boolean
+  currentDetails?: ShippingDetails | null;
+  onUpdate: (details: Partial<ShippingDetails>) => void;
+  onClose: () => void;
+  isUpdating: boolean;
 }
 
 function ShippingUpdateModal({
@@ -533,10 +523,12 @@ function ShippingUpdateModal({
   onClose,
   isUpdating,
 }: ShippingUpdateModalProps) {
-  const [carrier, setCarrier] = useState(currentDetails?.carrier || '')
-  const [trackingNumber, setTrackingNumber] = useState(currentDetails?.trackingNumber || '')
-  const [trackingUrl, setTrackingUrl] = useState(currentDetails?.trackingUrl || '')
-  const [estimatedDelivery, setEstimatedDelivery] = useState(currentDetails?.estimatedDelivery || '')
+  const [carrier, setCarrier] = useState(currentDetails?.carrier || "");
+  const [trackingNumber, setTrackingNumber] = useState(currentDetails?.trackingNumber || "");
+  const [trackingUrl, setTrackingUrl] = useState(currentDetails?.trackingUrl || "");
+  const [estimatedDelivery, setEstimatedDelivery] = useState(
+    currentDetails?.estimatedDelivery || ""
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -610,12 +602,12 @@ function ShippingUpdateModal({
             disabled={isUpdating}
             className="flex-1 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
           >
-            {isUpdating ? 'Updating...' : 'Update Shipping'}
+            {isUpdating ? "Updating..." : "Update Shipping"}
           </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -630,47 +622,46 @@ export function OrderDetail({
   onInitiateRefund,
   isUpdating = false,
 }: OrderDetailProps) {
-  const [showStatusModal, setShowStatusModal] = useState(false)
-  const [showShippingModal, setShowShippingModal] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [isEditingNotes, setIsEditingNotes] = useState(false)
-  const [editedNotes, setEditedNotes] = useState(order.internalNotes || '')
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showShippingModal, setShowShippingModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editedNotes, setEditedNotes] = useState(order.internalNotes || "");
 
   const handleCopyOrderNumber = () => {
-    navigator.clipboard.writeText(order.orderNumber)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    navigator.clipboard.writeText(order.orderNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleStatusUpdate = async (status: OrderStatus, reason?: string) => {
     if (onUpdateStatus) {
-      await onUpdateStatus(status, reason)
+      await onUpdateStatus(status, reason);
     }
-    setShowStatusModal(false)
-  }
+    setShowStatusModal(false);
+  };
 
   const handleShippingUpdate = async (details: Partial<ShippingDetails>) => {
     if (onUpdateShipping) {
-      await onUpdateShipping(details)
+      await onUpdateShipping(details);
     }
-    setShowShippingModal(false)
-  }
+    setShowShippingModal(false);
+  };
 
   const handleNotesUpdate = async () => {
     if (onUpdateNotes) {
-      await onUpdateNotes(editedNotes)
+      await onUpdateNotes(editedNotes);
     }
-    setIsEditingNotes(false)
-  }
+    setIsEditingNotes(false);
+  };
 
   const handleCancelNotesEdit = () => {
-    setEditedNotes(order.internalNotes || '')
-    setIsEditingNotes(false)
-  }
+    setEditedNotes(order.internalNotes || "");
+    setIsEditingNotes(false);
+  };
 
   const canRefund =
-    order.paymentStatus === 'paid' &&
-    !['refunded', 'cancelled'].includes(order.status)
+    order.paymentStatus === "paid" && !["refunded", "cancelled"].includes(order.status);
 
   return (
     <div className="space-y-6">
@@ -678,9 +669,7 @@ export function OrderDetail({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold text-foreground">
-              Order {order.orderNumber}
-            </h2>
+            <h2 className="text-2xl font-bold text-foreground">Order {order.orderNumber}</h2>
             <button
               type="button"
               onClick={handleCopyOrderNumber}
@@ -695,7 +684,7 @@ export function OrderDetail({
             </button>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Created {new Date(order.createdAt).toLocaleString('en-IN')}
+            Created {new Date(order.createdAt).toLocaleString("en-IN")}
           </p>
         </div>
 
@@ -738,8 +727,8 @@ export function OrderDetail({
           <button
             type="button"
             onClick={() => {
-              if (confirm('Are you sure you want to initiate a refund for this order?')) {
-                onInitiateRefund(undefined, 'Admin initiated refund')
+              if (confirm("Are you sure you want to initiate a refund for this order?")) {
+                onInitiateRefund(undefined, "Admin initiated refund");
               }
             }}
             disabled={isUpdating}
@@ -816,7 +805,7 @@ export function OrderDetail({
                       disabled={isUpdating}
                       className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
                     >
-                      {isUpdating ? 'Saving...' : 'Save Notes'}
+                      {isUpdating ? "Saving..." : "Save Notes"}
                     </button>
                   </div>
                 </div>
@@ -844,9 +833,7 @@ export function OrderDetail({
               {order.customer?.phone && (
                 <p className="text-muted-foreground">{order.customer.phone}</p>
               )}
-              {!order.customer && (
-                <p className="italic text-muted-foreground">Guest checkout</p>
-              )}
+              {!order.customer && <p className="italic text-muted-foreground">Guest checkout</p>}
             </div>
           </div>
 
@@ -855,18 +842,12 @@ export function OrderDetail({
             <div className="rounded-xl border border-border bg-card p-4">
               <SectionHeader icon={MapPin} title="Shipping Address" />
               <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">
-                  {order.shippingAddress.fullName}
-                </p>
+                <p className="font-medium text-foreground">{order.shippingAddress.fullName}</p>
                 <p>{order.shippingAddress.addressLine1}</p>
-                {order.shippingAddress.addressLine2 && (
-                  <p>{order.shippingAddress.addressLine2}</p>
-                )}
-                {order.shippingAddress.landmark && (
-                  <p>Near: {order.shippingAddress.landmark}</p>
-                )}
+                {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
+                {order.shippingAddress.landmark && <p>Near: {order.shippingAddress.landmark}</p>}
                 <p>
-                  {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
+                  {order.shippingAddress.city}, {order.shippingAddress.state}{" "}
                   {order.shippingAddress.postalCode}
                 </p>
                 <p>{order.shippingAddress.phone}</p>
@@ -881,13 +862,13 @@ export function OrderDetail({
               <div className="mt-3 space-y-2 text-sm">
                 {order.shippingDetails.carrier && (
                   <p>
-                    <span className="text-muted-foreground">Carrier:</span>{' '}
+                    <span className="text-muted-foreground">Carrier:</span>{" "}
                     <span className="text-foreground">{order.shippingDetails.carrier}</span>
                   </p>
                 )}
                 {order.shippingDetails.trackingNumber && (
                   <p>
-                    <span className="text-muted-foreground">Tracking:</span>{' '}
+                    <span className="text-muted-foreground">Tracking:</span>{" "}
                     <span className="font-mono text-foreground">
                       {order.shippingDetails.trackingNumber}
                     </span>
@@ -905,9 +886,11 @@ export function OrderDetail({
                 )}
                 {order.shippingDetails.estimatedDelivery && (
                   <p>
-                    <span className="text-muted-foreground">Est. Delivery:</span>{' '}
+                    <span className="text-muted-foreground">Est. Delivery:</span>{" "}
                     <span className="text-foreground">
-                      {new Date(order.shippingDetails.estimatedDelivery).toLocaleDateString('en-IN')}
+                      {new Date(order.shippingDetails.estimatedDelivery).toLocaleDateString(
+                        "en-IN"
+                      )}
                     </span>
                   </p>
                 )}
@@ -933,7 +916,7 @@ export function OrderDetail({
                 <span className="text-muted-foreground">Shipping</span>
                 <span>
                   {parseFloat(order.shippingCost) === 0
-                    ? 'FREE'
+                    ? "FREE"
                     : formatPrice(parseFloat(order.shippingCost))}
                 </span>
               </div>
@@ -952,11 +935,7 @@ export function OrderDetail({
           <div className="rounded-xl border border-border bg-card p-4">
             <SectionHeader icon={Calendar} title="Timeline" />
             <div className="mt-3 space-y-3 text-sm">
-              <TimelineItem
-                label="Order Created"
-                date={order.createdAt}
-                isCompleted={true}
-              />
+              <TimelineItem label="Order Created" date={order.createdAt} isCompleted={true} />
               <TimelineItem
                 label="Payment Received"
                 date={order.paidAt}
@@ -1004,7 +983,7 @@ export function OrderDetail({
         />
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -1017,48 +996,40 @@ function TimelineItem({
   isCompleted,
   isError = false,
 }: {
-  label: string
-  date?: string | null
-  isCompleted: boolean
-  isError?: boolean
+  label: string;
+  date?: string | null;
+  isCompleted: boolean;
+  isError?: boolean;
 }) {
   return (
     <div className="flex items-start gap-3">
       <div
         className={cn(
-          'mt-0.5 h-4 w-4 rounded-full border-2',
+          "mt-0.5 h-4 w-4 rounded-full border-2",
           isCompleted
             ? isError
-              ? 'border-red-500 bg-red-500'
-              : 'border-green-500 bg-green-500'
-            : 'border-gray-300 bg-white'
+              ? "border-red-500 bg-red-500"
+              : "border-green-500 bg-green-500"
+            : "border-gray-300 bg-white"
         )}
       >
-        {isCompleted && (
-          <CheckCircle2 className="h-3 w-3 text-white" />
-        )}
+        {isCompleted && <CheckCircle2 className="h-3 w-3 text-white" />}
       </div>
       <div className="min-w-0 flex-1">
         <p
           className={cn(
-            'font-medium',
-            isCompleted
-              ? isError
-                ? 'text-red-600'
-                : 'text-foreground'
-              : 'text-muted-foreground'
+            "font-medium",
+            isCompleted ? (isError ? "text-red-600" : "text-foreground") : "text-muted-foreground"
           )}
         >
           {label}
         </p>
         {date && (
-          <p className="text-xs text-muted-foreground">
-            {new Date(date).toLocaleString('en-IN')}
-          </p>
+          <p className="text-xs text-muted-foreground">{new Date(date).toLocaleString("en-IN")}</p>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -1117,7 +1088,7 @@ export function OrderDetailSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default OrderDetail
+export default OrderDetail;

@@ -6,9 +6,9 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { Calendar, CheckCircle, Clock } from 'lucide-react'
-import { cn, formatDate } from '~/lib/utils'
-import type { ShipmentStatus } from '~/lib/api'
+import { Calendar, CheckCircle, Clock } from "lucide-react";
+import { cn, formatDate } from "~/lib/utils";
+import type { ShipmentStatus } from "~/lib/api";
 
 // ============================================================================
 // Types
@@ -16,13 +16,13 @@ import type { ShipmentStatus } from '~/lib/api'
 
 export interface DeliveryEstimateProps {
   /** Estimated delivery date (ISO string) */
-  estimatedDeliveryAt: string | null
+  estimatedDeliveryAt: string | null;
   /** Actual delivery date (ISO string) */
-  deliveredAt: string | null
+  deliveredAt: string | null;
   /** Current shipment status */
-  status: ShipmentStatus
+  status: ShipmentStatus;
   /** Optional className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -33,35 +33,35 @@ export interface DeliveryEstimateProps {
  * Format delivery date for display
  */
 function formatDeliveryDate(dateString: string): string {
-  const date = new Date(dateString)
-  const today = new Date()
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+  const date = new Date(dateString);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
   // Check if it's today
   if (date.toDateString() === today.toDateString()) {
-    return 'Today'
+    return "Today";
   }
 
   // Check if it's tomorrow
   if (date.toDateString() === tomorrow.toDateString()) {
-    return 'Tomorrow'
+    return "Tomorrow";
   }
 
   // Otherwise format with day of week
-  return formatDate(dateString, { weekday: 'short' })
+  return formatDate(dateString, { weekday: "short" });
 }
 
 /**
  * Calculate days until delivery
  */
 function getDaysUntilDelivery(dateString: string): number {
-  const date = new Date(dateString)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  date.setHours(0, 0, 0, 0)
-  const diffTime = date.getTime() - today.getTime()
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  const date = new Date(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  const diffTime = date.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
 // ============================================================================
@@ -85,31 +85,29 @@ export function DeliveryEstimate({
   className,
 }: DeliveryEstimateProps) {
   // If delivered, show delivery date
-  if (status === 'delivered' && deliveredAt) {
+  if (status === "delivered" && deliveredAt) {
     return (
-      <div className={cn('flex items-center gap-2', className)}>
+      <div className={cn("flex items-center gap-2", className)}>
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
           <CheckCircle className="h-4 w-4 text-green-600" />
         </div>
         <div>
           <p className="text-sm font-medium text-green-700">Delivered</p>
-          <p className="text-xs text-muted-foreground">
-            {formatDeliveryDate(deliveredAt)}
-          </p>
+          <p className="text-xs text-muted-foreground">{formatDeliveryDate(deliveredAt)}</p>
         </div>
       </div>
-    )
+    );
   }
 
   // If cancelled or returned, don't show estimate
-  if (status === 'cancelled' || status === 'returned') {
-    return null
+  if (status === "cancelled" || status === "returned") {
+    return null;
   }
 
   // If no estimate available
   if (!estimatedDeliveryAt) {
     return (
-      <div className={cn('flex items-center gap-2', className)}>
+      <div className={cn("flex items-center gap-2", className)}>
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
           <Clock className="h-4 w-4 text-muted-foreground" />
         </div>
@@ -118,60 +116,52 @@ export function DeliveryEstimate({
           <p className="text-xs text-muted-foreground">Calculating...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Show estimated delivery
-  const daysUntil = getDaysUntilDelivery(estimatedDeliveryAt)
-  const isUrgent = daysUntil <= 1
-  const isSoon = daysUntil <= 3
+  const daysUntil = getDaysUntilDelivery(estimatedDeliveryAt);
+  const isUrgent = daysUntil <= 1;
+  const isSoon = daysUntil <= 3;
 
   return (
-    <div className={cn('flex items-center gap-2', className)}>
+    <div className={cn("flex items-center gap-2", className)}>
       <div
         className={cn(
-          'flex h-8 w-8 items-center justify-center rounded-full',
-          isUrgent ? 'bg-amber-100' : isSoon ? 'bg-blue-100' : 'bg-muted'
+          "flex h-8 w-8 items-center justify-center rounded-full",
+          isUrgent ? "bg-amber-100" : isSoon ? "bg-blue-100" : "bg-muted"
         )}
       >
         <Calendar
           className={cn(
-            'h-4 w-4',
-            isUrgent
-              ? 'text-amber-600'
-              : isSoon
-                ? 'text-blue-600'
-                : 'text-muted-foreground'
+            "h-4 w-4",
+            isUrgent ? "text-amber-600" : isSoon ? "text-blue-600" : "text-muted-foreground"
           )}
         />
       </div>
       <div>
         <p className="text-sm font-medium text-foreground">
-          {isUrgent
-            ? 'Arriving Soon!'
-            : isSoon
-              ? 'Arriving in a few days'
-              : 'Estimated Delivery'}
+          {isUrgent ? "Arriving Soon!" : isSoon ? "Arriving in a few days" : "Estimated Delivery"}
         </p>
         <p
           className={cn(
-            'text-xs',
+            "text-xs",
             isUrgent
-              ? 'font-medium text-amber-600'
+              ? "font-medium text-amber-600"
               : isSoon
-                ? 'text-blue-600'
-                : 'text-muted-foreground'
+                ? "text-blue-600"
+                : "text-muted-foreground"
           )}
         >
           {formatDeliveryDate(estimatedDeliveryAt)}
         </p>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Exports
 // ============================================================================
 
-export default DeliveryEstimate
+export default DeliveryEstimate;

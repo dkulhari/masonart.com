@@ -72,9 +72,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
   const originalHeight = metadata.height || 1200;
 
   // Convert original to WebP (preserving dimensions)
-  const originalWebP = await sharp(input)
-    .webp({ quality: 85 })
-    .toBuffer();
+  const originalWebP = await sharp(input).webp({ quality: 85 }).toBuffer();
 
   // Generate responsive variants (only downscale, never upscale)
   const variants: ImageVariant[] = [];
@@ -122,10 +120,7 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
  * Convert a single image to WebP without generating variants.
  * Useful for one-off conversions (avatars, reference images).
  */
-export async function convertToWebP(
-  input: Buffer,
-  quality: number = 80
-): Promise<Buffer> {
+export async function convertToWebP(input: Buffer, quality: number = 80): Promise<Buffer> {
   return sharp(input).webp({ quality }).toBuffer();
 }
 

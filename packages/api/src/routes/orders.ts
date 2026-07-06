@@ -149,10 +149,7 @@ async function generateOrderNumber(): Promise<string> {
 /**
  * Calculate shipping cost based on method and subtotal
  */
-function calculateShippingCost(
-  method: string,
-  subtotal: string
-): string {
+function calculateShippingCost(method: string, subtotal: string): string {
   const subtotalNum = parseFloat(subtotal);
 
   // Free shipping for orders over 2000 INR
@@ -209,249 +206,229 @@ ordersApp.use("*", requireAuth);
 // POST /api/orders - Create Order
 // ============================================================================
 
-ordersApp.post(
-  "/",
-  zValidator("json", createOrderSchema),
-  async (c) => {
-    const user = c.get("user");
-    const input = c.req.valid("json");
+ordersApp.post("/", zValidator("json", createOrderSchema), async (c) => {
+  const user = c.get("user");
+  const input = c.req.valid("json");
 
-    try {
-      // Get user's active cart with items
-      const userCart = await db.query.carts.findFirst({
-        where: and(eq(carts.userId, user.id), eq(carts.isActive, true)),
-        with: {
-          items: {
-            where: eq(cartItems.isSavedForLater, false),
-            with: {
-              product: true,
-              variant: true,
-              frame: true,
-            },
+  try {
+    // Get user's active cart with items
+    const userCart = await db.query.carts.findFirst({
+      where: and(eq(carts.userId, user.id), eq(carts.isActive, true)),
+      with: {
+        items: {
+          where: eq(cartItems.isSavedForLater, false),
+          with: {
+            product: true,
+            variant: true,
+            frame: true,
           },
         },
-      });
+      },
+    });
 
-      if (!userCart) {
-        return c.json({ error: "No active cart found" }, 404);
-      }
-
-      const activeItems = userCart.items.filter((item) => !item.isSavedForLater);
-
-      if (activeItems.length === 0) {
-        return c.json({ error: "Cart is empty" }, 400);
-      }
-
-      // Validate all items are still available
-      for (const item of activeItems) {
-        if (!item.product || item.product.status !== "active") {
-          return c.json(
-            { error: `Product "${item.product?.title || "Unknown"}" is no longer available` },
-            400
-          );
-        }
-        if (!item.variant || !item.variant.isInStock) {
-          return c.json(
-            { error: `Selected size for "${item.product?.title}" is out of stock` },
-            400
-          );
-        }
-      }
-
-      // Calculate totals
-      const subtotal = activeItems.reduce((sum, item) => {
-        return sum + parseFloat(item.lineTotal);
-      }, 0);
-
-      const subtotalStr = subtotal.toFixed(2);
-      const shippingCost = calculateShippingCost(input.shippingMethod, subtotalStr);
-      const discount = "0.00"; // TODO: Apply coupon if provided
-      const tax = "0.00"; // TODO: Calculate tax based on location
-      const total = (
-        subtotal +
-        parseFloat(shippingCost) -
-        parseFloat(discount) +
-        parseFloat(tax)
-      ).toFixed(2);
-
-      // Generate order number
-      const orderNumber = await generateOrderNumber();
-
-      // Create order in a transaction
-      const newOrder = await db.transaction(async (tx) => {
-        // Create the order
-        const insertedOrders = await tx
-          .insert(orders)
-          .values({
-            orderNumber,
-            userId: user.id,
-            status: "pending",
-            paymentStatus: "pending",
-            orderType: activeItems.some((i) => i.isAiGenerated) ? "ai_generated" : "regular",
-            shippingAddress: input.shippingAddress as OrderShippingAddress,
-            shippingMethod: input.shippingMethod,
-            shippingCost,
-            subtotal: subtotalStr,
-            discount,
-            tax,
-            total,
-            couponCode: input.couponCode || null,
-            couponDiscount: "0.00",
-            itemCount: activeItems.reduce((sum, item) => sum + item.quantity, 0),
-            customerNotes: input.customerNotes || null,
-            currency: "INR",
-          })
-          .returning();
-
-        const createdOrder = insertedOrders[0];
-        if (!createdOrder) {
-          throw new Error("Failed to create order");
-        }
-
-        // Create order items
-        const orderItemsToInsert = activeItems.map((item) => ({
-          orderId: createdOrder.id,
-          productId: item.productId,
-          variantId: item.variantId,
-          frameId: item.frameId,
-          snapshot: createItemSnapshot(
-            item.product!,
-            item.variant!,
-            item.frame
-          ),
-          unitPrice: item.unitPrice,
-          framePrice: item.framePrice,
-          quantity: item.quantity,
-          lineTotal: item.lineTotal,
-          isAiGenerated: item.isAiGenerated,
-          aiGenerationId: item.aiGenerationId,
-          customizations: item.customizations as Record<string, unknown> | null,
-        }));
-
-        await tx.insert(orderItems).values(orderItemsToInsert);
-
-        // Clear cart items (but keep saved for later items)
-        await tx
-          .delete(cartItems)
-          .where(
-            and(
-              eq(cartItems.cartId, userCart.id),
-              eq(cartItems.isSavedForLater, false)
-            )
-          );
-
-        // Update cart totals
-        await tx
-          .update(carts)
-          .set({
-            itemCount: 0,
-            subtotal: "0.00",
-            lastActivityAt: new Date(),
-          })
-          .where(eq(carts.id, userCart.id));
-
-        return createdOrder;
-      });
-
-      // Return created order
-      return c.json(
-        {
-          message: "Order created successfully",
-          order: {
-            id: newOrder.id,
-            orderNumber: newOrder.orderNumber,
-            status: newOrder.status,
-            paymentStatus: newOrder.paymentStatus,
-            subtotal: newOrder.subtotal,
-            shippingCost: newOrder.shippingCost,
-            discount: newOrder.discount,
-            tax: newOrder.tax,
-            total: newOrder.total,
-            itemCount: newOrder.itemCount,
-            currency: newOrder.currency,
-            createdAt: newOrder.createdAt,
-          },
-        },
-        201
-      );
-    } catch (error) {
-      console.error("Error creating order:", error);
-      return c.json({ error: "Failed to create order" }, 500);
+    if (!userCart) {
+      return c.json({ error: "No active cart found" }, 404);
     }
+
+    const activeItems = userCart.items.filter((item) => !item.isSavedForLater);
+
+    if (activeItems.length === 0) {
+      return c.json({ error: "Cart is empty" }, 400);
+    }
+
+    // Validate all items are still available
+    for (const item of activeItems) {
+      if (!item.product || item.product.status !== "active") {
+        return c.json(
+          { error: `Product "${item.product?.title || "Unknown"}" is no longer available` },
+          400
+        );
+      }
+      if (!item.variant || !item.variant.isInStock) {
+        return c.json({ error: `Selected size for "${item.product?.title}" is out of stock` }, 400);
+      }
+    }
+
+    // Calculate totals
+    const subtotal = activeItems.reduce((sum, item) => {
+      return sum + parseFloat(item.lineTotal);
+    }, 0);
+
+    const subtotalStr = subtotal.toFixed(2);
+    const shippingCost = calculateShippingCost(input.shippingMethod, subtotalStr);
+    const discount = "0.00"; // TODO: Apply coupon if provided
+    const tax = "0.00"; // TODO: Calculate tax based on location
+    const total = (
+      subtotal +
+      parseFloat(shippingCost) -
+      parseFloat(discount) +
+      parseFloat(tax)
+    ).toFixed(2);
+
+    // Generate order number
+    const orderNumber = await generateOrderNumber();
+
+    // Create order in a transaction
+    const newOrder = await db.transaction(async (tx) => {
+      // Create the order
+      const insertedOrders = await tx
+        .insert(orders)
+        .values({
+          orderNumber,
+          userId: user.id,
+          status: "pending",
+          paymentStatus: "pending",
+          orderType: activeItems.some((i) => i.isAiGenerated) ? "ai_generated" : "regular",
+          shippingAddress: input.shippingAddress as OrderShippingAddress,
+          shippingMethod: input.shippingMethod,
+          shippingCost,
+          subtotal: subtotalStr,
+          discount,
+          tax,
+          total,
+          couponCode: input.couponCode || null,
+          couponDiscount: "0.00",
+          itemCount: activeItems.reduce((sum, item) => sum + item.quantity, 0),
+          customerNotes: input.customerNotes || null,
+          currency: "INR",
+        })
+        .returning();
+
+      const createdOrder = insertedOrders[0];
+      if (!createdOrder) {
+        throw new Error("Failed to create order");
+      }
+
+      // Create order items
+      const orderItemsToInsert = activeItems.map((item) => ({
+        orderId: createdOrder.id,
+        productId: item.productId,
+        variantId: item.variantId,
+        frameId: item.frameId,
+        snapshot: createItemSnapshot(item.product!, item.variant!, item.frame),
+        unitPrice: item.unitPrice,
+        framePrice: item.framePrice,
+        quantity: item.quantity,
+        lineTotal: item.lineTotal,
+        isAiGenerated: item.isAiGenerated,
+        aiGenerationId: item.aiGenerationId,
+        customizations: item.customizations as Record<string, unknown> | null,
+      }));
+
+      await tx.insert(orderItems).values(orderItemsToInsert);
+
+      // Clear cart items (but keep saved for later items)
+      await tx
+        .delete(cartItems)
+        .where(and(eq(cartItems.cartId, userCart.id), eq(cartItems.isSavedForLater, false)));
+
+      // Update cart totals
+      await tx
+        .update(carts)
+        .set({
+          itemCount: 0,
+          subtotal: "0.00",
+          lastActivityAt: new Date(),
+        })
+        .where(eq(carts.id, userCart.id));
+
+      return createdOrder;
+    });
+
+    // Return created order
+    return c.json(
+      {
+        message: "Order created successfully",
+        order: {
+          id: newOrder.id,
+          orderNumber: newOrder.orderNumber,
+          status: newOrder.status,
+          paymentStatus: newOrder.paymentStatus,
+          subtotal: newOrder.subtotal,
+          shippingCost: newOrder.shippingCost,
+          discount: newOrder.discount,
+          tax: newOrder.tax,
+          total: newOrder.total,
+          itemCount: newOrder.itemCount,
+          currency: newOrder.currency,
+          createdAt: newOrder.createdAt,
+        },
+      },
+      201
+    );
+  } catch (error) {
+    console.error("Error creating order:", error);
+    return c.json({ error: "Failed to create order" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/orders - List User Orders
 // ============================================================================
 
-ordersApp.get(
-  "/",
-  zValidator("query", listOrdersQuerySchema),
-  async (c) => {
-    const user = c.get("user");
-    const { page, pageSize, status } = c.req.valid("query");
+ordersApp.get("/", zValidator("query", listOrdersQuerySchema), async (c) => {
+  const user = c.get("user");
+  const { page, pageSize, status } = c.req.valid("query");
 
-    try {
-      // Build where conditions
-      const conditions = [eq(orders.userId, user.id)];
+  try {
+    // Build where conditions
+    const conditions = [eq(orders.userId, user.id)];
 
-      if (status) {
-        conditions.push(eq(orders.status, status));
-      }
-
-      // Calculate offset
-      const offset = (page - 1) * pageSize;
-
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(orders)
-        .where(and(...conditions));
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Get orders with basic info
-      const orderList = await db
-        .select({
-          id: orders.id,
-          orderNumber: orders.orderNumber,
-          status: orders.status,
-          paymentStatus: orders.paymentStatus,
-          orderType: orders.orderType,
-          subtotal: orders.subtotal,
-          shippingCost: orders.shippingCost,
-          discount: orders.discount,
-          total: orders.total,
-          itemCount: orders.itemCount,
-          currency: orders.currency,
-          shippingMethod: orders.shippingMethod,
-          createdAt: orders.createdAt,
-          paidAt: orders.paidAt,
-          shippedAt: orders.shippedAt,
-          deliveredAt: orders.deliveredAt,
-        })
-        .from(orders)
-        .where(and(...conditions))
-        .orderBy(desc(orders.createdAt))
-        .limit(pageSize)
-        .offset(offset);
-
-      return c.json({
-        items: orderList,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      console.error("Error fetching orders:", error);
-      return c.json({ error: "Failed to fetch orders" }, 500);
+    if (status) {
+      conditions.push(eq(orders.status, status));
     }
+
+    // Calculate offset
+    const offset = (page - 1) * pageSize;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(and(...conditions));
+
+    const total = countResult[0]?.count ?? 0;
+
+    // Get orders with basic info
+    const orderList = await db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        status: orders.status,
+        paymentStatus: orders.paymentStatus,
+        orderType: orders.orderType,
+        subtotal: orders.subtotal,
+        shippingCost: orders.shippingCost,
+        discount: orders.discount,
+        total: orders.total,
+        itemCount: orders.itemCount,
+        currency: orders.currency,
+        shippingMethod: orders.shippingMethod,
+        createdAt: orders.createdAt,
+        paidAt: orders.paidAt,
+        shippedAt: orders.shippedAt,
+        deliveredAt: orders.deliveredAt,
+      })
+      .from(orders)
+      .where(and(...conditions))
+      .orderBy(desc(orders.createdAt))
+      .limit(pageSize)
+      .offset(offset);
+
+    return c.json({
+      items: orderList,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    return c.json({ error: "Failed to fetch orders" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/orders/:id - Get Order by ID or Order Number
@@ -527,9 +504,7 @@ ordersApp.get("/:id", async (c) => {
               status: reviews.status,
             })
             .from(reviews)
-            .where(
-              and(eq(reviews.userId, user.id), inArray(reviews.productId, productIds))
-            )
+            .where(and(eq(reviews.userId, user.id), inArray(reviews.productId, productIds)))
         : [];
 
     // Create a map for quick lookup
@@ -602,9 +577,7 @@ ordersApp.get("/:id", async (c) => {
               type: item.frame.type,
             }
           : null,
-        review: item.productId
-          ? reviewsByProductId.get(item.productId) || null
-          : null,
+        review: item.productId ? reviewsByProductId.get(item.productId) || null : null,
       })),
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
@@ -740,96 +713,92 @@ ordersApp.post("/:id/payment", async (c) => {
 // POST /api/orders/:id/payment/verify - Verify Payment
 // ============================================================================
 
-ordersApp.post(
-  "/:id/payment/verify",
-  zValidator("json", verifyPaymentSchema),
-  async (c) => {
-    const user = c.get("user");
-    const { id } = c.req.param();
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = c.req.valid("json");
+ordersApp.post("/:id/payment/verify", zValidator("json", verifyPaymentSchema), async (c) => {
+  const user = c.get("user");
+  const { id } = c.req.param();
+  const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = c.req.valid("json");
 
-    try {
-      // Determine if ID is UUID or order number
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
+  try {
+    // Determine if ID is UUID or order number
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-      if (!isUUID && !isOrderNumber) {
-        return c.json({ error: "Invalid order ID format" }, 400);
-      }
+    if (!isUUID && !isOrderNumber) {
+      return c.json({ error: "Invalid order ID format" }, 400);
+    }
 
-      // Build where condition
-      const whereCondition = isUUID
-        ? and(eq(orders.id, id), eq(orders.userId, user.id))
-        : and(eq(orders.orderNumber, id), eq(orders.userId, user.id));
+    // Build where condition
+    const whereCondition = isUUID
+      ? and(eq(orders.id, id), eq(orders.userId, user.id))
+      : and(eq(orders.orderNumber, id), eq(orders.userId, user.id));
 
-      // Get order
-      const order = await db.query.orders.findFirst({
-        where: whereCondition,
-      });
+    // Get order
+    const order = await db.query.orders.findFirst({
+      where: whereCondition,
+    });
 
-      if (!order) {
-        return c.json({ error: "Order not found" }, 404);
-      }
+    if (!order) {
+      return c.json({ error: "Order not found" }, 404);
+    }
 
-      // Verify the Razorpay order ID matches
-      const paymentDetails = order.paymentDetails as OrderPaymentDetails | null;
-      if (paymentDetails?.orderId !== razorpayOrderId) {
-        return c.json({ error: "Invalid payment order ID" }, 400);
-      }
+    // Verify the Razorpay order ID matches
+    const paymentDetails = order.paymentDetails as OrderPaymentDetails | null;
+    if (paymentDetails?.orderId !== razorpayOrderId) {
+      return c.json({ error: "Invalid payment order ID" }, 400);
+    }
 
-      // Verify payment signature
-      const isValid = verifyPaymentSignature({
-        razorpayOrderId,
-        razorpayPaymentId,
-        razorpaySignature,
-      });
+    // Verify payment signature
+    const isValid = verifyPaymentSignature({
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+    });
 
-      if (!isValid) {
-        // Update order with failed payment
-        await db
-          .update(orders)
-          .set({
-            paymentStatus: "failed",
-            updatedAt: new Date(),
-          })
-          .where(eq(orders.id, order.id));
-
-        return c.json({ error: "Payment verification failed" }, 400);
-      }
-
-      // Update order to confirmed/paid status
-      // Note: The webhook will also update this, but we update here for immediate response
+    if (!isValid) {
+      // Update order with failed payment
       await db
         .update(orders)
         .set({
-          status: "confirmed",
-          paymentStatus: "paid",
-          paymentDetails: {
-            ...paymentDetails,
-            paymentId: razorpayPaymentId,
-            transactionId: razorpayPaymentId,
-            capturedAt: new Date().toISOString(),
-          } as OrderPaymentDetails,
-          paidAt: new Date(),
+          paymentStatus: "failed",
           updatedAt: new Date(),
         })
         .where(eq(orders.id, order.id));
 
-      return c.json({
-        success: true,
-        message: "Payment verified successfully",
-        order: {
-          id: order.id,
-          orderNumber: order.orderNumber,
-          status: "confirmed",
-          paymentStatus: "paid",
-        },
-      });
-    } catch (error) {
-      return c.json({ error: "Failed to verify payment" }, 500);
+      return c.json({ error: "Payment verification failed" }, 400);
     }
+
+    // Update order to confirmed/paid status
+    // Note: The webhook will also update this, but we update here for immediate response
+    await db
+      .update(orders)
+      .set({
+        status: "confirmed",
+        paymentStatus: "paid",
+        paymentDetails: {
+          ...paymentDetails,
+          paymentId: razorpayPaymentId,
+          transactionId: razorpayPaymentId,
+          capturedAt: new Date().toISOString(),
+        } as OrderPaymentDetails,
+        paidAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id));
+
+    return c.json({
+      success: true,
+      message: "Payment verified successfully",
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: "confirmed",
+        paymentStatus: "paid",
+      },
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to verify payment" }, 500);
   }
-);
+});
 
 // ============================================================================
 // POST /api/orders/:orderId/items/:itemId/review - Create Review for Order Item
@@ -861,10 +830,7 @@ ordersApp.post(
 
       // Check order is delivered
       if (order.status !== "delivered") {
-        return c.json(
-          { error: "Reviews can only be submitted for delivered orders" },
-          400
-        );
+        return c.json({ error: "Reviews can only be submitted for delivered orders" }, 400);
       }
 
       // Get order item
@@ -884,9 +850,7 @@ ordersApp.post(
       const existingReview = await db
         .select({ id: reviews.id })
         .from(reviews)
-        .where(
-          and(eq(reviews.productId, orderItem.productId), eq(reviews.userId, user.id))
-        )
+        .where(and(eq(reviews.productId, orderItem.productId), eq(reviews.userId, user.id)))
         .limit(1);
 
       if (existingReview.length > 0) {

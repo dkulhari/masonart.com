@@ -12,11 +12,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import {
-  reviews,
-  reviewStatusEnum,
-  type ReviewStatus,
-} from "../../src/database/schema/reviews";
+import { reviews, reviewStatusEnum, type ReviewStatus } from "../../src/database/schema/reviews";
 
 // Check if we should skip database runtime tests
 const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === "true";
@@ -144,10 +140,8 @@ describe("Reviews Table Schema", () => {
       expect(result.length).toBe(1);
     });
 
-    dbTest(
-      "should have foreign key to products",
-      async () => {
-        const result = await client!`
+    dbTest("should have foreign key to products", async () => {
+      const result = await client!`
         SELECT tc.constraint_name, ccu.table_name AS foreign_table_name
         FROM information_schema.table_constraints tc
         JOIN information_schema.constraint_column_usage ccu
@@ -156,9 +150,8 @@ describe("Reviews Table Schema", () => {
           AND tc.constraint_type = 'FOREIGN KEY'
           AND ccu.table_name = 'products'
       `;
-        expect(result.length).toBe(1);
-      }
-    );
+      expect(result.length).toBe(1);
+    });
 
     dbTest("should have foreign key to users", async () => {
       const result = await client!`
@@ -176,41 +169,35 @@ describe("Reviews Table Schema", () => {
   });
 
   describe("Review Status Enum", () => {
-    dbTest(
-      "should have review_status enum with correct values",
-      async () => {
-        const result = await client!`
+    dbTest("should have review_status enum with correct values", async () => {
+      const result = await client!`
         SELECT enumlabel FROM pg_enum
         JOIN pg_type ON pg_enum.enumtypid = pg_type.oid
         WHERE pg_type.typname = 'review_status'
         ORDER BY enumsortorder
       `;
 
-        const enumValues = result.map((row: any) => row.enumlabel);
-        expect(enumValues).toContain("pending");
-        expect(enumValues).toContain("approved");
-        expect(enumValues).toContain("rejected");
-        expect(enumValues).toHaveLength(3);
-      }
-    );
+      const enumValues = result.map((row: any) => row.enumlabel);
+      expect(enumValues).toContain("pending");
+      expect(enumValues).toContain("approved");
+      expect(enumValues).toContain("rejected");
+      expect(enumValues).toHaveLength(3);
+    });
   });
 
   describe("Indexes", () => {
-    dbTest(
-      "should have indexes defined for common queries",
-      async () => {
-        const result = await client!`
+    dbTest("should have indexes defined for common queries", async () => {
+      const result = await client!`
         SELECT indexname FROM pg_indexes
         WHERE tablename = 'reviews'
       `;
 
-        const indexNames = result.map((row: any) => row.indexname);
-        expect(indexNames).toContain("reviews_product_id_idx");
-        expect(indexNames).toContain("reviews_user_id_idx");
-        expect(indexNames).toContain("reviews_status_idx");
-        expect(indexNames).toContain("reviews_created_at_idx");
-      }
-    );
+      const indexNames = result.map((row: any) => row.indexname);
+      expect(indexNames).toContain("reviews_product_id_idx");
+      expect(indexNames).toContain("reviews_user_id_idx");
+      expect(indexNames).toContain("reviews_status_idx");
+      expect(indexNames).toContain("reviews_created_at_idx");
+    });
   });
 
   describe("Rating Constraint", () => {

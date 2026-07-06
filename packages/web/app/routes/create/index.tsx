@@ -11,82 +11,81 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute, useRouteContext } from '@tanstack/react-router'
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { Sparkles, Wand2, HelpCircle, Loader2, Wallet, Gift, AlertCircle } from 'lucide-react'
+import { createFileRoute, useRouteContext } from "@tanstack/react-router";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Sparkles, Wand2, HelpCircle, Loader2, Wallet, Gift, AlertCircle } from "lucide-react";
 
-import { cn, formatPrice } from '~/lib/utils'
-import { aiApi, walletApi, type WalletBalance, type CostEstimate } from '~/lib/api'
-import { AddFundsButton } from '~/components/wallet/AddFundsButton'
-import { PromptInput } from '~/components/ai-generator/PromptInput'
+import { cn, formatPrice } from "~/lib/utils";
+import { aiApi, walletApi, type WalletBalance, type CostEstimate } from "~/lib/api";
+import { AddFundsButton } from "~/components/wallet/AddFundsButton";
+import { PromptInput } from "~/components/ai-generator/PromptInput";
 import {
   StyleSelector,
   type StylePreset,
   type AspectRatio,
-} from '~/components/ai-generator/StyleSelector'
+} from "~/components/ai-generator/StyleSelector";
 import {
   GenerationResults,
   type Generation,
   type GenerationStatus,
   type GeneratedImage,
-} from '~/components/ai-generator/GenerationResults'
+} from "~/components/ai-generator/GenerationResults";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface AIGenerationResponse {
-  message: string
+  message: string;
   generation: {
-    id: string
-    status: string
-    stylePreset: string
-    aspectRatio: string
-    variationCount: number
-    queuedAt: string
-  }
-  jobId: string
+    id: string;
+    status: string;
+    stylePreset: string;
+    aspectRatio: string;
+    variationCount: number;
+    queuedAt: string;
+  };
+  jobId: string;
 }
 
 interface AIGenerationStatusResponse {
-  id: string
-  status: GenerationStatus
-  images: GeneratedImage[] | null
-  selectedImageId: string | null
-  selectedImageUrl: string | null
-  processingTimeMs: number | null
-  errorMessage: string | null
+  id: string;
+  status: GenerationStatus;
+  images: GeneratedImage[] | null;
+  selectedImageId: string | null;
+  selectedImageUrl: string | null;
+  processingTimeMs: number | null;
+  errorMessage: string | null;
   timestamps: {
-    createdAt: string
-    queuedAt: string | null
-    processingStartedAt: string | null
-    completedAt: string | null
-  }
+    createdAt: string;
+    queuedAt: string | null;
+    processingStartedAt: string | null;
+    completedAt: string | null;
+  };
 }
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/create/')({
+export const Route = createFileRoute("/create/")({
   head: () => ({
     meta: [
-      { title: 'Create AI Poster | MasonArt' },
+      { title: "Create AI Poster | MasonArt" },
       {
-        name: 'description',
+        name: "description",
         content:
-          'Create unique, custom posters using AI. Choose from various styles like Wabi-Sabi, Abstract, Botanical, and more.',
+          "Create unique, custom posters using AI. Choose from various styles like Wabi-Sabi, Abstract, Botanical, and more.",
       },
-      { property: 'og:title', content: 'Create AI Poster | MasonArt' },
+      { property: "og:title", content: "Create AI Poster | MasonArt" },
       {
-        property: 'og:description',
-        content:
-          'Create unique, custom posters using AI. Choose from various styles.',
+        property: "og:description",
+        content: "Create unique, custom posters using AI. Choose from various styles.",
       },
     ],
   }),
   component: CreatePage,
-})
+});
 
 // ============================================================================
 // Main Component
@@ -94,96 +93,94 @@ export const Route = createFileRoute('/create/')({
 
 function CreatePage() {
   // Get session from route context if available
-  const routeContext = useRouteContext({ from: '__root__' })
-  const session = routeContext?.session
-  const user = session?.user
+  const routeContext = useRouteContext({ from: "__root__" });
+  const session = routeContext?.session;
+  const user = session?.user;
 
   // Form state
-  const [prompt, setPrompt] = useState('')
-  const [negativePrompt, setNegativePrompt] = useState('')
-  const [selectedStyle, setSelectedStyle] = useState<StylePreset>('wabi-sabi')
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState<AspectRatio>('portrait')
+  const [prompt, setPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
+  const [selectedStyle, setSelectedStyle] = useState<StylePreset>("wabi-sabi");
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<AspectRatio>("portrait");
 
   // Generation state
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [currentGeneration, setCurrentGeneration] = useState<Generation | null>(null)
-  const [progress, setProgress] = useState(0)
-  const [progressMessage, setProgressMessage] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentGeneration, setCurrentGeneration] = useState<Generation | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   // Wallet state
-  const [walletBalance, setWalletBalance] = useState<WalletBalance | null>(null)
-  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
-  const [isLoadingWallet, setIsLoadingWallet] = useState(false)
+  const [walletBalance, setWalletBalance] = useState<WalletBalance | null>(null);
+  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
 
   // Polling reference
-  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
+        clearInterval(pollingIntervalRef.current);
       }
-    }
-  }, [])
+    };
+  }, []);
 
   // Fetch wallet balance when user is logged in
   useEffect(() => {
     if (!user) {
-      setWalletBalance(null)
-      return
+      setWalletBalance(null);
+      return;
     }
 
     async function fetchWalletData() {
-      setIsLoadingWallet(true)
+      setIsLoadingWallet(true);
       try {
         const [balance, cost] = await Promise.all([
           walletApi.getBalance(),
           walletApi.estimateCost({ variationCount: 4 }),
-        ])
-        setWalletBalance(balance)
-        setCostEstimate(cost)
+        ]);
+        setWalletBalance(balance);
+        setCostEstimate(cost);
       } catch (err) {
-        console.error('Failed to fetch wallet data:', err)
+        console.error("Failed to fetch wallet data:", err);
       } finally {
-        setIsLoadingWallet(false)
+        setIsLoadingWallet(false);
       }
     }
 
-    fetchWalletData()
-  }, [user])
+    fetchWalletData();
+  }, [user]);
 
   // Refresh wallet balance after successful payment
   const handleWalletTopUpSuccess = useCallback((newBalance: number) => {
-    setWalletBalance((prev) =>
-      prev ? { ...prev, balancePaise: newBalance } : null
-    )
-  }, [])
+    setWalletBalance((prev) => (prev ? { ...prev, balancePaise: newBalance } : null));
+  }, []);
 
   // Poll for generation status
   const pollGenerationStatus = useCallback(async (generationId: string) => {
     try {
-      const status: AIGenerationStatusResponse = await aiApi.getGenerationStatus(generationId)
+      const status: AIGenerationStatusResponse = await aiApi.getGenerationStatus(generationId);
 
       // Update progress based on status
-      if (status.status === 'queued') {
-        setProgress(10)
-        setProgressMessage('Waiting in queue...')
-      } else if (status.status === 'processing') {
-        setProgress(50)
-        setProgressMessage('AI is generating your poster...')
-      } else if (status.status === 'completed') {
-        setProgress(100)
-        setProgressMessage('Complete!')
-        setIsGenerating(false)
+      if (status.status === "queued") {
+        setProgress(10);
+        setProgressMessage("Waiting in queue...");
+      } else if (status.status === "processing") {
+        setProgress(50);
+        setProgressMessage("AI is generating your poster...");
+      } else if (status.status === "completed") {
+        setProgress(100);
+        setProgressMessage("Complete!");
+        setIsGenerating(false);
 
         // Update generation with results
         setCurrentGeneration((prev) =>
           prev
             ? {
                 ...prev,
-                status: 'completed',
+                status: "completed",
                 images: status.images || [],
                 selectedImageId: status.selectedImageId || undefined,
                 selectedImageUrl: status.selectedImageUrl || undefined,
@@ -191,67 +188,65 @@ function CreatePage() {
                 completedAt: status.timestamps.completedAt || undefined,
               }
             : null
-        )
+        );
 
         // Refresh wallet balance after generation
         if (user) {
-          walletApi.getBalance().then(setWalletBalance).catch(console.error)
+          walletApi.getBalance().then(setWalletBalance).catch(console.error);
         }
 
         // Stop polling
         if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current)
-          pollingIntervalRef.current = null
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
         }
-      } else if (status.status === 'failed') {
-        setIsGenerating(false)
-        setError(status.errorMessage || 'Generation failed')
+      } else if (status.status === "failed") {
+        setIsGenerating(false);
+        setError(status.errorMessage || "Generation failed");
 
         // Update generation with error
         setCurrentGeneration((prev) =>
           prev
             ? {
                 ...prev,
-                status: 'failed',
-                errorMessage: status.errorMessage || 'Generation failed',
+                status: "failed",
+                errorMessage: status.errorMessage || "Generation failed",
               }
             : null
-        )
+        );
 
         // Stop polling
         if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current)
-          pollingIntervalRef.current = null
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
         }
-      } else if (status.status === 'cancelled') {
-        setIsGenerating(false)
-        setCurrentGeneration((prev) =>
-          prev ? { ...prev, status: 'cancelled' } : null
-        )
+      } else if (status.status === "cancelled") {
+        setIsGenerating(false);
+        setCurrentGeneration((prev) => (prev ? { ...prev, status: "cancelled" } : null));
 
         // Stop polling
         if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current)
-          pollingIntervalRef.current = null
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
         }
       }
     } catch (err) {
       // Don't stop polling on individual errors, but log them
-      console.error('Error polling generation status:', err)
+      console.error("Error polling generation status:", err);
     }
-  }, [])
+  }, []);
 
   // Handle generate button click
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) {
-      setError('Please enter a prompt')
-      return
+      setError("Please enter a prompt");
+      return;
     }
 
-    setError(null)
-    setIsGenerating(true)
-    setProgress(0)
-    setProgressMessage('Submitting request...')
+    setError(null);
+    setIsGenerating(true);
+    setProgress(0);
+    setProgressMessage("Submitting request...");
 
     try {
       const response: AIGenerationResponse = await aiApi.generate({
@@ -259,7 +254,7 @@ function CreatePage() {
         negativePrompt: negativePrompt.trim() || undefined,
         stylePreset: selectedStyle,
         aspectRatio: selectedAspectRatio,
-      })
+      });
 
       // Create initial generation object
       const newGeneration: Generation = {
@@ -270,89 +265,83 @@ function CreatePage() {
         status: response.generation.status as GenerationStatus,
         images: [],
         createdAt: response.generation.queuedAt,
-      }
+      };
 
-      setCurrentGeneration(newGeneration)
-      setProgress(10)
-      setProgressMessage('In queue...')
+      setCurrentGeneration(newGeneration);
+      setProgress(10);
+      setProgressMessage("In queue...");
 
       // Start polling for status
       pollingIntervalRef.current = setInterval(() => {
-        pollGenerationStatus(response.generation.id)
-      }, 2000)
+        pollGenerationStatus(response.generation.id);
+      }, 2000);
     } catch (err) {
-      setIsGenerating(false)
-      setError(err instanceof Error ? err.message : 'Failed to start generation')
+      setIsGenerating(false);
+      setError(err instanceof Error ? err.message : "Failed to start generation");
     }
-  }, [prompt, negativePrompt, selectedStyle, selectedAspectRatio, pollGenerationStatus])
+  }, [prompt, negativePrompt, selectedStyle, selectedAspectRatio, pollGenerationStatus]);
 
   // Handle image selection
-  const handleSelectImage = useCallback(
-    async (_generationId: string, imageId: string) => {
-      try {
-        // Optimistically update UI
-        setCurrentGeneration((prev) => {
-          if (!prev) return null
-          const selectedImage = prev.images.find((img) => img.id === imageId)
-          return {
-            ...prev,
-            selectedImageId: imageId,
-            selectedImageUrl: selectedImage?.imageUrl,
-            images: prev.images.map((img) => ({
-              ...img,
-              isSelected: img.id === imageId,
-            })),
-          }
-        })
+  const handleSelectImage = useCallback(async (_generationId: string, imageId: string) => {
+    try {
+      // Optimistically update UI
+      setCurrentGeneration((prev) => {
+        if (!prev) return null;
+        const selectedImage = prev.images.find((img) => img.id === imageId);
+        return {
+          ...prev,
+          selectedImageId: imageId,
+          selectedImageUrl: selectedImage?.imageUrl,
+          images: prev.images.map((img) => ({
+            ...img,
+            isSelected: img.id === imageId,
+          })),
+        };
+      });
 
-        // Call API to persist selection
-        // Note: This would typically be an API call
-        // await aiApi.selectImage(_generationId, imageId);
-      } catch (err) {
-        console.error('Failed to select image:', err)
-      }
-    },
-    []
-  )
+      // Call API to persist selection
+      // Note: This would typically be an API call
+      // await aiApi.selectImage(_generationId, imageId);
+    } catch (err) {
+      console.error("Failed to select image:", err);
+    }
+  }, []);
 
   // Handle add to cart
-  const handleAddToCart = useCallback(
-    (generation: Generation) => {
-      if (!generation.selectedImageUrl) {
-        setError('Please select an image first')
-        return
-      }
+  const handleAddToCart = useCallback((generation: Generation) => {
+    if (!generation.selectedImageUrl) {
+      setError("Please select an image first");
+      return;
+    }
 
-      // TODO: Navigate to product creation/cart flow
-      // For now, just log
-      console.log('Add to cart:', {
-        generationId: generation.id,
-        imageUrl: generation.selectedImageUrl,
-        stylePreset: generation.stylePreset,
-      })
+    // TODO: Navigate to product creation/cart flow
+    // For now, just log
+    console.log("Add to cart:", {
+      generationId: generation.id,
+      imageUrl: generation.selectedImageUrl,
+      stylePreset: generation.stylePreset,
+    });
 
-      // Could navigate to a product customization page
-      // navigate({ to: '/create/customize', search: { generationId: generation.id } })
-    },
-    []
-  )
+    // Could navigate to a product customization page
+    // navigate({ to: '/create/customize', search: { generationId: generation.id } })
+  }, []);
 
   // Handle retry
   const handleRetry = useCallback(() => {
-    setError(null)
-    setCurrentGeneration(null)
-    setProgress(0)
+    setError(null);
+    setCurrentGeneration(null);
+    setProgress(0);
     // User can click Generate again
-  }, [])
+  }, []);
 
   // Handle generate variations
   const handleGenerateVariations = useCallback(() => {
     // Keep the same prompt/style but regenerate
-    handleGenerate()
-  }, [handleGenerate])
+    handleGenerate();
+  }, [handleGenerate]);
 
   // Check if form is valid
-  const isFormValid = prompt.trim().length >= 3 && prompt.trim().length <= 500
+  const isFormValid = prompt.trim().length >= 3 && prompt.trim().length <= 500;
 
   return (
     <div className="flex flex-col">
@@ -435,15 +424,20 @@ function CreatePage() {
                     <div className="flex items-start gap-3">
                       <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-amber-800">
-                          Insufficient balance
-                        </p>
+                        <p className="text-sm font-medium text-amber-800">Insufficient balance</p>
                         <p className="text-xs text-amber-700 mt-1">
-                          You need {formatPrice(costEstimate.cost.userPricePaise - walletBalance.balance.paise)} more to generate.
+                          You need{" "}
+                          {formatPrice(
+                            costEstimate.cost.userPricePaise - walletBalance.balance.paise
+                          )}{" "}
+                          more to generate.
                         </p>
                         <div className="mt-3">
                           <AddFundsButton
-                            amountPaise={Math.max(10000, costEstimate.cost.userPricePaise - walletBalance.balance.paise)}
+                            amountPaise={Math.max(
+                              10000,
+                              costEstimate.cost.userPricePaise - walletBalance.balance.paise
+                            )}
                             label="Add Funds"
                             onSuccess={handleWalletTopUpSuccess}
                             userDetails={{
@@ -461,12 +455,22 @@ function CreatePage() {
               <button
                 type="button"
                 onClick={handleGenerate}
-                disabled={!isFormValid || isGenerating || !!(user && walletBalance && costEstimate && !costEstimate.canUseFreeGeneration && walletBalance.balance.paise < costEstimate.cost.userPricePaise)}
+                disabled={
+                  !isFormValid ||
+                  isGenerating ||
+                  !!(
+                    user &&
+                    walletBalance &&
+                    costEstimate &&
+                    !costEstimate.canUseFreeGeneration &&
+                    walletBalance.balance.paise < costEstimate.cost.userPricePaise
+                  )
+                }
                 className={cn(
-                  'flex items-center justify-center gap-2 rounded-lg px-8 py-4 text-base font-semibold transition-all',
+                  "flex items-center justify-center gap-2 rounded-lg px-8 py-4 text-base font-semibold transition-all",
                   isFormValid && !isGenerating
-                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30'
-                    : 'cursor-not-allowed bg-muted text-muted-foreground'
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30"
+                    : "cursor-not-allowed bg-muted text-muted-foreground"
                 )}
               >
                 {isGenerating ? (
@@ -509,7 +513,7 @@ function CreatePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -519,26 +523,23 @@ function CreatePage() {
 function TipsSection() {
   const tips = [
     {
-      title: 'Be Descriptive',
+      title: "Be Descriptive",
       description:
-        'Include details about colors, mood, composition, and lighting for better results.',
+        "Include details about colors, mood, composition, and lighting for better results.",
     },
     {
-      title: 'Try Different Styles',
-      description:
-        'Each style has unique characteristics. Experiment to find your favorite.',
+      title: "Try Different Styles",
+      description: "Each style has unique characteristics. Experiment to find your favorite.",
     },
     {
-      title: 'Use Negative Prompts',
-      description:
-        "Specify what you don't want to refine the output. E.g., 'no text, no people'.",
+      title: "Use Negative Prompts",
+      description: "Specify what you don't want to refine the output. E.g., 'no text, no people'.",
     },
     {
-      title: 'Iterate',
-      description:
-        "Don't settle on the first result. Generate variations and refine your prompt.",
+      title: "Iterate",
+      description: "Don't settle on the first result. Generate variations and refine your prompt.",
     },
-  ]
+  ];
 
   return (
     <div className="rounded-xl border border-border bg-muted/30 p-6">
@@ -555,7 +556,7 @@ function TipsSection() {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -563,15 +564,15 @@ function TipsSection() {
 // ============================================================================
 
 interface CostPreviewCardProps {
-  walletBalance: WalletBalance | null
-  costEstimate: CostEstimate | null
-  isLoading: boolean
-  onTopUpSuccess: (newBalance: number) => void
+  walletBalance: WalletBalance | null;
+  costEstimate: CostEstimate | null;
+  isLoading: boolean;
+  onTopUpSuccess: (newBalance: number) => void;
   userDetails?: {
-    name?: string
-    email?: string
-    phone?: string
-  }
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
 }
 
 function CostPreviewCard({
@@ -589,11 +590,11 @@ function CostPreviewCard({
           Loading wallet info...
         </div>
       </div>
-    )
+    );
   }
 
   if (!walletBalance || !costEstimate) {
-    return null
+    return null;
   }
 
   // User has free generations
@@ -604,9 +605,7 @@ function CostPreviewCard({
           <div className="flex items-center gap-2">
             <Gift className="h-5 w-5 text-emerald-600" />
             <div>
-              <p className="text-sm font-medium text-emerald-800">
-                Free Generation Available
-              </p>
+              <p className="text-sm font-medium text-emerald-800">Free Generation Available</p>
               <p className="text-xs text-emerald-700">
                 {walletBalance.freeGenerationsRemaining} of 3 free generations remaining
               </p>
@@ -617,38 +616,36 @@ function CostPreviewCard({
           </span>
         </div>
       </div>
-    )
+    );
   }
 
   // User will pay from wallet
-  const hasSufficientBalance = walletBalance.balance.paise >= costEstimate.cost.userPricePaise
+  const hasSufficientBalance = walletBalance.balance.paise >= costEstimate.cost.userPricePaise;
 
   return (
-    <div className={cn(
-      'rounded-lg border px-4 py-3',
-      hasSufficientBalance
-        ? 'border-border bg-muted/30'
-        : 'border-amber-200 bg-amber-50'
-    )}>
+    <div
+      className={cn(
+        "rounded-lg border px-4 py-3",
+        hasSufficientBalance ? "border-border bg-muted/30" : "border-amber-200 bg-amber-50"
+      )}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Wallet className={cn(
-            'h-5 w-5',
-            hasSufficientBalance ? 'text-muted-foreground' : 'text-amber-600'
-          )} />
+          <Wallet
+            className={cn(
+              "h-5 w-5",
+              hasSufficientBalance ? "text-muted-foreground" : "text-amber-600"
+            )}
+          />
           <div>
-            <p className="text-sm font-medium text-foreground">
-              Generation Cost
-            </p>
+            <p className="text-sm font-medium text-foreground">Generation Cost</p>
             <p className="text-xs text-muted-foreground">
               Balance: {walletBalance.balance.formatted}
             </p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-lg font-semibold text-foreground">
-            {costEstimate.cost.formatted}
-          </p>
+          <p className="text-lg font-semibold text-foreground">{costEstimate.cost.formatted}</p>
           {costEstimate.cost.markupPercentage > 0 && (
             <p className="text-xs text-muted-foreground">
               incl. {costEstimate.cost.markupPercentage}% fee
@@ -658,19 +655,20 @@ function CostPreviewCard({
       </div>
 
       {/* Quick top-up if balance is low but not insufficient */}
-      {hasSufficientBalance && walletBalance.balance.paise < costEstimate.cost.userPricePaise * 3 && (
-        <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground">Running low? Add funds now</p>
-          <AddFundsButton
-            amountPaise={10000}
-            label="+ ₹100"
-            onSuccess={onTopUpSuccess}
-            userDetails={userDetails}
-            variant="compact"
-            showIcon={false}
-          />
-        </div>
-      )}
+      {hasSufficientBalance &&
+        walletBalance.balance.paise < costEstimate.cost.userPricePaise * 3 && (
+          <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+            <p className="text-xs text-muted-foreground">Running low? Add funds now</p>
+            <AddFundsButton
+              amountPaise={10000}
+              label="+ ₹100"
+              onSuccess={onTopUpSuccess}
+              userDetails={userDetails}
+              variant="compact"
+              showIcon={false}
+            />
+          </div>
+        )}
     </div>
-  )
+  );
 }

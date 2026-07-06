@@ -4,8 +4,8 @@
  * Provides reusable test data for order-related tests
  */
 
-import type { Address } from './users';
-import { createAddress } from './users';
+import type { Address } from "./users";
+import { createAddress } from "./users";
 
 export interface OrderItem {
   id: string;
@@ -33,12 +33,19 @@ export interface Order {
   id: string;
   orderNumber: string;
   userId: string;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  status:
+    | "pending"
+    | "confirmed"
+    | "processing"
+    | "shipped"
+    | "delivered"
+    | "cancelled"
+    | "refunded";
   items: OrderItem[];
   shippingAddress: Address;
   billingAddress?: Address;
-  paymentMethod: 'razorpay' | 'stripe' | 'cod' | 'upi';
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  paymentMethod: "razorpay" | "stripe" | "cod" | "upi";
+  paymentStatus: "pending" | "paid" | "failed" | "refunded";
   paymentId?: string;
   subtotal: string;
   shippingCost: string;
@@ -52,7 +59,7 @@ export interface Order {
   internalNotes?: string;
   photoApproval?: {
     required: boolean;
-    status: 'pending' | 'sent' | 'approved' | 'changes_requested';
+    status: "pending" | "sent" | "approved" | "changes_requested";
     photoUrls?: string[];
     approvedAt?: Date;
     feedback?: string;
@@ -77,23 +84,23 @@ export interface CartItem {
  */
 export function createOrderItem(overrides?: Partial<OrderItem>): OrderItem {
   return {
-    id: 'item_1234567890',
-    orderId: 'order_1234567890',
-    productId: 'prod_1234567890',
-    variantId: 'variant_1234567890',
-    frameId: 'frame_001',
-    productTitle: 'Ocean Waves Abstract Poster',
-    productSku: 'TX234',
-    sizeLabel: '24x32 inches',
-    frameType: 'Black Frame',
+    id: "item_1234567890",
+    orderId: "order_1234567890",
+    productId: "prod_1234567890",
+    variantId: "variant_1234567890",
+    frameId: "frame_001",
+    productTitle: "Ocean Waves Abstract Poster",
+    productSku: "TX234",
+    sizeLabel: "24x32 inches",
+    frameType: "Black Frame",
     quantity: 1,
-    unitPrice: '3499.00',
-    subtotal: '3499.00',
-    imageUrl: 'https://cdn.example.com/products/tx234-main.jpg',
+    unitPrice: "3499.00",
+    subtotal: "3499.00",
+    imageUrl: "https://cdn.example.com/products/tx234-main.jpg",
     customizations: {
-      matOption: 'white',
-      glassType: 'standard',
-      signaturePlacement: 'bottom-right',
+      matOption: "white",
+      glassType: "standard",
+      signaturePlacement: "bottom-right",
     },
     ...overrides,
   };
@@ -107,27 +114,27 @@ export function createOrder(overrides?: Partial<Order>): Order {
   const estimatedDelivery = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
   return {
-    id: 'order_1234567890',
-    orderNumber: 'ORD-' + Date.now().toString().slice(-8).toUpperCase(),
-    userId: 'user_1234567890',
-    status: 'confirmed',
+    id: "order_1234567890",
+    orderNumber: "ORD-" + Date.now().toString().slice(-8).toUpperCase(),
+    userId: "user_1234567890",
+    status: "confirmed",
     items: [createOrderItem()],
     shippingAddress: createAddress({
-      fullName: 'John Doe',
-      phone: '+919876543210',
-      addressLine1: '123 MG Road',
-      city: 'Bangalore',
-      state: 'Karnataka',
-      pincode: '560001',
+      fullName: "John Doe",
+      phone: "+919876543210",
+      addressLine1: "123 MG Road",
+      city: "Bangalore",
+      state: "Karnataka",
+      pincode: "560001",
     }),
-    paymentMethod: 'razorpay',
-    paymentStatus: 'paid',
-    paymentId: 'pay_' + Math.random().toString(36).substring(2, 15),
-    subtotal: '3499.00',
-    shippingCost: '0.00',
-    tax: '629.82',
-    discount: '0.00',
-    total: '4128.82',
+    paymentMethod: "razorpay",
+    paymentStatus: "paid",
+    paymentId: "pay_" + Math.random().toString(36).substring(2, 15),
+    subtotal: "3499.00",
+    shippingCost: "0.00",
+    tax: "629.82",
+    discount: "0.00",
+    total: "4128.82",
     trackingNumber: undefined,
     shippingCarrier: undefined,
     estimatedDelivery,
@@ -144,8 +151,8 @@ export function createOrder(overrides?: Partial<Order>): Order {
  */
 export function createPendingOrder(overrides?: Partial<Order>): Order {
   return createOrder({
-    status: 'pending',
-    paymentStatus: 'pending',
+    status: "pending",
+    paymentStatus: "pending",
     paymentId: undefined,
     trackingNumber: undefined,
     ...overrides,
@@ -157,10 +164,10 @@ export function createPendingOrder(overrides?: Partial<Order>): Order {
  */
 export function createShippedOrder(overrides?: Partial<Order>): Order {
   return createOrder({
-    status: 'shipped',
-    paymentStatus: 'paid',
-    trackingNumber: 'TRK' + Date.now().toString().slice(-10).toUpperCase(),
-    shippingCarrier: 'Delhivery',
+    status: "shipped",
+    paymentStatus: "paid",
+    trackingNumber: "TRK" + Date.now().toString().slice(-10).toUpperCase(),
+    shippingCarrier: "Delhivery",
     ...overrides,
   });
 }
@@ -173,10 +180,10 @@ export function createDeliveredOrder(overrides?: Partial<Order>): Order {
   const deliveredAt = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
 
   return createOrder({
-    status: 'delivered',
-    paymentStatus: 'paid',
-    trackingNumber: 'TRK' + Date.now().toString().slice(-10).toUpperCase(),
-    shippingCarrier: 'Delhivery',
+    status: "delivered",
+    paymentStatus: "paid",
+    trackingNumber: "TRK" + Date.now().toString().slice(-10).toUpperCase(),
+    shippingCarrier: "Delhivery",
     deliveredAt,
     ...overrides,
   });
@@ -190,10 +197,10 @@ export function createCancelledOrder(overrides?: Partial<Order>): Order {
   const cancelledAt = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000); // 1 day ago
 
   return createOrder({
-    status: 'cancelled',
-    paymentStatus: 'refunded',
+    status: "cancelled",
+    paymentStatus: "refunded",
     cancelledAt,
-    notes: 'Customer requested cancellation',
+    notes: "Customer requested cancellation",
     ...overrides,
   });
 }
@@ -203,16 +210,16 @@ export function createCancelledOrder(overrides?: Partial<Order>): Order {
  */
 export function createOrderWithPhotoApproval(overrides?: Partial<Order>): Order {
   return createOrder({
-    status: 'processing',
+    status: "processing",
     photoApproval: {
       required: true,
-      status: 'pending',
+      status: "pending",
       photoUrls: [],
     },
     items: [
       createOrderItem({
-        productSku: 'AI-' + Date.now().toString().slice(-6),
-        productTitle: 'AI Generated Abstract Art',
+        productSku: "AI-" + Date.now().toString().slice(-6),
+        productTitle: "AI Generated Abstract Art",
       }),
     ],
     ...overrides,
@@ -227,22 +234,22 @@ export function createOrderItems(orderId: string, count: number = 3): OrderItem[
 
   const templates = [
     {
-      productTitle: 'Ocean Waves Abstract Poster',
-      productSku: 'TX234',
-      sizeLabel: '24x32 inches',
-      unitPrice: '3499.00',
+      productTitle: "Ocean Waves Abstract Poster",
+      productSku: "TX234",
+      sizeLabel: "24x32 inches",
+      unitPrice: "3499.00",
     },
     {
-      productTitle: 'Mountain Peaks Minimalist',
-      productSku: 'TX235',
-      sizeLabel: '18x24 inches',
-      unitPrice: '2299.00',
+      productTitle: "Mountain Peaks Minimalist",
+      productSku: "TX235",
+      sizeLabel: "18x24 inches",
+      unitPrice: "2299.00",
     },
     {
-      productTitle: 'Botanical Line Art',
-      productSku: 'TX236',
-      sizeLabel: '24x24 inches',
-      unitPrice: '2899.00',
+      productTitle: "Botanical Line Art",
+      productSku: "TX236",
+      sizeLabel: "24x24 inches",
+      unitPrice: "2899.00",
     },
   ];
 
@@ -252,16 +259,18 @@ export function createOrderItems(orderId: string, count: number = 3): OrderItem[
     const unitPrice = parseFloat(template.unitPrice);
     const subtotal = (unitPrice * quantity).toFixed(2);
 
-    items.push(createOrderItem({
-      id: `item_${orderId}_${i}`,
-      orderId,
-      productId: `prod_${i.toString().padStart(10, '0')}`,
-      variantId: `variant_${i.toString().padStart(10, '0')}`,
-      ...template,
-      quantity,
-      subtotal,
-      imageUrl: `https://cdn.example.com/products/${template.productSku.toLowerCase()}-main.jpg`,
-    }));
+    items.push(
+      createOrderItem({
+        id: `item_${orderId}_${i}`,
+        orderId,
+        productId: `prod_${i.toString().padStart(10, "0")}`,
+        variantId: `variant_${i.toString().padStart(10, "0")}`,
+        ...template,
+        quantity,
+        subtotal,
+        imageUrl: `https://cdn.example.com/products/${template.productSku.toLowerCase()}-main.jpg`,
+      })
+    );
   }
 
   return items;
@@ -274,8 +283,14 @@ export function createOrders(userId: string, count: number = 5): Order[] {
   const orders: Order[] = [];
   const now = new Date();
 
-  const statuses: Order['status'][] = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
-  const paymentStatuses: Order['paymentStatus'][] = ['pending', 'paid', 'paid', 'paid', 'paid'];
+  const statuses: Order["status"][] = [
+    "pending",
+    "confirmed",
+    "processing",
+    "shipped",
+    "delivered",
+  ];
+  const paymentStatuses: Order["paymentStatus"][] = ["pending", "paid", "paid", "paid", "paid"];
 
   for (let i = 0; i < count; i++) {
     const status = statuses[i % statuses.length];
@@ -287,19 +302,21 @@ export function createOrders(userId: string, count: number = 5): Order[] {
     const tax = subtotal * 0.18;
     const total = subtotal + tax;
 
-    orders.push(createOrder({
-      id: `order_${i.toString().padStart(10, '0')}`,
-      orderNumber: `ORD-${(100000 + i).toString()}`,
-      userId,
-      status,
-      paymentStatus,
-      items,
-      subtotal: subtotal.toFixed(2),
-      tax: tax.toFixed(2),
-      total: total.toFixed(2),
-      createdAt,
-      updatedAt: createdAt,
-    }));
+    orders.push(
+      createOrder({
+        id: `order_${i.toString().padStart(10, "0")}`,
+        orderNumber: `ORD-${(100000 + i).toString()}`,
+        userId,
+        status,
+        paymentStatus,
+        items,
+        subtotal: subtotal.toFixed(2),
+        tax: tax.toFixed(2),
+        total: total.toFixed(2),
+        createdAt,
+        updatedAt: createdAt,
+      })
+    );
   }
 
   return orders;
@@ -310,10 +327,10 @@ export function createOrders(userId: string, count: number = 5): Order[] {
  */
 export function createCartItem(overrides?: Partial<CartItem>): CartItem {
   return {
-    id: 'cart_item_' + Date.now(),
-    productId: 'prod_1234567890',
-    variantId: 'variant_1234567890',
-    frameId: 'frame_001',
+    id: "cart_item_" + Date.now(),
+    productId: "prod_1234567890",
+    variantId: "variant_1234567890",
+    frameId: "frame_001",
     quantity: 1,
     addedAt: new Date(),
     ...overrides,
@@ -327,14 +344,16 @@ export function createCartItems(count: number = 3): CartItem[] {
   const items: CartItem[] = [];
 
   for (let i = 0; i < count; i++) {
-    items.push(createCartItem({
-      id: `cart_item_${i}`,
-      productId: `prod_${i.toString().padStart(10, '0')}`,
-      variantId: `variant_${i.toString().padStart(10, '0')}`,
-      frameId: i % 2 === 0 ? `frame_00${i % 3 + 1}` : undefined,
-      quantity: 1 + (i % 2),
-      addedAt: new Date(Date.now() - i * 60 * 60 * 1000),
-    }));
+    items.push(
+      createCartItem({
+        id: `cart_item_${i}`,
+        productId: `prod_${i.toString().padStart(10, "0")}`,
+        variantId: `variant_${i.toString().padStart(10, "0")}`,
+        frameId: i % 2 === 0 ? `frame_00${(i % 3) + 1}` : undefined,
+        quantity: 1 + (i % 2),
+        addedAt: new Date(Date.now() - i * 60 * 60 * 1000),
+      })
+    );
   }
 
   return items;
@@ -343,7 +362,11 @@ export function createCartItems(count: number = 3): CartItem[] {
 /**
  * Calculate order totals
  */
-export function calculateOrderTotals(items: OrderItem[], shippingCost: number = 0, discountAmount: number = 0): {
+export function calculateOrderTotals(
+  items: OrderItem[],
+  shippingCost: number = 0,
+  discountAmount: number = 0
+): {
   subtotal: string;
   shippingCost: string;
   tax: string;

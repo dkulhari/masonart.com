@@ -10,17 +10,17 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { z } from 'zod'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
+import { Plus, RefreshCw, AlertCircle } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { getApiUrl } from "~/lib/utils";
 import {
-  Plus,
-  RefreshCw,
-  AlertCircle,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { getApiUrl } from '~/lib/utils'
-import { ProductsTable, ProductsTableSkeleton, type AdminProduct } from '~/components/admin/ProductsTable'
+  ProductsTable,
+  ProductsTableSkeleton,
+  type AdminProduct,
+} from "~/components/admin/ProductsTable";
 
 // ============================================================================
 // Route Configuration
@@ -29,37 +29,40 @@ import { ProductsTable, ProductsTableSkeleton, type AdminProduct } from '~/compo
 const searchParamsSchema = z.object({
   page: z.coerce.number().positive().optional().default(1),
   pageSize: z.coerce.number().positive().max(100).optional().default(20),
-  status: z.enum(['draft', 'active', 'archived']).optional(),
+  status: z.enum(["draft", "active", "archived"]).optional(),
   search: z.string().optional(),
-  sortBy: z.enum(['createdAt', 'updatedAt', 'title', 'basePrice', 'sku']).optional().default('createdAt'),
-  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
-})
+  sortBy: z
+    .enum(["createdAt", "updatedAt", "title", "basePrice", "sku"])
+    .optional()
+    .default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+});
 
-type SearchParams = z.infer<typeof searchParamsSchema>
+type SearchParams = z.infer<typeof searchParamsSchema>;
 
-export const Route = createFileRoute('/admin/products/')({
+export const Route = createFileRoute("/admin/products/")({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Products | Admin | MasonArt' },
-      { name: 'robots', content: 'noindex, nofollow' },
+      { title: "Products | Admin | MasonArt" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: AdminProductsPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface PaginatedResponse {
-  items: AdminProduct[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
+  items: AdminProduct[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 // ============================================================================
@@ -67,50 +70,47 @@ interface PaginatedResponse {
 // ============================================================================
 
 async function fetchProducts(params: SearchParams): Promise<PaginatedResponse> {
-  const queryParams = new URLSearchParams()
+  const queryParams = new URLSearchParams();
 
-  queryParams.set('page', String(params.page))
-  queryParams.set('pageSize', String(params.pageSize))
-  queryParams.set('sortBy', params.sortBy)
-  queryParams.set('sortOrder', params.sortOrder)
+  queryParams.set("page", String(params.page));
+  queryParams.set("pageSize", String(params.pageSize));
+  queryParams.set("sortBy", params.sortBy);
+  queryParams.set("sortOrder", params.sortOrder);
 
   if (params.status) {
-    queryParams.set('status', params.status)
+    queryParams.set("status", params.status);
   }
 
   if (params.search) {
-    queryParams.set('search', params.search)
+    queryParams.set("search", params.search);
   }
 
-  const response = await fetch(
-    `${getApiUrl()}/api/admin/products?${queryParams.toString()}`,
-    {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  )
+  const response = await fetch(`${getApiUrl()}/api/admin/products?${queryParams.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch products')
+    throw new Error("Failed to fetch products");
   }
 
-  return response.json()
+  return response.json();
 }
 
 async function archiveProduct(id: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/products/${id}`, {
-    method: 'DELETE',
-    credentials: 'include',
+    method: "DELETE",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-  })
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to archive product')
+    throw new Error("Failed to archive product");
   }
 }
 
@@ -119,10 +119,10 @@ async function archiveProduct(id: string): Promise<void> {
 // ============================================================================
 
 function AdminProductsPage() {
-  const navigate = useNavigate()
-  const searchParams = Route.useSearch()
+  const navigate = useNavigate();
+  const searchParams = Route.useSearch();
 
-  const [products, setProducts] = useState<AdminProduct[]>([])
+  const [products, setProducts] = useState<AdminProduct[]>([]);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -130,17 +130,17 @@ function AdminProductsPage() {
     totalPages: 0,
     hasNextPage: false,
     hasPreviousPage: false,
-  })
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch products
   const loadProducts = useCallback(async () => {
     try {
-      setError(null)
-      const data = await fetchProducts(searchParams)
-      setProducts(data.items)
+      setError(null);
+      const data = await fetchProducts(searchParams);
+      setProducts(data.items);
       setPagination({
         total: data.total,
         page: data.page,
@@ -148,70 +148,72 @@ function AdminProductsPage() {
         totalPages: data.totalPages,
         hasNextPage: data.hasNextPage,
         hasPreviousPage: data.hasPreviousPage,
-      })
+      });
     } catch (err) {
-      setError('Failed to load products. Please try again.')
+      setError("Failed to load products. Please try again.");
     } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [searchParams])
+  }, [searchParams]);
 
   useEffect(() => {
-    setIsLoading(true)
-    loadProducts()
-  }, [loadProducts])
+    setIsLoading(true);
+    loadProducts();
+  }, [loadProducts]);
 
   // Refresh handler
   const handleRefresh = () => {
-    setIsRefreshing(true)
-    loadProducts()
-  }
+    setIsRefreshing(true);
+    loadProducts();
+  };
 
   // Update URL params
   const updateSearch = (updates: Partial<SearchParams>) => {
     navigate({
-      to: '/admin/products',
+      to: "/admin/products",
       search: (prev: SearchParams) => ({
         ...prev,
         ...updates,
-        page: updates.page || (updates.status !== undefined || updates.search !== undefined ? 1 : prev.page),
+        page:
+          updates.page ||
+          (updates.status !== undefined || updates.search !== undefined ? 1 : prev.page),
       }),
-    })
-  }
+    });
+  };
 
   // Navigation handlers
   const handleCreateProduct = () => {
-    navigate({ to: '/admin/products/new' })
-  }
+    navigate({ to: "/admin/products/new" });
+  };
 
   const handleEditProduct = (product: AdminProduct) => {
     navigate({
-      to: '/admin/products/$id',
+      to: "/admin/products/$id",
       params: { id: product.id },
-    })
-  }
+    });
+  };
 
   const handleViewProduct = (product: AdminProduct) => {
     navigate({
-      to: '/admin/products/$id',
+      to: "/admin/products/$id",
       params: { id: product.id },
-    })
-  }
+    });
+  };
 
   // Archive handler
   const handleArchiveProduct = async (product: AdminProduct) => {
     if (!confirm(`Are you sure you want to archive "${product.title}"?`)) {
-      return
+      return;
     }
 
     try {
-      await archiveProduct(product.id)
-      loadProducts()
+      await archiveProduct(product.id);
+      loadProducts();
     } catch (err) {
-      setError('Failed to archive product. Please try again.')
+      setError("Failed to archive product. Please try again.");
     }
-  }
+  };
 
   // Delete handler (same as archive for soft delete)
   const handleDeleteProduct = async (product: AdminProduct) => {
@@ -220,37 +222,33 @@ function AdminProductsPage() {
         `Are you sure you want to delete "${product.title}"? This action will archive the product.`
       )
     ) {
-      return
+      return;
     }
 
     try {
-      await archiveProduct(product.id)
-      loadProducts()
+      await archiveProduct(product.id);
+      loadProducts();
     } catch (err) {
-      setError('Failed to delete product. Please try again.')
+      setError("Failed to delete product. Please try again.");
     }
-  }
+  };
 
   // Bulk archive
   const handleBulkArchive = async (selectedProducts: AdminProduct[]) => {
-    if (
-      !confirm(
-        `Are you sure you want to archive ${selectedProducts.length} products?`
-      )
-    ) {
-      return
+    if (!confirm(`Are you sure you want to archive ${selectedProducts.length} products?`)) {
+      return;
     }
 
     try {
-      await Promise.all(selectedProducts.map((p) => archiveProduct(p.id)))
-      loadProducts()
+      await Promise.all(selectedProducts.map((p) => archiveProduct(p.id)));
+      loadProducts();
     } catch (err) {
-      setError('Failed to archive some products. Please try again.')
+      setError("Failed to archive some products. Please try again.");
     }
-  }
+  };
 
   // Bulk delete (same as archive)
-  const handleBulkDelete = handleBulkArchive
+  const handleBulkDelete = handleBulkArchive;
 
   return (
     <div className="space-y-6">
@@ -270,7 +268,7 @@ function AdminProductsPage() {
             disabled={isLoading || isRefreshing}
             className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           >
-            <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
 
@@ -343,7 +341,7 @@ function AdminProductsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default AdminProductsPage
+export default AdminProductsPage;

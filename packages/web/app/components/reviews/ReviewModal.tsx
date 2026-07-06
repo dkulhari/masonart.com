@@ -6,10 +6,10 @@
  * for both create and edit modes.
  */
 
-import { useCallback, useEffect } from 'react'
-import { X } from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { ReviewForm, type ReviewFormData } from './ReviewForm'
+import { useCallback, useEffect } from "react";
+import { X } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { ReviewForm, type ReviewFormData } from "./ReviewForm";
 
 // ============================================================================
 // Types
@@ -17,28 +17,28 @@ import { ReviewForm, type ReviewFormData } from './ReviewForm'
 
 export interface ReviewModalProps {
   /** Whether the modal is open */
-  isOpen: boolean
+  isOpen: boolean;
   /** Callback to close the modal */
-  onClose: () => void
+  onClose: () => void;
   /** Order ID for creating a new review */
-  orderId: string
+  orderId: string;
   /** Order item ID for creating a new review */
-  orderItemId: string
+  orderItemId: string;
   /** Product ID being reviewed */
-  productId: string
+  productId: string;
   /** Product name to display in header */
-  productName: string
+  productName: string;
   /** Optional product thumbnail URL */
-  productThumbnail?: string
+  productThumbnail?: string;
   /** Existing review data for edit mode */
   existingReview?: {
-    id: string
-    rating: number
-    title?: string
-    content: string
-  }
+    id: string;
+    rating: number;
+    title?: string;
+    content: string;
+  };
   /** Callback after successful submission */
-  onSuccess?: () => void
+  onSuccess?: () => void;
 }
 
 // ============================================================================
@@ -92,64 +92,64 @@ export function ReviewModal({
 }: ReviewModalProps) {
   // Handle escape key to close modal
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) return;
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
+      if (e.key === "Escape") {
+        onClose();
       }
-    }
+    };
 
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden'
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = ''
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isOpen])
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
 
   // Handle form submission - routes to appropriate API endpoint
   const handleSubmit = useCallback(
     async (data: ReviewFormData) => {
       const url = existingReview
         ? `/api/reviews/${existingReview.id}`
-        : `/api/orders/${orderId}/items/${orderItemId}/review`
+        : `/api/orders/${orderId}/items/${orderItemId}/review`;
 
-      const method = existingReview ? 'PATCH' : 'POST'
+      const method = existingReview ? "PATCH" : "POST";
 
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data),
-      })
+      });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}))
-        throw new Error(error.error || 'Failed to submit review')
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to submit review");
       }
     },
     [orderId, orderItemId, existingReview]
-  )
+  );
 
   // Handle successful submission - call callback and close modal
   const handleSuccess = useCallback(() => {
-    onSuccess?.()
+    onSuccess?.();
     // Delay close slightly to show success state
-    setTimeout(() => onClose(), 1500)
-  }, [onSuccess, onClose])
+    setTimeout(() => onClose(), 1500);
+  }, [onSuccess, onClose]);
 
   // Don't render if not open
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -163,9 +163,9 @@ export function ReviewModal({
       {/* Modal */}
       <div
         className={cn(
-          'relative z-10 w-full max-w-lg mx-4',
-          'bg-card rounded-xl shadow-xl',
-          'max-h-[90vh] overflow-y-auto'
+          "relative z-10 w-full max-w-lg mx-4",
+          "bg-card rounded-xl shadow-xl",
+          "max-h-[90vh] overflow-y-auto"
         )}
         role="dialog"
         aria-modal="true"
@@ -183,7 +183,7 @@ export function ReviewModal({
             )}
             <div>
               <h2 id="review-modal-title" className="text-lg font-semibold text-foreground">
-                {existingReview ? 'Edit Review' : 'Write a Review'}
+                {existingReview ? "Edit Review" : "Write a Review"}
               </h2>
               <p className="text-sm text-muted-foreground line-clamp-1">{productName}</p>
             </div>
@@ -207,7 +207,7 @@ export function ReviewModal({
               existingReview
                 ? {
                     rating: existingReview.rating,
-                    title: existingReview.title || '',
+                    title: existingReview.title || "",
                     content: existingReview.content,
                   }
                 : undefined
@@ -220,11 +220,11 @@ export function ReviewModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Default Export
 // ============================================================================
 
-export default ReviewModal
+export default ReviewModal;

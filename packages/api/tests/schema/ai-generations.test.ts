@@ -1,9 +1,6 @@
 // packages/api/tests/schema/ai-generations.test.ts
 import { describe, it, expect } from "vitest";
-import {
-  aiModerationStatusEnum,
-  aiGenerations,
-} from "../../src/database/schema/ai-generations";
+import { aiModerationStatusEnum, aiGenerations } from "../../src/database/schema/ai-generations";
 
 describe("AI Moderation Status Enum", () => {
   it("should have all required moderation statuses", () => {

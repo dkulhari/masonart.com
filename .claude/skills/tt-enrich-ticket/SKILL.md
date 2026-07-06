@@ -34,6 +34,7 @@ $ARGUMENTS: <ticket-id | feature-name> [--query=<specific-query>]
 - `--query`: Optional specific query to search for (e.g., `--query="why gemini over openai"`)
 
 **Examples:**
+
 ```bash
 /tt-enrich-ticket 159                           # Single ticket
 /tt-enrich-ticket gemini-direct-provider        # All tickets in feature
@@ -51,11 +52,13 @@ ToolSearch: "+ticketrack list"
 ```
 
 Then call:
+
 ```
 mcp__ticketrack__listFeatures
 ```
 
 **If ToolSearch returns no ticketrack tools OR listFeatures fails:**
+
 ```
 ❌ TickeTrack MCP Not Available
 
@@ -72,12 +75,14 @@ To fix:
 ### Step 1: Resolve Target Tickets
 
 **If ticket ID provided:**
+
 ```yaml
 mcp__ticketrack__getTicket:
   ticketId: <id>
 ```
 
 **If feature name provided:**
+
 ```yaml
 mcp__ticketrack__listTickets:
   featureName: <feature-name>
@@ -88,6 +93,7 @@ Collect all ticket IDs for processing.
 ### Step 2: For Each Ticket (Interactive Loop)
 
 **2a. Display ticket context:**
+
 ```
 ┌─────────────────────────────────────────┐
 │ Ticket #159 - Add Google Generative AI  │
@@ -97,6 +103,7 @@ Collect all ticket IDs for processing.
 ```
 
 **2b. Build search query:**
+
 - Extract file paths from ticket description
 - Extract keywords from ticket title
 - If `--query` provided, use that as primary search
@@ -109,16 +116,19 @@ mcp__plugin_claude-mem_mcp-search__search:
 
 **2c. Filter for decisions:**
 Look for observations with:
+
 - Type indicator `⚖️` (decision)
 - Keywords: "decided", "decision", "chose", "rationale", "why", "trade-off"
 
 **2d. Fetch full observation content:**
+
 ```yaml
 mcp__plugin_claude-mem_mcp-search__get_observations:
   ids: [<observation-ids>]
 ```
 
 **2e. Present findings to user:**
+
 ```
 Searching claude-mem for decisions...
 
@@ -133,6 +143,7 @@ allowing file fallback, ensuring data integrity..."
 **2f. Ask user for action:**
 
 Use AskUserQuestion with options:
+
 - **Add** - Add this decision as comment
 - **Skip** - Skip this observation, continue to next
 - **Skip All** - Skip remaining tickets
@@ -158,6 +169,7 @@ mcp__ticketrack__addComment:
 ### Step 4: Continue or Complete
 
 After each ticket:
+
 - If more tickets remain and user didn't "Skip All", continue to next
 - Track statistics: tickets processed, decisions added, skipped
 
@@ -184,16 +196,19 @@ Tickets enriched:
 ## Search Strategy
 
 **Primary search (decisions):**
+
 1. File paths from ticket → search claude-mem
 2. Filter for `⚖️` type observations
 3. Look for decision keywords in title/narrative
 
 **With --query flag:**
+
 1. Use provided query directly
 2. Combine with ticket file paths for relevance
 3. Still filter for decision-type observations
 
 **Relevance scoring:**
+
 - Direct file path match: highest priority
 - Feature name match: high priority
 - Keyword match in title: medium priority
@@ -211,6 +226,7 @@ allowing file fallback, ensuring data integrity across all ticket
 operations.
 
 **Rationale**:
+
 - Prevents data corruption from concurrent writes
 - Ensures proper validation via MCP layer
 - Maintains audit trail through MCP logging
@@ -218,18 +234,19 @@ operations.
 
 ## Error Handling
 
-| Error | Response |
-|-------|----------|
-| TickeTrack MCP unavailable | **STOP** - Display connection error, do not proceed |
-| Ticket not found | "Ticket #{id} not found" |
-| Feature not found | "Feature '{name}' not found" |
-| No decisions found | "No decision observations found for this ticket" (continue to next) |
-| claude-mem search fails | Report error, continue to next ticket |
-| User aborts (Skip All) | Complete with partial summary |
+| Error                      | Response                                                            |
+| -------------------------- | ------------------------------------------------------------------- |
+| TickeTrack MCP unavailable | **STOP** - Display connection error, do not proceed                 |
+| Ticket not found           | "Ticket #{id} not found"                                            |
+| Feature not found          | "Feature '{name}' not found"                                        |
+| No decisions found         | "No decision observations found for this ticket" (continue to next) |
+| claude-mem search fails    | Report error, continue to next ticket                               |
+| User aborts (Skip All)     | Complete with partial summary                                       |
 
 ## Multiple Invocations
 
 This skill is **idempotent-safe**:
+
 - Before adding a comment, check if observation ID already referenced in existing comments
 - Skip already-added observations with note: "Already added: #2379"
 - User can run multiple times to add more context as it becomes available

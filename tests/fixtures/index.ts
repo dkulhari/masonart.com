@@ -27,14 +27,9 @@ export {
   createProductVariants,
   createFrames,
   createAIGeneratedProduct,
-} from './products';
+} from "./products";
 
-export type {
-  Product,
-  ProductVariant,
-  ProductImage,
-  Frame,
-} from './products';
+export type { Product, ProductVariant, ProductImage, Frame } from "./products";
 
 // ============================================================================
 // User fixtures
@@ -50,14 +45,9 @@ export {
   createAddresses,
   createSession,
   createCompleteUser,
-} from './users';
+} from "./users";
 
-export type {
-  User,
-  Address,
-  UserPreferences,
-  Session,
-} from './users';
+export type { User, Address, UserPreferences, Session } from "./users";
 
 // ============================================================================
 // Order fixtures
@@ -75,13 +65,9 @@ export {
   createCartItem,
   createCartItems,
   calculateOrderTotals,
-} from './orders';
+} from "./orders";
 
-export type {
-  Order,
-  OrderItem,
-  CartItem,
-} from './orders';
+export type { Order, OrderItem, CartItem } from "./orders";
 
 // ============================================================================
 // AI Generation fixtures
@@ -97,7 +83,7 @@ export {
   createAIParameters,
   stylePresets,
   aspectRatios,
-} from './ai';
+} from "./ai";
 
 export type {
   AIGeneration,
@@ -108,7 +94,7 @@ export type {
   StylePreset,
   AIGenerationStatus,
   ModerationStatus,
-} from './ai';
+} from "./ai";
 
 // ============================================================================
 // Review fixtures
@@ -119,14 +105,9 @@ export {
   invalidReviewContent,
   generateRandomReview,
   generateRandomReviews,
-} from './reviews';
+} from "./reviews";
 
-export type {
-  Review,
-  ReviewAuthor,
-  ReviewProduct,
-  ReviewStats,
-} from './reviews';
+export type { Review, ReviewAuthor, ReviewProduct, ReviewStats } from "./reviews";
 
 // ============================================================================
 // Playwright E2E test helpers
@@ -155,11 +136,9 @@ export {
   generateTestEmail,
   assertions,
   selectors,
-} from './playwright';
+} from "./playwright";
 
-export type {
-  TestSeedConfig,
-} from './playwright';
+export type { TestSeedConfig } from "./playwright";
 
 // ============================================================================
 // Database test helpers
@@ -175,9 +154,6 @@ export {
   getProductWithVariants,
   testIsolation,
   quickTestData,
-} from './database';
+} from "./database";
 
-export type {
-  TestDataSet,
-  TestDataConfig,
-} from './database';
+export type { TestDataSet, TestDataConfig } from "./database";

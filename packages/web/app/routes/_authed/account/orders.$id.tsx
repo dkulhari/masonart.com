@@ -10,8 +10,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Package,
@@ -30,105 +30,110 @@ import {
   ExternalLink,
   Star,
   PenLine,
-} from 'lucide-react'
-import { cn, formatPrice, formatDate } from '~/lib/utils'
-import { authApi, ordersApi } from '~/lib/api'
-import { OrderTrackingCard } from '~/components/order'
-import { ReviewModal } from '~/components/reviews'
+} from "lucide-react";
+import { cn, formatPrice, formatDate } from "~/lib/utils";
+import { authApi, ordersApi } from "~/lib/api";
+import { OrderTrackingCard } from "~/components/order";
+import { ReviewModal } from "~/components/reviews";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/_authed/account/orders/$id')({
+export const Route = createFileRoute("/_authed/account/orders/$id")({
   head: () => ({
     meta: [
-      { title: 'Order Details | MasonArt' },
-      { name: 'description', content: 'View your order details and tracking information.' },
-      { name: 'robots', content: 'noindex' },
+      { title: "Order Details | MasonArt" },
+      { name: "description", content: "View your order details and tracking information." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: OrderDetailPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface OrderItem {
-  id: string
-  productId: string
-  productTitle: string
-  productSlug?: string
-  thumbnailUrl?: string
-  sizeLabel?: string
-  frameName?: string
-  quantity: number
-  unitPrice: number
-  framePrice?: number
-  totalPrice: number
+  id: string;
+  productId: string;
+  productTitle: string;
+  productSlug?: string;
+  thumbnailUrl?: string;
+  sizeLabel?: string;
+  frameName?: string;
+  quantity: number;
+  unitPrice: number;
+  framePrice?: number;
+  totalPrice: number;
   review?: {
-    id: string
-    status: 'pending' | 'approved' | 'rejected'
-  } | null
+    id: string;
+    status: "pending" | "approved" | "rejected";
+  } | null;
 }
 
 interface ShippingAddress {
-  fullName: string
-  phone: string
-  addressLine1: string
-  addressLine2?: string
-  landmark?: string
-  city: string
-  state: string
-  postalCode: string
-  countryCode?: string
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2?: string;
+  landmark?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  countryCode?: string;
 }
 
 type OrderStatus =
-  | 'pending_payment'
-  | 'confirmed'
-  | 'processing'
-  | 'shipped'
-  | 'out_for_delivery'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded'
+  | "pending_payment"
+  | "confirmed"
+  | "processing"
+  | "shipped"
+  | "out_for_delivery"
+  | "delivered"
+  | "cancelled"
+  | "refunded";
 
-type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded'
+type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "partially_refunded";
 
-type ApprovalStatus = 'pending_upload' | 'pending_approval' | 'changes_requested' | 'approved' | 'expired'
+type ApprovalStatus =
+  | "pending_upload"
+  | "pending_approval"
+  | "changes_requested"
+  | "approved"
+  | "expired";
 
 interface OrderApproval {
-  id: string
-  orderItemId: string
-  status: ApprovalStatus
-  approvalToken: string
-  deadlineAt?: string | null
-  approvedAt?: string | null
-  createdAt: string
+  id: string;
+  orderItemId: string;
+  status: ApprovalStatus;
+  approvalToken: string;
+  deadlineAt?: string | null;
+  approvedAt?: string | null;
+  createdAt: string;
 }
 
 interface OrderDetail {
-  id: string
-  orderNumber: string
-  status: OrderStatus
-  paymentStatus: PaymentStatus
-  createdAt: string
-  updatedAt: string
-  items: OrderItem[]
-  subtotal: number
-  shippingCost: number
-  taxAmount: number
-  discountAmount: number
-  total: number
-  shippingAddress: ShippingAddress
-  shippingMethod?: string
-  customerNotes?: string
-  estimatedDelivery?: string
-  shippedAt?: string
-  deliveredAt?: string
-  approvals?: OrderApproval[]
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderItem[];
+  subtotal: number;
+  shippingCost: number;
+  taxAmount: number;
+  discountAmount: number;
+  total: number;
+  shippingAddress: ShippingAddress;
+  shippingMethod?: string;
+  customerNotes?: string;
+  estimatedDelivery?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
+  approvals?: OrderApproval[];
 }
 
 // ============================================================================
@@ -136,175 +141,178 @@ interface OrderDetail {
 // ============================================================================
 
 interface StatusConfig {
-  label: string
-  icon: typeof Package
-  color: string
-  bgColor: string
+  label: string;
+  icon: typeof Package;
+  color: string;
+  bgColor: string;
 }
 
 const ORDER_STATUS_CONFIG: Record<OrderStatus, StatusConfig> = {
   pending_payment: {
-    label: 'Pending Payment',
+    label: "Pending Payment",
     icon: Clock,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-100',
+    color: "text-amber-600",
+    bgColor: "bg-amber-100",
   },
   confirmed: {
-    label: 'Confirmed',
+    label: "Confirmed",
     icon: CheckCircle,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
+    color: "text-blue-600",
+    bgColor: "bg-blue-100",
   },
   processing: {
-    label: 'Processing',
+    label: "Processing",
     icon: Package,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
+    color: "text-purple-600",
+    bgColor: "bg-purple-100",
   },
   shipped: {
-    label: 'Shipped',
+    label: "Shipped",
     icon: Truck,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
+    color: "text-blue-600",
+    bgColor: "bg-blue-100",
   },
   out_for_delivery: {
-    label: 'Out for Delivery',
+    label: "Out for Delivery",
     icon: Truck,
-    color: 'text-cyan-600',
-    bgColor: 'bg-cyan-100',
+    color: "text-cyan-600",
+    bgColor: "bg-cyan-100",
   },
   delivered: {
-    label: 'Delivered',
+    label: "Delivered",
     icon: CheckCircle,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
+    color: "text-green-600",
+    bgColor: "bg-green-100",
   },
   cancelled: {
-    label: 'Cancelled',
+    label: "Cancelled",
     icon: XCircle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
+    color: "text-red-600",
+    bgColor: "bg-red-100",
   },
   refunded: {
-    label: 'Refunded',
+    label: "Refunded",
     icon: CreditCard,
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
   },
-}
+};
 
 const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, StatusConfig> = {
   pending: {
-    label: 'Pending',
+    label: "Pending",
     icon: Clock,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-100',
+    color: "text-amber-600",
+    bgColor: "bg-amber-100",
   },
   paid: {
-    label: 'Paid',
+    label: "Paid",
     icon: CheckCircle,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
+    color: "text-green-600",
+    bgColor: "bg-green-100",
   },
   failed: {
-    label: 'Failed',
+    label: "Failed",
     icon: XCircle,
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
+    color: "text-red-600",
+    bgColor: "bg-red-100",
   },
   refunded: {
-    label: 'Refunded',
+    label: "Refunded",
     icon: CreditCard,
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
   },
   partially_refunded: {
-    label: 'Partial Refund',
+    label: "Partial Refund",
     icon: CreditCard,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
+    color: "text-orange-600",
+    bgColor: "bg-orange-100",
   },
-}
+};
 
-const APPROVAL_STATUS_CONFIG: Record<ApprovalStatus, { label: string; color: string; bgColor: string }> = {
+const APPROVAL_STATUS_CONFIG: Record<
+  ApprovalStatus,
+  { label: string; color: string; bgColor: string }
+> = {
   pending_upload: {
-    label: 'Awaiting Photos',
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100',
+    label: "Awaiting Photos",
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
   },
   pending_approval: {
-    label: 'Ready for Review',
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-100',
+    label: "Ready for Review",
+    color: "text-amber-600",
+    bgColor: "bg-amber-100",
   },
   changes_requested: {
-    label: 'Changes Requested',
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
+    label: "Changes Requested",
+    color: "text-orange-600",
+    bgColor: "bg-orange-100",
   },
   approved: {
-    label: 'Approved',
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
+    label: "Approved",
+    color: "text-green-600",
+    bgColor: "bg-green-100",
   },
   expired: {
-    label: 'Expired',
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
+    label: "Expired",
+    color: "text-red-600",
+    bgColor: "bg-red-100",
   },
-}
+};
 
 // ============================================================================
 // Approval Status Section
 // ============================================================================
 
 function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
-  if (approvals.length === 0) return null
+  if (approvals.length === 0) return null;
 
   // Compute overall status
   const getOverallStatus = (): ApprovalStatus => {
     const statusPriority: ApprovalStatus[] = [
-      'expired',
-      'changes_requested',
-      'pending_upload',
-      'pending_approval',
-      'approved',
-    ]
+      "expired",
+      "changes_requested",
+      "pending_upload",
+      "pending_approval",
+      "approved",
+    ];
 
     for (const status of statusPriority) {
       if (approvals.some((a) => a.status === status)) {
-        return status
+        return status;
       }
     }
-    return 'pending_upload'
-  }
+    return "pending_upload";
+  };
 
-  const overallStatus = getOverallStatus()
-  const config = APPROVAL_STATUS_CONFIG[overallStatus]
+  const overallStatus = getOverallStatus();
+  const config = APPROVAL_STATUS_CONFIG[overallStatus];
   const pendingCount = approvals.filter(
-    (a) => a.status !== 'approved' && a.status !== 'expired'
-  ).length
-  const approvedCount = approvals.filter((a) => a.status === 'approved').length
-  const allApproved = approvedCount === approvals.length
+    (a) => a.status !== "approved" && a.status !== "expired"
+  ).length;
+  const approvedCount = approvals.filter((a) => a.status === "approved").length;
+  const allApproved = approvedCount === approvals.length;
 
   // Find first pending approval token
   const pendingApproval = approvals.find(
-    (a) => a.status === 'pending_approval' || a.status === 'changes_requested'
-  )
+    (a) => a.status === "pending_approval" || a.status === "changes_requested"
+  );
 
   // Get deadline info
   const getDeadlineText = () => {
-    if (!pendingApproval?.deadlineAt) return null
-    const deadline = new Date(pendingApproval.deadlineAt)
-    const now = new Date()
-    const hoursRemaining = Math.max(0, (deadline.getTime() - now.getTime()) / (1000 * 60 * 60))
+    if (!pendingApproval?.deadlineAt) return null;
+    const deadline = new Date(pendingApproval.deadlineAt);
+    const now = new Date();
+    const hoursRemaining = Math.max(0, (deadline.getTime() - now.getTime()) / (1000 * 60 * 60));
 
-    if (hoursRemaining <= 0) return 'Deadline passed'
-    if (hoursRemaining <= 24) return `${Math.ceil(hoursRemaining)} hours remaining`
-    return `${Math.ceil(hoursRemaining / 24)} days remaining`
-  }
+    if (hoursRemaining <= 0) return "Deadline passed";
+    if (hoursRemaining <= 24) return `${Math.ceil(hoursRemaining)} hours remaining`;
+    return `${Math.ceil(hoursRemaining / 24)} days remaining`;
+  };
 
-  const deadlineText = getDeadlineText()
+  const deadlineText = getDeadlineText();
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -319,7 +327,7 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
           <span className="text-sm text-muted-foreground">Status</span>
           <div
             className={cn(
-              'flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium',
+              "flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium",
               config.bgColor,
               config.color
             )}
@@ -343,10 +351,12 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
         {deadlineText && pendingCount > 0 && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Deadline</span>
-            <span className={cn(
-              'flex items-center gap-1 text-sm',
-              deadlineText.includes('hours') ? 'text-red-600' : 'text-foreground'
-            )}>
+            <span
+              className={cn(
+                "flex items-center gap-1 text-sm",
+                deadlineText.includes("hours") ? "text-red-600" : "text-foreground"
+              )}
+            >
               <Timer className="h-3.5 w-3.5" />
               {deadlineText}
             </span>
@@ -372,7 +382,7 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -380,71 +390,71 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
 // ============================================================================
 
 function OrderDetailPage() {
-  const navigate = useNavigate()
-  const params = Route.useParams()
-  const id = params.id
+  const navigate = useNavigate();
+  const params = Route.useParams();
+  const id = params.id;
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
-  const [order, setOrder] = useState<OrderDetail | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [reviewModalState, setReviewModalState] = useState<{
-    isOpen: boolean
-    orderItemId: string
-    productId: string
-    productName: string
-    productThumbnail?: string
-    existingReview?: { id: string; rating: number; title?: string; content: string }
-  } | null>(null)
+    isOpen: boolean;
+    orderItemId: string;
+    productId: string;
+    productName: string;
+    productThumbnail?: string;
+    existingReview?: { id: string; rating: number; title?: string; content: string };
+  } | null>(null);
 
   // Check authentication
   useEffect(() => {
     async function checkAuth() {
       try {
-        const session = await authApi.getSession()
+        const session = await authApi.getSession();
         if (!session?.user) {
           navigate({
-            to: '/auth/login',
+            to: "/auth/login",
             search: { redirect: `/account/orders/${id}` },
-          })
-          return
+          });
+          return;
         }
-        setIsAuthenticated(true)
+        setIsAuthenticated(true);
       } catch {
         navigate({
-          to: '/auth/login',
+          to: "/auth/login",
           search: { redirect: `/account/orders/${id}` },
-        })
+        });
       }
     }
 
-    checkAuth()
-  }, [navigate, id])
+    checkAuth();
+  }, [navigate, id]);
 
   // Fetch order
   const fetchOrder = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) return;
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const data = await ordersApi.getById(id)
+      const data = await ordersApi.getById(id);
       if (!data) {
-        setError('Order not found')
-        return
+        setError("Order not found");
+        return;
       }
-      setOrder(data)
+      setOrder(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load order')
+      setError(err instanceof Error ? err.message : "Failed to load order");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [isAuthenticated, id])
+  }, [isAuthenticated, id]);
 
   useEffect(() => {
-    fetchOrder()
-  }, [fetchOrder])
+    fetchOrder();
+  }, [fetchOrder]);
 
   // Review handlers
   const handleWriteReview = (item: OrderItem) => {
@@ -454,16 +464,16 @@ function OrderDetailPage() {
       productId: item.productId,
       productName: item.productTitle,
       productThumbnail: item.thumbnailUrl,
-    })
-  }
+    });
+  };
 
   const handleEditReview = async (item: OrderItem) => {
-    if (!item.review) return
+    if (!item.review) return;
     // Fetch the review to get full content
     try {
-      const res = await fetch(`/api/reviews/${item.review.id}`, { credentials: 'include' })
+      const res = await fetch(`/api/reviews/${item.review.id}`, { credentials: "include" });
       if (res.ok) {
-        const data = await res.json()
+        const data = await res.json();
         setReviewModalState({
           isOpen: true,
           orderItemId: item.id,
@@ -476,16 +486,16 @@ function OrderDetailPage() {
             title: data.review.title,
             content: data.review.content,
           },
-        })
+        });
       }
     } catch (error) {
-      console.error('Failed to fetch review:', error)
+      console.error("Failed to fetch review:", error);
     }
-  }
+  };
 
-  const handleCloseReviewModal = () => setReviewModalState(null)
+  const handleCloseReviewModal = () => setReviewModalState(null);
 
-  const handleReviewSuccess = () => fetchOrder()
+  const handleReviewSuccess = () => fetchOrder();
 
   // Loading state while checking auth
   if (isAuthenticated === null) {
@@ -496,7 +506,7 @@ function OrderDetailPage() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Loading state
@@ -514,7 +524,7 @@ function OrderDetailPage() {
           <OrderDetailSkeleton />
         </div>
       </div>
-    )
+    );
   }
 
   // Error state
@@ -532,7 +542,7 @@ function OrderDetailPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
             <h2 className="mt-4 text-lg font-semibold text-red-900">
-              {error || 'Order not found'}
+              {error || "Order not found"}
             </h2>
             <p className="mt-2 text-sm text-red-700">
               We couldn&apos;t load this order. Please try again.
@@ -547,12 +557,13 @@ function OrderDetailPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  const orderStatusConfig = ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG.confirmed
-  const paymentStatusConfig = PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.pending
-  const OrderStatusIcon = orderStatusConfig.icon
+  const orderStatusConfig = ORDER_STATUS_CONFIG[order.status] || ORDER_STATUS_CONFIG.confirmed;
+  const paymentStatusConfig =
+    PAYMENT_STATUS_CONFIG[order.paymentStatus] || PAYMENT_STATUS_CONFIG.pending;
+  const OrderStatusIcon = orderStatusConfig.icon;
 
   return (
     <div className="min-h-screen bg-background">
@@ -581,7 +592,7 @@ function OrderDetailPage() {
               {/* Order Status Badge */}
               <div
                 className={cn(
-                  'flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium',
+                  "flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium",
                   orderStatusConfig.bgColor,
                   orderStatusConfig.color
                 )}
@@ -597,10 +608,7 @@ function OrderDetailPage() {
           {/* Main Content */}
           <div className="space-y-6 lg:col-span-2">
             {/* Order Tracking */}
-            <OrderTrackingCard
-              orderId={order.id}
-              defaultExpanded
-            />
+            <OrderTrackingCard orderId={order.id} defaultExpanded />
 
             {/* Order Items */}
             <div className="rounded-xl border border-border bg-card">
@@ -658,20 +666,20 @@ function OrderDetailPage() {
                         </p>
                       )}
                       {/* Review Button - only for delivered orders */}
-                      {order.status === 'delivered' && (
+                      {order.status === "delivered" && (
                         <div className="mt-2">
                           {item.review ? (
                             <button
                               onClick={() => handleEditReview(item)}
                               className={cn(
-                                'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                                item.review.status === 'pending'
-                                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                                item.review.status === "pending"
+                                  ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                  : "bg-green-100 text-green-700 hover:bg-green-200"
                               )}
                             >
                               <Star className="h-3.5 w-3.5" />
-                              {item.review.status === 'pending' ? 'Review Pending' : 'Edit Review'}
+                              {item.review.status === "pending" ? "Review Pending" : "Edit Review"}
                             </button>
                           ) : (
                             <button
@@ -712,7 +720,7 @@ function OrderDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
                   <span className="text-foreground">
-                    {order.shippingCost === 0 ? 'Free' : formatPrice(order.shippingCost)}
+                    {order.shippingCost === 0 ? "Free" : formatPrice(order.shippingCost)}
                   </span>
                 </div>
                 {order.taxAmount > 0 && (
@@ -741,7 +749,7 @@ function OrderDetailPage() {
                   <span className="text-sm text-muted-foreground">Payment</span>
                   <div
                     className={cn(
-                      'flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                      "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
                       paymentStatusConfig.bgColor,
                       paymentStatusConfig.color
                     )}
@@ -761,14 +769,10 @@ function OrderDetailPage() {
               <div className="mt-4 text-sm text-muted-foreground">
                 <p className="font-medium text-foreground">{order.shippingAddress.fullName}</p>
                 <p className="mt-1">{order.shippingAddress.addressLine1}</p>
-                {order.shippingAddress.addressLine2 && (
-                  <p>{order.shippingAddress.addressLine2}</p>
-                )}
-                {order.shippingAddress.landmark && (
-                  <p>Near: {order.shippingAddress.landmark}</p>
-                )}
+                {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
+                {order.shippingAddress.landmark && <p>Near: {order.shippingAddress.landmark}</p>}
                 <p>
-                  {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
+                  {order.shippingAddress.city}, {order.shippingAddress.state}{" "}
                   {order.shippingAddress.postalCode}
                 </p>
                 <p className="mt-1">{order.shippingAddress.phone}</p>
@@ -815,7 +819,7 @@ function OrderDetailPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -861,7 +865,7 @@ function OrderDetailSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default OrderDetailPage
+export default OrderDetailPage;

@@ -16,11 +16,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../../database";
 import { orders } from "../../database/schema/orders";
-import {
-  requireAuth,
-  requireAdmin,
-  type AuthVariables,
-} from "../../middleware/auth";
+import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
 import {
   sendOrderNotification,
   getOrderNotifications,
@@ -72,10 +68,7 @@ adminNotificationsApp.post(
       });
 
       if (!order) {
-        return c.json(
-          { error: "Order not found", code: "ORDER_NOT_FOUND" },
-          404
-        );
+        return c.json({ error: "Order not found", code: "ORDER_NOT_FOUND" }, 404);
       }
 
       // Send notification
@@ -95,10 +88,7 @@ adminNotificationsApp.post(
       });
     } catch (error) {
       console.error("[AdminNotifications] Error triggering notification:", error);
-      return c.json(
-        { error: "Failed to trigger notification", code: "TRIGGER_ERROR" },
-        500
-      );
+      return c.json({ error: "Failed to trigger notification", code: "TRIGGER_ERROR" }, 500);
     }
   }
 );
@@ -118,10 +108,7 @@ adminNotificationsApp.get("/orders/:orderId/notifications", async (c) => {
     });
 
     if (!order) {
-      return c.json(
-        { error: "Order not found", code: "ORDER_NOT_FOUND" },
-        404
-      );
+      return c.json({ error: "Order not found", code: "ORDER_NOT_FOUND" }, 404);
     }
 
     const notificationHistory = await getOrderNotifications(orderId);
@@ -142,10 +129,7 @@ adminNotificationsApp.get("/orders/:orderId/notifications", async (c) => {
     });
   } catch (error) {
     console.error("[AdminNotifications] Error fetching notifications:", error);
-    return c.json(
-      { error: "Failed to fetch notifications", code: "FETCH_ERROR" },
-      500
-    );
+    return c.json({ error: "Failed to fetch notifications", code: "FETCH_ERROR" }, 500);
   }
 });
 
@@ -160,10 +144,7 @@ adminNotificationsApp.post("/notifications/:id/retry", async (c) => {
     const result = await retryNotification(id);
 
     if (!result.success && result.errors.includes("Notification not found")) {
-      return c.json(
-        { error: "Notification not found", code: "NOT_FOUND" },
-        404
-      );
+      return c.json({ error: "Notification not found", code: "NOT_FOUND" }, 404);
     }
 
     return c.json({
@@ -173,10 +154,7 @@ adminNotificationsApp.post("/notifications/:id/retry", async (c) => {
     });
   } catch (error) {
     console.error("[AdminNotifications] Error retrying notification:", error);
-    return c.json(
-      { error: "Failed to retry notification", code: "RETRY_ERROR" },
-      500
-    );
+    return c.json({ error: "Failed to retry notification", code: "RETRY_ERROR" }, 500);
   }
 });
 

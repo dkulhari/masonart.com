@@ -13,8 +13,8 @@
  * @see packages/api/src/services/exchange-rate.ts
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
-import '../setup';
+import { describe, it, expect, beforeAll } from "vitest";
+import "../setup";
 
 // ============================================================================
 // Test Constants
@@ -28,20 +28,20 @@ const MAX_REASONABLE_RATE = 100.0;
 // Tests
 // ============================================================================
 
-describe('Exchange Rate Service', () => {
-  describe('getExchangeRate', () => {
-    it('should return a valid exchange rate', async () => {
+describe("Exchange Rate Service", () => {
+  describe("getExchangeRate", () => {
+    it("should return a valid exchange rate", async () => {
       // Import the actual service - it will use fallback if Redis/API unavailable
-      const { getExchangeRate } = await import('../../src/services/exchange-rate');
+      const { getExchangeRate } = await import("../../src/services/exchange-rate");
       const rate = await getExchangeRate();
 
       // Should return a valid number
-      expect(typeof rate).toBe('number');
+      expect(typeof rate).toBe("number");
       expect(rate).toBeGreaterThan(0);
     });
 
-    it('should return a rate within reasonable USD/INR range', async () => {
-      const { getExchangeRate } = await import('../../src/services/exchange-rate');
+    it("should return a rate within reasonable USD/INR range", async () => {
+      const { getExchangeRate } = await import("../../src/services/exchange-rate");
       const rate = await getExchangeRate();
 
       // USD/INR rate should be between 70 and 100 (reasonable historical range)
@@ -49,8 +49,8 @@ describe('Exchange Rate Service', () => {
       expect(rate).toBeLessThanOrEqual(MAX_REASONABLE_RATE);
     });
 
-    it('should return consistent results on multiple calls', async () => {
-      const { getExchangeRate } = await import('../../src/services/exchange-rate');
+    it("should return consistent results on multiple calls", async () => {
+      const { getExchangeRate } = await import("../../src/services/exchange-rate");
 
       const rate1 = await getExchangeRate();
       const rate2 = await getExchangeRate();
@@ -60,9 +60,9 @@ describe('Exchange Rate Service', () => {
     });
   });
 
-  describe('convertUsdCentsToInrPaise', () => {
-    it('should convert USD cents to INR paise correctly', async () => {
-      const { convertUsdCentsToInrPaise } = await import('../../src/services/exchange-rate');
+  describe("convertUsdCentsToInrPaise", () => {
+    it("should convert USD cents to INR paise correctly", async () => {
+      const { convertUsdCentsToInrPaise } = await import("../../src/services/exchange-rate");
 
       // 100 USD cents = $1.00
       const result = await convertUsdCentsToInrPaise(100);
@@ -76,26 +76,26 @@ describe('Exchange Rate Service', () => {
       expect(result.paise).toBeLessThan(10000);
     });
 
-    it('should return exchange rate used in conversion', async () => {
-      const { convertUsdCentsToInrPaise } = await import('../../src/services/exchange-rate');
+    it("should return exchange rate used in conversion", async () => {
+      const { convertUsdCentsToInrPaise } = await import("../../src/services/exchange-rate");
       const result = await convertUsdCentsToInrPaise(100);
 
-      expect(result).toHaveProperty('paise');
-      expect(result).toHaveProperty('exchangeRate');
-      expect(typeof result.paise).toBe('number');
-      expect(typeof result.exchangeRate).toBe('number');
+      expect(result).toHaveProperty("paise");
+      expect(result).toHaveProperty("exchangeRate");
+      expect(typeof result.paise).toBe("number");
+      expect(typeof result.exchangeRate).toBe("number");
     });
 
-    it('should handle zero cents', async () => {
-      const { convertUsdCentsToInrPaise } = await import('../../src/services/exchange-rate');
+    it("should handle zero cents", async () => {
+      const { convertUsdCentsToInrPaise } = await import("../../src/services/exchange-rate");
       const result = await convertUsdCentsToInrPaise(0);
 
       expect(result.paise).toBe(0);
       expect(result.exchangeRate).toBeGreaterThan(0);
     });
 
-    it('should handle large amounts', async () => {
-      const { convertUsdCentsToInrPaise } = await import('../../src/services/exchange-rate');
+    it("should handle large amounts", async () => {
+      const { convertUsdCentsToInrPaise } = await import("../../src/services/exchange-rate");
 
       // 10000 cents = $100
       const result = await convertUsdCentsToInrPaise(10000);
@@ -105,8 +105,8 @@ describe('Exchange Rate Service', () => {
       expect(result.paise).toBeLessThan(1000000);
     });
 
-    it('should scale linearly with input', async () => {
-      const { convertUsdCentsToInrPaise } = await import('../../src/services/exchange-rate');
+    it("should scale linearly with input", async () => {
+      const { convertUsdCentsToInrPaise } = await import("../../src/services/exchange-rate");
 
       const result100 = await convertUsdCentsToInrPaise(100);
       const result200 = await convertUsdCentsToInrPaise(200);
@@ -115,8 +115,8 @@ describe('Exchange Rate Service', () => {
       expect(result200.paise).toBe(result100.paise * 2);
     });
 
-    it('should maintain consistent exchange rate across calls', async () => {
-      const { convertUsdCentsToInrPaise } = await import('../../src/services/exchange-rate');
+    it("should maintain consistent exchange rate across calls", async () => {
+      const { convertUsdCentsToInrPaise } = await import("../../src/services/exchange-rate");
 
       const result1 = await convertUsdCentsToInrPaise(100);
       const result2 = await convertUsdCentsToInrPaise(500);
@@ -126,9 +126,10 @@ describe('Exchange Rate Service', () => {
     });
   });
 
-  describe('Conversion Formula', () => {
-    it('should correctly apply the conversion formula', async () => {
-      const { convertUsdCentsToInrPaise, getExchangeRate } = await import('../../src/services/exchange-rate');
+  describe("Conversion Formula", () => {
+    it("should correctly apply the conversion formula", async () => {
+      const { convertUsdCentsToInrPaise, getExchangeRate } =
+        await import("../../src/services/exchange-rate");
 
       const rate = await getExchangeRate();
       const result = await convertUsdCentsToInrPaise(100);

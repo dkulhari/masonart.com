@@ -10,9 +10,9 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { z } from 'zod'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 import {
   ArrowLeft,
   AlertCircle,
@@ -28,73 +28,72 @@ import {
   ExternalLink,
   Package,
   Trash2,
-} from 'lucide-react'
-import { cn, getApiUrl } from '~/lib/utils'
+} from "lucide-react";
+import { cn, getApiUrl } from "~/lib/utils";
 
 // ============================================================================
 // Route Configuration
 // ============================================================================
 
 const searchParamsSchema = z.object({
-  action: z.enum(['upload']).optional(),
-})
+  action: z.enum(["upload"]).optional(),
+});
 
- 
-export const Route = createFileRoute('/admin/approvals/$id' as any)({
+export const Route = createFileRoute("/admin/approvals/$id" as any)({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Approval Details | Admin | MasonArt' },
-      { name: 'robots', content: 'noindex, nofollow' },
+      { title: "Approval Details | Admin | MasonArt" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: AdminApprovalDetailPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface ApprovalPhoto {
-  id: string
-  url: string
-  thumbnailUrl: string | null
-  sortOrder: number
-  uploadedAt: string
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  sortOrder: number;
+  uploadedAt: string;
 }
 
 interface ApprovalComment {
-  id: string
-  authorType: 'admin' | 'customer'
-  authorId: string | null
-  comment: string
-  createdAt: string
+  id: string;
+  authorType: "admin" | "customer";
+  authorId: string | null;
+  comment: string;
+  createdAt: string;
 }
 
 interface ApprovalOrder {
-  id: string
-  orderNumber: string
-  status: string
+  id: string;
+  orderNumber: string;
+  status: string;
   shippingAddress: {
-    fullName?: string
-    phone?: string
-  } | null
+    fullName?: string;
+    phone?: string;
+  } | null;
 }
 
 interface ApprovalDetail {
-  id: string
-  orderId: string
-  orderItemId: string
-  status: 'pending_upload' | 'pending_approval' | 'changes_requested' | 'approved' | 'expired'
-  approvalToken: string
-  deadlineAt: string | null
-  approvedAt: string | null
-  reminderSentAt: string | null
-  createdAt: string
-  updatedAt: string
-  photos: ApprovalPhoto[]
-  comments: ApprovalComment[]
-  order: ApprovalOrder | null
+  id: string;
+  orderId: string;
+  orderItemId: string;
+  status: "pending_upload" | "pending_approval" | "changes_requested" | "approved" | "expired";
+  approvalToken: string;
+  deadlineAt: string | null;
+  approvedAt: string | null;
+  reminderSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  photos: ApprovalPhoto[];
+  comments: ApprovalComment[];
+  order: ApprovalOrder | null;
 }
 
 // ============================================================================
@@ -103,19 +102,19 @@ interface ApprovalDetail {
 
 async function fetchApproval(id: string): Promise<ApprovalDetail> {
   const response = await fetch(`${getApiUrl()}/api/admin/approvals/${id}`, {
-    credentials: 'include',
-  })
+    credentials: "include",
+  });
 
   if (!response.ok) {
     if (response.status === 404) {
-      throw new Error('Approval not found')
+      throw new Error("Approval not found");
     }
-    const errorData = await response.json() as { error?: string }
-    throw new Error(errorData.error || 'Failed to fetch approval')
+    const errorData = (await response.json()) as { error?: string };
+    throw new Error(errorData.error || "Failed to fetch approval");
   }
 
-  const data = await response.json() as { data: ApprovalDetail }
-  return data.data
+  const data = (await response.json()) as { data: ApprovalDetail };
+  return data.data;
 }
 
 async function uploadPhotos(
@@ -124,41 +123,41 @@ async function uploadPhotos(
   sendNotification: boolean
 ): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/approvals/${approvalId}/photos`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ photos, sendNotification }),
-  })
+  });
 
   if (!response.ok) {
-    const errorData = await response.json() as { error?: string }
-    throw new Error(errorData.error || 'Failed to upload photos')
+    const errorData = (await response.json()) as { error?: string };
+    throw new Error(errorData.error || "Failed to upload photos");
   }
 }
 
 async function deletePhotos(approvalId: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/approvals/${approvalId}/photos`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
+    method: "DELETE",
+    credentials: "include",
+  });
 
   if (!response.ok) {
-    const errorData = await response.json() as { error?: string }
-    throw new Error(errorData.error || 'Failed to delete photos')
+    const errorData = (await response.json()) as { error?: string };
+    throw new Error(errorData.error || "Failed to delete photos");
   }
 }
 
 async function addComment(approvalId: string, comment: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/approvals/${approvalId}/comments`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ comment }),
-  })
+  });
 
   if (!response.ok) {
-    const errorData = await response.json() as { error?: string }
-    throw new Error(errorData.error || 'Failed to add comment')
+    const errorData = (await response.json()) as { error?: string };
+    throw new Error(errorData.error || "Failed to add comment");
   }
 }
 
@@ -168,20 +167,20 @@ async function addComment(approvalId: string, comment: string): Promise<void> {
 
 function StatusBadge({ status }: { status: string }) {
   const statusColors: Record<string, string> = {
-    pending_upload: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-    pending_approval: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    changes_requested: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-    approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    expired: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
-  }
+    pending_upload: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+    pending_approval: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    changes_requested: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+    approved: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    expired: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+  };
 
   const statusLabels: Record<string, string> = {
-    pending_upload: 'Pending Upload',
-    pending_approval: 'Pending Approval',
-    changes_requested: 'Changes Requested',
-    approved: 'Approved',
-    expired: 'Expired',
-  }
+    pending_upload: "Pending Upload",
+    pending_approval: "Pending Approval",
+    changes_requested: "Changes Requested",
+    approved: "Approved",
+    expired: "Expired",
+  };
 
   const statusIcons: Record<string, React.ReactNode> = {
     pending_upload: <Camera className="h-4 w-4" />,
@@ -189,14 +188,19 @@ function StatusBadge({ status }: { status: string }) {
     changes_requested: <MessageSquare className="h-4 w-4" />,
     approved: <CheckCircle2 className="h-4 w-4" />,
     expired: <Timer className="h-4 w-4" />,
-  }
+  };
 
   return (
-    <span className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium', statusColors[status])}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium",
+        statusColors[status]
+      )}
+    >
       {statusIcons[status]}
       {statusLabels[status]}
     </span>
-  )
+  );
 }
 
 // ============================================================================
@@ -209,63 +213,63 @@ function PhotoUploadSection({
   onDelete,
   loading,
 }: {
-  approval: ApprovalDetail
-  onUpload: (photos: { url: string }[], notify: boolean) => Promise<void>
-  onDelete: () => Promise<void>
-  loading: boolean
+  approval: ApprovalDetail;
+  onUpload: (photos: { url: string }[], notify: boolean) => Promise<void>;
+  onDelete: () => Promise<void>;
+  loading: boolean;
 }) {
-  const [urls, setUrls] = useState<string[]>([''])
-  const [sendNotification, setSendNotification] = useState(true)
-  const [uploading, setUploading] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [urls, setUrls] = useState<string[]>([""]);
+  const [sendNotification, setSendNotification] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleAddUrl = () => {
-    setUrls([...urls, ''])
-  }
+    setUrls([...urls, ""]);
+  };
 
   const handleRemoveUrl = (index: number) => {
-    setUrls(urls.filter((_, i) => i !== index))
-  }
+    setUrls(urls.filter((_, i) => i !== index));
+  };
 
   const handleUrlChange = (index: number, value: string) => {
-    const newUrls = [...urls]
-    newUrls[index] = value
-    setUrls(newUrls)
-  }
+    const newUrls = [...urls];
+    newUrls[index] = value;
+    setUrls(newUrls);
+  };
 
   const handleUpload = async () => {
-    const validUrls = urls.filter((url) => url.trim())
-    if (validUrls.length === 0) return
+    const validUrls = urls.filter((url) => url.trim());
+    if (validUrls.length === 0) return;
 
-    setUploading(true)
+    setUploading(true);
     try {
       await onUpload(
         validUrls.map((url, i) => ({ url, sortOrder: i })),
         sendNotification
-      )
-      setUrls([''])
+      );
+      setUrls([""]);
     } catch (err) {
       // Error handled by parent
     } finally {
-      setUploading(false)
+      setUploading(false);
     }
-  }
+  };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete all photos? This action cannot be undone.')) {
-      return
+    if (!confirm("Are you sure you want to delete all photos? This action cannot be undone.")) {
+      return;
     }
-    setDeleting(true)
+    setDeleting(true);
     try {
-      await onDelete()
+      await onDelete();
     } catch (err) {
       // Error handled by parent
     } finally {
-      setDeleting(false)
+      setDeleting(false);
     }
-  }
+  };
 
-  const canUpload = approval.status === 'pending_upload' || approval.status === 'changes_requested'
+  const canUpload = approval.status === "pending_upload" || approval.status === "changes_requested";
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
@@ -283,11 +287,7 @@ function PhotoUploadSection({
                 key={photo.id}
                 className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
               >
-                <img
-                  src={photo.url}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
+                <img src={photo.url} alt="" className="h-full w-full object-cover" />
                 <a
                   href={photo.url}
                   target="_blank"
@@ -306,7 +306,7 @@ function PhotoUploadSection({
               className="mt-4 flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
             >
               <Trash2 className="h-4 w-4" />
-              {deleting ? 'Deleting...' : 'Delete All & Re-upload'}
+              {deleting ? "Deleting..." : "Delete All & Re-upload"}
             </button>
           )}
         </div>
@@ -365,7 +365,7 @@ function PhotoUploadSection({
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             <Upload className="h-4 w-4" />
-            {uploading ? 'Uploading...' : 'Upload Photos'}
+            {uploading ? "Uploading..." : "Upload Photos"}
           </button>
         </div>
       )}
@@ -377,7 +377,7 @@ function PhotoUploadSection({
         </p>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -389,38 +389,38 @@ function CommentsSection({
   onAddComment,
   loading,
 }: {
-  approval: ApprovalDetail
-  onAddComment: (comment: string) => Promise<void>
-  loading: boolean
+  approval: ApprovalDetail;
+  onAddComment: (comment: string) => Promise<void>;
+  loading: boolean;
 }) {
-  const [comment, setComment] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!comment.trim()) return
+    e.preventDefault();
+    if (!comment.trim()) return;
 
-    setSubmitting(true)
+    setSubmitting(true);
     try {
-      await onAddComment(comment.trim())
-      setComment('')
+      await onAddComment(comment.trim());
+      setComment("");
     } catch (err) {
       // Error handled by parent
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
@@ -432,30 +432,28 @@ function CommentsSection({
       {/* Comments Timeline */}
       <div className="mb-6 space-y-4">
         {approval.comments.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            No comments yet.
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">No comments yet.</p>
         ) : (
           approval.comments.map((c) => (
             <div
               key={c.id}
               className={cn(
-                'rounded-lg p-4',
-                c.authorType === 'admin'
-                  ? 'bg-blue-50 dark:bg-blue-900/20'
-                  : 'bg-gray-50 dark:bg-gray-700/50'
+                "rounded-lg p-4",
+                c.authorType === "admin"
+                  ? "bg-blue-50 dark:bg-blue-900/20"
+                  : "bg-gray-50 dark:bg-gray-700/50"
               )}
             >
               <div className="mb-2 flex items-center gap-2">
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 text-xs font-medium',
-                    c.authorType === 'admin'
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
-                      : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
+                    "rounded-full px-2 py-0.5 text-xs font-medium",
+                    c.authorType === "admin"
+                      ? "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200"
+                      : "bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300"
                   )}
                 >
-                  {c.authorType === 'admin' ? 'Admin' : 'Customer'}
+                  {c.authorType === "admin" ? "Admin" : "Customer"}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {formatDate(c.createdAt)}
@@ -484,11 +482,11 @@ function CommentsSection({
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
           <Send className="h-4 w-4" />
-          {submitting ? 'Sending...' : 'Send Response'}
+          {submitting ? "Sending..." : "Send Response"}
         </button>
       </form>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -496,81 +494,86 @@ function CommentsSection({
 // ============================================================================
 
 function AdminApprovalDetailPage() {
-  const params = Route.useParams() as { id: string }
+  const params = Route.useParams() as { id: string };
   // Note: Route.useSearch() available for ?action=upload to auto-open upload form
 
-  const [approval, setApproval] = useState<ApprovalDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [approval, setApproval] = useState<ApprovalDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadApproval = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const data = await fetchApproval(params.id)
-      setApproval(data)
+      const data = await fetchApproval(params.id);
+      setApproval(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load approval')
+      setError(err instanceof Error ? err.message : "Failed to load approval");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [params.id])
+  }, [params.id]);
 
   useEffect(() => {
-    loadApproval()
-  }, [loadApproval])
+    loadApproval();
+  }, [loadApproval]);
 
   const handleUploadPhotos = async (photos: { url: string }[], notify: boolean) => {
     try {
-      await uploadPhotos(params.id, photos.map((p, i) => ({ ...p, sortOrder: i })), notify)
-      await loadApproval()
+      await uploadPhotos(
+        params.id,
+        photos.map((p, i) => ({ ...p, sortOrder: i })),
+        notify
+      );
+      await loadApproval();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload photos')
-      throw err
+      setError(err instanceof Error ? err.message : "Failed to upload photos");
+      throw err;
     }
-  }
+  };
 
   const handleDeletePhotos = async () => {
     try {
-      await deletePhotos(params.id)
-      await loadApproval()
+      await deletePhotos(params.id);
+      await loadApproval();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete photos')
-      throw err
+      setError(err instanceof Error ? err.message : "Failed to delete photos");
+      throw err;
     }
-  }
+  };
 
   const handleAddComment = async (comment: string) => {
     try {
-      await addComment(params.id, comment)
-      await loadApproval()
+      await addComment(params.id, comment);
+      await loadApproval();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add comment')
-      throw err
+      setError(err instanceof Error ? err.message : "Failed to add comment");
+      throw err;
     }
-  }
+  };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
 
   const getDeadlineInfo = () => {
-    if (!approval?.deadlineAt) return null
-    const deadline = new Date(approval.deadlineAt)
-    const now = new Date()
-    const hoursLeft = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60)
+    if (!approval?.deadlineAt) return null;
+    const deadline = new Date(approval.deadlineAt);
+    const now = new Date();
+    const hoursLeft = (deadline.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursLeft < 0) return { text: 'Deadline passed', className: 'text-red-600' }
-    if (hoursLeft < 24) return { text: `${Math.round(hoursLeft)} hours left`, className: 'text-orange-600' }
-    return { text: `${Math.round(hoursLeft / 24)} days left`, className: 'text-gray-600' }
-  }
+    if (hoursLeft < 0) return { text: "Deadline passed", className: "text-red-600" };
+    if (hoursLeft < 24)
+      return { text: `${Math.round(hoursLeft)} hours left`, className: "text-orange-600" };
+    return { text: `${Math.round(hoursLeft / 24)} days left`, className: "text-gray-600" };
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -585,9 +588,7 @@ function AdminApprovalDetailPage() {
               <ArrowLeft className="h-5 w-5" />
             </a>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Approval Details
-              </h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Approval Details</h1>
               {approval?.order && (
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Order #{approval.order.orderNumber}
@@ -600,7 +601,7 @@ function AdminApprovalDetailPage() {
             disabled={loading}
             className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             Refresh
           </button>
         </div>
@@ -627,12 +628,19 @@ function AdminApprovalDetailPage() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <StatusBadge status={approval.status} />
-                  {getDeadlineInfo() && approval.status !== 'approved' && approval.status !== 'expired' && (
-                    <p className={cn('mt-2 flex items-center gap-1 text-sm', getDeadlineInfo()?.className)}>
-                      <Timer className="h-4 w-4" />
-                      {getDeadlineInfo()?.text}
-                    </p>
-                  )}
+                  {getDeadlineInfo() &&
+                    approval.status !== "approved" &&
+                    approval.status !== "expired" && (
+                      <p
+                        className={cn(
+                          "mt-2 flex items-center gap-1 text-sm",
+                          getDeadlineInfo()?.className
+                        )}
+                      >
+                        <Timer className="h-4 w-4" />
+                        {getDeadlineInfo()?.text}
+                      </p>
+                    )}
                 </div>
                 <div className="text-right text-sm text-gray-500 dark:text-gray-400">
                   <p>Created: {formatDate(approval.createdAt)}</p>
@@ -683,5 +691,5 @@ function AdminApprovalDetailPage() {
         ) : null}
       </div>
     </div>
-  )
+  );
 }

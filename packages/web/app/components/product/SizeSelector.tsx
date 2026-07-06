@@ -7,8 +7,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { Check } from 'lucide-react'
-import { cn, formatPrice, formatDimension } from '~/lib/utils'
+import { Check } from "lucide-react";
+import { cn, formatPrice, formatDimension } from "~/lib/utils";
 
 // ============================================================================
 // Types
@@ -16,38 +16,38 @@ import { cn, formatPrice, formatDimension } from '~/lib/utils'
 
 export interface SizeVariant {
   /** Variant ID */
-  id: string
+  id: string;
   /** Size ID */
-  sizeId: string
+  sizeId: string;
   /** Size label (e.g., "24x24 inches") */
-  sizeLabel: string
+  sizeLabel: string;
   /** Width in inches */
-  widthInches: number
+  widthInches: number;
   /** Height in inches */
-  heightInches: number
+  heightInches: number;
   /** Price for this variant */
-  price: string | number
+  price: string | number;
   /** Stock quantity (-1 for unlimited) */
-  stockQuantity: number
+  stockQuantity: number;
   /** Whether this variant is available */
-  isAvailable: boolean
+  isAvailable: boolean;
   /** SKU for this variant */
-  sku?: string
+  sku?: string;
 }
 
 export interface SizeSelectorProps {
   /** Available size variants */
-  variants: SizeVariant[]
+  variants: SizeVariant[];
   /** Currently selected variant ID */
-  selectedVariantId: string | null
+  selectedVariantId: string | null;
   /** Callback when a variant is selected */
-  onVariantSelect: (variant: SizeVariant) => void
+  onVariantSelect: (variant: SizeVariant) => void;
   /** Display unit preference */
-  displayUnit?: 'inches' | 'cm'
+  displayUnit?: "inches" | "cm";
   /** Whether to show out of stock variants */
-  showOutOfStock?: boolean
+  showOutOfStock?: boolean;
   /** Optional className for styling */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -68,25 +68,19 @@ export function SizeSelector({
   variants,
   selectedVariantId,
   onVariantSelect,
-  displayUnit = 'inches',
+  displayUnit = "inches",
   showOutOfStock = true,
   className,
 }: SizeSelectorProps) {
   // Filter variants if not showing out of stock
-  const displayedVariants = showOutOfStock
-    ? variants
-    : variants.filter((v) => v.isAvailable)
+  const displayedVariants = showOutOfStock ? variants : variants.filter((v) => v.isAvailable);
 
   if (displayedVariants.length === 0) {
-    return (
-      <div className={cn('text-muted-foreground', className)}>
-        No sizes available
-      </div>
-    )
+    return <div className={cn("text-muted-foreground", className)}>No sizes available</div>;
   }
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn("space-y-3", className)}>
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-foreground">Select Size</h3>
         <button
@@ -96,17 +90,16 @@ export function SizeSelector({
             // Toggle between inches and cm - this would typically be managed by parent
           }}
         >
-          {displayUnit === 'inches' ? 'Show in cm' : 'Show in inches'}
+          {displayUnit === "inches" ? "Show in cm" : "Show in inches"}
         </button>
       </div>
 
       <div className="grid gap-2">
         {displayedVariants.map((variant) => {
-          const isSelected = variant.id === selectedVariantId
-          const isOutOfStock = !variant.isAvailable || variant.stockQuantity === 0
-          const price = typeof variant.price === 'string'
-            ? parseFloat(variant.price)
-            : variant.price
+          const isSelected = variant.id === selectedVariantId;
+          const isOutOfStock = !variant.isAvailable || variant.stockQuantity === 0;
+          const price =
+            typeof variant.price === "string" ? parseFloat(variant.price) : variant.price;
 
           return (
             <button
@@ -115,39 +108,41 @@ export function SizeSelector({
               onClick={() => !isOutOfStock && onVariantSelect(variant)}
               disabled={isOutOfStock}
               className={cn(
-                'relative flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-all',
+                "relative flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-all",
                 isSelected
-                  ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500 dark:bg-brand-950/20'
-                  : 'border-border bg-card hover:border-brand-300 hover:bg-muted/50',
-                isOutOfStock && 'cursor-not-allowed opacity-50'
+                  ? "border-brand-500 bg-brand-50/50 ring-1 ring-brand-500 dark:bg-brand-950/20"
+                  : "border-border bg-card hover:border-brand-300 hover:bg-muted/50",
+                isOutOfStock && "cursor-not-allowed opacity-50"
               )}
               aria-label={`Select size ${formatDimension(variant.widthInches, variant.heightInches, displayUnit)}`}
               aria-pressed={isSelected}
             >
               {/* Size Info */}
               <div className="flex flex-col">
-                <span className={cn(
-                  'text-sm font-medium',
-                  isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-foreground'
-                )}>
+                <span
+                  className={cn(
+                    "text-sm font-medium",
+                    isSelected ? "text-brand-700 dark:text-brand-300" : "text-foreground"
+                  )}
+                >
                   {formatDimension(variant.widthInches, variant.heightInches, displayUnit)}
                 </span>
-                {variant.sizeLabel && variant.sizeLabel !== formatDimension(variant.widthInches, variant.heightInches, displayUnit) && (
-                  <span className="text-xs text-muted-foreground">
-                    {variant.sizeLabel}
-                  </span>
-                )}
-                {isOutOfStock && (
-                  <span className="text-xs text-destructive">Out of stock</span>
-                )}
+                {variant.sizeLabel &&
+                  variant.sizeLabel !==
+                    formatDimension(variant.widthInches, variant.heightInches, displayUnit) && (
+                    <span className="text-xs text-muted-foreground">{variant.sizeLabel}</span>
+                  )}
+                {isOutOfStock && <span className="text-xs text-destructive">Out of stock</span>}
               </div>
 
               {/* Price */}
               <div className="flex items-center gap-2">
-                <span className={cn(
-                  'text-sm font-semibold',
-                  isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-foreground'
-                )}>
+                <span
+                  className={cn(
+                    "text-sm font-semibold",
+                    isSelected ? "text-brand-700 dark:text-brand-300" : "text-foreground"
+                  )}
+                >
                   {formatPrice(price)}
                 </span>
                 {isSelected && (
@@ -157,11 +152,11 @@ export function SizeSelector({
                 )}
               </div>
             </button>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -171,17 +166,17 @@ export function SizeSelectorCompact({
   variants,
   selectedVariantId,
   onVariantSelect,
-  displayUnit = 'inches',
+  displayUnit = "inches",
   className,
-}: Omit<SizeSelectorProps, 'showOutOfStock'>) {
-  const availableVariants = variants.filter((v) => v.isAvailable)
+}: Omit<SizeSelectorProps, "showOutOfStock">) {
+  const availableVariants = variants.filter((v) => v.isAvailable);
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn("space-y-2", className)}>
       <label className="text-sm font-medium text-foreground">Size</label>
       <div className="flex flex-wrap gap-2">
         {availableVariants.map((variant) => {
-          const isSelected = variant.id === selectedVariantId
+          const isSelected = variant.id === selectedVariantId;
 
           return (
             <button
@@ -189,19 +184,19 @@ export function SizeSelectorCompact({
               type="button"
               onClick={() => onVariantSelect(variant)}
               className={cn(
-                'rounded-md border px-3 py-1.5 text-sm transition-all',
+                "rounded-md border px-3 py-1.5 text-sm transition-all",
                 isSelected
-                  ? 'border-brand-500 bg-brand-500 text-white'
-                  : 'border-border bg-background hover:border-brand-300'
+                  ? "border-brand-500 bg-brand-500 text-white"
+                  : "border-border bg-background hover:border-brand-300"
               )}
             >
               {formatDimension(variant.widthInches, variant.heightInches, displayUnit)}
             </button>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 /**
@@ -209,7 +204,7 @@ export function SizeSelectorCompact({
  */
 export function SizeSelectorSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('space-y-3 animate-pulse', className)}>
+    <div className={cn("space-y-3 animate-pulse", className)}>
       <div className="flex items-center justify-between">
         <div className="h-4 w-20 rounded bg-muted" />
         <div className="h-3 w-16 rounded bg-muted" />
@@ -229,7 +224,7 @@ export function SizeSelectorSkeleton({ className }: { className?: string }) {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default SizeSelector
+export default SizeSelector;

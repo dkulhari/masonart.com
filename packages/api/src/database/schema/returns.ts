@@ -130,9 +130,7 @@ export const returnRequests = pgTable(
     orderIdIdx: index("return_requests_order_id_idx").on(table.orderId),
     userIdIdx: index("return_requests_user_id_idx").on(table.userId),
     statusIdx: index("return_requests_status_idx").on(table.status),
-    requestedAtIdx: index("return_requests_requested_at_idx").on(
-      table.requestedAt
-    ),
+    requestedAtIdx: index("return_requests_requested_at_idx").on(table.requestedAt),
   })
 );
 

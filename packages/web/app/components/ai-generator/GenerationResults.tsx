@@ -11,7 +11,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback } from "react";
 import {
   Loader2,
   Check,
@@ -26,83 +26,92 @@ import {
   ZoomIn,
   Maximize2,
   ChevronDown,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
+} from "lucide-react";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type GenerationStatus = 'idle' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled'
+export type GenerationStatus =
+  | "idle"
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
-export type UpscaleMultiplier = 2 | 4
+export type UpscaleMultiplier = 2 | 4;
 
 export interface UpscaleInfo {
-  multiplier: UpscaleMultiplier
-  upscaledImageUrl?: string
-  status: 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
-  progress?: number
+  multiplier: UpscaleMultiplier;
+  upscaledImageUrl?: string;
+  status: "idle" | "pending" | "processing" | "completed" | "failed";
+  progress?: number;
 }
 
 export interface GeneratedImage {
-  id: string
-  imageUrl: string
-  thumbnailUrl?: string
-  isSelected?: boolean
-  seed?: number
-  upscale?: UpscaleInfo
+  id: string;
+  imageUrl: string;
+  thumbnailUrl?: string;
+  isSelected?: boolean;
+  seed?: number;
+  upscale?: UpscaleInfo;
 }
 
 export interface Generation {
-  id: string
-  promptText: string
-  stylePreset: string
-  aspectRatio: string
-  status: GenerationStatus
-  images: GeneratedImage[]
-  selectedImageId?: string
-  selectedImageUrl?: string
-  errorMessage?: string
-  processingTimeMs?: number
-  createdAt: string
-  completedAt?: string
+  id: string;
+  promptText: string;
+  stylePreset: string;
+  aspectRatio: string;
+  status: GenerationStatus;
+  images: GeneratedImage[];
+  selectedImageId?: string;
+  selectedImageUrl?: string;
+  errorMessage?: string;
+  processingTimeMs?: number;
+  createdAt: string;
+  completedAt?: string;
 }
 
 export interface UpscaleCost {
-  multiplier: UpscaleMultiplier
-  cost: number
-  estimatedTimeSeconds: number
+  multiplier: UpscaleMultiplier;
+  cost: number;
+  estimatedTimeSeconds: number;
 }
 
 export interface GenerationResultsProps {
   /** Current generation being processed or viewed */
-  currentGeneration?: Generation | null
+  currentGeneration?: Generation | null;
   /** Whether generation is in progress */
-  isGenerating?: boolean
+  isGenerating?: boolean;
   /** Progress percentage (0-100) */
-  progress?: number
+  progress?: number;
   /** Progress status message */
-  progressMessage?: string
+  progressMessage?: string;
   /** Callback when user selects an image */
-  onSelectImage?: (generationId: string, imageId: string) => void
+  onSelectImage?: (generationId: string, imageId: string) => void;
   /** Callback when user wants to add selected image to cart */
-  onAddToCart?: (generation: Generation) => void
+  onAddToCart?: (generation: Generation) => void;
   /** Callback when user wants to retry failed generation */
-  onRetry?: () => void
+  onRetry?: () => void;
   /** Callback when user wants to generate variations */
-  onGenerateVariations?: (generation: Generation) => void
+  onGenerateVariations?: (generation: Generation) => void;
   /** Callback when user wants to upscale an image */
-  onUpscale?: (generationId: string, imageId: string, multiplier: UpscaleMultiplier) => void
+  onUpscale?: (generationId: string, imageId: string, multiplier: UpscaleMultiplier) => void;
   /** Whether an upscale is in progress for an image */
-  isImageUpscaling?: (generationId: string, imageId: string) => boolean
+  isImageUpscaling?: (generationId: string, imageId: string) => boolean;
   /** Get upscale job info for an image */
-  getUpscaleJob?: (generationId: string, imageId: string) => { status: string; progress: number } | undefined
+  getUpscaleJob?: (
+    generationId: string,
+    imageId: string
+  ) => { status: string; progress: number } | undefined;
   /** Available upscale costs */
-  upscaleCosts?: UpscaleCost[]
+  upscaleCosts?: UpscaleCost[];
   /** User's wallet balance */
-  walletBalance?: number
+  walletBalance?: number;
   /** Custom className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -115,13 +124,13 @@ export interface GenerationResultsProps {
 const DEFAULT_UPSCALE_COSTS: UpscaleCost[] = [
   { multiplier: 2, cost: 5, estimatedTimeSeconds: 15 },
   { multiplier: 4, cost: 10, estimatedTimeSeconds: 30 },
-]
+];
 
 export function GenerationResults({
   currentGeneration,
   isGenerating = false,
   progress = 0,
-  progressMessage = 'Generating...',
+  progressMessage = "Generating...",
   onSelectImage,
   onAddToCart,
   onRetry,
@@ -133,78 +142,80 @@ export function GenerationResults({
   walletBalance,
   className,
 }: GenerationResultsProps) {
-  const [selectedImageForPreview, setSelectedImageForPreview] = useState<GeneratedImage | null>(null)
-  const [upscaleDropdownOpen, setUpscaleDropdownOpen] = useState<string | null>(null)
+  const [selectedImageForPreview, setSelectedImageForPreview] = useState<GeneratedImage | null>(
+    null
+  );
+  const [upscaleDropdownOpen, setUpscaleDropdownOpen] = useState<string | null>(null);
 
   const handleImageSelect = useCallback(
     (imageId: string) => {
-      if (!currentGeneration || !onSelectImage) return
-      onSelectImage(currentGeneration.id, imageId)
+      if (!currentGeneration || !onSelectImage) return;
+      onSelectImage(currentGeneration.id, imageId);
     },
     [currentGeneration, onSelectImage]
-  )
+  );
 
   const handleAddToCart = useCallback(() => {
-    if (!currentGeneration || !onAddToCart) return
-    onAddToCart(currentGeneration)
-  }, [currentGeneration, onAddToCart])
+    if (!currentGeneration || !onAddToCart) return;
+    onAddToCart(currentGeneration);
+  }, [currentGeneration, onAddToCart]);
 
   const handleGenerateVariations = useCallback(() => {
-    if (!currentGeneration || !onGenerateVariations) return
-    onGenerateVariations(currentGeneration)
-  }, [currentGeneration, onGenerateVariations])
+    if (!currentGeneration || !onGenerateVariations) return;
+    onGenerateVariations(currentGeneration);
+  }, [currentGeneration, onGenerateVariations]);
 
   // Idle/Empty State
   if (!currentGeneration && !isGenerating) {
     return (
-      <div className={cn('flex flex-col', className)}>
+      <div className={cn("flex flex-col", className)}>
         <EmptyState />
       </div>
-    )
+    );
   }
 
   // Loading/Generating State
-  if (isGenerating || currentGeneration?.status === 'queued' || currentGeneration?.status === 'processing') {
-    const generatingStatus = currentGeneration?.status === 'queued' ? 'queued' : 'processing'
+  if (
+    isGenerating ||
+    currentGeneration?.status === "queued" ||
+    currentGeneration?.status === "processing"
+  ) {
+    const generatingStatus = currentGeneration?.status === "queued" ? "queued" : "processing";
     return (
-      <div className={cn('flex flex-col', className)}>
-        <GeneratingState
-          progress={progress}
-          message={progressMessage}
-          status={generatingStatus}
-        />
+      <div className={cn("flex flex-col", className)}>
+        <GeneratingState progress={progress} message={progressMessage} status={generatingStatus} />
       </div>
-    )
+    );
   }
 
   // Error State
-  if (currentGeneration?.status === 'failed') {
+  if (currentGeneration?.status === "failed") {
     return (
-      <div className={cn('flex flex-col', className)}>
+      <div className={cn("flex flex-col", className)}>
         <ErrorState
-          message={currentGeneration.errorMessage || 'Generation failed'}
+          message={currentGeneration.errorMessage || "Generation failed"}
           onRetry={onRetry}
         />
       </div>
-    )
+    );
   }
 
   // Cancelled State
-  if (currentGeneration?.status === 'cancelled') {
+  if (currentGeneration?.status === "cancelled") {
     return (
-      <div className={cn('flex flex-col', className)}>
+      <div className={cn("flex flex-col", className)}>
         <CancelledState onRetry={onRetry} />
       </div>
-    )
+    );
   }
 
   // Completed State - Show Results
-  const images = currentGeneration?.images || []
-  const selectedImageId = currentGeneration?.selectedImageId
-  const hasSelectedImage = !!selectedImageId
+  const images = currentGeneration?.images || [];
+  const selectedImageId = currentGeneration?.selectedImageId;
+  const hasSelectedImage = !!selectedImageId;
 
   return (
-    <div className={cn('flex flex-col gap-6', className)}>
+    <div className={cn("flex flex-col gap-6", className)}>
       {/* Header */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
@@ -230,20 +241,22 @@ export function GenerationResults({
       {/* Images Grid */}
       <div className="grid grid-cols-2 gap-4">
         {images.map((image) => {
-          const isSelected = image.id === selectedImageId
-          const imageIsUpscaling = isImageUpscaling?.(currentGeneration?.id || '', image.id) || false
-          const upscaleJob = getUpscaleJob?.(currentGeneration?.id || '', image.id)
-          const hasUpscaledVersion = image.upscale?.status === 'completed' && image.upscale?.upscaledImageUrl
-          const isUpscaleDropdownOpen = upscaleDropdownOpen === image.id
+          const isSelected = image.id === selectedImageId;
+          const imageIsUpscaling =
+            isImageUpscaling?.(currentGeneration?.id || "", image.id) || false;
+          const upscaleJob = getUpscaleJob?.(currentGeneration?.id || "", image.id);
+          const hasUpscaledVersion =
+            image.upscale?.status === "completed" && image.upscale?.upscaledImageUrl;
+          const isUpscaleDropdownOpen = upscaleDropdownOpen === image.id;
 
           return (
             <div
               key={image.id}
               className={cn(
-                'group relative aspect-square overflow-hidden rounded-lg border transition-all',
+                "group relative aspect-square overflow-hidden rounded-lg border transition-all",
                 isSelected
-                  ? 'border-primary ring-2 ring-primary ring-offset-2'
-                  : 'border-border hover:border-muted-foreground'
+                  ? "border-primary ring-2 ring-primary ring-offset-2"
+                  : "border-border hover:border-muted-foreground"
               )}
             >
               {/* Image */}
@@ -268,8 +281,8 @@ export function GenerationResults({
               {!imageIsUpscaling && (
                 <div
                   className={cn(
-                    'absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40',
-                    isSelected && 'bg-black/20'
+                    "absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40",
+                    isSelected && "bg-black/20"
                   )}
                 >
                   {/* Selection Check */}
@@ -285,11 +298,11 @@ export function GenerationResults({
                       type="button"
                       onClick={() => handleImageSelect(image.id)}
                       className={cn(
-                        'flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg transition-colors',
-                        'hover:bg-primary hover:text-primary-foreground',
-                        isSelected && 'bg-primary text-primary-foreground'
+                        "flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg transition-colors",
+                        "hover:bg-primary hover:text-primary-foreground",
+                        isSelected && "bg-primary text-primary-foreground"
                       )}
-                      title={isSelected ? 'Selected' : 'Select this image'}
+                      title={isSelected ? "Selected" : "Select this image"}
                     >
                       <Check className="h-5 w-5" />
                     </button>
@@ -306,7 +319,9 @@ export function GenerationResults({
                       <div className="relative">
                         <button
                           type="button"
-                          onClick={() => setUpscaleDropdownOpen(isUpscaleDropdownOpen ? null : image.id)}
+                          onClick={() =>
+                            setUpscaleDropdownOpen(isUpscaleDropdownOpen ? null : image.id)
+                          }
                           className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg transition-colors hover:bg-white"
                           title="Upscale image"
                         >
@@ -319,23 +334,22 @@ export function GenerationResults({
                               Upscale to
                             </p>
                             {upscaleCosts.map((option) => {
-                              const canAfford = walletBalance === undefined || walletBalance >= option.cost
+                              const canAfford =
+                                walletBalance === undefined || walletBalance >= option.cost;
                               return (
                                 <button
                                   key={option.multiplier}
                                   type="button"
                                   onClick={() => {
                                     if (canAfford && currentGeneration) {
-                                      onUpscale(currentGeneration.id, image.id, option.multiplier)
-                                      setUpscaleDropdownOpen(null)
+                                      onUpscale(currentGeneration.id, image.id, option.multiplier);
+                                      setUpscaleDropdownOpen(null);
                                     }
                                   }}
                                   disabled={!canAfford}
                                   className={cn(
-                                    'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm',
-                                    canAfford
-                                      ? 'hover:bg-accent'
-                                      : 'cursor-not-allowed opacity-50'
+                                    "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm",
+                                    canAfford ? "hover:bg-accent" : "cursor-not-allowed opacity-50"
                                   )}
                                 >
                                   <span className="font-medium">{option.multiplier}x</span>
@@ -343,7 +357,7 @@ export function GenerationResults({
                                     {option.cost} credits
                                   </span>
                                 </button>
-                              )
+                              );
                             })}
                             {walletBalance !== undefined && (
                               <div className="mt-2 border-t border-border pt-2">
@@ -374,7 +388,7 @@ export function GenerationResults({
                 </div>
               )}
             </div>
-          )
+          );
         })}
       </div>
 
@@ -382,10 +396,12 @@ export function GenerationResults({
       {walletBalance !== undefined && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-2">
           <span className="text-sm text-muted-foreground">Wallet Balance</span>
-          <span className={cn(
-            'text-sm font-medium',
-            walletBalance < 5 ? 'text-amber-600' : 'text-foreground'
-          )}>
+          <span
+            className={cn(
+              "text-sm font-medium",
+              walletBalance < 5 ? "text-amber-600" : "text-foreground"
+            )}
+          >
             {walletBalance} credits
             {walletBalance < 5 && (
               <span className="ml-2 text-xs text-amber-600">(Low balance)</span>
@@ -412,14 +428,14 @@ export function GenerationResults({
           onClick={handleAddToCart}
           disabled={!hasSelectedImage}
           className={cn(
-            'flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-medium transition-colors',
+            "flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-medium transition-colors",
             hasSelectedImage
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-              : 'cursor-not-allowed bg-muted text-muted-foreground'
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "cursor-not-allowed bg-muted text-muted-foreground"
           )}
         >
           <ShoppingCart className="h-4 w-4" />
-          {hasSelectedImage ? 'Add to Cart' : 'Select an image first'}
+          {hasSelectedImage ? "Add to Cart" : "Select an image first"}
         </button>
       </div>
 
@@ -429,19 +445,23 @@ export function GenerationResults({
           image={selectedImageForPreview}
           onClose={() => setSelectedImageForPreview(null)}
           onSelect={() => {
-            handleImageSelect(selectedImageForPreview.id)
-            setSelectedImageForPreview(null)
+            handleImageSelect(selectedImageForPreview.id);
+            setSelectedImageForPreview(null);
           }}
-          onUpscale={onUpscale && currentGeneration ? (multiplier) => {
-            onUpscale(currentGeneration.id, selectedImageForPreview.id, multiplier)
-          } : undefined}
+          onUpscale={
+            onUpscale && currentGeneration
+              ? (multiplier) => {
+                  onUpscale(currentGeneration.id, selectedImageForPreview.id, multiplier);
+                }
+              : undefined
+          }
           upscaleCosts={upscaleCosts}
           walletBalance={walletBalance}
-          isUpscaling={isImageUpscaling?.(currentGeneration?.id || '', selectedImageForPreview.id)}
+          isUpscaling={isImageUpscaling?.(currentGeneration?.id || "", selectedImageForPreview.id)}
         />
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -454,15 +474,13 @@ function EmptyState() {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
         <ImageIcon className="h-8 w-8 text-primary" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
-        No generations yet
-      </h3>
+      <h3 className="mb-2 text-lg font-semibold text-foreground">No generations yet</h3>
       <p className="max-w-sm text-sm text-muted-foreground">
-        Enter a prompt, choose your style and aspect ratio, then click Generate to
-        create your custom poster.
+        Enter a prompt, choose your style and aspect ratio, then click Generate to create your
+        custom poster.
       </p>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -470,9 +488,9 @@ function EmptyState() {
 // ============================================================================
 
 interface GeneratingStateProps {
-  progress: number
-  message: string
-  status: 'queued' | 'processing'
+  progress: number;
+  message: string;
+  status: "queued" | "processing";
 }
 
 function GeneratingState({ progress, message, status }: GeneratingStateProps) {
@@ -481,14 +499,12 @@ function GeneratingState({ progress, message, status }: GeneratingStateProps) {
       <div className="mb-6 relative">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-medium text-primary">
-            {Math.round(progress)}%
-          </span>
+          <span className="text-sm font-medium text-primary">{Math.round(progress)}%</span>
         </div>
       </div>
 
       <h3 className="mb-2 text-lg font-semibold text-foreground">
-        {status === 'queued' ? 'In Queue' : 'Generating Your Poster'}
+        {status === "queued" ? "In Queue" : "Generating Your Poster"}
       </h3>
       <p className="mb-4 text-sm text-muted-foreground">{message}</p>
 
@@ -502,11 +518,9 @@ function GeneratingState({ progress, message, status }: GeneratingStateProps) {
         </div>
       </div>
 
-      <p className="mt-4 text-xs text-muted-foreground">
-        This usually takes 15-30 seconds
-      </p>
+      <p className="mt-4 text-xs text-muted-foreground">This usually takes 15-30 seconds</p>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -514,8 +528,8 @@ function GeneratingState({ progress, message, status }: GeneratingStateProps) {
 // ============================================================================
 
 interface ErrorStateProps {
-  message: string
-  onRetry?: () => void
+  message: string;
+  onRetry?: () => void;
 }
 
 function ErrorState({ message, onRetry }: ErrorStateProps) {
@@ -524,9 +538,7 @@ function ErrorState({ message, onRetry }: ErrorStateProps) {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
         <AlertCircle className="h-8 w-8 text-destructive" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
-        Generation Failed
-      </h3>
+      <h3 className="mb-2 text-lg font-semibold text-foreground">Generation Failed</h3>
       <p className="mb-4 max-w-sm text-sm text-muted-foreground">{message}</p>
       {onRetry && (
         <button
@@ -539,7 +551,7 @@ function ErrorState({ message, onRetry }: ErrorStateProps) {
         </button>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -547,7 +559,7 @@ function ErrorState({ message, onRetry }: ErrorStateProps) {
 // ============================================================================
 
 interface CancelledStateProps {
-  onRetry?: () => void
+  onRetry?: () => void;
 }
 
 function CancelledState({ onRetry }: CancelledStateProps) {
@@ -556,9 +568,7 @@ function CancelledState({ onRetry }: CancelledStateProps) {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
         <AlertCircle className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
-        Generation Cancelled
-      </h3>
+      <h3 className="mb-2 text-lg font-semibold text-foreground">Generation Cancelled</h3>
       <p className="mb-4 text-sm text-muted-foreground">
         The generation was cancelled before completion.
       </p>
@@ -573,7 +583,7 @@ function CancelledState({ onRetry }: CancelledStateProps) {
         </button>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -581,13 +591,13 @@ function CancelledState({ onRetry }: CancelledStateProps) {
 // ============================================================================
 
 interface ImagePreviewModalProps {
-  image: GeneratedImage
-  onClose: () => void
-  onSelect: () => void
-  onUpscale?: (multiplier: UpscaleMultiplier) => void
-  upscaleCosts?: UpscaleCost[]
-  walletBalance?: number
-  isUpscaling?: boolean
+  image: GeneratedImage;
+  onClose: () => void;
+  onSelect: () => void;
+  onUpscale?: (multiplier: UpscaleMultiplier) => void;
+  upscaleCosts?: UpscaleCost[];
+  walletBalance?: number;
+  isUpscaling?: boolean;
 }
 
 function ImagePreviewModal({
@@ -599,18 +609,15 @@ function ImagePreviewModal({
   walletBalance,
   isUpscaling,
 }: ImagePreviewModalProps) {
-  const [showUpscaleOptions, setShowUpscaleOptions] = useState(false)
-  const hasUpscaledVersion = image.upscale?.status === 'completed' && image.upscale?.upscaledImageUrl
-  const displayUrl = hasUpscaledVersion ? image.upscale!.upscaledImageUrl! : image.imageUrl
+  const [showUpscaleOptions, setShowUpscaleOptions] = useState(false);
+  const hasUpscaledVersion =
+    image.upscale?.status === "completed" && image.upscale?.upscaledImageUrl;
+  const displayUrl = hasUpscaledVersion ? image.upscale!.upscaledImageUrl! : image.imageUrl;
 
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50 bg-black/80"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 z-50 bg-black/80" onClick={onClose} aria-hidden="true" />
 
       {/* Modal */}
       <div
@@ -656,11 +663,11 @@ function ImagePreviewModal({
             <div className="flex gap-2">
               <a
                 href={displayUrl}
-                download={hasUpscaledVersion ? 'upscaled-image.png' : 'generated-image.png'}
+                download={hasUpscaledVersion ? "upscaled-image.png" : "generated-image.png"}
                 className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:bg-accent"
               >
                 <Download className="h-4 w-4" />
-                {hasUpscaledVersion ? 'Download High-Res' : 'Download'}
+                {hasUpscaledVersion ? "Download High-Res" : "Download"}
               </a>
               <button
                 type="button"
@@ -697,23 +704,22 @@ function ImagePreviewModal({
                         Upscale to
                       </p>
                       {upscaleCosts.map((option) => {
-                        const canAfford = walletBalance === undefined || walletBalance >= option.cost
+                        const canAfford =
+                          walletBalance === undefined || walletBalance >= option.cost;
                         return (
                           <button
                             key={option.multiplier}
                             type="button"
                             onClick={() => {
                               if (canAfford) {
-                                onUpscale(option.multiplier)
-                                setShowUpscaleOptions(false)
+                                onUpscale(option.multiplier);
+                                setShowUpscaleOptions(false);
                               }
                             }}
                             disabled={!canAfford}
                             className={cn(
-                              'flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm',
-                              canAfford
-                                ? 'hover:bg-accent'
-                                : 'cursor-not-allowed opacity-50'
+                              "flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm",
+                              canAfford ? "hover:bg-accent" : "cursor-not-allowed opacity-50"
                             )}
                           >
                             <div>
@@ -726,7 +732,7 @@ function ImagePreviewModal({
                               {option.cost} credits
                             </span>
                           </button>
-                        )
+                        );
                       })}
                       {walletBalance !== undefined && (
                         <div className="mt-2 border-t border-border pt-2">
@@ -752,7 +758,7 @@ function ImagePreviewModal({
         </div>
       </div>
     </>
-  )
+  );
 }
 
-export default GenerationResults
+export default GenerationResults;

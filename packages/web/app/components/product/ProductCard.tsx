@@ -7,49 +7,54 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { Palette, Sparkles } from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
-import { OptimizedImage, type ImageVariant } from '~/components/ui/OptimizedImage'
+import { Palette, Sparkles } from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import { OptimizedImage, type ImageVariant } from "~/components/ui/OptimizedImage";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ProductImage {
-  id: string
-  url: string
-  alt?: string
-  isPrimary?: boolean
-  webpUrl?: string
-  width?: number
-  height?: number
-  variants?: ImageVariant[]
+  id: string;
+  url: string;
+  alt?: string;
+  isPrimary?: boolean;
+  webpUrl?: string;
+  width?: number;
+  height?: number;
+  variants?: ImageVariant[];
 }
 
 export interface ProductCardData {
-  id: string
-  title: string
-  slug: string
-  basePrice: string
-  images: ProductImage[]
-  orientation: 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
-  styles?: string[]
-  isFeatured?: boolean
-  isAiGenerated?: boolean
+  id: string;
+  title: string;
+  slug: string;
+  basePrice: string;
+  images: ProductImage[];
+  orientation: "square" | "portrait" | "landscape" | "panoramic" | "round";
+  styles?: string[];
+  isFeatured?: boolean;
+  isAiGenerated?: boolean;
 }
 
 export interface ProductCardProps {
-  product: ProductCardData
+  product: ProductCardData;
   /** Whether to show the featured badge */
-  showFeaturedBadge?: boolean
+  showFeaturedBadge?: boolean;
   /** Whether to show the AI badge */
-  showAiBadge?: boolean
+  showAiBadge?: boolean;
   /** Custom className for the card */
-  className?: string
+  className?: string;
   /** Size variant for the card */
-  size?: 'sm' | 'md' | 'lg'
+  size?: "sm" | "md" | "lg";
   /** Override aspect ratio for uniform grid alignment */
-  uniformAspectRatio?: 'aspect-square' | 'aspect-[3/4]' | 'aspect-[2/3]' | 'aspect-[3/2]' | 'aspect-video'
+  uniformAspectRatio?:
+    | "aspect-square"
+    | "aspect-[3/4]"
+    | "aspect-[2/3]"
+    | "aspect-[3/2]"
+    | "aspect-video";
 }
 
 // ============================================================================
@@ -57,12 +62,12 @@ export interface ProductCardProps {
 // ============================================================================
 
 const ASPECT_RATIO_MAP: Record<string, string> = {
-  square: 'aspect-square',
-  portrait: 'aspect-[2/3]',
-  landscape: 'aspect-[3/2]',
-  panoramic: 'aspect-video',
-  round: 'aspect-square',
-}
+  square: "aspect-square",
+  portrait: "aspect-[2/3]",
+  landscape: "aspect-[3/2]",
+  panoramic: "aspect-video",
+  round: "aspect-square",
+};
 
 // ============================================================================
 // Component
@@ -83,52 +88,43 @@ export function ProductCard({
   showFeaturedBadge = true,
   showAiBadge = true,
   className,
-  size = 'md',
+  size = "md",
   uniformAspectRatio,
 }: ProductCardProps) {
-  const primaryImage =
-    product.images?.find((img) => img.isPrimary) || product.images?.[0]
-  const price = parseFloat(product.basePrice)
+  const primaryImage = product.images?.find((img) => img.isPrimary) || product.images?.[0];
+  const price = parseFloat(product.basePrice);
   const aspectRatioClass =
-    uniformAspectRatio || ASPECT_RATIO_MAP[product.orientation] || ASPECT_RATIO_MAP.portrait
+    uniformAspectRatio || ASPECT_RATIO_MAP[product.orientation] || ASPECT_RATIO_MAP.portrait;
 
   // Size-based styling
   const sizeStyles = {
     sm: {
-      padding: 'p-2 sm:p-3',
-      title: 'text-xs sm:text-sm',
-      price: 'text-xs sm:text-sm',
-      styleText: 'text-[10px] sm:text-xs',
+      padding: "p-2 sm:p-3",
+      title: "text-xs sm:text-sm",
+      price: "text-xs sm:text-sm",
+      styleText: "text-[10px] sm:text-xs",
     },
     md: {
-      padding: 'p-3 sm:p-4',
-      title: 'text-sm sm:text-base',
-      price: 'text-sm sm:text-base',
-      styleText: 'text-xs',
+      padding: "p-3 sm:p-4",
+      title: "text-sm sm:text-base",
+      price: "text-sm sm:text-base",
+      styleText: "text-xs",
     },
     lg: {
-      padding: 'p-4 sm:p-5',
-      title: 'text-base sm:text-lg',
-      price: 'text-base sm:text-lg',
-      styleText: 'text-xs sm:text-sm',
+      padding: "p-4 sm:p-5",
+      title: "text-base sm:text-lg",
+      price: "text-base sm:text-lg",
+      styleText: "text-xs sm:text-sm",
     },
-  }
+  };
 
-  const styles = sizeStyles[size]
+  const styles = sizeStyles[size];
 
   return (
-    <a
-      href={`/posters/${product.slug}`}
-      className={cn('group block', className)}
-    >
+    <a href={`/posters/${product.slug}`} className={cn("group block", className)}>
       <div className="card-hover overflow-hidden rounded-lg border border-border bg-card">
         {/* Image Container */}
-        <div
-          className={cn(
-            'relative overflow-hidden bg-muted',
-            aspectRatioClass
-          )}
-        >
+        <div className={cn("relative overflow-hidden bg-muted", aspectRatioClass)}>
           {primaryImage?.url ? (
             <OptimizedImage
               src={primaryImage.url}
@@ -168,7 +164,7 @@ export function ProductCard({
         <div className={styles.padding}>
           <h3
             className={cn(
-              'line-clamp-1 font-medium text-foreground transition-colors group-hover:text-brand-600',
+              "line-clamp-1 font-medium text-foreground transition-colors group-hover:text-brand-600",
               styles.title
             )}
           >
@@ -181,42 +177,30 @@ export function ProductCard({
               {product.styles.slice(0, 2).map((style) => (
                 <span
                   key={style}
-                  className={cn(
-                    'capitalize text-muted-foreground',
-                    styles.styleText
-                  )}
+                  className={cn("capitalize text-muted-foreground", styles.styleText)}
                 >
-                  {style.replace(/-/g, ' ')}
+                  {style.replace(/-/g, " ")}
                 </span>
               ))}
             </div>
           )}
 
           {/* Price */}
-          <p
-            className={cn(
-              'mt-2 font-semibold text-foreground',
-              styles.price
-            )}
-          >
+          <p className={cn("mt-2 font-semibold text-foreground", styles.price)}>
             From {formatPrice(price)}
           </p>
         </div>
       </div>
     </a>
-  )
+  );
 }
 
 /**
  * ProductCardSkeleton - Loading skeleton for product cards
  */
-export function ProductCardSkeleton({
-  className,
-}: {
-  className?: string
-}) {
+export function ProductCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('animate-pulse', className)}>
+    <div className={cn("animate-pulse", className)}>
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {/* Image Skeleton */}
         <div className="aspect-[2/3] bg-muted" />
@@ -235,7 +219,7 @@ export function ProductCardSkeleton({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default ProductCard
+export default ProductCard;

@@ -7,8 +7,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useState, useEffect, useCallback } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   ShoppingCart,
   MapPin,
@@ -18,184 +18,200 @@ import {
   ArrowLeft,
   Check,
   AlertCircle,
-} from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
+} from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import { useCartItems, useCartSubtotal, useIsCartEmpty } from "~/stores/cart";
 import {
-  useCartItems,
-  useCartSubtotal,
-  useIsCartEmpty,
-} from '~/stores/cart'
-import { AddressForm, type AddressFormData, type AddressFormErrors, SavedAddressSelector, type SavedAddress } from '~/components/checkout/AddressForm'
-import { OrderSummary } from '~/components/checkout/OrderSummary'
-import { PaymentButton } from '~/components/checkout/PaymentButton'
-import { ShippingSelector, type SelectedShippingOption } from '~/components/checkout/ShippingSelector'
-import type { OrderInput } from '~/lib/api'
-import { addressesApi } from '~/lib/api'
-import { useSession } from '~/lib/auth-client'
+  AddressForm,
+  type AddressFormData,
+  type AddressFormErrors,
+  SavedAddressSelector,
+  type SavedAddress,
+} from "~/components/checkout/AddressForm";
+import { OrderSummary } from "~/components/checkout/OrderSummary";
+import { PaymentButton } from "~/components/checkout/PaymentButton";
+import {
+  ShippingSelector,
+  type SelectedShippingOption,
+} from "~/components/checkout/ShippingSelector";
+import type { OrderInput } from "~/lib/api";
+import { addressesApi } from "~/lib/api";
+import { useSession } from "~/lib/auth-client";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/checkout/')({
+export const Route = createFileRoute("/checkout/")({
   head: () => ({
     meta: [
-      { title: 'Checkout | MasonArt' },
+      { title: "Checkout | MasonArt" },
       {
-        name: 'description',
-        content: 'Complete your order. Secure checkout with multiple payment options.',
+        name: "description",
+        content: "Complete your order. Secure checkout with multiple payment options.",
       },
-      { name: 'robots', content: 'noindex' }, // Don't index checkout pages
+      { name: "robots", content: "noindex" }, // Don't index checkout pages
     ],
   }),
   component: CheckoutPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
-type CheckoutStep = 'shipping' | 'delivery' | 'payment' | 'review'
+type CheckoutStep = "shipping" | "delivery" | "payment" | "review";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const CHECKOUT_STEPS: { id: CheckoutStep; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'shipping', label: 'Shipping', icon: MapPin },
-  { id: 'delivery', label: 'Delivery', icon: Truck },
-  { id: 'payment', label: 'Payment', icon: CreditCard },
-]
+const CHECKOUT_STEPS: {
+  id: CheckoutStep;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
+  { id: "shipping", label: "Shipping", icon: MapPin },
+  { id: "delivery", label: "Delivery", icon: Truck },
+  { id: "payment", label: "Payment", icon: CreditCard },
+];
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function CheckoutPage() {
-  const items = useCartItems()
-  const subtotal = useCartSubtotal()
-  const isEmpty = useIsCartEmpty()
-  const { data: session } = useSession()
-  const isLoggedIn = !!session?.user
+  const items = useCartItems();
+  const subtotal = useCartSubtotal();
+  const isEmpty = useIsCartEmpty();
+  const { data: session } = useSession();
+  const isLoggedIn = !!session?.user;
 
   // Checkout state
-  const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping')
-  const [shippingAddress, setShippingAddress] = useState<AddressFormData | null>(null)
-  const [isAddressValid, setIsAddressValid] = useState(false)
-  const [selectedShippingOption, setSelectedShippingOption] = useState<SelectedShippingOption | null>(null)
-  const [customerNotes, setCustomerNotes] = useState('')
+  const [currentStep, setCurrentStep] = useState<CheckoutStep>("shipping");
+  const [shippingAddress, setShippingAddress] = useState<AddressFormData | null>(null);
+  const [isAddressValid, setIsAddressValid] = useState(false);
+  const [selectedShippingOption, setSelectedShippingOption] =
+    useState<SelectedShippingOption | null>(null);
+  const [customerNotes, setCustomerNotes] = useState("");
 
   // Saved addresses state
-  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
-  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null)
-  const [showNewAddressForm, setShowNewAddressForm] = useState(false)
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
 
   // Fetch saved addresses when logged in
   useEffect(() => {
-    if (!isLoggedIn) return
-    addressesApi.list().then((response) => {
-      const mapped: SavedAddress[] = response.addresses.map((a) => ({
-        id: a.id,
-        fullName: a.fullName,
-        phone: a.phone,
-        addressLine1: a.addressLine1,
-        addressLine2: a.addressLine2 || undefined,
-        city: a.city,
-        state: a.state,
-        postalCode: a.postalCode,
-        isDefault: a.isDefault,
-      }))
-      setSavedAddresses(mapped)
-      // Auto-select default address
-      const defaultAddr = mapped.find((a) => a.isDefault)
-      if (defaultAddr && !shippingAddress) {
-        handleSavedAddressSelect(defaultAddr)
-      }
-    }).catch(() => {
-      // Silently fail - user can still enter address manually
-    })
-  }, [isLoggedIn])
+    if (!isLoggedIn) return;
+    addressesApi
+      .list()
+      .then((response) => {
+        const mapped: SavedAddress[] = response.addresses.map((a) => ({
+          id: a.id,
+          fullName: a.fullName,
+          phone: a.phone,
+          addressLine1: a.addressLine1,
+          addressLine2: a.addressLine2 || undefined,
+          city: a.city,
+          state: a.state,
+          postalCode: a.postalCode,
+          isDefault: a.isDefault,
+        }));
+        setSavedAddresses(mapped);
+        // Auto-select default address
+        const defaultAddr = mapped.find((a) => a.isDefault);
+        if (defaultAddr && !shippingAddress) {
+          handleSavedAddressSelect(defaultAddr);
+        }
+      })
+      .catch(() => {
+        // Silently fail - user can still enter address manually
+      });
+  }, [isLoggedIn]);
 
   // Handle selecting a saved address
-  const handleSavedAddressSelect = useCallback((address: SavedAddress) => {
-    setSelectedSavedAddressId(address.id)
-    setShowNewAddressForm(false)
-    const formData: AddressFormData = {
-      fullName: address.fullName,
-      email: session?.user?.email || '',
-      phone: address.phone,
-      addressLine1: address.addressLine1,
-      addressLine2: address.addressLine2 || '',
-      landmark: '',
-      city: address.city,
-      state: address.state,
-      postalCode: address.postalCode,
-      countryCode: 'IN',
-      saveAddress: false,
-    }
-    setShippingAddress(formData)
-    setIsAddressValid(true)
-  }, [session?.user?.email])
+  const handleSavedAddressSelect = useCallback(
+    (address: SavedAddress) => {
+      setSelectedSavedAddressId(address.id);
+      setShowNewAddressForm(false);
+      const formData: AddressFormData = {
+        fullName: address.fullName,
+        email: session?.user?.email || "",
+        phone: address.phone,
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2 || "",
+        landmark: "",
+        city: address.city,
+        state: address.state,
+        postalCode: address.postalCode,
+        countryCode: "IN",
+        saveAddress: false,
+      };
+      setShippingAddress(formData);
+      setIsAddressValid(true);
+    },
+    [session?.user?.email]
+  );
 
   // Handle "Add New Address" from selector
   const handleAddNewAddress = useCallback(() => {
-    setSelectedSavedAddressId(null)
-    setShowNewAddressForm(true)
-    setShippingAddress(null)
-    setIsAddressValid(false)
-  }, [])
+    setSelectedSavedAddressId(null);
+    setShowNewAddressForm(true);
+    setShippingAddress(null);
+    setIsAddressValid(false);
+  }, []);
 
   // Pricing calculations - use actual shipping cost from selected option
-  const shippingCost = selectedShippingOption?.finalCost ?? 0
-  const total = subtotal + shippingCost
+  const shippingCost = selectedShippingOption?.finalCost ?? 0;
+  const total = subtotal + shippingCost;
 
   // Handle address change
   const handleAddressChange = (data: AddressFormData) => {
-    setShippingAddress(data)
-  }
+    setShippingAddress(data);
+  };
 
   // Handle validation change
   const handleValidationChange = (isValid: boolean, _errors: AddressFormErrors) => {
-    setIsAddressValid(isValid)
+    setIsAddressValid(isValid);
     // Errors are handled at the form level
-  }
+  };
 
   // Navigate to next step
   const goToNextStep = () => {
-    const stepIndex = CHECKOUT_STEPS.findIndex((s) => s.id === currentStep)
-    const nextStep = CHECKOUT_STEPS[stepIndex + 1]
+    const stepIndex = CHECKOUT_STEPS.findIndex((s) => s.id === currentStep);
+    const nextStep = CHECKOUT_STEPS[stepIndex + 1];
     if (stepIndex < CHECKOUT_STEPS.length - 1 && nextStep) {
-      setCurrentStep(nextStep.id)
+      setCurrentStep(nextStep.id);
     }
     // Payment is handled by PaymentButton component
-  }
+  };
 
   // Navigate to previous step
   const goToPreviousStep = () => {
-    const stepIndex = CHECKOUT_STEPS.findIndex((s) => s.id === currentStep)
-    const prevStep = CHECKOUT_STEPS[stepIndex - 1]
+    const stepIndex = CHECKOUT_STEPS.findIndex((s) => s.id === currentStep);
+    const prevStep = CHECKOUT_STEPS[stepIndex - 1];
     if (stepIndex > 0 && prevStep) {
-      setCurrentStep(prevStep.id)
+      setCurrentStep(prevStep.id);
     }
-  }
+  };
 
   // Check if can proceed to next step
   const canProceedFromCurrentStep = (): boolean => {
     switch (currentStep) {
-      case 'shipping':
-        return isAddressValid && shippingAddress !== null
-      case 'delivery':
-        return selectedShippingOption !== null
-      case 'payment':
-        return true // Will be validated by payment provider
+      case "shipping":
+        return isAddressValid && shippingAddress !== null;
+      case "delivery":
+        return selectedShippingOption !== null;
+      case "payment":
+        return true; // Will be validated by payment provider
       default:
-        return false
+        return false;
     }
-  }
+  };
 
   // Build order data for payment
   const buildOrderData = (): OrderInput | null => {
-    if (!shippingAddress) return null
+    if (!shippingAddress) return null;
 
     return {
       shippingAddress: {
@@ -207,51 +223,55 @@ function CheckoutPage() {
         city: shippingAddress.city,
         state: shippingAddress.state,
         postalCode: shippingAddress.postalCode,
-        countryCode: shippingAddress.countryCode || 'IN',
+        countryCode: shippingAddress.countryCode || "IN",
       },
       // Pass selected shipping option ID - API will handle the mapping
       shippingOptionId: selectedShippingOption?.id,
       customerNotes: customerNotes || undefined,
-    }
-  }
+    };
+  };
 
   // Handle payment success
   const handlePaymentSuccess = (_orderId: string, orderNumber: string) => {
     // Save address if checkbox was checked, user is logged in, and address wasn't from saved addresses
     if (isLoggedIn && shippingAddress?.saveAddress && !selectedSavedAddressId) {
-      addressesApi.create({
-        fullName: shippingAddress.fullName,
-        phone: shippingAddress.phone.startsWith('+') ? shippingAddress.phone : `+91${shippingAddress.phone}`,
-        addressLine1: shippingAddress.addressLine1,
-        addressLine2: shippingAddress.addressLine2 || null,
-        landmark: shippingAddress.landmark || null,
-        city: shippingAddress.city,
-        state: shippingAddress.state,
-        postalCode: shippingAddress.postalCode,
-        countryCode: shippingAddress.countryCode || 'IN',
-      }).catch(() => {
-        // Silently fail - don't block order confirmation
-      })
+      addressesApi
+        .create({
+          fullName: shippingAddress.fullName,
+          phone: shippingAddress.phone.startsWith("+")
+            ? shippingAddress.phone
+            : `+91${shippingAddress.phone}`,
+          addressLine1: shippingAddress.addressLine1,
+          addressLine2: shippingAddress.addressLine2 || null,
+          landmark: shippingAddress.landmark || null,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          postalCode: shippingAddress.postalCode,
+          countryCode: shippingAddress.countryCode || "IN",
+        })
+        .catch(() => {
+          // Silently fail - don't block order confirmation
+        });
     }
 
     // Redirect to order confirmation page
-    window.location.href = `/orders/${orderNumber}?success=true`
-  }
+    window.location.href = `/orders/${orderNumber}?success=true`;
+  };
 
   // Handle payment error
   const handlePaymentError = (_error: string) => {
     // Error is displayed by PaymentButton component
     // Could add additional error handling here if needed
-  }
+  };
 
   // Scroll to top when step changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [currentStep])
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentStep]);
 
   // Empty cart state
   if (isEmpty) {
-    return <EmptyCartState />
+    return <EmptyCartState />;
   }
 
   return (
@@ -279,7 +299,7 @@ function CheckoutPage() {
           {/* Left Column - Form */}
           <div className="lg:col-span-2">
             {/* Shipping Step */}
-            {currentStep === 'shipping' && (
+            {currentStep === "shipping" && (
               <div className="space-y-6">
                 {/* Saved Address Selector (for logged-in users with addresses) */}
                 {isLoggedIn && savedAddresses.length > 0 && (
@@ -305,7 +325,8 @@ function CheckoutPage() {
                 {/* Customer Notes */}
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h3 className="mb-4 text-base font-semibold text-foreground">
-                    Order Notes <span className="text-muted-foreground font-normal">(Optional)</span>
+                    Order Notes{" "}
+                    <span className="text-muted-foreground font-normal">(Optional)</span>
                   </h3>
                   <textarea
                     value={customerNotes}
@@ -314,8 +335,8 @@ function CheckoutPage() {
                     rows={3}
                     maxLength={500}
                     className={cn(
-                      'w-full resize-none rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                      'hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2'
+                      "w-full resize-none rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors",
+                      "hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
                     )}
                   />
                   <p className="mt-1 text-xs text-muted-foreground text-right">
@@ -330,11 +351,11 @@ function CheckoutPage() {
                     onClick={goToNextStep}
                     disabled={!canProceedFromCurrentStep()}
                     className={cn(
-                      'flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                      "flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors",
+                      "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
                       canProceedFromCurrentStep()
-                        ? 'bg-brand-500 text-white hover:bg-brand-600'
-                        : 'cursor-not-allowed bg-muted text-muted-foreground'
+                        ? "bg-brand-500 text-white hover:bg-brand-600"
+                        : "cursor-not-allowed bg-muted text-muted-foreground"
                     )}
                   >
                     Continue to Delivery
@@ -345,7 +366,7 @@ function CheckoutPage() {
             )}
 
             {/* Delivery Step */}
-            {currentStep === 'delivery' && (
+            {currentStep === "delivery" && (
               <div className="space-y-6">
                 {/* Delivery Options */}
                 <div className="rounded-xl border border-border bg-card p-6">
@@ -371,7 +392,7 @@ function CheckoutPage() {
                       <h3 className="text-base font-semibold text-foreground">Shipping To</h3>
                       <button
                         type="button"
-                        onClick={() => setCurrentStep('shipping')}
+                        onClick={() => setCurrentStep("shipping")}
                         className="text-sm font-medium text-brand-600 hover:text-brand-700"
                       >
                         Edit
@@ -382,7 +403,8 @@ function CheckoutPage() {
                       <p>{shippingAddress.addressLine1}</p>
                       {shippingAddress.addressLine2 && <p>{shippingAddress.addressLine2}</p>}
                       <p>
-                        {shippingAddress.city}, {shippingAddress.state} - {shippingAddress.postalCode}
+                        {shippingAddress.city}, {shippingAddress.state} -{" "}
+                        {shippingAddress.postalCode}
                       </p>
                       <p className="mt-1">{shippingAddress.phone}</p>
                     </div>
@@ -404,11 +426,11 @@ function CheckoutPage() {
                     onClick={goToNextStep}
                     disabled={!canProceedFromCurrentStep()}
                     className={cn(
-                      'flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                      "flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors",
+                      "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
                       canProceedFromCurrentStep()
-                        ? 'bg-brand-500 text-white hover:bg-brand-600'
-                        : 'cursor-not-allowed bg-muted text-muted-foreground'
+                        ? "bg-brand-500 text-white hover:bg-brand-600"
+                        : "cursor-not-allowed bg-muted text-muted-foreground"
                     )}
                   >
                     Continue to Payment
@@ -419,7 +441,7 @@ function CheckoutPage() {
             )}
 
             {/* Payment Step */}
-            {currentStep === 'payment' && (
+            {currentStep === "payment" && (
               <div className="space-y-6">
                 {/* Payment Section - Placeholder for Razorpay */}
                 <div className="rounded-xl border border-border bg-card p-6">
@@ -439,7 +461,8 @@ function CheckoutPage() {
                       <div className="mb-3 border-b border-border pb-3">
                         <p className="text-xs text-muted-foreground">Shipping to:</p>
                         <p className="text-sm text-foreground">
-                          {shippingAddress.fullName}, {shippingAddress.city}, {shippingAddress.state}
+                          {shippingAddress.fullName}, {shippingAddress.city},{" "}
+                          {shippingAddress.state}
                         </p>
                       </div>
                     )}
@@ -452,7 +475,8 @@ function CheckoutPage() {
                           {selectedShippingOption.name} ({selectedShippingOption.carrier})
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {selectedShippingOption.estimatedDaysMin === selectedShippingOption.estimatedDaysMax
+                          {selectedShippingOption.estimatedDaysMin ===
+                          selectedShippingOption.estimatedDaysMax
                             ? `${selectedShippingOption.estimatedDaysMin} business days`
                             : `${selectedShippingOption.estimatedDaysMin}-${selectedShippingOption.estimatedDaysMax} business days`}
                         </p>
@@ -462,13 +486,15 @@ function CheckoutPage() {
                     {/* Total */}
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-foreground">Total Amount</span>
-                      <span className="text-lg font-bold text-foreground">{formatPrice(total)}</span>
+                      <span className="text-lg font-bold text-foreground">
+                        {formatPrice(total)}
+                      </span>
                     </div>
                   </div>
 
                   {/* Payment Button */}
                   {(() => {
-                    const orderData = buildOrderData()
+                    const orderData = buildOrderData();
                     if (!orderData) {
                       return (
                         <div className="rounded-lg border border-dashed border-red-300 bg-red-50/50 p-8 text-center">
@@ -480,7 +506,7 @@ function CheckoutPage() {
                             Please complete the shipping address form first.
                           </p>
                         </div>
-                      )
+                      );
                     }
 
                     return (
@@ -492,7 +518,7 @@ function CheckoutPage() {
                         onError={handlePaymentError}
                         disabled={!isAddressValid}
                       />
-                    )
+                    );
                   })()}
                 </div>
 
@@ -530,7 +556,8 @@ function CheckoutPage() {
                   <div className="text-xs text-muted-foreground">
                     <p className="font-medium text-foreground">Secure Checkout</p>
                     <p className="mt-1">
-                      Your payment information is encrypted and secure. We never store your card details.
+                      Your payment information is encrypted and secure. We never store your card
+                      details.
                     </p>
                   </div>
                 </div>
@@ -540,7 +567,7 @@ function CheckoutPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -548,20 +575,20 @@ function CheckoutPage() {
 // ============================================================================
 
 interface CheckoutStepsProps {
-  currentStep: CheckoutStep
-  onStepClick: (step: CheckoutStep) => void
+  currentStep: CheckoutStep;
+  onStepClick: (step: CheckoutStep) => void;
 }
 
 function CheckoutSteps({ currentStep, onStepClick }: CheckoutStepsProps) {
-  const currentIndex = CHECKOUT_STEPS.findIndex((s) => s.id === currentStep)
+  const currentIndex = CHECKOUT_STEPS.findIndex((s) => s.id === currentStep);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between">
         {CHECKOUT_STEPS.map((step, index) => {
-          const isCompleted = index < currentIndex
-          const isCurrent = index === currentIndex
-          const isClickable = index <= currentIndex
+          const isCompleted = index < currentIndex;
+          const isCurrent = index === currentIndex;
+          const isClickable = index <= currentIndex;
 
           return (
             <div key={step.id} className="flex flex-1 items-center">
@@ -571,31 +598,27 @@ function CheckoutSteps({ currentStep, onStepClick }: CheckoutStepsProps) {
                 onClick={() => isClickable && onStepClick(step.id)}
                 disabled={!isClickable}
                 className={cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-2 transition-colors',
-                  isClickable && !isCurrent && 'hover:bg-muted',
-                  !isClickable && 'cursor-not-allowed'
+                  "flex items-center gap-2 rounded-lg px-3 py-2 transition-colors",
+                  isClickable && !isCurrent && "hover:bg-muted",
+                  !isClickable && "cursor-not-allowed"
                 )}
               >
                 <div
                   className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
-                    isCompleted && 'bg-green-500 text-white',
-                    isCurrent && 'bg-brand-500 text-white',
-                    !isCompleted && !isCurrent && 'bg-muted text-muted-foreground'
+                    "flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors",
+                    isCompleted && "bg-green-500 text-white",
+                    isCurrent && "bg-brand-500 text-white",
+                    !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
                   )}
                 >
-                  {isCompleted ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <step.icon className="h-4 w-4" />
-                  )}
+                  {isCompleted ? <Check className="h-4 w-4" /> : <step.icon className="h-4 w-4" />}
                 </div>
                 <span
                   className={cn(
-                    'hidden text-sm font-medium sm:block',
-                    isCurrent && 'text-foreground',
-                    isCompleted && 'text-green-600',
-                    !isCompleted && !isCurrent && 'text-muted-foreground'
+                    "hidden text-sm font-medium sm:block",
+                    isCurrent && "text-foreground",
+                    isCompleted && "text-green-600",
+                    !isCompleted && !isCurrent && "text-muted-foreground"
                   )}
                 >
                   {step.label}
@@ -607,18 +630,18 @@ function CheckoutSteps({ currentStep, onStepClick }: CheckoutStepsProps) {
                 <div className="mx-2 flex-1">
                   <div
                     className={cn(
-                      'h-0.5 rounded-full transition-colors',
-                      isCompleted ? 'bg-green-500' : 'bg-muted'
+                      "h-0.5 rounded-full transition-colors",
+                      isCompleted ? "bg-green-500" : "bg-muted"
                     )}
                   />
                 </div>
               )}
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -649,5 +672,5 @@ function EmptyCartState() {
         </div>
       </div>
     </div>
-  )
+  );
 }

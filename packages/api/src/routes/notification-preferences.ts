@@ -95,10 +95,7 @@ notificationPreferencesApp.get("/", async (c) => {
     });
   } catch (error) {
     console.error("[NotificationPreferences] Error getting preferences:", error);
-    return c.json(
-      { error: "Failed to get notification preferences", code: "GET_ERROR" },
-      500
-    );
+    return c.json({ error: "Failed to get notification preferences", code: "GET_ERROR" }, 500);
   }
 });
 
@@ -108,74 +105,67 @@ notificationPreferencesApp.get("/", async (c) => {
  *
  * Only provided fields will be updated. Returns the updated preferences.
  */
-notificationPreferencesApp.patch(
-  "/",
-  zValidator("json", updatePreferencesSchema),
-  async (c) => {
-    const user = c.get("user");
-    const updates = c.req.valid("json");
+notificationPreferencesApp.patch("/", zValidator("json", updatePreferencesSchema), async (c) => {
+  const user = c.get("user");
+  const updates = c.req.valid("json");
 
-    // Check if there's anything to update
-    if (Object.keys(updates).length === 0) {
-      return c.json(
-        { error: "No preferences to update", code: "NO_UPDATES" },
-        400
-      );
-    }
-
-    try {
-      // Check if preferences exist
-      const existing = await db.query.notificationPreferences.findFirst({
-        where: eq(notificationPreferences.userId, user.id),
-      });
-
-      let preferences: NotificationPreference;
-
-      if (!existing) {
-        // Create new preferences with updates
-        const [created] = await db
-          .insert(notificationPreferences)
-          .values({
-            userId: user.id,
-            // Defaults
-            emailOrderConfirmation: true,
-            emailShipped: true,
-            emailOutForDelivery: true,
-            emailDelivered: true,
-            smsOrderConfirmation: false,
-            smsShipped: false,
-            smsOutForDelivery: false,
-            smsDelivered: false,
-            // Apply updates
-            ...updates,
-          })
-          .returning();
-
-        preferences = created!;
-      } else {
-        // Update existing preferences
-        const [updated] = await db
-          .update(notificationPreferences)
-          .set(updates)
-          .where(eq(notificationPreferences.userId, user.id))
-          .returning();
-
-        preferences = updated!;
-      }
-
-      return c.json({
-        preferences: formatPreferences(preferences),
-        message: "Notification preferences updated",
-      });
-    } catch (error) {
-      console.error("[NotificationPreferences] Error updating preferences:", error);
-      return c.json(
-        { error: "Failed to update notification preferences", code: "UPDATE_ERROR" },
-        500
-      );
-    }
+  // Check if there's anything to update
+  if (Object.keys(updates).length === 0) {
+    return c.json({ error: "No preferences to update", code: "NO_UPDATES" }, 400);
   }
-);
+
+  try {
+    // Check if preferences exist
+    const existing = await db.query.notificationPreferences.findFirst({
+      where: eq(notificationPreferences.userId, user.id),
+    });
+
+    let preferences: NotificationPreference;
+
+    if (!existing) {
+      // Create new preferences with updates
+      const [created] = await db
+        .insert(notificationPreferences)
+        .values({
+          userId: user.id,
+          // Defaults
+          emailOrderConfirmation: true,
+          emailShipped: true,
+          emailOutForDelivery: true,
+          emailDelivered: true,
+          smsOrderConfirmation: false,
+          smsShipped: false,
+          smsOutForDelivery: false,
+          smsDelivered: false,
+          // Apply updates
+          ...updates,
+        })
+        .returning();
+
+      preferences = created!;
+    } else {
+      // Update existing preferences
+      const [updated] = await db
+        .update(notificationPreferences)
+        .set(updates)
+        .where(eq(notificationPreferences.userId, user.id))
+        .returning();
+
+      preferences = updated!;
+    }
+
+    return c.json({
+      preferences: formatPreferences(preferences),
+      message: "Notification preferences updated",
+    });
+  } catch (error) {
+    console.error("[NotificationPreferences] Error updating preferences:", error);
+    return c.json(
+      { error: "Failed to update notification preferences", code: "UPDATE_ERROR" },
+      500
+    );
+  }
+});
 
 // ============================================================================
 // Helper Functions

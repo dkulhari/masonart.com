@@ -61,9 +61,7 @@ export async function sendAlert(options: AlertOptions): Promise<void> {
           text: message,
         },
       },
-      ...(fields.length > 0
-        ? [{ type: "section", fields }]
-        : []),
+      ...(fields.length > 0 ? [{ type: "section", fields }] : []),
       {
         type: "context",
         elements: [
@@ -84,10 +82,7 @@ export async function sendAlert(options: AlertOptions): Promise<void> {
     });
 
     if (!response.ok) {
-      logger.warn(
-        { status: response.status },
-        "Failed to send Slack alert"
-      );
+      logger.warn({ status: response.status }, "Failed to send Slack alert");
     }
   } catch (err) {
     logger.warn({ err }, "Error sending Slack alert");
@@ -97,14 +92,22 @@ export async function sendAlert(options: AlertOptions): Promise<void> {
 /**
  * Alert for critical errors (payment failures, auth system down, etc.)
  */
-export function alertCritical(title: string, message: string, context?: Record<string, string>): void {
+export function alertCritical(
+  title: string,
+  message: string,
+  context?: Record<string, string>
+): void {
   sendAlert({ severity: "critical", title, message, context });
 }
 
 /**
  * Alert for warnings (rate limit exceeded, email delivery failure, etc.)
  */
-export function alertWarning(title: string, message: string, context?: Record<string, string>): void {
+export function alertWarning(
+  title: string,
+  message: string,
+  context?: Record<string, string>
+): void {
   sendAlert({ severity: "warning", title, message, context });
 }
 

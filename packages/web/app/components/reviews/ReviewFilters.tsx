@@ -7,36 +7,36 @@
  * Following patterns from ProductFilters.tsx
  */
 
-import { useState, useCallback } from 'react'
-import { Star, ChevronDown, Check, X } from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { useState, useCallback } from "react";
+import { Star, ChevronDown, Check, X } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type ReviewSortOption = 'newest' | 'oldest' | 'highest' | 'lowest'
+export type ReviewSortOption = "newest" | "oldest" | "highest" | "lowest";
 
 export interface ReviewFilterState {
   /** Filter by specific rating (1-5) or null for all */
-  rating: number | null
+  rating: number | null;
   /** Sort order */
-  sortBy: ReviewSortOption
+  sortBy: ReviewSortOption;
 }
 
 export interface ReviewFiltersProps {
   /** Current filter state */
-  filters: ReviewFilterState
+  filters: ReviewFilterState;
   /** Callback when filters change */
-  onFiltersChange: (filters: ReviewFilterState) => void
+  onFiltersChange: (filters: ReviewFilterState) => void;
   /** Total reviews count */
-  totalCount?: number
+  totalCount?: number;
   /** Filtered reviews count */
-  filteredCount?: number
+  filteredCount?: number;
   /** Custom className */
-  className?: string
+  className?: string;
   /** Compact mode for inline display */
-  compact?: boolean
+  compact?: boolean;
 }
 
 // ============================================================================
@@ -44,11 +44,11 @@ export interface ReviewFiltersProps {
 // ============================================================================
 
 const SORT_OPTIONS: { id: ReviewSortOption; label: string }[] = [
-  { id: 'newest', label: 'Newest First' },
-  { id: 'oldest', label: 'Oldest First' },
-  { id: 'highest', label: 'Highest Rated' },
-  { id: 'lowest', label: 'Lowest Rated' },
-]
+  { id: "newest", label: "Newest First" },
+  { id: "oldest", label: "Oldest First" },
+  { id: "highest", label: "Highest Rated" },
+  { id: "lowest", label: "Lowest Rated" },
+];
 
 // ============================================================================
 // Component
@@ -75,30 +75,30 @@ export function ReviewFilters({
   // Handle rating filter change
   const handleRatingChange = useCallback(
     (rating: number | null) => {
-      onFiltersChange({ ...filters, rating })
+      onFiltersChange({ ...filters, rating });
     },
     [filters, onFiltersChange]
-  )
+  );
 
   // Handle sort change
   const handleSortChange = useCallback(
     (sortBy: ReviewSortOption) => {
-      onFiltersChange({ ...filters, sortBy })
+      onFiltersChange({ ...filters, sortBy });
     },
     [filters, onFiltersChange]
-  )
+  );
 
   // Clear all filters
   const clearFilters = useCallback(() => {
-    onFiltersChange({ rating: null, sortBy: 'newest' })
-  }, [onFiltersChange])
+    onFiltersChange({ rating: null, sortBy: "newest" });
+  }, [onFiltersChange]);
 
-  const hasActiveFilters = filters.rating !== null
+  const hasActiveFilters = filters.rating !== null;
 
   return (
     <div
       className={cn(
-        'flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between',
+        "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between",
         className
       )}
     >
@@ -109,16 +109,14 @@ export function ReviewFilters({
           type="button"
           onClick={() => handleRatingChange(null)}
           className={cn(
-            'rounded-full border px-3 py-1.5 text-sm transition-colors',
+            "rounded-full border px-3 py-1.5 text-sm transition-colors",
             filters.rating === null
-              ? 'border-primary bg-primary/10 font-medium text-primary'
-              : 'border-border hover:border-muted-foreground'
+              ? "border-primary bg-primary/10 font-medium text-primary"
+              : "border-border hover:border-muted-foreground"
           )}
         >
           All
-          {totalCount > 0 && (
-            <span className="ml-1 text-muted-foreground">({totalCount})</span>
-          )}
+          {totalCount > 0 && <span className="ml-1 text-muted-foreground">({totalCount})</span>}
         </button>
 
         {/* Rating filter buttons */}
@@ -128,19 +126,19 @@ export function ReviewFilters({
             type="button"
             onClick={() => handleRatingChange(rating)}
             className={cn(
-              'flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors',
+              "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition-colors",
               filters.rating === rating
-                ? 'border-primary bg-primary/10 font-medium text-primary'
-                : 'border-border hover:border-muted-foreground'
+                ? "border-primary bg-primary/10 font-medium text-primary"
+                : "border-border hover:border-muted-foreground"
             )}
             aria-pressed={filters.rating === rating}
           >
             <Star
               className={cn(
-                'h-3.5 w-3.5',
+                "h-3.5 w-3.5",
                 filters.rating === rating
-                  ? 'fill-amber-400 text-amber-400'
-                  : 'text-muted-foreground'
+                  ? "fill-amber-400 text-amber-400"
+                  : "text-muted-foreground"
               )}
             />
             {rating}
@@ -170,14 +168,10 @@ export function ReviewFilters({
         )}
 
         {/* Sort dropdown */}
-        <SortDropdown
-          value={filters.sortBy}
-          onChange={handleSortChange}
-          compact={compact}
-        />
+        <SortDropdown value={filters.sortBy} onChange={handleSortChange} compact={compact} />
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -185,14 +179,14 @@ export function ReviewFilters({
 // ============================================================================
 
 interface SortDropdownProps {
-  value: ReviewSortOption
-  onChange: (value: ReviewSortOption) => void
-  compact?: boolean
+  value: ReviewSortOption;
+  onChange: (value: ReviewSortOption) => void;
+  compact?: boolean;
 }
 
 function SortDropdown({ value, onChange, compact = false }: SortDropdownProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const currentOption = SORT_OPTIONS.find((opt) => opt.id === value)
+  const [isOpen, setIsOpen] = useState(false);
+  const currentOption = SORT_OPTIONS.find((opt) => opt.id === value);
 
   return (
     <div className="relative">
@@ -200,8 +194,8 @@ function SortDropdown({ value, onChange, compact = false }: SortDropdownProps) {
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm transition-colors hover:bg-accent',
-          compact && 'px-2 py-1.5'
+          "flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm transition-colors hover:bg-accent",
+          compact && "px-2 py-1.5"
         )}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
@@ -214,10 +208,7 @@ function SortDropdown({ value, onChange, compact = false }: SortDropdownProps) {
       {isOpen && (
         <>
           {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
 
           {/* Dropdown menu */}
           <div
@@ -229,12 +220,12 @@ function SortDropdown({ value, onChange, compact = false }: SortDropdownProps) {
                 key={option.id}
                 type="button"
                 onClick={() => {
-                  onChange(option.id)
-                  setIsOpen(false)
+                  onChange(option.id);
+                  setIsOpen(false);
                 }}
                 className={cn(
-                  'flex w-full items-center justify-between px-3 py-2 text-sm text-left transition-colors hover:bg-accent',
-                  value === option.id && 'bg-primary/5 font-medium text-primary'
+                  "flex w-full items-center justify-between px-3 py-2 text-sm text-left transition-colors hover:bg-accent",
+                  value === option.id && "bg-primary/5 font-medium text-primary"
                 )}
                 role="option"
                 aria-selected={value === option.id}
@@ -247,11 +238,11 @@ function SortDropdown({ value, onChange, compact = false }: SortDropdownProps) {
         </>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
 // Default Export
 // ============================================================================
 
-export default ReviewFilters
+export default ReviewFilters;

@@ -104,9 +104,7 @@ export function getInitials(name: string): string {
 export function formatRelativeTime(date: Date | string): string {
   const now = new Date();
   const targetDate = typeof date === "string" ? new Date(date) : date;
-  const diffInSeconds = Math.floor(
-    (now.getTime() - targetDate.getTime()) / 1000
-  );
+  const diffInSeconds = Math.floor((now.getTime() - targetDate.getTime()) / 1000);
 
   const intervals: { [key: string]: number } = {
     year: 31536000,
@@ -134,10 +132,7 @@ export function formatRelativeTime(date: Date | string): string {
  * @example
  * formatDate(new Date()) // => "December 27, 2024"
  */
-export function formatDate(
-  date: Date | string,
-  options: Intl.DateTimeFormatOptions = {}
-): string {
+export function formatDate(date: Date | string, options: Intl.DateTimeFormatOptions = {}): string {
   const targetDate = typeof date === "string" ? new Date(date) : date;
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: "numeric",
@@ -240,10 +235,8 @@ export function calculateItemTotal(
   framePrice: number | string,
   quantity: number
 ): number {
-  const unit =
-    typeof unitPrice === "string" ? parseFloat(unitPrice) : unitPrice;
-  const frame =
-    typeof framePrice === "string" ? parseFloat(framePrice) : framePrice;
+  const unit = typeof unitPrice === "string" ? parseFloat(unitPrice) : unitPrice;
+  const frame = typeof framePrice === "string" ? parseFloat(framePrice) : framePrice;
   return (unit + frame) * quantity;
 }
 
@@ -266,11 +259,7 @@ export function formatDimension(
 /**
  * Get placeholder image URL
  */
-export function getPlaceholderImage(
-  width: number,
-  height: number,
-  text = ""
-): string {
+export function getPlaceholderImage(width: number, height: number, text = ""): string {
   const encodedText = encodeURIComponent(text || `${width}x${height}`);
   return `https://placehold.co/${width}x${height}/1a1a1a/fafafa?text=${encodedText}`;
 }

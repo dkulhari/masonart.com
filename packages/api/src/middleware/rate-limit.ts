@@ -23,9 +23,7 @@ interface RateLimitOptions {
  */
 function getClientIp(c: Context): string {
   return (
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-    c.req.header("x-real-ip") ||
-    "unknown"
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || c.req.header("x-real-ip") || "unknown"
   );
 }
 
@@ -47,11 +45,7 @@ export function rateLimit(options: RateLimitOptions) {
     const ip = getClientIp(c);
     const key = `${options.keyPrefix}:${ip}`;
 
-    const result = await checkRateLimit(
-      key,
-      options.limit,
-      options.windowSeconds
-    );
+    const result = await checkRateLimit(key, options.limit, options.windowSeconds);
 
     // Set rate limit headers on all responses
     c.header("X-RateLimit-Limit", String(options.limit));
@@ -60,9 +54,7 @@ export function rateLimit(options: RateLimitOptions) {
 
     if (!result.success) {
       c.header("Retry-After", String(result.resetIn));
-      logger.warn(
-        `Rate limit exceeded: ${options.keyPrefix} from ${ip}`
-      );
+      logger.warn(`Rate limit exceeded: ${options.keyPrefix} from ${ip}`);
       return c.json(
         {
           error: "Too Many Requests",

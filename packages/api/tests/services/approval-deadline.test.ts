@@ -246,9 +246,7 @@ describe("Approval Deadline Checker Service", () => {
     });
 
     it("should handle errors gracefully", async () => {
-      vi.mocked(expireOverdueApprovals).mockRejectedValue(
-        new Error("Database error")
-      );
+      vi.mocked(expireOverdueApprovals).mockRejectedValue(new Error("Database error"));
 
       const result = await processExpiredApprovals();
 
@@ -278,9 +276,7 @@ describe("Approval Deadline Checker Service", () => {
     it("should aggregate errors from both operations", async () => {
       vi.mocked(getApprovalsNearDeadline).mockResolvedValue([mockApproval as any]);
       vi.mocked(getApprovalById).mockResolvedValue(null);
-      vi.mocked(expireOverdueApprovals).mockRejectedValue(
-        new Error("Expire error")
-      );
+      vi.mocked(expireOverdueApprovals).mockRejectedValue(new Error("Expire error"));
 
       const result = await runDeadlineCheck();
 

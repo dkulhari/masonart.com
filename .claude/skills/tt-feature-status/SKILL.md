@@ -23,6 +23,7 @@ $ARGUMENTS: [feature-name]
 - `feature-name` (optional): Specific feature to check. If omitted, shows all in-progress features.
 
 **Examples**:
+
 - `/tt-feature-status` - Show all active features
 - `/tt-feature-status user-reviews` - Show specific feature
 
@@ -46,6 +47,7 @@ mcp__ticketrack__listTickets:
 ```
 
 Calculate:
+
 - Total tickets
 - Done tickets
 - In-progress tickets
@@ -76,6 +78,7 @@ mcp__ticketrack__listTickets:
 #### Step 3: Analyze Tickets
 
 Group tickets by status:
+
 - **Done**: Completed tickets
 - **In Progress**: Currently being worked on
 - **Ready**: Not blocked, can be started
@@ -86,6 +89,7 @@ For blocked tickets, identify what they're blocked by.
 #### Step 4: Identify Next Actions
 
 Determine recommended next actions:
+
 1. If in-progress tickets exist: "Continue working on #{id}"
 2. If ready tickets exist: "Start #{id} - {title}"
 3. If only blocked tickets: "Unblock by completing #{blocking-id}"
@@ -155,6 +159,7 @@ Progress: ████████░░ 80% (8/10 tickets)
 ## Progress Bar Generation
 
 Use block characters to show progress:
+
 - `█` = 10% complete
 - `░` = 10% remaining
 
@@ -162,13 +167,13 @@ Example: 67% = `███████░░░`
 
 ## Status Indicators
 
-| Symbol | Meaning |
-|--------|---------|
-| ✅ | Done |
-| 🔄 | In Progress |
-| 📋 | Ready (not blocked) |
-| 🚫 | Blocked |
-| ⏳ | Pending |
+| Symbol | Meaning             |
+| ------ | ------------------- |
+| ✅     | Done                |
+| 🔄     | In Progress         |
+| 📋     | Ready (not blocked) |
+| 🚫     | Blocked             |
+| ⏳     | Pending             |
 
 ## Error Handling
 

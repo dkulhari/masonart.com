@@ -101,10 +101,7 @@ async function getUserPreferences(userId: string): Promise<UserPreferences> {
 /**
  * Determine which channels should be used for a notification type
  */
-function getEnabledChannels(
-  type: NotificationType,
-  prefs: UserPreferences
-): NotificationChannel[] {
+function getEnabledChannels(type: NotificationType, prefs: UserPreferences): NotificationChannel[] {
   const channels: NotificationChannel[] = [];
 
   switch (type) {
@@ -132,10 +129,7 @@ function getEnabledChannels(
 /**
  * Get email template for notification type
  */
-function getEmailTemplate(
-  type: NotificationType,
-  order: Order
-): { subject: string; html: string } {
+function getEmailTemplate(type: NotificationType, order: Order): { subject: string; html: string } {
   switch (type) {
     case "order_confirmation":
       return getOrderConfirmationTemplate(order);
@@ -169,9 +163,7 @@ function getSmsMessage(type: NotificationType, order: Order): string {
 /**
  * Log notification to database
  */
-async function logNotification(
-  notification: NewNotification
-): Promise<string | null> {
+async function logNotification(notification: NewNotification): Promise<string | null> {
   try {
     const [inserted] = await db
       .insert(notifications)
@@ -253,9 +245,7 @@ export async function sendOrderNotification(
     }
 
     // Get user preferences (use defaults for guests)
-    const preferences = order.userId
-      ? await getUserPreferences(order.userId)
-      : DEFAULT_PREFERENCES;
+    const preferences = order.userId ? await getUserPreferences(order.userId) : DEFAULT_PREFERENCES;
 
     // Determine which channels to use
     const channels = forceChannels || getEnabledChannels(type, preferences);
@@ -317,10 +307,7 @@ export async function sendOrderNotification(
         // Note: We're using the SMS service which is designed for OTP
         // For transactional SMS, we'd need a different endpoint or service
         // For now, log the message in dev mode
-        if (
-          process.env.NODE_ENV === "development" ||
-          process.env.NODE_ENV === "test"
-        ) {
+        if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
           const message = getSmsMessage(type, order);
           logger.info({ to: recipientPhone, message }, "Dev mode: would send SMS");
           result.channels.sms = { sent: true };
@@ -349,16 +336,12 @@ export async function sendOrderNotification(
     }
 
     // Overall success if at least one channel succeeded
-    result.success =
-      result.channels.email?.sent === true ||
-      result.channels.sms?.sent === true;
+    result.success = result.channels.email?.sent === true || result.channels.sms?.sent === true;
 
     return result;
   } catch (error) {
     logger.error({ err: error, orderId: options.orderId }, "Error sending notification");
-    result.errors.push(
-      error instanceof Error ? error.message : "Unknown error"
-    );
+    result.errors.push(error instanceof Error ? error.message : "Unknown error");
     return result;
   }
 }
@@ -405,9 +388,7 @@ export async function getOrderNotifications(orderId: string) {
 /**
  * Retry a failed notification
  */
-export async function retryNotification(
-  notificationId: string
-): Promise<NotificationResult> {
+export async function retryNotification(notificationId: string): Promise<NotificationResult> {
   const notification = await db.query.notifications.findFirst({
     where: eq(notifications.id, notificationId),
   });

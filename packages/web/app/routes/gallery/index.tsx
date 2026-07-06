@@ -7,66 +7,59 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
-import {
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
-  Heart,
-  Eye,
-  ImageOff,
-} from 'lucide-react'
-import { aiApi, type AIGalleryListParams } from '~/lib/api'
-import { cn } from '~/lib/utils'
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, Sparkles, Heart, Eye, ImageOff } from "lucide-react";
+import { aiApi, type AIGalleryListParams } from "~/lib/api";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface GalleryItem {
-  id: string
-  promptText: string
-  stylePreset: string | null
-  aspectRatio: string | null
-  imageUrl: string | null
-  likesCount: number
-  viewsCount: number
-  createdAt: string
+  id: string;
+  promptText: string;
+  stylePreset: string | null;
+  aspectRatio: string | null;
+  imageUrl: string | null;
+  likesCount: number;
+  viewsCount: number;
+  createdAt: string;
 }
 
 interface GalleryPageData {
-  items: GalleryItem[]
+  items: GalleryItem[];
   pagination: {
-    page: number
-    pageSize: number
-    total: number
-    totalPages: number
-    hasNextPage: boolean
-    hasPreviousPage: boolean
-  }
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 }
 
 // Search params schema for URL state
 interface GallerySearchParams {
-  page?: number
-  stylePreset?: string
-  sortBy?: 'createdAt' | 'likes'
+  page?: number;
+  stylePreset?: string;
+  sortBy?: "createdAt" | "likes";
 }
 
 // Style preset options
 const STYLE_PRESETS = [
-  { value: '', label: 'All Styles' },
-  { value: 'abstract', label: 'Abstract' },
-  { value: 'minimalist', label: 'Minimalist' },
-  { value: 'watercolor', label: 'Watercolor' },
-  { value: 'oil-painting', label: 'Oil Painting' },
-  { value: 'digital-art', label: 'Digital Art' },
-  { value: 'photography', label: 'Photography' },
-  { value: 'vintage', label: 'Vintage' },
-  { value: 'pop-art', label: 'Pop Art' },
-  { value: 'line-art', label: 'Line Art' },
-]
+  { value: "", label: "All Styles" },
+  { value: "abstract", label: "Abstract" },
+  { value: "minimalist", label: "Minimalist" },
+  { value: "watercolor", label: "Watercolor" },
+  { value: "oil-painting", label: "Oil Painting" },
+  { value: "digital-art", label: "Digital Art" },
+  { value: "photography", label: "Photography" },
+  { value: "vintage", label: "Vintage" },
+  { value: "pop-art", label: "Pop Art" },
+  { value: "line-art", label: "Line Art" },
+];
 
 // ============================================================================
 // Data Fetching Function
@@ -77,14 +70,14 @@ async function fetchGalleryData(params: GallerySearchParams): Promise<GalleryPag
     const apiParams: AIGalleryListParams = {
       page: params.page || 1,
       pageSize: 24,
-      sortBy: params.sortBy || 'createdAt',
-    }
+      sortBy: params.sortBy || "createdAt",
+    };
 
     if (params.stylePreset) {
-      apiParams.stylePreset = params.stylePreset
+      apiParams.stylePreset = params.stylePreset;
     }
 
-    const response = await aiApi.gallery(apiParams)
+    const response = await aiApi.gallery(apiParams);
 
     return {
       items: response.items || [],
@@ -96,9 +89,9 @@ async function fetchGalleryData(params: GallerySearchParams): Promise<GalleryPag
         hasNextPage: response.hasNextPage || false,
         hasPreviousPage: response.hasPreviousPage || false,
       },
-    }
+    };
   } catch (error) {
-    console.error('Failed to fetch gallery:', error)
+    console.error("Failed to fetch gallery:", error);
     return {
       items: [],
       pagination: {
@@ -109,7 +102,7 @@ async function fetchGalleryData(params: GallerySearchParams): Promise<GalleryPag
         hasNextPage: false,
         hasPreviousPage: false,
       },
-    }
+    };
   }
 }
 
@@ -117,11 +110,11 @@ async function fetchGalleryData(params: GallerySearchParams): Promise<GalleryPag
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/gallery/')({
+export const Route = createFileRoute("/gallery/")({
   validateSearch: (search: Record<string, unknown>): GallerySearchParams => ({
     page: search.page ? Number(search.page) : undefined,
     stylePreset: search.stylePreset as string | undefined,
-    sortBy: search.sortBy as 'createdAt' | 'likes' | undefined,
+    sortBy: search.sortBy as "createdAt" | "likes" | undefined,
   }),
   loaderDeps: ({ search }) => ({
     page: search.page,
@@ -129,39 +122,39 @@ export const Route = createFileRoute('/gallery/')({
     sortBy: search.sortBy,
   }),
   loader: async ({ deps }) => {
-    return fetchGalleryData(deps)
+    return fetchGalleryData(deps);
   },
   head: () => ({
     meta: [
-      { title: 'AI Art Gallery | MasonArt' },
+      { title: "AI Art Gallery | MasonArt" },
       {
-        name: 'description',
+        name: "description",
         content:
-          'Explore stunning AI-generated artwork created by our community. Get inspired and create your own unique poster designs.',
+          "Explore stunning AI-generated artwork created by our community. Get inspired and create your own unique poster designs.",
       },
-      { property: 'og:title', content: 'AI Art Gallery | MasonArt' },
+      { property: "og:title", content: "AI Art Gallery | MasonArt" },
       {
-        property: 'og:description',
+        property: "og:description",
         content:
-          'Explore stunning AI-generated artwork created by our community. Get inspired and create your own unique poster designs.',
+          "Explore stunning AI-generated artwork created by our community. Get inspired and create your own unique poster designs.",
       },
     ],
   }),
   component: GalleryPage,
-})
+});
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function GalleryPage() {
-  const data = Route.useLoaderData()
-  const search = Route.useSearch()
-  const navigate = useNavigate({ from: Route.fullPath })
+  const data = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
 
-  const { items, pagination } = data
-  const currentStylePreset = search.stylePreset || ''
-  const currentSortBy = search.sortBy || 'createdAt'
+  const { items, pagination } = data;
+  const currentStylePreset = search.stylePreset || "";
+  const currentSortBy = search.sortBy || "createdAt";
 
   // Update URL with new search params
   const updateSearch = (updates: Partial<GallerySearchParams>) => {
@@ -172,8 +165,8 @@ function GalleryPage() {
         // Reset to page 1 when changing filters
         page: updates.page !== undefined ? updates.page : 1,
       }),
-    })
-  }
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -188,8 +181,8 @@ function GalleryPage() {
             AI Art Gallery
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-            Explore stunning AI-generated artwork created by our community.
-            Get inspired and create your own unique poster designs.
+            Explore stunning AI-generated artwork created by our community. Get inspired and create
+            your own unique poster designs.
           </p>
           <Link
             to="/create"
@@ -219,9 +212,7 @@ function GalleryPage() {
             {/* Sort By */}
             <select
               value={currentSortBy}
-              onChange={(e) =>
-                updateSearch({ sortBy: e.target.value as 'createdAt' | 'likes' })
-              }
+              onChange={(e) => updateSearch({ sortBy: e.target.value as "createdAt" | "likes" })}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               <option value="createdAt">Newest</option>
@@ -231,7 +222,7 @@ function GalleryPage() {
 
           {/* Results Count */}
           <p className="text-sm text-muted-foreground">
-            {pagination.total} {pagination.total === 1 ? 'artwork' : 'artworks'}
+            {pagination.total} {pagination.total === 1 ? "artwork" : "artworks"}
           </p>
         </div>
 
@@ -278,7 +269,7 @@ function GalleryPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -286,40 +277,40 @@ function GalleryPage() {
 // ============================================================================
 
 interface GalleryCardProps {
-  item: GalleryItem
+  item: GalleryItem;
 }
 
 function GalleryCard({ item }: GalleryCardProps) {
-  const [imageError, setImageError] = useState(false)
+  const [imageError, setImageError] = useState(false);
 
   // Format date
-  const formattedDate = new Date(item.createdAt).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  })
+  const formattedDate = new Date(item.createdAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 
   // Determine aspect ratio class
   const getAspectRatioClass = () => {
     switch (item.aspectRatio) {
-      case '1:1':
-        return 'aspect-square'
-      case '16:9':
-        return 'aspect-video'
-      case '9:16':
-        return 'aspect-[9/16]'
-      case '4:3':
-        return 'aspect-[4/3]'
-      case '3:4':
-        return 'aspect-[3/4]'
+      case "1:1":
+        return "aspect-square";
+      case "16:9":
+        return "aspect-video";
+      case "9:16":
+        return "aspect-[9/16]";
+      case "4:3":
+        return "aspect-[4/3]";
+      case "3:4":
+        return "aspect-[3/4]";
       default:
-        return 'aspect-square'
+        return "aspect-square";
     }
-  }
+  };
 
   return (
     <div className="group overflow-hidden rounded-lg border border-border bg-card transition-shadow hover:shadow-md">
       {/* Image Container */}
-      <div className={cn('relative overflow-hidden bg-muted', getAspectRatioClass())}>
+      <div className={cn("relative overflow-hidden bg-muted", getAspectRatioClass())}>
         {item.imageUrl && !imageError ? (
           <img
             src={item.imageUrl}
@@ -365,7 +356,7 @@ function GalleryCard({ item }: GalleryCardProps) {
         <p className="line-clamp-2 text-sm text-foreground">{item.promptText}</p>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -393,5 +384,5 @@ function EmptyGalleryState() {
         Create with AI
       </Link>
     </div>
-  )
+  );
 }

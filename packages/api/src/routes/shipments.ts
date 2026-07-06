@@ -14,11 +14,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../database";
 import { orderShipments, shippingOptions } from "../database/schema/shipping";
 import { orders } from "../database/schema/orders";
-import {
-  requireAuth,
-  canAccess,
-  type AuthVariables,
-} from "../middleware/auth";
+import { requireAuth, canAccess, type AuthVariables } from "../middleware/auth";
 import { HTTPException } from "hono/http-exception";
 
 // ============================================================================
@@ -32,14 +28,14 @@ function generateTrackingUrl(carrier: string, trackingNumber: string | null): st
   if (!trackingNumber) return null;
 
   const carrierUrls: Record<string, string> = {
-    "usps": `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`,
-    "fedex": `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`,
-    "ups": `https://www.ups.com/track?tracknum=${trackingNumber}`,
-    "dhl": `https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=${trackingNumber}`,
-    "delhivery": `https://www.delhivery.com/track/package/${trackingNumber}`,
-    "bluedart": `https://www.bluedart.com/tracking/${trackingNumber}`,
-    "dtdc": `https://www.dtdc.in/tracking.asp?awbNo=${trackingNumber}`,
-    "shiprocket": `https://shiprocket.co/tracking/${trackingNumber}`,
+    usps: `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`,
+    fedex: `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber}`,
+    ups: `https://www.ups.com/track?tracknum=${trackingNumber}`,
+    dhl: `https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=${trackingNumber}`,
+    delhivery: `https://www.delhivery.com/track/package/${trackingNumber}`,
+    bluedart: `https://www.bluedart.com/tracking/${trackingNumber}`,
+    dtdc: `https://www.dtdc.in/tracking.asp?awbNo=${trackingNumber}`,
+    shiprocket: `https://shiprocket.co/tracking/${trackingNumber}`,
   };
 
   const carrierLower = carrier.toLowerCase();
@@ -66,13 +62,21 @@ function generateTrackingTimeline(shipment: {
     {
       status: "label_created",
       label: "Shipping Label Created",
-      completed: ["label_created", "shipped", "in_transit", "out_for_delivery", "delivered"].includes(shipment.status),
+      completed: [
+        "label_created",
+        "shipped",
+        "in_transit",
+        "out_for_delivery",
+        "delivered",
+      ].includes(shipment.status),
       timestamp: null,
     },
     {
       status: "shipped",
       label: "Shipped",
-      completed: ["shipped", "in_transit", "out_for_delivery", "delivered"].includes(shipment.status),
+      completed: ["shipped", "in_transit", "out_for_delivery", "delivered"].includes(
+        shipment.status
+      ),
       timestamp: shipment.shippedAt?.toISOString() || null,
     },
     {
@@ -174,7 +178,8 @@ shipmentsApp.get("/orders/:orderId/shipments", async (c) => {
     // Add generated tracking URLs if not present
     const shipmentsWithUrls = shipmentsList.map((shipment) => ({
       ...shipment,
-      trackingUrl: shipment.trackingUrl || generateTrackingUrl(shipment.carrier, shipment.trackingNumber),
+      trackingUrl:
+        shipment.trackingUrl || generateTrackingUrl(shipment.carrier, shipment.trackingNumber),
     }));
 
     return c.json({
@@ -256,7 +261,8 @@ shipmentsApp.get("/shipments/:id/track", async (c) => {
     });
 
     // Generate tracking URL if not present
-    const trackingUrl = shipment.trackingUrl || generateTrackingUrl(shipment.carrier, shipment.trackingNumber);
+    const trackingUrl =
+      shipment.trackingUrl || generateTrackingUrl(shipment.carrier, shipment.trackingNumber);
 
     return c.json({
       shipment: {

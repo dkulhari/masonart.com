@@ -1,5 +1,5 @@
-import { Link } from '@tanstack/react-router'
-import { Facebook, Instagram, Twitter, Mail } from 'lucide-react'
+import { Link } from "@tanstack/react-router";
+import { Facebook, Instagram, Twitter, Mail } from "lucide-react";
 
 /**
  * Footer component for the MasonArt e-commerce platform.
@@ -7,7 +7,7 @@ import { Facebook, Instagram, Twitter, Mail } from 'lucide-react'
  * and legal information.
  */
 export function Footer() {
-  const currentYear = new Date().getFullYear()
+  const currentYear = new Date().getFullYear();
 
   return (
     <footer className="border-t border-border bg-background">
@@ -21,8 +21,8 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm text-muted-foreground">
-              Premium posters and frames for your space. Create custom AI-generated
-              art or choose from our curated collection.
+              Premium posters and frames for your space. Create custom AI-generated art or choose
+              from our curated collection.
             </p>
             <div className="flex space-x-4">
               <SocialLink href="https://instagram.com" label="Instagram">
@@ -89,7 +89,7 @@ export function Footer() {
             </p>
             <form
               onSubmit={(e) => {
-                e.preventDefault()
+                e.preventDefault();
                 // Newsletter subscription will be implemented later
               }}
               className="flex flex-col space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0"
@@ -128,27 +128,18 @@ export function Footer() {
         </div>
       </div>
     </footer>
-  )
+  );
 }
 
 /**
  * Footer navigation link component.
  */
-function FooterLink({
-  to,
-  children,
-}: {
-  to: string
-  children: React.ReactNode
-}) {
+function FooterLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
-    <Link
-      to={to}
-      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-    >
+    <Link to={to} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
       {children}
     </Link>
-  )
+  );
 }
 
 /**
@@ -159,9 +150,9 @@ function SocialLink({
   label,
   children,
 }: {
-  href: string
-  label: string
-  children: React.ReactNode
+  href: string;
+  label: string;
+  children: React.ReactNode;
 }) {
   return (
     <a
@@ -173,5 +164,5 @@ function SocialLink({
     >
       {children}
     </a>
-  )
+  );
 }

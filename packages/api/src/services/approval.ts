@@ -142,10 +142,7 @@ export async function createApproval(
 
     // Verify order item exists and belongs to order
     const orderItem = await db.query.orderItems.findFirst({
-      where: and(
-        eq(orderItems.id, orderItemId),
-        eq(orderItems.orderId, orderId)
-      ),
+      where: and(eq(orderItems.id, orderItemId), eq(orderItems.orderId, orderId)),
     });
 
     if (!orderItem) {
@@ -173,10 +170,7 @@ export async function createApproval(
       deadlineAt: calculateDeadline(deadlineDays),
     };
 
-    const [approval] = await db
-      .insert(productionApprovals)
-      .values(approvalData)
-      .returning();
+    const [approval] = await db.insert(productionApprovals).values(approvalData).returning();
 
     return { success: true, approval };
   } catch (error) {
@@ -191,9 +185,7 @@ export async function createApproval(
 /**
  * Upload production photos for an approval
  */
-export async function uploadPhotos(
-  options: UploadPhotosOptions
-): Promise<UploadPhotosResult> {
+export async function uploadPhotos(options: UploadPhotosOptions): Promise<UploadPhotosResult> {
   const { approvalId, photos, uploadedBy } = options;
 
   try {
@@ -207,10 +199,7 @@ export async function uploadPhotos(
     }
 
     // Only allow photo uploads for pending_upload or changes_requested status
-    if (
-      approval.status !== "pending_upload" &&
-      approval.status !== "changes_requested"
-    ) {
+    if (approval.status !== "pending_upload" && approval.status !== "changes_requested") {
       return {
         success: false,
         error: `Cannot upload photos when status is ${approval.status}`,
@@ -226,10 +215,7 @@ export async function uploadPhotos(
       uploadedBy,
     }));
 
-    const insertedPhotos = await db
-      .insert(approvalPhotos)
-      .values(photoData)
-      .returning();
+    const insertedPhotos = await db.insert(approvalPhotos).values(photoData).returning();
 
     // Update approval status to pending_approval
     await db
@@ -289,10 +275,7 @@ export async function requestChanges(
       comment,
     };
 
-    const [insertedComment] = await db
-      .insert(approvalComments)
-      .values(commentData)
-      .returning();
+    const [insertedComment] = await db.insert(approvalComments).values(commentData).returning();
 
     // Update approval status
     const [updatedApproval] = await db
@@ -313,8 +296,7 @@ export async function requestChanges(
     logger.error({ err: error }, "Error requesting changes");
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to request changes",
+      error: error instanceof Error ? error.message : "Failed to request changes",
     };
   }
 }
@@ -367,8 +349,7 @@ export async function approveProduction(
     logger.error({ err: error }, "Error approving production");
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to approve production",
+      error: error instanceof Error ? error.message : "Failed to approve production",
     };
   }
 }
@@ -376,9 +357,7 @@ export async function approveProduction(
 /**
  * Get approval by token with full details
  */
-export async function getApprovalByToken(
-  token: string
-): Promise<ApprovalWithDetails | null> {
+export async function getApprovalByToken(token: string): Promise<ApprovalWithDetails | null> {
   try {
     const approval = await db.query.productionApprovals.findFirst({
       where: eq(productionApprovals.approvalToken, token),
@@ -416,9 +395,7 @@ export async function getApprovalByToken(
 /**
  * Get approval by ID with full details
  */
-export async function getApprovalById(
-  id: string
-): Promise<ApprovalWithDetails | null> {
+export async function getApprovalById(id: string): Promise<ApprovalWithDetails | null> {
   try {
     const approval = await db.query.productionApprovals.findFirst({
       where: eq(productionApprovals.id, id),
@@ -456,9 +433,7 @@ export async function getApprovalById(
 /**
  * Get all approvals for an order
  */
-export async function getOrderApprovals(
-  orderId: string
-): Promise<ProductionApproval[]> {
+export async function getOrderApprovals(orderId: string): Promise<ProductionApproval[]> {
   try {
     return await db.query.productionApprovals.findMany({
       where: eq(productionApprovals.orderId, orderId),
@@ -501,9 +476,7 @@ export async function getApprovalsNearDeadline(
 ): Promise<ProductionApproval[]> {
   try {
     const deadlineThreshold = new Date();
-    deadlineThreshold.setHours(
-      deadlineThreshold.getHours() + hoursBeforeDeadline
-    );
+    deadlineThreshold.setHours(deadlineThreshold.getHours() + hoursBeforeDeadline);
 
     return await db.query.productionApprovals.findMany({
       where: and(
@@ -581,10 +554,7 @@ export async function addAdminComment(
       comment,
     };
 
-    const [inserted] = await db
-      .insert(approvalComments)
-      .values(commentData)
-      .returning();
+    const [inserted] = await db.insert(approvalComments).values(commentData).returning();
 
     return inserted ?? null;
   } catch (error) {
@@ -598,9 +568,7 @@ export async function addAdminComment(
  */
 export async function deleteApprovalPhotos(approvalId: string): Promise<boolean> {
   try {
-    await db
-      .delete(approvalPhotos)
-      .where(eq(approvalPhotos.approvalId, approvalId));
+    await db.delete(approvalPhotos).where(eq(approvalPhotos.approvalId, approvalId));
     return true;
   } catch (error) {
     logger.error({ err: error }, "Error deleting approval photos");
@@ -635,10 +603,7 @@ export async function createApprovalsForOrder(
   try {
     // Get all order items that require approval (AI-generated/made-to-order)
     const items = await db.query.orderItems.findMany({
-      where: and(
-        eq(orderItems.orderId, orderId),
-        eq(orderItems.isAiGenerated, true)
-      ),
+      where: and(eq(orderItems.orderId, orderId), eq(orderItems.isAiGenerated, true)),
     });
 
     if (items.length === 0) {
@@ -670,9 +635,7 @@ export async function createApprovalsForOrder(
       if (createResult.success && createResult.approval) {
         result.approvals.push(createResult.approval);
       } else {
-        result.errors.push(
-          `Failed to create approval for item ${item.id}: ${createResult.error}`
-        );
+        result.errors.push(`Failed to create approval for item ${item.id}: ${createResult.error}`);
         result.success = false;
       }
     }
@@ -681,9 +644,7 @@ export async function createApprovalsForOrder(
   } catch (error) {
     logger.error({ err: error }, "Error creating approvals for order");
     result.success = false;
-    result.errors.push(
-      error instanceof Error ? error.message : "Unknown error"
-    );
+    result.errors.push(error instanceof Error ? error.message : "Unknown error");
   }
 
   return result;
@@ -723,9 +684,7 @@ export async function areOrderApprovalsComplete(orderId: string): Promise<boolea
       return true; // No approvals means nothing to wait for
     }
 
-    return approvals.every(
-      (a) => a.status === "approved" || a.status === "expired"
-    );
+    return approvals.every((a) => a.status === "approved" || a.status === "expired");
   } catch (error) {
     logger.error({ err: error }, "Error checking approval completion");
     return false;

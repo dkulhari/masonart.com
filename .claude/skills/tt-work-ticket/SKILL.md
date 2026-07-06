@@ -40,6 +40,7 @@ mcp__ticketrack__showTicketDetails:
 ```
 
 Extract:
+
 - Title
 - Description
 - Labels
@@ -73,6 +74,7 @@ mcp__ticketrack__listFeatures
 ```
 
 Find the feature and extract:
+
 - Feature description
 - Implementation plan (if present)
 - Related context
@@ -82,6 +84,7 @@ Find the feature and extract:
 Based on ticket labels, dynamically discover relevant files. Do NOT assume specific paths.
 
 **For `database` / `schema` labels**:
+
 ```
 Glob: **/schema/*.{ts,js,prisma}, **/models/*.{ts,js,py}
 Grep: "createTable", "Schema", "@Entity", "model"
@@ -89,6 +92,7 @@ Read: Discovered schema files
 ```
 
 **For `backend` / `api` labels**:
+
 ```
 Glob: **/routes/**/*.{ts,js}, **/api/**/*.{ts,js}
 Glob: **/services/**/*.{ts,js}, **/controllers/**/*.{ts,js}
@@ -96,6 +100,7 @@ Read: Discovered route and service files
 ```
 
 **For `frontend` / `ui` labels**:
+
 ```
 Glob: **/components/**/*.{tsx,jsx,vue,svelte}
 Glob: **/pages/**/*.{tsx,jsx}, **/app/**/*.{tsx,jsx}
@@ -103,6 +108,7 @@ Read: Discovered component files
 ```
 
 **For `tests` labels**:
+
 ```
 Glob: **/*.test.{ts,js}, **/*.spec.{ts,js}
 Glob: **/__tests__/**/*.{ts,js}
@@ -171,11 +177,11 @@ Ready to implement. What would you like to do?
 
 ### Testing Strategy (Per Ticket)
 
-| Ticket Type | Test Types | Location | Tool |
-|-------------|------------|----------|------|
-| Database/Schema | Schema validation, type inference | Discover from project | Project's test runner |
-| Backend/API | Route tests, service unit tests | Discover from project | Project's test runner |
-| Frontend/UI | Component tests (if complex), hook tests | Discover from project | Project's test runner |
+| Ticket Type     | Test Types                               | Location              | Tool                  |
+| --------------- | ---------------------------------------- | --------------------- | --------------------- |
+| Database/Schema | Schema validation, type inference        | Discover from project | Project's test runner |
+| Backend/API     | Route tests, service unit tests          | Discover from project | Project's test runner |
+| Frontend/UI     | Component tests (if complex), hook tests | Discover from project | Project's test runner |
 
 **E2E tests are NOT per-ticket** - they're created at feature completion by `/tt-implement-feature`.
 
@@ -307,6 +313,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ```
 
 **Commit Message Guidelines**:
+
 - Use conventional commits: `feat`, `fix`, `refactor`, `test`, `docs`
 - Scope should match the ticket area (schema, api, ui, etc.)
 - Reference the ticket number with `Implements #XX` or `Fixes #XX`
@@ -328,6 +335,7 @@ After committing, you MUST complete this checklist:
 ```
 
 **Action 1: Update Status**
+
 ```
 mcp__ticketrack__updateTicketStatus:
   ticketNumber: {ticket-number}
@@ -335,6 +343,7 @@ mcp__ticketrack__updateTicketStatus:
 ```
 
 **Action 2: Add Completion Comment** (DO NOT SKIP!)
+
 ```
 mcp__ticketrack__addComment:
   ticketNumber: {ticket-number}

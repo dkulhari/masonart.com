@@ -8,17 +8,17 @@
  * - Generation parameters
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * AI generation status enum
  */
 export const AIGenerationStatusSchema = z.enum([
-  'pending',
-  'processing',
-  'completed',
-  'failed',
-  'cancelled',
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+  "cancelled",
 ]);
 export type AIGenerationStatus = z.infer<typeof AIGenerationStatusSchema>;
 
@@ -26,11 +26,11 @@ export type AIGenerationStatus = z.infer<typeof AIGenerationStatusSchema>;
  * AI model enum
  */
 export const AIModelSchema = z.enum([
-  'sdxl',
-  'sd-2-1',
-  'dalle-3',
-  'midjourney',
-  'stable-diffusion-xl-lightning',
+  "sdxl",
+  "sd-2-1",
+  "dalle-3",
+  "midjourney",
+  "stable-diffusion-xl-lightning",
 ]);
 export type AIModel = z.infer<typeof AIModelSchema>;
 
@@ -38,13 +38,13 @@ export type AIModel = z.infer<typeof AIModelSchema>;
  * Aspect ratio enum
  */
 export const AspectRatioSchema = z.enum([
-  '1:1', // Square
-  '4:5', // Portrait
-  '3:4', // Portrait
-  '2:3', // Portrait
-  '4:3', // Landscape
-  '16:9', // Landscape
-  '21:9', // Panoramic
+  "1:1", // Square
+  "4:5", // Portrait
+  "3:4", // Portrait
+  "2:3", // Portrait
+  "4:3", // Landscape
+  "16:9", // Landscape
+  "21:9", // Panoramic
 ]);
 export type AspectRatio = z.infer<typeof AspectRatioSchema>;
 
@@ -52,23 +52,23 @@ export type AspectRatio = z.infer<typeof AspectRatioSchema>;
  * Style preset enum
  */
 export const StylePresetSchema = z.enum([
-  'wabi-sabi',
-  'abstract-expression',
-  'botanical',
-  'vintage-poster',
-  'minimalist',
-  'geometric',
-  'watercolor',
-  'line-art',
-  'pop-art',
-  'surrealism',
+  "wabi-sabi",
+  "abstract-expression",
+  "botanical",
+  "vintage-poster",
+  "minimalist",
+  "geometric",
+  "watercolor",
+  "line-art",
+  "pop-art",
+  "surrealism",
 ]);
 export type StylePreset = z.infer<typeof StylePresetSchema>;
 
 /**
  * Moderation status enum
  */
-export const ModerationStatusSchema = z.enum(['pending', 'approved', 'rejected', 'flagged']);
+export const ModerationStatusSchema = z.enum(["pending", "approved", "rejected", "flagged"]);
 export type ModerationStatus = z.infer<typeof ModerationStatusSchema>;
 
 /**
@@ -77,14 +77,14 @@ export type ModerationStatus = z.infer<typeof ModerationStatusSchema>;
 export const AIGenerationParametersSchema = z.object({
   cfgScale: z
     .number()
-    .min(1, 'CFG scale must be at least 1')
-    .max(20, 'CFG scale must be at most 20')
+    .min(1, "CFG scale must be at least 1")
+    .max(20, "CFG scale must be at most 20")
     .optional(),
   steps: z
     .number()
     .int()
-    .min(1, 'Steps must be at least 1')
-    .max(150, 'Steps must be at most 150')
+    .min(1, "Steps must be at least 1")
+    .max(150, "Steps must be at most 150")
     .optional(),
   sampler: z.string().max(50).optional(),
   seed: z.number().int().nonnegative().optional(),
@@ -96,11 +96,11 @@ export type AIGenerationParameters = z.infer<typeof AIGenerationParametersSchema
  * AI Generation Image Schema
  */
 export const AIGenerationImageSchema = z.object({
-  url: z.string().url('Image URL must be a valid URL'),
-  width: z.number().int().positive('Image width must be a positive integer'),
-  height: z.number().int().positive('Image height must be a positive integer'),
+  url: z.string().url("Image URL must be a valid URL"),
+  width: z.number().int().positive("Image width must be a positive integer"),
+  height: z.number().int().positive("Image height must be a positive integer"),
   isSelected: z.boolean(),
-  thumbnailUrl: z.string().url('Thumbnail URL must be a valid URL').optional(),
+  thumbnailUrl: z.string().url("Thumbnail URL must be a valid URL").optional(),
 });
 export type AIGenerationImage = z.infer<typeof AIGenerationImageSchema>;
 
@@ -108,21 +108,19 @@ export type AIGenerationImage = z.infer<typeof AIGenerationImageSchema>;
  * AI Generation Schema
  */
 export const AIGenerationSchema = z.object({
-  id: z.string().min(1, 'Generation ID is required'),
-  userId: z.string().min(1, 'User ID is required'),
+  id: z.string().min(1, "Generation ID is required"),
+  userId: z.string().min(1, "User ID is required"),
   prompt: z
     .string()
-    .min(3, 'Prompt must be at least 3 characters')
-    .max(1000, 'Prompt must be 1000 characters or less'),
+    .min(3, "Prompt must be at least 3 characters")
+    .max(1000, "Prompt must be 1000 characters or less"),
   enhancedPrompt: z.string().max(2000).optional(),
   stylePreset: StylePresetSchema,
   aspectRatio: AspectRatioSchema,
   model: AIModelSchema,
   parameters: AIGenerationParametersSchema.optional(),
   status: AIGenerationStatusSchema,
-  images: z
-    .array(AIGenerationImageSchema)
-    .max(10, 'Maximum 10 images per generation'),
+  images: z.array(AIGenerationImageSchema).max(10, "Maximum 10 images per generation"),
   selectedImageId: z.string().optional(),
   moderationStatus: ModerationStatusSchema,
   moderationNotes: z.string().max(1000).optional(),
@@ -146,11 +144,11 @@ export type AIGeneration = z.infer<typeof AIGenerationSchema>;
 export const AIGenerationCreateSchema = z.object({
   prompt: z
     .string()
-    .min(3, 'Prompt must be at least 3 characters')
-    .max(1000, 'Prompt must be 1000 characters or less'),
+    .min(3, "Prompt must be at least 3 characters")
+    .max(1000, "Prompt must be 1000 characters or less"),
   stylePreset: StylePresetSchema,
   aspectRatio: AspectRatioSchema,
-  model: AIModelSchema.optional().default('sdxl'),
+  model: AIModelSchema.optional().default("sdxl"),
   parameters: AIGenerationParametersSchema.optional(),
   isPublic: z.boolean().optional().default(false),
 });
@@ -215,8 +213,8 @@ export type AIGenerationStats = z.infer<typeof AIGenerationStatsSchema>;
  * AI Image Selection Schema
  */
 export const AIImageSelectionSchema = z.object({
-  generationId: z.string().min(1, 'Generation ID is required'),
-  imageUrl: z.string().url('Image URL must be a valid URL'),
+  generationId: z.string().min(1, "Generation ID is required"),
+  imageUrl: z.string().url("Image URL must be a valid URL"),
 });
 export type AIImageSelection = z.infer<typeof AIImageSelectionSchema>;
 
@@ -224,11 +222,11 @@ export type AIImageSelection = z.infer<typeof AIImageSelectionSchema>;
  * AI Generation Regenerate Schema
  */
 export const AIGenerationRegenerateSchema = z.object({
-  generationId: z.string().min(1, 'Generation ID is required'),
+  generationId: z.string().min(1, "Generation ID is required"),
   modifiedPrompt: z
     .string()
-    .min(3, 'Prompt must be at least 3 characters')
-    .max(1000, 'Prompt must be 1000 characters or less')
+    .min(3, "Prompt must be at least 3 characters")
+    .max(1000, "Prompt must be 1000 characters or less")
     .optional(),
   stylePreset: StylePresetSchema.optional(),
   aspectRatio: AspectRatioSchema.optional(),

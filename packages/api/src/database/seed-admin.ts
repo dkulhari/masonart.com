@@ -64,8 +64,7 @@ const sampleFrames: NewFrame[] = [
   {
     name: "Natural Oak",
     type: "oak",
-    description:
-      "Warm natural oak frame with visible grain. Brings organic warmth to any room.",
+    description: "Warm natural oak frame with visible grain. Brings organic warmth to any room.",
     material: "Oak Wood",
     thickness: "1.00",
     color: "Natural Oak",
@@ -79,8 +78,7 @@ const sampleFrames: NewFrame[] = [
   {
     name: "Rich Walnut",
     type: "walnut",
-    description:
-      "Deep walnut frame with elegant grain patterns. Adds sophistication and depth.",
+    description: "Deep walnut frame with elegant grain patterns. Adds sophistication and depth.",
     material: "Walnut Wood",
     thickness: "1.00",
     color: "Dark Walnut",
@@ -150,11 +148,7 @@ async function seedFrames(): Promise<void> {
 }
 
 async function seedAdmin(): Promise<void> {
-  const existing = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, ADMIN_EMAIL))
-    .limit(1);
+  const existing = await db.select().from(users).where(eq(users.email, ADMIN_EMAIL)).limit(1);
 
   if (existing.length > 0) {
     console.log(`  Admin user already exists: ${ADMIN_EMAIL}`);

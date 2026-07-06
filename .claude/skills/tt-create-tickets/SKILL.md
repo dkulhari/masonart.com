@@ -45,10 +45,12 @@ If tickets exist, ask: "Feature already has {N} tickets. Create additional ticke
 ### Step 3: Parse Implementation Plan
 
 Extract tasks from the plan. Look for:
+
 - Checkbox items: `- [ ] Task description`
 - Phase headers: `### Phase N: Name`
 
 Build a structured list:
+
 ```
 [
   { phase: "Phase 1: Database Schema", tasks: ["Task 1", "Task 2"] },
@@ -75,23 +77,29 @@ For each task, create a ticket object:
 **Note**: Tests are part of each ticket, not separate testing tickets. Do not create separate tickets for testing phases.
 
 **Priority Mapping**:
+
 - Phase 1 tasks: `high` (foundational)
 - Phase 2-3 tasks: `medium`
 - Phase 4+ tasks: `low`
 
 **Description Template**:
+
 ```markdown
 ## Task
+
 {Task description from plan}
 
 ## Context
+
 Part of feature: {feature-name}
 Phase: {phase-name}
 
 ## Testing Requirements
+
 {Based on phase - see Testing by Phase below}
 
 ## Acceptance Criteria
+
 - [ ] Implementation complete
 - [ ] Unit/integration tests written (see Testing Requirements)
 - [ ] All tests passing
@@ -152,6 +160,7 @@ mcp__ticketrack__bulkCreateTickets:
 ```
 
 **Batching Strategy**:
+
 - Split all tickets into groups of 5 or fewer
 - Process each batch sequentially (wait for one to complete before starting next)
 - Keep ticket descriptions concise to minimize payload size

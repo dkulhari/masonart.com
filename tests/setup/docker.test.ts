@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { createConnection } from 'net';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { execSync } from 'child_process';
+import { describe, it, expect, beforeAll } from "vitest";
+import { createConnection } from "net";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
+import { execSync } from "child_process";
 
 /**
  * Tests to verify Docker Compose services are properly configured and running
@@ -22,31 +22,31 @@ import { execSync } from 'child_process';
 
 // Project paths
 const rootDir = process.cwd();
-const dockerComposeFile = join(rootDir, 'docker', 'docker-compose.yml');
+const dockerComposeFile = join(rootDir, "docker", "docker-compose.yml");
 
 // Configuration for Docker services
 const DOCKER_SERVICES = {
   postgres: {
-    host: process.env.POSTGRES_HOST || 'localhost',
-    port: parseInt(process.env.POSTGRES_PORT || '5433', 10),
-    user: process.env.POSTGRES_USER || 'poster_app',
-    password: process.env.POSTGRES_PASSWORD || 'dev_password',
-    database: process.env.POSTGRES_DB || 'poster_app_dev',
-    image: 'postgres:16',
-    containerName: 'poster-app-postgres',
+    host: process.env.POSTGRES_HOST || "localhost",
+    port: parseInt(process.env.POSTGRES_PORT || "5433", 10),
+    user: process.env.POSTGRES_USER || "poster_app",
+    password: process.env.POSTGRES_PASSWORD || "dev_password",
+    database: process.env.POSTGRES_DB || "poster_app_dev",
+    image: "postgres:16",
+    containerName: "poster-app-postgres",
   },
   redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6380', 10),
-    image: 'redis:7-alpine',
-    containerName: 'poster-app-redis',
+    host: process.env.REDIS_HOST || "localhost",
+    port: parseInt(process.env.REDIS_PORT || "6380", 10),
+    image: "redis:7-alpine",
+    containerName: "poster-app-redis",
   },
   minio: {
-    host: process.env.MINIO_HOST || 'localhost',
-    port: parseInt(process.env.MINIO_PORT || '9000', 10),
-    consolePort: parseInt(process.env.MINIO_CONSOLE_PORT || '9001', 10),
-    image: 'minio/minio',
-    containerName: 'poster-app-minio',
+    host: process.env.MINIO_HOST || "localhost",
+    port: parseInt(process.env.MINIO_PORT || "9000", 10),
+    consolePort: parseInt(process.env.MINIO_CONSOLE_PORT || "9001", 10),
+    image: "minio/minio",
+    containerName: "poster-app-minio",
   },
 };
 
@@ -55,7 +55,7 @@ const DOCKER_SERVICES = {
  */
 function isDockerAvailable(): boolean {
   try {
-    execSync('docker --version', { stdio: 'ignore' });
+    execSync("docker --version", { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -68,12 +68,12 @@ function isDockerAvailable(): boolean {
 function isDockerComposeAvailable(): boolean {
   try {
     // Try docker compose (V2)
-    execSync('docker compose version', { stdio: 'ignore' });
+    execSync("docker compose version", { stdio: "ignore" });
     return true;
   } catch {
     try {
       // Try docker-compose (V1)
-      execSync('docker-compose --version', { stdio: 'ignore' });
+      execSync("docker-compose --version", { stdio: "ignore" });
       return true;
     } catch {
       return false;
@@ -93,13 +93,13 @@ function checkPort(host: string, port: number, timeout = 5000): Promise<boolean>
       resolve(false);
     }, timeout);
 
-    socket.on('connect', () => {
+    socket.on("connect", () => {
       clearTimeout(timer);
       socket.destroy();
       resolve(true);
     });
 
-    socket.on('error', () => {
+    socket.on("error", () => {
       clearTimeout(timer);
       socket.destroy();
       resolve(false);
@@ -113,7 +113,7 @@ function checkPort(host: string, port: number, timeout = 5000): Promise<boolean>
 async function testPostgresConnection(): Promise<boolean> {
   try {
     // Dynamic import to avoid requiring pg as a hard dependency
-    const pg = await import('pg').catch(() => null);
+    const pg = await import("pg").catch(() => null);
 
     if (!pg) {
       // If pg is not installed, fall back to port check
@@ -131,7 +131,7 @@ async function testPostgresConnection(): Promise<boolean> {
     });
 
     await client.connect();
-    const result = await client.query('SELECT NOW()');
+    const result = await client.query("SELECT NOW()");
     await client.end();
 
     return result.rows.length > 0;
@@ -146,7 +146,7 @@ async function testPostgresConnection(): Promise<boolean> {
 async function testRedisConnection(): Promise<boolean> {
   try {
     // Dynamic import to avoid requiring redis as a hard dependency
-    const redis = await import('redis').catch(() => null);
+    const redis = await import("redis").catch(() => null);
 
     if (!redis) {
       // If redis is not installed, fall back to port check
@@ -166,7 +166,7 @@ async function testRedisConnection(): Promise<boolean> {
     const pong = await client.ping();
     await client.quit();
 
-    return pong === 'PONG';
+    return pong === "PONG";
   } catch (error) {
     return false;
   }
@@ -178,144 +178,144 @@ async function testRedisConnection(): Promise<boolean> {
  * These tests validate the Docker Compose configuration file exists
  * and contains the expected service definitions.
  */
-describe('Docker Compose Configuration', () => {
+describe("Docker Compose Configuration", () => {
   let dockerComposeContent: string;
 
   beforeAll(() => {
     if (existsSync(dockerComposeFile)) {
-      dockerComposeContent = readFileSync(dockerComposeFile, 'utf-8');
+      dockerComposeContent = readFileSync(dockerComposeFile, "utf-8");
     }
   });
 
-  describe('Configuration file', () => {
-    it('should have docker-compose.yml in docker directory', () => {
+  describe("Configuration file", () => {
+    it("should have docker-compose.yml in docker directory", () => {
       expect(existsSync(dockerComposeFile)).toBe(true);
     });
 
-    it('should have valid YAML content', () => {
+    it("should have valid YAML content", () => {
       expect(dockerComposeContent).toBeDefined();
       expect(dockerComposeContent.length).toBeGreaterThan(0);
-      expect(dockerComposeContent).toContain('services:');
+      expect(dockerComposeContent).toContain("services:");
     });
 
-    it('should define volumes section', () => {
-      expect(dockerComposeContent).toContain('volumes:');
+    it("should define volumes section", () => {
+      expect(dockerComposeContent).toContain("volumes:");
     });
   });
 
-  describe('PostgreSQL service configuration', () => {
-    it('should have postgres service defined', () => {
-      expect(dockerComposeContent).toContain('postgres:');
+  describe("PostgreSQL service configuration", () => {
+    it("should have postgres service defined", () => {
+      expect(dockerComposeContent).toContain("postgres:");
     });
 
-    it('should use postgres:16 image', () => {
+    it("should use postgres:16 image", () => {
       expect(dockerComposeContent).toContain(`image: ${DOCKER_SERVICES.postgres.image}`);
     });
 
-    it('should expose port 5433 externally', () => {
+    it("should expose port 5433 externally", () => {
       expect(dockerComposeContent).toMatch(/["']?5433:5432["']?/);
     });
 
-    it('should have container name configured', () => {
+    it("should have container name configured", () => {
       expect(dockerComposeContent).toContain(
         `container_name: ${DOCKER_SERVICES.postgres.containerName}`
       );
     });
 
-    it('should have environment variables for credentials', () => {
-      expect(dockerComposeContent).toContain('POSTGRES_USER:');
-      expect(dockerComposeContent).toContain('POSTGRES_PASSWORD:');
-      expect(dockerComposeContent).toContain('POSTGRES_DB:');
+    it("should have environment variables for credentials", () => {
+      expect(dockerComposeContent).toContain("POSTGRES_USER:");
+      expect(dockerComposeContent).toContain("POSTGRES_PASSWORD:");
+      expect(dockerComposeContent).toContain("POSTGRES_DB:");
     });
 
-    it('should have data volume mounted', () => {
-      expect(dockerComposeContent).toContain('postgres_data:');
+    it("should have data volume mounted", () => {
+      expect(dockerComposeContent).toContain("postgres_data:");
     });
 
-    it('should have healthcheck configured', () => {
-      expect(dockerComposeContent).toContain('pg_isready');
+    it("should have healthcheck configured", () => {
+      expect(dockerComposeContent).toContain("pg_isready");
     });
   });
 
-  describe('Redis service configuration', () => {
-    it('should have redis service defined', () => {
-      expect(dockerComposeContent).toContain('redis:');
+  describe("Redis service configuration", () => {
+    it("should have redis service defined", () => {
+      expect(dockerComposeContent).toContain("redis:");
     });
 
-    it('should use redis:7-alpine image', () => {
+    it("should use redis:7-alpine image", () => {
       expect(dockerComposeContent).toContain(`image: ${DOCKER_SERVICES.redis.image}`);
     });
 
-    it('should expose port 6380 externally', () => {
+    it("should expose port 6380 externally", () => {
       expect(dockerComposeContent).toMatch(/["']?6380:6379["']?/);
     });
 
-    it('should have container name configured', () => {
+    it("should have container name configured", () => {
       expect(dockerComposeContent).toContain(
         `container_name: ${DOCKER_SERVICES.redis.containerName}`
       );
     });
 
-    it('should have data volume mounted', () => {
-      expect(dockerComposeContent).toContain('redis_data:');
+    it("should have data volume mounted", () => {
+      expect(dockerComposeContent).toContain("redis_data:");
     });
 
-    it('should have healthcheck configured', () => {
-      expect(dockerComposeContent).toContain('redis-cli');
-      expect(dockerComposeContent).toContain('ping');
+    it("should have healthcheck configured", () => {
+      expect(dockerComposeContent).toContain("redis-cli");
+      expect(dockerComposeContent).toContain("ping");
     });
   });
 
-  describe('MinIO service configuration', () => {
-    it('should have minio service defined', () => {
-      expect(dockerComposeContent).toContain('minio:');
+  describe("MinIO service configuration", () => {
+    it("should have minio service defined", () => {
+      expect(dockerComposeContent).toContain("minio:");
     });
 
-    it('should use minio/minio image', () => {
+    it("should use minio/minio image", () => {
       expect(dockerComposeContent).toContain(`image: ${DOCKER_SERVICES.minio.image}`);
     });
 
-    it('should expose API port 9000 externally', () => {
+    it("should expose API port 9000 externally", () => {
       expect(dockerComposeContent).toMatch(/["']?9000:9000["']?/);
     });
 
-    it('should expose console port 9001 externally', () => {
+    it("should expose console port 9001 externally", () => {
       expect(dockerComposeContent).toMatch(/["']?9001:9001["']?/);
     });
 
-    it('should have container name configured', () => {
+    it("should have container name configured", () => {
       expect(dockerComposeContent).toContain(
         `container_name: ${DOCKER_SERVICES.minio.containerName}`
       );
     });
 
-    it('should have data volume mounted', () => {
-      expect(dockerComposeContent).toContain('minio_data:');
+    it("should have data volume mounted", () => {
+      expect(dockerComposeContent).toContain("minio_data:");
     });
   });
 
-  describe('Docker and Docker Compose availability', () => {
-    it('should report Docker availability status', () => {
+  describe("Docker and Docker Compose availability", () => {
+    it("should report Docker availability status", () => {
       const dockerAvailable = isDockerAvailable();
 
       // This test always passes but logs the Docker status
       if (!dockerAvailable) {
-        console.log('Note: Docker is not available on this system. Runtime tests will be skipped.');
+        console.log("Note: Docker is not available on this system. Runtime tests will be skipped.");
       }
 
-      expect(typeof dockerAvailable).toBe('boolean');
+      expect(typeof dockerAvailable).toBe("boolean");
     });
 
-    it('should report Docker Compose availability status', () => {
+    it("should report Docker Compose availability status", () => {
       const composeAvailable = isDockerComposeAvailable();
 
       if (!composeAvailable) {
         console.log(
-          'Note: Docker Compose is not available on this system. Validation tests will be skipped.'
+          "Note: Docker Compose is not available on this system. Validation tests will be skipped."
         );
       }
 
-      expect(typeof composeAvailable).toBe('boolean');
+      expect(typeof composeAvailable).toBe("boolean");
     });
   });
 });
@@ -323,26 +323,26 @@ describe('Docker Compose Configuration', () => {
 /**
  * Docker Compose validation tests (require Docker Compose to be installed)
  */
-describe('Docker Compose validation', () => {
+describe("Docker Compose validation", () => {
   const canValidate = isDockerAvailable() && isDockerComposeAvailable();
 
-  describe.skipIf(!canValidate)('Configuration validation', () => {
-    it('should pass docker compose config validation', () => {
+  describe.skipIf(!canValidate)("Configuration validation", () => {
+    it("should pass docker compose config validation", () => {
       try {
         // Try V2 first, then V1
         try {
           execSync(`docker compose -f "${dockerComposeFile}" config --quiet`, {
-            stdio: 'pipe',
+            stdio: "pipe",
           });
         } catch {
           execSync(`docker-compose -f "${dockerComposeFile}" config --quiet`, {
-            stdio: 'pipe',
+            stdio: "pipe",
           });
         }
 
         expect(true).toBe(true); // Config is valid
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         expect.fail(`Docker Compose config validation failed: ${errorMessage}`);
       }
     });
@@ -379,8 +379,7 @@ let _minioRunning: boolean | null = null;
 // Skip runtime tests if SKIP_DOCKER_RUNTIME_TESTS is set
 // This is useful for CI environments where services might not be running yet
 const skipRuntimeTests =
-  process.env.SKIP_DOCKER_RUNTIME_TESTS === 'true' ||
-  process.env.SKIP_DOCKER_RUNTIME_TESTS === '1';
+  process.env.SKIP_DOCKER_RUNTIME_TESTS === "true" || process.env.SKIP_DOCKER_RUNTIME_TESTS === "1";
 
 /**
  * Docker Services Runtime Tests
@@ -408,7 +407,7 @@ async function anyDockerServiceRunning(): Promise<boolean> {
   return pg || redis || minio;
 }
 
-describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
+describe.skipIf(skipRuntimeTests)("Docker Compose Services (Runtime)", () => {
   // Track if Docker services are available - determined in beforeAll
   let servicesAvailable = false;
 
@@ -424,15 +423,15 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
 
     if (!servicesAvailable) {
       console.log(
-        '\n⚠️  No Docker services detected. Runtime tests will pass with warnings.\n' +
-          '   To run full Docker tests: cd docker && docker compose up -d\n' +
-          '   To skip Docker runtime tests: SKIP_DOCKER_RUNTIME_TESTS=true bun test\n'
+        "\n⚠️  No Docker services detected. Runtime tests will pass with warnings.\n" +
+          "   To run full Docker tests: cd docker && docker compose up -d\n" +
+          "   To skip Docker runtime tests: SKIP_DOCKER_RUNTIME_TESTS=true bun test\n"
       );
     }
   });
 
-  describe('PostgreSQL Container', () => {
-    it('should be accessible on expected port', async () => {
+  describe("PostgreSQL Container", () => {
+    it("should be accessible on expected port", async () => {
       const isAccessible = await checkPort(
         DOCKER_SERVICES.postgres.host,
         DOCKER_SERVICES.postgres.port
@@ -452,13 +451,11 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
       expect(isAccessible).toBe(true);
     }, 10000);
 
-    it('should accept database connections', async () => {
+    it("should accept database connections", async () => {
       const canConnect = await testPostgresConnection();
 
       if (!canConnect) {
-        console.log(
-          'PostgreSQL is not accepting connections. Ensure the container is healthy.'
-        );
+        console.log("PostgreSQL is not accepting connections. Ensure the container is healthy.");
         // Skip instead of fail when no services are running
         if (!servicesAvailable) {
           return; // Pass with warning when Docker isn't running
@@ -468,19 +465,16 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
       expect(canConnect).toBe(true);
     }, 10000);
 
-    it('should be using expected database configuration', () => {
-      expect(DOCKER_SERVICES.postgres.user).toBe('poster_app');
-      expect(DOCKER_SERVICES.postgres.database).toBe('poster_app_dev');
+    it("should be using expected database configuration", () => {
+      expect(DOCKER_SERVICES.postgres.user).toBe("poster_app");
+      expect(DOCKER_SERVICES.postgres.database).toBe("poster_app_dev");
       expect(DOCKER_SERVICES.postgres.port).toBe(5433);
     });
   });
 
-  describe('Redis Container', () => {
-    it('should be accessible on expected port', async () => {
-      const isAccessible = await checkPort(
-        DOCKER_SERVICES.redis.host,
-        DOCKER_SERVICES.redis.port
-      );
+  describe("Redis Container", () => {
+    it("should be accessible on expected port", async () => {
+      const isAccessible = await checkPort(DOCKER_SERVICES.redis.host, DOCKER_SERVICES.redis.port);
 
       if (!isAccessible) {
         console.log(
@@ -496,11 +490,11 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
       expect(isAccessible).toBe(true);
     }, 10000);
 
-    it('should respond to PING command', async () => {
+    it("should respond to PING command", async () => {
       const canConnect = await testRedisConnection();
 
       if (!canConnect) {
-        console.log('Redis is not responding to PING. Ensure the container is healthy.');
+        console.log("Redis is not responding to PING. Ensure the container is healthy.");
         // Skip instead of fail when no services are running
         if (!servicesAvailable) {
           return; // Pass with warning when Docker isn't running
@@ -510,17 +504,14 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
       expect(canConnect).toBe(true);
     }, 10000);
 
-    it('should be using expected Redis configuration', () => {
+    it("should be using expected Redis configuration", () => {
       expect(DOCKER_SERVICES.redis.port).toBe(6380);
     });
   });
 
-  describe('MinIO Container', () => {
-    it('should be accessible on API port', async () => {
-      const isAccessible = await checkPort(
-        DOCKER_SERVICES.minio.host,
-        DOCKER_SERVICES.minio.port
-      );
+  describe("MinIO Container", () => {
+    it("should be accessible on API port", async () => {
+      const isAccessible = await checkPort(DOCKER_SERVICES.minio.host, DOCKER_SERVICES.minio.port);
 
       if (!isAccessible) {
         console.log(
@@ -536,7 +527,7 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
       expect(isAccessible).toBe(true);
     }, 10000);
 
-    it('should be accessible on Console port', async () => {
+    it("should be accessible on Console port", async () => {
       const isAccessible = await checkPort(
         DOCKER_SERVICES.minio.host,
         DOCKER_SERVICES.minio.consolePort
@@ -556,14 +547,14 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
       expect(isAccessible).toBe(true);
     }, 10000);
 
-    it('should be using expected MinIO configuration', () => {
+    it("should be using expected MinIO configuration", () => {
       expect(DOCKER_SERVICES.minio.port).toBe(9000);
       expect(DOCKER_SERVICES.minio.consolePort).toBe(9001);
     });
   });
 
-  describe('Service Health', () => {
-    it('should have all services running simultaneously', async () => {
+  describe("Service Health", () => {
+    it("should have all services running simultaneously", async () => {
       const [postgresHealthy, redisHealthy, minioHealthy] = await Promise.all([
         checkPort(DOCKER_SERVICES.postgres.host, DOCKER_SERVICES.postgres.port),
         checkPort(DOCKER_SERVICES.redis.host, DOCKER_SERVICES.redis.port),
@@ -571,10 +562,10 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
       ]);
 
       if (!postgresHealthy || !redisHealthy || !minioHealthy) {
-        console.log('Not all services are healthy:');
-        console.log(`  PostgreSQL: ${postgresHealthy ? '✓' : '✗'}`);
-        console.log(`  Redis: ${redisHealthy ? '✓' : '✗'}`);
-        console.log(`  MinIO: ${minioHealthy ? '✓' : '✗'}`);
+        console.log("Not all services are healthy:");
+        console.log(`  PostgreSQL: ${postgresHealthy ? "✓" : "✗"}`);
+        console.log(`  Redis: ${redisHealthy ? "✓" : "✗"}`);
+        console.log(`  MinIO: ${minioHealthy ? "✓" : "✗"}`);
 
         // Skip instead of fail when no services are running at all
         if (!servicesAvailable) {
@@ -588,24 +579,24 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
     }, 10000);
   });
 
-  describe('Environment Configuration', () => {
-    it('should use localhost as default host for PostgreSQL', () => {
-      expect(DOCKER_SERVICES.postgres.host).toBe('localhost');
+  describe("Environment Configuration", () => {
+    it("should use localhost as default host for PostgreSQL", () => {
+      expect(DOCKER_SERVICES.postgres.host).toBe("localhost");
     });
 
-    it('should use localhost as default host for Redis', () => {
-      expect(DOCKER_SERVICES.redis.host).toBe('localhost');
+    it("should use localhost as default host for Redis", () => {
+      expect(DOCKER_SERVICES.redis.host).toBe("localhost");
     });
 
-    it('should use localhost as default host for MinIO', () => {
-      expect(DOCKER_SERVICES.minio.host).toBe('localhost');
+    it("should use localhost as default host for MinIO", () => {
+      expect(DOCKER_SERVICES.minio.host).toBe("localhost");
     });
 
-    it('should allow environment variable overrides', () => {
+    it("should allow environment variable overrides", () => {
       // Verify that environment variables can be read
       // This test documents the expected behavior - env vars are either
       // undefined (default) or strings (when set)
-      expect(typeof process.env).toBe('object');
+      expect(typeof process.env).toBe("object");
 
       // Check that the defaults are applied when env vars aren't set
       // or that env vars are properly read when set
@@ -615,10 +606,10 @@ describe.skipIf(skipRuntimeTests)('Docker Compose Services (Runtime)', () => {
       const redisPort = process.env.REDIS_PORT;
 
       // Each should be undefined or a string
-      expect(pgHost === undefined || typeof pgHost === 'string').toBe(true);
-      expect(pgPort === undefined || typeof pgPort === 'string').toBe(true);
-      expect(redisHost === undefined || typeof redisHost === 'string').toBe(true);
-      expect(redisPort === undefined || typeof redisPort === 'string').toBe(true);
+      expect(pgHost === undefined || typeof pgHost === "string").toBe(true);
+      expect(pgPort === undefined || typeof pgPort === "string").toBe(true);
+      expect(redisHost === undefined || typeof redisHost === "string").toBe(true);
+      expect(redisPort === undefined || typeof redisPort === "string").toBe(true);
     });
   });
 });

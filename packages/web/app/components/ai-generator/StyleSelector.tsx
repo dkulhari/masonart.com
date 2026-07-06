@@ -11,7 +11,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback } from "react";
 import {
   Palette,
   Square,
@@ -20,67 +20,67 @@ import {
   Maximize2,
   Check,
   Crown,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
+} from "lucide-react";
+import { cn } from "~/lib/utils";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export type StylePreset =
-  | 'wabi-sabi'
-  | 'abstract-expression'
-  | 'botanical'
-  | 'geometric-modern'
-  | 'vintage-poster'
-  | 'pop-art'
-  | 'watercolor'
-  | 'photography'
-  | 'line-art'
-  | 'typography'
+  | "wabi-sabi"
+  | "abstract-expression"
+  | "botanical"
+  | "geometric-modern"
+  | "vintage-poster"
+  | "pop-art"
+  | "watercolor"
+  | "photography"
+  | "line-art"
+  | "typography"
   // New presets from Full AI Generator feature
-  | 'ink-wash'
-  | 'digital-art'
-  | 'minimalist-modern'
-  | 'impressionist'
-  | 'art-deco'
+  | "ink-wash"
+  | "digital-art"
+  | "minimalist-modern"
+  | "impressionist"
+  | "art-deco";
 
-export type AspectRatio = 'square' | 'portrait' | 'landscape' | 'panoramic'
+export type AspectRatio = "square" | "portrait" | "landscape" | "panoramic";
 
-export type StyleCategory = 'all' | 'artistic' | 'photographic' | 'illustrative' | 'decorative'
+export type StyleCategory = "all" | "artistic" | "photographic" | "illustrative" | "decorative";
 
 export interface StylePresetConfig {
-  id: StylePreset
-  name: string
-  description: string
-  category: StyleCategory
-  isPremium: boolean
-  thumbnailColor: string // Placeholder color for style preview
+  id: StylePreset;
+  name: string;
+  description: string;
+  category: StyleCategory;
+  isPremium: boolean;
+  thumbnailColor: string; // Placeholder color for style preview
 }
 
 export interface AspectRatioConfig {
-  id: AspectRatio
-  name: string
-  ratio: string
-  description: string
-  icon: React.ReactNode
+  id: AspectRatio;
+  name: string;
+  ratio: string;
+  description: string;
+  icon: React.ReactNode;
 }
 
 export interface StyleSelectorProps {
   /** Selected style preset */
-  selectedStyle: StylePreset
+  selectedStyle: StylePreset;
   /** Callback when style changes */
-  onStyleChange: (style: StylePreset) => void
+  onStyleChange: (style: StylePreset) => void;
   /** Selected aspect ratio */
-  selectedAspectRatio: AspectRatio
+  selectedAspectRatio: AspectRatio;
   /** Callback when aspect ratio changes */
-  onAspectRatioChange: (ratio: AspectRatio) => void
+  onAspectRatioChange: (ratio: AspectRatio) => void;
   /** Whether user has access to premium styles */
-  hasPremiumAccess?: boolean
+  hasPremiumAccess?: boolean;
   /** Whether the selector is disabled */
-  disabled?: boolean
+  disabled?: boolean;
   /** Custom className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -89,166 +89,166 @@ export interface StyleSelectorProps {
 
 const STYLE_PRESETS: StylePresetConfig[] = [
   {
-    id: 'wabi-sabi',
-    name: 'Wabi-Sabi',
-    description: 'Minimalist, organic aesthetics embracing imperfection',
-    category: 'artistic',
+    id: "wabi-sabi",
+    name: "Wabi-Sabi",
+    description: "Minimalist, organic aesthetics embracing imperfection",
+    category: "artistic",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-stone-300 to-stone-500',
+    thumbnailColor: "bg-gradient-to-br from-stone-300 to-stone-500",
   },
   {
-    id: 'abstract-expression',
-    name: 'Abstract Expression',
-    description: 'Bold brushstrokes and emotional intensity',
-    category: 'artistic',
+    id: "abstract-expression",
+    name: "Abstract Expression",
+    description: "Bold brushstrokes and emotional intensity",
+    category: "artistic",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-red-400 via-yellow-400 to-blue-500',
+    thumbnailColor: "bg-gradient-to-br from-red-400 via-yellow-400 to-blue-500",
   },
   {
-    id: 'botanical',
-    name: 'Botanical',
-    description: 'Elegant floral and plant illustrations',
-    category: 'illustrative',
+    id: "botanical",
+    name: "Botanical",
+    description: "Elegant floral and plant illustrations",
+    category: "illustrative",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-green-300 to-emerald-600',
+    thumbnailColor: "bg-gradient-to-br from-green-300 to-emerald-600",
   },
   {
-    id: 'geometric-modern',
-    name: 'Geometric Modern',
-    description: 'Clean lines and geometric shapes',
-    category: 'decorative',
+    id: "geometric-modern",
+    name: "Geometric Modern",
+    description: "Clean lines and geometric shapes",
+    category: "decorative",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-blue-400 to-purple-500',
+    thumbnailColor: "bg-gradient-to-br from-blue-400 to-purple-500",
   },
   {
-    id: 'vintage-poster',
-    name: 'Vintage Poster',
-    description: 'Nostalgic retro designs with classic aesthetics',
-    category: 'decorative',
+    id: "vintage-poster",
+    name: "Vintage Poster",
+    description: "Nostalgic retro designs with classic aesthetics",
+    category: "decorative",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-amber-300 to-orange-600',
+    thumbnailColor: "bg-gradient-to-br from-amber-300 to-orange-600",
   },
   {
-    id: 'pop-art',
-    name: 'Pop Art',
-    description: 'Bold colors and graphic imagery',
-    category: 'artistic',
+    id: "pop-art",
+    name: "Pop Art",
+    description: "Bold colors and graphic imagery",
+    category: "artistic",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-pink-400 via-yellow-400 to-cyan-400',
+    thumbnailColor: "bg-gradient-to-br from-pink-400 via-yellow-400 to-cyan-400",
   },
   {
-    id: 'watercolor',
-    name: 'Watercolor',
-    description: 'Soft, flowing artistic washes',
-    category: 'artistic',
+    id: "watercolor",
+    name: "Watercolor",
+    description: "Soft, flowing artistic washes",
+    category: "artistic",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-sky-200 via-pink-200 to-violet-200',
+    thumbnailColor: "bg-gradient-to-br from-sky-200 via-pink-200 to-violet-200",
   },
   {
-    id: 'photography',
-    name: 'Photography',
-    description: 'Photorealistic imagery with professional quality',
-    category: 'photographic',
+    id: "photography",
+    name: "Photography",
+    description: "Photorealistic imagery with professional quality",
+    category: "photographic",
     isPremium: true,
-    thumbnailColor: 'bg-gradient-to-br from-gray-700 to-gray-900',
+    thumbnailColor: "bg-gradient-to-br from-gray-700 to-gray-900",
   },
   {
-    id: 'line-art',
-    name: 'Line Art',
-    description: 'Minimalist single-stroke aesthetics',
-    category: 'illustrative',
+    id: "line-art",
+    name: "Line Art",
+    description: "Minimalist single-stroke aesthetics",
+    category: "illustrative",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-white to-gray-200',
+    thumbnailColor: "bg-gradient-to-br from-white to-gray-200",
   },
   {
-    id: 'typography',
-    name: 'Typography',
-    description: 'Text-focused artistic designs',
-    category: 'decorative',
+    id: "typography",
+    name: "Typography",
+    description: "Text-focused artistic designs",
+    category: "decorative",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-slate-800 to-slate-950',
+    thumbnailColor: "bg-gradient-to-br from-slate-800 to-slate-950",
   },
   // New presets from Full AI Generator feature
   {
-    id: 'ink-wash',
-    name: 'Ink Wash',
-    description: 'Asian-inspired flowing ink gradients',
-    category: 'artistic',
+    id: "ink-wash",
+    name: "Ink Wash",
+    description: "Asian-inspired flowing ink gradients",
+    category: "artistic",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-b from-gray-200 via-gray-400 to-gray-800',
+    thumbnailColor: "bg-gradient-to-b from-gray-200 via-gray-400 to-gray-800",
   },
   {
-    id: 'digital-art',
-    name: 'Digital Art',
-    description: 'Modern digital illustration and concept art',
-    category: 'illustrative',
+    id: "digital-art",
+    name: "Digital Art",
+    description: "Modern digital illustration and concept art",
+    category: "illustrative",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-purple-500 via-cyan-400 to-pink-500',
+    thumbnailColor: "bg-gradient-to-br from-purple-500 via-cyan-400 to-pink-500",
   },
   {
-    id: 'minimalist-modern',
-    name: 'Minimalist Modern',
-    description: 'Clean Scandinavian-inspired simplicity',
-    category: 'decorative',
+    id: "minimalist-modern",
+    name: "Minimalist Modern",
+    description: "Clean Scandinavian-inspired simplicity",
+    category: "decorative",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-neutral-100 to-neutral-300',
+    thumbnailColor: "bg-gradient-to-br from-neutral-100 to-neutral-300",
   },
   {
-    id: 'impressionist',
-    name: 'Impressionist',
-    description: 'Monet-inspired light and color play',
-    category: 'artistic',
+    id: "impressionist",
+    name: "Impressionist",
+    description: "Monet-inspired light and color play",
+    category: "artistic",
     isPremium: false,
-    thumbnailColor: 'bg-gradient-to-br from-blue-300 via-green-200 to-yellow-200',
+    thumbnailColor: "bg-gradient-to-br from-blue-300 via-green-200 to-yellow-200",
   },
   {
-    id: 'art-deco',
-    name: 'Art Deco',
-    description: '1920s geometric glamour with gold accents',
-    category: 'decorative',
+    id: "art-deco",
+    name: "Art Deco",
+    description: "1920s geometric glamour with gold accents",
+    category: "decorative",
     isPremium: true,
-    thumbnailColor: 'bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-800',
+    thumbnailColor: "bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-800",
   },
-]
+];
 
 const ASPECT_RATIOS: AspectRatioConfig[] = [
   {
-    id: 'square',
-    name: 'Square',
-    ratio: '1:1',
-    description: 'Perfect for Instagram',
+    id: "square",
+    name: "Square",
+    ratio: "1:1",
+    description: "Perfect for Instagram",
     icon: <Square className="h-5 w-5" />,
   },
   {
-    id: 'portrait',
-    name: 'Portrait',
-    ratio: '2:3',
-    description: 'Standard poster format',
+    id: "portrait",
+    name: "Portrait",
+    ratio: "2:3",
+    description: "Standard poster format",
     icon: <RectangleVertical className="h-5 w-5" />,
   },
   {
-    id: 'landscape',
-    name: 'Landscape',
-    ratio: '3:2',
-    description: 'Wide format',
+    id: "landscape",
+    name: "Landscape",
+    ratio: "3:2",
+    description: "Wide format",
     icon: <RectangleHorizontal className="h-5 w-5" />,
   },
   {
-    id: 'panoramic',
-    name: 'Panoramic',
-    ratio: '16:9',
-    description: 'Ultra-wide format',
+    id: "panoramic",
+    name: "Panoramic",
+    ratio: "16:9",
+    description: "Ultra-wide format",
     icon: <Maximize2 className="h-5 w-5" />,
   },
-]
+];
 
 const CATEGORIES: { id: StyleCategory; label: string }[] = [
-  { id: 'all', label: 'All Styles' },
-  { id: 'artistic', label: 'Artistic' },
-  { id: 'photographic', label: 'Photographic' },
-  { id: 'illustrative', label: 'Illustrative' },
-  { id: 'decorative', label: 'Decorative' },
-]
+  { id: "all", label: "All Styles" },
+  { id: "artistic", label: "Artistic" },
+  { id: "photographic", label: "Photographic" },
+  { id: "illustrative", label: "Illustrative" },
+  { id: "decorative", label: "Decorative" },
+];
 
 // ============================================================================
 // Component
@@ -266,35 +266,35 @@ export function StyleSelector({
   disabled = false,
   className,
 }: StyleSelectorProps) {
-  const [selectedCategory, setSelectedCategory] = useState<StyleCategory>('all')
+  const [selectedCategory, setSelectedCategory] = useState<StyleCategory>("all");
 
   const filteredStyles =
-    selectedCategory === 'all'
+    selectedCategory === "all"
       ? STYLE_PRESETS
-      : STYLE_PRESETS.filter((style) => style.category === selectedCategory)
+      : STYLE_PRESETS.filter((style) => style.category === selectedCategory);
 
   const handleStyleClick = useCallback(
     (style: StylePresetConfig) => {
-      if (disabled) return
+      if (disabled) return;
       if (style.isPremium && !hasPremiumAccess) {
         // Could show upgrade modal here
-        return
+        return;
       }
-      onStyleChange(style.id)
+      onStyleChange(style.id);
     },
     [disabled, hasPremiumAccess, onStyleChange]
-  )
+  );
 
   const handleAspectRatioClick = useCallback(
     (ratio: AspectRatio) => {
-      if (disabled) return
-      onAspectRatioChange(ratio)
+      if (disabled) return;
+      onAspectRatioChange(ratio);
     },
     [disabled, onAspectRatioChange]
-  )
+  );
 
   return (
-    <div className={cn('flex flex-col gap-6', className)}>
+    <div className={cn("flex flex-col gap-6", className)}>
       {/* Style Presets Section */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
@@ -311,11 +311,11 @@ export function StyleSelector({
               onClick={() => setSelectedCategory(category.id)}
               disabled={disabled}
               className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                'disabled:cursor-not-allowed disabled:opacity-50',
+                "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                "disabled:cursor-not-allowed disabled:opacity-50",
                 selectedCategory === category.id
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border hover:border-muted-foreground'
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border hover:border-muted-foreground"
               )}
             >
               {category.label}
@@ -326,8 +326,8 @@ export function StyleSelector({
         {/* Style Cards Grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {filteredStyles.map((style) => {
-            const isSelected = selectedStyle === style.id
-            const isLocked = style.isPremium && !hasPremiumAccess
+            const isSelected = selectedStyle === style.id;
+            const isLocked = style.isPremium && !hasPremiumAccess;
 
             return (
               <button
@@ -336,21 +336,16 @@ export function StyleSelector({
                 onClick={() => handleStyleClick(style)}
                 disabled={disabled}
                 className={cn(
-                  'group relative flex flex-col overflow-hidden rounded-lg border transition-all',
-                  'disabled:cursor-not-allowed',
+                  "group relative flex flex-col overflow-hidden rounded-lg border transition-all",
+                  "disabled:cursor-not-allowed",
                   isSelected
-                    ? 'border-primary ring-2 ring-primary ring-offset-2'
-                    : 'border-border hover:border-muted-foreground',
-                  isLocked && 'opacity-75'
+                    ? "border-primary ring-2 ring-primary ring-offset-2"
+                    : "border-border hover:border-muted-foreground",
+                  isLocked && "opacity-75"
                 )}
               >
                 {/* Style Preview */}
-                <div
-                  className={cn(
-                    'aspect-square w-full',
-                    style.thumbnailColor
-                  )}
-                >
+                <div className={cn("aspect-square w-full", style.thumbnailColor)}>
                   {/* Selection Check */}
                   {isSelected && (
                     <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
@@ -371,24 +366,20 @@ export function StyleSelector({
                   {/* Locked Overlay */}
                   {isLocked && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <div className="text-xs font-medium text-white">
-                        Upgrade to unlock
-                      </div>
+                      <div className="text-xs font-medium text-white">Upgrade to unlock</div>
                     </div>
                   )}
                 </div>
 
                 {/* Style Info */}
                 <div className="flex flex-col gap-0.5 p-2">
-                  <span className="text-xs font-medium text-foreground">
-                    {style.name}
-                  </span>
+                  <span className="text-xs font-medium text-foreground">{style.name}</span>
                   <span className="line-clamp-2 text-[10px] text-muted-foreground">
                     {style.description}
                   </span>
                 </div>
               </button>
-            )
+            );
           })}
         </div>
       </div>
@@ -399,7 +390,7 @@ export function StyleSelector({
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {ASPECT_RATIOS.map((ratio) => {
-            const isSelected = selectedAspectRatio === ratio.id
+            const isSelected = selectedAspectRatio === ratio.id;
 
             return (
               <button
@@ -408,36 +399,32 @@ export function StyleSelector({
                 onClick={() => handleAspectRatioClick(ratio.id)}
                 disabled={disabled}
                 className={cn(
-                  'flex flex-col items-center gap-2 rounded-lg border p-4 transition-all',
-                  'disabled:cursor-not-allowed disabled:opacity-50',
+                  "flex flex-col items-center gap-2 rounded-lg border p-4 transition-all",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
                   isSelected
-                    ? 'border-primary bg-primary/5 ring-2 ring-primary ring-offset-2'
-                    : 'border-border hover:border-muted-foreground'
+                    ? "border-primary bg-primary/5 ring-2 ring-primary ring-offset-2"
+                    : "border-border hover:border-muted-foreground"
                 )}
               >
                 <div
                   className={cn(
-                    'text-muted-foreground transition-colors',
-                    isSelected && 'text-primary'
+                    "text-muted-foreground transition-colors",
+                    isSelected && "text-primary"
                   )}
                 >
                   {ratio.icon}
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-sm font-medium text-foreground">
-                    {ratio.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {ratio.ratio}
-                  </span>
+                  <span className="text-sm font-medium text-foreground">{ratio.name}</span>
+                  <span className="text-xs text-muted-foreground">{ratio.ratio}</span>
                 </div>
               </button>
-            )
+            );
           })}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default StyleSelector
+export default StyleSelector;

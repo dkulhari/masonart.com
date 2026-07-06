@@ -18,11 +18,7 @@ import { eq, asc, desc, sql } from "drizzle-orm";
 
 import { db } from "../../database";
 import { shippingOptions } from "../../database/schema/shipping";
-import {
-  requireAuth,
-  requireAdmin,
-  type AuthVariables,
-} from "../../middleware/auth";
+import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
 import { deleteCached } from "../../lib/redis";
 import { SHIPPING_CACHE_PREFIX } from "../shipping";
 
@@ -51,19 +47,21 @@ const listShippingOptionsSchema = z.object({
 /**
  * Schema for creating a new shipping option
  */
-const createShippingOptionSchema = z.object({
-  name: z.string().min(1).max(100),
-  carrier: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
-  baseCost: z.number().min(0),
-  estimatedDaysMin: z.number().int().positive(),
-  estimatedDaysMax: z.number().int().positive(),
-  sortOrder: z.number().int().default(0),
-  isActive: z.boolean().default(true),
-}).refine((data) => data.estimatedDaysMax >= data.estimatedDaysMin, {
-  message: "estimatedDaysMax must be greater than or equal to estimatedDaysMin",
-  path: ["estimatedDaysMax"],
-});
+const createShippingOptionSchema = z
+  .object({
+    name: z.string().min(1).max(100),
+    carrier: z.string().min(1).max(100),
+    description: z.string().max(500).optional(),
+    baseCost: z.number().min(0),
+    estimatedDaysMin: z.number().int().positive(),
+    estimatedDaysMax: z.number().int().positive(),
+    sortOrder: z.number().int().default(0),
+    isActive: z.boolean().default(true),
+  })
+  .refine((data) => data.estimatedDaysMax >= data.estimatedDaysMin, {
+    message: "estimatedDaysMax must be greater than or equal to estimatedDaysMin",
+    path: ["estimatedDaysMax"],
+  });
 
 /**
  * Schema for updating a shipping option
@@ -93,105 +91,95 @@ adminShippingApp.use("*", requireAdmin);
 // GET /api/admin/shipping/options - List All Shipping Options
 // ============================================================================
 
-adminShippingApp.get(
-  "/options",
-  zValidator("query", listShippingOptionsSchema),
-  async (c) => {
-    const { includeInactive, page, pageSize, sortBy, sortOrder: order } = c.req.valid("query");
+adminShippingApp.get("/options", zValidator("query", listShippingOptionsSchema), async (c) => {
+  const { includeInactive, page, pageSize, sortBy, sortOrder: order } = c.req.valid("query");
 
-    try {
-      // Build sort order
-      const orderFn = order === "asc" ? asc : desc;
-      const orderByColumn = {
-        name: shippingOptions.name,
-        carrier: shippingOptions.carrier,
-        baseCost: shippingOptions.baseCost,
-        sortOrder: shippingOptions.sortOrder,
-        createdAt: shippingOptions.createdAt,
-      }[sortBy];
+  try {
+    // Build sort order
+    const orderFn = order === "asc" ? asc : desc;
+    const orderByColumn = {
+      name: shippingOptions.name,
+      carrier: shippingOptions.carrier,
+      baseCost: shippingOptions.baseCost,
+      sortOrder: shippingOptions.sortOrder,
+      createdAt: shippingOptions.createdAt,
+    }[sortBy];
 
-      const offset = (page - 1) * pageSize;
+    const offset = (page - 1) * pageSize;
 
-      // Build where condition
-      const whereCondition = includeInactive
-        ? undefined
-        : eq(shippingOptions.isActive, true);
+    // Build where condition
+    const whereCondition = includeInactive ? undefined : eq(shippingOptions.isActive, true);
 
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(shippingOptions)
-        .where(whereCondition);
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(shippingOptions)
+      .where(whereCondition);
 
-      const total = countResult[0]?.count ?? 0;
+    const total = countResult[0]?.count ?? 0;
 
-      // Get shipping options
-      const options = await db
-        .select()
-        .from(shippingOptions)
-        .where(whereCondition)
-        .orderBy(orderFn(orderByColumn))
-        .limit(pageSize)
-        .offset(offset);
+    // Get shipping options
+    const options = await db
+      .select()
+      .from(shippingOptions)
+      .where(whereCondition)
+      .orderBy(orderFn(orderByColumn))
+      .limit(pageSize)
+      .offset(offset);
 
-      return c.json({
-        items: options,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      console.error("Error fetching admin shipping options:", error);
-      return c.json({ error: "Failed to fetch shipping options" }, 500);
-    }
+    return c.json({
+      items: options,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    console.error("Error fetching admin shipping options:", error);
+    return c.json({ error: "Failed to fetch shipping options" }, 500);
   }
-);
+});
 
 // ============================================================================
 // POST /api/admin/shipping/options - Create Shipping Option
 // ============================================================================
 
-adminShippingApp.post(
-  "/options",
-  zValidator("json", createShippingOptionSchema),
-  async (c) => {
-    const data = c.req.valid("json");
+adminShippingApp.post("/options", zValidator("json", createShippingOptionSchema), async (c) => {
+  const data = c.req.valid("json");
 
-    try {
-      // Create the shipping option
-      const [newOption] = await db
-        .insert(shippingOptions)
-        .values({
-          name: data.name,
-          carrier: data.carrier,
-          description: data.description,
-          baseCost: data.baseCost.toFixed(2),
-          estimatedDaysMin: data.estimatedDaysMin,
-          estimatedDaysMax: data.estimatedDaysMax,
-          sortOrder: data.sortOrder,
-          isActive: data.isActive,
-        })
-        .returning();
+  try {
+    // Create the shipping option
+    const [newOption] = await db
+      .insert(shippingOptions)
+      .values({
+        name: data.name,
+        carrier: data.carrier,
+        description: data.description,
+        baseCost: data.baseCost.toFixed(2),
+        estimatedDaysMin: data.estimatedDaysMin,
+        estimatedDaysMax: data.estimatedDaysMax,
+        sortOrder: data.sortOrder,
+        isActive: data.isActive,
+      })
+      .returning();
 
-      // Invalidate cache
-      await deleteCached(`${SHIPPING_CACHE_PREFIX}options:*`);
+    // Invalidate cache
+    await deleteCached(`${SHIPPING_CACHE_PREFIX}options:*`);
 
-      return c.json(
-        {
-          message: "Shipping option created successfully",
-          option: newOption,
-        },
-        201
-      );
-    } catch (error) {
-      console.error("Error creating shipping option:", error);
-      return c.json({ error: "Failed to create shipping option" }, 500);
-    }
+    return c.json(
+      {
+        message: "Shipping option created successfully",
+        option: newOption,
+      },
+      201
+    );
+  } catch (error) {
+    console.error("Error creating shipping option:", error);
+    return c.json({ error: "Failed to create shipping option" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/admin/shipping/options/:id - Get Single Shipping Option
@@ -262,8 +250,10 @@ adminShippingApp.patch(
       if (updates.carrier !== undefined) updateData.carrier = updates.carrier;
       if (updates.description !== undefined) updateData.description = updates.description;
       if (updates.baseCost !== undefined) updateData.baseCost = updates.baseCost.toFixed(2);
-      if (updates.estimatedDaysMin !== undefined) updateData.estimatedDaysMin = updates.estimatedDaysMin;
-      if (updates.estimatedDaysMax !== undefined) updateData.estimatedDaysMax = updates.estimatedDaysMax;
+      if (updates.estimatedDaysMin !== undefined)
+        updateData.estimatedDaysMin = updates.estimatedDaysMin;
+      if (updates.estimatedDaysMax !== undefined)
+        updateData.estimatedDaysMax = updates.estimatedDaysMax;
       if (updates.sortOrder !== undefined) updateData.sortOrder = updates.sortOrder;
       if (updates.isActive !== undefined) updateData.isActive = updates.isActive;
 

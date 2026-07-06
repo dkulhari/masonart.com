@@ -6,21 +6,13 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
-import { z } from 'zod'
-import {
-  Package,
-  ArrowLeft,
-  Filter,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { authApi, ordersApi } from '~/lib/api'
-import { OrderList, type Order } from '~/components/account/OrderList'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { z } from "zod";
+import { Package, ArrowLeft, Filter, Loader2, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { authApi, ordersApi } from "~/lib/api";
+import { OrderList, type Order } from "~/components/account/OrderList";
 
 // ============================================================================
 // Route Definition
@@ -29,35 +21,35 @@ import { OrderList, type Order } from '~/components/account/OrderList'
 const searchParamsSchema = z.object({
   page: z.coerce.number().optional().default(1),
   status: z.string().optional(),
-})
+});
 
-export const Route = createFileRoute('/_authed/account/orders')({
+export const Route = createFileRoute("/_authed/account/orders")({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'Order History | MasonArt' },
+      { title: "Order History | MasonArt" },
       {
-        name: 'description',
-        content: 'View your complete order history and track your MasonArt purchases.',
+        name: "description",
+        content: "View your complete order history and track your MasonArt purchases.",
       },
-      { name: 'robots', content: 'noindex' },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: OrderHistoryPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface OrdersResponse {
-  items: Order[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
+  items: Order[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 // ============================================================================
@@ -65,135 +57,135 @@ interface OrdersResponse {
 // ============================================================================
 
 interface StatusFilterOption {
-  value: string
-  label: string
+  value: string;
+  label: string;
 }
 
 const STATUS_FILTERS: StatusFilterOption[] = [
-  { value: '', label: 'All Orders' },
-  { value: 'pending_payment', label: 'Pending Payment' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'shipped', label: 'Shipped' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'cancelled', label: 'Cancelled' },
-]
+  { value: "", label: "All Orders" },
+  { value: "pending_payment", label: "Pending Payment" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "processing", label: "Processing" },
+  { value: "shipped", label: "Shipped" },
+  { value: "delivered", label: "Delivered" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 10;
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function OrderHistoryPage() {
-  const navigate = useNavigate()
-  const search = useSearch({ from: '/_authed/account/orders' })
+  const navigate = useNavigate();
+  const search = useSearch({ from: "/_authed/account/orders" });
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
-  const [orders, setOrders] = useState<Order[]>([])
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
     totalPages: 0,
     hasNextPage: false,
     hasPreviousPage: false,
-  })
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showFilters, setShowFilters] = useState(false)
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const currentPage = search.page || 1
-  const currentStatus = search.status || ''
+  const currentPage = search.page || 1;
+  const currentStatus = search.status || "";
 
   // Check authentication
   useEffect(() => {
     async function checkAuth() {
       try {
-        const session = await authApi.getSession()
+        const session = await authApi.getSession();
         if (!session?.user) {
           navigate({
-            to: '/auth/login',
-            search: { redirect: '/account/orders' },
-          })
-          return
+            to: "/auth/login",
+            search: { redirect: "/account/orders" },
+          });
+          return;
         }
-        setIsAuthenticated(true)
+        setIsAuthenticated(true);
       } catch {
         navigate({
-          to: '/auth/login',
-          search: { redirect: '/account/orders' },
-        })
+          to: "/auth/login",
+          search: { redirect: "/account/orders" },
+        });
       }
     }
 
-    checkAuth()
-  }, [navigate])
+    checkAuth();
+  }, [navigate]);
 
   // Fetch orders
   const fetchOrders = useCallback(async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) return;
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
       const response: OrdersResponse = await ordersApi.list({
         page: currentPage,
         pageSize: PAGE_SIZE,
         ...(currentStatus && { status: currentStatus }),
-      })
+      });
 
-      setOrders(response.items || [])
+      setOrders(response.items || []);
       setPagination({
         total: response.total,
         page: response.page,
         totalPages: response.totalPages,
         hasNextPage: response.hasNextPage,
         hasPreviousPage: response.hasPreviousPage,
-      })
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load orders')
+      setError(err instanceof Error ? err.message : "Failed to load orders");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [isAuthenticated, currentPage, currentStatus])
+  }, [isAuthenticated, currentPage, currentStatus]);
 
   useEffect(() => {
-    fetchOrders()
-  }, [fetchOrders])
+    fetchOrders();
+  }, [fetchOrders]);
 
   // Handle filter change
   const handleStatusChange = (status: string) => {
     navigate({
-      to: '/account/orders',
+      to: "/account/orders",
       search: {
         page: 1,
         status: status || undefined,
       },
-    })
-    setShowFilters(false)
-  }
+    });
+    setShowFilters(false);
+  };
 
   // Handle pagination
   const handlePageChange = (newPage: number) => {
     navigate({
-      to: '/account/orders',
+      to: "/account/orders",
       search: {
         page: newPage,
         status: currentStatus || undefined,
       },
-    })
+    });
     // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Clear filter
   const handleClearFilter = () => {
     navigate({
-      to: '/account/orders',
+      to: "/account/orders",
       search: { page: 1 },
-    })
-  }
+    });
+  };
 
   // Loading state while checking auth
   if (isAuthenticated === null) {
@@ -204,7 +196,7 @@ function OrderHistoryPage() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -228,8 +220,8 @@ function OrderHistoryPage() {
             </h1>
             <p className="mt-2 text-muted-foreground">
               {pagination.total > 0
-                ? `${pagination.total} ${pagination.total === 1 ? 'order' : 'orders'} found`
-                : 'View and track your orders'}
+                ? `${pagination.total} ${pagination.total === 1 ? "order" : "orders"} found`
+                : "View and track your orders"}
             </p>
           </div>
 
@@ -261,10 +253,10 @@ function OrderHistoryPage() {
                     type="button"
                     onClick={() => handleStatusChange(option.value)}
                     className={cn(
-                      'w-full rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                      "w-full rounded-lg px-3 py-2 text-left text-sm transition-colors",
                       currentStatus === option.value
-                        ? 'bg-brand-100 font-medium text-brand-700'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        ? "bg-brand-100 font-medium text-brand-700"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
                   >
                     {option.label}
@@ -294,10 +286,10 @@ function OrderHistoryPage() {
                     type="button"
                     onClick={() => handleStatusChange(option.value)}
                     className={cn(
-                      'rounded-full px-4 py-2 text-sm transition-colors',
+                      "rounded-full px-4 py-2 text-sm transition-colors",
                       currentStatus === option.value
-                        ? 'bg-brand-500 font-medium text-white'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                        ? "bg-brand-500 font-medium text-white"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                     )}
                   >
                     {option.label}
@@ -341,7 +333,7 @@ function OrderHistoryPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -349,11 +341,11 @@ function OrderHistoryPage() {
 // ============================================================================
 
 interface PaginationProps {
-  currentPage: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-  onPageChange: (page: number) => void
+  currentPage: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  onPageChange: (page: number) => void;
 }
 
 function Pagination({
@@ -365,25 +357,21 @@ function Pagination({
 }: PaginationProps) {
   // Generate page numbers to display
   const getPageNumbers = () => {
-    const pages: (number | 'ellipsis')[] = []
-    const delta = 1 // Number of pages to show on each side of current
+    const pages: (number | "ellipsis")[] = [];
+    const delta = 1; // Number of pages to show on each side of current
 
     for (let i = 1; i <= totalPages; i++) {
-      if (
-        i === 1 ||
-        i === totalPages ||
-        (i >= currentPage - delta && i <= currentPage + delta)
-      ) {
-        pages.push(i)
-      } else if (pages[pages.length - 1] !== 'ellipsis') {
-        pages.push('ellipsis')
+      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+        pages.push(i);
+      } else if (pages[pages.length - 1] !== "ellipsis") {
+        pages.push("ellipsis");
       }
     }
 
-    return pages
-  }
+    return pages;
+  };
 
-  const pageNumbers = getPageNumbers()
+  const pageNumbers = getPageNumbers();
 
   return (
     <div className="mt-8 flex items-center justify-center gap-2">
@@ -393,10 +381,10 @@ function Pagination({
         onClick={() => onPageChange(currentPage - 1)}
         disabled={!hasPreviousPage}
         className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-lg border transition-colors',
+          "flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
           hasPreviousPage
-            ? 'border-border bg-background text-foreground hover:bg-muted'
-            : 'cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground'
+            ? "border-border bg-background text-foreground hover:bg-muted"
+            : "cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground"
         )}
         aria-label="Previous page"
       >
@@ -406,7 +394,7 @@ function Pagination({
       {/* Page Numbers */}
       <div className="flex items-center gap-1">
         {pageNumbers.map((page, index) =>
-          page === 'ellipsis' ? (
+          page === "ellipsis" ? (
             <span
               key={`ellipsis-${index}`}
               className="flex h-10 w-10 items-center justify-center text-muted-foreground"
@@ -419,10 +407,10 @@ function Pagination({
               type="button"
               onClick={() => onPageChange(page)}
               className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors',
+                "flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors",
                 page === currentPage
-                  ? 'border-brand-500 bg-brand-500 text-white'
-                  : 'border-border bg-background text-foreground hover:bg-muted'
+                  ? "border-brand-500 bg-brand-500 text-white"
+                  : "border-border bg-background text-foreground hover:bg-muted"
               )}
             >
               {page}
@@ -437,15 +425,15 @@ function Pagination({
         onClick={() => onPageChange(currentPage + 1)}
         disabled={!hasNextPage}
         className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-lg border transition-colors',
+          "flex h-10 w-10 items-center justify-center rounded-lg border transition-colors",
           hasNextPage
-            ? 'border-border bg-background text-foreground hover:bg-muted'
-            : 'cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground'
+            ? "border-border bg-background text-foreground hover:bg-muted"
+            : "cursor-not-allowed border-border/50 bg-muted/30 text-muted-foreground"
         )}
         aria-label="Next page"
       >
         <ChevronRight className="h-5 w-5" />
       </button>
     </div>
-  )
+  );
 }

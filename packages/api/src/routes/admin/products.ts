@@ -28,11 +28,7 @@ import {
   type Orientation,
   type ProductStatus,
 } from "../../database/schema/products";
-import {
-  requireAuth,
-  requireAdmin,
-  type AuthVariables,
-} from "../../middleware/auth";
+import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
 import { deleteCached, CacheKeys } from "../../lib/redis";
 
 // ============================================================================
@@ -98,13 +94,7 @@ const createProductSchema = z.object({
   colors: z.array(z.string()).optional(),
   rooms: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
-  orientation: z.enum([
-    "square",
-    "portrait",
-    "landscape",
-    "panoramic",
-    "round",
-  ]),
+  orientation: z.enum(["square", "portrait", "landscape", "panoramic", "round"]),
   artistId: z.string().uuid().optional().nullable(),
   images: z.array(productImageSchema).optional(),
   seoTitle: z.string().max(200).optional(),
@@ -158,94 +148,89 @@ adminProductsApp.use("*", requireAdmin);
 // GET /api/admin/products - List Products (Admin)
 // ============================================================================
 
-adminProductsApp.get(
-  "/",
-  zValidator("query", listProductsQuerySchema),
-  async (c) => {
-    const { page, pageSize, status, search, sortBy, sortOrder } =
-      c.req.valid("query");
+adminProductsApp.get("/", zValidator("query", listProductsQuerySchema), async (c) => {
+  const { page, pageSize, status, search, sortBy, sortOrder } = c.req.valid("query");
 
-    try {
-      // Build where conditions
-      const conditions: ReturnType<typeof eq>[] = [];
+  try {
+    // Build where conditions
+    const conditions: ReturnType<typeof eq>[] = [];
 
-      if (status) {
-        conditions.push(eq(products.status, status));
-      }
+    if (status) {
+      conditions.push(eq(products.status, status));
+    }
 
-      if (search) {
-        const searchPattern = `%${search}%`;
-        conditions.push(
-          or(
-            ilike(products.title, searchPattern),
-            ilike(products.sku, searchPattern),
-            ilike(products.slug, searchPattern)
-          )!
-        );
-      }
+    if (search) {
+      const searchPattern = `%${search}%`;
+      conditions.push(
+        or(
+          ilike(products.title, searchPattern),
+          ilike(products.sku, searchPattern),
+          ilike(products.slug, searchPattern)
+        )!
+      );
+    }
 
-      // Build sort order
-      const orderByColumn = {
+    // Build sort order
+    const orderByColumn = {
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      title: products.title,
+      basePrice: products.basePrice,
+      sku: products.sku,
+    }[sortBy];
+
+    const orderByDirection = sortOrder === "asc" ? asc : desc;
+    const offset = (page - 1) * pageSize;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(products)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    const total = countResult[0]?.count ?? 0;
+
+    // Get products with variant count
+    const productList = await db
+      .select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        slug: products.slug,
+        description: products.description,
+        basePrice: products.basePrice,
+        styles: products.styles,
+        subjects: products.subjects,
+        colors: products.colors,
+        rooms: products.rooms,
+        orientation: products.orientation,
+        images: products.images,
+        status: products.status,
+        isFeatured: products.isFeatured,
+        featuredOrder: products.featuredOrder,
+        isAiGenerated: products.isAiGenerated,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
-        title: products.title,
-        basePrice: products.basePrice,
-        sku: products.sku,
-      }[sortBy];
+      })
+      .from(products)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(orderByDirection(orderByColumn))
+      .limit(pageSize)
+      .offset(offset);
 
-      const orderByDirection = sortOrder === "asc" ? asc : desc;
-      const offset = (page - 1) * pageSize;
-
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(products)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Get products with variant count
-      const productList = await db
-        .select({
-          id: products.id,
-          sku: products.sku,
-          title: products.title,
-          slug: products.slug,
-          description: products.description,
-          basePrice: products.basePrice,
-          styles: products.styles,
-          subjects: products.subjects,
-          colors: products.colors,
-          rooms: products.rooms,
-          orientation: products.orientation,
-          images: products.images,
-          status: products.status,
-          isFeatured: products.isFeatured,
-          featuredOrder: products.featuredOrder,
-          isAiGenerated: products.isAiGenerated,
-          createdAt: products.createdAt,
-          updatedAt: products.updatedAt,
-        })
-        .from(products)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(orderByDirection(orderByColumn))
-        .limit(pageSize)
-        .offset(offset);
-
-      return c.json({
-        items: productList,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      return c.json({ error: "Failed to fetch products" }, 500);
-    }
+    return c.json({
+      items: productList,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to fetch products" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/admin/products/:id - Get Product by ID (Admin)
@@ -255,9 +240,7 @@ adminProductsApp.get("/:id", async (c) => {
   const { id } = c.req.param();
 
   // Validate UUID format
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-  ) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     return c.json({ error: "Invalid product ID format" }, 400);
   }
 
@@ -285,204 +268,185 @@ adminProductsApp.get("/:id", async (c) => {
 // POST /api/admin/products - Create Product
 // ============================================================================
 
-adminProductsApp.post(
-  "/",
-  zValidator("json", createProductSchema),
-  async (c) => {
-    const input = c.req.valid("json");
+adminProductsApp.post("/", zValidator("json", createProductSchema), async (c) => {
+  const input = c.req.valid("json");
 
-    try {
-      // Check if SKU already exists
-      const existingSku = await db
-        .select({ id: products.id })
-        .from(products)
-        .where(eq(products.sku, input.sku))
-        .limit(1);
+  try {
+    // Check if SKU already exists
+    const existingSku = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.sku, input.sku))
+      .limit(1);
 
-      if (existingSku.length > 0) {
-        return c.json({ error: "SKU already exists" }, 409);
-      }
-
-      // Check if slug already exists
-      const existingSlug = await db
-        .select({ id: products.id })
-        .from(products)
-        .where(eq(products.slug, input.slug))
-        .limit(1);
-
-      if (existingSlug.length > 0) {
-        return c.json({ error: "Slug already exists" }, 409);
-      }
-
-      // Create product
-      const insertedProducts = await db
-        .insert(products)
-        .values({
-          sku: input.sku,
-          title: input.title,
-          slug: input.slug,
-          description: input.description || null,
-          basePrice: input.basePrice,
-          styles: input.styles || [],
-          subjects: input.subjects || [],
-          colors: input.colors || [],
-          rooms: input.rooms || [],
-          tags: input.tags || [],
-          orientation: input.orientation as Orientation,
-          artistId: input.artistId || null,
-          images: (input.images as ProductImage[]) || [],
-          seoTitle: input.seoTitle || null,
-          seoDescription: input.seoDescription || null,
-          status: (input.status as ProductStatus) || "draft",
-          isFeatured: input.isFeatured || false,
-          featuredOrder: input.featuredOrder || null,
-          isAiGenerated: input.isAiGenerated || false,
-          aiGenerationId: input.aiGenerationId || null,
-        })
-        .returning();
-
-      const newProduct = insertedProducts[0];
-      if (!newProduct) {
-        throw new Error("Failed to create product");
-      }
-
-      // Invalidate product list cache
-      await deleteCached(CacheKeys.PRODUCT_LIST);
-
-      return c.json(
-        {
-          message: "Product created successfully",
-          product: newProduct,
-        },
-        201
-      );
-    } catch (error) {
-      return c.json({ error: "Failed to create product" }, 500);
+    if (existingSku.length > 0) {
+      return c.json({ error: "SKU already exists" }, 409);
     }
+
+    // Check if slug already exists
+    const existingSlug = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.slug, input.slug))
+      .limit(1);
+
+    if (existingSlug.length > 0) {
+      return c.json({ error: "Slug already exists" }, 409);
+    }
+
+    // Create product
+    const insertedProducts = await db
+      .insert(products)
+      .values({
+        sku: input.sku,
+        title: input.title,
+        slug: input.slug,
+        description: input.description || null,
+        basePrice: input.basePrice,
+        styles: input.styles || [],
+        subjects: input.subjects || [],
+        colors: input.colors || [],
+        rooms: input.rooms || [],
+        tags: input.tags || [],
+        orientation: input.orientation as Orientation,
+        artistId: input.artistId || null,
+        images: (input.images as ProductImage[]) || [],
+        seoTitle: input.seoTitle || null,
+        seoDescription: input.seoDescription || null,
+        status: (input.status as ProductStatus) || "draft",
+        isFeatured: input.isFeatured || false,
+        featuredOrder: input.featuredOrder || null,
+        isAiGenerated: input.isAiGenerated || false,
+        aiGenerationId: input.aiGenerationId || null,
+      })
+      .returning();
+
+    const newProduct = insertedProducts[0];
+    if (!newProduct) {
+      throw new Error("Failed to create product");
+    }
+
+    // Invalidate product list cache
+    await deleteCached(CacheKeys.PRODUCT_LIST);
+
+    return c.json(
+      {
+        message: "Product created successfully",
+        product: newProduct,
+      },
+      201
+    );
+  } catch (error) {
+    return c.json({ error: "Failed to create product" }, 500);
   }
-);
+});
 
 // ============================================================================
 // PATCH /api/admin/products/:id - Update Product
 // ============================================================================
 
-adminProductsApp.patch(
-  "/:id",
-  zValidator("json", updateProductSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const input = c.req.valid("json");
+adminProductsApp.patch("/:id", zValidator("json", updateProductSchema), async (c) => {
+  const { id } = c.req.param();
+  const input = c.req.valid("json");
 
-    // Validate UUID format
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        id
-      )
-    ) {
-      return c.json({ error: "Invalid product ID format" }, 400);
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: "Invalid product ID format" }, 400);
+  }
+
+  try {
+    // Check if product exists
+    const existing = await db
+      .select({ id: products.id, slug: products.slug, sku: products.sku })
+      .from(products)
+      .where(eq(products.id, id))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return c.json({ error: "Product not found" }, 404);
     }
 
-    try {
-      // Check if product exists
-      const existing = await db
-        .select({ id: products.id, slug: products.slug, sku: products.sku })
+    const existingProduct = existing[0];
+    if (!existingProduct) {
+      return c.json({ error: "Product not found" }, 404);
+    }
+
+    // Check for SKU conflict if updating SKU
+    if (input.sku && input.sku !== existingProduct.sku) {
+      const skuConflict = await db
+        .select({ id: products.id })
         .from(products)
-        .where(eq(products.id, id))
+        .where(eq(products.sku, input.sku))
         .limit(1);
 
-      if (existing.length === 0) {
-        return c.json({ error: "Product not found" }, 404);
+      if (skuConflict.length > 0) {
+        return c.json({ error: "SKU already exists" }, 409);
       }
-
-      const existingProduct = existing[0];
-      if (!existingProduct) {
-        return c.json({ error: "Product not found" }, 404);
-      }
-
-      // Check for SKU conflict if updating SKU
-      if (input.sku && input.sku !== existingProduct.sku) {
-        const skuConflict = await db
-          .select({ id: products.id })
-          .from(products)
-          .where(eq(products.sku, input.sku))
-          .limit(1);
-
-        if (skuConflict.length > 0) {
-          return c.json({ error: "SKU already exists" }, 409);
-        }
-      }
-
-      // Check for slug conflict if updating slug
-      if (input.slug && input.slug !== existingProduct.slug) {
-        const slugConflict = await db
-          .select({ id: products.id })
-          .from(products)
-          .where(eq(products.slug, input.slug))
-          .limit(1);
-
-        if (slugConflict.length > 0) {
-          return c.json({ error: "Slug already exists" }, 409);
-        }
-      }
-
-      // Build update object
-      const updateData: Record<string, unknown> = {
-        updatedAt: new Date(),
-      };
-
-      if (input.sku !== undefined) updateData.sku = input.sku;
-      if (input.title !== undefined) updateData.title = input.title;
-      if (input.slug !== undefined) updateData.slug = input.slug;
-      if (input.description !== undefined)
-        updateData.description = input.description;
-      if (input.basePrice !== undefined) updateData.basePrice = input.basePrice;
-      if (input.styles !== undefined) updateData.styles = input.styles;
-      if (input.subjects !== undefined) updateData.subjects = input.subjects;
-      if (input.colors !== undefined) updateData.colors = input.colors;
-      if (input.rooms !== undefined) updateData.rooms = input.rooms;
-      if (input.tags !== undefined) updateData.tags = input.tags;
-      if (input.orientation !== undefined)
-        updateData.orientation = input.orientation;
-      if (input.artistId !== undefined) updateData.artistId = input.artistId;
-      if (input.images !== undefined) updateData.images = input.images;
-      if (input.seoTitle !== undefined) updateData.seoTitle = input.seoTitle;
-      if (input.seoDescription !== undefined)
-        updateData.seoDescription = input.seoDescription;
-      if (input.status !== undefined) updateData.status = input.status;
-      if (input.isFeatured !== undefined)
-        updateData.isFeatured = input.isFeatured;
-      if (input.featuredOrder !== undefined)
-        updateData.featuredOrder = input.featuredOrder;
-      if (input.isAiGenerated !== undefined)
-        updateData.isAiGenerated = input.isAiGenerated;
-      if (input.aiGenerationId !== undefined)
-        updateData.aiGenerationId = input.aiGenerationId;
-
-      // Update product
-      const updatedProducts = await db
-        .update(products)
-        .set(updateData)
-        .where(eq(products.id, id))
-        .returning();
-
-      const updatedProduct = updatedProducts[0];
-
-      // Invalidate caches
-      await deleteCached(CacheKeys.PRODUCT_LIST);
-      await deleteCached(`${CacheKeys.PRODUCT}${existingProduct.slug}`);
-      if (input.slug && input.slug !== existingProduct.slug) {
-        await deleteCached(`${CacheKeys.PRODUCT}${input.slug}`);
-      }
-
-      return c.json({
-        message: "Product updated successfully",
-        product: updatedProduct,
-      });
-    } catch (error) {
-      return c.json({ error: "Failed to update product" }, 500);
     }
+
+    // Check for slug conflict if updating slug
+    if (input.slug && input.slug !== existingProduct.slug) {
+      const slugConflict = await db
+        .select({ id: products.id })
+        .from(products)
+        .where(eq(products.slug, input.slug))
+        .limit(1);
+
+      if (slugConflict.length > 0) {
+        return c.json({ error: "Slug already exists" }, 409);
+      }
+    }
+
+    // Build update object
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
+
+    if (input.sku !== undefined) updateData.sku = input.sku;
+    if (input.title !== undefined) updateData.title = input.title;
+    if (input.slug !== undefined) updateData.slug = input.slug;
+    if (input.description !== undefined) updateData.description = input.description;
+    if (input.basePrice !== undefined) updateData.basePrice = input.basePrice;
+    if (input.styles !== undefined) updateData.styles = input.styles;
+    if (input.subjects !== undefined) updateData.subjects = input.subjects;
+    if (input.colors !== undefined) updateData.colors = input.colors;
+    if (input.rooms !== undefined) updateData.rooms = input.rooms;
+    if (input.tags !== undefined) updateData.tags = input.tags;
+    if (input.orientation !== undefined) updateData.orientation = input.orientation;
+    if (input.artistId !== undefined) updateData.artistId = input.artistId;
+    if (input.images !== undefined) updateData.images = input.images;
+    if (input.seoTitle !== undefined) updateData.seoTitle = input.seoTitle;
+    if (input.seoDescription !== undefined) updateData.seoDescription = input.seoDescription;
+    if (input.status !== undefined) updateData.status = input.status;
+    if (input.isFeatured !== undefined) updateData.isFeatured = input.isFeatured;
+    if (input.featuredOrder !== undefined) updateData.featuredOrder = input.featuredOrder;
+    if (input.isAiGenerated !== undefined) updateData.isAiGenerated = input.isAiGenerated;
+    if (input.aiGenerationId !== undefined) updateData.aiGenerationId = input.aiGenerationId;
+
+    // Update product
+    const updatedProducts = await db
+      .update(products)
+      .set(updateData)
+      .where(eq(products.id, id))
+      .returning();
+
+    const updatedProduct = updatedProducts[0];
+
+    // Invalidate caches
+    await deleteCached(CacheKeys.PRODUCT_LIST);
+    await deleteCached(`${CacheKeys.PRODUCT}${existingProduct.slug}`);
+    if (input.slug && input.slug !== existingProduct.slug) {
+      await deleteCached(`${CacheKeys.PRODUCT}${input.slug}`);
+    }
+
+    return c.json({
+      message: "Product updated successfully",
+      product: updatedProduct,
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to update product" }, 500);
   }
-);
+});
 
 // ============================================================================
 // DELETE /api/admin/products/:id - Archive Product (Soft Delete)
@@ -492,9 +456,7 @@ adminProductsApp.delete("/:id", async (c) => {
   const { id } = c.req.param();
 
   // Validate UUID format
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
-  ) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     return c.json({ error: "Invalid product ID format" }, 400);
   }
 
@@ -540,76 +502,68 @@ adminProductsApp.delete("/:id", async (c) => {
 // POST /api/admin/products/:id/variants - Add Variant
 // ============================================================================
 
-adminProductsApp.post(
-  "/:id/variants",
-  zValidator("json", createVariantSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const input = c.req.valid("json");
+adminProductsApp.post("/:id/variants", zValidator("json", createVariantSchema), async (c) => {
+  const { id } = c.req.param();
+  const input = c.req.valid("json");
 
-    // Validate UUID format
-    if (
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        id
-      )
-    ) {
-      return c.json({ error: "Invalid product ID format" }, 400);
-    }
-
-    try {
-      // Check if product exists
-      const existing = await db
-        .select({ id: products.id, slug: products.slug })
-        .from(products)
-        .where(eq(products.id, id))
-        .limit(1);
-
-      if (existing.length === 0) {
-        return c.json({ error: "Product not found" }, 404);
-      }
-
-      const existingProduct = existing[0];
-      if (!existingProduct) {
-        return c.json({ error: "Product not found" }, 404);
-      }
-
-      // Create variant
-      const insertedVariants = await db
-        .insert(productVariants)
-        .values({
-          productId: id,
-          sizeLabel: input.sizeLabel,
-          widthInches: input.widthInches,
-          heightInches: input.heightInches,
-          widthCm: input.widthCm || null,
-          heightCm: input.heightCm || null,
-          price: input.price,
-          stockQuantity: input.stockQuantity ?? 0,
-          lowStockThreshold: input.lowStockThreshold ?? 5,
-          isInStock: input.isInStock ?? true,
-          variantSku: input.variantSku || null,
-          sortOrder: input.sortOrder ?? 0,
-          isActive: input.isActive ?? true,
-        })
-        .returning();
-
-      const newVariant = insertedVariants[0];
-
-      // Invalidate product cache
-      await deleteCached(`${CacheKeys.PRODUCT}${existingProduct.slug}`);
-
-      return c.json(
-        {
-          message: "Variant created successfully",
-          variant: newVariant,
-        },
-        201
-      );
-    } catch (error) {
-      return c.json({ error: "Failed to create variant" }, 500);
-    }
+  // Validate UUID format
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: "Invalid product ID format" }, 400);
   }
-);
+
+  try {
+    // Check if product exists
+    const existing = await db
+      .select({ id: products.id, slug: products.slug })
+      .from(products)
+      .where(eq(products.id, id))
+      .limit(1);
+
+    if (existing.length === 0) {
+      return c.json({ error: "Product not found" }, 404);
+    }
+
+    const existingProduct = existing[0];
+    if (!existingProduct) {
+      return c.json({ error: "Product not found" }, 404);
+    }
+
+    // Create variant
+    const insertedVariants = await db
+      .insert(productVariants)
+      .values({
+        productId: id,
+        sizeLabel: input.sizeLabel,
+        widthInches: input.widthInches,
+        heightInches: input.heightInches,
+        widthCm: input.widthCm || null,
+        heightCm: input.heightCm || null,
+        price: input.price,
+        stockQuantity: input.stockQuantity ?? 0,
+        lowStockThreshold: input.lowStockThreshold ?? 5,
+        isInStock: input.isInStock ?? true,
+        variantSku: input.variantSku || null,
+        sortOrder: input.sortOrder ?? 0,
+        isActive: input.isActive ?? true,
+      })
+      .returning();
+
+    const newVariant = insertedVariants[0];
+
+    // Invalidate product cache
+    await deleteCached(`${CacheKeys.PRODUCT}${existingProduct.slug}`);
+
+    return c.json(
+      {
+        message: "Variant created successfully",
+        variant: newVariant,
+      },
+      201
+    );
+  } catch (error) {
+    return c.json({ error: "Failed to create variant" }, 500);
+  }
+});
 
 // ============================================================================
 // PATCH /api/admin/products/:id/variants/:variantId - Update Variant
@@ -623,8 +577,7 @@ adminProductsApp.patch(
     const input = c.req.valid("json");
 
     // Validate UUID formats
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id) || !uuidRegex.test(variantId)) {
       return c.json({ error: "Invalid ID format" }, 400);
     }
@@ -637,12 +590,7 @@ adminProductsApp.patch(
           productId: productVariants.productId,
         })
         .from(productVariants)
-        .where(
-          and(
-            eq(productVariants.id, variantId),
-            eq(productVariants.productId, id)
-          )
-        )
+        .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, id)))
         .limit(1);
 
       if (existingVariant.length === 0) {
@@ -660,20 +608,16 @@ adminProductsApp.patch(
       const updateData: Record<string, unknown> = {};
 
       if (input.sizeLabel !== undefined) updateData.sizeLabel = input.sizeLabel;
-      if (input.widthInches !== undefined)
-        updateData.widthInches = input.widthInches;
-      if (input.heightInches !== undefined)
-        updateData.heightInches = input.heightInches;
+      if (input.widthInches !== undefined) updateData.widthInches = input.widthInches;
+      if (input.heightInches !== undefined) updateData.heightInches = input.heightInches;
       if (input.widthCm !== undefined) updateData.widthCm = input.widthCm;
       if (input.heightCm !== undefined) updateData.heightCm = input.heightCm;
       if (input.price !== undefined) updateData.price = input.price;
-      if (input.stockQuantity !== undefined)
-        updateData.stockQuantity = input.stockQuantity;
+      if (input.stockQuantity !== undefined) updateData.stockQuantity = input.stockQuantity;
       if (input.lowStockThreshold !== undefined)
         updateData.lowStockThreshold = input.lowStockThreshold;
       if (input.isInStock !== undefined) updateData.isInStock = input.isInStock;
-      if (input.variantSku !== undefined)
-        updateData.variantSku = input.variantSku;
+      if (input.variantSku !== undefined) updateData.variantSku = input.variantSku;
       if (input.sortOrder !== undefined) updateData.sortOrder = input.sortOrder;
       if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
@@ -709,8 +653,7 @@ adminProductsApp.delete("/:id/variants/:variantId", async (c) => {
   const { id, variantId } = c.req.param();
 
   // Validate UUID formats
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(id) || !uuidRegex.test(variantId)) {
     return c.json({ error: "Invalid ID format" }, 400);
   }
@@ -723,12 +666,7 @@ adminProductsApp.delete("/:id/variants/:variantId", async (c) => {
         productId: productVariants.productId,
       })
       .from(productVariants)
-      .where(
-        and(
-          eq(productVariants.id, variantId),
-          eq(productVariants.productId, id)
-        )
-      )
+      .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, id)))
       .limit(1);
 
     if (existingVariant.length === 0) {

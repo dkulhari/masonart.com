@@ -73,10 +73,7 @@ beforeAll(async () => {
       isDatabaseAvailable = false;
     }
   } catch (error) {
-    console.log(
-      "Could not initialize app for testing:",
-      (error as Error).message
-    );
+    console.log("Could not initialize app for testing:", (error as Error).message);
     isDatabaseAvailable = false;
   }
 }, 10000);
@@ -113,9 +110,7 @@ describe("Admin Shipping Route Module Exports", () => {
 describe("Admin Shipping Validation Schemas", () => {
   describe("listShippingOptionsSchema", () => {
     it("should provide defaults for all parameters", async () => {
-      const { listShippingOptionsSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { listShippingOptionsSchema } = await import("../../../src/routes/admin/shipping");
 
       const result = listShippingOptionsSchema.parse({});
       expect(result.includeInactive).toBe(true);
@@ -126,9 +121,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should validate sortBy enum values", async () => {
-      const { listShippingOptionsSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { listShippingOptionsSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(listShippingOptionsSchema.safeParse({ sortBy: "name" }).success).toBe(true);
       expect(listShippingOptionsSchema.safeParse({ sortBy: "carrier" }).success).toBe(true);
@@ -139,9 +132,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should validate sortOrder enum values", async () => {
-      const { listShippingOptionsSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { listShippingOptionsSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(listShippingOptionsSchema.safeParse({ sortOrder: "asc" }).success).toBe(true);
       expect(listShippingOptionsSchema.safeParse({ sortOrder: "desc" }).success).toBe(true);
@@ -149,9 +140,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should reject invalid pagination values", async () => {
-      const { listShippingOptionsSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { listShippingOptionsSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(listShippingOptionsSchema.safeParse({ page: 0 }).success).toBe(false);
       expect(listShippingOptionsSchema.safeParse({ page: -1 }).success).toBe(false);
@@ -162,9 +151,7 @@ describe("Admin Shipping Validation Schemas", () => {
 
   describe("createShippingOptionSchema", () => {
     it("should validate required fields", async () => {
-      const { createShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { createShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       // Valid data
       expect(
@@ -179,15 +166,11 @@ describe("Admin Shipping Validation Schemas", () => {
 
       // Missing required fields
       expect(createShippingOptionSchema.safeParse({}).success).toBe(false);
-      expect(
-        createShippingOptionSchema.safeParse({ name: "Test" }).success
-      ).toBe(false);
+      expect(createShippingOptionSchema.safeParse({ name: "Test" }).success).toBe(false);
     });
 
     it("should validate name max length", async () => {
-      const { createShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { createShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(
         createShippingOptionSchema.safeParse({
@@ -211,9 +194,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should validate baseCost is non-negative", async () => {
-      const { createShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { createShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(
         createShippingOptionSchema.safeParse({
@@ -237,9 +218,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should validate estimatedDaysMax >= estimatedDaysMin", async () => {
-      const { createShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { createShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       // Valid: max > min
       expect(
@@ -276,9 +255,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should validate estimated days are positive integers", async () => {
-      const { createShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { createShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(
         createShippingOptionSchema.safeParse({
@@ -302,9 +279,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should allow optional description", async () => {
-      const { createShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { createShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       // Without description
       expect(
@@ -331,9 +306,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should validate description max length", async () => {
-      const { createShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { createShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(
         createShippingOptionSchema.safeParse({
@@ -348,9 +321,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should provide defaults for sortOrder and isActive", async () => {
-      const { createShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { createShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       const result = createShippingOptionSchema.parse({
         name: "Test",
@@ -367,9 +338,7 @@ describe("Admin Shipping Validation Schemas", () => {
 
   describe("updateShippingOptionSchema", () => {
     it("should allow partial updates", async () => {
-      const { updateShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { updateShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(updateShippingOptionSchema.safeParse({ name: "New Name" }).success).toBe(true);
       expect(updateShippingOptionSchema.safeParse({ carrier: "FedEx" }).success).toBe(true);
@@ -378,9 +347,7 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should validate baseCost if provided", async () => {
-      const { updateShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { updateShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
       expect(updateShippingOptionSchema.safeParse({ baseCost: 10.99 }).success).toBe(true);
       expect(updateShippingOptionSchema.safeParse({ baseCost: 0 }).success).toBe(true);
@@ -388,13 +355,9 @@ describe("Admin Shipping Validation Schemas", () => {
     });
 
     it("should allow setting description to null", async () => {
-      const { updateShippingOptionSchema } = await import(
-        "../../../src/routes/admin/shipping"
-      );
+      const { updateShippingOptionSchema } = await import("../../../src/routes/admin/shipping");
 
-      expect(
-        updateShippingOptionSchema.safeParse({ description: null }).success
-      ).toBe(true);
+      expect(updateShippingOptionSchema.safeParse({ description: null }).success).toBe(true);
     });
   });
 });

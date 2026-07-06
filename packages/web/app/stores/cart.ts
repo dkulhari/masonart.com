@@ -259,9 +259,7 @@ export const useCartStore = create<CartStore>()(
           }
 
           return {
-            items: state.items.map((item) =>
-              item.id === id ? { ...item, quantity } : item
-            ),
+            items: state.items.map((item) => (item.id === id ? { ...item, quantity } : item)),
           };
         }),
 
@@ -320,17 +318,11 @@ export const useCartStore = create<CartStore>()(
       },
 
       // Find existing item by product, variant, and frame
-      findExistingItem: (
-        productId: string,
-        variantId: string,
-        frameId: string | null
-      ) => {
+      findExistingItem: (productId: string, variantId: string, frameId: string | null) => {
         const { items } = get();
         return items.find(
           (item) =>
-            item.productId === productId &&
-            item.variantId === variantId &&
-            item.frameId === frameId
+            item.productId === productId && item.variantId === variantId && item.frameId === frameId
         );
       },
     }),
@@ -362,10 +354,7 @@ const selectItems = (state: CartStore) => state.items;
 const selectItemCount = (state: CartStore) =>
   state.items.reduce((sum, item) => sum + item.quantity, 0);
 const selectSubtotal = (state: CartStore) =>
-  state.items.reduce(
-    (sum, item) => sum + (item.unitPrice + item.framePrice) * item.quantity,
-    0
-  );
+  state.items.reduce((sum, item) => sum + (item.unitPrice + item.framePrice) * item.quantity, 0);
 const selectIsEmpty = (state: CartStore) => state.items.length === 0;
 
 // ============================================================================
@@ -412,17 +401,11 @@ export const useIsCartEmpty = () => useCartStore(selectIsEmpty);
 /**
  * Hook to find if a specific product configuration exists in cart
  */
-export const useIsInCart = (
-  productId: string,
-  variantId: string,
-  frameId: string | null = null
-) =>
+export const useIsInCart = (productId: string, variantId: string, frameId: string | null = null) =>
   useCartStore((state) =>
     state.items.some(
       (item) =>
-        item.productId === productId &&
-        item.variantId === variantId &&
-        item.frameId === frameId
+        item.productId === productId && item.variantId === variantId && item.frameId === frameId
     )
   );
 

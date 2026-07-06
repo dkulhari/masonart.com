@@ -16,11 +16,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
-import {
-  getApprovalByToken,
-  requestChanges,
-  approveProduction,
-} from "../services/approval";
+import { getApprovalByToken, requestChanges, approveProduction } from "../services/approval";
 import { sendEmail } from "../services/email";
 import {
   getApprovalConfirmedTemplate,
@@ -72,18 +68,12 @@ approvalsApp.get("/:token", async (c) => {
     const approval = await getApprovalByToken(token);
 
     if (!approval) {
-      return c.json(
-        { success: false, error: "Approval not found or link expired" },
-        404
-      );
+      return c.json({ success: false, error: "Approval not found or link expired" }, 404);
     }
 
     // Check if token has expired
     if (approval.tokenExpiresAt && approval.tokenExpiresAt < new Date()) {
-      return c.json(
-        { success: false, error: "This approval link has expired" },
-        410
-      );
+      return c.json({ success: false, error: "This approval link has expired" }, 410);
     }
 
     // Check if already expired by deadline
@@ -91,8 +81,7 @@ approvalsApp.get("/:token", async (c) => {
       return c.json(
         {
           success: false,
-          error:
-            "The approval deadline has passed. Your order will proceed to shipping.",
+          error: "The approval deadline has passed. Your order will proceed to shipping.",
           status: "expired",
         },
         410
@@ -127,18 +116,14 @@ approvalsApp.get("/:token", async (c) => {
         orderItem: approval.orderItem
           ? {
               title: (approval.orderItem.snapshot as { title?: string })?.title,
-              sizeLabel: (approval.orderItem.snapshot as { sizeLabel?: string })
-                ?.sizeLabel,
+              sizeLabel: (approval.orderItem.snapshot as { sizeLabel?: string })?.sizeLabel,
             }
           : null,
       },
     });
   } catch (error) {
     console.error("[Approvals] Error getting approval:", error);
-    return c.json(
-      { success: false, error: "Failed to get approval details" },
-      500
-    );
+    return c.json({ success: false, error: "Failed to get approval details" }, 500);
   }
 });
 
@@ -146,150 +131,139 @@ approvalsApp.get("/:token", async (c) => {
 // POST /api/approvals/:token/changes - Request Changes
 // ============================================================================
 
-approvalsApp.post(
-  "/:token/changes",
-  zValidator("json", requestChangesSchema),
-  async (c) => {
-    const { token } = c.req.param();
-    const { comment, authorId } = c.req.valid("json");
+approvalsApp.post("/:token/changes", zValidator("json", requestChangesSchema), async (c) => {
+  const { token } = c.req.param();
+  const { comment, authorId } = c.req.valid("json");
 
-    try {
-      const result = await requestChanges({
-        approvalToken: token,
-        comment,
-        authorId,
-      });
+  try {
+    const result = await requestChanges({
+      approvalToken: token,
+      comment,
+      authorId,
+    });
 
-      if (!result.success) {
-        const status = result.error?.includes("not found") ? 404 : 400;
-        return c.json({ success: false, error: result.error }, status);
-      }
-
-      return c.json({
-        success: true,
-        message: "Change request submitted successfully",
-        data: {
-          status: result.approval?.status,
-          comment: result.comment
-            ? {
-                id: result.comment.id,
-                comment: result.comment.comment,
-                createdAt: result.comment.createdAt,
-              }
-            : null,
-        },
-      });
-    } catch (error) {
-      console.error("[Approvals] Error requesting changes:", error);
-      return c.json({ success: false, error: "Failed to submit change request" }, 500);
+    if (!result.success) {
+      const status = result.error?.includes("not found") ? 404 : 400;
+      return c.json({ success: false, error: result.error }, status);
     }
+
+    return c.json({
+      success: true,
+      message: "Change request submitted successfully",
+      data: {
+        status: result.approval?.status,
+        comment: result.comment
+          ? {
+              id: result.comment.id,
+              comment: result.comment.comment,
+              createdAt: result.comment.createdAt,
+            }
+          : null,
+      },
+    });
+  } catch (error) {
+    console.error("[Approvals] Error requesting changes:", error);
+    return c.json({ success: false, error: "Failed to submit change request" }, 500);
   }
-);
+});
 
 // ============================================================================
 // POST /api/approvals/:token/approve - Approve for Shipping
 // ============================================================================
 
-approvalsApp.post(
-  "/:token/approve",
-  zValidator("json", approveSchema),
-  async (c) => {
-    const { token } = c.req.param();
-    const { approvedBy } = c.req.valid("json");
+approvalsApp.post("/:token/approve", zValidator("json", approveSchema), async (c) => {
+  const { token } = c.req.param();
+  const { approvedBy } = c.req.valid("json");
 
-    try {
-      const result = await approveProduction({
-        approvalToken: token,
-        approvedBy,
-      });
+  try {
+    const result = await approveProduction({
+      approvalToken: token,
+      approvedBy,
+    });
 
-      if (!result.success) {
-        const status = result.error?.includes("not found") ? 404 : 400;
-        return c.json({ success: false, error: result.error }, status);
-      }
+    if (!result.success) {
+      const status = result.error?.includes("not found") ? 404 : 400;
+      return c.json({ success: false, error: result.error }, status);
+    }
 
-      // Send confirmation email
-      if (result.approval) {
-        try {
-          const order = await db.query.orders.findFirst({
-            where: eq(orders.id, result.approval.orderId),
-          });
+    // Send confirmation email
+    if (result.approval) {
+      try {
+        const order = await db.query.orders.findFirst({
+          where: eq(orders.id, result.approval.orderId),
+        });
 
-          if (order) {
-            // Get recipient email
-            let recipientEmail: string | null = null;
-            if (order.userId) {
-              const user = await db.query.users.findFirst({
-                where: eq(
-                  (await import("../database/schema/users")).users.id,
-                  order.userId
-                ),
+        if (order) {
+          // Get recipient email
+          let recipientEmail: string | null = null;
+          if (order.userId) {
+            const user = await db.query.users.findFirst({
+              where: eq((await import("../database/schema/users")).users.id, order.userId),
+            });
+            recipientEmail = user?.email || null;
+          } else {
+            recipientEmail = order.guestEmail;
+          }
+
+          if (recipientEmail) {
+            // Get full approval details for email
+            const fullApproval = await getApprovalByToken(token);
+
+            if (fullApproval) {
+              const approvalUrl = `${APPROVAL_BASE_URL}/approve/${token}`;
+
+              const emailContext: ApprovalEmailContext = {
+                approval: fullApproval,
+                order: {
+                  orderNumber: order.orderNumber,
+                  shippingAddress: order.shippingAddress as {
+                    fullName?: string;
+                  },
+                },
+                orderItem: {
+                  snapshot: (fullApproval.orderItem?.snapshot || {}) as {
+                    title?: string;
+                    sizeLabel?: string;
+                  },
+                },
+                photos: fullApproval.photos,
+                approvalUrl,
+              };
+
+              const template = getApprovalConfirmedTemplate(emailContext);
+
+              await sendEmail({
+                to: recipientEmail,
+                subject: template.subject,
+                html: template.html,
+                text: template.text,
+                tags: [
+                  { name: "type", value: "approval_confirmed" },
+                  { name: "approval_id", value: result.approval.id },
+                  { name: "order_number", value: order.orderNumber },
+                ],
               });
-              recipientEmail = user?.email || null;
-            } else {
-              recipientEmail = order.guestEmail;
-            }
-
-            if (recipientEmail) {
-              // Get full approval details for email
-              const fullApproval = await getApprovalByToken(token);
-
-              if (fullApproval) {
-                const approvalUrl = `${APPROVAL_BASE_URL}/approve/${token}`;
-
-                const emailContext: ApprovalEmailContext = {
-                  approval: fullApproval,
-                  order: {
-                    orderNumber: order.orderNumber,
-                    shippingAddress: order.shippingAddress as {
-                      fullName?: string;
-                    },
-                  },
-                  orderItem: {
-                    snapshot: (fullApproval.orderItem?.snapshot || {}) as {
-                      title?: string;
-                      sizeLabel?: string;
-                    },
-                  },
-                  photos: fullApproval.photos,
-                  approvalUrl,
-                };
-
-                const template = getApprovalConfirmedTemplate(emailContext);
-
-                await sendEmail({
-                  to: recipientEmail,
-                  subject: template.subject,
-                  html: template.html,
-                  text: template.text,
-                  tags: [
-                    { name: "type", value: "approval_confirmed" },
-                    { name: "approval_id", value: result.approval.id },
-                    { name: "order_number", value: order.orderNumber },
-                  ],
-                });
-              }
             }
           }
-        } catch (emailError) {
-          // Log email error but don't fail the approval
-          console.error("[Approvals] Error sending confirmation email:", emailError);
         }
+      } catch (emailError) {
+        // Log email error but don't fail the approval
+        console.error("[Approvals] Error sending confirmation email:", emailError);
       }
-
-      return c.json({
-        success: true,
-        message: "Production approved! Your order will proceed to shipping.",
-        data: {
-          status: result.approval?.status,
-          approvedAt: result.approval?.approvedAt,
-        },
-      });
-    } catch (error) {
-      console.error("[Approvals] Error approving production:", error);
-      return c.json({ success: false, error: "Failed to approve production" }, 500);
     }
+
+    return c.json({
+      success: true,
+      message: "Production approved! Your order will proceed to shipping.",
+      data: {
+        status: result.approval?.status,
+        approvedAt: result.approval?.approvedAt,
+      },
+    });
+  } catch (error) {
+    console.error("[Approvals] Error approving production:", error);
+    return c.json({ success: false, error: "Failed to approve production" }, 500);
   }
-);
+});
 
 export { approvalsApp };

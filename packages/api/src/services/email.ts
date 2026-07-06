@@ -42,8 +42,7 @@ export interface EmailTemplate {
 // ============================================================================
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
-const DEFAULT_FROM_EMAIL =
-  process.env.EMAIL_FROM || "MasonArt <notifications@masonart.com>";
+const DEFAULT_FROM_EMAIL = process.env.EMAIL_FROM || "MasonArt <notifications@masonart.com>";
 const DEFAULT_REPLY_TO = process.env.EMAIL_REPLY_TO || "support@masonart.com";
 
 // Initialize Resend client (only if API key is available)
@@ -69,9 +68,7 @@ function getResendClient(): Resend | null {
  * @param options - Email options including recipient, subject, and content
  * @returns Result with success status and message ID or error
  */
-export async function sendEmail(
-  options: SendEmailOptions
-): Promise<SendEmailResponse> {
+export async function sendEmail(options: SendEmailOptions): Promise<SendEmailResponse> {
   const { to, subject, html, text, from, replyTo, tags } = options;
 
   try {
@@ -79,10 +76,7 @@ export async function sendEmail(
 
     // Development/test mode - log email instead of sending
     if (!client) {
-      if (
-        process.env.NODE_ENV === "development" ||
-        process.env.NODE_ENV === "test"
-      ) {
+      if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
         const recipients = Array.isArray(to) ? to.join(", ") : to;
         logger.info(
           {
@@ -181,9 +175,7 @@ export async function sendTemplateEmail(
  */
 export function isEmailServiceConfigured(): boolean {
   return (
-    !!RESEND_API_KEY ||
-    process.env.NODE_ENV === "development" ||
-    process.env.NODE_ENV === "test"
+    !!RESEND_API_KEY || process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test"
   );
 }
 

@@ -26,11 +26,7 @@ import {
   type ReturnStatus,
 } from "../database/schema/returns";
 import { orders } from "../database/schema/orders";
-import {
-  requireAuth,
-  canAccess,
-  type AuthVariables,
-} from "../middleware/auth";
+import { requireAuth, canAccess, type AuthVariables } from "../middleware/auth";
 import { getCached, setCached } from "../lib/redis";
 
 // ============================================================================
@@ -113,12 +109,7 @@ async function checkReturnEligibility(
   const existingReturn = await db
     .select({ id: returnRequests.id, status: returnRequests.status })
     .from(returnRequests)
-    .where(
-      and(
-        eq(returnRequests.orderId, orderId),
-        eq(returnRequests.userId, userId)
-      )
-    )
+    .where(and(eq(returnRequests.orderId, orderId), eq(returnRequests.userId, userId)))
     .limit(1);
 
   if (existingReturn.length) {
@@ -306,59 +297,55 @@ returnsApp.get("/orders/:orderId/returns", async (c) => {
 /**
  * POST /api/orders/:orderId/returns - Create a return request
  */
-returnsApp.post(
-  "/orders/:orderId/returns",
-  zValidator("json", createReturnSchema),
-  async (c) => {
-    const orderId = c.req.param("orderId");
-    const { reason, reasonDetails } = c.req.valid("json");
-    const user = c.get("user");
+returnsApp.post("/orders/:orderId/returns", zValidator("json", createReturnSchema), async (c) => {
+  const orderId = c.req.param("orderId");
+  const { reason, reasonDetails } = c.req.valid("json");
+  const user = c.get("user");
 
-    // Validate UUID format
-    if (!orderId || !/^[0-9a-f-]{36}$/i.test(orderId)) {
-      return c.json({ error: "Invalid order ID" }, 400);
-    }
-
-    try {
-      // Check eligibility
-      const eligibility = await checkReturnEligibility(orderId, user.id);
-
-      if (!eligibility.eligible) {
-        return c.json({ error: eligibility.reason }, 400);
-      }
-
-      // Create the return request
-      const [newReturn] = await db
-        .insert(returnRequests)
-        .values({
-          orderId,
-          userId: user.id,
-          reason: reason as ReturnReason,
-          reasonDetails,
-          status: "pending",
-        })
-        .returning();
-
-      return c.json(
-        {
-          message: "Return request submitted successfully",
-          return: {
-            id: newReturn!.id,
-            orderId: newReturn!.orderId,
-            reason: newReturn!.reason,
-            reasonDetails: newReturn!.reasonDetails,
-            status: newReturn!.status,
-            requestedAt: newReturn!.requestedAt,
-          },
-        },
-        201
-      );
-    } catch (error) {
-      console.error("Error creating return request:", error);
-      return c.json({ error: "Failed to create return request" }, 500);
-    }
+  // Validate UUID format
+  if (!orderId || !/^[0-9a-f-]{36}$/i.test(orderId)) {
+    return c.json({ error: "Invalid order ID" }, 400);
   }
-);
+
+  try {
+    // Check eligibility
+    const eligibility = await checkReturnEligibility(orderId, user.id);
+
+    if (!eligibility.eligible) {
+      return c.json({ error: eligibility.reason }, 400);
+    }
+
+    // Create the return request
+    const [newReturn] = await db
+      .insert(returnRequests)
+      .values({
+        orderId,
+        userId: user.id,
+        reason: reason as ReturnReason,
+        reasonDetails,
+        status: "pending",
+      })
+      .returning();
+
+    return c.json(
+      {
+        message: "Return request submitted successfully",
+        return: {
+          id: newReturn!.id,
+          orderId: newReturn!.orderId,
+          reason: newReturn!.reason,
+          reasonDetails: newReturn!.reasonDetails,
+          status: newReturn!.status,
+          requestedAt: newReturn!.requestedAt,
+        },
+      },
+      201
+    );
+  } catch (error) {
+    console.error("Error creating return request:", error);
+    return c.json({ error: "Failed to create return request" }, 500);
+  }
+});
 
 /**
  * GET /api/returns/:id - Get return request details

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 /**
  * Product Detail Page E2E Tests
@@ -39,12 +39,12 @@ import { test, expect } from '@playwright/test';
  * Returns the product URL if a product was found
  */
 async function navigateToProductPage(page: typeof test.page): Promise<string | null> {
-  await page.goto('/posters');
+  await page.goto("/posters");
   const productLinks = page.locator('a[href^="/posters/"]');
   const count = await productLinks.count();
 
   if (count > 0) {
-    const href = await productLinks.first().getAttribute('href');
+    const href = await productLinks.first().getAttribute("href");
     if (href) {
       await page.goto(href);
       return href;
@@ -57,9 +57,9 @@ async function navigateToProductPage(page: typeof test.page): Promise<string | n
 // Breadcrumb Navigation Tests
 // ============================================================================
 
-test.describe('Product Detail - Breadcrumb', () => {
-  test('should display breadcrumb navigation', async ({ page }) => {
-    await page.goto('/posters');
+test.describe("Product Detail - Breadcrumb", () => {
+  test("should display breadcrumb navigation", async ({ page }) => {
+    await page.goto("/posters");
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -70,8 +70,8 @@ test.describe('Product Detail - Breadcrumb', () => {
     }
   });
 
-  test('should display Home link in breadcrumb', async ({ page }) => {
-    await page.goto('/posters');
+  test("should display Home link in breadcrumb", async ({ page }) => {
+    await page.goto("/posters");
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -79,12 +79,12 @@ test.describe('Product Detail - Breadcrumb', () => {
       await productLinks.first().click();
       const homeLink = page.locator('nav[aria-label="Breadcrumb"] a[href="/"]');
       await expect(homeLink).toBeVisible();
-      await expect(homeLink).toHaveText('Home');
+      await expect(homeLink).toHaveText("Home");
     }
   });
 
-  test('should display Posters link in breadcrumb', async ({ page }) => {
-    await page.goto('/posters');
+  test("should display Posters link in breadcrumb", async ({ page }) => {
+    await page.goto("/posters");
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -92,12 +92,12 @@ test.describe('Product Detail - Breadcrumb', () => {
       await productLinks.first().click();
       const postersLink = page.locator('nav[aria-label="Breadcrumb"] a[href="/posters"]');
       await expect(postersLink).toBeVisible();
-      await expect(postersLink).toHaveText('Posters');
+      await expect(postersLink).toHaveText("Posters");
     }
   });
 
-  test('should display product title in breadcrumb', async ({ page }) => {
-    await page.goto('/posters');
+  test("should display product title in breadcrumb", async ({ page }) => {
+    await page.goto("/posters");
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -109,8 +109,8 @@ test.describe('Product Detail - Breadcrumb', () => {
     }
   });
 
-  test('should navigate to listing page from breadcrumb', async ({ page }) => {
-    await page.goto('/posters');
+  test("should navigate to listing page from breadcrumb", async ({ page }) => {
+    await page.goto("/posters");
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -118,7 +118,7 @@ test.describe('Product Detail - Breadcrumb', () => {
       await productLinks.first().click();
       const postersLink = page.locator('nav[aria-label="Breadcrumb"] a[href="/posters"]');
       await postersLink.click();
-      await expect(page).toHaveURL('/posters');
+      await expect(page).toHaveURL("/posters");
     }
   });
 });
@@ -127,23 +127,25 @@ test.describe('Product Detail - Breadcrumb', () => {
 // Product Image Gallery Tests
 // ============================================================================
 
-test.describe('Product Detail - Image Gallery', () => {
+test.describe("Product Detail - Image Gallery", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display main product image', async ({ page }) => {
+  test("should display main product image", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const mainImage = page.locator('.aspect-square img, .aspect-square svg.text-muted-foreground');
+      const mainImage = page.locator(
+        ".aspect-square img, .aspect-square svg.text-muted-foreground"
+      );
       await expect(mainImage.first()).toBeVisible();
     }
   });
 
-  test('should display image navigation arrows when multiple images', async ({ page }) => {
+  test("should display image navigation arrows when multiple images", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -161,7 +163,7 @@ test.describe('Product Detail - Image Gallery', () => {
     }
   });
 
-  test('should navigate images with arrows', async ({ page }) => {
+  test("should navigate images with arrows", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -172,58 +174,58 @@ test.describe('Product Detail - Image Gallery', () => {
       if (await nextButton.isVisible()) {
         await nextButton.click();
         // Should still see the main image area
-        const mainImage = page.locator('.aspect-square');
+        const mainImage = page.locator(".aspect-square");
         await expect(mainImage).toBeVisible();
       }
     }
   });
 
-  test('should display thumbnail gallery when multiple images', async ({ page }) => {
+  test("should display thumbnail gallery when multiple images", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Thumbnails container
-      const thumbnails = page.locator('.flex.gap-2.overflow-x-auto button');
+      const thumbnails = page.locator(".flex.gap-2.overflow-x-auto button");
       const thumbnailCount = await thumbnails.count();
       // May or may not have thumbnails
       expect(thumbnailCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should highlight current thumbnail', async ({ page }) => {
+  test("should highlight current thumbnail", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const selectedThumbnail = page.locator('.flex.gap-2 button.border-brand-500');
+      const selectedThumbnail = page.locator(".flex.gap-2 button.border-brand-500");
       const selectedCount = await selectedThumbnail.count();
       // May have a selected thumbnail
       expect(selectedCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should change main image on thumbnail click', async ({ page }) => {
+  test("should change main image on thumbnail click", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const thumbnails = page.locator('.flex.gap-2.overflow-x-auto button');
+      const thumbnails = page.locator(".flex.gap-2.overflow-x-auto button");
       const thumbnailCount = await thumbnails.count();
 
       if (thumbnailCount > 1) {
         await thumbnails.nth(1).click();
         // The second thumbnail should now be selected
-        const selectedThumbnail = page.locator('.flex.gap-2 button.border-brand-500');
+        const selectedThumbnail = page.locator(".flex.gap-2 button.border-brand-500");
         await expect(selectedThumbnail).toBeVisible();
       }
     }
   });
 
-  test('should display Featured badge on featured products', async ({ page }) => {
+  test("should display Featured badge on featured products", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -235,7 +237,7 @@ test.describe('Product Detail - Image Gallery', () => {
     }
   });
 
-  test('should display AI Generated badge on AI products', async ({ page }) => {
+  test("should display AI Generated badge on AI products", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -252,68 +254,68 @@ test.describe('Product Detail - Image Gallery', () => {
 // Product Information Tests
 // ============================================================================
 
-test.describe('Product Detail - Product Information', () => {
+test.describe("Product Detail - Product Information", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display product title', async ({ page }) => {
+  test("should display product title", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const title = page.locator('h1');
+      const title = page.locator("h1");
       await expect(title).toBeVisible();
     }
   });
 
-  test('should display style tags if available', async ({ page }) => {
+  test("should display style tags if available", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Style tags are optional
-      const styleTags = page.locator('.rounded-full.bg-muted.px-2\\.5.text-xs.capitalize');
+      const styleTags = page.locator(".rounded-full.bg-muted.px-2\\.5.text-xs.capitalize");
       const tagCount = await styleTags.count();
       expect(tagCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should display artist name if available', async ({ page }) => {
+  test("should display artist name if available", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Artist is optional, look for "by" text
-      const artistText = page.locator('text=/^by /');
+      const artistText = page.locator("text=/^by /");
       const artistCount = await artistText.count();
       expect(artistCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should display rating if available', async ({ page }) => {
+  test("should display rating if available", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Rating with star icon
-      const ratingSection = page.locator('text=/reviews\\)/');
+      const ratingSection = page.locator("text=/reviews\\)/");
       const ratingCount = await ratingSection.count();
       expect(ratingCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should display SKU', async ({ page }) => {
+  test("should display SKU", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const sku = page.locator('text=/SKU: /');
+      const sku = page.locator("text=/SKU: /");
       await expect(sku).toBeVisible();
     }
   });
@@ -323,40 +325,40 @@ test.describe('Product Detail - Product Information', () => {
 // Price Display Tests
 // ============================================================================
 
-test.describe('Product Detail - Price Display', () => {
+test.describe("Product Detail - Price Display", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display price section', async ({ page }) => {
+  test("should display price section", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const priceSection = page.locator('.rounded-lg.border.border-border.bg-muted\\/30.p-4');
+      const priceSection = page.locator(".rounded-lg.border.border-border.bg-muted\\/30.p-4");
       await expect(priceSection.first()).toBeVisible();
     }
   });
 
-  test('should display price in INR format', async ({ page }) => {
+  test("should display price in INR format", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const price = page.locator('text=/₹[\\d,]+/');
+      const price = page.locator("text=/₹[\\d,]+/");
       await expect(price.first()).toBeVisible();
     }
   });
 
-  test('should display price explanation text', async ({ page }) => {
+  test("should display price explanation text", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const priceNote = page.locator('text=Price varies by size and frame selection');
+      const priceNote = page.locator("text=Price varies by size and frame selection");
       await expect(priceNote).toBeVisible();
     }
   });
@@ -366,49 +368,49 @@ test.describe('Product Detail - Price Display', () => {
 // Size Selector Tests
 // ============================================================================
 
-test.describe('Product Detail - Size Selector', () => {
+test.describe("Product Detail - Size Selector", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display size selection section', async ({ page }) => {
+  test("should display size selection section", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const sizeSection = page.locator('text=Select Size');
+      const sizeSection = page.locator("text=Select Size");
       await expect(sizeSection).toBeVisible();
     }
   });
 
-  test('should display available size options', async ({ page }) => {
+  test("should display available size options", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Size options should be present
-      const sizeOptions = page.locator('[data-size-option], .rounded-lg.border');
+      const sizeOptions = page.locator("[data-size-option], .rounded-lg.border");
       const optionCount = await sizeOptions.count();
       expect(optionCount).toBeGreaterThan(0);
     }
   });
 
-  test('should have a size selected by default', async ({ page }) => {
+  test("should have a size selected by default", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Selected size has different styling
-      const selectedSize = page.locator('.border-brand-500');
+      const selectedSize = page.locator(".border-brand-500");
       const selectedCount = await selectedSize.count();
       expect(selectedCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should update price when selecting different size', async ({ page }) => {
+  test("should update price when selecting different size", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -416,11 +418,11 @@ test.describe('Product Detail - Size Selector', () => {
       await productLinks.first().click();
 
       // Get initial price
-      const priceElement = page.locator('.text-3xl.font-bold').first();
+      const priceElement = page.locator(".text-3xl.font-bold").first();
       const initialPrice = await priceElement.textContent();
 
       // Click a different size if available
-      const sizeOptions = page.locator('[data-size-option], button:has(.text-sm.font-medium)');
+      const sizeOptions = page.locator("[data-size-option], button:has(.text-sm.font-medium)");
       const optionCount = await sizeOptions.count();
 
       if (optionCount > 1) {
@@ -432,27 +434,27 @@ test.describe('Product Detail - Size Selector', () => {
     }
   });
 
-  test('should display size dimensions', async ({ page }) => {
+  test("should display size dimensions", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Size dimensions with x notation
-      const dimensions = page.locator('text=/\\d+.*x.*\\d+/');
+      const dimensions = page.locator("text=/\\d+.*x.*\\d+/");
       const dimensionCount = await dimensions.count();
       expect(dimensionCount).toBeGreaterThan(0);
     }
   });
 
-  test('should show unavailable sizes as disabled', async ({ page }) => {
+  test("should show unavailable sizes as disabled", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Out of stock sizes may have opacity or line-through
-      const unavailableSizes = page.locator('.line-through, .opacity-50');
+      const unavailableSizes = page.locator(".line-through, .opacity-50");
       const unavailableCount = await unavailableSizes.count();
       expect(unavailableCount).toBeGreaterThanOrEqual(0);
     }
@@ -463,50 +465,50 @@ test.describe('Product Detail - Size Selector', () => {
 // Frame Selector Tests
 // ============================================================================
 
-test.describe('Product Detail - Frame Selector', () => {
+test.describe("Product Detail - Frame Selector", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display frame selection section when frames available', async ({ page }) => {
+  test("should display frame selection section when frames available", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const frameSection = page.locator('text=Select Frame');
+      const frameSection = page.locator("text=Select Frame");
       const frameSectionCount = await frameSection.count();
       // Frame section is optional
       expect(frameSectionCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should display No Frame option', async ({ page }) => {
+  test("should display No Frame option", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const noFrameOption = page.locator('text=No Frame');
+      const noFrameOption = page.locator("text=No Frame");
       const noFrameCount = await noFrameOption.count();
       expect(noFrameCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should display frame options with prices', async ({ page }) => {
+  test("should display frame options with prices", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Frame options with price modifiers
-      const frameOptions = page.locator('text=/\\+₹/');
+      const frameOptions = page.locator("text=/\\+₹/");
       const frameCount = await frameOptions.count();
       expect(frameCount).toBeGreaterThanOrEqual(0);
     }
   });
 
-  test('should update total price when selecting frame', async ({ page }) => {
+  test("should update total price when selecting frame", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -514,7 +516,7 @@ test.describe('Product Detail - Frame Selector', () => {
       await productLinks.first().click();
 
       // Get initial price
-      const priceElement = page.locator('.text-3xl.font-bold').first();
+      const priceElement = page.locator(".text-3xl.font-bold").first();
       const initialPrice = await priceElement.textContent();
 
       // Click a frame option if available
@@ -530,7 +532,7 @@ test.describe('Product Detail - Frame Selector', () => {
     }
   });
 
-  test('should show includes frame text when frame selected', async ({ page }) => {
+  test("should show includes frame text when frame selected", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -557,23 +559,23 @@ test.describe('Product Detail - Frame Selector', () => {
 // Quantity Controls Tests
 // ============================================================================
 
-test.describe('Product Detail - Quantity Controls', () => {
+test.describe("Product Detail - Quantity Controls", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display quantity selector', async ({ page }) => {
+  test("should display quantity selector", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const quantityLabel = page.locator('text=Quantity');
+      const quantityLabel = page.locator("text=Quantity");
       await expect(quantityLabel).toBeVisible();
     }
   });
 
-  test('should display quantity decrease button', async ({ page }) => {
+  test("should display quantity decrease button", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -584,7 +586,7 @@ test.describe('Product Detail - Quantity Controls', () => {
     }
   });
 
-  test('should display quantity increase button', async ({ page }) => {
+  test("should display quantity increase button", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -595,19 +597,19 @@ test.describe('Product Detail - Quantity Controls', () => {
     }
   });
 
-  test('should start with quantity 1', async ({ page }) => {
+  test("should start with quantity 1", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const quantityDisplay = page.locator('.min-w-\\[3rem\\].text-center');
-      await expect(quantityDisplay).toHaveText('1');
+      const quantityDisplay = page.locator(".min-w-\\[3rem\\].text-center");
+      await expect(quantityDisplay).toHaveText("1");
     }
   });
 
   // Skipped: Quantity button interactions are flaky due to viewport/scroll issues
-  test.skip('should increase quantity on plus click', async ({ page }) => {
+  test.skip("should increase quantity on plus click", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -619,13 +621,13 @@ test.describe('Product Detail - Quantity Controls', () => {
       await expect(increaseButton).toBeVisible();
       await increaseButton.click();
 
-      const quantityDisplay = page.locator('.min-w-\\[3rem\\].text-center');
-      await expect(quantityDisplay).toHaveText('2');
+      const quantityDisplay = page.locator(".min-w-\\[3rem\\].text-center");
+      await expect(quantityDisplay).toHaveText("2");
     }
   });
 
   // Skipped: Quantity button interactions are flaky due to viewport/scroll issues
-  test.skip('should decrease quantity on minus click', async ({ page }) => {
+  test.skip("should decrease quantity on minus click", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -641,16 +643,16 @@ test.describe('Product Detail - Quantity Controls', () => {
       // Increase to 2 first
       await increaseButton.click();
       // Wait for quantity to update before decreasing
-      const quantityDisplay = page.locator('.min-w-\\[3rem\\].text-center');
-      await expect(quantityDisplay).toHaveText('2');
+      const quantityDisplay = page.locator(".min-w-\\[3rem\\].text-center");
+      await expect(quantityDisplay).toHaveText("2");
       // Then decrease
       await decreaseButton.click();
 
-      await expect(quantityDisplay).toHaveText('1');
+      await expect(quantityDisplay).toHaveText("1");
     }
   });
 
-  test('should disable minus button at quantity 1', async ({ page }) => {
+  test("should disable minus button at quantity 1", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -661,7 +663,7 @@ test.describe('Product Detail - Quantity Controls', () => {
     }
   });
 
-  test('should not go below quantity 1', async ({ page }) => {
+  test("should not go below quantity 1", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -675,8 +677,8 @@ test.describe('Product Detail - Quantity Controls', () => {
       // Try clicking disabled button
       await decreaseButton.click({ force: true });
 
-      const quantityDisplay = page.locator('.min-w-\\[3rem\\].text-center');
-      await expect(quantityDisplay).toHaveText('1');
+      const quantityDisplay = page.locator(".min-w-\\[3rem\\].text-center");
+      await expect(quantityDisplay).toHaveText("1");
     }
   });
 });
@@ -685,12 +687,12 @@ test.describe('Product Detail - Quantity Controls', () => {
 // Add to Cart Tests
 // ============================================================================
 
-test.describe('Product Detail - Add to Cart', () => {
+test.describe("Product Detail - Add to Cart", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display Add to Cart button', async ({ page }) => {
+  test("should display Add to Cart button", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -701,19 +703,19 @@ test.describe('Product Detail - Add to Cart', () => {
     }
   });
 
-  test('should display cart icon in button', async ({ page }) => {
+  test("should display cart icon in button", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       const addToCartButton = page.locator('button:has-text("Add to Cart")');
-      const cartIcon = addToCartButton.locator('svg');
+      const cartIcon = addToCartButton.locator("svg");
       await expect(cartIcon).toBeVisible();
     }
   });
 
-  test('should enable Add to Cart when size selected', async ({ page }) => {
+  test("should enable Add to Cart when size selected", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -723,7 +725,7 @@ test.describe('Product Detail - Add to Cart', () => {
       // If a size is selected by default, button should be enabled
       const isDisabled = await addToCartButton.isDisabled();
       // Button state depends on whether a variant is available
-      expect(typeof isDisabled).toBe('boolean');
+      expect(typeof isDisabled).toBe("boolean");
     }
   });
 });
@@ -732,12 +734,12 @@ test.describe('Product Detail - Add to Cart', () => {
 // Action Buttons Tests
 // ============================================================================
 
-test.describe('Product Detail - Action Buttons', () => {
+test.describe("Product Detail - Action Buttons", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display wishlist button', async ({ page }) => {
+  test("should display wishlist button", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -748,7 +750,7 @@ test.describe('Product Detail - Action Buttons', () => {
     }
   });
 
-  test('should display share button', async ({ page }) => {
+  test("should display share button", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -764,62 +766,62 @@ test.describe('Product Detail - Action Buttons', () => {
 // Trust Badges Tests
 // ============================================================================
 
-test.describe('Product Detail - Trust Badges', () => {
+test.describe("Product Detail - Trust Badges", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display Free Shipping badge', async ({ page }) => {
+  test("should display Free Shipping badge", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const freeShipping = page.locator('text=Free Shipping');
+      const freeShipping = page.locator("text=Free Shipping");
       await expect(freeShipping).toBeVisible();
     }
   });
 
-  test('should display Secure Payment badge', async ({ page }) => {
+  test("should display Secure Payment badge", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const securePayment = page.locator('text=Secure Payment');
+      const securePayment = page.locator("text=Secure Payment");
       await expect(securePayment).toBeVisible();
     }
   });
 
-  test('should display Easy Returns badge', async ({ page }) => {
+  test("should display Easy Returns badge", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const easyReturns = page.locator('text=Easy Returns');
+      const easyReturns = page.locator("text=Easy Returns");
       await expect(easyReturns).toBeVisible();
     }
   });
 
-  test('should display shipping threshold', async ({ page }) => {
+  test("should display shipping threshold", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const shippingThreshold = page.locator('text=Orders over ₹999');
+      const shippingThreshold = page.locator("text=Orders over ₹999");
       await expect(shippingThreshold).toBeVisible();
     }
   });
 
-  test('should display return policy duration', async ({ page }) => {
+  test("should display return policy duration", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const returnPolicy = page.locator('text=30-day policy');
+      const returnPolicy = page.locator("text=30-day policy");
       await expect(returnPolicy).toBeVisible();
     }
   });
@@ -829,12 +831,12 @@ test.describe('Product Detail - Trust Badges', () => {
 // Product Description Tests
 // ============================================================================
 
-test.describe('Product Detail - Description', () => {
+test.describe("Product Detail - Description", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display Description section', async ({ page }) => {
+  test("should display Description section", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -847,13 +849,13 @@ test.describe('Product Detail - Description', () => {
     }
   });
 
-  test('should display description content', async ({ page }) => {
+  test("should display description content", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const descriptionContent = page.locator('.prose.prose-sm');
+      const descriptionContent = page.locator(".prose.prose-sm");
       const contentCount = await descriptionContent.count();
       expect(contentCount).toBeGreaterThanOrEqual(0);
     }
@@ -864,12 +866,12 @@ test.describe('Product Detail - Description', () => {
 // Room Suggestions Tests
 // ============================================================================
 
-test.describe('Product Detail - Room Suggestions', () => {
+test.describe("Product Detail - Room Suggestions", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display Perfect For section when room suggestions available', async ({ page }) => {
+  test("should display Perfect For section when room suggestions available", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -882,7 +884,7 @@ test.describe('Product Detail - Room Suggestions', () => {
     }
   });
 
-  test('should display room suggestion tags', async ({ page }) => {
+  test("should display room suggestion tags", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -892,7 +894,7 @@ test.describe('Product Detail - Room Suggestions', () => {
       const perfectForCount = await perfectFor.count();
 
       if (perfectForCount > 0) {
-        const roomTags = page.locator('.rounded-full.border.border-border.bg-background.px-3');
+        const roomTags = page.locator(".rounded-full.border.border-border.bg-background.px-3");
         const tagCount = await roomTags.count();
         expect(tagCount).toBeGreaterThan(0);
       }
@@ -904,12 +906,12 @@ test.describe('Product Detail - Room Suggestions', () => {
 // Related Products Tests
 // ============================================================================
 
-test.describe('Product Detail - Related Products', () => {
+test.describe("Product Detail - Related Products", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should display You May Also Like section', async ({ page }) => {
+  test("should display You May Also Like section", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -920,13 +922,13 @@ test.describe('Product Detail - Related Products', () => {
     }
   });
 
-  test('should display related products grid', async ({ page }) => {
+  test("should display related products grid", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const relatedGrid = page.locator('.grid.grid-cols-2.gap-4');
+      const relatedGrid = page.locator(".grid.grid-cols-2.gap-4");
       await expect(relatedGrid.last()).toBeVisible();
     }
   });
@@ -936,12 +938,12 @@ test.describe('Product Detail - Related Products', () => {
 // SEO Meta Tags Tests
 // ============================================================================
 
-test.describe('Product Detail - SEO Meta Tags', () => {
+test.describe("Product Detail - SEO Meta Tags", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should have page title with product name', async ({ page }) => {
+  test("should have page title with product name", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -954,106 +956,112 @@ test.describe('Product Detail - SEO Meta Tags', () => {
     }
   });
 
-  test('should have meta description', async ({ page }) => {
+  test("should have meta description", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const description = await page.locator('meta[name="description"]').getAttribute('content');
+      const description = await page.locator('meta[name="description"]').getAttribute("content");
       expect(description).toBeTruthy();
     }
   });
 
-  test('should have canonical URL', async ({ page }) => {
+  test("should have canonical URL", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const canonical = await page.locator('link[rel="canonical"]').getAttribute('href');
+      const canonical = await page.locator('link[rel="canonical"]').getAttribute("href");
       expect(canonical).toBeTruthy();
-      expect(canonical).toContain('/posters/');
+      expect(canonical).toContain("/posters/");
     }
   });
 
-  test('should have Open Graph title', async ({ page }) => {
+  test("should have Open Graph title", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const ogTitle = await page.locator('meta[property="og:title"]').getAttribute('content');
+      const ogTitle = await page.locator('meta[property="og:title"]').getAttribute("content");
       expect(ogTitle).toBeTruthy();
     }
   });
 
-  test('should have Open Graph type as product', async ({ page }) => {
+  test("should have Open Graph type as product", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const ogType = await page.locator('meta[property="og:type"]').getAttribute('content');
-      expect(ogType).toBe('product');
+      const ogType = await page.locator('meta[property="og:type"]').getAttribute("content");
+      expect(ogType).toBe("product");
     }
   });
 
-  test('should have Open Graph image', async ({ page }) => {
+  test("should have Open Graph image", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const ogImage = await page.locator('meta[property="og:image"]').getAttribute('content');
+      const ogImage = await page.locator('meta[property="og:image"]').getAttribute("content");
       expect(ogImage).toBeTruthy();
     }
   });
 
-  test('should have Twitter card meta tag', async ({ page }) => {
+  test("should have Twitter card meta tag", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const twitterCard = await page.locator('meta[name="twitter:card"]').getAttribute('content');
-      expect(twitterCard).toBe('summary_large_image');
+      const twitterCard = await page.locator('meta[name="twitter:card"]').getAttribute("content");
+      expect(twitterCard).toBe("summary_large_image");
     }
   });
 
-  test('should have product price meta tags', async ({ page }) => {
+  test("should have product price meta tags", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const priceAmount = await page.locator('meta[property="product:price:amount"]').getAttribute('content');
-      const priceCurrency = await page.locator('meta[property="product:price:currency"]').getAttribute('content');
+      const priceAmount = await page
+        .locator('meta[property="product:price:amount"]')
+        .getAttribute("content");
+      const priceCurrency = await page
+        .locator('meta[property="product:price:currency"]')
+        .getAttribute("content");
 
       expect(priceAmount).toBeTruthy();
-      expect(priceCurrency).toBe('INR');
+      expect(priceCurrency).toBe("INR");
     }
   });
 
-  test('should have product availability meta tag', async ({ page }) => {
+  test("should have product availability meta tag", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const availability = await page.locator('meta[property="product:availability"]').getAttribute('content');
+      const availability = await page
+        .locator('meta[property="product:availability"]')
+        .getAttribute("content");
       expect(availability).toMatch(/in stock|out of stock/);
     }
   });
 
-  test('should have robots meta tag', async ({ page }) => {
+  test("should have robots meta tag", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const robots = await page.locator('meta[name="robots"]').getAttribute('content');
-      expect(robots).toContain('follow');
+      const robots = await page.locator('meta[name="robots"]').getAttribute("content");
+      expect(robots).toContain("follow");
     }
   });
 });
@@ -1062,27 +1070,29 @@ test.describe('Product Detail - SEO Meta Tags', () => {
 // JSON-LD Structured Data Tests
 // ============================================================================
 
-test.describe('Product Detail - JSON-LD Structured Data', () => {
+test.describe("Product Detail - JSON-LD Structured Data", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should have JSON-LD script tag', async ({ page }) => {
+  test("should have JSON-LD script tag", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       const jsonLd = page.locator('script[type="application/ld+json"]');
-      await expect(jsonLd).toBeVisible({ timeout: 5000 }).catch(() => {
-        // JSON-LD may be present but hidden
-      });
+      await expect(jsonLd)
+        .toBeVisible({ timeout: 5000 })
+        .catch(() => {
+          // JSON-LD may be present but hidden
+        });
       const jsonLdCount = await jsonLd.count();
       expect(jsonLdCount).toBeGreaterThan(0);
     }
   });
 
-  test('should have valid JSON-LD content', async ({ page }) => {
+  test("should have valid JSON-LD content", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -1093,13 +1103,13 @@ test.describe('Product Detail - JSON-LD Structured Data', () => {
 
       if (content) {
         const parsed = JSON.parse(content);
-        expect(parsed['@context']).toBe('https://schema.org');
-        expect(parsed['@type']).toBe('Product');
+        expect(parsed["@context"]).toBe("https://schema.org");
+        expect(parsed["@type"]).toBe("Product");
       }
     }
   });
 
-  test('should include product name in JSON-LD', async ({ page }) => {
+  test("should include product name in JSON-LD", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -1115,7 +1125,7 @@ test.describe('Product Detail - JSON-LD Structured Data', () => {
     }
   });
 
-  test('should include offers in JSON-LD', async ({ page }) => {
+  test("should include offers in JSON-LD", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -1127,7 +1137,7 @@ test.describe('Product Detail - JSON-LD Structured Data', () => {
       if (content) {
         const parsed = JSON.parse(content);
         expect(parsed.offers).toBeTruthy();
-        expect(parsed.offers.priceCurrency).toBe('INR');
+        expect(parsed.offers.priceCurrency).toBe("INR");
       }
     }
   });
@@ -1137,10 +1147,10 @@ test.describe('Product Detail - JSON-LD Structured Data', () => {
 // Responsive Design Tests
 // ============================================================================
 
-test.describe('Product Detail - Responsive Design', () => {
-  test('should display properly on mobile', async ({ page }) => {
+test.describe("Product Detail - Responsive Design", () => {
+  test("should display properly on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
@@ -1148,14 +1158,14 @@ test.describe('Product Detail - Responsive Design', () => {
     if (count > 0) {
       await productLinks.first().click();
       // On mobile, should still see main elements
-      const title = page.locator('h1');
+      const title = page.locator("h1");
       await expect(title).toBeVisible();
     }
   });
 
-  test('should stack layout on mobile', async ({ page }) => {
+  test("should stack layout on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
@@ -1163,63 +1173,63 @@ test.describe('Product Detail - Responsive Design', () => {
     if (count > 0) {
       await productLinks.first().click();
       // Grid should stack on mobile
-      const mainGrid = page.locator('.grid.gap-8.lg\\:grid-cols-2');
+      const mainGrid = page.locator(".grid.gap-8.lg\\:grid-cols-2");
       await expect(mainGrid.first()).toBeVisible();
     }
   });
 
-  test('should display properly on tablet', async ({ page }) => {
+  test("should display properly on tablet", async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const title = page.locator('h1');
+      const title = page.locator("h1");
       await expect(title).toBeVisible();
     }
   });
 
-  test('should use two-column layout on desktop', async ({ page }) => {
+  test("should use two-column layout on desktop", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const mainGrid = page.locator('.grid.gap-8.lg\\:grid-cols-2');
+      const mainGrid = page.locator(".grid.gap-8.lg\\:grid-cols-2");
       await expect(mainGrid.first()).toBeVisible();
     }
   });
 
-  test('should scale images properly on different viewports', async ({ page }) => {
+  test("should scale images properly on different viewports", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const mainImage = page.locator('.aspect-square');
+      const mainImage = page.locator(".aspect-square");
       await expect(mainImage.first()).toBeVisible();
     }
   });
 
-  test('should adjust trust badges layout on mobile', async ({ page }) => {
+  test("should adjust trust badges layout on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const trustBadges = page.locator('.grid.grid-cols-3');
+      const trustBadges = page.locator(".grid.grid-cols-3");
       const badgesCount = await trustBadges.count();
       expect(badgesCount).toBeGreaterThan(0);
     }
@@ -1230,24 +1240,24 @@ test.describe('Product Detail - Responsive Design', () => {
 // Accessibility Tests
 // ============================================================================
 
-test.describe('Product Detail - Accessibility', () => {
+test.describe("Product Detail - Accessibility", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should have proper heading hierarchy', async ({ page }) => {
+  test("should have proper heading hierarchy", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Should have exactly one h1
-      const h1Count = await page.locator('h1').count();
+      const h1Count = await page.locator("h1").count();
       expect(h1Count).toBe(1);
     }
   });
 
-  test('should have ARIA labels on navigation buttons', async ({ page }) => {
+  test("should have ARIA labels on navigation buttons", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -1262,7 +1272,7 @@ test.describe('Product Detail - Accessibility', () => {
     }
   });
 
-  test('should have ARIA labels on action buttons', async ({ page }) => {
+  test("should have ARIA labels on action buttons", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -1276,7 +1286,7 @@ test.describe('Product Detail - Accessibility', () => {
     }
   });
 
-  test('should have ARIA labels on quantity buttons', async ({ page }) => {
+  test("should have ARIA labels on quantity buttons", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -1290,7 +1300,7 @@ test.describe('Product Detail - Accessibility', () => {
     }
   });
 
-  test('should have accessible breadcrumb navigation', async ({ page }) => {
+  test("should have accessible breadcrumb navigation", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
@@ -1305,28 +1315,28 @@ test.describe('Product Detail - Accessibility', () => {
     }
   });
 
-  test('should have alt text on images', async ({ page }) => {
+  test("should have alt text on images", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const images = page.locator('img[alt]');
+      const images = page.locator("img[alt]");
       const imageCount = await images.count();
       expect(imageCount).toBeGreaterThan(0);
     }
   });
 
-  test('should be keyboard navigable', async ({ page }) => {
+  test("should be keyboard navigable", async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
       // Tab into page
-      await page.keyboard.press('Tab');
+      await page.keyboard.press("Tab");
 
-      const focusedElement = page.locator(':focus');
+      const focusedElement = page.locator(":focus");
       await expect(focusedElement.first()).toBeTruthy();
     }
   });
@@ -1336,36 +1346,36 @@ test.describe('Product Detail - Accessibility', () => {
 // 404 / Not Found Tests
 // ============================================================================
 
-test.describe('Product Detail - Not Found', () => {
-  test('should display not found page for invalid product', async ({ page }) => {
-    await page.goto('/posters/nonexistent-product-slug-xyz-123');
+test.describe("Product Detail - Not Found", () => {
+  test("should display not found page for invalid product", async ({ page }) => {
+    await page.goto("/posters/nonexistent-product-slug-xyz-123");
 
     // Should show not found message
-    const notFound = page.locator('text=Product Not Found');
+    const notFound = page.locator("text=Product Not Found");
     await expect(notFound).toBeVisible();
   });
 
-  test('should display description on not found page', async ({ page }) => {
-    await page.goto('/posters/nonexistent-product-slug-xyz-123');
+  test("should display description on not found page", async ({ page }) => {
+    await page.goto("/posters/nonexistent-product-slug-xyz-123");
 
-    const description = page.locator('text=could not be found');
+    const description = page.locator("text=could not be found");
     await expect(description).toBeVisible();
   });
 
-  test('should display Browse All Products link on not found page', async ({ page }) => {
-    await page.goto('/posters/nonexistent-product-slug-xyz-123');
+  test("should display Browse All Products link on not found page", async ({ page }) => {
+    await page.goto("/posters/nonexistent-product-slug-xyz-123");
 
     const browseLink = page.locator('a[href="/posters"]:has-text("Browse All Products")');
     await expect(browseLink).toBeVisible();
   });
 
-  test('should navigate to listing from not found page', async ({ page }) => {
-    await page.goto('/posters/nonexistent-product-slug-xyz-123');
+  test("should navigate to listing from not found page", async ({ page }) => {
+    await page.goto("/posters/nonexistent-product-slug-xyz-123");
 
     const browseLink = page.locator('a[href="/posters"]:has-text("Browse All Products")');
     await browseLink.click();
 
-    await expect(page).toHaveURL('/posters');
+    await expect(page).toHaveURL("/posters");
   });
 });
 
@@ -1373,9 +1383,9 @@ test.describe('Product Detail - Not Found', () => {
 // Performance Tests
 // ============================================================================
 
-test.describe('Product Detail - Performance', () => {
-  test('should load page within acceptable time', async ({ page }) => {
-    await page.goto('/posters');
+test.describe("Product Detail - Performance", () => {
+  test("should load page within acceptable time", async ({ page }) => {
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
@@ -1383,15 +1393,15 @@ test.describe('Product Detail - Performance', () => {
     if (count > 0) {
       const startTime = Date.now();
       await productLinks.first().click();
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
 
       const loadTime = Date.now() - startTime;
       expect(loadTime).toBeLessThan(5000);
     }
   });
 
-  test('should render title quickly', async ({ page }) => {
-    await page.goto('/posters');
+  test("should render title quickly", async ({ page }) => {
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
@@ -1399,22 +1409,22 @@ test.describe('Product Detail - Performance', () => {
     if (count > 0) {
       const startTime = Date.now();
       await productLinks.first().click();
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
 
       const renderTime = Date.now() - startTime;
       expect(renderTime).toBeLessThan(3000);
     }
   });
 
-  test('should maintain layout during scroll', async ({ page }) => {
-    await page.goto('/posters');
+  test("should maintain layout during scroll", async ({ page }) => {
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const header = page.locator('header');
+      const header = page.locator("header");
       const initialBox = await header.boundingBox();
 
       // Scroll down
@@ -1429,22 +1439,22 @@ test.describe('Product Detail - Performance', () => {
     }
   });
 
-  test('should not have JavaScript errors on page load', async ({ page }) => {
+  test("should not have JavaScript errors on page load", async ({ page }) => {
     const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
+    page.on("pageerror", (error) => errors.push(error.message));
 
-    await page.goto('/posters');
+    await page.goto("/posters");
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
       await page.waitForTimeout(1000);
 
       // Filter out expected network errors
       const criticalErrors = errors.filter(
-        (e) => !e.includes('Failed to fetch') && !e.includes('NetworkError')
+        (e) => !e.includes("Failed to fetch") && !e.includes("NetworkError")
       );
 
       expect(criticalErrors.length).toBe(0);
@@ -1456,22 +1466,22 @@ test.describe('Product Detail - Performance', () => {
 // Navigation Tests
 // ============================================================================
 
-test.describe('Product Detail - Navigation', () => {
-  test('should navigate from listing to detail page', async ({ page }) => {
-    await page.goto('/posters');
+test.describe("Product Detail - Navigation", () => {
+  test("should navigate from listing to detail page", async ({ page }) => {
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
-      const href = await productLinks.first().getAttribute('href');
+      const href = await productLinks.first().getAttribute("href");
       await productLinks.first().click();
       await expect(page).toHaveURL(href!);
     }
   });
 
-  test('should navigate back to listing with browser back', async ({ page }) => {
-    await page.goto('/posters');
+  test("should navigate back to listing with browser back", async ({ page }) => {
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
@@ -1479,12 +1489,12 @@ test.describe('Product Detail - Navigation', () => {
     if (count > 0) {
       await productLinks.first().click();
       await page.goBack();
-      await expect(page).toHaveURL('/posters');
+      await expect(page).toHaveURL("/posters");
     }
   });
 
-  test('should navigate to home from breadcrumb', async ({ page }) => {
-    await page.goto('/posters');
+  test("should navigate to home from breadcrumb", async ({ page }) => {
+    await page.goto("/posters");
 
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
@@ -1493,7 +1503,7 @@ test.describe('Product Detail - Navigation', () => {
       await productLinks.first().click();
       const homeLink = page.locator('nav[aria-label="Breadcrumb"] a[href="/"]');
       await homeLink.click();
-      await expect(page).toHaveURL('/');
+      await expect(page).toHaveURL("/");
     }
   });
 });
@@ -1502,20 +1512,20 @@ test.describe('Product Detail - Navigation', () => {
 // Error Handling Tests
 // ============================================================================
 
-test.describe('Product Detail - Error Handling', () => {
-  test('should handle missing product gracefully', async ({ page }) => {
-    await page.goto('/posters/missing-product-12345');
+test.describe("Product Detail - Error Handling", () => {
+  test("should handle missing product gracefully", async ({ page }) => {
+    await page.goto("/posters/missing-product-12345");
 
     // Should show not found or error message
-    const notFound = page.locator('text=Product Not Found');
+    const notFound = page.locator("text=Product Not Found");
     await expect(notFound).toBeVisible();
   });
 
-  test('should handle invalid category gracefully', async ({ page }) => {
-    await page.goto('/posters/invalid-category-xyz/some-product');
+  test("should handle invalid category gracefully", async ({ page }) => {
+    await page.goto("/posters/invalid-category-xyz/some-product");
 
     // Page should still load
-    const pageContent = page.locator('body');
+    const pageContent = page.locator("body");
     await expect(pageContent).toBeVisible();
   });
 });

@@ -194,10 +194,7 @@ export async function sendOTP(phone: string): Promise<SendOTPResponse> {
  * @param sessionId - Session ID returned from sendOTP
  * @param otp - OTP entered by user
  */
-export async function verifyOTP(
-  sessionId: string,
-  otp: string
-): Promise<VerifyOTPResponse> {
+export async function verifyOTP(sessionId: string, otp: string): Promise<VerifyOTPResponse> {
   try {
     // Validate OTP format (6 digits)
     if (!/^\d{6}$/.test(otp)) {
@@ -212,10 +209,7 @@ export async function verifyOTP(
     // outside dev/test mode or this becomes a production auth bypass.
     if (sessionId.startsWith("dev_")) {
       if (!IS_DEV_SMS_MODE) {
-        logger.warn(
-          { sessionId },
-          "Rejected dev OTP session outside development/test mode"
-        );
+        logger.warn({ sessionId }, "Rejected dev OTP session outside development/test mode");
         return {
           success: false,
           error: "Invalid session",
@@ -314,11 +308,9 @@ export type TransactionalSMSType =
 // Transactional SMS template names registered with 2Factor.in (DLT compliant)
 // These need to be registered in your 2Factor.in dashboard
 const TRANSACTIONAL_TEMPLATES: Record<TransactionalSMSType, string> = {
-  order_confirmation:
-    process.env.TWO_FACTOR_ORDER_CONFIRMED_TEMPLATE || "MasonArtOrderConfirmed",
+  order_confirmation: process.env.TWO_FACTOR_ORDER_CONFIRMED_TEMPLATE || "MasonArtOrderConfirmed",
   shipped: process.env.TWO_FACTOR_SHIPPED_TEMPLATE || "MasonArtShipped",
-  out_for_delivery:
-    process.env.TWO_FACTOR_OUT_FOR_DELIVERY_TEMPLATE || "MasonArtOutForDelivery",
+  out_for_delivery: process.env.TWO_FACTOR_OUT_FOR_DELIVERY_TEMPLATE || "MasonArtOutForDelivery",
   delivered: process.env.TWO_FACTOR_DELIVERED_TEMPLATE || "MasonArtDelivered",
 };
 
@@ -400,8 +392,7 @@ export async function sendTransactionalSMS(
     logger.error({ err: error }, "Error sending transactional SMS");
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to send transactional SMS",
+      error: error instanceof Error ? error.message : "Failed to send transactional SMS",
     };
   }
 }

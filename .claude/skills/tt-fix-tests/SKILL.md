@@ -31,6 +31,7 @@ Orchestrates test execution in a continuous loop, creating bug tickets for failu
 2. **User explicitly interrupts**: User sends a message or cancels
 
 **DO NOT stop to:**
+
 - Ask "should I continue?" - YES, always continue
 - Ask "is this approach okay?" - Make the decision and proceed
 - Confirm before fixing each test - Just do it
@@ -39,6 +40,7 @@ Orchestrates test execution in a continuous loop, creating bug tickets for failu
 ### Handling Stuck Tests
 
 **After 5 failed attempts to fix a test:**
+
 1. Leave the bug ticket in `in-progress` status
 2. Add comment documenting all 5 attempts
 3. Track this test as "stuck" - allow it to fail in subsequent runs
@@ -85,14 +87,15 @@ $ARGUMENTS: [--max-iterations=30] [--max-tickets=20]
 
 The test runner uses `--max-failures=N` to stop early on the first **new** failure while allowing **stuck** tests to fail:
 
-| Stuck Tests | --max-failures | Behavior |
-|-------------|----------------|----------|
-| 0 | 1 | Stop on first failure |
-| 1 | 2 | Allow 1 stuck to fail, stop on next new failure |
-| 2 | 3 | Allow 2 stuck to fail, stop on next new failure |
-| N | N+1 | Allow N stuck to fail, stop on next new failure |
+| Stuck Tests | --max-failures | Behavior                                        |
+| ----------- | -------------- | ----------------------------------------------- |
+| 0           | 1              | Stop on first failure                           |
+| 1           | 2              | Allow 1 stuck to fail, stop on next new failure |
+| 2           | 3              | Allow 2 stuck to fail, stop on next new failure |
+| N           | N+1            | Allow N stuck to fail, stop on next new failure |
 
 This ensures we:
+
 1. Focus on one failure at a time (efficient)
 2. Don't re-fail already-stuck tests (wasteful)
 3. Continue discovering new failures after marking tests as stuck
@@ -108,7 +111,7 @@ session:
   max_tickets: 20
 
   # Dynamic --max-failures value (1 + stuck_count)
-  stuck_count: 0  # Incremented when a test is marked stuck
+  stuck_count: 0 # Incremented when a test is marked stuck
 
   # Tickets created this session
   tickets:
@@ -116,7 +119,7 @@ session:
       test_key: "approval.test.ts:should create approval"
       feature: photo-approval-workflow
       attempts: 3
-      status: done  # or in-progress
+      status: done # or in-progress
 
   # Tests we've given up on (5 failed attempts)
   stuck_tests:
@@ -154,10 +157,12 @@ MAX_FAILURES=$((1 + stuck_count))
 ```
 
 This command:
+
 - Stops on the **first new failure** (the +1)
 - Allows all **stuck tests** to fail without stopping (the stuck_count)
 
 **If exit code 0** → All tests pass → Check if we have stuck tests:
+
 - If no stuck tests: **Done! All tests passing!**
 - If stuck tests exist: **Done! All fixable tests passing!**
 
@@ -168,12 +173,14 @@ This command:
 Extract every failure from test output, not just the first one.
 
 **Playwright (E2E) failure pattern**:
+
 ```
 ✘  1 [chromium] › tests/e2e/approval.spec.ts:45:5 › Approval › should display photos (15s)
     Error: expect(received).toBeVisible()
 ```
 
 Extract:
+
 - `test_file`: `tests/e2e/approval.spec.ts`
 - `test_name`: `Approval › should display photos`
 - `line`: 45
@@ -181,12 +188,14 @@ Extract:
 - `test_key`: `approval.spec.ts:Approval › should display photos`
 
 **Vitest (unit) failure pattern**:
+
 ```
  FAIL  packages/api/tests/services/approval.test.ts > ApprovalService > create > should create
 AssertionError: expected { success: false } to equal { success: true }
 ```
 
 Extract:
+
 - `test_file`: `packages/api/tests/services/approval.test.ts`
 - `test_name`: `ApprovalService > create > should create`
 - `error`: `expected { success: false } to equal { success: true }`
@@ -202,6 +211,7 @@ for failure in all_failures:
 ```
 
 **If no new failures** (all failures are stuck tests):
+
 - Report completion with stuck test summary
 - **Done!**
 
@@ -223,6 +233,7 @@ if attempts[test_key] > 5:
 #### 5b. Find or Create Ticket
 
 Check if we already have a ticket for this test:
+
 ```python
 existing_ticket = find_ticket_by_test_key(test_key)
 if existing_ticket:
@@ -235,24 +246,24 @@ else:
 
 Map test file to feature using path patterns:
 
-| Test Path Contains | Feature |
-|--------------------|---------|
-| `approval` | `photo-approval-workflow` |
-| `tracking`, `notification` | `order-tracking-notifications` |
-| `cart`, `checkout`, `order` | `cart-checkout` |
-| `auth`, `login`, `signup` | `authentication` |
-| `product`, `catalog` | `product-catalog` |
-| `admin` | `admin-panel` |
-| `review`, `rating` | `user-reviews` |
-| `ai`, `generation` | `ai-generation` |
-| `wallet` | `wallet-system` |
-| `shipping`, `return` | `shipping-returns` |
+| Test Path Contains          | Feature                        |
+| --------------------------- | ------------------------------ |
+| `approval`                  | `photo-approval-workflow`      |
+| `tracking`, `notification`  | `order-tracking-notifications` |
+| `cart`, `checkout`, `order` | `cart-checkout`                |
+| `auth`, `login`, `signup`   | `authentication`               |
+| `product`, `catalog`        | `product-catalog`              |
+| `admin`                     | `admin-panel`                  |
+| `review`, `rating`          | `user-reviews`                 |
+| `ai`, `generation`          | `ai-generation`                |
+| `wallet`                    | `wallet-system`                |
+| `shipping`, `return`        | `shipping-returns`             |
 
 If no match, use the most recently active feature or ask user (only genuine blocker).
 
 #### 5d. Create Bug Ticket (if new)
 
-```
+````
 mcp__ticketrack__createTicket:
   feature: "{detected-feature}"
   title: "Bug: {test-name} failing"
@@ -277,9 +288,10 @@ mcp__ticketrack__createTicket:
     - [ ] Test passes
     - [ ] Root cause documented
     - [ ] No regressions
-```
+````
 
 **Layer detection**:
+
 - `tests/e2e/*` → `e2e`
 - `packages/api/tests/*` → `api`
 - `packages/web/tests/*` → `web`
@@ -291,6 +303,7 @@ mcp__ticketrack__createTicket:
 ```
 
 This will:
+
 1. Load ticket context
 2. Analyze the failing test
 3. Implement the fix
@@ -305,6 +318,7 @@ This will:
 After tt-work-ticket completes:
 
 **If ticket marked done**: Fix succeeded
+
 ```
 ✅ Ticket #{id} fixed
    Test: {test-name}
@@ -312,6 +326,7 @@ After tt-work-ticket completes:
 ```
 
 **If ticket still in-progress**: Fix failed, will retry
+
 ```
 ⚠️ Ticket #{id} fix attempt {n} failed
    Test: {test-name}
@@ -323,7 +338,8 @@ After tt-work-ticket completes:
 When a test has failed 5 times:
 
 1. **Add comment to ticket**:
-```
+
+````
 mcp__ticketrack__addComment:
   ticketId: {ticket-id}
   comment: |
@@ -346,9 +362,10 @@ mcp__ticketrack__addComment:
 
     **Recommendation**:
     {analysis of why fixes aren't working}
-```
+````
 
 2. **Increment stuck_count** - This is critical for the --max-failures strategy:
+
 ```python
 stuck_count += 1  # Next run will use --max-failures=(1 + stuck_count)
 ```
@@ -479,6 +496,7 @@ Running ./scripts/run-tests.sh e2e...
 ### Final Summary Variations
 
 **All tests fixed**:
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Session Complete
@@ -498,6 +516,7 @@ Running ./scripts/run-tests.sh e2e...
 ```
 
 **Max iterations reached**:
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚠️ Max Iterations Reached (30)
@@ -522,6 +541,7 @@ Recommendation:
 ```
 
 **Max tickets reached**:
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚠️ Too Many Failures
@@ -565,14 +585,14 @@ tt-fix-tests (orchestrator)
 
 ## Key Differences from Original Design
 
-| Aspect | Original | Revised |
-|--------|----------|---------|
-| Stop on failure | Run all tests | `--max-failures=1+stuck_count` |
-| User prompts | Asked for feature if unknown | Only if truly blocked |
-| Max attempts | 3 | 5 |
-| On stuck test | Skip and stop | Mark stuck, increment allowed failures |
-| Test run scope | Run all, parse all | Stop early, fix one at a time |
-| Allowed failures | None | Dynamic: 1 + stuck_count |
+| Aspect           | Original                     | Revised                                |
+| ---------------- | ---------------------------- | -------------------------------------- |
+| Stop on failure  | Run all tests                | `--max-failures=1+stuck_count`         |
+| User prompts     | Asked for feature if unknown | Only if truly blocked                  |
+| Max attempts     | 3                            | 5                                      |
+| On stuck test    | Skip and stop                | Mark stuck, increment allowed failures |
+| Test run scope   | Run all, parse all           | Stop early, fix one at a time          |
+| Allowed failures | None                         | Dynamic: 1 + stuck_count               |
 
 ## Notes
 

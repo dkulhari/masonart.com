@@ -21,8 +21,7 @@ const EXCHANGE_RATE_CACHE_TTL = 3600;
 const FALLBACK_EXCHANGE_RATE = 83.0;
 
 /** Exchange rate API URL (free tier) */
-const EXCHANGE_RATE_API_URL =
-  "https://api.exchangerate-api.com/v4/latest/USD";
+const EXCHANGE_RATE_API_URL = "https://api.exchangerate-api.com/v4/latest/USD";
 
 // ============================================================================
 // Types

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from "@playwright/test";
 
 /**
  * Payment Processing Flow E2E Tests
@@ -27,23 +27,26 @@ import { test, expect, type Page } from '@playwright/test';
 /**
  * Add a test item to cart via localStorage
  */
-async function addItemToCart(page: Page, itemOverrides?: Partial<{
-  id: string;
-  productTitle: string;
-  unitPrice: number;
-  framePrice: number;
-  quantity: number;
-}>) {
+async function addItemToCart(
+  page: Page,
+  itemOverrides?: Partial<{
+    id: string;
+    productTitle: string;
+    unitPrice: number;
+    framePrice: number;
+    quantity: number;
+  }>
+) {
   const item = {
-    id: itemOverrides?.id || 'test_item_1',
-    productId: 'prod_123',
-    variantId: 'var_123',
+    id: itemOverrides?.id || "test_item_1",
+    productId: "prod_123",
+    variantId: "var_123",
     frameId: null,
     quantity: itemOverrides?.quantity || 1,
-    productTitle: itemOverrides?.productTitle || 'Test Poster',
-    productSlug: 'abstract/test-poster',
-    thumbnailUrl: '',
-    sizeLabel: '24x32 inches',
+    productTitle: itemOverrides?.productTitle || "Test Poster",
+    productSlug: "abstract/test-poster",
+    thumbnailUrl: "",
+    sizeLabel: "24x32 inches",
     widthInches: 24,
     heightInches: 32,
     unitPrice: itemOverrides?.unitPrice || 2999,
@@ -53,10 +56,10 @@ async function addItemToCart(page: Page, itemOverrides?: Partial<{
   };
 
   await page.evaluate((cartItem) => {
-    const existing = localStorage.getItem('masonart-cart-storage');
+    const existing = localStorage.getItem("masonart-cart-storage");
     const data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
     data.state.items.push(cartItem);
-    localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
+    localStorage.setItem("masonart-cart-storage", JSON.stringify(data));
   }, item);
 }
 
@@ -64,42 +67,45 @@ async function addItemToCart(page: Page, itemOverrides?: Partial<{
  * Fill address form with valid data
  */
 async function fillValidAddressForm(page: Page) {
-  await page.fill('#fullName', 'John Doe');
-  await page.fill('#email', 'john.doe@example.com');
-  await page.fill('#phone', '9876543210');
-  await page.fill('#addressLine1', '123 Test Street, Building A');
-  await page.fill('#city', 'Mumbai');
-  await page.selectOption('#state', 'Maharashtra');
-  await page.fill('#postalCode', '400001');
+  await page.fill("#fullName", "John Doe");
+  await page.fill("#email", "john.doe@example.com");
+  await page.fill("#phone", "9876543210");
+  await page.fill("#addressLine1", "123 Test Street, Building A");
+  await page.fill("#city", "Mumbai");
+  await page.selectOption("#state", "Maharashtra");
+  await page.fill("#postalCode", "400001");
 }
 
 /**
  * Navigate through checkout to payment step
  */
 async function navigateToPaymentStep(page: Page) {
-  await page.goto('/checkout');
-  await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
-  await addItemToCart(page, { productTitle: 'Payment Test Poster', unitPrice: 2999 });
+  await page.goto("/checkout");
+  await page.evaluate(() => localStorage.removeItem("masonart-cart-storage"));
+  await addItemToCart(page, { productTitle: "Payment Test Poster", unitPrice: 2999 });
   await page.reload();
 
   // Fill shipping address
   await fillValidAddressForm(page);
-  await page.getByRole('button', { name: 'Continue to Delivery' }).click();
+  await page.getByRole("button", { name: "Continue to Delivery" }).click();
 
   // Select delivery and proceed to payment
-  await page.getByRole('button', { name: 'Continue to Payment' }).click();
+  await page.getByRole("button", { name: "Continue to Payment" }).click();
 }
 
 /**
  * Mock Razorpay script and API responses
  */
-async function setupRazorpayMocks(page: Page, options?: {
-  scriptLoadFail?: boolean;
-  orderCreateFail?: boolean;
-  paymentInitiateFail?: boolean;
-  paymentFail?: boolean;
-  verificationFail?: boolean;
-}) {
+async function setupRazorpayMocks(
+  page: Page,
+  options?: {
+    scriptLoadFail?: boolean;
+    orderCreateFail?: boolean;
+    paymentInitiateFail?: boolean;
+    paymentFail?: boolean;
+    verificationFail?: boolean;
+  }
+) {
   // Mock the Razorpay script loading
   await page.addInitScript((opts) => {
     if (opts.scriptLoadFail) {
@@ -118,24 +124,24 @@ async function setupRazorpayMocks(page: Page, options?: {
 
       open() {
         // Simulate payment modal opening
-        const event = new CustomEvent('razorpay-modal-opened');
+        const event = new CustomEvent("razorpay-modal-opened");
         window.dispatchEvent(event);
 
         // Simulate payment based on options
         setTimeout(() => {
           if (opts.paymentFail) {
             // Trigger payment failed event
-            if (this.handlers['payment.failed']) {
-              this.handlers['payment.failed']();
+            if (this.handlers["payment.failed"]) {
+              this.handlers["payment.failed"]();
             }
           } else {
             // Trigger success handler with mock response
             const handler = this.options.handler as (response: Record<string, string>) => void;
             if (handler) {
               handler({
-                razorpay_order_id: 'order_mock123',
-                razorpay_payment_id: 'pay_mock456',
-                razorpay_signature: 'mock_signature_789',
+                razorpay_order_id: "order_mock123",
+                razorpay_payment_id: "pay_mock456",
+                razorpay_signature: "mock_signature_789",
               });
             }
           }
@@ -143,7 +149,7 @@ async function setupRazorpayMocks(page: Page, options?: {
       }
 
       close() {
-        const event = new CustomEvent('razorpay-modal-closed');
+        const event = new CustomEvent("razorpay-modal-closed");
         window.dispatchEvent(event);
       }
 
@@ -158,16 +164,16 @@ async function setupRazorpayMocks(page: Page, options?: {
 
   // Mock API endpoints
   if (!options?.orderCreateFail) {
-    await page.route('**/api/orders', async (route) => {
-      if (route.request().method() === 'POST') {
+    await page.route("**/api/orders", async (route) => {
+      if (route.request().method() === "POST") {
         await route.fulfill({
           status: 200,
-          contentType: 'application/json',
+          contentType: "application/json",
           body: JSON.stringify({
             success: true,
             order: {
-              id: 'order_123',
-              orderNumber: 'ORD-12345678',
+              id: "order_123",
+              orderNumber: "ORD-12345678",
             },
           }),
         });
@@ -176,14 +182,14 @@ async function setupRazorpayMocks(page: Page, options?: {
       }
     });
   } else {
-    await page.route('**/api/orders', async (route) => {
-      if (route.request().method() === 'POST') {
+    await page.route("**/api/orders", async (route) => {
+      if (route.request().method() === "POST") {
         await route.fulfill({
           status: 500,
-          contentType: 'application/json',
+          contentType: "application/json",
           body: JSON.stringify({
             success: false,
-            error: 'Failed to create order',
+            error: "Failed to create order",
           }),
         });
       } else {
@@ -193,86 +199,86 @@ async function setupRazorpayMocks(page: Page, options?: {
   }
 
   if (!options?.paymentInitiateFail) {
-    await page.route('**/api/orders/*/payment/initiate', async (route) => {
+    await page.route("**/api/orders/*/payment/initiate", async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           success: true,
-          razorpayKeyId: 'rzp_test_123',
-          razorpayOrderId: 'order_mock123',
+          razorpayKeyId: "rzp_test_123",
+          razorpayOrderId: "order_mock123",
           amount: 299900,
-          currency: 'INR',
-          orderNumber: 'ORD-12345678',
+          currency: "INR",
+          orderNumber: "ORD-12345678",
           prefill: {
-            name: 'John Doe',
-            email: 'john.doe@example.com',
+            name: "John Doe",
+            email: "john.doe@example.com",
           },
         }),
       });
     });
   } else {
-    await page.route('**/api/orders/*/payment/initiate', async (route) => {
+    await page.route("**/api/orders/*/payment/initiate", async (route) => {
       await route.fulfill({
         status: 500,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           success: false,
-          error: 'Failed to initiate payment',
+          error: "Failed to initiate payment",
         }),
       });
     });
   }
 
   if (!options?.verificationFail) {
-    await page.route('**/api/orders/*/payment/verify', async (route) => {
+    await page.route("**/api/orders/*/payment/verify", async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           success: true,
           order: {
-            id: 'order_123',
-            orderNumber: 'ORD-12345678',
+            id: "order_123",
+            orderNumber: "ORD-12345678",
           },
         }),
       });
     });
   } else {
-    await page.route('**/api/orders/*/payment/verify', async (route) => {
+    await page.route("**/api/orders/*/payment/verify", async (route) => {
       await route.fulfill({
         status: 400,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           success: false,
-          error: 'Payment verification failed',
+          error: "Payment verification failed",
         }),
       });
     });
   }
 
   // Mock shipping estimate API - required for delivery step
-  await page.route('**/api/shipping/estimate*', async (route) => {
+  await page.route("**/api/shipping/estimate*", async (route) => {
     await route.fulfill({
       status: 200,
-      contentType: 'application/json',
+      contentType: "application/json",
       body: JSON.stringify({
         options: [
           {
-            id: 'standard',
-            name: 'Standard Delivery',
-            carrier: 'India Post',
-            baseCost: '₹99',
+            id: "standard",
+            name: "Standard Delivery",
+            carrier: "India Post",
+            baseCost: "₹99",
             finalCost: 0,
             estimatedDaysMin: 5,
             estimatedDaysMax: 7,
             isFree: true,
           },
           {
-            id: 'express',
-            name: 'Express Delivery',
-            carrier: 'BlueDart',
-            baseCost: '₹199',
+            id: "express",
+            name: "Express Delivery",
+            carrier: "BlueDart",
+            baseCost: "₹199",
             finalCost: 199,
             estimatedDaysMin: 2,
             estimatedDaysMax: 3,
@@ -291,46 +297,46 @@ async function setupRazorpayMocks(page: Page, options?: {
 // Payment Button Tests
 // ============================================================================
 
-test.describe('Payment Processing - Payment Button', () => {
+test.describe("Payment Processing - Payment Button", () => {
   test.beforeEach(async ({ page }) => {
     await setupRazorpayMocks(page);
     await navigateToPaymentStep(page);
   });
 
-  test('should display payment button', async ({ page }) => {
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+  test("should display payment button", async ({ page }) => {
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
   });
 
-  test('should display payment amount on button', async ({ page }) => {
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+  test("should display payment amount on button", async ({ page }) => {
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     // Button should show formatted price
     const buttonText = await payButton.textContent();
     expect(buttonText).toMatch(/Pay.*₹/);
   });
 
-  test('should have credit card icon on payment button', async ({ page }) => {
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
-    const icon = payButton.locator('svg');
+  test("should have credit card icon on payment button", async ({ page }) => {
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
+    const icon = payButton.locator("svg");
     await expect(icon).toBeVisible();
   });
 
-  test('should display security notice', async ({ page }) => {
-    const securityNotice = page.locator('text=Secured by Razorpay');
+  test("should display security notice", async ({ page }) => {
+    const securityNotice = page.locator("text=Secured by Razorpay");
     await expect(securityNotice).toBeVisible();
   });
 
-  test('should display encryption message', async ({ page }) => {
+  test("should display encryption message", async ({ page }) => {
     // "encrypted" appears multiple times on the page
-    const encryptionMessage = page.locator('text=encrypted').first();
+    const encryptionMessage = page.locator("text=encrypted").first();
     await expect(encryptionMessage).toBeVisible();
   });
 
-  test('should display accepted payment methods', async ({ page }) => {
-    await expect(page.locator('text=UPI')).toBeVisible();
-    await expect(page.locator('text=Cards')).toBeVisible();
-    await expect(page.locator('text=Net Banking')).toBeVisible();
-    await expect(page.locator('text=Wallets')).toBeVisible();
+  test("should display accepted payment methods", async ({ page }) => {
+    await expect(page.locator("text=UPI")).toBeVisible();
+    await expect(page.locator("text=Cards")).toBeVisible();
+    await expect(page.locator("text=Net Banking")).toBeVisible();
+    await expect(page.locator("text=Wallets")).toBeVisible();
   });
 });
 
@@ -340,36 +346,36 @@ test.describe('Payment Processing - Payment Button', () => {
 // Skipped: Payment initiation mocks return Unauthorized from real API
 // These tests require real authentication or server-side mock support
 
-test.describe.skip('Payment Processing - Payment Initiation', () => {
+test.describe.skip("Payment Processing - Payment Initiation", () => {
   test.beforeEach(async ({ page }) => {
     await setupRazorpayMocks(page);
   });
 
-  test('should show loading state when clicked', async ({ page }) => {
+  test("should show loading state when clicked", async ({ page }) => {
     await navigateToPaymentStep(page);
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Should show loading text
-    await expect(page.getByText('Creating Order', { exact: true })).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText("Creating Order", { exact: true })).toBeVisible({ timeout: 2000 });
   });
 
-  test('should disable button during payment processing', async ({ page }) => {
+  test("should disable button during payment processing", async ({ page }) => {
     await navigateToPaymentStep(page);
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Button should be disabled during processing
     await expect(payButton).toBeDisabled({ timeout: 2000 });
   });
 
-  test('should show spinner during payment processing', async ({ page }) => {
+  test("should show spinner during payment processing", async ({ page }) => {
     await navigateToPaymentStep(page);
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Should show spinner/loading indicator
-    const spinner = page.locator('button .animate-spin');
+    const spinner = page.locator("button .animate-spin");
     await expect(spinner).toBeVisible({ timeout: 2000 });
   });
 });
@@ -380,46 +386,52 @@ test.describe.skip('Payment Processing - Payment Initiation', () => {
 // Skipped: Payment success mocks return Unauthorized from real API
 // These tests require real authentication or server-side mock support
 
-test.describe.skip('Payment Processing - Success Flow', () => {
-  test('should complete payment and show success state', async ({ page }) => {
+test.describe.skip("Payment Processing - Success Flow", () => {
+  test("should complete payment and show success state", async ({ page }) => {
     await setupRazorpayMocks(page);
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Wait for success state
-    await expect(page.getByText('Payment Successful', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Payment Successful", { exact: true })).toBeVisible({
+      timeout: 5000,
+    });
   });
 
-  test('should show success icon after payment', async ({ page }) => {
+  test("should show success icon after payment", async ({ page }) => {
     await setupRazorpayMocks(page);
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Wait for success state
-    await expect(page.getByText('Payment Successful', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Payment Successful", { exact: true })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Button should have success styling (green)
-    const successButton = page.locator('button.bg-green-500');
+    const successButton = page.locator("button.bg-green-500");
     await expect(successButton).toBeVisible();
   });
 
-  test('should clear cart after successful payment', async ({ page }) => {
+  test("should clear cart after successful payment", async ({ page }) => {
     await setupRazorpayMocks(page);
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Wait for success state
-    await expect(page.getByText('Payment Successful', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Payment Successful", { exact: true })).toBeVisible({
+      timeout: 5000,
+    });
 
     // Check cart is cleared in localStorage
     const cartData = await page.evaluate(() => {
-      const cart = localStorage.getItem('masonart-cart-storage');
+      const cart = localStorage.getItem("masonart-cart-storage");
       return cart ? JSON.parse(cart) : null;
     });
 
@@ -434,82 +446,82 @@ test.describe.skip('Payment Processing - Success Flow', () => {
 // Skipped: Payment failure mocks return Unauthorized from real API
 // These tests require real authentication or server-side mock support
 
-test.describe.skip('Payment Processing - Failure Handling', () => {
-  test('should display error message on order creation failure', async ({ page }) => {
+test.describe.skip("Payment Processing - Failure Handling", () => {
+  test("should display error message on order creation failure", async ({ page }) => {
     await setupRazorpayMocks(page, { orderCreateFail: true });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Should show error message
-    await expect(page.locator('.bg-red-50')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".bg-red-50")).toBeVisible({ timeout: 5000 });
   });
 
-  test('should display error message on payment initiation failure', async ({ page }) => {
+  test("should display error message on payment initiation failure", async ({ page }) => {
     await setupRazorpayMocks(page, { paymentInitiateFail: true });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Should show error message
-    await expect(page.locator('.bg-red-50')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".bg-red-50")).toBeVisible({ timeout: 5000 });
   });
 
-  test('should display error message on payment failure', async ({ page }) => {
+  test("should display error message on payment failure", async ({ page }) => {
     await setupRazorpayMocks(page, { paymentFail: true });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Should show error state
-    await expect(page.getByText('Payment failed', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Payment failed", { exact: true })).toBeVisible({ timeout: 5000 });
   });
 
-  test('should display error message on verification failure', async ({ page }) => {
+  test("should display error message on verification failure", async ({ page }) => {
     await setupRazorpayMocks(page, { verificationFail: true });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Should show verification error
-    await expect(page.locator('.bg-red-50')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".bg-red-50")).toBeVisible({ timeout: 5000 });
   });
 
-  test('should show Try Again button after failure', async ({ page }) => {
+  test("should show Try Again button after failure", async ({ page }) => {
     await setupRazorpayMocks(page, { paymentFail: true });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Should show Try Again text
-    await expect(page.getByRole('button', { name: 'Try Again' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("button", { name: "Try Again" })).toBeVisible({ timeout: 5000 });
   });
 
-  test('should allow retry after payment failure', async ({ page }) => {
+  test("should allow retry after payment failure", async ({ page }) => {
     // First attempt fails
     await setupRazorpayMocks(page, { paymentFail: true });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Wait for failure
-    await expect(page.getByRole('button', { name: 'Try Again' })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("button", { name: "Try Again" })).toBeVisible({ timeout: 5000 });
 
     // Setup successful mock for retry
     await setupRazorpayMocks(page, {});
 
     // Click retry
-    const retryButton = page.getByRole('button', { name: 'Try Again' });
+    const retryButton = page.getByRole("button", { name: "Try Again" });
     await retryButton.click();
 
     // Should start processing again
-    await expect(page.getByText('Creating Order', { exact: true })).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText("Creating Order", { exact: true })).toBeVisible({ timeout: 2000 });
   });
 });
 
@@ -519,8 +531,8 @@ test.describe.skip('Payment Processing - Failure Handling', () => {
 // Skipped: Payment cancellation mocks return Unauthorized from real API
 // These tests require real authentication or server-side mock support
 
-test.describe.skip('Payment Processing - Cancellation', () => {
-  test('should handle payment modal dismiss', async ({ page }) => {
+test.describe.skip("Payment Processing - Cancellation", () => {
+  test("should handle payment modal dismiss", async ({ page }) => {
     // Setup mock that simulates modal dismiss
     await page.addInitScript(() => {
       class MockRazorpay {
@@ -550,14 +562,14 @@ test.describe.skip('Payment Processing - Cancellation', () => {
     });
 
     // Mock API endpoints
-    await page.route('**/api/orders', async (route) => {
-      if (route.request().method() === 'POST') {
+    await page.route("**/api/orders", async (route) => {
+      if (route.request().method() === "POST") {
         await route.fulfill({
           status: 200,
-          contentType: 'application/json',
+          contentType: "application/json",
           body: JSON.stringify({
             success: true,
-            order: { id: 'order_123', orderNumber: 'ORD-12345678' },
+            order: { id: "order_123", orderNumber: "ORD-12345678" },
           }),
         });
       } else {
@@ -565,32 +577,34 @@ test.describe.skip('Payment Processing - Cancellation', () => {
       }
     });
 
-    await page.route('**/api/orders/*/payment/initiate', async (route) => {
+    await page.route("**/api/orders/*/payment/initiate", async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           success: true,
-          razorpayKeyId: 'rzp_test_123',
-          razorpayOrderId: 'order_mock123',
+          razorpayKeyId: "rzp_test_123",
+          razorpayOrderId: "order_mock123",
           amount: 299900,
-          currency: 'INR',
-          orderNumber: 'ORD-12345678',
-          prefill: { name: 'John Doe', email: 'john.doe@example.com' },
+          currency: "INR",
+          orderNumber: "ORD-12345678",
+          prefill: { name: "John Doe", email: "john.doe@example.com" },
         }),
       });
     });
 
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Should show cancellation message
-    await expect(page.getByText('Payment was cancelled', { exact: true })).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText("Payment was cancelled", { exact: true })).toBeVisible({
+      timeout: 3000,
+    });
   });
 
-  test('should return to idle state after cancellation', async ({ page }) => {
+  test("should return to idle state after cancellation", async ({ page }) => {
     await page.addInitScript(() => {
       class MockRazorpay {
         options: Record<string, unknown>;
@@ -617,14 +631,14 @@ test.describe.skip('Payment Processing - Cancellation', () => {
       (window as unknown as Record<string, unknown>).Razorpay = MockRazorpay;
     });
 
-    await page.route('**/api/orders', async (route) => {
-      if (route.request().method() === 'POST') {
+    await page.route("**/api/orders", async (route) => {
+      if (route.request().method() === "POST") {
         await route.fulfill({
           status: 200,
-          contentType: 'application/json',
+          contentType: "application/json",
           body: JSON.stringify({
             success: true,
-            order: { id: 'order_123', orderNumber: 'ORD-12345678' },
+            order: { id: "order_123", orderNumber: "ORD-12345678" },
           }),
         });
       } else {
@@ -632,32 +646,34 @@ test.describe.skip('Payment Processing - Cancellation', () => {
       }
     });
 
-    await page.route('**/api/orders/*/payment/initiate', async (route) => {
+    await page.route("**/api/orders/*/payment/initiate", async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           success: true,
-          razorpayKeyId: 'rzp_test_123',
-          razorpayOrderId: 'order_mock123',
+          razorpayKeyId: "rzp_test_123",
+          razorpayOrderId: "order_mock123",
           amount: 299900,
-          currency: 'INR',
-          orderNumber: 'ORD-12345678',
-          prefill: { name: 'John Doe', email: 'john.doe@example.com' },
+          currency: "INR",
+          orderNumber: "ORD-12345678",
+          prefill: { name: "John Doe", email: "john.doe@example.com" },
         }),
       });
     });
 
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Wait for cancellation
-    await expect(page.getByText('Payment was cancelled', { exact: true })).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText("Payment was cancelled", { exact: true })).toBeVisible({
+      timeout: 3000,
+    });
 
     // Button should be back to normal state (not disabled)
-    await expect(page.getByRole('button', { name: /^Pay ₹/ })).not.toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Pay ₹/ })).not.toBeDisabled();
   });
 });
 
@@ -665,34 +681,34 @@ test.describe.skip('Payment Processing - Cancellation', () => {
 // Order Summary in Payment Step Tests
 // ============================================================================
 
-test.describe('Payment Processing - Order Summary', () => {
+test.describe("Payment Processing - Order Summary", () => {
   test.beforeEach(async ({ page }) => {
     await setupRazorpayMocks(page);
     await navigateToPaymentStep(page);
   });
 
-  test('should display order summary in payment step', async ({ page }) => {
+  test("should display order summary in payment step", async ({ page }) => {
     const summaryTitle = page.locator('h3:has-text("Order Summary")');
     await expect(summaryTitle).toBeVisible();
   });
 
-  test('should display shipping address in order summary', async ({ page }) => {
-    const shippingTo = page.locator('text=Shipping to:');
+  test("should display shipping address in order summary", async ({ page }) => {
+    const shippingTo = page.locator("text=Shipping to:");
     await expect(shippingTo).toBeVisible();
   });
 
-  test('should display delivery method in order summary', async ({ page }) => {
-    const delivery = page.locator('text=Delivery:');
+  test("should display delivery method in order summary", async ({ page }) => {
+    const delivery = page.locator("text=Delivery:");
     await expect(delivery).toBeVisible();
   });
 
-  test('should display total amount', async ({ page }) => {
-    const totalLabel = page.getByText('Total Amount', { exact: true });
+  test("should display total amount", async ({ page }) => {
+    const totalLabel = page.getByText("Total Amount", { exact: true });
     await expect(totalLabel).toBeVisible();
   });
 
-  test('should display price in INR format', async ({ page }) => {
-    const price = page.locator('text=/₹[\\d,]+/');
+  test("should display price in INR format", async ({ page }) => {
+    const price = page.locator("text=/₹[\\d,]+/");
     await expect(price.first()).toBeVisible();
   });
 });
@@ -701,19 +717,19 @@ test.describe('Payment Processing - Order Summary', () => {
 // Payment Step Navigation Tests
 // ============================================================================
 
-test.describe('Payment Processing - Navigation', () => {
+test.describe("Payment Processing - Navigation", () => {
   test.beforeEach(async ({ page }) => {
     await setupRazorpayMocks(page);
     await navigateToPaymentStep(page);
   });
 
-  test('should display back button', async ({ page }) => {
-    const backButton = page.getByRole('button', { name: 'Back' });
+  test("should display back button", async ({ page }) => {
+    const backButton = page.getByRole("button", { name: "Back" });
     await expect(backButton).toBeVisible();
   });
 
-  test('should navigate back to delivery step', async ({ page }) => {
-    const backButton = page.getByRole('button', { name: 'Back' });
+  test("should navigate back to delivery step", async ({ page }) => {
+    const backButton = page.getByRole("button", { name: "Back" });
     await backButton.click();
 
     // Should show delivery options
@@ -721,15 +737,15 @@ test.describe('Payment Processing - Navigation', () => {
     await expect(deliveryTitle).toBeVisible();
   });
 
-  test('should show payment step as active in progress indicator', async ({ page }) => {
+  test("should show payment step as active in progress indicator", async ({ page }) => {
     // Payment step should be highlighted
-    const paymentStep = page.getByText('Payment', { exact: true }).first();
+    const paymentStep = page.getByText("Payment", { exact: true }).first();
     await expect(paymentStep).toBeVisible();
   });
 
-  test('should show completed checkmarks for shipping and delivery steps', async ({ page }) => {
+  test("should show completed checkmarks for shipping and delivery steps", async ({ page }) => {
     // Both shipping and delivery should have checkmarks
-    const checkIcons = page.locator('.bg-green-500 svg');
+    const checkIcons = page.locator(".bg-green-500 svg");
     const count = await checkIcons.count();
     expect(count).toBeGreaterThanOrEqual(2);
   });
@@ -739,8 +755,8 @@ test.describe('Payment Processing - Navigation', () => {
 // Razorpay Script Loading Tests
 // ============================================================================
 
-test.describe('Payment Processing - Script Loading', () => {
-  test('should handle Razorpay script load failure gracefully', async ({ page }) => {
+test.describe("Payment Processing - Script Loading", () => {
+  test("should handle Razorpay script load failure gracefully", async ({ page }) => {
     // Don't load Razorpay script
     await page.addInitScript(() => {
       // Razorpay is not defined
@@ -748,14 +764,14 @@ test.describe('Payment Processing - Script Loading', () => {
     });
 
     // Mock API endpoints
-    await page.route('**/api/orders', async (route) => {
-      if (route.request().method() === 'POST') {
+    await page.route("**/api/orders", async (route) => {
+      if (route.request().method() === "POST") {
         await route.fulfill({
           status: 200,
-          contentType: 'application/json',
+          contentType: "application/json",
           body: JSON.stringify({
             success: true,
-            order: { id: 'order_123', orderNumber: 'ORD-12345678' },
+            order: { id: "order_123", orderNumber: "ORD-12345678" },
           }),
         });
       } else {
@@ -764,17 +780,17 @@ test.describe('Payment Processing - Script Loading', () => {
     });
 
     // Mock shipping estimate API
-    await page.route('**/api/shipping/estimate*', async (route) => {
+    await page.route("**/api/shipping/estimate*", async (route) => {
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: JSON.stringify({
           options: [
             {
-              id: 'standard',
-              name: 'Standard Delivery',
-              carrier: 'India Post',
-              baseCost: '₹99',
+              id: "standard",
+              name: "Standard Delivery",
+              carrier: "India Post",
+              baseCost: "₹99",
               finalCost: 0,
               estimatedDaysMin: 5,
               estimatedDaysMax: 7,
@@ -791,7 +807,7 @@ test.describe('Payment Processing - Script Loading', () => {
     await navigateToPaymentStep(page);
 
     // Payment button should still be visible
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
 
     // But should be disabled if script failed to load
@@ -803,49 +819,49 @@ test.describe('Payment Processing - Script Loading', () => {
 // Multiple Items Payment Tests
 // ============================================================================
 
-test.describe('Payment Processing - Multiple Items', () => {
-  test('should handle payment for multiple cart items', async ({ page }) => {
+test.describe("Payment Processing - Multiple Items", () => {
+  test("should handle payment for multiple cart items", async ({ page }) => {
     await setupRazorpayMocks(page);
 
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.goto("/checkout");
+    await page.evaluate(() => localStorage.removeItem("masonart-cart-storage"));
 
     // Add multiple items
-    await addItemToCart(page, { id: 'item_1', productTitle: 'Poster One', unitPrice: 1500 });
-    await addItemToCart(page, { id: 'item_2', productTitle: 'Poster Two', unitPrice: 2000 });
-    await addItemToCart(page, { id: 'item_3', productTitle: 'Poster Three', unitPrice: 2500 });
+    await addItemToCart(page, { id: "item_1", productTitle: "Poster One", unitPrice: 1500 });
+    await addItemToCart(page, { id: "item_2", productTitle: "Poster Two", unitPrice: 2000 });
+    await addItemToCart(page, { id: "item_3", productTitle: "Poster Three", unitPrice: 2500 });
 
     await page.reload();
 
     // Navigate to payment
     await fillValidAddressForm(page);
-    await page.getByRole('button', { name: 'Continue to Delivery' }).click();
-    await page.getByRole('button', { name: 'Continue to Payment' }).click();
+    await page.getByRole("button", { name: "Continue to Delivery" }).click();
+    await page.getByRole("button", { name: "Continue to Payment" }).click();
 
     // Payment button should be visible
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
   });
 
-  test('should display correct total for multiple items', async ({ page }) => {
+  test("should display correct total for multiple items", async ({ page }) => {
     await setupRazorpayMocks(page);
 
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.goto("/checkout");
+    await page.evaluate(() => localStorage.removeItem("masonart-cart-storage"));
 
     // Add multiple items
-    await addItemToCart(page, { id: 'item_1', productTitle: 'Poster One', unitPrice: 1500 });
-    await addItemToCart(page, { id: 'item_2', productTitle: 'Poster Two', unitPrice: 2000 });
+    await addItemToCart(page, { id: "item_1", productTitle: "Poster One", unitPrice: 1500 });
+    await addItemToCart(page, { id: "item_2", productTitle: "Poster Two", unitPrice: 2000 });
 
     await page.reload();
 
     // Navigate to payment
     await fillValidAddressForm(page);
-    await page.getByRole('button', { name: 'Continue to Delivery' }).click();
-    await page.getByRole('button', { name: 'Continue to Payment' }).click();
+    await page.getByRole("button", { name: "Continue to Delivery" }).click();
+    await page.getByRole("button", { name: "Continue to Payment" }).click();
 
     // Should display total that includes both items
-    const totalSection = page.getByText('Total', { exact: true });
+    const totalSection = page.getByText("Total", { exact: true });
     await expect(totalSection).toBeVisible();
   });
 });
@@ -854,40 +870,40 @@ test.describe('Payment Processing - Multiple Items', () => {
 // Responsive Design Tests
 // ============================================================================
 
-test.describe('Payment Processing - Responsive Design', () => {
+test.describe("Payment Processing - Responsive Design", () => {
   test.beforeEach(async ({ page }) => {
     await setupRazorpayMocks(page);
   });
 
-  test('should display payment button on mobile', async ({ page }) => {
+  test("should display payment button on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
   });
 
-  test('should display payment methods on mobile', async ({ page }) => {
+  test("should display payment methods on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await navigateToPaymentStep(page);
 
     // Payment methods should be visible
-    await expect(page.locator('text=UPI')).toBeVisible();
+    await expect(page.locator("text=UPI")).toBeVisible();
   });
 
-  test('should display payment button on tablet', async ({ page }) => {
+  test("should display payment button on tablet", async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
   });
 
-  test('should display payment button on desktop', async ({ page }) => {
+  test("should display payment button on desktop", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
   });
 });
@@ -896,14 +912,14 @@ test.describe('Payment Processing - Responsive Design', () => {
 // Accessibility Tests
 // ============================================================================
 
-test.describe('Payment Processing - Accessibility', () => {
+test.describe("Payment Processing - Accessibility", () => {
   test.beforeEach(async ({ page }) => {
     await setupRazorpayMocks(page);
     await navigateToPaymentStep(page);
   });
 
-  test('should have accessible payment button', async ({ page }) => {
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+  test("should have accessible payment button", async ({ page }) => {
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
 
     // Button should be focusable
@@ -911,25 +927,25 @@ test.describe('Payment Processing - Accessibility', () => {
     await expect(payButton).toBeFocused();
   });
 
-  test('should have accessible error messages', async ({ page }) => {
+  test("should have accessible error messages", async ({ page }) => {
     await setupRazorpayMocks(page, { paymentFail: true });
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Error message should be visible
-    await expect(page.locator('.bg-red-50')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".bg-red-50")).toBeVisible({ timeout: 5000 });
   });
 
-  test('should be keyboard navigable', async ({ page }) => {
-    await page.keyboard.press('Tab');
+  test("should be keyboard navigable", async ({ page }) => {
+    await page.keyboard.press("Tab");
 
-    const focusedElement = page.locator(':focus');
+    const focusedElement = page.locator(":focus");
     await expect(focusedElement.first()).toBeTruthy();
   });
 
-  test('should have proper focus styles on payment button', async ({ page }) => {
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+  test("should have proper focus styles on payment button", async ({ page }) => {
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.focus();
 
     // Button should show focus indication
@@ -941,28 +957,28 @@ test.describe('Payment Processing - Accessibility', () => {
 // Performance Tests
 // ============================================================================
 
-test.describe('Payment Processing - Performance', () => {
-  test('should load payment step within acceptable time', async ({ page }) => {
+test.describe("Payment Processing - Performance", () => {
+  test("should load payment step within acceptable time", async ({ page }) => {
     await setupRazorpayMocks(page);
 
     const startTime = Date.now();
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
 
     const loadTime = Date.now() - startTime;
     expect(loadTime).toBeLessThan(10000); // 10 seconds max
   });
 
-  test('should not have JavaScript errors during payment flow', async ({ page }) => {
+  test("should not have JavaScript errors during payment flow", async ({ page }) => {
     const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
+    page.on("pageerror", (error) => errors.push(error.message));
 
     await setupRazorpayMocks(page);
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Wait for payment processing
@@ -970,7 +986,7 @@ test.describe('Payment Processing - Performance', () => {
 
     // Filter out expected errors
     const criticalErrors = errors.filter(
-      (e) => !e.includes('Failed to fetch') && !e.includes('NetworkError')
+      (e) => !e.includes("Failed to fetch") && !e.includes("NetworkError")
     );
 
     expect(criticalErrors.length).toBe(0);
@@ -983,19 +999,19 @@ test.describe('Payment Processing - Performance', () => {
 // Skipped: Error recovery mocks return Unauthorized from real API
 // These tests require real authentication or server-side mock support
 
-test.describe.skip('Payment Processing - Error Recovery', () => {
-  test('should allow user to navigate back after error', async ({ page }) => {
+test.describe.skip("Payment Processing - Error Recovery", () => {
+  test("should allow user to navigate back after error", async ({ page }) => {
     await setupRazorpayMocks(page, { paymentFail: true });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Wait for error
-    await expect(page.locator('.bg-red-50')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".bg-red-50")).toBeVisible({ timeout: 5000 });
 
     // Should be able to go back
-    const backButton = page.getByRole('button', { name: 'Back' });
+    const backButton = page.getByRole("button", { name: "Back" });
     await backButton.click();
 
     // Should show delivery step
@@ -1003,24 +1019,24 @@ test.describe.skip('Payment Processing - Error Recovery', () => {
     await expect(deliveryTitle).toBeVisible();
   });
 
-  test('should preserve form data after payment error', async ({ page }) => {
+  test("should preserve form data after payment error", async ({ page }) => {
     await setupRazorpayMocks(page, { paymentFail: true });
     await navigateToPaymentStep(page);
 
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await payButton.click();
 
     // Wait for error
-    await expect(page.locator('.bg-red-50')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(".bg-red-50")).toBeVisible({ timeout: 5000 });
 
     // Go back to shipping
-    const backButton = page.getByRole('button', { name: 'Back' });
+    const backButton = page.getByRole("button", { name: "Back" });
     await backButton.click();
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole("button", { name: "Edit" }).click();
 
     // Check if form data is preserved
-    const fullNameInput = page.locator('#fullName');
-    await expect(fullNameInput).toHaveValue('John Doe');
+    const fullNameInput = page.locator("#fullName");
+    await expect(fullNameInput).toHaveValue("John Doe");
   });
 });
 
@@ -1028,29 +1044,29 @@ test.describe.skip('Payment Processing - Error Recovery', () => {
 // High Value Order Tests
 // ============================================================================
 
-test.describe('Payment Processing - High Value Orders', () => {
-  test('should handle high value orders correctly', async ({ page }) => {
+test.describe("Payment Processing - High Value Orders", () => {
+  test("should handle high value orders correctly", async ({ page }) => {
     await setupRazorpayMocks(page);
 
-    await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.goto("/checkout");
+    await page.evaluate(() => localStorage.removeItem("masonart-cart-storage"));
 
     // Add high value item
     await addItemToCart(page, {
-      id: 'luxury_item',
-      productTitle: 'Premium Art Collection',
-      unitPrice: 50000 // ₹500
+      id: "luxury_item",
+      productTitle: "Premium Art Collection",
+      unitPrice: 50000, // ₹500
     });
 
     await page.reload();
 
     // Navigate to payment
     await fillValidAddressForm(page);
-    await page.getByRole('button', { name: 'Continue to Delivery' }).click();
-    await page.getByRole('button', { name: 'Continue to Payment' }).click();
+    await page.getByRole("button", { name: "Continue to Delivery" }).click();
+    await page.getByRole("button", { name: "Continue to Payment" }).click();
 
     // Payment button should be visible with correct amount
-    const payButton = page.getByRole('button', { name: /^Pay ₹/ });
+    const payButton = page.getByRole("button", { name: /^Pay ₹/ });
     await expect(payButton).toBeVisible();
   });
 });

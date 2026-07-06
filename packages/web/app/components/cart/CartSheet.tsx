@@ -7,16 +7,11 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useCallback, useRef } from 'react'
-import { X, ShoppingCart, ArrowRight, ShoppingBag } from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
-import {
-  useCartItems,
-  useCartSubtotal,
-  useCartItemCount,
-  useCartActions,
-} from '~/stores/cart'
-import { CartItem } from './CartItem'
+import { useEffect, useCallback, useRef } from "react";
+import { X, ShoppingCart, ArrowRight, ShoppingBag } from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import { useCartItems, useCartSubtotal, useCartItemCount, useCartActions } from "~/stores/cart";
+import { CartItem } from "./CartItem";
 
 // ============================================================================
 // Types
@@ -24,11 +19,11 @@ import { CartItem } from './CartItem'
 
 export interface CartSheetProps {
   /** Whether the sheet is open */
-  isOpen: boolean
+  isOpen: boolean;
   /** Callback to close the sheet */
-  onClose: () => void
+  onClose: () => void;
   /** Optional className for the sheet panel */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -51,56 +46,56 @@ export interface CartSheetProps {
  * />
  */
 export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
-  const items = useCartItems()
-  const subtotal = useCartSubtotal()
-  const itemCount = useCartItemCount()
-  const { updateQuantity, removeItem } = useCartActions()
+  const items = useCartItems();
+  const subtotal = useCartSubtotal();
+  const itemCount = useCartItemCount();
+  const { updateQuantity, removeItem } = useCartActions();
 
-  const sheetRef = useRef<HTMLDivElement>(null)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Handle escape key
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
+      if (e.key === "Escape") {
+        onClose();
       }
     },
     [onClose]
-  )
+  );
 
   // Handle click outside
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) {
-        onClose()
+        onClose();
       }
     },
     [onClose]
-  )
+  );
 
   // Focus management and scroll lock
   useEffect(() => {
     if (isOpen) {
       // Focus the close button when opening
-      closeButtonRef.current?.focus()
+      closeButtonRef.current?.focus();
 
       // Lock scroll
-      const originalOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
 
       // Add escape key listener
-      document.addEventListener('keydown', handleKeyDown)
+      document.addEventListener("keydown", handleKeyDown);
 
       return () => {
-        document.body.style.overflow = originalOverflow
-        document.removeEventListener('keydown', handleKeyDown)
-      }
+        document.body.style.overflow = originalOverflow;
+        document.removeEventListener("keydown", handleKeyDown);
+      };
     }
-  }, [isOpen, handleKeyDown])
+  }, [isOpen, handleKeyDown]);
 
   // Don't render if closed (for animation purposes, we still render but hide)
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <>
@@ -118,9 +113,9 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
         aria-modal="true"
         aria-labelledby="cart-sheet-title"
         className={cn(
-          'fixed right-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl',
-          'flex flex-col',
-          'animate-in slide-in-from-right duration-300',
+          "fixed right-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl",
+          "flex flex-col",
+          "animate-in slide-in-from-right duration-300",
           className
         )}
       >
@@ -133,7 +128,7 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
             </h2>
             {itemCount > 0 && (
               <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
-                {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                {itemCount} {itemCount === 1 ? "item" : "items"}
               </span>
             )}
           </div>
@@ -205,7 +200,7 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
         )}
       </div>
     </>
-  )
+  );
 }
 
 // ============================================================================
@@ -218,9 +213,7 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
         <ShoppingBag className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
-        Your cart is empty
-      </h3>
+      <h3 className="mb-2 text-lg font-semibold text-foreground">Your cart is empty</h3>
       <p className="mb-6 text-sm text-muted-foreground">
         Discover our collection of premium posters and custom frames
       </p>
@@ -233,7 +226,7 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
         <ArrowRight className="h-4 w-4" />
       </a>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -242,9 +235,9 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
 
 export interface CartTriggerProps {
   /** Callback when clicked */
-  onClick: () => void
+  onClick: () => void;
   /** Optional className */
-  className?: string
+  className?: string;
 }
 
 /**
@@ -252,26 +245,26 @@ export interface CartTriggerProps {
  * Shows a badge with item count when cart is not empty
  */
 export function CartTrigger({ onClick, className }: CartTriggerProps) {
-  const itemCount = useCartItemCount()
+  const itemCount = useCartItemCount();
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+        "relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
         className
       )}
-      aria-label={`Shopping cart${itemCount > 0 ? `, ${itemCount} items` : ''}`}
+      aria-label={`Shopping cart${itemCount > 0 ? `, ${itemCount} items` : ""}`}
     >
       <ShoppingCart className="h-5 w-5" />
       {itemCount > 0 && (
         <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs font-medium text-white">
-          {itemCount > 99 ? '99+' : itemCount}
+          {itemCount > 99 ? "99+" : itemCount}
         </span>
       )}
     </button>
-  )
+  );
 }
 
-export default CartSheet
+export default CartSheet;

@@ -5,70 +5,52 @@
  * These schemas match the types defined in ../types/ai.ts
  */
 
-import { z } from 'zod';
-import { productColorSchema, posterOrientationSchema } from './product';
+import { z } from "zod";
+import { productColorSchema, posterOrientationSchema } from "./product";
 
 // ============================================================================
 // Enum Schemas
 // ============================================================================
 
 export const aiStylePresetSchema = z.enum([
-  'wabi-sabi',
-  'abstract-expression',
-  'botanical',
-  'geometric-modern',
-  'vintage-poster',
-  'pop-art',
-  'watercolor',
-  'photography',
-  'line-art',
-  'typography',
+  "wabi-sabi",
+  "abstract-expression",
+  "botanical",
+  "geometric-modern",
+  "vintage-poster",
+  "pop-art",
+  "watercolor",
+  "photography",
+  "line-art",
+  "typography",
 ]);
 
-export const aiAspectRatioSchema = z.enum([
-  'square',
-  'portrait',
-  'landscape',
-  'panoramic',
-]);
+export const aiAspectRatioSchema = z.enum(["square", "portrait", "landscape", "panoramic"]);
 
 export const aiColorMoodSchema = z.enum([
-  'warm',
-  'cool',
-  'neutral',
-  'vibrant',
-  'muted',
-  'monochrome',
-  'earth-tones',
-  'pastel',
+  "warm",
+  "cool",
+  "neutral",
+  "vibrant",
+  "muted",
+  "monochrome",
+  "earth-tones",
+  "pastel",
 ]);
 
 export const aiGenerationStatusSchema = z.enum([
-  'queued',
-  'processing',
-  'completed',
-  'failed',
-  'cancelled',
+  "queued",
+  "processing",
+  "completed",
+  "failed",
+  "cancelled",
 ]);
 
-export const aiSubscriptionTierSchema = z.enum([
-  'guest',
-  'free',
-  'premium',
-  'unlimited',
-]);
+export const aiSubscriptionTierSchema = z.enum(["guest", "free", "premium", "unlimited"]);
 
-export const aiModelProviderSchema = z.enum([
-  'stable-diffusion',
-  'dall-e-3',
-  'midjourney',
-]);
+export const aiModelProviderSchema = z.enum(["stable-diffusion", "dall-e-3", "midjourney"]);
 
-export const galleryVisibilitySchema = z.enum([
-  'private',
-  'public',
-  'unlisted',
-]);
+export const galleryVisibilitySchema = z.enum(["private", "public", "unlisted"]);
 
 // ============================================================================
 // Generation Input Schemas
@@ -182,7 +164,7 @@ export const galleryFiltersSchema = z.object({
   onlyPurchased: z.boolean().optional(),
   creatorUserId: z.string().optional(),
   searchQuery: z.string().optional(),
-  sortBy: z.enum(['recent', 'popular', 'most-liked']).optional(),
+  sortBy: z.enum(["recent", "popular", "most-liked"]).optional(),
 });
 
 export const paginatedGallerySchema = z.object({
@@ -202,7 +184,7 @@ export const paginatedGallerySchema = z.object({
 export const aiUsageTierLimitsSchema = z.object({
   tier: aiSubscriptionTierSchema,
   generationsLimit: z.number().int().nonnegative(),
-  limitPeriod: z.enum(['session', 'day', 'month']),
+  limitPeriod: z.enum(["session", "day", "month"]),
   maxVariations: z.number().int().positive(),
   hasWatermarkPreview: z.boolean(),
   hasPriorityQueue: z.boolean(),
@@ -241,7 +223,7 @@ export const aiGenerationJobSchema = z.object({
   id: z.string().min(1),
   generationId: z.string().min(1),
   userId: z.string().optional(),
-  status: z.enum(['queued', 'processing', 'completed', 'failed']),
+  status: z.enum(["queued", "processing", "completed", "failed"]),
   priority: z.number().int().nonnegative(),
   retryCount: z.number().int().nonnegative(),
   maxRetries: z.number().int().nonnegative(),
@@ -370,7 +352,7 @@ export const createProductFromAIInputSchema = z.object({
  */
 export const purchaseAISubscriptionInputSchema = z.object({
   planId: z.string().min(1),
-  billingPeriod: z.enum(['monthly', 'annual']),
+  billingPeriod: z.enum(["monthly", "annual"]),
 });
 
 // ============================================================================

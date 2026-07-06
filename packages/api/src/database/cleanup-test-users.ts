@@ -25,11 +25,7 @@ async function cleanup() {
   for (const email of testEmails) {
     try {
       // Find user
-      const user = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
+      const user = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
       if (user.length > 0 && user[0]) {
         const userId = user[0].id;

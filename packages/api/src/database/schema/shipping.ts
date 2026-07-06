@@ -48,9 +48,7 @@ export const shippingOptions = pgTable(
     name: varchar("name", { length: 100 }).notNull(), // e.g., "Standard Shipping", "Express"
     carrier: varchar("carrier", { length: 100 }).notNull(), // e.g., "USPS", "FedEx", "UPS", "Delhivery"
     description: text("description"),
-    baseCost: decimal("base_cost", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    baseCost: decimal("base_cost", { precision: 10, scale: 2 }).default("0.00").notNull(),
     estimatedDaysMin: integer("estimated_days_min").notNull(), // Minimum delivery days
     estimatedDaysMax: integer("estimated_days_max").notNull(), // Maximum delivery days
     isActive: boolean("is_active").default(true).notNull(),
@@ -80,10 +78,9 @@ export const orderShipments = pgTable(
     orderId: uuid("order_id")
       .references(() => orders.id, { onDelete: "cascade" })
       .notNull(),
-    shippingOptionId: uuid("shipping_option_id").references(
-      () => shippingOptions.id,
-      { onDelete: "set null" }
-    ),
+    shippingOptionId: uuid("shipping_option_id").references(() => shippingOptions.id, {
+      onDelete: "set null",
+    }),
 
     // Tracking information
     trackingNumber: varchar("tracking_number", { length: 100 }),
@@ -111,9 +108,7 @@ export const orderShipments = pgTable(
   (table) => ({
     orderIdIdx: index("order_shipments_order_id_idx").on(table.orderId),
     statusIdx: index("order_shipments_status_idx").on(table.status),
-    trackingNumberIdx: index("order_shipments_tracking_number_idx").on(
-      table.trackingNumber
-    ),
+    trackingNumberIdx: index("order_shipments_tracking_number_idx").on(table.trackingNumber),
   })
 );
 
@@ -124,12 +119,9 @@ export const orderShipments = pgTable(
 /**
  * Shipping options relations
  */
-export const shippingOptionsRelations = relations(
-  shippingOptions,
-  ({ many }) => ({
-    shipments: many(orderShipments),
-  })
-);
+export const shippingOptionsRelations = relations(shippingOptions, ({ many }) => ({
+  shipments: many(orderShipments),
+}));
 
 /**
  * Order shipments relations

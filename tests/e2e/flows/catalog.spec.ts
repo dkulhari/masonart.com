@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 /**
  * Product Catalog Flow E2E Tests
@@ -22,11 +22,11 @@ import { test, expect } from '@playwright/test';
 // Home to Catalog Navigation Flow
 // ============================================================================
 
-test.describe('Catalog Flow - Home to Catalog Navigation', () => {
-  test('should navigate from home page hero to catalog', async ({ page }) => {
+test.describe("Catalog Flow - Home to Catalog Navigation", () => {
+  test("should navigate from home page hero to catalog", async ({ page }) => {
     // Start at home page
-    await page.goto('/');
-    await expect(page.locator('h1')).toBeVisible();
+    await page.goto("/");
+    await expect(page.locator("h1")).toBeVisible();
 
     // Click "Shop Posters" CTA in hero
     const shopButton = page.locator('a[href="/posters"]:has-text("Shop Posters")');
@@ -34,13 +34,13 @@ test.describe('Catalog Flow - Home to Catalog Navigation', () => {
     await shopButton.click();
 
     // Should land on catalog page
-    await expect(page).toHaveURL('/posters');
+    await expect(page).toHaveURL("/posters");
     await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
   });
 
-  test('should navigate from category card to filtered catalog', async ({ page }) => {
+  test("should navigate from category card to filtered catalog", async ({ page }) => {
     // Start at home page
-    await page.goto('/');
+    await page.goto("/");
 
     // Click on Abstract category card
     const abstractLink = page.locator('a[href="/posters?styles=abstract"]');
@@ -53,20 +53,20 @@ test.describe('Catalog Flow - Home to Catalog Navigation', () => {
 
     // Filter tag should be visible in the active filters section (near the products)
     // Use text locator with exact match to avoid matching the checkbox
-    const mainContent = page.locator('main');
-    const abstractTag = mainContent.getByRole('button', { name: /^abstract$/i });
+    const mainContent = page.locator("main");
+    const abstractTag = mainContent.getByRole("button", { name: /^abstract$/i });
     await expect(abstractTag.first()).toBeVisible();
   });
 
-  test('should navigate from header navigation to catalog', async ({ page }) => {
+  test("should navigate from header navigation to catalog", async ({ page }) => {
     // Start at home page
-    await page.goto('/');
+    await page.goto("/");
 
     // Find and click the Posters link in header navigation
     const navLink = page.locator('header a[href="/posters"]');
-    if (await navLink.count() > 0) {
+    if ((await navLink.count()) > 0) {
       await navLink.first().click();
-      await expect(page).toHaveURL('/posters');
+      await expect(page).toHaveURL("/posters");
     }
   });
 });
@@ -77,15 +77,15 @@ test.describe('Catalog Flow - Home to Catalog Navigation', () => {
 
 // Skipped: These tests expect URL-driven filtering but the UI uses client-side state
 // The filter checkboxes update visually but don't push to URL as expected
-test.describe.skip('Catalog Flow - Filter Application', () => {
+test.describe.skip("Catalog Flow - Filter Application", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should apply single style filter and see updated results', async ({ page }) => {
+  test("should apply single style filter and see updated results", async ({ page }) => {
     // Apply Abstract style filter (use exact match to avoid matching "Abstract & Geometric")
-    const abstractLabel = page.locator('label').filter({ hasText: /^Abstract$/ });
+    const abstractLabel = page.locator("label").filter({ hasText: /^Abstract$/ });
     await abstractLabel.click();
 
     // URL should update
@@ -96,18 +96,18 @@ test.describe.skip('Catalog Flow - Filter Application', () => {
     await expect(filterTag.first()).toBeVisible();
 
     // Page should show filtered indication
-    const activeFilters = page.locator('text=Active filters:');
+    const activeFilters = page.locator("text=Active filters:");
     await expect(activeFilters.first()).toBeVisible();
   });
 
-  test('should apply multiple filters and see combined results', async ({ page }) => {
+  test("should apply multiple filters and see combined results", async ({ page }) => {
     // Apply Portrait orientation
     const portraitButton = page.locator('button:has-text("Portrait")').first();
     await portraitButton.click();
     await expect(page).toHaveURL(/orientation=portrait/);
 
     // Apply Abstract style (use exact match to avoid matching "Abstract & Geometric")
-    const abstractLabel = page.locator('label').filter({ hasText: /^Abstract$/ });
+    const abstractLabel = page.locator("label").filter({ hasText: /^Abstract$/ });
     await abstractLabel.click();
     await expect(page).toHaveURL(/styles=abstract/);
 
@@ -120,7 +120,7 @@ test.describe.skip('Catalog Flow - Filter Application', () => {
     await expect(page.locator('button:has-text("abstract")').first()).toBeVisible();
   });
 
-  test('should apply sort and filter combination', async ({ page }) => {
+  test("should apply sort and filter combination", async ({ page }) => {
     // Apply price sort
     const priceLowHigh = page.locator('button:has-text("Price: Low to High")');
     await priceLowHigh.click();
@@ -137,9 +137,9 @@ test.describe.skip('Catalog Flow - Filter Application', () => {
     await expect(page).toHaveURL(/styles=minimalist/);
   });
 
-  test('should remove individual filter via tag click', async ({ page }) => {
+  test("should remove individual filter via tag click", async ({ page }) => {
     // Apply two filters
-    await page.goto('/posters?styles=abstract,minimalist');
+    await page.goto("/posters?styles=abstract,minimalist");
 
     // Remove abstract filter
     const abstractTag = page.locator('button:has-text("abstract")').first();
@@ -150,9 +150,9 @@ test.describe.skip('Catalog Flow - Filter Application', () => {
     await expect(page).toHaveURL(/minimalist/);
   });
 
-  test('should clear all filters at once', async ({ page }) => {
+  test("should clear all filters at once", async ({ page }) => {
     // Apply multiple filters
-    await page.goto('/posters?styles=abstract&orientation=portrait');
+    await page.goto("/posters?styles=abstract&orientation=portrait");
 
     // Click Clear all button
     const clearAllButton = page.locator('button:has-text("Clear all")').first();
@@ -169,13 +169,13 @@ test.describe.skip('Catalog Flow - Filter Application', () => {
 // ============================================================================
 
 // Skipped: Mobile filter UI doesn't use a dialog as expected
-test.describe.skip('Catalog Flow - Mobile Filter Experience', () => {
+test.describe.skip("Catalog Flow - Mobile Filter Experience", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/posters');
+    await page.goto("/posters");
   });
 
-  test('should open mobile filter sheet, apply filter, and close', async ({ page }) => {
+  test("should open mobile filter sheet, apply filter, and close", async ({ page }) => {
     // Click filters button
     const filterButton = page.locator('button:has-text("Filters")');
     await expect(filterButton).toBeVisible();
@@ -190,7 +190,7 @@ test.describe.skip('Catalog Flow - Mobile Filter Experience', () => {
     if (await styleSection.isVisible()) {
       await styleSection.click();
     }
-    const abstractLabel = page.locator('label').filter({ hasText: /^Abstract$/ });
+    const abstractLabel = page.locator("label").filter({ hasText: /^Abstract$/ });
     await abstractLabel.click();
 
     // Apply filters button
@@ -202,13 +202,13 @@ test.describe.skip('Catalog Flow - Mobile Filter Experience', () => {
     await expect(page).toHaveURL(/styles=abstract/);
   });
 
-  test('should show filter count badge when filters active', async ({ page }) => {
+  test("should show filter count badge when filters active", async ({ page }) => {
     // Navigate with filters
-    await page.goto('/posters?styles=abstract&orientation=portrait');
+    await page.goto("/posters?styles=abstract&orientation=portrait");
 
     // Filter button should show badge
     const filterButton = page.locator('button:has-text("Filters")');
-    const badge = filterButton.locator('.rounded-full.bg-primary');
+    const badge = filterButton.locator(".rounded-full.bg-primary");
     await expect(badge).toBeVisible();
   });
 });
@@ -217,10 +217,10 @@ test.describe.skip('Catalog Flow - Mobile Filter Experience', () => {
 // Product Browsing and Viewing Flow
 // ============================================================================
 
-test.describe('Catalog Flow - Browse and View Products', () => {
-  test('should browse catalog and view product details', async ({ page }) => {
+test.describe("Catalog Flow - Browse and View Products", () => {
+  test("should browse catalog and view product details", async ({ page }) => {
     // Start at catalog
-    await page.goto('/posters');
+    await page.goto("/posters");
     await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
 
     // Find product cards
@@ -229,24 +229,24 @@ test.describe('Catalog Flow - Browse and View Products', () => {
 
     if (count > 0) {
       // Get first product's URL
-      const firstProductUrl = await productCards.first().getAttribute('href');
+      const firstProductUrl = await productCards.first().getAttribute("href");
 
       // Click on first product
       await productCards.first().click();
 
       // Should be on product detail page
       await expect(page).toHaveURL(firstProductUrl!);
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
 
       // Should see product details
-      await expect(page.locator('text=Select Size')).toBeVisible();
+      await expect(page.locator("text=Select Size")).toBeVisible();
       await expect(page.locator('button:has-text("Add to Cart")')).toBeVisible();
     }
   });
 
-  test('should navigate back from product to catalog', async ({ page }) => {
+  test("should navigate back from product to catalog", async ({ page }) => {
     // Start at catalog
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     const productCards = page.locator('a[href^="/posters/"]');
     const count = await productCards.count();
@@ -259,13 +259,13 @@ test.describe('Catalog Flow - Browse and View Products', () => {
       await page.goBack();
 
       // Should be back at catalog
-      await expect(page).toHaveURL('/posters');
+      await expect(page).toHaveURL("/posters");
       await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
     }
   });
 
-  test('should navigate back from product via breadcrumb', async ({ page }) => {
-    await page.goto('/posters');
+  test("should navigate back from product via breadcrumb", async ({ page }) => {
+    await page.goto("/posters");
 
     const productCards = page.locator('a[href^="/posters/"]');
     const count = await productCards.count();
@@ -279,18 +279,18 @@ test.describe('Catalog Flow - Browse and View Products', () => {
       await postersBreadcrumb.click();
 
       // Should be back at catalog
-      await expect(page).toHaveURL('/posters');
+      await expect(page).toHaveURL("/posters");
     }
   });
 
-  test('should preserve filters when navigating back from product', async ({ page }) => {
+  test("should preserve filters when navigating back from product", async ({ page }) => {
     // Start with filters applied
-    await page.goto('/posters?styles=abstract&orientation=portrait');
+    await page.goto("/posters?styles=abstract&orientation=portrait");
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Verify filters are shown (use main content area to avoid matching hidden checkbox)
-    const mainContent = page.locator('main');
-    await expect(mainContent.getByRole('button', { name: /^abstract$/i }).first()).toBeVisible();
+    const mainContent = page.locator("main");
+    await expect(mainContent.getByRole("button", { name: /^abstract$/i }).first()).toBeVisible();
 
     const productCards = page.locator('a[href^="/posters/"]');
     const count = await productCards.count();
@@ -298,7 +298,7 @@ test.describe('Catalog Flow - Browse and View Products', () => {
     if (count > 0) {
       // Navigate to product
       await productCards.first().click();
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
 
       // Navigate back
       await page.goBack();
@@ -314,16 +314,16 @@ test.describe('Catalog Flow - Browse and View Products', () => {
 // Pagination Flow
 // ============================================================================
 
-test.describe('Catalog Flow - Pagination', () => {
-  test('should navigate through pages of results', async ({ page }) => {
-    await page.goto('/posters', { waitUntil: 'networkidle' });
+test.describe("Catalog Flow - Pagination", () => {
+  test("should navigate through pages of results", async ({ page }) => {
+    await page.goto("/posters", { waitUntil: "networkidle" });
 
     const pagination = page.locator('nav[aria-label="Pagination"]');
 
     if (await pagination.isVisible()) {
       // Should start on page 1
       const currentPage = page.locator('button[aria-current="page"]');
-      await expect(currentPage).toContainText('1');
+      await expect(currentPage).toContainText("1");
 
       // Click next page
       const nextButton = page.locator('button[aria-label="Go to next page"]');
@@ -334,22 +334,22 @@ test.describe('Catalog Flow - Pagination', () => {
         await expect(page).toHaveURL(/page=2/);
 
         // Current page should show 2
-        await expect(page.locator('button[aria-current="page"]')).toContainText('2');
+        await expect(page.locator('button[aria-current="page"]')).toContainText("2");
       }
     }
   });
 
-  test('should reset to page 1 when applying new filter', async ({ page }) => {
+  test("should reset to page 1 when applying new filter", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Start on page 2
-    await page.goto('/posters?page=2', { waitUntil: 'networkidle' });
+    await page.goto("/posters?page=2", { waitUntil: "networkidle" });
 
     const pagination = page.locator('nav[aria-label="Pagination"]');
 
     if (await pagination.isVisible()) {
       // Apply a filter
-      const abstractLabel = page.locator('label').filter({ hasText: /^Abstract$/ });
+      const abstractLabel = page.locator("label").filter({ hasText: /^Abstract$/ });
       await abstractLabel.click();
 
       // Should no longer be on page 2
@@ -358,11 +358,11 @@ test.describe('Catalog Flow - Pagination', () => {
     }
   });
 
-  test('should preserve filters when paginating', async ({ page }) => {
+  test("should preserve filters when paginating", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Start with filter applied
-    await page.goto('/posters?styles=abstract', { waitUntil: 'networkidle' });
+    await page.goto("/posters?styles=abstract", { waitUntil: "networkidle" });
 
     const pagination = page.locator('nav[aria-label="Pagination"]');
 
@@ -384,13 +384,13 @@ test.describe('Catalog Flow - Pagination', () => {
 // ============================================================================
 
 // Skipped: These tests rely on filter clicks pushing to URL which doesn't work as expected
-test.describe.skip('Catalog Flow - Complete User Journeys', () => {
-  test('journey: home -> category -> filter -> product -> back', async ({ page }) => {
+test.describe.skip("Catalog Flow - Complete User Journeys", () => {
+  test("journey: home -> category -> filter -> product -> back", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Step 1: Start at home
-    await page.goto('/');
-    await expect(page.locator('h1')).toBeVisible();
+    await page.goto("/");
+    await expect(page.locator("h1")).toBeVisible();
 
     // Step 2: Click Abstract category
     const abstractCategory = page.locator('a[href="/posters?styles=abstract"]');
@@ -407,12 +407,12 @@ test.describe.skip('Catalog Flow - Complete User Journeys', () => {
     const count = await productCards.count();
 
     if (count > 0) {
-      const productUrl = await productCards.first().getAttribute('href');
+      const productUrl = await productCards.first().getAttribute("href");
       await productCards.first().click();
 
       // Should see product detail
       await expect(page).toHaveURL(productUrl!);
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
 
       // Step 5: Go back
       await page.goBack();
@@ -423,11 +423,11 @@ test.describe.skip('Catalog Flow - Complete User Journeys', () => {
     }
   });
 
-  test('journey: browse -> filter -> sort -> product', async ({ page }) => {
+  test("journey: browse -> filter -> sort -> product", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Step 1: Go to catalog
-    await page.goto('/posters');
+    await page.goto("/posters");
     await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
 
     // Step 2: Apply style filter
@@ -454,21 +454,21 @@ test.describe.skip('Catalog Flow - Complete User Journeys', () => {
       await productCards.first().click();
 
       // Should be on product detail
-      await expect(page.locator('h1')).toBeVisible();
-      await expect(page.locator('text=/₹/')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
+      await expect(page.locator("text=/₹/")).toBeVisible();
     }
   });
 
-  test('journey: mobile - browse and filter products', async ({ page }) => {
+  test("journey: mobile - browse and filter products", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     // Step 1: Start at home
-    await page.goto('/');
+    await page.goto("/");
 
     // Step 2: Navigate to catalog via CTA
     const shopButton = page.locator('a[href="/posters"]:has-text("Shop Posters")');
     await shopButton.click();
-    await expect(page).toHaveURL('/posters');
+    await expect(page).toHaveURL("/posters");
 
     // Step 3: Open filter sheet
     const filterButton = page.locator('button:has-text("Filters")');
@@ -479,7 +479,7 @@ test.describe.skip('Catalog Flow - Complete User Journeys', () => {
     if (await styleSection.isVisible()) {
       await styleSection.click();
     }
-    const abstractLabel = page.locator('label').filter({ hasText: /^Abstract$/ });
+    const abstractLabel = page.locator("label").filter({ hasText: /^Abstract$/ });
     await abstractLabel.click();
 
     // Step 5: Apply and close sheet
@@ -495,15 +495,15 @@ test.describe.skip('Catalog Flow - Complete User Journeys', () => {
 
     if (count > 0) {
       await productCards.first().click();
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
     }
   });
 
-  test('journey: search refinement - narrow then broaden filters', async ({ page }) => {
+  test("journey: search refinement - narrow then broaden filters", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Step 1: Start with broad filter
-    await page.goto('/posters?styles=abstract');
+    await page.goto("/posters?styles=abstract");
     await expect(page.locator('button:has-text("abstract")').first()).toBeVisible();
 
     // Step 2: Add more restrictive filter
@@ -542,38 +542,38 @@ test.describe.skip('Catalog Flow - Complete User Journeys', () => {
 // ============================================================================
 
 // Skipped: These tests rely on filter clicks pushing to URL which doesn't work as expected
-test.describe.skip('Catalog Flow - Edge Cases', () => {
-  test('should handle invalid filter parameters gracefully', async ({ page }) => {
+test.describe.skip("Catalog Flow - Edge Cases", () => {
+  test("should handle invalid filter parameters gracefully", async ({ page }) => {
     // Navigate with invalid filter
-    await page.goto('/posters?styles=nonexistent-style-xyz');
+    await page.goto("/posters?styles=nonexistent-style-xyz");
 
     // Page should still load
     await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
   });
 
-  test('should handle missing product in detail page', async ({ page }) => {
+  test("should handle missing product in detail page", async ({ page }) => {
     // Navigate to non-existent product
-    await page.goto('/posters/nonexistent-product-12345');
+    await page.goto("/posters/nonexistent-product-12345");
 
     // Should show not found
-    const notFound = page.locator('text=Product Not Found');
+    const notFound = page.locator("text=Product Not Found");
     await expect(notFound).toBeVisible();
 
     // Browse All Products link should work
     const browseLink = page.locator('a[href="/posters"]:has-text("Browse All Products")');
     await browseLink.click();
-    await expect(page).toHaveURL('/posters');
+    await expect(page).toHaveURL("/posters");
   });
 
-  test('should handle rapid filter changes without breaking', async ({ page }) => {
+  test("should handle rapid filter changes without breaking", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     // Rapidly click multiple filters
     const portraitButton = page.locator('button:has-text("Portrait")').first();
     await portraitButton.click();
 
-    const abstractLabel = page.locator('label').filter({ hasText: /^Abstract$/ });
+    const abstractLabel = page.locator("label").filter({ hasText: /^Abstract$/ });
     await abstractLabel.click();
 
     const minimalistLabel = page.locator('label:has-text("Minimalist")');
@@ -588,11 +588,11 @@ test.describe.skip('Catalog Flow - Edge Cases', () => {
     await expect(page).toHaveURL(/styles=.*minimalist/);
   });
 
-  test('should handle page reload with filters preserved', async ({ page }) => {
+  test("should handle page reload with filters preserved", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Navigate with filters
-    await page.goto('/posters?styles=abstract&orientation=portrait&sortBy=basePrice&sortOrder=asc');
+    await page.goto("/posters?styles=abstract&orientation=portrait&sortBy=basePrice&sortOrder=asc");
 
     // Verify filters are applied
     await expect(page.locator('button:has-text("abstract")').first()).toBeVisible();
@@ -613,10 +613,10 @@ test.describe.skip('Catalog Flow - Edge Cases', () => {
 // ============================================================================
 
 // Skipped: These tests rely on filter clicks pushing to URL which doesn't work as expected
-test.describe.skip('Catalog Flow - Performance', () => {
-  test('should load catalog page within acceptable time', async ({ page }) => {
+test.describe.skip("Catalog Flow - Performance", () => {
+  test("should load catalog page within acceptable time", async ({ page }) => {
     const startTime = Date.now();
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
 
@@ -624,9 +624,9 @@ test.describe.skip('Catalog Flow - Performance', () => {
     expect(loadTime).toBeLessThan(5000);
   });
 
-  test('should update filters responsively', async ({ page }) => {
+  test("should update filters responsively", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     const startTime = Date.now();
 
@@ -640,8 +640,8 @@ test.describe.skip('Catalog Flow - Performance', () => {
     expect(filterTime).toBeLessThan(2000);
   });
 
-  test('should navigate to product detail quickly', async ({ page }) => {
-    await page.goto('/posters');
+  test("should navigate to product detail quickly", async ({ page }) => {
+    await page.goto("/posters");
 
     const productCards = page.locator('a[href^="/posters/"]');
     const count = await productCards.count();
@@ -650,21 +650,21 @@ test.describe.skip('Catalog Flow - Performance', () => {
       const startTime = Date.now();
       await productCards.first().click();
 
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
 
       const navigationTime = Date.now() - startTime;
       expect(navigationTime).toBeLessThan(3000);
     }
   });
 
-  test('should not have JavaScript errors during flow', async ({ page }) => {
+  test("should not have JavaScript errors during flow", async ({ page }) => {
     const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
+    page.on("pageerror", (error) => errors.push(error.message));
 
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // Complete a typical flow
-    await page.goto('/');
+    await page.goto("/");
     await page.locator('a[href="/posters"]').first().click();
 
     const portraitButton = page.locator('button:has-text("Portrait")').first();
@@ -681,7 +681,7 @@ test.describe.skip('Catalog Flow - Performance', () => {
 
     // Filter out expected network errors
     const criticalErrors = errors.filter(
-      (e) => !e.includes('Failed to fetch') && !e.includes('NetworkError')
+      (e) => !e.includes("Failed to fetch") && !e.includes("NetworkError")
     );
 
     expect(criticalErrors.length).toBe(0);
@@ -692,49 +692,49 @@ test.describe.skip('Catalog Flow - Performance', () => {
 // Accessibility Flow
 // ============================================================================
 
-test.describe('Catalog Flow - Accessibility', () => {
-  test('should maintain keyboard navigation through flow', async ({ page }) => {
-    await page.goto('/posters');
+test.describe("Catalog Flow - Accessibility", () => {
+  test("should maintain keyboard navigation through flow", async ({ page }) => {
+    await page.goto("/posters");
 
     // Tab into the page
-    await page.keyboard.press('Tab');
+    await page.keyboard.press("Tab");
 
     // Should have focused element
-    const focusedElement = page.locator(':focus');
+    const focusedElement = page.locator(":focus");
     await expect(focusedElement.first()).toBeTruthy();
 
     // Continue tabbing to reach filters or products
     for (let i = 0; i < 10; i++) {
-      await page.keyboard.press('Tab');
+      await page.keyboard.press("Tab");
     }
 
     // Should still have focus somewhere
-    const currentFocus = page.locator(':focus');
+    const currentFocus = page.locator(":focus");
     await expect(currentFocus.first()).toBeTruthy();
   });
 
-  test('should have accessible filter controls', async ({ page }) => {
+  test("should have accessible filter controls", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     // Filter sections should have aria-expanded
     const styleSection = page.locator('button:has-text("Style")');
-    const ariaExpanded = await styleSection.getAttribute('aria-expanded');
+    const ariaExpanded = await styleSection.getAttribute("aria-expanded");
     expect(ariaExpanded).toBeTruthy();
   });
 
   // Skipped: Active filters section is hidden/scrolled out of view on desktop
-  test.skip('should announce active filters for screen readers', async ({ page }) => {
+  test.skip("should announce active filters for screen readers", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters?styles=abstract');
+    await page.goto("/posters?styles=abstract");
 
     // Active filters section should be present
-    const activeFiltersSection = page.locator('text=Active filters:');
+    const activeFiltersSection = page.locator("text=Active filters:");
     await expect(activeFiltersSection.first()).toBeVisible();
   });
 
-  test('should have proper breadcrumb navigation on product page', async ({ page }) => {
-    await page.goto('/posters');
+  test("should have proper breadcrumb navigation on product page", async ({ page }) => {
+    await page.goto("/posters");
 
     const productCards = page.locator('a[href^="/posters/"]');
     const count = await productCards.count();
@@ -758,17 +758,17 @@ test.describe('Catalog Flow - Accessibility', () => {
 // ============================================================================
 
 // Skipped: Mobile filter UI doesn't use a dialog as expected
-test.describe.skip('Catalog Flow - Responsive Behavior', () => {
-  test('should complete flow on mobile viewport', async ({ page }) => {
+test.describe.skip("Catalog Flow - Responsive Behavior", () => {
+  test("should complete flow on mobile viewport", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     // Navigate through flow
-    await page.goto('/');
+    await page.goto("/");
     const shopButton = page.locator('a[href="/posters"]:has-text("Shop Posters")');
     await shopButton.click();
 
     // Should be on catalog
-    await expect(page).toHaveURL('/posters');
+    await expect(page).toHaveURL("/posters");
 
     // Filter via mobile sheet
     const filterButton = page.locator('button:has-text("Filters")');
@@ -784,33 +784,33 @@ test.describe.skip('Catalog Flow - Responsive Behavior', () => {
     const productCards = page.locator('a[href^="/posters/"]');
     if ((await productCards.count()) > 0) {
       await productCards.first().click();
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
     }
   });
 
-  test('should complete flow on tablet viewport', async ({ page }) => {
+  test("should complete flow on tablet viewport", async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
 
-    await page.goto('/posters');
+    await page.goto("/posters");
     await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
 
     // Products should display in grid
     const productCards = page.locator('a[href^="/posters/"]');
     if ((await productCards.count()) > 0) {
       await productCards.first().click();
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
       await page.goBack();
-      await expect(page).toHaveURL('/posters');
+      await expect(page).toHaveURL("/posters");
     }
   });
 
-  test('should complete flow on desktop viewport', async ({ page }) => {
+  test("should complete flow on desktop viewport", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
 
-    await page.goto('/posters');
+    await page.goto("/posters");
 
     // Desktop filter sidebar should be visible
-    const filterSidebar = page.locator('aside.hidden.lg\\:block');
+    const filterSidebar = page.locator("aside.hidden.lg\\:block");
     await expect(filterSidebar).toBeVisible();
 
     // Apply filter
@@ -821,7 +821,7 @@ test.describe.skip('Catalog Flow - Responsive Behavior', () => {
     const productCards = page.locator('a[href^="/posters/"]');
     if ((await productCards.count()) > 0) {
       await productCards.first().click();
-      await expect(page.locator('h1')).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible();
     }
   });
 });

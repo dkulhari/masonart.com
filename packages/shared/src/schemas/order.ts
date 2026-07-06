@@ -8,86 +8,86 @@
  * - Addresses
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Order status enum
  */
 export const OrderStatusSchema = z.enum([
-  'pending',
-  'confirmed',
-  'processing',
-  'shipped',
-  'delivered',
-  'cancelled',
-  'refunded',
+  "pending",
+  "confirmed",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "refunded",
 ]);
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 
 /**
  * Payment status enum
  */
-export const PaymentStatusSchema = z.enum(['pending', 'paid', 'failed', 'refunded']);
+export const PaymentStatusSchema = z.enum(["pending", "paid", "failed", "refunded"]);
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 
 /**
  * Payment method enum
  */
-export const PaymentMethodSchema = z.enum(['razorpay', 'stripe', 'cod', 'upi']);
+export const PaymentMethodSchema = z.enum(["razorpay", "stripe", "cod", "upi"]);
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 
 /**
  * Photo approval status enum
  */
 export const PhotoApprovalStatusSchema = z.enum([
-  'pending',
-  'sent',
-  'approved',
-  'changes_requested',
+  "pending",
+  "sent",
+  "approved",
+  "changes_requested",
 ]);
 export type PhotoApprovalStatus = z.infer<typeof PhotoApprovalStatusSchema>;
 
 /**
  * Address type enum
  */
-export const AddressTypeSchema = z.enum(['home', 'office', 'other']);
+export const AddressTypeSchema = z.enum(["home", "office", "other"]);
 export type AddressType = z.infer<typeof AddressTypeSchema>;
 
 /**
  * Address Schema (used in orders and user profiles)
  */
 export const AddressSchema = z.object({
-  id: z.string().min(1, 'Address ID is required'),
+  id: z.string().min(1, "Address ID is required"),
   fullName: z
     .string()
-    .min(2, 'Full name must be at least 2 characters')
-    .max(100, 'Full name must be 100 characters or less'),
+    .min(2, "Full name must be at least 2 characters")
+    .max(100, "Full name must be 100 characters or less"),
   phone: z
     .string()
     .regex(
       /^\+[1-9]\d{1,14}$/,
-      'Phone number must be in E.164 format with + prefix (e.g., +919876543210)'
+      "Phone number must be in E.164 format with + prefix (e.g., +919876543210)"
     ),
   addressLine1: z
     .string()
-    .min(5, 'Address line 1 must be at least 5 characters')
-    .max(200, 'Address line 1 must be 200 characters or less'),
-  addressLine2: z
-    .string()
-    .max(200, 'Address line 2 must be 200 characters or less')
-    .optional(),
+    .min(5, "Address line 1 must be at least 5 characters")
+    .max(200, "Address line 1 must be 200 characters or less"),
+  addressLine2: z.string().max(200, "Address line 2 must be 200 characters or less").optional(),
   city: z
     .string()
-    .min(2, 'City must be at least 2 characters')
-    .max(100, 'City must be 100 characters or less'),
+    .min(2, "City must be at least 2 characters")
+    .max(100, "City must be 100 characters or less"),
   state: z
     .string()
-    .min(2, 'State must be at least 2 characters')
-    .max(100, 'State must be 100 characters or less'),
+    .min(2, "State must be at least 2 characters")
+    .max(100, "State must be 100 characters or less"),
   pincode: z
     .string()
-    .regex(/^(\d{6}|\d{5}(-\d{4})?)$/, 'Pincode must be 6 digits (India) or 5 digits (US) or ZIP+4 format'),
-  country: z.string().min(2, 'Country is required').max(100),
+    .regex(
+      /^(\d{6}|\d{5}(-\d{4})?)$/,
+      "Pincode must be 6 digits (India) or 5 digits (US) or ZIP+4 format"
+    ),
+  country: z.string().min(2, "Country is required").max(100),
   isDefault: z.boolean(),
   type: AddressTypeSchema,
 });
@@ -108,7 +108,7 @@ export type AddressUpdate = z.infer<typeof AddressUpdateSchema>;
 /**
  * Saved Address Type Schema - matches DB enum for address purpose
  */
-export const SavedAddressTypeSchema = z.enum(['shipping', 'billing', 'both']);
+export const SavedAddressTypeSchema = z.enum(["shipping", "billing", "both"]);
 export type SavedAddressType = z.infer<typeof SavedAddressTypeSchema>;
 
 /**
@@ -122,40 +122,31 @@ export const SavedAddressSchema = z.object({
   type: SavedAddressTypeSchema,
   fullName: z
     .string()
-    .min(2, 'Full name must be at least 2 characters')
-    .max(100, 'Full name must be 100 characters or less'),
+    .min(2, "Full name must be at least 2 characters")
+    .max(100, "Full name must be 100 characters or less"),
   phone: z
     .string()
-    .regex(
-      /^\+[1-9]\d{1,14}$/,
-      'Phone number must be in E.164 format (e.g., +919876543210)'
-    ),
+    .regex(/^\+[1-9]\d{1,14}$/, "Phone number must be in E.164 format (e.g., +919876543210)"),
   addressLine1: z
     .string()
-    .min(5, 'Address line 1 must be at least 5 characters')
-    .max(200, 'Address line 1 must be 200 characters or less'),
+    .min(5, "Address line 1 must be at least 5 characters")
+    .max(200, "Address line 1 must be 200 characters or less"),
   addressLine2: z
     .string()
-    .max(200, 'Address line 2 must be 200 characters or less')
+    .max(200, "Address line 2 must be 200 characters or less")
     .optional()
     .nullable(),
-  landmark: z
-    .string()
-    .max(200, 'Landmark must be 200 characters or less')
-    .optional()
-    .nullable(),
+  landmark: z.string().max(200, "Landmark must be 200 characters or less").optional().nullable(),
   city: z
     .string()
-    .min(2, 'City must be at least 2 characters')
-    .max(100, 'City must be 100 characters or less'),
+    .min(2, "City must be at least 2 characters")
+    .max(100, "City must be 100 characters or less"),
   state: z
     .string()
-    .min(2, 'State must be at least 2 characters')
-    .max(100, 'State must be 100 characters or less'),
-  postalCode: z
-    .string()
-    .regex(/^\d{6}$/, 'Postal code must be 6 digits'),
-  countryCode: z.string().length(2, 'Country code must be 2 characters').default('IN'),
+    .min(2, "State must be at least 2 characters")
+    .max(100, "State must be 100 characters or less"),
+  postalCode: z.string().regex(/^\d{6}$/, "Postal code must be 6 digits"),
+  countryCode: z.string().length(2, "Country code must be 2 characters").default("IN"),
   isDefault: z.boolean().default(false),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
@@ -166,7 +157,7 @@ export type SavedAddress = z.infer<typeof SavedAddressSchema>;
  * Saved Address Create Schema - for POST /api/addresses
  */
 export const SavedAddressCreateSchema = z.object({
-  type: SavedAddressTypeSchema.default('both'),
+  type: SavedAddressTypeSchema.default("both"),
   fullName: SavedAddressSchema.shape.fullName,
   phone: SavedAddressSchema.shape.phone,
   addressLine1: SavedAddressSchema.shape.addressLine1,
@@ -201,19 +192,19 @@ export type OrderItemCustomizations = z.infer<typeof OrderItemCustomizationsSche
  * Order Item Schema
  */
 export const OrderItemSchema = z.object({
-  id: z.string().min(1, 'Order item ID is required'),
-  orderId: z.string().min(1, 'Order ID is required'),
-  productId: z.string().min(1, 'Product ID is required'),
-  variantId: z.string().min(1, 'Variant ID is required'),
+  id: z.string().min(1, "Order item ID is required"),
+  orderId: z.string().min(1, "Order ID is required"),
+  productId: z.string().min(1, "Product ID is required"),
+  variantId: z.string().min(1, "Variant ID is required"),
   frameId: z.string().optional(),
-  productTitle: z.string().min(1, 'Product title is required').max(200),
-  productSku: z.string().min(1, 'Product SKU is required'),
-  sizeLabel: z.string().min(1, 'Size label is required'),
+  productTitle: z.string().min(1, "Product title is required").max(200),
+  productSku: z.string().min(1, "Product SKU is required"),
+  sizeLabel: z.string().min(1, "Size label is required"),
   frameType: z.string().optional(),
-  quantity: z.number().int().positive('Quantity must be a positive integer'),
-  unitPrice: z.string().regex(/^\d+\.\d{2}$/, 'Unit price must be in format: 0000.00'),
-  subtotal: z.string().regex(/^\d+\.\d{2}$/, 'Subtotal must be in format: 0000.00'),
-  imageUrl: z.string().url('Image URL must be a valid URL'),
+  quantity: z.number().int().positive("Quantity must be a positive integer"),
+  unitPrice: z.string().regex(/^\d+\.\d{2}$/, "Unit price must be in format: 0000.00"),
+  subtotal: z.string().regex(/^\d+\.\d{2}$/, "Subtotal must be in format: 0000.00"),
+  imageUrl: z.string().url("Image URL must be a valid URL"),
   customizations: OrderItemCustomizationsSchema.optional(),
 });
 export type OrderItem = z.infer<typeof OrderItemSchema>;
@@ -240,27 +231,30 @@ export type PhotoApproval = z.infer<typeof PhotoApprovalSchema>;
  * Order Schema
  */
 export const OrderSchema = z.object({
-  id: z.string().min(1, 'Order ID is required'),
+  id: z.string().min(1, "Order ID is required"),
   orderNumber: z
     .string()
-    .min(1, 'Order number is required')
-    .regex(/^[A-Z0-9-]+$/, 'Order number must contain only uppercase letters, numbers, and hyphens'),
-  userId: z.string().min(1, 'User ID is required'),
+    .min(1, "Order number is required")
+    .regex(
+      /^[A-Z0-9-]+$/,
+      "Order number must contain only uppercase letters, numbers, and hyphens"
+    ),
+  userId: z.string().min(1, "User ID is required"),
   status: OrderStatusSchema,
   items: z
     .array(OrderItemSchema)
-    .min(1, 'Order must contain at least one item')
-    .max(50, 'Order cannot contain more than 50 items'),
+    .min(1, "Order must contain at least one item")
+    .max(50, "Order cannot contain more than 50 items"),
   shippingAddress: AddressSchema,
   billingAddress: AddressSchema.optional(),
   paymentMethod: PaymentMethodSchema,
   paymentStatus: PaymentStatusSchema,
   paymentId: z.string().optional(),
-  subtotal: z.string().regex(/^\d+\.\d{2}$/, 'Subtotal must be in format: 0000.00'),
-  shippingCost: z.string().regex(/^\d+\.\d{2}$/, 'Shipping cost must be in format: 0000.00'),
-  tax: z.string().regex(/^\d+\.\d{2}$/, 'Tax must be in format: 0000.00'),
-  discount: z.string().regex(/^\d+\.\d{2}$/, 'Discount must be in format: 0000.00'),
-  total: z.string().regex(/^\d+\.\d{2}$/, 'Total must be in format: 0000.00'),
+  subtotal: z.string().regex(/^\d+\.\d{2}$/, "Subtotal must be in format: 0000.00"),
+  shippingCost: z.string().regex(/^\d+\.\d{2}$/, "Shipping cost must be in format: 0000.00"),
+  tax: z.string().regex(/^\d+\.\d{2}$/, "Tax must be in format: 0000.00"),
+  discount: z.string().regex(/^\d+\.\d{2}$/, "Discount must be in format: 0000.00"),
+  total: z.string().regex(/^\d+\.\d{2}$/, "Total must be in format: 0000.00"),
   trackingNumber: z.string().optional(),
   shippingCarrier: z.string().optional(),
   estimatedDelivery: z.date().optional(),
@@ -285,12 +279,14 @@ export const OrderCreateSchema = OrderSchema.omit({
   updatedAt: true,
   cancelledAt: true,
   deliveredAt: true,
-}).extend({
-  items: z
-    .array(OrderItemCreateSchema)
-    .min(1, 'Order must contain at least one item')
-    .max(50, 'Order cannot contain more than 50 items'),
-}).strict();
+})
+  .extend({
+    items: z
+      .array(OrderItemCreateSchema)
+      .min(1, "Order must contain at least one item")
+      .max(50, "Order cannot contain more than 50 items"),
+  })
+  .strict();
 export type OrderCreate = z.infer<typeof OrderCreateSchema>;
 
 /**
@@ -304,12 +300,12 @@ export type OrderUpdate = z.infer<typeof OrderUpdateSchema>;
  * Cart Item Schema
  */
 export const CartItemSchema = z.object({
-  id: z.string().min(1, 'Cart item ID is required'),
-  userId: z.string().min(1, 'User ID is required'),
-  productId: z.string().min(1, 'Product ID is required'),
-  variantId: z.string().min(1, 'Variant ID is required'),
+  id: z.string().min(1, "Cart item ID is required"),
+  userId: z.string().min(1, "User ID is required"),
+  productId: z.string().min(1, "Product ID is required"),
+  variantId: z.string().min(1, "Variant ID is required"),
   frameId: z.string().optional(),
-  quantity: z.number().int().positive('Quantity must be a positive integer').max(99),
+  quantity: z.number().int().positive("Quantity must be a positive integer").max(99),
   addedAt: z.date(),
 });
 export type CartItem = z.infer<typeof CartItemSchema>;

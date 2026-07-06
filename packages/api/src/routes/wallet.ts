@@ -15,10 +15,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
-import {
-  requireAuth,
-  type AuthVariables,
-} from "../middleware/auth";
+import { requireAuth, type AuthVariables } from "../middleware/auth";
 import {
   getWalletBalance,
   getTransactionHistory,
@@ -33,15 +30,9 @@ import {
   getRazorpayKeyId,
   isRazorpayConfigured,
 } from "../lib/razorpay";
-import {
-  aiModelProviderEnum,
-  aiStylePresetEnum,
-} from "../database/schema/ai-generations";
+import { aiModelProviderEnum, aiStylePresetEnum } from "../database/schema/ai-generations";
 import type { FalModelType } from "../ai/generator";
-import {
-  WALLET_CONFIG_KEYS,
-  WALLET_CONFIG_DEFAULTS,
-} from "../database/schema/wallet";
+import { WALLET_CONFIG_KEYS, WALLET_CONFIG_DEFAULTS } from "../database/schema/wallet";
 
 // ============================================================================
 // Constants
@@ -62,9 +53,7 @@ const TOPUP_PRESETS = [
 const transactionsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional().default(1),
   pageSize: z.coerce.number().int().positive().max(50).optional().default(20),
-  type: z
-    .enum(["credit", "debit", "refund", "bonus", "adjustment"])
-    .optional(),
+  type: z.enum(["credit", "debit", "refund", "bonus", "adjustment"]).optional(),
   status: z.enum(["pending", "completed", "failed", "reversed"]).optional(),
   fromDate: z.coerce.date().optional(),
   toDate: z.coerce.date().optional(),
@@ -131,8 +120,7 @@ walletApp.get("/", requireAuth, async (c) => {
       isPaymentConfigured: isRazorpayConfigured(),
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return c.json({ error: `Failed to get wallet: ${errorMessage}` }, 500);
   }
 });
@@ -147,8 +135,7 @@ walletApp.get(
   zValidator("query", transactionsQuerySchema),
   async (c) => {
     const user = c.get("user");
-    const { page, pageSize, type, status, fromDate, toDate } =
-      c.req.valid("query");
+    const { page, pageSize, type, status, fromDate, toDate } = c.req.valid("query");
 
     try {
       const result = await getTransactionHistory(
@@ -167,9 +154,8 @@ walletApp.get(
           paise: tx.amountPaise,
           rupees: tx.amountPaise / 100,
           formatted:
-            (tx.type === "credit" || tx.type === "refund" || tx.type === "bonus"
-              ? "+"
-              : "-") + `₹${(tx.amountPaise / 100).toFixed(2)}`,
+            (tx.type === "credit" || tx.type === "refund" || tx.type === "bonus" ? "+" : "-") +
+            `₹${(tx.amountPaise / 100).toFixed(2)}`,
         },
         balanceAfter: {
           paise: tx.balanceAfterPaise,
@@ -191,12 +177,8 @@ walletApp.get(
         hasPreviousPage: result.hasPreviousPage,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json(
-        { error: `Failed to get transactions: ${errorMessage}` },
-        500
-      );
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return c.json({ error: `Failed to get transactions: ${errorMessage}` }, 500);
     }
   }
 );
@@ -205,126 +187,107 @@ walletApp.get(
 // POST /api/wallet/topup - Create Top-Up Order
 // ============================================================================
 
-walletApp.post(
-  "/topup",
-  requireAuth,
-  zValidator("json", createTopUpSchema),
-  async (c) => {
-    const user = c.get("user");
-    const { amountPaise } = c.req.valid("json");
+walletApp.post("/topup", requireAuth, zValidator("json", createTopUpSchema), async (c) => {
+  const user = c.get("user");
+  const { amountPaise } = c.req.valid("json");
 
-    if (!isRazorpayConfigured()) {
-      return c.json({ error: "Payment gateway not configured" }, 503);
-    }
+  if (!isRazorpayConfigured()) {
+    return c.json({ error: "Payment gateway not configured" }, 503);
+  }
 
-    try {
-      // Create Razorpay order
-      const receipt = `wallet_${user.id}_${Date.now()}`;
-      const razorpayOrder = await createRazorpayOrder({
-        amount: amountPaise,
+  try {
+    // Create Razorpay order
+    const receipt = `wallet_${user.id}_${Date.now()}`;
+    const razorpayOrder = await createRazorpayOrder({
+      amount: amountPaise,
+      currency: "INR",
+      receipt,
+      notes: {
+        userId: user.id,
+        type: "wallet_topup",
+      },
+    });
+
+    // Create pending transaction
+    await createPendingTopUp(user.id, amountPaise, razorpayOrder.id);
+
+    return c.json(
+      {
+        orderId: razorpayOrder.id,
+        amount: {
+          paise: amountPaise,
+          rupees: amountPaise / 100,
+          formatted: `₹${(amountPaise / 100).toFixed(2)}`,
+        },
         currency: "INR",
-        receipt,
+        keyId: getRazorpayKeyId(),
+        prefill: {
+          name: user.name,
+          email: user.email,
+          contact: user.phone || undefined,
+        },
         notes: {
           userId: user.id,
           type: "wallet_topup",
         },
-      });
-
-      // Create pending transaction
-      await createPendingTopUp(user.id, amountPaise, razorpayOrder.id);
-
-      return c.json(
-        {
-          orderId: razorpayOrder.id,
-          amount: {
-            paise: amountPaise,
-            rupees: amountPaise / 100,
-            formatted: `₹${(amountPaise / 100).toFixed(2)}`,
-          },
-          currency: "INR",
-          keyId: getRazorpayKeyId(),
-          prefill: {
-            name: user.name,
-            email: user.email,
-            contact: user.phone || undefined,
-          },
-          notes: {
-            userId: user.id,
-            type: "wallet_topup",
-          },
-        },
-        201
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json({ error: `Failed to create top-up: ${errorMessage}` }, 500);
-    }
+      },
+      201
+    );
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to create top-up: ${errorMessage}` }, 500);
   }
-);
+});
 
 // ============================================================================
 // POST /api/wallet/topup/verify - Verify Payment
 // ============================================================================
 
-walletApp.post(
-  "/topup/verify",
-  requireAuth,
-  zValidator("json", verifyTopUpSchema),
-  async (c) => {
-    const user = c.get("user");
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } =
-      c.req.valid("json");
+walletApp.post("/topup/verify", requireAuth, zValidator("json", verifyTopUpSchema), async (c) => {
+  const user = c.get("user");
+  const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = c.req.valid("json");
 
-    try {
-      // Verify signature
-      const isValid = verifyPaymentSignature({
-        razorpayOrderId,
-        razorpayPaymentId,
-        razorpaySignature,
-      });
+  try {
+    // Verify signature
+    const isValid = verifyPaymentSignature({
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+    });
 
-      if (!isValid) {
-        return c.json({ error: "Invalid payment signature" }, 400);
-      }
-
-      // Complete the pending transaction
-      const transaction = await completePendingTopUp(
-        razorpayOrderId,
-        razorpayPaymentId
-      );
-
-      // Get updated balance
-      const balance = await getWalletBalance(user.id);
-
-      return c.json({
-        message: "Payment verified successfully",
-        transaction: {
-          id: transaction.id,
-          type: transaction.type,
-          status: transaction.status,
-          amount: {
-            paise: transaction.amountPaise,
-            rupees: transaction.amountPaise / 100,
-            formatted: `₹${(transaction.amountPaise / 100).toFixed(2)}`,
-          },
-        },
-        balance: {
-          paise: balance.balancePaise,
-          rupees: balance.balanceRupees,
-          formatted: `₹${balance.balanceRupees.toFixed(2)}`,
-        },
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json(
-        { error: `Failed to verify payment: ${errorMessage}` },
-        500
-      );
+    if (!isValid) {
+      return c.json({ error: "Invalid payment signature" }, 400);
     }
+
+    // Complete the pending transaction
+    const transaction = await completePendingTopUp(razorpayOrderId, razorpayPaymentId);
+
+    // Get updated balance
+    const balance = await getWalletBalance(user.id);
+
+    return c.json({
+      message: "Payment verified successfully",
+      transaction: {
+        id: transaction.id,
+        type: transaction.type,
+        status: transaction.status,
+        amount: {
+          paise: transaction.amountPaise,
+          rupees: transaction.amountPaise / 100,
+          formatted: `₹${(transaction.amountPaise / 100).toFixed(2)}`,
+        },
+      },
+      balance: {
+        paise: balance.balancePaise,
+        rupees: balance.balanceRupees,
+        formatted: `₹${balance.balanceRupees.toFixed(2)}`,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return c.json({ error: `Failed to verify payment: ${errorMessage}` }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/wallet/estimate-cost - Estimate AI Generation Cost
@@ -361,12 +324,8 @@ walletApp.get(
         variationCount,
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.json(
-        { error: `Failed to estimate cost: ${errorMessage}` },
-        500
-      );
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      return c.json({ error: `Failed to estimate cost: ${errorMessage}` }, 500);
     }
   }
 );

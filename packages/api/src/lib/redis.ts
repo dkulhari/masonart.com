@@ -5,10 +5,10 @@
  * Uses ioredis for full Redis functionality and BullMQ compatibility.
  */
 
-import Redis from 'ioredis';
+import Redis from "ioredis";
 
 // Redis connection URL from environment
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 
 /**
  * Redis client singleton for general-purpose caching
@@ -19,7 +19,7 @@ export const redis = new Redis(REDIS_URL, {
   lazyConnect: true,
   retryStrategy: (times) => {
     // In development, don't retry if Redis is not available
-    if (process.env.NODE_ENV === 'development' && times > 3) {
+    if (process.env.NODE_ENV === "development" && times > 3) {
       return null; // Stop retrying
     }
     return Math.min(times * 100, 3000);
@@ -27,12 +27,12 @@ export const redis = new Redis(REDIS_URL, {
 });
 
 // Suppress Redis connection errors in development
-redis.on('error', (err) => {
-  if (process.env.NODE_ENV === 'development') {
+redis.on("error", (err) => {
+  if (process.env.NODE_ENV === "development") {
     // Silently ignore connection errors in development
     return;
   }
-  console.error('Redis connection error:', err);
+  console.error("Redis connection error:", err);
 });
 
 /**
@@ -66,13 +66,13 @@ const DEFAULT_TTL = 3600;
  * Cache key prefixes for different data types
  */
 export const CacheKeys = {
-  PRODUCT: 'product:',
-  PRODUCT_LIST: 'product-list:',
-  CART: 'cart:',
-  SESSION: 'session:',
-  USER: 'user:',
-  AI_GENERATION: 'ai-gen:',
-  RATE_LIMIT: 'rate-limit:',
+  PRODUCT: "product:",
+  PRODUCT_LIST: "product-list:",
+  CART: "cart:",
+  SESSION: "session:",
+  USER: "user:",
+  AI_GENERATION: "ai-gen:",
+  RATE_LIMIT: "rate-limit:",
 } as const;
 
 /**
@@ -80,7 +80,7 @@ export const CacheKeys = {
  */
 export async function getCached<T>(key: string): Promise<T | null> {
   try {
-    if (redis.status !== 'ready') return null;
+    if (redis.status !== "ready") return null;
     const value = await redis.get(key);
     if (!value) return null;
 
@@ -104,8 +104,8 @@ export async function setCached<T>(
   ttlSeconds: number = DEFAULT_TTL
 ): Promise<void> {
   try {
-    if (redis.status !== 'ready') return;
-    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    if (redis.status !== "ready") return;
+    const serialized = typeof value === "string" ? value : JSON.stringify(value);
     await redis.setex(key, ttlSeconds, serialized);
   } catch {
     // Redis not available - skip caching silently
@@ -117,7 +117,7 @@ export async function setCached<T>(
  */
 export async function deleteCached(key: string): Promise<void> {
   try {
-    if (redis.status !== 'ready') return;
+    if (redis.status !== "ready") return;
     await redis.del(key);
   } catch {
     // Redis not available - skip silently
@@ -129,7 +129,7 @@ export async function deleteCached(key: string): Promise<void> {
  */
 export async function deleteCachedPattern(pattern: string): Promise<void> {
   try {
-    if (redis.status !== 'ready') return;
+    if (redis.status !== "ready") return;
     const keys = await redis.keys(pattern);
     if (keys.length > 0) {
       await redis.del(...keys);
@@ -173,11 +173,12 @@ export async function checkRateLimit(
 
   if (count >= limit) {
     // Get the oldest entry to calculate reset time
-    const oldest = await redis.zrange(rateLimitKey, 0, 0, 'WITHSCORES');
+    const oldest = await redis.zrange(rateLimitKey, 0, 0, "WITHSCORES");
     const oldestTimestamp = oldest[1];
-    const resetIn = oldest.length >= 2 && oldestTimestamp !== undefined
-      ? Math.ceil((parseInt(oldestTimestamp) + windowSeconds * 1000 - now) / 1000)
-      : windowSeconds;
+    const resetIn =
+      oldest.length >= 2 && oldestTimestamp !== undefined
+        ? Math.ceil((parseInt(oldestTimestamp) + windowSeconds * 1000 - now) / 1000)
+        : windowSeconds;
 
     return {
       success: false,
@@ -216,9 +217,7 @@ export async function setSession(
 /**
  * Get session data from Redis
  */
-export async function getSession(
-  sessionId: string
-): Promise<Record<string, unknown> | null> {
+export async function getSession(sessionId: string): Promise<Record<string, unknown> | null> {
   const key = `${CacheKeys.SESSION}${sessionId}`;
   return getCached(key);
 }
@@ -240,15 +239,15 @@ export async function deleteSession(sessionId: string): Promise<void> {
  * Call this on server startup
  */
 export async function initRedis(): Promise<void> {
-  if (redis.status === 'ready') return;
+  if (redis.status === "ready") return;
 
   try {
     await redis.connect();
   } catch (error) {
     // Connection failed, but ioredis will auto-reconnect
     // This is fine for development when Redis might not be running
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Redis connection failed, will retry automatically:', error);
+    if (process.env.NODE_ENV === "development") {
+      console.warn("Redis connection failed, will retry automatically:", error);
     } else {
       throw error;
     }
@@ -267,7 +266,7 @@ export async function closeRedis(): Promise<void> {
  * Check if Redis is connected
  */
 export function isRedisConnected(): boolean {
-  return redis.status === 'ready';
+  return redis.status === "ready";
 }
 
 // Export default redis instance

@@ -12,49 +12,39 @@
 /**
  * User role types
  */
-export type UserRole = 'customer' | 'trade' | 'admin' | 'super-admin';
+export type UserRole = "customer" | "trade" | "admin" | "super-admin";
 
 /**
  * Authentication provider types
  */
-export type AuthProvider =
-  | 'email'
-  | 'google'
-  | 'facebook'
-  | 'apple'
-  | 'phone';
+export type AuthProvider = "email" | "google" | "facebook" | "apple" | "phone";
 
 /**
  * User account status
  */
-export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending-verification';
+export type UserStatus = "active" | "inactive" | "suspended" | "pending-verification";
 
 /**
  * Trade program status
  */
-export type TradeStatus =
-  | 'none'
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'suspended';
+export type TradeStatus = "none" | "pending" | "approved" | "rejected" | "suspended";
 
 /**
  * Trade account type categories
  */
 export type TradeAccountType =
-  | 'interior-designer'
-  | 'architect'
-  | 'staging-company'
-  | 'hospitality'
-  | 'office-designer'
-  | 'art-consultant'
-  | 'other';
+  | "interior-designer"
+  | "architect"
+  | "staging-company"
+  | "hospitality"
+  | "office-designer"
+  | "art-consultant"
+  | "other";
 
 /**
  * Notification channel types
  */
-export type NotificationChannel = 'email' | 'sms' | 'push' | 'whatsapp';
+export type NotificationChannel = "email" | "sms" | "push" | "whatsapp";
 
 // ============================================================================
 // Address Types
@@ -63,7 +53,7 @@ export type NotificationChannel = 'email' | 'sms' | 'push' | 'whatsapp';
 /**
  * Address type designation
  */
-export type AddressType = 'shipping' | 'billing' | 'both';
+export type AddressType = "shipping" | "billing" | "both";
 
 /**
  * User address definition
@@ -125,12 +115,12 @@ export interface AddressInput {
 /**
  * Saved payment method types
  */
-export type PaymentMethodType = 'card' | 'upi' | 'netbanking' | 'wallet';
+export type PaymentMethodType = "card" | "upi" | "netbanking" | "wallet";
 
 /**
  * Card brand types
  */
-export type CardBrand = 'visa' | 'mastercard' | 'amex' | 'rupay' | 'other';
+export type CardBrand = "visa" | "mastercard" | "amex" | "rupay" | "other";
 
 /**
  * Saved payment method
@@ -172,14 +162,14 @@ export interface SavedPaymentMethod {
  * Notification category types
  */
 export type NotificationCategory =
-  | 'order-updates'
-  | 'promotions'
-  | 'new-arrivals'
-  | 'price-drops'
-  | 'back-in-stock'
-  | 'artist-updates'
-  | 'ai-gallery'
-  | 'review-requests';
+  | "order-updates"
+  | "promotions"
+  | "new-arrivals"
+  | "price-drops"
+  | "back-in-stock"
+  | "artist-updates"
+  | "ai-gallery"
+  | "review-requests";
 
 /**
  * User notification preferences
@@ -296,7 +286,7 @@ export interface User {
   /** Number of AI generation credits remaining */
   aiCreditsRemaining: number;
   /** AI subscription tier */
-  aiSubscriptionTier?: 'free' | 'premium' | 'unlimited';
+  aiSubscriptionTier?: "free" | "premium" | "unlimited";
   /** When the account was created */
   createdAt: Date;
   /** When the account was last updated */

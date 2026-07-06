@@ -5,7 +5,7 @@
  * and display labels based on the requirements specification (Section 4.3).
  */
 
-import type { ProductSize, SizeCategory, PriceTier } from '../types/product';
+import type { ProductSize, SizeCategory, PriceTier } from "../types/product";
 
 // ============================================================================
 // Helper Functions
@@ -70,14 +70,14 @@ const createSize = (
  * Square poster sizes (equal width and height)
  */
 export const SQUARE_SIZES: readonly ProductSize[] = [
-  createSize(12, 12, 1, 'square'),
-  createSize(16, 16, 1, 'square'),
-  createSize(20, 20, 2, 'square'),
-  createSize(24, 24, 2, 'square'),
-  createSize(30, 30, 3, 'square'),
-  createSize(36, 36, 3, 'square'),
-  createSize(40, 40, 4, 'square'),
-  createSize(48, 48, 4, 'square'),
+  createSize(12, 12, 1, "square"),
+  createSize(16, 16, 1, "square"),
+  createSize(20, 20, 2, "square"),
+  createSize(24, 24, 2, "square"),
+  createSize(30, 30, 3, "square"),
+  createSize(36, 36, 3, "square"),
+  createSize(40, 40, 4, "square"),
+  createSize(48, 48, 4, "square"),
 ] as const;
 
 // ============================================================================
@@ -89,14 +89,14 @@ export const SQUARE_SIZES: readonly ProductSize[] = [
  * Listed as width × height for portrait orientation
  */
 export const PORTRAIT_LANDSCAPE_SIZES: readonly ProductSize[] = [
-  createSize(12, 16, 1, 'portrait-landscape'),
-  createSize(16, 20, 1, 'portrait-landscape'),
-  createSize(18, 24, 2, 'portrait-landscape'),
-  createSize(24, 32, 2, 'portrait-landscape'),
-  createSize(24, 36, 3, 'portrait-landscape'),
-  createSize(30, 40, 3, 'portrait-landscape'),
-  createSize(36, 48, 4, 'portrait-landscape'),
-  createSize(40, 60, 4, 'portrait-landscape'),
+  createSize(12, 16, 1, "portrait-landscape"),
+  createSize(16, 20, 1, "portrait-landscape"),
+  createSize(18, 24, 2, "portrait-landscape"),
+  createSize(24, 32, 2, "portrait-landscape"),
+  createSize(24, 36, 3, "portrait-landscape"),
+  createSize(30, 40, 3, "portrait-landscape"),
+  createSize(36, 48, 4, "portrait-landscape"),
+  createSize(40, 60, 4, "portrait-landscape"),
 ] as const;
 
 // ============================================================================
@@ -107,10 +107,10 @@ export const PORTRAIT_LANDSCAPE_SIZES: readonly ProductSize[] = [
  * Panoramic poster sizes (wide format for landscape scenes)
  */
 export const PANORAMIC_SIZES: readonly ProductSize[] = [
-  createSize(12, 36, 2, 'panoramic'),
-  createSize(16, 48, 3, 'panoramic'),
-  createSize(20, 60, 4, 'panoramic'),
-  createSize(24, 72, 4, 'panoramic'),
+  createSize(12, 36, 2, "panoramic"),
+  createSize(16, 48, 3, "panoramic"),
+  createSize(20, 60, 4, "panoramic"),
+  createSize(24, 72, 4, "panoramic"),
 ] as const;
 
 // ============================================================================
@@ -151,9 +151,9 @@ export const SIZES_BY_TIER: ReadonlyMap<PriceTier, readonly ProductSize[]> = new
  * Map of categories to their associated sizes
  */
 export const SIZES_BY_CATEGORY: ReadonlyMap<SizeCategory, readonly ProductSize[]> = new Map([
-  ['square', SQUARE_SIZES],
-  ['portrait-landscape', PORTRAIT_LANDSCAPE_SIZES],
-  ['panoramic', PANORAMIC_SIZES],
+  ["square", SQUARE_SIZES],
+  ["portrait-landscape", PORTRAIT_LANDSCAPE_SIZES],
+  ["panoramic", PANORAMIC_SIZES],
 ]);
 
 // ============================================================================
@@ -206,15 +206,15 @@ export const isSquareSize = (size: ProductSize): boolean => {
  * Get sizes compatible with a specific orientation
  */
 export const getSizesForOrientation = (
-  orientation: 'square' | 'portrait' | 'landscape' | 'panoramic'
+  orientation: "square" | "portrait" | "landscape" | "panoramic"
 ): readonly ProductSize[] => {
   switch (orientation) {
-    case 'square':
+    case "square":
       return SQUARE_SIZES;
-    case 'portrait':
-    case 'landscape':
+    case "portrait":
+    case "landscape":
       return PORTRAIT_LANDSCAPE_SIZES;
-    case 'panoramic':
+    case "panoramic":
       return PANORAMIC_SIZES;
     default:
       return [];
@@ -228,7 +228,7 @@ export const getSizesForOrientation = (
 /**
  * Default size for new products
  */
-export const DEFAULT_SIZE_ID = 'portrait-landscape-16x20';
+export const DEFAULT_SIZE_ID = "portrait-landscape-16x20";
 
 /**
  * Smallest available size
@@ -244,8 +244,8 @@ export const LARGEST_SIZE = PANORAMIC_SIZES[PANORAMIC_SIZES.length - 1];
  * Most popular sizes (commonly used for featured products)
  */
 export const POPULAR_SIZES: readonly string[] = [
-  'square-16x16',
-  'portrait-landscape-16x20',
-  'portrait-landscape-24x36',
-  'panoramic-16x48',
+  "square-16x16",
+  "portrait-landscape-16x20",
+  "portrait-landscape-24x36",
+  "panoramic-16x48",
 ] as const;

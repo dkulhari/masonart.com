@@ -10,9 +10,9 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { z } from 'zod'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
 import {
   RefreshCw,
   AlertCircle,
@@ -28,10 +28,10 @@ import {
   MoreHorizontal,
   Search,
   Filter,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
-import { getApiUrl } from '~/lib/utils'
-import { StatsCard, StatsCardGrid, StatsCardSkeleton } from '~/components/admin/StatsCard'
+} from "lucide-react";
+import { cn } from "~/lib/utils";
+import { getApiUrl } from "~/lib/utils";
+import { StatsCard, StatsCardGrid, StatsCardSkeleton } from "~/components/admin/StatsCard";
 
 // ============================================================================
 // Route Configuration
@@ -40,73 +40,73 @@ import { StatsCard, StatsCardGrid, StatsCardSkeleton } from '~/components/admin/
 const searchParamsSchema = z.object({
   page: z.coerce.number().positive().optional().default(1),
   pageSize: z.coerce.number().positive().max(100).optional().default(20),
-  status: z.enum(['pending', 'approved', 'rejected']).optional(),
+  status: z.enum(["pending", "approved", "rejected"]).optional(),
   search: z.string().optional(),
-  sortBy: z.enum(['newest', 'oldest', 'rating']).optional().default('newest'),
-})
+  sortBy: z.enum(["newest", "oldest", "rating"]).optional().default("newest"),
+});
 
-type SearchParams = z.infer<typeof searchParamsSchema>
+type SearchParams = z.infer<typeof searchParamsSchema>;
 
-export const Route = createFileRoute('/admin/reviews')({
+export const Route = createFileRoute("/admin/reviews")({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Reviews | Admin | MasonArt' },
-      { name: 'robots', content: 'noindex, nofollow' },
+      { title: "Reviews | Admin | MasonArt" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: AdminReviewsPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface ReviewAuthor {
-  id: string
-  name: string | null
-  email: string
+  id: string;
+  name: string | null;
+  email: string;
 }
 
 interface ReviewProduct {
-  id: string
-  title: string
-  slug: string
+  id: string;
+  title: string;
+  slug: string;
 }
 
 interface AdminReview {
-  id: string
-  productId: string
-  userId: string
-  rating: number
-  title: string | null
-  content: string | null
-  status: 'pending' | 'approved' | 'rejected'
-  moderatorId: string | null
-  moderatorNotes: string | null
-  createdAt: string
-  updatedAt: string
-  author: ReviewAuthor | null
-  product: ReviewProduct | null
+  id: string;
+  productId: string;
+  userId: string;
+  rating: number;
+  title: string | null;
+  content: string | null;
+  status: "pending" | "approved" | "rejected";
+  moderatorId: string | null;
+  moderatorNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  author: ReviewAuthor | null;
+  product: ReviewProduct | null;
 }
 
 interface ReviewStats {
-  pending: number
-  approved: number
-  rejected: number
-  today: number
-  averageRating: number
-  total: number
+  pending: number;
+  approved: number;
+  rejected: number;
+  today: number;
+  averageRating: number;
+  total: number;
 }
 
 interface PaginatedResponse {
-  items: AdminReview[]
-  total: number
-  page: number
-  pageSize: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
+  items: AdminReview[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 // ============================================================================
@@ -114,84 +114,81 @@ interface PaginatedResponse {
 // ============================================================================
 
 async function fetchReviews(params: SearchParams): Promise<PaginatedResponse> {
-  const queryParams = new URLSearchParams()
+  const queryParams = new URLSearchParams();
 
-  queryParams.set('page', String(params.page))
-  queryParams.set('pageSize', String(params.pageSize))
-  queryParams.set('sortBy', params.sortBy)
+  queryParams.set("page", String(params.page));
+  queryParams.set("pageSize", String(params.pageSize));
+  queryParams.set("sortBy", params.sortBy);
 
   if (params.status) {
-    queryParams.set('status', params.status)
+    queryParams.set("status", params.status);
   }
 
   if (params.search) {
-    queryParams.set('search', params.search)
+    queryParams.set("search", params.search);
   }
 
-  const response = await fetch(
-    `${getApiUrl()}/api/admin/reviews?${queryParams.toString()}`,
-    {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    }
-  )
+  const response = await fetch(`${getApiUrl()}/api/admin/reviews?${queryParams.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch reviews')
+    throw new Error("Failed to fetch reviews");
   }
 
-  return response.json()
+  return response.json();
 }
 
 async function fetchReviewStats(): Promise<ReviewStats> {
   const response = await fetch(`${getApiUrl()}/api/admin/reviews/stats`, {
-    method: 'GET',
-    credentials: 'include',
+    method: "GET",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-  })
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch review statistics')
+    throw new Error("Failed to fetch review statistics");
   }
 
-  return response.json()
+  return response.json();
 }
 
 async function moderateReview(
   reviewId: string,
-  status: 'approved' | 'rejected',
+  status: "approved" | "rejected",
   moderatorNotes?: string
 ): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/reviews/${reviewId}`, {
-    method: 'PATCH',
-    credentials: 'include',
+    method: "PATCH",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ status, moderatorNotes }),
-  })
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to moderate review')
+    throw new Error("Failed to moderate review");
   }
 }
 
 async function deleteReview(reviewId: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/reviews/${reviewId}`, {
-    method: 'DELETE',
-    credentials: 'include',
+    method: "DELETE",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-  })
+  });
 
   if (!response.ok) {
-    throw new Error('Failed to delete review')
+    throw new Error("Failed to delete review");
   }
 }
 
@@ -200,11 +197,11 @@ async function deleteReview(reviewId: string): Promise<void> {
 // ============================================================================
 
 function AdminReviewsPage() {
-  const navigate = useNavigate()
-  const searchParams = Route.useSearch()
+  const navigate = useNavigate();
+  const searchParams = Route.useSearch();
 
-  const [reviews, setReviews] = useState<AdminReview[]>([])
-  const [stats, setStats] = useState<ReviewStats | null>(null)
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [stats, setStats] = useState<ReviewStats | null>(null);
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -212,21 +209,21 @@ function AdminReviewsPage() {
     totalPages: 0,
     hasNextPage: false,
     hasPreviousPage: false,
-  })
-  const [isLoading, setIsLoading] = useState(true)
-  const [isStatsLoading, setIsStatsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [selectedReviews, setSelectedReviews] = useState<Set<string>>(new Set())
-  const [expandedReview, setExpandedReview] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState(searchParams.search || '')
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedReviews, setSelectedReviews] = useState<Set<string>>(new Set());
+  const [expandedReview, setExpandedReview] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(searchParams.search || "");
 
   // Fetch reviews
   const loadReviews = useCallback(async () => {
     try {
-      setError(null)
-      const data = await fetchReviews(searchParams)
-      setReviews(data.items)
+      setError(null);
+      const data = await fetchReviews(searchParams);
+      setReviews(data.items);
       setPagination({
         total: data.total,
         page: data.page,
@@ -234,160 +231,158 @@ function AdminReviewsPage() {
         totalPages: data.totalPages,
         hasNextPage: data.hasNextPage,
         hasPreviousPage: data.hasPreviousPage,
-      })
+      });
     } catch {
-      setError('Failed to load reviews. Please try again.')
+      setError("Failed to load reviews. Please try again.");
     } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [searchParams])
+  }, [searchParams]);
 
   // Fetch stats
   const loadStats = useCallback(async () => {
     try {
-      const data = await fetchReviewStats()
-      setStats(data)
+      const data = await fetchReviewStats();
+      setStats(data);
     } catch {
       // Stats error is non-critical, don't show error banner
     } finally {
-      setIsStatsLoading(false)
+      setIsStatsLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    setIsLoading(true)
-    loadReviews()
-    loadStats()
-  }, [loadReviews, loadStats])
+    setIsLoading(true);
+    loadReviews();
+    loadStats();
+  }, [loadReviews, loadStats]);
 
   // Refresh handler
   const handleRefresh = () => {
-    setIsRefreshing(true)
-    setIsStatsLoading(true)
-    loadReviews()
-    loadStats()
-  }
+    setIsRefreshing(true);
+    setIsStatsLoading(true);
+    loadReviews();
+    loadStats();
+  };
 
   // Update URL params
   const updateSearch = (updates: Partial<SearchParams>) => {
     navigate({
-      to: '/admin/reviews',
+      to: "/admin/reviews",
       search: {
         ...searchParams,
         ...updates,
-        page: updates.page || (updates.status !== undefined || updates.search !== undefined ? 1 : searchParams.page),
+        page:
+          updates.page ||
+          (updates.status !== undefined || updates.search !== undefined ? 1 : searchParams.page),
       },
-    })
-  }
+    });
+  };
 
   // Handle search submit
   const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    updateSearch({ search: searchQuery || undefined })
-  }
+    e.preventDefault();
+    updateSearch({ search: searchQuery || undefined });
+  };
 
   // Handle approve
   const handleApprove = async (reviewId: string) => {
     try {
-      await moderateReview(reviewId, 'approved')
-      setIsRefreshing(true)
-      await loadReviews()
-      await loadStats()
+      await moderateReview(reviewId, "approved");
+      setIsRefreshing(true);
+      await loadReviews();
+      await loadStats();
     } catch {
-      setError('Failed to approve review. Please try again.')
+      setError("Failed to approve review. Please try again.");
     }
-  }
+  };
 
   // Handle reject
   const handleReject = async (reviewId: string, notes?: string) => {
     try {
-      await moderateReview(reviewId, 'rejected', notes)
-      setIsRefreshing(true)
-      await loadReviews()
-      await loadStats()
+      await moderateReview(reviewId, "rejected", notes);
+      setIsRefreshing(true);
+      await loadReviews();
+      await loadStats();
     } catch {
-      setError('Failed to reject review. Please try again.')
+      setError("Failed to reject review. Please try again.");
     }
-  }
+  };
 
   // Handle delete
   const handleDelete = async (reviewId: string) => {
-    if (!confirm('Are you sure you want to permanently delete this review?')) {
-      return
+    if (!confirm("Are you sure you want to permanently delete this review?")) {
+      return;
     }
 
     try {
-      await deleteReview(reviewId)
-      setIsRefreshing(true)
-      await loadReviews()
-      await loadStats()
+      await deleteReview(reviewId);
+      setIsRefreshing(true);
+      await loadReviews();
+      await loadStats();
     } catch {
-      setError('Failed to delete review. Please try again.')
+      setError("Failed to delete review. Please try again.");
     }
-  }
+  };
 
   // Handle bulk approve
   const handleBulkApprove = async () => {
-    if (selectedReviews.size === 0) return
+    if (selectedReviews.size === 0) return;
 
     if (!confirm(`Are you sure you want to approve ${selectedReviews.size} reviews?`)) {
-      return
+      return;
     }
 
     try {
-      await Promise.all(
-        Array.from(selectedReviews).map((id) => moderateReview(id, 'approved'))
-      )
-      setSelectedReviews(new Set())
-      setIsRefreshing(true)
-      await loadReviews()
-      await loadStats()
+      await Promise.all(Array.from(selectedReviews).map((id) => moderateReview(id, "approved")));
+      setSelectedReviews(new Set());
+      setIsRefreshing(true);
+      await loadReviews();
+      await loadStats();
     } catch {
-      setError('Failed to approve some reviews. Please try again.')
+      setError("Failed to approve some reviews. Please try again.");
     }
-  }
+  };
 
   // Handle bulk reject
   const handleBulkReject = async () => {
-    if (selectedReviews.size === 0) return
+    if (selectedReviews.size === 0) return;
 
     if (!confirm(`Are you sure you want to reject ${selectedReviews.size} reviews?`)) {
-      return
+      return;
     }
 
     try {
-      await Promise.all(
-        Array.from(selectedReviews).map((id) => moderateReview(id, 'rejected'))
-      )
-      setSelectedReviews(new Set())
-      setIsRefreshing(true)
-      await loadReviews()
-      await loadStats()
+      await Promise.all(Array.from(selectedReviews).map((id) => moderateReview(id, "rejected")));
+      setSelectedReviews(new Set());
+      setIsRefreshing(true);
+      await loadReviews();
+      await loadStats();
     } catch {
-      setError('Failed to reject some reviews. Please try again.')
+      setError("Failed to reject some reviews. Please try again.");
     }
-  }
+  };
 
   // Toggle review selection
   const toggleSelection = (reviewId: string) => {
-    const newSelection = new Set(selectedReviews)
+    const newSelection = new Set(selectedReviews);
     if (newSelection.has(reviewId)) {
-      newSelection.delete(reviewId)
+      newSelection.delete(reviewId);
     } else {
-      newSelection.add(reviewId)
+      newSelection.add(reviewId);
     }
-    setSelectedReviews(newSelection)
-  }
+    setSelectedReviews(newSelection);
+  };
 
   // Toggle all selection
   const toggleSelectAll = () => {
     if (selectedReviews.size === reviews.length) {
-      setSelectedReviews(new Set())
+      setSelectedReviews(new Set());
     } else {
-      setSelectedReviews(new Set(reviews.map((r) => r.id)))
+      setSelectedReviews(new Set(reviews.map((r) => r.id)));
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -407,7 +402,7 @@ function AdminReviewsPage() {
             disabled={isLoading || isRefreshing}
             className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
           >
-            <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
@@ -450,7 +445,9 @@ function AdminReviewsPage() {
               value={stats?.today ?? 0}
               icon={Calendar}
               variant="info"
-              description={stats?.averageRating ? `Avg rating: ${stats.averageRating.toFixed(1)}` : undefined}
+              description={
+                stats?.averageRating ? `Avg rating: ${stats.averageRating.toFixed(1)}` : undefined
+              }
             />
           </>
         )}
@@ -475,20 +472,19 @@ function AdminReviewsPage() {
         {/* Status Filter */}
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
-          {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
+          {(["all", "pending", "approved", "rejected"] as const).map((status) => (
             <button
               key={status}
-              onClick={() => updateSearch({ status: status === 'all' ? undefined : status })}
+              onClick={() => updateSearch({ status: status === "all" ? undefined : status })}
               className={cn(
-                'rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-                (status === 'all' && !searchParams.status) ||
-                  searchParams.status === status
-                  ? 'bg-brand-500 text-white'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                (status === "all" && !searchParams.status) || searchParams.status === status
+                  ? "bg-brand-500 text-white"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-              {status === 'pending' && stats?.pending ? (
+              {status === "all" ? "All" : status.charAt(0).toUpperCase() + status.slice(1)}
+              {status === "pending" && stats?.pending ? (
                 <span className="ml-1.5 rounded-full bg-white/20 px-1.5 text-xs">
                   {stats.pending}
                 </span>
@@ -633,7 +629,7 @@ function AdminReviewsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -641,14 +637,14 @@ function AdminReviewsPage() {
 // ============================================================================
 
 interface ReviewRowProps {
-  review: AdminReview
-  isSelected: boolean
-  isExpanded: boolean
-  onToggleSelect: () => void
-  onToggleExpand: () => void
-  onApprove: () => void
-  onReject: (notes?: string) => void
-  onDelete: () => void
+  review: AdminReview;
+  isSelected: boolean;
+  isExpanded: boolean;
+  onToggleSelect: () => void;
+  onToggleExpand: () => void;
+  onApprove: () => void;
+  onReject: (notes?: string) => void;
+  onDelete: () => void;
 }
 
 function ReviewRow({
@@ -661,29 +657,29 @@ function ReviewRow({
   onReject,
   onDelete,
 }: ReviewRowProps) {
-  const [showRejectModal, setShowRejectModal] = useState(false)
-  const [rejectNotes, setRejectNotes] = useState('')
-  const [showMenu, setShowMenu] = useState(false)
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectNotes, setRejectNotes] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
 
   const handleRejectSubmit = () => {
-    onReject(rejectNotes || undefined)
-    setShowRejectModal(false)
-    setRejectNotes('')
-  }
+    onReject(rejectNotes || undefined);
+    setShowRejectModal(false);
+    setRejectNotes("");
+  };
 
   const statusStyles = {
-    pending: 'bg-amber-100 text-amber-700',
-    approved: 'bg-green-100 text-green-700',
-    rejected: 'bg-red-100 text-red-700',
-  }
+    pending: "bg-amber-100 text-amber-700",
+    approved: "bg-green-100 text-green-700",
+    rejected: "bg-red-100 text-red-700",
+  };
 
   return (
     <>
       <tr
         className={cn(
-          'transition-colors hover:bg-muted/50',
-          isSelected && 'bg-brand-50/50',
-          isExpanded && 'bg-muted/30'
+          "transition-colors hover:bg-muted/50",
+          isSelected && "bg-brand-50/50",
+          isExpanded && "bg-muted/30"
         )}
       >
         <td className="px-4 py-3">
@@ -700,7 +696,7 @@ function ReviewRow({
               onClick={onToggleExpand}
               className="font-medium text-foreground hover:text-brand-600"
             >
-              {review.product?.title || 'Unknown Product'}
+              {review.product?.title || "Unknown Product"}
             </button>
             {review.product && (
               <a
@@ -721,7 +717,7 @@ function ReviewRow({
             </div>
             <div>
               <p className="text-sm font-medium text-foreground">
-                {review.author?.name || 'Anonymous'}
+                {review.author?.name || "Anonymous"}
               </p>
               <p className="text-xs text-muted-foreground">{review.author?.email}</p>
             </div>
@@ -733,10 +729,8 @@ function ReviewRow({
               <Star
                 key={i}
                 className={cn(
-                  'h-4 w-4',
-                  i < review.rating
-                    ? 'fill-amber-400 text-amber-400'
-                    : 'fill-muted text-muted'
+                  "h-4 w-4",
+                  i < review.rating ? "fill-amber-400 text-amber-400" : "fill-muted text-muted"
                 )}
               />
             ))}
@@ -744,13 +738,13 @@ function ReviewRow({
         </td>
         <td className="hidden max-w-xs px-4 py-3 md:table-cell">
           <p className="truncate text-sm text-muted-foreground">
-            {review.title || review.content || 'No content'}
+            {review.title || review.content || "No content"}
           </p>
         </td>
         <td className="px-4 py-3">
           <span
             className={cn(
-              'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+              "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
               statusStyles[review.status]
             )}
           >
@@ -759,16 +753,16 @@ function ReviewRow({
         </td>
         <td className="hidden px-4 py-3 sm:table-cell">
           <time className="text-sm text-muted-foreground">
-            {new Date(review.createdAt).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
+            {new Date(review.createdAt).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
             })}
           </time>
         </td>
         <td className="px-4 py-3">
           <div className="flex items-center justify-end gap-1">
-            {review.status === 'pending' && (
+            {review.status === "pending" && (
               <>
                 <button
                   onClick={onApprove}
@@ -795,36 +789,33 @@ function ReviewRow({
               </button>
               {showMenu && (
                 <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowMenu(false)}
-                  />
+                  <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                   <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-lg border border-border bg-card py-1 shadow-lg">
                     <button
                       onClick={() => {
-                        onToggleExpand()
-                        setShowMenu(false)
+                        onToggleExpand();
+                        setShowMenu(false);
                       }}
                       className="flex w-full items-center px-3 py-1.5 text-sm text-foreground hover:bg-muted"
                     >
                       View Details
                     </button>
-                    {review.status !== 'approved' && (
+                    {review.status !== "approved" && (
                       <button
                         onClick={() => {
-                          onApprove()
-                          setShowMenu(false)
+                          onApprove();
+                          setShowMenu(false);
                         }}
                         className="flex w-full items-center px-3 py-1.5 text-sm text-green-600 hover:bg-muted"
                       >
                         Approve
                       </button>
                     )}
-                    {review.status !== 'rejected' && (
+                    {review.status !== "rejected" && (
                       <button
                         onClick={() => {
-                          setShowRejectModal(true)
-                          setShowMenu(false)
+                          setShowRejectModal(true);
+                          setShowMenu(false);
                         }}
                         className="flex w-full items-center px-3 py-1.5 text-sm text-red-600 hover:bg-muted"
                       >
@@ -833,8 +824,8 @@ function ReviewRow({
                     )}
                     <button
                       onClick={() => {
-                        onDelete()
-                        setShowMenu(false)
+                        onDelete();
+                        setShowMenu(false);
                       }}
                       className="flex w-full items-center px-3 py-1.5 text-sm text-red-600 hover:bg-muted"
                     >
@@ -855,20 +846,14 @@ function ReviewRow({
             <div className="space-y-3">
               {review.title && (
                 <div>
-                  <p className="text-xs font-medium uppercase text-muted-foreground">
-                    Title
-                  </p>
+                  <p className="text-xs font-medium uppercase text-muted-foreground">Title</p>
                   <p className="text-sm text-foreground">{review.title}</p>
                 </div>
               )}
               {review.content && (
                 <div>
-                  <p className="text-xs font-medium uppercase text-muted-foreground">
-                    Content
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm text-foreground">
-                    {review.content}
-                  </p>
+                  <p className="text-xs font-medium uppercase text-muted-foreground">Content</p>
+                  <p className="whitespace-pre-wrap text-sm text-foreground">{review.content}</p>
                 </div>
               )}
               {review.moderatorNotes && (
@@ -905,8 +890,8 @@ function ReviewRow({
                   <div className="mt-4 flex justify-end gap-2">
                     <button
                       onClick={() => {
-                        setShowRejectModal(false)
-                        setRejectNotes('')
+                        setShowRejectModal(false);
+                        setRejectNotes("");
                       }}
                       className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
                     >
@@ -926,7 +911,7 @@ function ReviewRow({
         </>
       )}
     </>
-  )
+  );
 }
 
 // ============================================================================
@@ -972,7 +957,7 @@ function ReviewsTableSkeleton() {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default AdminReviewsPage
+export default AdminReviewsPage;

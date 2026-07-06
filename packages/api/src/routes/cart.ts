@@ -170,9 +170,7 @@ async function updateCartTotals(cartId: string): Promise<void> {
       subtotal: sql<string>`COALESCE(SUM(${cartItems.lineTotal}::numeric), 0)::text`,
     })
     .from(cartItems)
-    .where(
-      and(eq(cartItems.cartId, cartId), eq(cartItems.isSavedForLater, false))
-    );
+    .where(and(eq(cartItems.cartId, cartId), eq(cartItems.isSavedForLater, false)));
 
   const totals = result[0];
 
@@ -193,11 +191,7 @@ async function updateCartTotals(cartId: string): Promise<void> {
 /**
  * Calculate line total for a cart item
  */
-function calculateLineTotal(
-  unitPrice: string,
-  framePrice: string,
-  quantity: number
-): string {
+function calculateLineTotal(unitPrice: string, framePrice: string, quantity: number): string {
   const unit = parseFloat(unitPrice) || 0;
   const frame = parseFloat(framePrice) || 0;
   return ((unit + frame) * quantity).toFixed(2);
@@ -446,9 +440,7 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
           eq(cartItems.cartId, cart.id),
           eq(cartItems.productId, input.productId),
           eq(cartItems.variantId, input.variantId),
-          input.frameId
-            ? eq(cartItems.frameId, input.frameId)
-            : sql`${cartItems.frameId} IS NULL`,
+          input.frameId ? eq(cartItems.frameId, input.frameId) : sql`${cartItems.frameId} IS NULL`,
           eq(cartItems.isSavedForLater, false)
         )
       )
@@ -459,19 +451,14 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
     if (existingItems[0]) {
       // Update quantity of existing item
       const newQuantity = existingItems[0].quantity + input.quantity;
-      const lineTotal = calculateLineTotal(
-        variant[0].price,
-        framePrice,
-        newQuantity
-      );
+      const lineTotal = calculateLineTotal(variant[0].price, framePrice, newQuantity);
 
       const updated = await db
         .update(cartItems)
         .set({
           quantity: newQuantity,
           lineTotal,
-          customizations:
-            (input.customizations as CartItemCustomizations) || null,
+          customizations: (input.customizations as CartItemCustomizations) || null,
         })
         .where(eq(cartItems.id, existingItems[0].id))
         .returning();
@@ -479,11 +466,7 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
       cartItem = updated[0];
     } else {
       // Create new cart item
-      const lineTotal = calculateLineTotal(
-        variant[0].price,
-        framePrice,
-        input.quantity
-      );
+      const lineTotal = calculateLineTotal(variant[0].price, framePrice, input.quantity);
 
       const inserted = await db
         .insert(cartItems)
@@ -499,8 +482,7 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
           isAiGenerated: input.isAiGenerated,
           aiGenerationId: input.aiGenerationId || null,
           aiDetails: (input.aiDetails as CartItemAIDetails) || null,
-          customizations:
-            (input.customizations as CartItemCustomizations) || null,
+          customizations: (input.customizations as CartItemCustomizations) || null,
         })
         .returning();
 
@@ -527,121 +509,107 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
 // PATCH /api/cart/items/:id - Update Cart Item
 // ============================================================================
 
-cartApp.patch(
-  "/items/:id",
-  zValidator("json", updateCartItemSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const user = c.get("user");
-    const userId = user?.id || null;
-    const sessionId = getCookie(c, GUEST_CART_COOKIE) || null;
-    const input = c.req.valid("json");
+cartApp.patch("/items/:id", zValidator("json", updateCartItemSchema), async (c) => {
+  const { id } = c.req.param();
+  const user = c.get("user");
+  const userId = user?.id || null;
+  const sessionId = getCookie(c, GUEST_CART_COOKIE) || null;
+  const input = c.req.valid("json");
 
-    // Validate UUID format
-    if (!/^[0-9a-f-]{36}$/i.test(id)) {
-      return c.json({ error: "Invalid item ID format" }, 400);
-    }
-
-    try {
-      // Get the cart item with cart info
-      const items = await db
-        .select({
-          cartItem: cartItems,
-          cart: carts,
-        })
-        .from(cartItems)
-        .innerJoin(carts, eq(cartItems.cartId, carts.id))
-        .where(eq(cartItems.id, id))
-        .limit(1);
-
-      if (!items[0]) {
-        return c.json({ error: "Cart item not found" }, 404);
-      }
-
-      const { cartItem, cart } = items[0];
-
-      // Verify cart ownership
-      const isOwner = userId
-        ? cart.userId === userId
-        : cart.sessionId === sessionId;
-
-      if (!isOwner) {
-        return c.json({ error: "Cart item not found" }, 404);
-      }
-
-      // Build update object
-      const updates: Partial<typeof cartItems.$inferInsert> = {};
-
-      if (input.quantity !== undefined) {
-        updates.quantity = input.quantity;
-      }
-
-      if (input.isSavedForLater !== undefined) {
-        updates.isSavedForLater = input.isSavedForLater;
-      }
-
-      if (input.customizations !== undefined) {
-        updates.customizations = input.customizations as CartItemCustomizations;
-      }
-
-      // Handle frame update
-      let newFramePrice = cartItem.framePrice;
-      if (input.frameId !== undefined) {
-        if (input.frameId === null) {
-          updates.frameId = null;
-          newFramePrice = "0.00";
-        } else {
-          // Validate new frame
-          const frame = await db
-            .select({
-              id: frames.id,
-              priceAddition: frames.priceAddition,
-              isActive: frames.isActive,
-            })
-            .from(frames)
-            .where(eq(frames.id, input.frameId))
-            .limit(1);
-
-          if (!frame[0] || !frame[0].isActive) {
-            return c.json({ error: "Frame not found or unavailable" }, 404);
-          }
-
-          updates.frameId = input.frameId;
-          newFramePrice = frame[0].priceAddition || "0.00";
-        }
-        updates.framePrice = newFramePrice;
-      }
-
-      // Recalculate line total if quantity or frame changed
-      if (input.quantity !== undefined || input.frameId !== undefined) {
-        const quantity = input.quantity ?? cartItem.quantity;
-        updates.lineTotal = calculateLineTotal(
-          cartItem.unitPrice,
-          newFramePrice,
-          quantity
-        );
-      }
-
-      // Update the cart item
-      const updated = await db
-        .update(cartItems)
-        .set(updates)
-        .where(eq(cartItems.id, id))
-        .returning();
-
-      // Update cart totals
-      await updateCartTotals(cart.id);
-
-      return c.json({
-        message: "Cart item updated",
-        item: updated[0],
-      });
-    } catch (error) {
-      console.error("Error updating cart item:", error);
-      return c.json({ error: "Failed to update cart item" }, 500);
-    }
+  // Validate UUID format
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    return c.json({ error: "Invalid item ID format" }, 400);
   }
-);
+
+  try {
+    // Get the cart item with cart info
+    const items = await db
+      .select({
+        cartItem: cartItems,
+        cart: carts,
+      })
+      .from(cartItems)
+      .innerJoin(carts, eq(cartItems.cartId, carts.id))
+      .where(eq(cartItems.id, id))
+      .limit(1);
+
+    if (!items[0]) {
+      return c.json({ error: "Cart item not found" }, 404);
+    }
+
+    const { cartItem, cart } = items[0];
+
+    // Verify cart ownership
+    const isOwner = userId ? cart.userId === userId : cart.sessionId === sessionId;
+
+    if (!isOwner) {
+      return c.json({ error: "Cart item not found" }, 404);
+    }
+
+    // Build update object
+    const updates: Partial<typeof cartItems.$inferInsert> = {};
+
+    if (input.quantity !== undefined) {
+      updates.quantity = input.quantity;
+    }
+
+    if (input.isSavedForLater !== undefined) {
+      updates.isSavedForLater = input.isSavedForLater;
+    }
+
+    if (input.customizations !== undefined) {
+      updates.customizations = input.customizations as CartItemCustomizations;
+    }
+
+    // Handle frame update
+    let newFramePrice = cartItem.framePrice;
+    if (input.frameId !== undefined) {
+      if (input.frameId === null) {
+        updates.frameId = null;
+        newFramePrice = "0.00";
+      } else {
+        // Validate new frame
+        const frame = await db
+          .select({
+            id: frames.id,
+            priceAddition: frames.priceAddition,
+            isActive: frames.isActive,
+          })
+          .from(frames)
+          .where(eq(frames.id, input.frameId))
+          .limit(1);
+
+        if (!frame[0] || !frame[0].isActive) {
+          return c.json({ error: "Frame not found or unavailable" }, 404);
+        }
+
+        updates.frameId = input.frameId;
+        newFramePrice = frame[0].priceAddition || "0.00";
+      }
+      updates.framePrice = newFramePrice;
+    }
+
+    // Recalculate line total if quantity or frame changed
+    if (input.quantity !== undefined || input.frameId !== undefined) {
+      const quantity = input.quantity ?? cartItem.quantity;
+      updates.lineTotal = calculateLineTotal(cartItem.unitPrice, newFramePrice, quantity);
+    }
+
+    // Update the cart item
+    const updated = await db.update(cartItems).set(updates).where(eq(cartItems.id, id)).returning();
+
+    // Update cart totals
+    await updateCartTotals(cart.id);
+
+    return c.json({
+      message: "Cart item updated",
+      item: updated[0],
+    });
+  } catch (error) {
+    console.error("Error updating cart item:", error);
+    return c.json({ error: "Failed to update cart item" }, 500);
+  }
+});
 
 // ============================================================================
 // DELETE /api/cart/items/:id - Remove Cart Item
@@ -677,9 +645,7 @@ cartApp.delete("/items/:id", async (c) => {
     const { cart } = items[0];
 
     // Verify cart ownership
-    const isOwner = userId
-      ? cart.userId === userId
-      : cart.sessionId === sessionId;
+    const isOwner = userId ? cart.userId === userId : cart.sessionId === sessionId;
 
     if (!isOwner) {
       return c.json({ error: "Cart item not found" }, 404);
@@ -740,9 +706,7 @@ cartApp.delete("/", async (c) => {
     // Delete all cart items (not saved for later)
     await db
       .delete(cartItems)
-      .where(
-        and(eq(cartItems.cartId, cart.id), eq(cartItems.isSavedForLater, false))
-      );
+      .where(and(eq(cartItems.cartId, cart.id), eq(cartItems.isSavedForLater, false)));
 
     // Update cart totals
     await updateCartTotals(cart.id);
@@ -787,10 +751,7 @@ cartApp.post("/merge", zValidator("json", mergeCartSchema), async (c) => {
     const userCart = await getOrCreateCart(user.id, null);
 
     // Get all items from guest cart
-    const guestItems = await db
-      .select()
-      .from(cartItems)
-      .where(eq(cartItems.cartId, guestCart.id));
+    const guestItems = await db.select().from(cartItems).where(eq(cartItems.cartId, guestCart.id));
 
     // Merge items into user cart
     for (const item of guestItems) {
@@ -803,9 +764,7 @@ cartApp.post("/merge", zValidator("json", mergeCartSchema), async (c) => {
             eq(cartItems.cartId, userCart.id),
             eq(cartItems.productId, item.productId),
             eq(cartItems.variantId, item.variantId),
-            item.frameId
-              ? eq(cartItems.frameId, item.frameId)
-              : sql`${cartItems.frameId} IS NULL`,
+            item.frameId ? eq(cartItems.frameId, item.frameId) : sql`${cartItems.frameId} IS NULL`,
             eq(cartItems.isSavedForLater, item.isSavedForLater)
           )
         )
@@ -814,11 +773,7 @@ cartApp.post("/merge", zValidator("json", mergeCartSchema), async (c) => {
       if (existingItems[0]) {
         // Update quantity
         const newQuantity = existingItems[0].quantity + item.quantity;
-        const lineTotal = calculateLineTotal(
-          item.unitPrice,
-          item.framePrice,
-          newQuantity
-        );
+        const lineTotal = calculateLineTotal(item.unitPrice, item.framePrice, newQuantity);
 
         await db
           .update(cartItems)
@@ -826,18 +781,12 @@ cartApp.post("/merge", zValidator("json", mergeCartSchema), async (c) => {
           .where(eq(cartItems.id, existingItems[0].id));
       } else {
         // Move item to user cart
-        await db
-          .update(cartItems)
-          .set({ cartId: userCart.id })
-          .where(eq(cartItems.id, item.id));
+        await db.update(cartItems).set({ cartId: userCart.id }).where(eq(cartItems.id, item.id));
       }
     }
 
     // Deactivate guest cart
-    await db
-      .update(carts)
-      .set({ isActive: false })
-      .where(eq(carts.id, guestCart.id));
+    await db.update(carts).set({ isActive: false }).where(eq(carts.id, guestCart.id));
 
     // Update user cart totals
     await updateCartTotals(userCart.id);

@@ -7,34 +7,34 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { cn } from '~/lib/utils'
-import { StarRating } from './StarRating'
+import { cn } from "~/lib/utils";
+import { StarRating } from "./StarRating";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface RatingDistribution {
-  rating: number
-  count: number
-  percentage: number
+  rating: number;
+  count: number;
+  percentage: number;
 }
 
 export interface ReviewStats {
-  averageRating: number
-  totalReviews: number
-  distribution: RatingDistribution[]
+  averageRating: number;
+  totalReviews: number;
+  distribution: RatingDistribution[];
 }
 
 export interface ReviewSummaryProps {
   /** Review statistics data */
-  stats: ReviewStats
+  stats: ReviewStats;
   /** Show distribution chart */
-  showDistribution?: boolean
+  showDistribution?: boolean;
   /** Custom className */
-  className?: string
+  className?: string;
   /** Compact layout for smaller spaces */
-  compact?: boolean
+  compact?: boolean;
 }
 
 // ============================================================================
@@ -66,17 +66,13 @@ export function ReviewSummary({
   compact = false,
 }: ReviewSummaryProps) {
   return (
-    <div className={cn('flex flex-col', className)}>
+    <div className={cn("flex flex-col", className)}>
       {compact ? (
         // Compact layout: inline rating and count
         <div className="flex items-center gap-2">
-          <StarRating
-            rating={stats.averageRating}
-            size="sm"
-            showValue
-          />
+          <StarRating rating={stats.averageRating} size="sm" showValue />
           <span className="text-sm text-muted-foreground">
-            ({stats.totalReviews.toLocaleString()} review{stats.totalReviews !== 1 ? 's' : ''})
+            ({stats.totalReviews.toLocaleString()} review{stats.totalReviews !== 1 ? "s" : ""})
           </span>
         </div>
       ) : (
@@ -87,13 +83,10 @@ export function ReviewSummary({
             <div className="text-5xl font-bold text-foreground">
               {stats.averageRating.toFixed(1)}
             </div>
-            <StarRating
-              rating={stats.averageRating}
-              size="md"
-              className="mt-2"
-            />
+            <StarRating rating={stats.averageRating} size="md" className="mt-2" />
             <p className="mt-1 text-sm text-muted-foreground">
-              Based on {stats.totalReviews.toLocaleString()} review{stats.totalReviews !== 1 ? 's' : ''}
+              Based on {stats.totalReviews.toLocaleString()} review
+              {stats.totalReviews !== 1 ? "s" : ""}
             </p>
           </div>
 
@@ -112,7 +105,7 @@ export function ReviewSummary({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -120,9 +113,9 @@ export function ReviewSummary({
 // ============================================================================
 
 interface RatingBarProps {
-  rating: number
-  count: number
-  percentage: number
+  rating: number;
+  count: number;
+  percentage: number;
 }
 
 function RatingBar({ rating, count, percentage }: RatingBarProps) {
@@ -130,7 +123,7 @@ function RatingBar({ rating, count, percentage }: RatingBarProps) {
     <div className="flex items-center gap-2">
       {/* Star count label */}
       <span className="w-16 text-sm text-muted-foreground">
-        {rating} star{rating !== 1 ? 's' : ''}
+        {rating} star{rating !== 1 ? "s" : ""}
       </span>
 
       {/* Progress bar */}
@@ -150,7 +143,7 @@ function RatingBar({ rating, count, percentage }: RatingBarProps) {
         {count.toLocaleString()}
       </span>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -165,13 +158,13 @@ export function ReviewSummarySkeleton({
   compact = false,
   className,
 }: {
-  showDistribution?: boolean
-  compact?: boolean
-  className?: string
+  showDistribution?: boolean;
+  compact?: boolean;
+  className?: string;
 }) {
   if (compact) {
     return (
-      <div className={cn('flex animate-pulse items-center gap-2', className)}>
+      <div className={cn("flex animate-pulse items-center gap-2", className)}>
         <div className="flex gap-1">
           {Array.from({ length: 5 }, (_, i) => (
             <div key={i} className="h-4 w-4 rounded bg-muted" />
@@ -179,11 +172,11 @@ export function ReviewSummarySkeleton({
         </div>
         <div className="h-4 w-24 rounded bg-muted" />
       </div>
-    )
+    );
   }
 
   return (
-    <div className={cn('flex animate-pulse flex-col gap-4 sm:flex-row sm:gap-8', className)}>
+    <div className={cn("flex animate-pulse flex-col gap-4 sm:flex-row sm:gap-8", className)}>
       {/* Average Rating Skeleton */}
       <div className="flex flex-col items-center sm:items-start">
         <div className="h-12 w-16 rounded bg-muted" />
@@ -208,7 +201,7 @@ export function ReviewSummarySkeleton({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -218,43 +211,41 @@ export function ReviewSummarySkeleton({
 /**
  * Calculate rating distribution from a list of reviews
  */
-export function calculateDistribution(
-  reviews: { rating: number }[]
-): RatingDistribution[] {
+export function calculateDistribution(reviews: { rating: number }[]): RatingDistribution[] {
   const counts = new Map<number, number>([
     [1, 0],
     [2, 0],
     [3, 0],
     [4, 0],
     [5, 0],
-  ])
+  ]);
 
   reviews.forEach((review) => {
-    const rounded = Math.round(review.rating)
+    const rounded = Math.round(review.rating);
     if (rounded >= 1 && rounded <= 5) {
-      counts.set(rounded, (counts.get(rounded) ?? 0) + 1)
+      counts.set(rounded, (counts.get(rounded) ?? 0) + 1);
     }
-  })
+  });
 
-  const total = reviews.length || 1
+  const total = reviews.length || 1;
 
   return [5, 4, 3, 2, 1].map((rating) => {
-    const count = counts.get(rating) ?? 0
+    const count = counts.get(rating) ?? 0;
     return {
       rating,
       count,
       percentage: (count / total) * 100,
-    }
-  })
+    };
+  });
 }
 
 /**
  * Calculate average rating from a list of reviews
  */
 export function calculateAverageRating(reviews: { rating: number }[]): number {
-  if (reviews.length === 0) return 0
-  const sum = reviews.reduce((acc, review) => acc + review.rating, 0)
-  return sum / reviews.length
+  if (reviews.length === 0) return 0;
+  const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
+  return sum / reviews.length;
 }
 
-export default ReviewSummary
+export default ReviewSummary;

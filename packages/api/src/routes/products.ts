@@ -58,7 +58,13 @@ function csvArrayOverlap(column: AnyPgColumn, csv: string | undefined) {
 const listProductsQuerySchema = z.object({
   // Pagination
   page: z.coerce.number().int().positive().optional().default(1),
-  pageSize: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional().default(DEFAULT_PAGE_SIZE),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PAGE_SIZE)
+    .optional()
+    .default(DEFAULT_PAGE_SIZE),
 
   // Filters
   styles: z.string().optional(), // comma-separated list
@@ -72,7 +78,10 @@ const listProductsQuerySchema = z.object({
   isAiGenerated: z.coerce.boolean().optional(),
 
   // Sorting
-  sortBy: z.enum(["createdAt", "updatedAt", "title", "basePrice", "featuredOrder"]).optional().default("createdAt"),
+  sortBy: z
+    .enum(["createdAt", "updatedAt", "title", "basePrice", "featuredOrder"])
+    .optional()
+    .default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
@@ -82,7 +91,13 @@ const listProductsQuerySchema = z.object({
 const searchProductsQuerySchema = z.object({
   q: z.string().min(1).max(200),
   page: z.coerce.number().int().positive().optional().default(1),
-  pageSize: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional().default(DEFAULT_PAGE_SIZE),
+  pageSize: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MAX_PAGE_SIZE)
+    .optional()
+    .default(DEFAULT_PAGE_SIZE),
 });
 
 /**
@@ -105,291 +120,271 @@ productsApp.use("*", optionalAuth);
 // GET /api/products - List Products
 // ============================================================================
 
-productsApp.get(
-  "/",
-  zValidator("query", listProductsQuerySchema),
-  async (c) => {
-    const query = c.req.valid("query");
-    const {
+productsApp.get("/", zValidator("query", listProductsQuerySchema), async (c) => {
+  const query = c.req.valid("query");
+  const {
+    page,
+    pageSize,
+    styles,
+    subjects,
+    colors,
+    rooms,
+    orientation,
+    priceMin,
+    priceMax,
+    isFeatured,
+    isAiGenerated,
+    sortBy,
+    sortOrder,
+  } = query;
+
+  // Build cache key from query params
+  const cacheKey = `${CacheKeys.PRODUCT_LIST}${JSON.stringify(query)}`;
+
+  // Try to get from cache
+  const cached = await getCached<{ items: unknown[]; total: number }>(cacheKey);
+  if (cached) {
+    return c.json({
+      ...cached,
       page,
       pageSize,
-      styles,
-      subjects,
-      colors,
-      rooms,
-      orientation,
-      priceMin,
-      priceMax,
-      isFeatured,
-      isAiGenerated,
-      sortBy,
-      sortOrder,
-    } = query;
+      totalPages: Math.ceil(cached.total / pageSize),
+      hasNextPage: page * pageSize < cached.total,
+      hasPreviousPage: page > 1,
+      fromCache: true,
+    });
+  }
 
-    // Build cache key from query params
-    const cacheKey = `${CacheKeys.PRODUCT_LIST}${JSON.stringify(query)}`;
+  // Build where conditions
+  const conditions: ReturnType<typeof eq>[] = [];
 
-    // Try to get from cache
-    const cached = await getCached<{ items: unknown[]; total: number }>(cacheKey);
-    if (cached) {
-      return c.json({
-        ...cached,
-        page,
-        pageSize,
-        totalPages: Math.ceil(cached.total / pageSize),
-        hasNextPage: page * pageSize < cached.total,
-        hasPreviousPage: page > 1,
-        fromCache: true,
-      });
-    }
+  // Only show active products
+  conditions.push(eq(products.status, "active"));
 
-    // Build where conditions
-    const conditions: ReturnType<typeof eq>[] = [];
+  // Filter by orientation
+  if (orientation) {
+    conditions.push(eq(products.orientation, orientation));
+  }
 
-    // Only show active products
-    conditions.push(eq(products.status, "active"));
+  // Filter by featured status
+  if (isFeatured !== undefined) {
+    conditions.push(eq(products.isFeatured, isFeatured));
+  }
 
-    // Filter by orientation
-    if (orientation) {
-      conditions.push(eq(products.orientation, orientation));
-    }
+  // Filter by AI generated
+  if (isAiGenerated !== undefined) {
+    conditions.push(eq(products.isAiGenerated, isAiGenerated));
+  }
 
-    // Filter by featured status
-    if (isFeatured !== undefined) {
-      conditions.push(eq(products.isFeatured, isFeatured));
-    }
+  // Filter by price range (base price)
+  if (priceMin !== undefined) {
+    conditions.push(sql`${products.basePrice}::numeric >= ${priceMin}`);
+  }
+  if (priceMax !== undefined) {
+    conditions.push(sql`${products.basePrice}::numeric <= ${priceMax}`);
+  }
 
-    // Filter by AI generated
-    if (isAiGenerated !== undefined) {
-      conditions.push(eq(products.isAiGenerated, isAiGenerated));
-    }
-
-    // Filter by price range (base price)
-    if (priceMin !== undefined) {
-      conditions.push(sql`${products.basePrice}::numeric >= ${priceMin}`);
-    }
-    if (priceMax !== undefined) {
-      conditions.push(sql`${products.basePrice}::numeric <= ${priceMax}`);
-    }
-
-    // Filter by array fields (styles, subjects, colors, rooms) using the
-    // array overlap operator (&&) with parameterized values
-    const arrayFilters = [
-      csvArrayOverlap(products.styles, styles),
-      csvArrayOverlap(products.subjects, subjects),
-      csvArrayOverlap(products.colors, colors),
-      csvArrayOverlap(products.rooms, rooms),
-    ];
-    for (const filter of arrayFilters) {
-      if (filter) {
-        conditions.push(filter);
-      }
-    }
-
-    // Build sort order
-    const orderByColumn = {
-      createdAt: products.createdAt,
-      updatedAt: products.updatedAt,
-      title: products.title,
-      basePrice: products.basePrice,
-      featuredOrder: products.featuredOrder,
-    }[sortBy];
-
-    const orderByDirection = sortOrder === "asc" ? asc : desc;
-
-    // Calculate offset
-    const offset = (page - 1) * pageSize;
-
-    try {
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(products)
-        .where(and(...conditions));
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Get products
-      const productList = await db
-        .select({
-          id: products.id,
-          sku: products.sku,
-          title: products.title,
-          slug: products.slug,
-          description: products.description,
-          basePrice: products.basePrice,
-          styles: products.styles,
-          subjects: products.subjects,
-          colors: products.colors,
-          orientation: products.orientation,
-          images: products.images,
-          isFeatured: products.isFeatured,
-          isAiGenerated: products.isAiGenerated,
-          featuredOrder: products.featuredOrder,
-          createdAt: products.createdAt,
-        })
-        .from(products)
-        .where(and(...conditions))
-        .orderBy(orderByDirection(orderByColumn))
-        .limit(pageSize)
-        .offset(offset);
-
-      const result = {
-        items: productList,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      };
-
-      // Cache the result
-      await setCached(cacheKey, { items: productList, total }, CACHE_TTL_PRODUCTS);
-
-      return c.json(result);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      return c.json({ error: "Failed to fetch products" }, 500);
+  // Filter by array fields (styles, subjects, colors, rooms) using the
+  // array overlap operator (&&) with parameterized values
+  const arrayFilters = [
+    csvArrayOverlap(products.styles, styles),
+    csvArrayOverlap(products.subjects, subjects),
+    csvArrayOverlap(products.colors, colors),
+    csvArrayOverlap(products.rooms, rooms),
+  ];
+  for (const filter of arrayFilters) {
+    if (filter) {
+      conditions.push(filter);
     }
   }
-);
+
+  // Build sort order
+  const orderByColumn = {
+    createdAt: products.createdAt,
+    updatedAt: products.updatedAt,
+    title: products.title,
+    basePrice: products.basePrice,
+    featuredOrder: products.featuredOrder,
+  }[sortBy];
+
+  const orderByDirection = sortOrder === "asc" ? asc : desc;
+
+  // Calculate offset
+  const offset = (page - 1) * pageSize;
+
+  try {
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(products)
+      .where(and(...conditions));
+
+    const total = countResult[0]?.count ?? 0;
+
+    // Get products
+    const productList = await db
+      .select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        slug: products.slug,
+        description: products.description,
+        basePrice: products.basePrice,
+        styles: products.styles,
+        subjects: products.subjects,
+        colors: products.colors,
+        orientation: products.orientation,
+        images: products.images,
+        isFeatured: products.isFeatured,
+        isAiGenerated: products.isAiGenerated,
+        featuredOrder: products.featuredOrder,
+        createdAt: products.createdAt,
+      })
+      .from(products)
+      .where(and(...conditions))
+      .orderBy(orderByDirection(orderByColumn))
+      .limit(pageSize)
+      .offset(offset);
+
+    const result = {
+      items: productList,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    };
+
+    // Cache the result
+    await setCached(cacheKey, { items: productList, total }, CACHE_TTL_PRODUCTS);
+
+    return c.json(result);
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return c.json({ error: "Failed to fetch products" }, 500);
+  }
+});
 
 // ============================================================================
 // GET /api/products/search - Search Products
 // ============================================================================
 
-productsApp.get(
-  "/search",
-  zValidator("query", searchProductsQuerySchema),
-  async (c) => {
-    const { q, page, pageSize } = c.req.valid("query");
+productsApp.get("/search", zValidator("query", searchProductsQuerySchema), async (c) => {
+  const { q, page, pageSize } = c.req.valid("query");
 
-    const offset = (page - 1) * pageSize;
+  const offset = (page - 1) * pageSize;
 
-    // Build search pattern for ILIKE
-    const searchPattern = `%${q}%`;
+  // Build search pattern for ILIKE
+  const searchPattern = `%${q}%`;
 
-    try {
-      // Search in title, description, tags, and SKU
-      const searchConditions = or(
-        ilike(products.title, searchPattern),
-        ilike(products.description, searchPattern),
-        ilike(products.sku, searchPattern),
-        sql`array_to_string(${products.tags}, ' ') ILIKE ${searchPattern}`,
-        sql`array_to_string(${products.styles}, ' ') ILIKE ${searchPattern}`,
-        sql`array_to_string(${products.subjects}, ' ') ILIKE ${searchPattern}`
-      );
+  try {
+    // Search in title, description, tags, and SKU
+    const searchConditions = or(
+      ilike(products.title, searchPattern),
+      ilike(products.description, searchPattern),
+      ilike(products.sku, searchPattern),
+      sql`array_to_string(${products.tags}, ' ') ILIKE ${searchPattern}`,
+      sql`array_to_string(${products.styles}, ' ') ILIKE ${searchPattern}`,
+      sql`array_to_string(${products.subjects}, ' ') ILIKE ${searchPattern}`
+    );
 
-      const whereCondition = and(
-        eq(products.status, "active"),
-        searchConditions
-      );
+    const whereCondition = and(eq(products.status, "active"), searchConditions);
 
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(products)
-        .where(whereCondition);
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(products)
+      .where(whereCondition);
 
-      const total = countResult[0]?.count ?? 0;
+    const total = countResult[0]?.count ?? 0;
 
-      // Get matching products
-      const productList = await db
-        .select({
-          id: products.id,
-          sku: products.sku,
-          title: products.title,
-          slug: products.slug,
-          description: products.description,
-          basePrice: products.basePrice,
-          styles: products.styles,
-          subjects: products.subjects,
-          colors: products.colors,
-          orientation: products.orientation,
-          images: products.images,
-          isFeatured: products.isFeatured,
-          isAiGenerated: products.isAiGenerated,
-          createdAt: products.createdAt,
-        })
-        .from(products)
-        .where(whereCondition)
-        .orderBy(desc(products.isFeatured), desc(products.createdAt))
-        .limit(pageSize)
-        .offset(offset);
+    // Get matching products
+    const productList = await db
+      .select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        slug: products.slug,
+        description: products.description,
+        basePrice: products.basePrice,
+        styles: products.styles,
+        subjects: products.subjects,
+        colors: products.colors,
+        orientation: products.orientation,
+        images: products.images,
+        isFeatured: products.isFeatured,
+        isAiGenerated: products.isAiGenerated,
+        createdAt: products.createdAt,
+      })
+      .from(products)
+      .where(whereCondition)
+      .orderBy(desc(products.isFeatured), desc(products.createdAt))
+      .limit(pageSize)
+      .offset(offset);
 
-      return c.json({
-        query: q,
-        items: productList,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      console.error("Error searching products:", error);
-      return c.json({ error: "Failed to search products" }, 500);
-    }
+    return c.json({
+      query: q,
+      items: productList,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    console.error("Error searching products:", error);
+    return c.json({ error: "Failed to search products" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/products/featured - Get Featured Products
 // ============================================================================
 
-productsApp.get(
-  "/featured",
-  zValidator("query", featuredProductsQuerySchema),
-  async (c) => {
-    const { limit } = c.req.valid("query");
+productsApp.get("/featured", zValidator("query", featuredProductsQuerySchema), async (c) => {
+  const { limit } = c.req.valid("query");
 
-    // Check cache
-    const cacheKey = `${CacheKeys.PRODUCT}featured:${limit}`;
-    const cached = await getCached<unknown[]>(cacheKey);
-    if (cached) {
-      return c.json({ items: cached, fromCache: true });
-    }
-
-    try {
-      const featuredProducts = await db
-        .select({
-          id: products.id,
-          sku: products.sku,
-          title: products.title,
-          slug: products.slug,
-          description: products.description,
-          basePrice: products.basePrice,
-          styles: products.styles,
-          subjects: products.subjects,
-          colors: products.colors,
-          orientation: products.orientation,
-          images: products.images,
-          isFeatured: products.isFeatured,
-          isAiGenerated: products.isAiGenerated,
-          featuredOrder: products.featuredOrder,
-        })
-        .from(products)
-        .where(
-          and(
-            eq(products.status, "active"),
-            eq(products.isFeatured, true)
-          )
-        )
-        .orderBy(asc(products.featuredOrder), desc(products.createdAt))
-        .limit(limit);
-
-      // Cache the result
-      await setCached(cacheKey, featuredProducts, CACHE_TTL_FEATURED);
-
-      return c.json({ items: featuredProducts });
-    } catch (error) {
-      console.error("Error fetching featured products:", error);
-      return c.json({ error: "Failed to fetch featured products" }, 500);
-    }
+  // Check cache
+  const cacheKey = `${CacheKeys.PRODUCT}featured:${limit}`;
+  const cached = await getCached<unknown[]>(cacheKey);
+  if (cached) {
+    return c.json({ items: cached, fromCache: true });
   }
-);
+
+  try {
+    const featuredProducts = await db
+      .select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        slug: products.slug,
+        description: products.description,
+        basePrice: products.basePrice,
+        styles: products.styles,
+        subjects: products.subjects,
+        colors: products.colors,
+        orientation: products.orientation,
+        images: products.images,
+        isFeatured: products.isFeatured,
+        isAiGenerated: products.isAiGenerated,
+        featuredOrder: products.featuredOrder,
+      })
+      .from(products)
+      .where(and(eq(products.status, "active"), eq(products.isFeatured, true)))
+      .orderBy(asc(products.featuredOrder), desc(products.createdAt))
+      .limit(limit);
+
+    // Cache the result
+    await setCached(cacheKey, featuredProducts, CACHE_TTL_FEATURED);
+
+    return c.json({ items: featuredProducts });
+  } catch (error) {
+    console.error("Error fetching featured products:", error);
+    return c.json({ error: "Failed to fetch featured products" }, 500);
+  }
+});
 
 // ============================================================================
 // GET /api/products/frames - Get Available Frames
@@ -546,12 +541,7 @@ productsApp.get("/:slug/variants", async (c) => {
         sortOrder: productVariants.sortOrder,
       })
       .from(productVariants)
-      .where(
-        and(
-          eq(productVariants.productId, product[0].id),
-          eq(productVariants.isActive, true)
-        )
-      )
+      .where(and(eq(productVariants.productId, product[0].id), eq(productVariants.isActive, true)))
       .orderBy(asc(productVariants.sortOrder));
 
     return c.json({ items: variants });
@@ -587,12 +577,7 @@ productsApp.post(
           orientation: products.orientation,
         })
         .from(products)
-        .where(
-          and(
-            eq(products.status, "active"),
-            inArray(products.id, ids)
-          )
-        );
+        .where(and(eq(products.status, "active"), inArray(products.id, ids)));
 
       return c.json({ items: productList });
     } catch (error) {

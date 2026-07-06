@@ -247,9 +247,7 @@ export const productsApi = {
     const queryString = params?.limit
       ? new URLSearchParams({ limit: String(params.limit) }).toString()
       : "";
-    const url = queryString
-      ? `/api/products/featured?${queryString}`
-      : "/api/products/featured";
+    const url = queryString ? `/api/products/featured?${queryString}` : "/api/products/featured";
 
     const response = await fetch(`${getApiUrl()}${url}`, {
       method: "GET",
@@ -1884,7 +1882,9 @@ export const notificationPreferencesApi = {
   /**
    * Update notification preferences
    */
-  async update(updates: NotificationPreferencesUpdate): Promise<NotificationPreferencesResponse & { message: string }> {
+  async update(
+    updates: NotificationPreferencesUpdate
+  ): Promise<NotificationPreferencesResponse & { message: string }> {
     const response = await fetch(`${getApiUrl()}/api/notification-preferences`, {
       method: "PATCH",
       credentials: "include",
@@ -1969,7 +1969,9 @@ export const addressesApi = {
     return response.json();
   },
 
-  async create(data: AddressCreateInput): Promise<{ address: SavedAddressResponse; message: string }> {
+  async create(
+    data: AddressCreateInput
+  ): Promise<{ address: SavedAddressResponse; message: string }> {
     const response = await fetch(`${getApiUrl()}/api/addresses`, {
       method: "POST",
       credentials: "include",
@@ -1985,7 +1987,10 @@ export const addressesApi = {
     return response.json();
   },
 
-  async update(id: string, data: AddressUpdateInput): Promise<{ address: SavedAddressResponse; message: string }> {
+  async update(
+    id: string,
+    data: AddressUpdateInput
+  ): Promise<{ address: SavedAddressResponse; message: string }> {
     const response = await fetch(`${getApiUrl()}/api/addresses/${id}`, {
       method: "PATCH",
       credentials: "include",

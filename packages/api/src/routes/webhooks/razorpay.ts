@@ -96,21 +96,22 @@ razorpayWebhooksApp.post("/", async (c) => {
   }
 
   // Log webhook event for audit trail
-  logger.info(
-    { eventId, event: payload.event },
-    `Processing Razorpay webhook: ${payload.event}`
-  );
+  logger.info({ eventId, event: payload.event }, `Processing Razorpay webhook: ${payload.event}`);
 
   // Process the webhook event
   const result = await processWebhookEvent(payload);
 
   // Mark event as processed (TTL: 7 days)
   if (isRedisConnected() && result.success) {
-    await redis.setex(dedupeKey, 7 * 24 * 60 * 60, JSON.stringify({
-      processedAt: new Date().toISOString(),
-      event: payload.event,
-      result: result.message,
-    }));
+    await redis.setex(
+      dedupeKey,
+      7 * 24 * 60 * 60,
+      JSON.stringify({
+        processedAt: new Date().toISOString(),
+        event: payload.event,
+        result: result.message,
+      })
+    );
   }
 
   if (!result.success) {
@@ -129,9 +130,7 @@ razorpayWebhooksApp.post("/", async (c) => {
 /**
  * Process a Razorpay webhook event
  */
-async function processWebhookEvent(
-  payload: RazorpayWebhookPayload
-): Promise<WebhookResult> {
+async function processWebhookEvent(payload: RazorpayWebhookPayload): Promise<WebhookResult> {
   const { event } = payload;
 
   switch (event) {
@@ -164,9 +163,7 @@ async function processWebhookEvent(
  * Handle payment.authorized event
  * Payment is authorized but not yet captured (if auto-capture is disabled)
  */
-async function handlePaymentAuthorized(
-  payload: RazorpayWebhookPayload
-): Promise<WebhookResult> {
+async function handlePaymentAuthorized(payload: RazorpayWebhookPayload): Promise<WebhookResult> {
   const payment = payload.payload.payment?.entity;
 
   if (!payment) {
@@ -221,9 +218,7 @@ async function handlePaymentAuthorized(
  * Handle payment.captured event
  * Payment has been successfully captured
  */
-async function handlePaymentCaptured(
-  payload: RazorpayWebhookPayload
-): Promise<WebhookResult> {
+async function handlePaymentCaptured(payload: RazorpayWebhookPayload): Promise<WebhookResult> {
   const payment = payload.payload.payment?.entity;
 
   if (!payment) {
@@ -283,9 +278,7 @@ async function handlePaymentCaptured(
  * Handle payment.failed event
  * Payment attempt has failed
  */
-async function handlePaymentFailed(
-  payload: RazorpayWebhookPayload
-): Promise<WebhookResult> {
+async function handlePaymentFailed(payload: RazorpayWebhookPayload): Promise<WebhookResult> {
   const payment = payload.payload.payment?.entity;
 
   if (!payment) {
@@ -344,9 +337,7 @@ async function handlePaymentFailed(
  * Handle refund.processed event
  * Refund has been successfully processed
  */
-async function handleRefundProcessed(
-  payload: RazorpayWebhookPayload
-): Promise<WebhookResult> {
+async function handleRefundProcessed(payload: RazorpayWebhookPayload): Promise<WebhookResult> {
   const refund = payload.payload.refund?.entity;
   const payment = payload.payload.payment?.entity;
 
@@ -360,7 +351,7 @@ async function handleRefundProcessed(
 
   try {
     // Get payment details to find the order
-    const paymentDetails = payment || await getRazorpayPayment(refund.payment_id);
+    const paymentDetails = payment || (await getRazorpayPayment(refund.payment_id));
 
     // Find order by Razorpay order ID
     const order = await findOrderByRazorpayOrderId(paymentDetails.order_id);
@@ -416,9 +407,7 @@ async function handleRefundProcessed(
  * Handle order.paid event
  * Order has been fully paid (alternative to payment.captured for some flows)
  */
-async function handleOrderPaid(
-  payload: RazorpayWebhookPayload
-): Promise<WebhookResult> {
+async function handleOrderPaid(payload: RazorpayWebhookPayload): Promise<WebhookResult> {
   const razorpayOrder = payload.payload.order?.entity;
   const payment = payload.payload.payment?.entity;
 
@@ -498,8 +487,7 @@ async function handleOrderPaid(
 async function findOrderByRazorpayOrderId(razorpayOrderId: string) {
   // Query orders where paymentDetails.orderId matches
   const result = await db.query.orders.findFirst({
-    where: (orders, { sql }) =>
-      sql`${orders.paymentDetails}->>'orderId' = ${razorpayOrderId}`,
+    where: (orders, { sql }) => sql`${orders.paymentDetails}->>'orderId' = ${razorpayOrderId}`,
   });
 
   return result;

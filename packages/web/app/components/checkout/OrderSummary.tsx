@@ -7,7 +7,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState } from 'react'
+import { useState } from "react";
 import {
   Package,
   Tag,
@@ -20,9 +20,9 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
-} from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
-import type { CartItem } from '~/stores/cart'
+} from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import type { CartItem } from "~/stores/cart";
 
 // ============================================================================
 // Types
@@ -30,33 +30,35 @@ import type { CartItem } from '~/stores/cart'
 
 interface OrderSummaryProps {
   /** Cart items to display */
-  items: CartItem[]
+  items: CartItem[];
   /** Subtotal before discounts and shipping */
-  subtotal: number
+  subtotal: number;
   /** Discount amount (from coupon) */
-  discountAmount?: number
+  discountAmount?: number;
   /** Applied coupon code */
-  appliedCouponCode?: string
+  appliedCouponCode?: string;
   /** Shipping cost */
-  shippingCost: number
+  shippingCost: number;
   /** Tax amount */
-  taxAmount?: number
+  taxAmount?: number;
   /** Whether to show detailed item list */
-  showItems?: boolean
+  showItems?: boolean;
   /** Callback when coupon is applied */
-  onApplyCoupon?: (code: string) => Promise<{ success: boolean; discount?: number; error?: string }>
+  onApplyCoupon?: (
+    code: string
+  ) => Promise<{ success: boolean; discount?: number; error?: string }>;
   /** Callback when coupon is removed */
-  onRemoveCoupon?: () => void
+  onRemoveCoupon?: () => void;
   /** Whether checkout button is enabled */
-  canProceed?: boolean
+  canProceed?: boolean;
   /** Checkout button text */
-  checkoutButtonText?: string
+  checkoutButtonText?: string;
   /** Callback for checkout button */
-  onCheckout?: () => void
+  onCheckout?: () => void;
   /** Whether checkout is in progress */
-  isCheckingOut?: boolean
+  isCheckingOut?: boolean;
   /** Class name for styling */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -74,48 +76,48 @@ export function OrderSummary({
   onApplyCoupon,
   onRemoveCoupon,
   canProceed = true,
-  checkoutButtonText = 'Place Order',
+  checkoutButtonText = "Place Order",
   onCheckout,
   isCheckingOut = false,
   className,
 }: OrderSummaryProps) {
-  const [isExpanded, setIsExpanded] = useState(showItems && items.length <= 3)
-  const [couponCode, setCouponCode] = useState('')
-  const [couponError, setCouponError] = useState<string | null>(null)
-  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(showItems && items.length <= 3);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
-  const total = subtotal - discountAmount + shippingCost + taxAmount
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+  const total = subtotal - discountAmount + shippingCost + taxAmount;
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   // Handle coupon application
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim() || !onApplyCoupon) return
+    if (!couponCode.trim() || !onApplyCoupon) return;
 
-    setIsApplyingCoupon(true)
-    setCouponError(null)
+    setIsApplyingCoupon(true);
+    setCouponError(null);
 
     try {
-      const result = await onApplyCoupon(couponCode.trim().toUpperCase())
+      const result = await onApplyCoupon(couponCode.trim().toUpperCase());
       if (result.success) {
-        setCouponCode('')
+        setCouponCode("");
       } else {
-        setCouponError(result.error || 'Invalid coupon code')
+        setCouponError(result.error || "Invalid coupon code");
       }
     } catch {
-      setCouponError('Failed to apply coupon. Please try again.')
+      setCouponError("Failed to apply coupon. Please try again.");
     } finally {
-      setIsApplyingCoupon(false)
+      setIsApplyingCoupon(false);
     }
-  }
+  };
 
   return (
-    <div className={cn('rounded-xl border border-border bg-card', className)}>
+    <div className={cn("rounded-xl border border-border bg-card", className)}>
       {/* Header */}
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Order Summary</h2>
           <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-sm font-medium text-brand-700">
-            {itemCount} {itemCount === 1 ? 'item' : 'items'}
+            {itemCount} {itemCount === 1 ? "item" : "items"}
           </span>
         </div>
       </div>
@@ -130,13 +132,9 @@ export function OrderSummary({
           >
             <span className="flex items-center gap-2">
               <Package className="h-4 w-4" />
-              {isExpanded ? 'Hide items' : 'Show items'}
+              {isExpanded ? "Hide items" : "Show items"}
             </span>
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
 
           {isExpanded && (
@@ -206,18 +204,18 @@ export function OrderSummary({
                 type="text"
                 value={couponCode}
                 onChange={(e) => {
-                  setCouponCode(e.target.value.toUpperCase())
-                  setCouponError(null)
+                  setCouponCode(e.target.value.toUpperCase());
+                  setCouponError(null);
                 }}
                 placeholder="Coupon code"
                 className={cn(
-                  'w-full rounded-lg border bg-background px-3 py-2 text-sm uppercase placeholder:normal-case placeholder:text-muted-foreground transition-colors',
-                  'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                  couponError ? 'border-red-500' : 'border-input hover:border-brand-300'
+                  "w-full rounded-lg border bg-background px-3 py-2 text-sm uppercase placeholder:normal-case placeholder:text-muted-foreground transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
+                  couponError ? "border-red-500" : "border-input hover:border-brand-300"
                 )}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleApplyCoupon()
+                  if (e.key === "Enter") {
+                    handleApplyCoupon();
                   }
                 }}
               />
@@ -227,18 +225,14 @@ export function OrderSummary({
               onClick={handleApplyCoupon}
               disabled={!couponCode.trim() || isApplyingCoupon}
               className={cn(
-                'rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                "rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium transition-colors",
+                "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
                 !couponCode.trim() || isApplyingCoupon
-                  ? 'cursor-not-allowed border-muted bg-muted text-muted-foreground'
-                  : 'bg-brand-50 text-brand-600 hover:bg-brand-100'
+                  ? "cursor-not-allowed border-muted bg-muted text-muted-foreground"
+                  : "bg-brand-50 text-brand-600 hover:bg-brand-100"
               )}
             >
-              {isApplyingCoupon ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Apply'
-              )}
+              {isApplyingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}
             </button>
           </div>
           {couponError && (
@@ -256,7 +250,8 @@ export function OrderSummary({
           <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
             <CheckCircle className="h-4 w-4" />
             <span>
-              Coupon <strong>{appliedCouponCode}</strong> applied! You save {formatPrice(discountAmount)}
+              Coupon <strong>{appliedCouponCode}</strong> applied! You save{" "}
+              {formatPrice(discountAmount)}
             </span>
           </div>
         </div>
@@ -278,11 +273,11 @@ export function OrderSummary({
             onClick={onCheckout}
             disabled={!canProceed || isCheckingOut}
             className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+              "flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
               !canProceed || isCheckingOut
-                ? 'cursor-not-allowed bg-muted text-muted-foreground'
-                : 'bg-brand-500 text-white hover:bg-brand-600'
+                ? "cursor-not-allowed bg-muted text-muted-foreground"
+                : "bg-brand-500 text-white hover:bg-brand-600"
             )}
           >
             {isCheckingOut ? (
@@ -315,7 +310,7 @@ export function OrderSummary({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -323,11 +318,11 @@ export function OrderSummary({
 // ============================================================================
 
 interface OrderItemProps {
-  item: CartItem
+  item: CartItem;
 }
 
 function OrderItem({ item }: OrderItemProps) {
-  const itemTotal = (item.unitPrice + item.framePrice) * item.quantity
+  const itemTotal = (item.unitPrice + item.framePrice) * item.quantity;
 
   return (
     <div className="flex gap-3">
@@ -343,9 +338,7 @@ function OrderItem({ item }: OrderItemProps) {
       {/* Details */}
       <div className="flex flex-1 flex-col justify-between">
         <div>
-          <h4 className="text-sm font-medium text-foreground line-clamp-1">
-            {item.productTitle}
-          </h4>
+          <h4 className="text-sm font-medium text-foreground line-clamp-1">{item.productTitle}</h4>
           <p className="text-xs text-muted-foreground">
             {item.sizeLabel}
             {item.frameName && ` • ${item.frameName}`}
@@ -358,7 +351,7 @@ function OrderItem({ item }: OrderItemProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -366,12 +359,12 @@ function OrderItem({ item }: OrderItemProps) {
 // ============================================================================
 
 interface CompactOrderSummaryProps {
-  subtotal: number
-  discountAmount?: number
-  shippingCost: number
-  taxAmount?: number
-  total: number
-  className?: string
+  subtotal: number;
+  discountAmount?: number;
+  shippingCost: number;
+  taxAmount?: number;
+  total: number;
+  className?: string;
 }
 
 export function CompactOrderSummary({
@@ -383,7 +376,7 @@ export function CompactOrderSummary({
   className,
 }: CompactOrderSummaryProps) {
   return (
-    <div className={cn('space-y-2 text-sm', className)}>
+    <div className={cn("space-y-2 text-sm", className)}>
       <div className="flex justify-between">
         <span className="text-muted-foreground">Subtotal</span>
         <span className="text-foreground">{formatPrice(subtotal)}</span>
@@ -398,8 +391,8 @@ export function CompactOrderSummary({
 
       <div className="flex justify-between">
         <span className="text-muted-foreground">Shipping</span>
-        <span className={shippingCost === 0 ? 'text-green-600' : 'text-foreground'}>
-          {shippingCost === 0 ? 'FREE' : formatPrice(shippingCost)}
+        <span className={shippingCost === 0 ? "text-green-600" : "text-foreground"}>
+          {shippingCost === 0 ? "FREE" : formatPrice(shippingCost)}
         </span>
       </div>
 
@@ -415,7 +408,7 @@ export function CompactOrderSummary({
         <span className="text-foreground">{formatPrice(total)}</span>
       </div>
     </div>
-  )
+  );
 }
 
-export default OrderSummary
+export default OrderSummary;

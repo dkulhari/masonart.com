@@ -239,9 +239,7 @@ export function requireRole(roles: UserRole | UserRole[]) {
     const userRole = user.role;
 
     if (!userRole || !allowedRoles.includes(userRole)) {
-      throw createForbiddenError(
-        `Access denied. Required role: ${allowedRoles.join(" or ")}`
-      );
+      throw createForbiddenError(`Access denied. Required role: ${allowedRoles.join(" or ")}`);
     }
 
     await next();
@@ -411,10 +409,7 @@ export function hasRole(user: AuthUser | null, role: UserRole): boolean {
 /**
  * Check if user has any of the specified roles
  */
-export function hasAnyRole(
-  user: AuthUser | null,
-  roles: UserRole[]
-): boolean {
+export function hasAnyRole(user: AuthUser | null, roles: UserRole[]): boolean {
   return user?.role ? roles.includes(user.role) : false;
 }
 
@@ -438,10 +433,7 @@ export function isAdmin(user: AuthUser | null): boolean {
  * }
  * ```
  */
-export function canAccess(
-  user: AuthUser | null,
-  resourceOwnerId: string
-): boolean {
+export function canAccess(user: AuthUser | null, resourceOwnerId: string): boolean {
   if (!user) return false;
   // Admins can access everything
   if (isAdmin(user)) return true;

@@ -9,10 +9,6 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": false
   },
-  "include": [
-    "**/*.ts",
-    "**/*.spec.ts",
-    "**/*.test.ts"
-  ],
+  "include": ["**/*.ts", "**/*.spec.ts", "**/*.test.ts"],
   "exclude": ["node_modules"]
 }

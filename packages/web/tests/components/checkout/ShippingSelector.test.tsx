@@ -4,9 +4,9 @@
  * Tests shipping option display, selection, and state management.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ShippingSelector, type ShippingOptionData } from '~/components/checkout/ShippingSelector';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { ShippingSelector, type ShippingOptionData } from "~/components/checkout/ShippingSelector";
 
 // ============================================================================
 // Mocks
@@ -14,30 +14,30 @@ import { ShippingSelector, type ShippingOptionData } from '~/components/checkout
 
 const mockShippingOptions: ShippingOptionData[] = [
   {
-    id: 'opt-standard',
-    name: 'Standard Delivery',
-    carrier: 'India Post',
-    baseCost: '99.00',
+    id: "opt-standard",
+    name: "Standard Delivery",
+    carrier: "India Post",
+    baseCost: "99.00",
     finalCost: 99,
     estimatedDaysMin: 5,
     estimatedDaysMax: 7,
     isFree: false,
   },
   {
-    id: 'opt-express',
-    name: 'Express Delivery',
-    carrier: 'Delhivery',
-    baseCost: '199.00',
+    id: "opt-express",
+    name: "Express Delivery",
+    carrier: "Delhivery",
+    baseCost: "199.00",
     finalCost: 199,
     estimatedDaysMin: 2,
     estimatedDaysMax: 3,
     isFree: false,
   },
   {
-    id: 'opt-free',
-    name: 'Free Shipping',
-    carrier: 'India Post',
-    baseCost: '0.00',
+    id: "opt-free",
+    name: "Free Shipping",
+    carrier: "India Post",
+    baseCost: "0.00",
     finalCost: 0,
     estimatedDaysMin: 7,
     estimatedDaysMax: 10,
@@ -53,7 +53,7 @@ const mockEstimateResponse = {
 };
 
 // Mock the API module
-vi.mock('~/lib/api', () => ({
+vi.mock("~/lib/api", () => ({
   api: {
     shipping: {
       getEstimate: vi.fn(),
@@ -62,14 +62,14 @@ vi.mock('~/lib/api', () => ({
 }));
 
 // Get reference to mocked api
-import { api } from '~/lib/api';
+import { api } from "~/lib/api";
 const mockedApi = vi.mocked(api);
 
 // ============================================================================
 // Tests
 // ============================================================================
 
-describe('ShippingSelector Component', () => {
+describe("ShippingSelector Component", () => {
   const defaultProps = {
     cartTotal: 500,
     selectedOptionId: null,
@@ -85,8 +85,8 @@ describe('ShippingSelector Component', () => {
     vi.resetAllMocks();
   });
 
-  describe('Loading State', () => {
-    it('shows loading spinner while fetching options', async () => {
+  describe("Loading State", () => {
+    it("shows loading spinner while fetching options", async () => {
       // Delay the response to see loading state
       mockedApi.shipping.getEstimate.mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve(mockEstimateResponse), 100))
@@ -97,7 +97,7 @@ describe('ShippingSelector Component', () => {
       expect(screen.getByText(/loading shipping options/i)).toBeInTheDocument();
     });
 
-    it('hides loading after options are fetched', async () => {
+    it("hides loading after options are fetched", async () => {
       render(<ShippingSelector {...defaultProps} />);
 
       await waitFor(() => {
@@ -106,35 +106,35 @@ describe('ShippingSelector Component', () => {
     });
   });
 
-  describe('Options Rendering', () => {
-    it('renders all shipping options', async () => {
+  describe("Options Rendering", () => {
+    it("renders all shipping options", async () => {
       render(<ShippingSelector {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Standard Delivery')).toBeInTheDocument();
-        expect(screen.getByText('Express Delivery')).toBeInTheDocument();
-        expect(screen.getByText('Free Shipping')).toBeInTheDocument();
+        expect(screen.getByText("Standard Delivery")).toBeInTheDocument();
+        expect(screen.getByText("Express Delivery")).toBeInTheDocument();
+        expect(screen.getByText("Free Shipping")).toBeInTheDocument();
       });
     });
 
-    it('displays carrier name for each option', async () => {
+    it("displays carrier name for each option", async () => {
       render(<ShippingSelector {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getAllByText('India Post')).toHaveLength(2);
-        expect(screen.getByText('Delhivery')).toBeInTheDocument();
+        expect(screen.getAllByText("India Post")).toHaveLength(2);
+        expect(screen.getByText("Delhivery")).toBeInTheDocument();
       });
     });
 
-    it('shows pricing correctly', async () => {
+    it("shows pricing correctly", async () => {
       render(<ShippingSelector {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText('FREE')).toBeInTheDocument(); // Free option
+        expect(screen.getByText("FREE")).toBeInTheDocument(); // Free option
       });
     });
 
-    it('shows estimated delivery', async () => {
+    it("shows estimated delivery", async () => {
       render(<ShippingSelector {...defaultProps} />);
 
       await waitFor(() => {
@@ -145,56 +145,56 @@ describe('ShippingSelector Component', () => {
     });
   });
 
-  describe('Selection', () => {
-    it('selecting option updates state', async () => {
+  describe("Selection", () => {
+    it("selecting option updates state", async () => {
       const onSelect = vi.fn();
       render(<ShippingSelector {...defaultProps} onSelect={onSelect} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Express Delivery')).toBeInTheDocument();
+        expect(screen.getByText("Express Delivery")).toBeInTheDocument();
       });
 
       // Click on Express option
-      fireEvent.click(screen.getByText('Express Delivery'));
+      fireEvent.click(screen.getByText("Express Delivery"));
 
       expect(onSelect).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: 'opt-express',
-          name: 'Express Delivery',
+          id: "opt-express",
+          name: "Express Delivery",
         })
       );
     });
 
-    it('highlights selected option', async () => {
+    it("highlights selected option", async () => {
       render(<ShippingSelector {...defaultProps} selectedOptionId="opt-express" />);
 
       await waitFor(() => {
-        const expressButton = screen.getByText('Express Delivery').closest('button');
-        expect(expressButton).toHaveClass('border-brand-500');
+        const expressButton = screen.getByText("Express Delivery").closest("button");
+        expect(expressButton).toHaveClass("border-brand-500");
       });
     });
 
-    it('auto-selects first option if none selected', async () => {
+    it("auto-selects first option if none selected", async () => {
       const onSelect = vi.fn();
       render(<ShippingSelector {...defaultProps} onSelect={onSelect} selectedOptionId={null} />);
 
       await waitFor(() => {
         expect(onSelect).toHaveBeenCalledWith(
           expect.objectContaining({
-            id: 'opt-standard',
+            id: "opt-standard",
           })
         );
       });
     });
   });
 
-  describe('Badges', () => {
+  describe("Badges", () => {
     it('shows "Free" badge for free shipping option', async () => {
       render(<ShippingSelector {...defaultProps} />);
 
       await waitFor(() => {
         // Should have a Free badge
-        const freeBadges = screen.getAllByText('Free');
+        const freeBadges = screen.getAllByText("Free");
         expect(freeBadges.length).toBeGreaterThanOrEqual(1);
       });
     });
@@ -203,13 +203,13 @@ describe('ShippingSelector Component', () => {
       render(<ShippingSelector {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Fastest')).toBeInTheDocument();
+        expect(screen.getByText("Fastest")).toBeInTheDocument();
       });
     });
   });
 
-  describe('Free Shipping Progress', () => {
-    it('shows progress bar when not qualifying for free shipping', async () => {
+  describe("Free Shipping Progress", () => {
+    it("shows progress bar when not qualifying for free shipping", async () => {
       render(<ShippingSelector {...defaultProps} cartTotal={500} />);
 
       await waitFor(() => {
@@ -217,7 +217,7 @@ describe('ShippingSelector Component', () => {
       });
     });
 
-    it('shows free shipping notice when qualified', async () => {
+    it("shows free shipping notice when qualified", async () => {
       mockedApi.shipping.getEstimate.mockResolvedValue({
         ...mockEstimateResponse,
         qualifiesForFreeShipping: true,
@@ -232,9 +232,9 @@ describe('ShippingSelector Component', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('shows error message when API fails', async () => {
-      mockedApi.shipping.getEstimate.mockRejectedValue(new Error('Network error'));
+  describe("Error Handling", () => {
+    it("shows error message when API fails", async () => {
+      mockedApi.shipping.getEstimate.mockRejectedValue(new Error("Network error"));
 
       render(<ShippingSelector {...defaultProps} />);
 
@@ -244,7 +244,7 @@ describe('ShippingSelector Component', () => {
     });
 
     it('shows "Try again" button on error', async () => {
-      mockedApi.shipping.getEstimate.mockRejectedValue(new Error('Network error'));
+      mockedApi.shipping.getEstimate.mockRejectedValue(new Error("Network error"));
 
       render(<ShippingSelector {...defaultProps} />);
 
@@ -254,8 +254,8 @@ describe('ShippingSelector Component', () => {
     });
   });
 
-  describe('No Options', () => {
-    it('shows message when no shipping options available', async () => {
+  describe("No Options", () => {
+    it("shows message when no shipping options available", async () => {
       mockedApi.shipping.getEstimate.mockResolvedValue({
         ...mockEstimateResponse,
         options: [],
@@ -269,8 +269,8 @@ describe('ShippingSelector Component', () => {
     });
   });
 
-  describe('API Integration', () => {
-    it('passes cartTotal to API', async () => {
+  describe("API Integration", () => {
+    it("passes cartTotal to API", async () => {
       render(<ShippingSelector {...defaultProps} cartTotal={2500} />);
 
       await waitFor(() => {
@@ -282,19 +282,19 @@ describe('ShippingSelector Component', () => {
       });
     });
 
-    it('passes postalCode to API when provided', async () => {
+    it("passes postalCode to API when provided", async () => {
       render(<ShippingSelector {...defaultProps} postalCode="110001" />);
 
       await waitFor(() => {
         expect(mockedApi.shipping.getEstimate).toHaveBeenCalledWith(
           expect.objectContaining({
-            zipCode: '110001',
+            zipCode: "110001",
           })
         );
       });
     });
 
-    it('refetches when cartTotal changes', async () => {
+    it("refetches when cartTotal changes", async () => {
       const { rerender } = render(<ShippingSelector {...defaultProps} cartTotal={500} />);
 
       await waitFor(() => {

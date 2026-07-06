@@ -8,46 +8,46 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useCallback } from 'react'
-import { CheckCircle2, MoreVertical, Flag, Trash2 } from 'lucide-react'
-import { cn, formatRelativeTime, formatDate, getInitials } from '~/lib/utils'
-import { StarRating } from './StarRating'
+import { useState, useCallback } from "react";
+import { CheckCircle2, MoreVertical, Flag, Trash2 } from "lucide-react";
+import { cn, formatRelativeTime, formatDate, getInitials } from "~/lib/utils";
+import { StarRating } from "./StarRating";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ReviewAuthor {
-  id: string
-  name: string
-  image?: string | null
+  id: string;
+  name: string;
+  image?: string | null;
 }
 
 export interface ReviewData {
-  id: string
-  rating: number
-  title?: string | null
-  content: string
-  author: ReviewAuthor
-  createdAt: string | Date
-  isVerifiedPurchase?: boolean
-  helpfulCount?: number
-  status?: 'pending' | 'approved' | 'rejected'
+  id: string;
+  rating: number;
+  title?: string | null;
+  content: string;
+  author: ReviewAuthor;
+  createdAt: string | Date;
+  isVerifiedPurchase?: boolean;
+  helpfulCount?: number;
+  status?: "pending" | "approved" | "rejected";
 }
 
 export interface ReviewCardProps {
   /** Review data to display */
-  review: ReviewData
+  review: ReviewData;
   /** Maximum content length before truncation */
-  maxContentLength?: number
+  maxContentLength?: number;
   /** Show action menu (for admin or owner) */
-  showActions?: boolean
+  showActions?: boolean;
   /** Callback when report is clicked */
-  onReport?: (reviewId: string) => void
+  onReport?: (reviewId: string) => void;
   /** Callback when delete is clicked (admin only) */
-  onDelete?: (reviewId: string) => void
+  onDelete?: (reviewId: string) => void;
   /** Custom className */
-  className?: string
+  className?: string;
 }
 
 // ============================================================================
@@ -78,38 +78,33 @@ export function ReviewCard({
   onDelete,
   className,
 }: ReviewCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   const toggleExpand = useCallback(() => {
-    setIsExpanded((prev) => !prev)
-  }, [])
+    setIsExpanded((prev) => !prev);
+  }, []);
 
   const toggleMenu = useCallback(() => {
-    setShowMenu((prev) => !prev)
-  }, [])
+    setShowMenu((prev) => !prev);
+  }, []);
 
   // Check if content needs truncation
-  const needsTruncation = review.content.length > maxContentLength
+  const needsTruncation = review.content.length > maxContentLength;
   const displayContent =
     needsTruncation && !isExpanded
-      ? review.content.slice(0, maxContentLength) + '...'
-      : review.content
+      ? review.content.slice(0, maxContentLength) + "..."
+      : review.content;
 
   // Format date
   const createdAt =
-    typeof review.createdAt === 'string'
-      ? new Date(review.createdAt)
-      : review.createdAt
-  const relativeTime = formatRelativeTime(createdAt)
-  const fullDate = formatDate(createdAt)
+    typeof review.createdAt === "string" ? new Date(review.createdAt) : review.createdAt;
+  const relativeTime = formatRelativeTime(createdAt);
+  const fullDate = formatDate(createdAt);
 
   return (
     <article
-      className={cn(
-        'rounded-lg border border-border bg-card p-4 sm:p-5',
-        className
-      )}
+      className={cn("rounded-lg border border-border bg-card p-4 sm:p-5", className)}
       aria-label={`Review by ${review.author.name}`}
     >
       {/* Header: Author info and rating */}
@@ -131,9 +126,7 @@ export function ReviewCard({
           {/* Author name and date */}
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-medium text-foreground">
-                {review.author.name}
-              </span>
+              <span className="font-medium text-foreground">{review.author.name}</span>
               {review.isVerifiedPurchase && (
                 <span
                   className="flex items-center gap-1 text-xs font-medium text-emerald-600"
@@ -170,18 +163,15 @@ export function ReviewCard({
             {showMenu && (
               <>
                 {/* Backdrop to close menu */}
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowMenu(false)}
-                />
+                <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
                 {/* Menu dropdown */}
                 <div className="absolute right-0 top-full z-20 mt-1 min-w-[140px] rounded-md border border-border bg-popover py-1 shadow-lg">
                   {onReport && (
                     <button
                       type="button"
                       onClick={() => {
-                        onReport(review.id)
-                        setShowMenu(false)
+                        onReport(review.id);
+                        setShowMenu(false);
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent"
                     >
@@ -193,8 +183,8 @@ export function ReviewCard({
                     <button
                       type="button"
                       onClick={() => {
-                        onDelete(review.id)
-                        setShowMenu(false)
+                        onDelete(review.id);
+                        setShowMenu(false);
                       }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent"
                     >
@@ -215,9 +205,7 @@ export function ReviewCard({
       </div>
 
       {/* Title */}
-      {review.title && (
-        <h4 className="mt-2 font-medium text-foreground">{review.title}</h4>
-      )}
+      {review.title && <h4 className="mt-2 font-medium text-foreground">{review.title}</h4>}
 
       {/* Content */}
       <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
@@ -231,28 +219,28 @@ export function ReviewCard({
           onClick={toggleExpand}
           className="mt-2 text-sm font-medium text-primary hover:underline"
         >
-          {isExpanded ? 'Show less' : 'Read more'}
+          {isExpanded ? "Show less" : "Read more"}
         </button>
       )}
 
       {/* Status badge for admin view */}
-      {review.status && review.status !== 'approved' && (
+      {review.status && review.status !== "approved" && (
         <div className="mt-3">
           <span
             className={cn(
-              'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-              review.status === 'pending' &&
-                'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-              review.status === 'rejected' &&
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+              review.status === "pending" &&
+                "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+              review.status === "rejected" &&
+                "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
             )}
           >
-            {review.status === 'pending' ? 'Pending Review' : 'Rejected'}
+            {review.status === "pending" ? "Pending Review" : "Rejected"}
           </span>
         </div>
       )}
     </article>
-  )
+  );
 }
 
 // ============================================================================
@@ -265,10 +253,7 @@ export function ReviewCard({
 export function ReviewCardSkeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn(
-        'animate-pulse rounded-lg border border-border bg-card p-4 sm:p-5',
-        className
-      )}
+      className={cn("animate-pulse rounded-lg border border-border bg-card p-4 sm:p-5", className)}
     >
       {/* Header */}
       <div className="flex items-start gap-3">
@@ -296,7 +281,7 @@ export function ReviewCardSkeleton({ className }: { className?: string }) {
         <div className="h-4 w-2/3 rounded bg-muted" />
       </div>
     </div>
-  )
+  );
 }
 
-export default ReviewCard
+export default ReviewCard;

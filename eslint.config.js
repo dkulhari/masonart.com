@@ -47,11 +47,7 @@ export default tseslint.config(
   {
     // Test suites keep unused fixtures/imports around for documentation and
     // skipped cases; don't fail the build on them.
-    files: [
-      "**/tests/**/*.{ts,tsx}",
-      "**/*.{test,spec}.{ts,tsx}",
-      "tests/**/*.ts",
-    ],
+    files: ["**/tests/**/*.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}", "tests/**/*.ts"],
     rules: {
       "@typescript-eslint/no-unused-vars": "off",
       "no-control-regex": "off",

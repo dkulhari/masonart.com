@@ -7,9 +7,9 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState } from 'react'
-import { createFileRoute, useSearch } from '@tanstack/react-router'
-import { z } from 'zod'
+import { useEffect, useState } from "react";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { z } from "zod";
 import {
   CheckCircle,
   Package,
@@ -26,9 +26,9 @@ import {
   Receipt,
   Loader2,
   AlertCircle,
-} from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
-import { ordersApi } from '~/lib/api'
+} from "lucide-react";
+import { cn, formatPrice } from "~/lib/utils";
+import { ordersApi } from "~/lib/api";
 
 // ============================================================================
 // Route Definition
@@ -37,63 +37,63 @@ import { ordersApi } from '~/lib/api'
 const searchSchema = z.object({
   orderNumber: z.string().optional(),
   orderId: z.string().optional(),
-})
+});
 
-export const Route = createFileRoute('/checkout/success')({
+export const Route = createFileRoute("/checkout/success")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: 'Order Confirmed | MasonArt' },
+      { title: "Order Confirmed | MasonArt" },
       {
-        name: 'description',
-        content: 'Your order has been placed successfully. Thank you for shopping with MasonArt.',
+        name: "description",
+        content: "Your order has been placed successfully. Thank you for shopping with MasonArt.",
       },
-      { name: 'robots', content: 'noindex' }, // Don't index success pages
+      { name: "robots", content: "noindex" }, // Don't index success pages
     ],
   }),
   component: OrderSuccessPage,
-})
+});
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface OrderDetails {
-  id: string
-  orderNumber: string
-  status: string
-  createdAt: string
-  total: number
-  subtotal: number
-  shippingCost: number
-  discountAmount?: number
-  customerNotes?: string
+  id: string;
+  orderNumber: string;
+  status: string;
+  createdAt: string;
+  total: number;
+  subtotal: number;
+  shippingCost: number;
+  discountAmount?: number;
+  customerNotes?: string;
   shippingAddress?: {
-    fullName: string
-    phone: string
-    addressLine1: string
-    addressLine2?: string
-    city: string
-    state: string
-    postalCode: string
-  }
-  shippingMethod?: string
-  estimatedDelivery?: string
+    fullName: string;
+    phone: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  };
+  shippingMethod?: string;
+  estimatedDelivery?: string;
   items?: Array<{
-    id: string
-    productTitle: string
-    thumbnailUrl?: string
-    sizeLabel?: string
-    frameName?: string
-    quantity: number
-    unitPrice: number
-    framePrice?: number
-  }>
+    id: string;
+    productTitle: string;
+    thumbnailUrl?: string;
+    sizeLabel?: string;
+    frameName?: string;
+    quantity: number;
+    unitPrice: number;
+    framePrice?: number;
+  }>;
   payment?: {
-    method?: string
-    status?: string
-  }
-  userEmail?: string
+    method?: string;
+    status?: string;
+  };
+  userEmail?: string;
 }
 
 // ============================================================================
@@ -101,47 +101,47 @@ interface OrderDetails {
 // ============================================================================
 
 function OrderSuccessPage() {
-  const search = useSearch({ from: '/checkout/success' })
-  const [order, setOrder] = useState<OrderDetails | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const search = useSearch({ from: "/checkout/success" });
+  const [order, setOrder] = useState<OrderDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Fetch order details
   useEffect(() => {
     async function fetchOrder() {
-      const identifier = search.orderNumber || search.orderId
+      const identifier = search.orderNumber || search.orderId;
       if (!identifier) {
-        setIsLoading(false)
-        return
+        setIsLoading(false);
+        return;
       }
 
       try {
-        const response = await ordersApi.getById(identifier)
+        const response = await ordersApi.getById(identifier);
         if (response) {
-          setOrder(response.order || response)
+          setOrder(response.order || response);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load order details')
+        setError(err instanceof Error ? err.message : "Failed to load order details");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchOrder()
-  }, [search.orderNumber, search.orderId])
+    fetchOrder();
+  }, [search.orderNumber, search.orderId]);
 
   // Copy order number to clipboard
   const handleCopyOrderNumber = async () => {
-    if (!order?.orderNumber) return
+    if (!order?.orderNumber) return;
     try {
-      await navigator.clipboard.writeText(order.orderNumber)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(order.orderNumber);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback for browsers without clipboard API
     }
-  }
+  };
 
   // Loading state
   if (isLoading) {
@@ -152,12 +152,12 @@ function OrderSuccessPage() {
           <p className="text-muted-foreground">Loading your order details...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // No order identifier provided
   if (!search.orderNumber && !search.orderId) {
-    return <GenericSuccessState />
+    return <GenericSuccessState />;
   }
 
   // Error state
@@ -181,12 +181,12 @@ function OrderSuccessPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   // Order not found
   if (!order) {
-    return <GenericSuccessState />
+    return <GenericSuccessState />;
   }
 
   return (
@@ -204,9 +204,7 @@ function OrderSuccessPage() {
           {/* Order Details */}
           <div className="mt-8 space-y-6">
             {/* Order Items */}
-            {order.items && order.items.length > 0 && (
-              <OrderItemsSection items={order.items} />
-            )}
+            {order.items && order.items.length > 0 && <OrderItemsSection items={order.items} />}
 
             {/* Shipping & Payment Info */}
             <div className="grid gap-6 lg:grid-cols-2">
@@ -253,7 +251,7 @@ function OrderSuccessPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -261,10 +259,10 @@ function OrderSuccessPage() {
 // ============================================================================
 
 interface SuccessHeaderProps {
-  orderNumber: string
-  userEmail?: string
-  onCopy: () => void
-  copied: boolean
+  orderNumber: string;
+  userEmail?: string;
+  onCopy: () => void;
+  copied: boolean;
 }
 
 function SuccessHeader({ orderNumber, userEmail, onCopy, copied }: SuccessHeaderProps) {
@@ -295,12 +293,12 @@ function SuccessHeader({ orderNumber, userEmail, onCopy, copied }: SuccessHeader
           type="button"
           onClick={onCopy}
           className={cn(
-            'ml-2 rounded-lg p-2 transition-colors',
+            "ml-2 rounded-lg p-2 transition-colors",
             copied
-              ? 'bg-green-100 text-green-600'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+              ? "bg-green-100 text-green-600"
+              : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
           )}
-          title={copied ? 'Copied!' : 'Copy order number'}
+          title={copied ? "Copied!" : "Copy order number"}
         >
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
         </button>
@@ -310,11 +308,12 @@ function SuccessHeader({ orderNumber, userEmail, onCopy, copied }: SuccessHeader
       {userEmail && (
         <p className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground animate-in fade-in slide-in-from-bottom-4 duration-500 delay-400">
           <Mail className="h-4 w-4" />
-          Confirmation email sent to <span className="font-medium text-foreground">{userEmail}</span>
+          Confirmation email sent to{" "}
+          <span className="font-medium text-foreground">{userEmail}</span>
         </p>
       )}
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -322,18 +321,18 @@ function SuccessHeader({ orderNumber, userEmail, onCopy, copied }: SuccessHeader
 // ============================================================================
 
 interface OrderItem {
-  id: string
-  productTitle: string
-  thumbnailUrl?: string
-  sizeLabel?: string
-  frameName?: string
-  quantity: number
-  unitPrice: number
-  framePrice?: number
+  id: string;
+  productTitle: string;
+  thumbnailUrl?: string;
+  sizeLabel?: string;
+  frameName?: string;
+  quantity: number;
+  unitPrice: number;
+  framePrice?: number;
 }
 
 interface OrderItemsSectionProps {
-  items: OrderItem[]
+  items: OrderItem[];
 }
 
 function OrderItemsSection({ items }: OrderItemsSectionProps) {
@@ -348,7 +347,7 @@ function OrderItemsSection({ items }: OrderItemsSectionProps) {
 
       <div className="divide-y divide-border">
         {items.map((item) => {
-          const itemTotal = (item.unitPrice + (item.framePrice || 0)) * item.quantity
+          const itemTotal = (item.unitPrice + (item.framePrice || 0)) * item.quantity;
           return (
             <div key={item.id} className="flex gap-4 p-4">
               {/* Thumbnail */}
@@ -386,11 +385,11 @@ function OrderItemsSection({ items }: OrderItemsSectionProps) {
                 </div>
               </div>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -399,16 +398,16 @@ function OrderItemsSection({ items }: OrderItemsSectionProps) {
 
 interface ShippingSectionProps {
   address: {
-    fullName: string
-    phone: string
-    addressLine1: string
-    addressLine2?: string
-    city: string
-    state: string
-    postalCode: string
-  }
-  method?: string
-  estimatedDelivery?: string
+    fullName: string;
+    phone: string;
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  };
+  method?: string;
+  estimatedDelivery?: string;
 }
 
 function ShippingSection({ address, method, estimatedDelivery }: ShippingSectionProps) {
@@ -449,7 +448,7 @@ function ShippingSection({ address, method, estimatedDelivery }: ShippingSection
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -457,11 +456,11 @@ function ShippingSection({ address, method, estimatedDelivery }: ShippingSection
 // ============================================================================
 
 interface OrderSummarySectionProps {
-  subtotal: number
-  shippingCost: number
-  discountAmount?: number
-  total: number
-  paymentStatus?: string
+  subtotal: number;
+  shippingCost: number;
+  discountAmount?: number;
+  total: number;
+  paymentStatus?: string;
 }
 
 function OrderSummarySection({
@@ -498,8 +497,8 @@ function OrderSummarySection({
         {/* Shipping */}
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Shipping</span>
-          <span className={shippingCost === 0 ? 'text-green-600' : 'text-foreground'}>
-            {shippingCost === 0 ? 'FREE' : formatPrice(shippingCost)}
+          <span className={shippingCost === 0 ? "text-green-600" : "text-foreground"}>
+            {shippingCost === 0 ? "FREE" : formatPrice(shippingCost)}
           </span>
         </div>
 
@@ -514,13 +513,13 @@ function OrderSummarySection({
           <div className="flex items-center justify-end gap-2 pt-2">
             <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
               <Check className="h-3 w-3" />
-              Payment {paymentStatus === 'captured' ? 'Complete' : paymentStatus}
+              Payment {paymentStatus === "captured" ? "Complete" : paymentStatus}
             </span>
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -531,25 +530,25 @@ function WhatNextSection() {
   const steps = [
     {
       icon: Mail,
-      title: 'Confirmation Email',
+      title: "Confirmation Email",
       description: "You'll receive an email with your order details and receipt.",
     },
     {
       icon: Package,
-      title: 'Order Processing',
-      description: 'Our team will prepare your order with care and attention to detail.',
+      title: "Order Processing",
+      description: "Our team will prepare your order with care and attention to detail.",
     },
     {
       icon: Truck,
-      title: 'Shipping Updates',
+      title: "Shipping Updates",
       description: "We'll send you tracking information once your order ships.",
     },
     {
       icon: Clock,
-      title: 'Delivery',
-      description: 'Your beautiful artwork will arrive at your doorstep.',
+      title: "Delivery",
+      description: "Your beautiful artwork will arrive at your doorstep.",
     },
-  ]
+  ];
 
   return (
     <div className="rounded-xl border border-border bg-card">
@@ -560,10 +559,7 @@ function WhatNextSection() {
       <div className="p-6">
         <div className="grid gap-4 sm:grid-cols-2">
           {steps.map((step, index) => (
-            <div
-              key={step.title}
-              className="flex items-start gap-3 rounded-lg bg-muted/30 p-4"
-            >
+            <div key={step.title} className="flex items-start gap-3 rounded-lg bg-muted/30 p-4">
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600">
                 <step.icon className="h-5 w-5" />
               </div>
@@ -581,7 +577,7 @@ function WhatNextSection() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ============================================================================
@@ -599,13 +595,11 @@ function GenericSuccessState() {
           </div>
 
           {/* Title */}
-          <h1 className="mb-2 text-2xl font-bold text-foreground sm:text-3xl">
-            Order Confirmed!
-          </h1>
+          <h1 className="mb-2 text-2xl font-bold text-foreground sm:text-3xl">Order Confirmed!</h1>
 
           <p className="mb-8 text-muted-foreground">
-            Thank you for your purchase. Your order has been placed successfully.
-            You will receive a confirmation email shortly.
+            Thank you for your purchase. Your order has been placed successfully. You will receive a
+            confirmation email shortly.
           </p>
 
           {/* Action Buttons */}
@@ -628,7 +622,7 @@ function GenericSuccessState() {
 
           {/* Help Text */}
           <p className="mt-8 text-sm text-muted-foreground">
-            Need help?{' '}
+            Need help?{" "}
             <a href="/contact" className="text-brand-600 hover:text-brand-700 font-medium">
               Contact us
             </a>
@@ -636,5 +630,5 @@ function GenericSuccessState() {
         </div>
       </div>
     </div>
-  )
+  );
 }

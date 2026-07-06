@@ -27,16 +27,8 @@ import {
   type OrderPaymentDetails,
 } from "../../database/schema/orders";
 import { users } from "../../database/schema/users";
-import {
-  requireAuth,
-  requireAdmin,
-  type AuthVariables,
-} from "../../middleware/auth";
-import {
-  createRefund,
-  isRazorpayConfigured,
-  RazorpayError,
-} from "../../lib/razorpay";
+import { requireAuth, requireAdmin, type AuthVariables } from "../../middleware/auth";
+import { createRefund, isRazorpayConfigured, RazorpayError } from "../../lib/razorpay";
 import { notifyOrderStatusChange } from "../../services/notifications";
 import { createApprovalsForOrder } from "../../services/approval";
 import { productionApprovals } from "../../database/schema/approvals";
@@ -190,158 +182,152 @@ adminOrdersApp.use("*", requireAdmin);
 // GET /api/admin/orders - List Orders (Admin)
 // ============================================================================
 
-adminOrdersApp.get(
-  "/",
-  zValidator("query", listOrdersQuerySchema),
-  async (c) => {
-    const {
-      page,
-      pageSize,
-      status,
-      paymentStatus,
-      orderType,
-      search,
-      dateFrom,
-      dateTo,
-      sortBy,
-      sortOrder,
-    } = c.req.valid("query");
+adminOrdersApp.get("/", zValidator("query", listOrdersQuerySchema), async (c) => {
+  const {
+    page,
+    pageSize,
+    status,
+    paymentStatus,
+    orderType,
+    search,
+    dateFrom,
+    dateTo,
+    sortBy,
+    sortOrder,
+  } = c.req.valid("query");
 
-    try {
-      // Build where conditions
-      const conditions: ReturnType<typeof eq>[] = [];
+  try {
+    // Build where conditions
+    const conditions: ReturnType<typeof eq>[] = [];
 
-      if (status) {
-        conditions.push(eq(orders.status, status));
-      }
+    if (status) {
+      conditions.push(eq(orders.status, status));
+    }
 
-      if (paymentStatus) {
-        conditions.push(eq(orders.paymentStatus, paymentStatus));
-      }
+    if (paymentStatus) {
+      conditions.push(eq(orders.paymentStatus, paymentStatus));
+    }
 
-      if (orderType) {
-        conditions.push(eq(orders.orderType, orderType));
-      }
+    if (orderType) {
+      conditions.push(eq(orders.orderType, orderType));
+    }
 
-      if (dateFrom) {
-        conditions.push(gte(orders.createdAt, dateFrom));
-      }
+    if (dateFrom) {
+      conditions.push(gte(orders.createdAt, dateFrom));
+    }
 
-      if (dateTo) {
-        conditions.push(lte(orders.createdAt, dateTo));
-      }
+    if (dateTo) {
+      conditions.push(lte(orders.createdAt, dateTo));
+    }
 
-      if (search) {
-        const searchPattern = `%${search}%`;
-        conditions.push(
-          or(
-            ilike(orders.orderNumber, searchPattern),
-            ilike(orders.guestEmail, searchPattern),
-            ilike(orders.guestPhone, searchPattern)
-          )!
-        );
-      }
+    if (search) {
+      const searchPattern = `%${search}%`;
+      conditions.push(
+        or(
+          ilike(orders.orderNumber, searchPattern),
+          ilike(orders.guestEmail, searchPattern),
+          ilike(orders.guestPhone, searchPattern)
+        )!
+      );
+    }
 
-      // Build sort order
-      const orderByColumn = {
+    // Build sort order
+    const orderByColumn = {
+      createdAt: orders.createdAt,
+      updatedAt: orders.updatedAt,
+      total: orders.total,
+      orderNumber: orders.orderNumber,
+    }[sortBy];
+
+    const orderByDirection = sortOrder === "asc" ? asc : desc;
+    const offset = (page - 1) * pageSize;
+
+    // Get total count
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    const total = countResult[0]?.count ?? 0;
+
+    // Get orders with user info
+    const orderList = await db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        userId: orders.userId,
+        guestEmail: orders.guestEmail,
+        guestPhone: orders.guestPhone,
+        status: orders.status,
+        paymentStatus: orders.paymentStatus,
+        orderType: orders.orderType,
+        shippingMethod: orders.shippingMethod,
+        shippingCost: orders.shippingCost,
+        subtotal: orders.subtotal,
+        discount: orders.discount,
+        tax: orders.tax,
+        total: orders.total,
+        itemCount: orders.itemCount,
+        currency: orders.currency,
         createdAt: orders.createdAt,
         updatedAt: orders.updatedAt,
-        total: orders.total,
-        orderNumber: orders.orderNumber,
-      }[sortBy];
+        paidAt: orders.paidAt,
+        shippedAt: orders.shippedAt,
+        deliveredAt: orders.deliveredAt,
+        cancelledAt: orders.cancelledAt,
+      })
+      .from(orders)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(orderByDirection(orderByColumn))
+      .limit(pageSize)
+      .offset(offset);
 
-      const orderByDirection = sortOrder === "asc" ? asc : desc;
-      const offset = (page - 1) * pageSize;
+    // Fetch user info for orders with userId
+    const userIds = orderList.filter((o) => o.userId).map((o) => o.userId as string);
 
-      // Get total count
-      const countResult = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(orders)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-      const total = countResult[0]?.count ?? 0;
-
-      // Get orders with user info
-      const orderList = await db
+    let userMap: Record<string, { name: string | null; email: string }> = {};
+    if (userIds.length > 0) {
+      const userList = await db
         .select({
-          id: orders.id,
-          orderNumber: orders.orderNumber,
-          userId: orders.userId,
-          guestEmail: orders.guestEmail,
-          guestPhone: orders.guestPhone,
-          status: orders.status,
-          paymentStatus: orders.paymentStatus,
-          orderType: orders.orderType,
-          shippingMethod: orders.shippingMethod,
-          shippingCost: orders.shippingCost,
-          subtotal: orders.subtotal,
-          discount: orders.discount,
-          tax: orders.tax,
-          total: orders.total,
-          itemCount: orders.itemCount,
-          currency: orders.currency,
-          createdAt: orders.createdAt,
-          updatedAt: orders.updatedAt,
-          paidAt: orders.paidAt,
-          shippedAt: orders.shippedAt,
-          deliveredAt: orders.deliveredAt,
-          cancelledAt: orders.cancelledAt,
+          id: users.id,
+          name: users.name,
+          email: users.email,
         })
-        .from(orders)
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(orderByDirection(orderByColumn))
-        .limit(pageSize)
-        .offset(offset);
+        .from(users)
+        .where(sql`${users.id} = ANY(${userIds})`);
 
-      // Fetch user info for orders with userId
-      const userIds = orderList
-        .filter((o) => o.userId)
-        .map((o) => o.userId as string);
-
-      let userMap: Record<string, { name: string | null; email: string }> = {};
-      if (userIds.length > 0) {
-        const userList = await db
-          .select({
-            id: users.id,
-            name: users.name,
-            email: users.email,
-          })
-          .from(users)
-          .where(sql`${users.id} = ANY(${userIds})`);
-
-        userMap = userList.reduce(
-          (acc, user) => {
-            acc[user.id] = { name: user.name, email: user.email };
-            return acc;
-          },
-          {} as Record<string, { name: string | null; email: string }>
-        );
-      }
-
-      // Add user info to orders
-      const ordersWithCustomer = orderList.map((order) => ({
-        ...order,
-        customer: order.userId
-          ? userMap[order.userId]
-          : order.guestEmail
-            ? { name: null, email: order.guestEmail }
-            : null,
-      }));
-
-      return c.json({
-        items: ordersWithCustomer,
-        total,
-        page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
-        hasNextPage: page * pageSize < total,
-        hasPreviousPage: page > 1,
-      });
-    } catch (error) {
-      return c.json({ error: "Failed to fetch orders" }, 500);
+      userMap = userList.reduce(
+        (acc, user) => {
+          acc[user.id] = { name: user.name, email: user.email };
+          return acc;
+        },
+        {} as Record<string, { name: string | null; email: string }>
+      );
     }
+
+    // Add user info to orders
+    const ordersWithCustomer = orderList.map((order) => ({
+      ...order,
+      customer: order.userId
+        ? userMap[order.userId]
+        : order.guestEmail
+          ? { name: null, email: order.guestEmail }
+          : null,
+    }));
+
+    return c.json({
+      items: ordersWithCustomer,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNextPage: page * pageSize < total,
+      hasPreviousPage: page > 1,
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to fetch orders" }, 500);
   }
-);
+});
 
 // ============================================================================
 // GET /api/admin/orders/stats - Get Order Statistics
@@ -390,9 +376,7 @@ adminOrdersApp.get("/stats", async (c) => {
         total: sql<string>`COALESCE(SUM(${orders.total}::numeric), 0)::text`,
       })
       .from(orders)
-      .where(
-        and(eq(orders.paymentStatus, "paid"), gte(orders.createdAt, monthStart))
-      );
+      .where(and(eq(orders.paymentStatus, "paid"), gte(orders.createdAt, monthStart)));
 
     // Format status counts as object
     const statusCountsMap = statusCounts.reduce(
@@ -431,8 +415,7 @@ adminOrdersApp.get("/:id", async (c) => {
   const { id } = c.req.param();
 
   // Determine if ID is UUID or order number
-  const isUUID =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
   if (!isUUID && !isOrderNumber) {
@@ -441,9 +424,7 @@ adminOrdersApp.get("/:id", async (c) => {
 
   try {
     // Build where condition
-    const whereCondition = isUUID
-      ? eq(orders.id, id)
-      : eq(orders.orderNumber, id);
+    const whereCondition = isUUID ? eq(orders.id, id) : eq(orders.orderNumber, id);
 
     // Get order with items
     const order = await db.query.orders.findFirst({
@@ -577,470 +558,410 @@ adminOrdersApp.get("/:id", async (c) => {
 // PATCH /api/admin/orders/:id - Update Order
 // ============================================================================
 
-adminOrdersApp.patch(
-  "/:id",
-  zValidator("json", updateOrderSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const input = c.req.valid("json");
+adminOrdersApp.patch("/:id", zValidator("json", updateOrderSchema), async (c) => {
+  const { id } = c.req.param();
+  const input = c.req.valid("json");
 
-    // Determine if ID is UUID or order number
-    const isUUID =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        id
-      );
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
+  // Determine if ID is UUID or order number
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
-      return c.json({ error: "Invalid order ID format" }, 400);
+  if (!isUUID && !isOrderNumber) {
+    return c.json({ error: "Invalid order ID format" }, 400);
+  }
+
+  try {
+    // Build where condition
+    const whereCondition = isUUID ? eq(orders.id, id) : eq(orders.orderNumber, id);
+
+    // Check if order exists
+    const existing = await db.select({ id: orders.id }).from(orders).where(whereCondition).limit(1);
+
+    if (existing.length === 0) {
+      return c.json({ error: "Order not found" }, 404);
     }
 
-    try {
-      // Build where condition
-      const whereCondition = isUUID
-        ? eq(orders.id, id)
-        : eq(orders.orderNumber, id);
+    // Build update object
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date(),
+    };
 
-      // Check if order exists
-      const existing = await db
-        .select({ id: orders.id })
-        .from(orders)
-        .where(whereCondition)
-        .limit(1);
-
-      if (existing.length === 0) {
-        return c.json({ error: "Order not found" }, 404);
+    if (input.status !== undefined) {
+      updateData.status = input.status;
+      // Set timestamp based on status
+      if (input.status === "cancelled") {
+        updateData.cancelledAt = new Date();
+      } else if (input.status === "shipped") {
+        updateData.shippedAt = new Date();
+      } else if (input.status === "delivered") {
+        updateData.deliveredAt = new Date();
       }
+    }
 
-      // Build update object
-      const updateData: Record<string, unknown> = {
-        updatedAt: new Date(),
-      };
-
-      if (input.status !== undefined) {
-        updateData.status = input.status;
-        // Set timestamp based on status
-        if (input.status === "cancelled") {
-          updateData.cancelledAt = new Date();
-        } else if (input.status === "shipped") {
-          updateData.shippedAt = new Date();
-        } else if (input.status === "delivered") {
-          updateData.deliveredAt = new Date();
-        }
+    if (input.paymentStatus !== undefined) {
+      updateData.paymentStatus = input.paymentStatus;
+      if (input.paymentStatus === "paid") {
+        updateData.paidAt = new Date();
       }
+    }
 
-      if (input.paymentStatus !== undefined) {
-        updateData.paymentStatus = input.paymentStatus;
-        if (input.paymentStatus === "paid") {
-          updateData.paidAt = new Date();
-        }
-      }
+    if (input.internalNotes !== undefined) {
+      updateData.internalNotes = input.internalNotes;
+    }
 
-      if (input.internalNotes !== undefined) {
-        updateData.internalNotes = input.internalNotes;
-      }
+    if (input.shippingMethod !== undefined) {
+      updateData.shippingMethod = input.shippingMethod;
+    }
 
-      if (input.shippingMethod !== undefined) {
-        updateData.shippingMethod = input.shippingMethod;
-      }
+    const existingOrder = existing[0];
+    if (!existingOrder) {
+      return c.json({ error: "Order not found" }, 404);
+    }
 
-      const existingOrder = existing[0];
-      if (!existingOrder) {
-        return c.json({ error: "Order not found" }, 404);
-      }
+    // Update order
+    const updatedOrders = await db
+      .update(orders)
+      .set(updateData)
+      .where(eq(orders.id, existingOrder.id))
+      .returning();
 
-      // Update order
-      const updatedOrders = await db
-        .update(orders)
-        .set(updateData)
-        .where(eq(orders.id, existingOrder.id))
-        .returning();
-
-      const updatedOrder = updatedOrders[0];
-      if (!updatedOrder) {
-        return c.json({ error: "Failed to update order" }, 500);
-      }
-
-      // Create approvals for made-to-order items when moving to processing
-      if (input.status === "processing") {
-        createApprovalsForOrder(updatedOrder.id).catch((err) => {
-          console.error("[Orders] Failed to create approvals:", err);
-        });
-      }
-
-      return c.json({
-        message: "Order updated successfully",
-        order: {
-          id: updatedOrder.id,
-          orderNumber: updatedOrder.orderNumber,
-          status: updatedOrder.status,
-          paymentStatus: updatedOrder.paymentStatus,
-          updatedAt: updatedOrder.updatedAt,
-        },
-      });
-    } catch (error) {
+    const updatedOrder = updatedOrders[0];
+    if (!updatedOrder) {
       return c.json({ error: "Failed to update order" }, 500);
     }
+
+    // Create approvals for made-to-order items when moving to processing
+    if (input.status === "processing") {
+      createApprovalsForOrder(updatedOrder.id).catch((err) => {
+        console.error("[Orders] Failed to create approvals:", err);
+      });
+    }
+
+    return c.json({
+      message: "Order updated successfully",
+      order: {
+        id: updatedOrder.id,
+        orderNumber: updatedOrder.orderNumber,
+        status: updatedOrder.status,
+        paymentStatus: updatedOrder.paymentStatus,
+        updatedAt: updatedOrder.updatedAt,
+      },
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to update order" }, 500);
   }
-);
+});
 
 // ============================================================================
 // PATCH /api/admin/orders/:id/status - Update Order Status
 // ============================================================================
 
-adminOrdersApp.patch(
-  "/:id/status",
-  zValidator("json", updateStatusSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const { status, reason } = c.req.valid("json");
+adminOrdersApp.patch("/:id/status", zValidator("json", updateStatusSchema), async (c) => {
+  const { id } = c.req.param();
+  const { status, reason } = c.req.valid("json");
 
-    // Determine if ID is UUID or order number
-    const isUUID =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        id
-      );
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
+  // Determine if ID is UUID or order number
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
-      return c.json({ error: "Invalid order ID format" }, 400);
-    }
-
-    try {
-      // Build where condition
-      const whereCondition = isUUID
-        ? eq(orders.id, id)
-        : eq(orders.orderNumber, id);
-
-      // Check if order exists
-      const existing = await db
-        .select({
-          id: orders.id,
-          status: orders.status,
-          internalNotes: orders.internalNotes,
-        })
-        .from(orders)
-        .where(whereCondition)
-        .limit(1);
-
-      if (existing.length === 0) {
-        return c.json({ error: "Order not found" }, 404);
-      }
-
-      // Build update object
-      const updateData: Record<string, unknown> = {
-        status,
-        updatedAt: new Date(),
-      };
-
-      // Set timestamp based on status
-      if (status === "cancelled") {
-        updateData.cancelledAt = new Date();
-      } else if (status === "shipped") {
-        updateData.shippedAt = new Date();
-      } else if (status === "delivered") {
-        updateData.deliveredAt = new Date();
-      }
-
-      const existingOrder = existing[0];
-      if (!existingOrder) {
-        return c.json({ error: "Order not found" }, 404);
-      }
-
-      // Append reason to internal notes if provided
-      if (reason) {
-        const existingNotes = existingOrder.internalNotes || "";
-        const timestamp = new Date().toISOString();
-        const noteAddition = `[${timestamp}] Status changed to ${status}: ${reason}`;
-        updateData.internalNotes = existingNotes
-          ? `${existingNotes}\n${noteAddition}`
-          : noteAddition;
-      }
-
-      // Update order
-      const updatedOrders = await db
-        .update(orders)
-        .set(updateData)
-        .where(eq(orders.id, existingOrder.id))
-        .returning();
-
-      const updatedOrder = updatedOrders[0];
-      if (!updatedOrder) {
-        return c.json({ error: "Failed to update order" }, 500);
-      }
-
-      // Trigger notification for status change (non-blocking)
-      // This runs in the background and doesn't affect the response
-      notifyOrderStatusChange(updatedOrder.id, status).catch((err) => {
-        console.error("[Orders] Failed to send notification:", err);
-      });
-
-      // Create approvals for made-to-order items when moving to processing
-      // This runs in the background and doesn't block the response
-      if (status === "processing") {
-        createApprovalsForOrder(updatedOrder.id).catch((err) => {
-          console.error("[Orders] Failed to create approvals:", err);
-        });
-      }
-
-      return c.json({
-        message: "Order status updated successfully",
-        order: {
-          id: updatedOrder.id,
-          orderNumber: updatedOrder.orderNumber,
-          status: updatedOrder.status,
-          previousStatus: existingOrder.status,
-        },
-      });
-    } catch (error) {
-      return c.json({ error: "Failed to update order status" }, 500);
-    }
+  if (!isUUID && !isOrderNumber) {
+    return c.json({ error: "Invalid order ID format" }, 400);
   }
-);
+
+  try {
+    // Build where condition
+    const whereCondition = isUUID ? eq(orders.id, id) : eq(orders.orderNumber, id);
+
+    // Check if order exists
+    const existing = await db
+      .select({
+        id: orders.id,
+        status: orders.status,
+        internalNotes: orders.internalNotes,
+      })
+      .from(orders)
+      .where(whereCondition)
+      .limit(1);
+
+    if (existing.length === 0) {
+      return c.json({ error: "Order not found" }, 404);
+    }
+
+    // Build update object
+    const updateData: Record<string, unknown> = {
+      status,
+      updatedAt: new Date(),
+    };
+
+    // Set timestamp based on status
+    if (status === "cancelled") {
+      updateData.cancelledAt = new Date();
+    } else if (status === "shipped") {
+      updateData.shippedAt = new Date();
+    } else if (status === "delivered") {
+      updateData.deliveredAt = new Date();
+    }
+
+    const existingOrder = existing[0];
+    if (!existingOrder) {
+      return c.json({ error: "Order not found" }, 404);
+    }
+
+    // Append reason to internal notes if provided
+    if (reason) {
+      const existingNotes = existingOrder.internalNotes || "";
+      const timestamp = new Date().toISOString();
+      const noteAddition = `[${timestamp}] Status changed to ${status}: ${reason}`;
+      updateData.internalNotes = existingNotes ? `${existingNotes}\n${noteAddition}` : noteAddition;
+    }
+
+    // Update order
+    const updatedOrders = await db
+      .update(orders)
+      .set(updateData)
+      .where(eq(orders.id, existingOrder.id))
+      .returning();
+
+    const updatedOrder = updatedOrders[0];
+    if (!updatedOrder) {
+      return c.json({ error: "Failed to update order" }, 500);
+    }
+
+    // Trigger notification for status change (non-blocking)
+    // This runs in the background and doesn't affect the response
+    notifyOrderStatusChange(updatedOrder.id, status).catch((err) => {
+      console.error("[Orders] Failed to send notification:", err);
+    });
+
+    // Create approvals for made-to-order items when moving to processing
+    // This runs in the background and doesn't block the response
+    if (status === "processing") {
+      createApprovalsForOrder(updatedOrder.id).catch((err) => {
+        console.error("[Orders] Failed to create approvals:", err);
+      });
+    }
+
+    return c.json({
+      message: "Order status updated successfully",
+      order: {
+        id: updatedOrder.id,
+        orderNumber: updatedOrder.orderNumber,
+        status: updatedOrder.status,
+        previousStatus: existingOrder.status,
+      },
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to update order status" }, 500);
+  }
+});
 
 // ============================================================================
 // PATCH /api/admin/orders/:id/shipping - Update Shipping Details
 // ============================================================================
 
-adminOrdersApp.patch(
-  "/:id/shipping",
-  zValidator("json", updateShippingSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const input = c.req.valid("json");
+adminOrdersApp.patch("/:id/shipping", zValidator("json", updateShippingSchema), async (c) => {
+  const { id } = c.req.param();
+  const input = c.req.valid("json");
 
-    // Determine if ID is UUID or order number
-    const isUUID =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        id
-      );
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
+  // Determine if ID is UUID or order number
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
 
-    if (!isUUID && !isOrderNumber) {
-      return c.json({ error: "Invalid order ID format" }, 400);
+  if (!isUUID && !isOrderNumber) {
+    return c.json({ error: "Invalid order ID format" }, 400);
+  }
+
+  try {
+    // Build where condition
+    const whereCondition = isUUID ? eq(orders.id, id) : eq(orders.orderNumber, id);
+
+    // Get existing order
+    const existing = await db
+      .select({
+        id: orders.id,
+        shippingDetails: orders.shippingDetails,
+      })
+      .from(orders)
+      .where(whereCondition)
+      .limit(1);
+
+    if (existing.length === 0) {
+      return c.json({ error: "Order not found" }, 404);
     }
 
-    try {
-      // Build where condition
-      const whereCondition = isUUID
-        ? eq(orders.id, id)
-        : eq(orders.orderNumber, id);
+    const existingOrder = existing[0];
+    if (!existingOrder) {
+      return c.json({ error: "Order not found" }, 404);
+    }
 
-      // Get existing order
-      const existing = await db
-        .select({
-          id: orders.id,
-          shippingDetails: orders.shippingDetails,
-        })
-        .from(orders)
-        .where(whereCondition)
-        .limit(1);
+    // Merge shipping details
+    const currentShippingDetails = (existingOrder.shippingDetails as OrderShippingDetails) || {};
+    const newShippingDetails: OrderShippingDetails = {
+      ...currentShippingDetails,
+    };
 
-      if (existing.length === 0) {
-        return c.json({ error: "Order not found" }, 404);
-      }
+    if (input.carrier !== undefined) newShippingDetails.carrier = input.carrier;
+    if (input.trackingNumber !== undefined)
+      newShippingDetails.trackingNumber = input.trackingNumber;
+    if (input.trackingUrl !== undefined) newShippingDetails.trackingUrl = input.trackingUrl;
+    if (input.awbNumber !== undefined) newShippingDetails.awbNumber = input.awbNumber;
+    if (input.shipmentId !== undefined) newShippingDetails.shipmentId = input.shipmentId;
+    if (input.estimatedDelivery !== undefined)
+      newShippingDetails.estimatedDelivery = input.estimatedDelivery;
 
-      const existingOrder = existing[0];
-      if (!existingOrder) {
-        return c.json({ error: "Order not found" }, 404);
-      }
+    // If tracking number is being added and shippedAt is not set, set it now
+    const updateData: Record<string, unknown> = {
+      shippingDetails: newShippingDetails,
+      updatedAt: new Date(),
+    };
 
-      // Merge shipping details
-      const currentShippingDetails =
-        (existingOrder.shippingDetails as OrderShippingDetails) || {};
-      const newShippingDetails: OrderShippingDetails = {
-        ...currentShippingDetails,
-      };
+    // Update order
+    const updatedOrders = await db
+      .update(orders)
+      .set(updateData)
+      .where(eq(orders.id, existingOrder.id))
+      .returning();
 
-      if (input.carrier !== undefined)
-        newShippingDetails.carrier = input.carrier;
-      if (input.trackingNumber !== undefined)
-        newShippingDetails.trackingNumber = input.trackingNumber;
-      if (input.trackingUrl !== undefined)
-        newShippingDetails.trackingUrl = input.trackingUrl;
-      if (input.awbNumber !== undefined)
-        newShippingDetails.awbNumber = input.awbNumber;
-      if (input.shipmentId !== undefined)
-        newShippingDetails.shipmentId = input.shipmentId;
-      if (input.estimatedDelivery !== undefined)
-        newShippingDetails.estimatedDelivery = input.estimatedDelivery;
-
-      // If tracking number is being added and shippedAt is not set, set it now
-      const updateData: Record<string, unknown> = {
-        shippingDetails: newShippingDetails,
-        updatedAt: new Date(),
-      };
-
-      // Update order
-      const updatedOrders = await db
-        .update(orders)
-        .set(updateData)
-        .where(eq(orders.id, existingOrder.id))
-        .returning();
-
-      const updatedOrder = updatedOrders[0];
-      if (!updatedOrder) {
-        return c.json({ error: "Failed to update shipping details" }, 500);
-      }
-
-      return c.json({
-        message: "Shipping details updated successfully",
-        order: {
-          id: updatedOrder.id,
-          orderNumber: updatedOrder.orderNumber,
-          shippingDetails: updatedOrder.shippingDetails,
-        },
-      });
-    } catch (error) {
+    const updatedOrder = updatedOrders[0];
+    if (!updatedOrder) {
       return c.json({ error: "Failed to update shipping details" }, 500);
     }
+
+    return c.json({
+      message: "Shipping details updated successfully",
+      order: {
+        id: updatedOrder.id,
+        orderNumber: updatedOrder.orderNumber,
+        shippingDetails: updatedOrder.shippingDetails,
+      },
+    });
+  } catch (error) {
+    return c.json({ error: "Failed to update shipping details" }, 500);
   }
-);
+});
 
 // ============================================================================
 // POST /api/admin/orders/:id/refund - Initiate Refund
 // ============================================================================
 
-adminOrdersApp.post(
-  "/:id/refund",
-  zValidator("json", refundSchema),
-  async (c) => {
-    const { id } = c.req.param();
-    const { amount, reason } = c.req.valid("json");
+adminOrdersApp.post("/:id/refund", zValidator("json", refundSchema), async (c) => {
+  const { id } = c.req.param();
+  const { amount, reason } = c.req.valid("json");
 
-    // Check if Razorpay is configured
-    if (!isRazorpayConfigured()) {
-      return c.json({ error: "Payment gateway not configured" }, 503);
-    }
-
-    // Determine if ID is UUID or order number
-    const isUUID =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        id
-      );
-    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
-
-    if (!isUUID && !isOrderNumber) {
-      return c.json({ error: "Invalid order ID format" }, 400);
-    }
-
-    try {
-      // Build where condition
-      const whereCondition = isUUID
-        ? eq(orders.id, id)
-        : eq(orders.orderNumber, id);
-
-      // Get existing order
-      const existing = await db
-        .select({
-          id: orders.id,
-          orderNumber: orders.orderNumber,
-          total: orders.total,
-          paymentStatus: orders.paymentStatus,
-          paymentDetails: orders.paymentDetails,
-          internalNotes: orders.internalNotes,
-        })
-        .from(orders)
-        .where(whereCondition)
-        .limit(1);
-
-      if (existing.length === 0) {
-        return c.json({ error: "Order not found" }, 404);
-      }
-
-      const order = existing[0];
-      if (!order) {
-        return c.json({ error: "Order not found" }, 404);
-      }
-
-      // Validate order can be refunded
-      if (order.paymentStatus !== "paid") {
-        return c.json(
-          { error: "Order has not been paid or already refunded" },
-          400
-        );
-      }
-
-      // Get payment ID from payment details
-      const paymentDetails = order.paymentDetails as OrderPaymentDetails | null;
-      if (!paymentDetails?.paymentId) {
-        return c.json({ error: "Payment ID not found for this order" }, 400);
-      }
-
-      // Calculate refund amount
-      const refundAmount = amount || parseFloat(order.total);
-      const totalAmount = parseFloat(order.total);
-
-      if (refundAmount > totalAmount) {
-        return c.json(
-          { error: "Refund amount cannot exceed order total" },
-          400
-        );
-      }
-
-      // Create refund via Razorpay
-      const refund = await createRefund({
-        paymentId: paymentDetails.paymentId,
-        amount: Math.round(refundAmount * 100), // Convert to paise
-        notes: {
-          reason,
-          orderNumber: order.orderNumber,
-          orderId: order.id,
-        },
-      });
-
-      // Determine new payment status
-      const isFullRefund = refundAmount >= totalAmount;
-      const newPaymentStatus: PaymentStatus = isFullRefund
-        ? "refunded"
-        : "partially_refunded";
-
-      // Update order with refund details
-      const timestamp = new Date().toISOString();
-      const noteAddition = `[${timestamp}] Refund initiated: ${refundAmount} INR. Reason: ${reason}`;
-      const existingNotes = order.internalNotes || "";
-
-      const updatedPaymentDetails: OrderPaymentDetails = {
-        ...paymentDetails,
-        refundId: refund.id,
-        refundAmount: refundAmount,
-        refundedAt: timestamp,
-      };
-
-      await db
-        .update(orders)
-        .set({
-          status: isFullRefund ? "refunded" : orders.status,
-          paymentStatus: newPaymentStatus,
-          paymentDetails: updatedPaymentDetails,
-          internalNotes: existingNotes
-            ? `${existingNotes}\n${noteAddition}`
-            : noteAddition,
-          updatedAt: new Date(),
-        })
-        .where(eq(orders.id, order.id));
-
-      return c.json({
-        message: "Refund initiated successfully",
-        refund: {
-          id: refund.id,
-          amount: refundAmount,
-          currency: "INR",
-          status: refund.status,
-          orderNumber: order.orderNumber,
-        },
-      });
-    } catch (error) {
-      if (error instanceof RazorpayError) {
-        return c.json(
-          { error: `Refund failed: ${error.message}` },
-          500
-        );
-      }
-      return c.json({ error: "Failed to process refund" }, 500);
-    }
+  // Check if Razorpay is configured
+  if (!isRazorpayConfigured()) {
+    return c.json({ error: "Payment gateway not configured" }, 503);
   }
-);
+
+  // Determine if ID is UUID or order number
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
+
+  if (!isUUID && !isOrderNumber) {
+    return c.json({ error: "Invalid order ID format" }, 400);
+  }
+
+  try {
+    // Build where condition
+    const whereCondition = isUUID ? eq(orders.id, id) : eq(orders.orderNumber, id);
+
+    // Get existing order
+    const existing = await db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        total: orders.total,
+        paymentStatus: orders.paymentStatus,
+        paymentDetails: orders.paymentDetails,
+        internalNotes: orders.internalNotes,
+      })
+      .from(orders)
+      .where(whereCondition)
+      .limit(1);
+
+    if (existing.length === 0) {
+      return c.json({ error: "Order not found" }, 404);
+    }
+
+    const order = existing[0];
+    if (!order) {
+      return c.json({ error: "Order not found" }, 404);
+    }
+
+    // Validate order can be refunded
+    if (order.paymentStatus !== "paid") {
+      return c.json({ error: "Order has not been paid or already refunded" }, 400);
+    }
+
+    // Get payment ID from payment details
+    const paymentDetails = order.paymentDetails as OrderPaymentDetails | null;
+    if (!paymentDetails?.paymentId) {
+      return c.json({ error: "Payment ID not found for this order" }, 400);
+    }
+
+    // Calculate refund amount
+    const refundAmount = amount || parseFloat(order.total);
+    const totalAmount = parseFloat(order.total);
+
+    if (refundAmount > totalAmount) {
+      return c.json({ error: "Refund amount cannot exceed order total" }, 400);
+    }
+
+    // Create refund via Razorpay
+    const refund = await createRefund({
+      paymentId: paymentDetails.paymentId,
+      amount: Math.round(refundAmount * 100), // Convert to paise
+      notes: {
+        reason,
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+      },
+    });
+
+    // Determine new payment status
+    const isFullRefund = refundAmount >= totalAmount;
+    const newPaymentStatus: PaymentStatus = isFullRefund ? "refunded" : "partially_refunded";
+
+    // Update order with refund details
+    const timestamp = new Date().toISOString();
+    const noteAddition = `[${timestamp}] Refund initiated: ${refundAmount} INR. Reason: ${reason}`;
+    const existingNotes = order.internalNotes || "";
+
+    const updatedPaymentDetails: OrderPaymentDetails = {
+      ...paymentDetails,
+      refundId: refund.id,
+      refundAmount: refundAmount,
+      refundedAt: timestamp,
+    };
+
+    await db
+      .update(orders)
+      .set({
+        status: isFullRefund ? "refunded" : orders.status,
+        paymentStatus: newPaymentStatus,
+        paymentDetails: updatedPaymentDetails,
+        internalNotes: existingNotes ? `${existingNotes}\n${noteAddition}` : noteAddition,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, order.id));
+
+    return c.json({
+      message: "Refund initiated successfully",
+      refund: {
+        id: refund.id,
+        amount: refundAmount,
+        currency: "INR",
+        status: refund.status,
+        orderNumber: order.orderNumber,
+      },
+    });
+  } catch (error) {
+    if (error instanceof RazorpayError) {
+      return c.json({ error: `Refund failed: ${error.message}` }, 500);
+    }
+    return c.json({ error: "Failed to process refund" }, 500);
+  }
+});
 
 // Export the router
 export { adminOrdersApp };

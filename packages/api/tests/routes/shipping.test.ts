@@ -70,10 +70,7 @@ beforeAll(async () => {
       isDatabaseAvailable = false;
     }
   } catch (error) {
-    console.log(
-      "Could not initialize app for testing:",
-      (error as Error).message
-    );
+    console.log("Could not initialize app for testing:", (error as Error).message);
     isDatabaseAvailable = false;
   }
 }, 10000);
@@ -138,12 +135,12 @@ describe("Shipping Validation Schemas", () => {
       expect(estimateShippingSchema.safeParse({ cartTotal: 100 }).success).toBe(true);
 
       // With zipCode
-      expect(
-        estimateShippingSchema.safeParse({ cartTotal: 100, zipCode: "12345" }).success
-      ).toBe(true);
-      expect(
-        estimateShippingSchema.safeParse({ cartTotal: 100, zipCode: "560001" }).success
-      ).toBe(true);
+      expect(estimateShippingSchema.safeParse({ cartTotal: 100, zipCode: "12345" }).success).toBe(
+        true
+      );
+      expect(estimateShippingSchema.safeParse({ cartTotal: 100, zipCode: "560001" }).success).toBe(
+        true
+      );
     });
 
     it("should reject zipCode exceeding max length", async () => {
@@ -260,9 +257,7 @@ describe("Shipping Input Validation", () => {
     it("should accept optional zipCode parameter", async () => {
       if (!app) return;
 
-      const res = await app.request(
-        "/api/shipping/estimate?cartTotal=500&zipCode=560001"
-      );
+      const res = await app.request("/api/shipping/estimate?cartTotal=500&zipCode=560001");
       expect([200, 500].includes(res.status)).toBe(true);
     });
   });
@@ -457,9 +452,7 @@ describe("Shipping Runtime Tests (Database Required)", () => {
       }
       if (!app) return;
 
-      const res = await app.request(
-        "/api/shipping/estimate?cartTotal=500&zipCode=560001"
-      );
+      const res = await app.request("/api/shipping/estimate?cartTotal=500&zipCode=560001");
       expect(res.status).toBe(200);
 
       const json = await res.json();

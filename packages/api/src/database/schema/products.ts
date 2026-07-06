@@ -50,11 +50,7 @@ export const orientationEnum = pgEnum("orientation", [
 /**
  * Product status enum for catalog management
  */
-export const productStatusEnum = pgEnum("product_status", [
-  "draft",
-  "active",
-  "archived",
-]);
+export const productStatusEnum = pgEnum("product_status", ["draft", "active", "archived"]);
 
 /**
  * Frame type enum for frame options
@@ -122,10 +118,7 @@ export const products = pgTable(
     // Indexes for common query patterns
     slugIdx: index("products_slug_idx").on(table.slug),
     statusIdx: index("products_status_idx").on(table.status),
-    featuredIdx: index("products_featured_idx").on(
-      table.isFeatured,
-      table.featuredOrder
-    ),
+    featuredIdx: index("products_featured_idx").on(table.isFeatured, table.featuredOrder),
     createdAtIdx: index("products_created_at_idx").on(table.createdAt),
   })
 );
@@ -193,14 +186,10 @@ export const frames = pgTable(
     color: text("color"), // Display color name
 
     // Pricing (as a modifier, e.g., 1.40 means 40% price increase)
-    priceModifier: decimal("price_modifier", { precision: 5, scale: 2 })
-      .default("1.00")
-      .notNull(),
+    priceModifier: decimal("price_modifier", { precision: 5, scale: 2 }).default("1.00").notNull(),
 
     // Alternative: flat price addition
-    priceAddition: decimal("price_addition", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    priceAddition: decimal("price_addition", { precision: 10, scale: 2 }).default("0.00").notNull(),
 
     // Display image
     imageUrl: text("image_url"),
@@ -239,15 +228,12 @@ export const productsRelations = relations(products, ({ many }) => ({
 /**
  * Product variants relations
  */
-export const productVariantsRelations = relations(
-  productVariants,
-  ({ one }) => ({
-    product: one(products, {
-      fields: [productVariants.productId],
-      references: [products.id],
-    }),
-  })
-);
+export const productVariantsRelations = relations(productVariants, ({ one }) => ({
+  product: one(products, {
+    fields: [productVariants.productId],
+    references: [products.id],
+  }),
+}));
 
 // ============================================================================
 // Type Exports (inferred from schema)

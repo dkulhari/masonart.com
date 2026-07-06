@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite'
-import tsConfigPaths from 'vite-tsconfig-paths'
-import { tanstackStart } from '@tanstack/react-start/plugin/vite'
-import viteReact from '@vitejs/plugin-react'
-import { visualizer } from 'rollup-plugin-visualizer'
+import { defineConfig } from "vite";
+import tsConfigPaths from "vite-tsconfig-paths";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import viteReact from "@vitejs/plugin-react";
+import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig({
   server: {
@@ -12,7 +12,7 @@ export default defineConfig({
   plugins: [
     tsConfigPaths(),
     tanstackStart({
-      srcDirectory: 'app',
+      srcDirectory: "app",
     }),
     // React's vite plugin must come after TanStack Start's vite plugin
     viteReact(),
@@ -22,7 +22,7 @@ export default defineConfig({
       ? [
           visualizer({
             open: true,
-            filename: 'bundle-stats.html',
+            filename: "bundle-stats.html",
             gzipSize: true,
             brotliSize: true,
           }),
@@ -36,10 +36,10 @@ export default defineConfig({
       output: {
         manualChunks: {
           // Vendor chunks for better caching
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-router': ['@tanstack/react-router', '@tanstack/react-start'],
+          "vendor-react": ["react", "react-dom"],
+          "vendor-router": ["@tanstack/react-router", "@tanstack/react-start"],
         },
       },
     },
   },
-})
+});

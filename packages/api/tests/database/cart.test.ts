@@ -9,20 +9,14 @@
  * Tests also gracefully skip when database is unavailable.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import { eq, and } from 'drizzle-orm';
-import postgres from 'postgres';
-import {
-  users,
-  products,
-  productVariants,
-  frames,
-  cartItems,
-} from '../../src/db/schema';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { eq, and } from "drizzle-orm";
+import postgres from "postgres";
+import { users, products, productVariants, frames, cartItems } from "../../src/db/schema";
 
 // Check if we should skip database runtime tests
-const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
+const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === "true";
 
 // Track database availability
 let isDatabaseAvailable = false;
@@ -35,12 +29,14 @@ let db: ReturnType<typeof drizzle> | null = null;
 
 beforeAll(async () => {
   if (SKIP_TESTS) {
-    console.log('⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)');
+    console.log("⏭️  Skipping database tests (SKIP_DB_RUNTIME_TESTS=true)");
     return;
   }
 
   try {
-    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    const databaseUrl =
+      process.env.DATABASE_URL ||
+      "postgresql://poster_app:dev_password@localhost:5433/poster_app_test";
     client = postgres(databaseUrl, {
       max: 1,
       connect_timeout: 5,
@@ -52,22 +48,22 @@ beforeAll(async () => {
     isDatabaseAvailable = true;
     db = drizzle(client);
 
-  // Drop tables to ensure clean state
-  await client`DROP TABLE IF EXISTS cart_items CASCADE`;
-  await client`DROP TABLE IF EXISTS product_variants CASCADE`;
-  await client`DROP TABLE IF EXISTS frames CASCADE`;
-  await client`DROP TABLE IF EXISTS products CASCADE`;
-  await client`DROP TABLE IF EXISTS users CASCADE`;
+    // Drop tables to ensure clean state
+    await client`DROP TABLE IF EXISTS cart_items CASCADE`;
+    await client`DROP TABLE IF EXISTS product_variants CASCADE`;
+    await client`DROP TABLE IF EXISTS frames CASCADE`;
+    await client`DROP TABLE IF EXISTS products CASCADE`;
+    await client`DROP TABLE IF EXISTS users CASCADE`;
 
-  await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+    await client`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
 
-  // Create enums
-  await client`DO $$ BEGIN CREATE TYPE user_role AS ENUM ('admin', 'customer', 'trade'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
-  await client`DO $$ BEGIN CREATE TYPE product_status AS ENUM ('draft', 'active', 'archived'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
-  await client`DO $$ BEGIN CREATE TYPE product_orientation AS ENUM ('square', 'portrait', 'landscape', 'panoramic', 'round'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
+    // Create enums
+    await client`DO $$ BEGIN CREATE TYPE user_role AS ENUM ('admin', 'customer', 'trade'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
+    await client`DO $$ BEGIN CREATE TYPE product_status AS ENUM ('draft', 'active', 'archived'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
+    await client`DO $$ BEGIN CREATE TYPE product_orientation AS ENUM ('square', 'portrait', 'landscape', 'panoramic', 'round'); EXCEPTION WHEN duplicate_object THEN null; END $$`;
 
-  // Create tables
-  await client`
+    // Create tables
+    await client`
     CREATE TABLE IF NOT EXISTS users (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       email VARCHAR(255) NOT NULL UNIQUE,
@@ -86,7 +82,7 @@ beforeAll(async () => {
     )
   `;
 
-  await client`
+    await client`
     CREATE TABLE IF NOT EXISTS products (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       sku VARCHAR(100) NOT NULL UNIQUE,
@@ -109,7 +105,7 @@ beforeAll(async () => {
     )
   `;
 
-  await client`
+    await client`
     CREATE TABLE IF NOT EXISTS product_variants (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -122,7 +118,7 @@ beforeAll(async () => {
     )
   `;
 
-  await client`
+    await client`
     CREATE TABLE IF NOT EXISTS frames (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       name VARCHAR(100) NOT NULL,
@@ -134,7 +130,7 @@ beforeAll(async () => {
     )
   `;
 
-  await client`
+    await client`
     CREATE TABLE IF NOT EXISTS cart_items (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -146,9 +142,9 @@ beforeAll(async () => {
     )
   `;
 
-    console.log('✅ Database connection established for cart schema tests');
+    console.log("✅ Database connection established for cart schema tests");
   } catch (error) {
-    console.log('⚠️  Database not available, runtime tests will be skipped');
+    console.log("⚠️  Database not available, runtime tests will be skipped");
     isDatabaseAvailable = false;
     if (client) {
       try {
@@ -186,7 +182,7 @@ beforeEach(async () => {
   await client`DELETE FROM users`;
 });
 
-describe('Cart Items Table Schema', () => {
+describe("Cart Items Table Schema", () => {
   let testUserId: string;
   let testProductId: string;
   let testVariantId: string;
@@ -196,56 +192,76 @@ describe('Cart Items Table Schema', () => {
     if (shouldSkip() || !db) return;
 
     // Create test user
-    const [user] = await db.insert(users).values({
-      email: 'cart-test@example.com',
-      name: 'Cart Test User',
-      role: 'customer',
-    }).returning();
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: "cart-test@example.com",
+        name: "Cart Test User",
+        role: "customer",
+      })
+      .returning();
     testUserId = user.id;
 
     // Create test product
-    const [product] = await db.insert(products).values({
-      sku: 'CART-TEST-001',
-      title: 'Test Product for Cart',
-      slug: 'test-product-cart',
-      description: 'Product for cart testing',
-      basePrice: '99.99',
-      styles: ['modern'],
-      subjects: ['art'],
-      colors: ['blue'],
-      orientation: 'portrait',
-      images: [{ url: 'https://example.com/img.jpg', alt: 'Test', width: 1000, height: 1500, isPrimary: true }],
-      seoTitle: 'Test Product',
-      seoDescription: 'Test',
-      status: 'active',
-    }).returning();
+    const [product] = await db
+      .insert(products)
+      .values({
+        sku: "CART-TEST-001",
+        title: "Test Product for Cart",
+        slug: "test-product-cart",
+        description: "Product for cart testing",
+        basePrice: "99.99",
+        styles: ["modern"],
+        subjects: ["art"],
+        colors: ["blue"],
+        orientation: "portrait",
+        images: [
+          {
+            url: "https://example.com/img.jpg",
+            alt: "Test",
+            width: 1000,
+            height: 1500,
+            isPrimary: true,
+          },
+        ],
+        seoTitle: "Test Product",
+        seoDescription: "Test",
+        status: "active",
+      })
+      .returning();
     testProductId = product.id;
 
     // Create test variant
-    const [variant] = await db.insert(productVariants).values({
-      productId: testProductId,
-      sizeLabel: '12x16 inches',
-      widthInches: '12.00',
-      heightInches: '16.00',
-      price: '129.99',
-      stockQuantity: 50,
-    }).returning();
+    const [variant] = await db
+      .insert(productVariants)
+      .values({
+        productId: testProductId,
+        sizeLabel: "12x16 inches",
+        widthInches: "12.00",
+        heightInches: "16.00",
+        price: "129.99",
+        stockQuantity: 50,
+      })
+      .returning();
     testVariantId = variant.id;
 
     // Create test frame
-    const [frame] = await db.insert(frames).values({
-      name: 'Classic Frame',
-      type: 'classic',
-      material: 'wood',
-      priceModifier: '1.30',
-      imageUrl: 'https://example.com/frame.jpg',
-      isActive: true,
-    }).returning();
+    const [frame] = await db
+      .insert(frames)
+      .values({
+        name: "Classic Frame",
+        type: "classic",
+        material: "wood",
+        priceModifier: "1.30",
+        imageUrl: "https://example.com/frame.jpg",
+        isActive: true,
+      })
+      .returning();
     testFrameId = frame.id;
   });
 
-  describe('Table Structure', () => {
-    it.skipIf(shouldSkip())('should have cart_items table', async () => {
+  describe("Table Structure", () => {
+    it.skipIf(shouldSkip())("should have cart_items table", async () => {
       const result = await client!`
         SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = 'cart_items'
@@ -253,7 +269,7 @@ describe('Cart Items Table Schema', () => {
       expect(result.length).toBe(1);
     });
 
-    it.skipIf(shouldSkip())('should have all required columns', async () => {
+    it.skipIf(shouldSkip())("should have all required columns", async () => {
       const result = await client!`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'cart_items'
@@ -261,16 +277,16 @@ describe('Cart Items Table Schema', () => {
       `;
 
       const columnNames = result.map((row: any) => row.column_name);
-      expect(columnNames).toContain('id');
-      expect(columnNames).toContain('user_id');
-      expect(columnNames).toContain('product_id');
-      expect(columnNames).toContain('variant_id');
-      expect(columnNames).toContain('frame_id');
-      expect(columnNames).toContain('quantity');
-      expect(columnNames).toContain('added_at');
+      expect(columnNames).toContain("id");
+      expect(columnNames).toContain("user_id");
+      expect(columnNames).toContain("product_id");
+      expect(columnNames).toContain("variant_id");
+      expect(columnNames).toContain("frame_id");
+      expect(columnNames).toContain("quantity");
+      expect(columnNames).toContain("added_at");
     });
 
-    it.skipIf(shouldSkip())('should have foreign keys', async () => {
+    it.skipIf(shouldSkip())("should have foreign keys", async () => {
       const result = await client!`
         SELECT constraint_name FROM information_schema.table_constraints
         WHERE table_name = 'cart_items' AND constraint_type = 'FOREIGN KEY'
@@ -279,16 +295,19 @@ describe('Cart Items Table Schema', () => {
     });
   });
 
-  describe('Cart Item CRUD Operations', () => {
-    it.skipIf(shouldSkip())('should insert a cart item', async () => {
-      const [result] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        quantity: 2,
-      }).returning();
+  describe("Cart Item CRUD Operations", () => {
+    it.skipIf(shouldSkip())("should insert a cart item", async () => {
+      const [result] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          quantity: 2,
+        })
+        .returning();
 
-      expect(result).toHaveProperty('id');
+      expect(result).toHaveProperty("id");
       expect(result.userId).toBe(testUserId);
       expect(result.productId).toBe(testProductId);
       expect(result.variantId).toBe(testVariantId);
@@ -296,19 +315,22 @@ describe('Cart Items Table Schema', () => {
       expect(result.addedAt).toBeDefined();
     });
 
-    it.skipIf(shouldSkip())('should insert cart item with frame', async () => {
-      const [result] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        frameId: testFrameId,
-        quantity: 1,
-      }).returning();
+    it.skipIf(shouldSkip())("should insert cart item with frame", async () => {
+      const [result] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          frameId: testFrameId,
+          quantity: 1,
+        })
+        .returning();
 
       expect(result.frameId).toBe(testFrameId);
     });
 
-    it.skipIf(shouldSkip())('should select cart items for a user', async () => {
+    it.skipIf(shouldSkip())("should select cart items for a user", async () => {
       await db!.insert(cartItems).values([
         {
           userId: testUserId,
@@ -329,29 +351,33 @@ describe('Cart Items Table Schema', () => {
       expect(result).toHaveLength(2);
     });
 
-    it.skipIf(shouldSkip())('should update cart item quantity', async () => {
-      const [inserted] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        quantity: 1,
-      }).returning();
+    it.skipIf(shouldSkip())("should update cart item quantity", async () => {
+      const [inserted] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          quantity: 1,
+        })
+        .returning();
 
-      await db!.update(cartItems)
-        .set({ quantity: 5 })
-        .where(eq(cartItems.id, inserted.id));
+      await db!.update(cartItems).set({ quantity: 5 }).where(eq(cartItems.id, inserted.id));
 
       const [result] = await db!.select().from(cartItems).where(eq(cartItems.id, inserted.id));
       expect(result.quantity).toBe(5);
     });
 
-    it.skipIf(shouldSkip())('should delete cart item', async () => {
-      const [inserted] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        quantity: 1,
-      }).returning();
+    it.skipIf(shouldSkip())("should delete cart item", async () => {
+      const [inserted] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          quantity: 1,
+        })
+        .returning();
 
       await db!.delete(cartItems).where(eq(cartItems.id, inserted.id));
 
@@ -359,7 +385,7 @@ describe('Cart Items Table Schema', () => {
       expect(result).toHaveLength(0);
     });
 
-    it.skipIf(shouldSkip())('should delete all cart items for a user', async () => {
+    it.skipIf(shouldSkip())("should delete all cart items for a user", async () => {
       await db!.insert(cartItems).values([
         {
           userId: testUserId,
@@ -382,8 +408,8 @@ describe('Cart Items Table Schema', () => {
     });
   });
 
-  describe('Cart Item Cascade Deletion', () => {
-    it.skipIf(shouldSkip())('should delete cart items when user is deleted', async () => {
+  describe("Cart Item Cascade Deletion", () => {
+    it.skipIf(shouldSkip())("should delete cart items when user is deleted", async () => {
       await db!.insert(cartItems).values({
         userId: testUserId,
         productId: testProductId,
@@ -398,14 +424,17 @@ describe('Cart Items Table Schema', () => {
     });
   });
 
-  describe('Cart Item Filtering', () => {
-    it.skipIf(shouldSkip())('should filter cart items by user', async () => {
+  describe("Cart Item Filtering", () => {
+    it.skipIf(shouldSkip())("should filter cart items by user", async () => {
       // Create second user
-      const [user2] = await db!.insert(users).values({
-        email: 'cart-test2@example.com',
-        name: 'Cart Test User 2',
-        role: 'customer',
-      }).returning();
+      const [user2] = await db!
+        .insert(users)
+        .values({
+          email: "cart-test2@example.com",
+          name: "Cart Test User 2",
+          role: "customer",
+        })
+        .returning();
 
       // Add items for both users
       await db!.insert(cartItems).values([
@@ -436,32 +465,46 @@ describe('Cart Items Table Schema', () => {
       expect(user2Items).toHaveLength(1);
     });
 
-    it.skipIf(shouldSkip())('should filter cart items by product and variant', async () => {
+    it.skipIf(shouldSkip())("should filter cart items by product and variant", async () => {
       // Create second product and variant
-      const [product2] = await db!.insert(products).values({
-        sku: 'CART-TEST-002',
-        title: 'Second Product',
-        slug: 'second-product-cart',
-        description: 'Second product for cart testing',
-        basePrice: '149.99',
-        styles: ['classic'],
-        subjects: ['photography'],
-        colors: ['black'],
-        orientation: 'landscape',
-        images: [{ url: 'https://example.com/img2.jpg', alt: 'Test 2', width: 1500, height: 1000, isPrimary: true }],
-        seoTitle: 'Second Product',
-        seoDescription: 'Test 2',
-        status: 'active',
-      }).returning();
+      const [product2] = await db!
+        .insert(products)
+        .values({
+          sku: "CART-TEST-002",
+          title: "Second Product",
+          slug: "second-product-cart",
+          description: "Second product for cart testing",
+          basePrice: "149.99",
+          styles: ["classic"],
+          subjects: ["photography"],
+          colors: ["black"],
+          orientation: "landscape",
+          images: [
+            {
+              url: "https://example.com/img2.jpg",
+              alt: "Test 2",
+              width: 1500,
+              height: 1000,
+              isPrimary: true,
+            },
+          ],
+          seoTitle: "Second Product",
+          seoDescription: "Test 2",
+          status: "active",
+        })
+        .returning();
 
-      const [variant2] = await db!.insert(productVariants).values({
-        productId: product2.id,
-        sizeLabel: '16x20 inches',
-        widthInches: '16.00',
-        heightInches: '20.00',
-        price: '179.99',
-        stockQuantity: 30,
-      }).returning();
+      const [variant2] = await db!
+        .insert(productVariants)
+        .values({
+          productId: product2.id,
+          sizeLabel: "16x20 inches",
+          widthInches: "16.00",
+          heightInches: "20.00",
+          price: "179.99",
+          stockQuantity: 30,
+        })
+        .returning();
 
       // Add items
       await db!.insert(cartItems).values([
@@ -479,42 +522,47 @@ describe('Cart Items Table Schema', () => {
         },
       ]);
 
-      const product1Items = await db!.select().from(cartItems)
-        .where(and(
-          eq(cartItems.userId, testUserId),
-          eq(cartItems.productId, testProductId)
-        ));
+      const product1Items = await db!
+        .select()
+        .from(cartItems)
+        .where(and(eq(cartItems.userId, testUserId), eq(cartItems.productId, testProductId)));
 
       expect(product1Items).toHaveLength(1);
       expect(product1Items[0].variantId).toBe(testVariantId);
     });
   });
 
-  describe('Cart Item with Frames', () => {
-    it.skipIf(shouldSkip())('should store cart items with frames', async () => {
-      const [result] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        frameId: testFrameId,
-        quantity: 1,
-      }).returning();
+  describe("Cart Item with Frames", () => {
+    it.skipIf(shouldSkip())("should store cart items with frames", async () => {
+      const [result] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          frameId: testFrameId,
+          quantity: 1,
+        })
+        .returning();
 
       expect(result.frameId).toBe(testFrameId);
     });
 
-    it.skipIf(shouldSkip())('should store cart items without frames', async () => {
-      const [result] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        quantity: 1,
-      }).returning();
+    it.skipIf(shouldSkip())("should store cart items without frames", async () => {
+      const [result] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          quantity: 1,
+        })
+        .returning();
 
       expect(result.frameId).toBeNull();
     });
 
-    it.skipIf(shouldSkip())('should filter cart items with frames', async () => {
+    it.skipIf(shouldSkip())("should filter cart items with frames", async () => {
       await db!.insert(cartItems).values([
         {
           userId: testUserId,
@@ -531,28 +579,30 @@ describe('Cart Items Table Schema', () => {
         },
       ]);
 
-      const withFrame = await db!.select().from(cartItems)
-        .where(and(
-          eq(cartItems.userId, testUserId),
-          eq(cartItems.frameId, testFrameId)
-        ));
+      const withFrame = await db!
+        .select()
+        .from(cartItems)
+        .where(and(eq(cartItems.userId, testUserId), eq(cartItems.frameId, testFrameId)));
 
       expect(withFrame).toHaveLength(1);
       expect(withFrame[0].frameId).toBe(testFrameId);
     });
   });
 
-  describe('Cart Item Quantities', () => {
-    it.skipIf(shouldSkip())('should store quantity correctly', async () => {
+  describe("Cart Item Quantities", () => {
+    it.skipIf(shouldSkip())("should store quantity correctly", async () => {
       const quantities = [1, 5, 10, 99];
 
       for (const qty of quantities) {
-        const [result] = await db!.insert(cartItems).values({
-          userId: testUserId,
-          productId: testProductId,
-          variantId: testVariantId,
-          quantity: qty,
-        }).returning();
+        const [result] = await db!
+          .insert(cartItems)
+          .values({
+            userId: testUserId,
+            productId: testProductId,
+            variantId: testVariantId,
+            quantity: qty,
+          })
+          .returning();
 
         expect(result.quantity).toBe(qty);
 
@@ -561,33 +611,37 @@ describe('Cart Items Table Schema', () => {
       }
     });
 
-    it.skipIf(shouldSkip())('should update quantity', async () => {
-      const [inserted] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        quantity: 1,
-      }).returning();
+    it.skipIf(shouldSkip())("should update quantity", async () => {
+      const [inserted] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          quantity: 1,
+        })
+        .returning();
 
-      await db!.update(cartItems)
-        .set({ quantity: 10 })
-        .where(eq(cartItems.id, inserted.id));
+      await db!.update(cartItems).set({ quantity: 10 }).where(eq(cartItems.id, inserted.id));
 
       const [result] = await db!.select().from(cartItems).where(eq(cartItems.id, inserted.id));
       expect(result.quantity).toBe(10);
     });
   });
 
-  describe('Cart Item Timestamps', () => {
-    it.skipIf(shouldSkip())('should set added_at timestamp automatically', async () => {
+  describe("Cart Item Timestamps", () => {
+    it.skipIf(shouldSkip())("should set added_at timestamp automatically", async () => {
       const before = new Date(Date.now() - 1000); // 1 second before
 
-      const [result] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        quantity: 1,
-      }).returning();
+      const [result] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          quantity: 1,
+        })
+        .returning();
 
       const after = new Date(Date.now() + 1000); // 1 second after
 
@@ -597,22 +651,23 @@ describe('Cart Items Table Schema', () => {
       expect(result.addedAt.getTime()).toBeLessThanOrEqual(after.getTime());
     });
 
-    it.skipIf(shouldSkip())('should maintain added_at timestamp on updates', async () => {
-      const [inserted] = await db!.insert(cartItems).values({
-        userId: testUserId,
-        productId: testProductId,
-        variantId: testVariantId,
-        quantity: 1,
-      }).returning();
+    it.skipIf(shouldSkip())("should maintain added_at timestamp on updates", async () => {
+      const [inserted] = await db!
+        .insert(cartItems)
+        .values({
+          userId: testUserId,
+          productId: testProductId,
+          variantId: testVariantId,
+          quantity: 1,
+        })
+        .returning();
 
       const originalAddedAt = inserted.addedAt;
 
       // Wait a bit
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      await db!.update(cartItems)
-        .set({ quantity: 5 })
-        .where(eq(cartItems.id, inserted.id));
+      await db!.update(cartItems).set({ quantity: 5 }).where(eq(cartItems.id, inserted.id));
 
       const [result] = await db!.select().from(cartItems).where(eq(cartItems.id, inserted.id));
 

@@ -75,10 +75,7 @@ beforeAll(async () => {
       isDatabaseAvailable = false;
     }
   } catch (error) {
-    console.log(
-      "Could not initialize app for testing:",
-      (error as Error).message
-    );
+    console.log("Could not initialize app for testing:", (error as Error).message);
     isDatabaseAvailable = false;
   }
 }, 10000);
@@ -190,33 +187,21 @@ describe("Reviews Validation Schemas", () => {
       const { createReviewSchema } = await import("../../src/routes/reviews");
 
       // Valid content
-      expect(
-        createReviewSchema.safeParse({ rating: 5, content: "1234567890" })
-          .success
-      ).toBe(true);
+      expect(createReviewSchema.safeParse({ rating: 5, content: "1234567890" }).success).toBe(true);
 
       // Invalid content (too short)
-      expect(
-        createReviewSchema.safeParse({ rating: 5, content: "123456789" }).success
-      ).toBe(false);
-      expect(
-        createReviewSchema.safeParse({ rating: 5, content: "" }).success
-      ).toBe(false);
+      expect(createReviewSchema.safeParse({ rating: 5, content: "123456789" }).success).toBe(false);
+      expect(createReviewSchema.safeParse({ rating: 5, content: "" }).success).toBe(false);
     });
 
     it("should reject content exceeding 5000 characters", async () => {
       const { createReviewSchema } = await import("../../src/routes/reviews");
 
       const longContent = "a".repeat(5001);
-      expect(
-        createReviewSchema.safeParse({ rating: 5, content: longContent }).success
-      ).toBe(false);
+      expect(createReviewSchema.safeParse({ rating: 5, content: longContent }).success).toBe(false);
 
       const validContent = "a".repeat(5000);
-      expect(
-        createReviewSchema.safeParse({ rating: 5, content: validContent })
-          .success
-      ).toBe(true);
+      expect(createReviewSchema.safeParse({ rating: 5, content: validContent }).success).toBe(true);
     });
 
     it("should allow optional title with max 255 characters", async () => {
@@ -255,13 +240,8 @@ describe("Reviews Validation Schemas", () => {
       const { updateReviewSchema } = await import("../../src/routes/reviews");
 
       expect(updateReviewSchema.safeParse({ rating: 4 }).success).toBe(true);
-      expect(
-        updateReviewSchema.safeParse({ content: "Updated content here" })
-          .success
-      ).toBe(true);
-      expect(updateReviewSchema.safeParse({ title: "New title" }).success).toBe(
-        true
-      );
+      expect(updateReviewSchema.safeParse({ content: "Updated content here" }).success).toBe(true);
+      expect(updateReviewSchema.safeParse({ title: "New title" }).success).toBe(true);
     });
 
     it("should validate rating if provided", async () => {
@@ -274,28 +254,16 @@ describe("Reviews Validation Schemas", () => {
 
   describe("listReviewsQuerySchema", () => {
     it("should validate sortBy enum values", async () => {
-      const { listReviewsQuerySchema } = await import(
-        "../../src/routes/reviews"
-      );
+      const { listReviewsQuerySchema } = await import("../../src/routes/reviews");
 
-      expect(
-        listReviewsQuerySchema.safeParse({ sortBy: "newest" }).success
-      ).toBe(true);
-      expect(
-        listReviewsQuerySchema.safeParse({ sortBy: "highest" }).success
-      ).toBe(true);
-      expect(
-        listReviewsQuerySchema.safeParse({ sortBy: "lowest" }).success
-      ).toBe(true);
-      expect(
-        listReviewsQuerySchema.safeParse({ sortBy: "invalid" }).success
-      ).toBe(false);
+      expect(listReviewsQuerySchema.safeParse({ sortBy: "newest" }).success).toBe(true);
+      expect(listReviewsQuerySchema.safeParse({ sortBy: "highest" }).success).toBe(true);
+      expect(listReviewsQuerySchema.safeParse({ sortBy: "lowest" }).success).toBe(true);
+      expect(listReviewsQuerySchema.safeParse({ sortBy: "invalid" }).success).toBe(false);
     });
 
     it("should provide defaults for pagination", async () => {
-      const { listReviewsQuerySchema } = await import(
-        "../../src/routes/reviews"
-      );
+      const { listReviewsQuerySchema } = await import("../../src/routes/reviews");
 
       const result = listReviewsQuerySchema.parse({});
       expect(result.page).toBe(1);
@@ -304,18 +272,12 @@ describe("Reviews Validation Schemas", () => {
     });
 
     it("should reject invalid pagination values", async () => {
-      const { listReviewsQuerySchema } = await import(
-        "../../src/routes/reviews"
-      );
+      const { listReviewsQuerySchema } = await import("../../src/routes/reviews");
 
       expect(listReviewsQuerySchema.safeParse({ page: 0 }).success).toBe(false);
       expect(listReviewsQuerySchema.safeParse({ page: -1 }).success).toBe(false);
-      expect(listReviewsQuerySchema.safeParse({ pageSize: 0 }).success).toBe(
-        false
-      );
-      expect(listReviewsQuerySchema.safeParse({ pageSize: 51 }).success).toBe(
-        false
-      );
+      expect(listReviewsQuerySchema.safeParse({ pageSize: 0 }).success).toBe(false);
+      expect(listReviewsQuerySchema.safeParse({ pageSize: 51 }).success).toBe(false);
     });
   });
 });
@@ -426,27 +388,21 @@ describe("Reviews Input Validation", () => {
     it("should reject invalid sortBy value", async () => {
       if (!app) return;
 
-      const res = await app.request(
-        `/api/products/${VALID_UUID}/reviews?sortBy=invalid`
-      );
+      const res = await app.request(`/api/products/${VALID_UUID}/reviews?sortBy=invalid`);
       expect(res.status).toBe(400);
     });
 
     it("should reject page less than 1", async () => {
       if (!app) return;
 
-      const res = await app.request(
-        `/api/products/${VALID_UUID}/reviews?page=0`
-      );
+      const res = await app.request(`/api/products/${VALID_UUID}/reviews?page=0`);
       expect(res.status).toBe(400);
     });
 
     it("should reject pageSize exceeding max (50)", async () => {
       if (!app) return;
 
-      const res = await app.request(
-        `/api/products/${VALID_UUID}/reviews?pageSize=51`
-      );
+      const res = await app.request(`/api/products/${VALID_UUID}/reviews?pageSize=51`);
       expect(res.status).toBe(400);
     });
   });
@@ -621,9 +577,7 @@ describe("Reviews Runtime Tests (Database Required)", () => {
       }
       if (!app) return;
 
-      const res = await app.request(
-        `/api/products/${VALID_UUID}/reviews?page=1&pageSize=5`
-      );
+      const res = await app.request(`/api/products/${VALID_UUID}/reviews?page=1&pageSize=5`);
 
       if (res.status === 200) {
         const json = await res.json();

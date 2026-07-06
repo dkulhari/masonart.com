@@ -9,14 +9,8 @@
  */
 
 import { Hono } from "hono";
-import {
-  verifyWebhookSignature,
-  type RazorpayWebhookPayload,
-} from "../../lib/razorpay";
-import {
-  completePendingTopUp,
-  failPendingTopUp,
-} from "../../services/wallet";
+import { verifyWebhookSignature, type RazorpayWebhookPayload } from "../../lib/razorpay";
+import { completePendingTopUp, failPendingTopUp } from "../../services/wallet";
 
 // ============================================================================
 // Route Handler
@@ -44,8 +38,7 @@ walletWebhookApp.post("/", async (c) => {
       return c.json({ error: "Invalid signature" }, 400);
     }
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Webhook signature verification failed:", errorMessage);
     return c.json({ error: "Signature verification failed" }, 400);
   }
@@ -77,13 +70,10 @@ walletWebhookApp.post("/", async (c) => {
         // Complete the pending transaction
         try {
           await completePendingTopUp(payment.order_id, payment.id);
-          console.info(
-            `Wallet top-up completed: order=${payment.order_id}, payment=${payment.id}`
-          );
+          console.info(`Wallet top-up completed: order=${payment.order_id}, payment=${payment.id}`);
         } catch (error) {
           // Transaction might already be completed (idempotency)
-          const errorMessage =
-            error instanceof Error ? error.message : "Unknown error";
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
           console.warn(`Wallet top-up completion warning: ${errorMessage}`);
         }
 
@@ -103,13 +93,10 @@ walletWebhookApp.post("/", async (c) => {
         }
 
         // Mark the transaction as failed
-        const errorDescription =
-          payment.error_description || "Payment failed";
+        const errorDescription = payment.error_description || "Payment failed";
         await failPendingTopUp(payment.order_id, errorDescription);
 
-        console.info(
-          `Wallet top-up failed: order=${payment.order_id}, reason=${errorDescription}`
-        );
+        console.info(`Wallet top-up failed: order=${payment.order_id}, reason=${errorDescription}`);
 
         return c.json({ message: "Payment failure recorded" });
       }
@@ -142,8 +129,7 @@ walletWebhookApp.post("/", async (c) => {
       }
     }
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error(`Wallet webhook error: ${errorMessage}`);
     return c.json({ error: `Webhook processing failed: ${errorMessage}` }, 500);
   }

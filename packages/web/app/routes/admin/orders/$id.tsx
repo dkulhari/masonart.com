@@ -11,35 +11,31 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import {
-  ArrowLeft,
-  AlertCircle,
-  RefreshCw,
-} from 'lucide-react'
-import { cn, getApiUrl } from '~/lib/utils'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
+import { cn, getApiUrl } from "~/lib/utils";
 import {
   OrderDetail,
   OrderDetailSkeleton,
   type FullOrder,
   type ShippingDetails,
-} from '~/components/admin/OrderDetail'
-import type { OrderStatus } from '~/components/admin/OrdersTable'
+} from "~/components/admin/OrderDetail";
+import type { OrderStatus } from "~/components/admin/OrdersTable";
 
 // ============================================================================
 // Route Configuration
 // ============================================================================
 
-export const Route = createFileRoute('/admin/orders/$id')({
+export const Route = createFileRoute("/admin/orders/$id")({
   head: () => ({
     meta: [
-      { title: 'Order Details | Admin | MasonArt' },
-      { name: 'robots', content: 'noindex, nofollow' },
+      { title: "Order Details | Admin | MasonArt" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: AdminOrderDetailPage,
-})
+});
 
 // ============================================================================
 // API Functions
@@ -47,22 +43,22 @@ export const Route = createFileRoute('/admin/orders/$id')({
 
 async function fetchOrder(id: string): Promise<FullOrder> {
   const response = await fetch(`${getApiUrl()}/api/admin/orders/${id}`, {
-    method: 'GET',
-    credentials: 'include',
+    method: "GET",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-  })
+  });
 
   if (!response.ok) {
     if (response.status === 404) {
-      throw new Error('Order not found')
+      throw new Error("Order not found");
     }
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to fetch order')
+    const error = await response.json();
+    throw new Error(error.error || "Failed to fetch order");
   }
 
-  return response.json()
+  return response.json();
 }
 
 async function updateOrderStatus(
@@ -71,17 +67,17 @@ async function updateOrderStatus(
   reason?: string
 ): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/orders/${orderId}/status`, {
-    method: 'PATCH',
-    credentials: 'include',
+    method: "PATCH",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ status, reason }),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to update order status')
+    const error = await response.json();
+    throw new Error(error.error || "Failed to update order status");
   }
 }
 
@@ -90,53 +86,49 @@ async function updateShippingDetails(
   details: Partial<ShippingDetails>
 ): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/orders/${orderId}/shipping`, {
-    method: 'PATCH',
-    credentials: 'include',
+    method: "PATCH",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(details),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to update shipping details')
+    const error = await response.json();
+    throw new Error(error.error || "Failed to update shipping details");
   }
 }
 
 async function updateOrderNotes(orderId: string, notes: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/orders/${orderId}`, {
-    method: 'PATCH',
-    credentials: 'include',
+    method: "PATCH",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({ internalNotes: notes }),
-  })
+  });
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to update order notes')
+    const error = await response.json();
+    throw new Error(error.error || "Failed to update order notes");
   }
 }
 
-async function initiateRefund(
-  orderId: string,
-  amount?: number,
-  reason?: string
-): Promise<void> {
+async function initiateRefund(orderId: string, amount?: number, reason?: string): Promise<void> {
   const response = await fetch(`${getApiUrl()}/api/admin/orders/${orderId}/refund`, {
-    method: 'POST',
-    credentials: 'include',
+    method: "POST",
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify({ amount, reason: reason || 'Admin initiated refund' }),
-  })
+    body: JSON.stringify({ amount, reason: reason || "Admin initiated refund" }),
+  });
 
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to initiate refund')
+    const error = await response.json();
+    throw new Error(error.error || "Failed to initiate refund");
   }
 }
 
@@ -145,93 +137,93 @@ async function initiateRefund(
 // ============================================================================
 
 function AdminOrderDetailPage() {
-  const navigate = useNavigate()
-  const { id } = Route.useParams()
+  const navigate = useNavigate();
+  const { id } = Route.useParams();
 
-  const [order, setOrder] = useState<FullOrder | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [order, setOrder] = useState<FullOrder | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch order
   const loadOrder = useCallback(async () => {
     try {
-      setError(null)
-      const data = await fetchOrder(id)
-      setOrder(data)
+      setError(null);
+      const data = await fetchOrder(id);
+      setOrder(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load order')
+      setError(err instanceof Error ? err.message : "Failed to load order");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [id])
+  }, [id]);
 
   useEffect(() => {
-    loadOrder()
-  }, [loadOrder])
+    loadOrder();
+  }, [loadOrder]);
 
   // Handle status update
   const handleUpdateStatus = async (status: OrderStatus, reason?: string) => {
-    setIsUpdating(true)
+    setIsUpdating(true);
     try {
-      await updateOrderStatus(id, status, reason)
-      await loadOrder()
+      await updateOrderStatus(id, status, reason);
+      await loadOrder();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update status')
+      setError(err instanceof Error ? err.message : "Failed to update status");
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   // Handle shipping update
   const handleUpdateShipping = async (details: Partial<ShippingDetails>) => {
-    setIsUpdating(true)
+    setIsUpdating(true);
     try {
-      await updateShippingDetails(id, details)
-      await loadOrder()
+      await updateShippingDetails(id, details);
+      await loadOrder();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update shipping')
+      setError(err instanceof Error ? err.message : "Failed to update shipping");
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   // Handle notes update
   const handleUpdateNotes = async (notes: string) => {
-    setIsUpdating(true)
+    setIsUpdating(true);
     try {
-      await updateOrderNotes(id, notes)
-      await loadOrder()
+      await updateOrderNotes(id, notes);
+      await loadOrder();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update notes')
+      setError(err instanceof Error ? err.message : "Failed to update notes");
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   // Handle refund
   const handleInitiateRefund = async (amount?: number, reason?: string) => {
-    setIsUpdating(true)
+    setIsUpdating(true);
     try {
-      await initiateRefund(id, amount, reason)
-      await loadOrder()
+      await initiateRefund(id, amount, reason);
+      await loadOrder();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initiate refund')
+      setError(err instanceof Error ? err.message : "Failed to initiate refund");
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   // Handle back navigation
   const handleBack = () => {
-    navigate({ to: '/admin/orders' })
-  }
+    navigate({ to: "/admin/orders" });
+  };
 
   // Handle refresh
   const handleRefresh = () => {
-    setIsLoading(true)
-    loadOrder()
-  }
+    setIsLoading(true);
+    loadOrder();
+  };
 
   return (
     <div className="space-y-6">
@@ -246,9 +238,7 @@ function AdminOrderDetailPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Order Details</h1>
-            <p className="text-sm text-muted-foreground">
-              View and manage order information
-            </p>
+            <p className="text-sm text-muted-foreground">View and manage order information</p>
           </div>
         </div>
 
@@ -257,7 +247,7 @@ function AdminOrderDetailPage() {
           disabled={isLoading}
           className="flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
         >
-          <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+          <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
           Refresh
         </button>
       </div>
@@ -305,7 +295,7 @@ function AdminOrderDetailPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default AdminOrderDetailPage
+export default AdminOrderDetailPage;

@@ -7,8 +7,8 @@
  * Following patterns from notifications.tsx
  */
 
-import { useEffect, useState, useCallback } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState, useCallback } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   MapPin,
   Plus,
@@ -20,164 +20,164 @@ import {
   CheckCircle,
   ArrowLeft,
   X,
-} from 'lucide-react'
-import { cn } from '~/lib/utils'
+} from "lucide-react";
+import { cn } from "~/lib/utils";
 import {
   addressesApi,
   type SavedAddressResponse,
   type AddressCreateInput,
   type AddressUpdateInput,
-} from '~/lib/api'
-import AddressForm, { type AddressFormData } from '~/components/checkout/AddressForm'
+} from "~/lib/api";
+import AddressForm, { type AddressFormData } from "~/components/checkout/AddressForm";
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/_authed/account/addresses')({
+export const Route = createFileRoute("/_authed/account/addresses")({
   head: () => ({
     meta: [
-      { title: 'Saved Addresses | MasonArt' },
-      { name: 'description', content: 'Manage your saved shipping and billing addresses.' },
-      { name: 'robots', content: 'noindex' },
+      { title: "Saved Addresses | MasonArt" },
+      { name: "description", content: "Manage your saved shipping and billing addresses." },
+      { name: "robots", content: "noindex" },
     ],
   }),
   component: AddressesPage,
-})
+});
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 function AddressesPage() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [addresses, setAddresses] = useState<SavedAddressResponse[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [editingAddress, setEditingAddress] = useState<SavedAddressResponse | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState<AddressFormData | null>(null)
-  const [formValid, setFormValid] = useState(false)
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [addresses, setAddresses] = useState<SavedAddressResponse[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<SavedAddressResponse | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<AddressFormData | null>(null);
+  const [formValid, setFormValid] = useState(false);
 
   // Fetch addresses on mount
   useEffect(() => {
-    fetchAddresses()
-  }, [])
+    fetchAddresses();
+  }, []);
 
   const fetchAddresses = async () => {
     try {
-      setIsLoading(true)
-      const response = await addressesApi.list()
-      setAddresses(response.addresses)
+      setIsLoading(true);
+      const response = await addressesApi.list();
+      setAddresses(response.addresses);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load addresses')
+      setError(err instanceof Error ? err.message : "Failed to load addresses");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const showSuccess = (message: string) => {
-    setSuccessMessage(message)
-    setTimeout(() => setSuccessMessage(null), 3000)
-  }
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
 
   const handleAdd = useCallback(() => {
-    setEditingAddress(null)
-    setFormData(null)
-    setFormValid(false)
-    setShowForm(true)
-    setError(null)
-  }, [])
+    setEditingAddress(null);
+    setFormData(null);
+    setFormValid(false);
+    setShowForm(true);
+    setError(null);
+  }, []);
 
   const handleEdit = useCallback((address: SavedAddressResponse) => {
-    setEditingAddress(address)
-    setFormData(null)
-    setFormValid(false)
-    setShowForm(true)
-    setError(null)
-  }, [])
+    setEditingAddress(address);
+    setFormData(null);
+    setFormValid(false);
+    setShowForm(true);
+    setError(null);
+  }, []);
 
   const handleCancel = useCallback(() => {
-    setShowForm(false)
-    setEditingAddress(null)
-    setFormData(null)
-    setError(null)
-  }, [])
+    setShowForm(false);
+    setEditingAddress(null);
+    setFormData(null);
+    setError(null);
+  }, []);
 
   const handleFormChange = useCallback((data: AddressFormData) => {
-    setFormData(data)
-  }, [])
+    setFormData(data);
+  }, []);
 
   const handleValidationChange = useCallback((isValid: boolean) => {
-    setFormValid(isValid)
-  }, [])
+    setFormValid(isValid);
+  }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!formData || !formValid) return
+    if (!formData || !formValid) return;
 
-    setIsSubmitting(true)
-    setError(null)
+    setIsSubmitting(true);
+    setError(null);
 
     const addressInput: AddressCreateInput = {
       fullName: formData.fullName,
-      phone: formData.phone.startsWith('+') ? formData.phone : `+91${formData.phone}`,
+      phone: formData.phone.startsWith("+") ? formData.phone : `+91${formData.phone}`,
       addressLine1: formData.addressLine1,
       addressLine2: formData.addressLine2 || null,
       landmark: formData.landmark || null,
       city: formData.city,
       state: formData.state,
       postalCode: formData.postalCode,
-      countryCode: formData.countryCode || 'IN',
-    }
+      countryCode: formData.countryCode || "IN",
+    };
 
     try {
       if (editingAddress) {
-        await addressesApi.update(editingAddress.id, addressInput as AddressUpdateInput)
-        showSuccess('Address updated')
+        await addressesApi.update(editingAddress.id, addressInput as AddressUpdateInput);
+        showSuccess("Address updated");
       } else {
-        await addressesApi.create(addressInput)
-        showSuccess('Address added')
+        await addressesApi.create(addressInput);
+        showSuccess("Address added");
       }
-      setShowForm(false)
-      setEditingAddress(null)
-      await fetchAddresses()
+      setShowForm(false);
+      setEditingAddress(null);
+      await fetchAddresses();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save address')
+      setError(err instanceof Error ? err.message : "Failed to save address");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }, [formData, formValid, editingAddress])
+  }, [formData, formValid, editingAddress]);
 
   const handleDelete = useCallback(async (id: string) => {
-    setDeletingId(id)
-    setError(null)
+    setDeletingId(id);
+    setError(null);
 
     try {
-      await addressesApi.remove(id)
-      setAddresses((prev) => prev.filter((a) => a.id !== id))
-      showSuccess('Address deleted')
+      await addressesApi.remove(id);
+      setAddresses((prev) => prev.filter((a) => a.id !== id));
+      showSuccess("Address deleted");
       // Re-fetch to get updated default status
-      await fetchAddresses()
+      await fetchAddresses();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete address')
+      setError(err instanceof Error ? err.message : "Failed to delete address");
     } finally {
-      setDeletingId(null)
+      setDeletingId(null);
     }
-  }, [])
+  }, []);
 
   const handleSetDefault = useCallback(async (id: string) => {
-    setError(null)
+    setError(null);
 
     try {
-      await addressesApi.setDefault(id)
-      await fetchAddresses()
-      showSuccess('Default address updated')
+      await addressesApi.setDefault(id);
+      await fetchAddresses();
+      showSuccess("Default address updated");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to set default address')
+      setError(err instanceof Error ? err.message : "Failed to set default address");
     }
-  }, [])
+  }, []);
 
   // Loading state
   if (isLoading) {
@@ -192,7 +192,7 @@ function AddressesPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -216,9 +216,7 @@ function AddressesPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-foreground">Saved Addresses</h1>
-                <p className="text-sm text-muted-foreground">
-                  Manage your delivery addresses
-                </p>
+                <p className="text-sm text-muted-foreground">Manage your delivery addresses</p>
               </div>
             </div>
             {!showForm && (
@@ -253,7 +251,7 @@ function AddressesPage() {
             <div className="mb-6 rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-6 py-4">
                 <h2 className="font-semibold text-foreground">
-                  {editingAddress ? 'Edit Address' : 'Add New Address'}
+                  {editingAddress ? "Edit Address" : "Add New Address"}
                 </h2>
                 <button
                   type="button"
@@ -271,8 +269,8 @@ function AddressesPage() {
                           fullName: editingAddress.fullName,
                           phone: editingAddress.phone,
                           addressLine1: editingAddress.addressLine1,
-                          addressLine2: editingAddress.addressLine2 || '',
-                          landmark: editingAddress.landmark || '',
+                          addressLine2: editingAddress.addressLine2 || "",
+                          landmark: editingAddress.landmark || "",
                           city: editingAddress.city,
                           state: editingAddress.state,
                           postalCode: editingAddress.postalCode,
@@ -297,14 +295,14 @@ function AddressesPage() {
                     onClick={handleSubmit}
                     disabled={!formValid || isSubmitting}
                     className={cn(
-                      'inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                      "inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2",
                       formValid && !isSubmitting
-                        ? 'bg-brand-500 text-white hover:bg-brand-600'
-                        : 'cursor-not-allowed bg-muted text-muted-foreground'
+                        ? "bg-brand-500 text-white hover:bg-brand-600"
+                        : "cursor-not-allowed bg-muted text-muted-foreground"
                     )}
                   >
                     {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {editingAddress ? 'Update Address' : 'Save Address'}
+                    {editingAddress ? "Update Address" : "Save Address"}
                   </button>
                 </div>
               </div>
@@ -334,8 +332,8 @@ function AddressesPage() {
                 <div
                   key={address.id}
                   className={cn(
-                    'rounded-xl border bg-card p-6 transition-colors',
-                    address.isDefault ? 'border-brand-300 bg-brand-50/30' : 'border-border'
+                    "rounded-xl border bg-card p-6 transition-colors",
+                    address.isDefault ? "border-brand-300 bg-brand-50/30" : "border-border"
                   )}
                 >
                   <div className="flex items-start justify-between">
@@ -408,14 +406,14 @@ function AddressesPage() {
           <div className="mt-8 rounded-xl border border-border bg-muted/30 p-6">
             <h3 className="text-sm font-semibold text-foreground">About Saved Addresses</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Your saved addresses make checkout faster. Your default address will be
-              automatically selected when you place an order. You can save up to 10 addresses.
+              Your saved addresses make checkout faster. Your default address will be automatically
+              selected when you place an order. You can save up to 10 addresses.
             </p>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default AddressesPage
+export default AddressesPage;

@@ -28,6 +28,7 @@ $ARGUMENTS: <feature-name> [optional: "<new-description>"]
 - `new-description` (optional): If provided, replace description with this. If omitted, shows current description for editing.
 
 **Examples**:
+
 - `/tt-edit-feature user-reviews` - View and edit interactively
 - `/tt-edit-feature user-reviews "Updated description here"` - Direct replacement
 
@@ -45,11 +46,13 @@ Show the user the current feature description clearly formatted.
 ### Step 3: Determine Edit Mode
 
 **If new description was provided in arguments**:
+
 - Update directly via `mcp__ticketrack__editFeature`
 - Show the updated description
 - Ask if further changes needed
 
 **If no new description provided**:
+
 - Use `AskUserQuestion` to ask what they want to change:
   - "Rewrite completely"
   - "Add to existing"
@@ -68,6 +71,7 @@ Show the user the current feature description clearly formatted.
 ### Step 5: Display Summary
 
 Output showing:
+
 - Feature name
 - Updated description
 - What changed (brief diff summary)

@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Hono, Context } from 'hono';
-import { HTTPException } from 'hono/http-exception';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Hono, Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import {
   requireAuth,
   optionalAuth,
@@ -18,8 +18,8 @@ import {
   type AuthSession,
   type AuthVariables,
   type OptionalAuthVariables,
-} from '../../src/middleware/auth';
-import '../setup'; // Import test setup
+} from "../../src/middleware/auth";
+import "../setup"; // Import test setup
 
 /**
  * Tests to verify auth middleware works correctly
@@ -51,22 +51,22 @@ import '../setup'; // Import test setup
  */
 function createMockUser(overrides: Partial<AuthUser> = {}): AuthUser {
   return {
-    id: 'user-123',
-    name: 'Test User',
-    email: 'test@example.com',
+    id: "user-123",
+    name: "Test User",
+    email: "test@example.com",
     emailVerified: true,
     image: null,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    role: 'customer',
-    firstName: 'Test',
-    lastName: 'User',
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
+    role: "customer",
+    firstName: "Test",
+    lastName: "User",
     phone: null,
     phoneVerified: false,
-    status: 'active',
-    tradeStatus: 'none',
+    status: "active",
+    tradeStatus: "none",
     aiCreditsRemaining: 5,
-    aiSubscriptionTier: 'free',
+    aiSubscriptionTier: "free",
     ...overrides,
   };
 }
@@ -74,20 +74,20 @@ function createMockUser(overrides: Partial<AuthUser> = {}): AuthUser {
 /**
  * Create a mock session
  */
-function createMockSession(userId: string = 'user-123'): AuthSession {
+function createMockSession(userId: string = "user-123"): AuthSession {
   return {
-    id: 'session-123',
-    token: 'mock-token-123',
+    id: "session-123",
+    token: "mock-token-123",
     userId,
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    ipAddress: '127.0.0.1',
-    userAgent: 'vitest',
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
+    ipAddress: "127.0.0.1",
+    userAgent: "vitest",
   };
 }
 
-describe('Auth Middleware', () => {
+describe("Auth Middleware", () => {
   let app: Hono;
 
   beforeEach(() => {
@@ -98,65 +98,65 @@ describe('Auth Middleware', () => {
   // Module Exports Tests
   // ==========================================================================
 
-  describe('Module Exports', () => {
-    it('should export requireAuth middleware', () => {
+  describe("Module Exports", () => {
+    it("should export requireAuth middleware", () => {
       expect(requireAuth).toBeDefined();
-      expect(typeof requireAuth).toBe('function');
+      expect(typeof requireAuth).toBe("function");
     });
 
-    it('should export optionalAuth middleware', () => {
+    it("should export optionalAuth middleware", () => {
       expect(optionalAuth).toBeDefined();
-      expect(typeof optionalAuth).toBe('function');
+      expect(typeof optionalAuth).toBe("function");
     });
 
-    it('should export requireRole middleware factory', () => {
+    it("should export requireRole middleware factory", () => {
       expect(requireRole).toBeDefined();
-      expect(typeof requireRole).toBe('function');
+      expect(typeof requireRole).toBe("function");
     });
 
-    it('should export requireAdmin middleware', () => {
+    it("should export requireAdmin middleware", () => {
       expect(requireAdmin).toBeDefined();
-      expect(typeof requireAdmin).toBe('function');
+      expect(typeof requireAdmin).toBe("function");
     });
 
-    it('should export requireTrade middleware', () => {
+    it("should export requireTrade middleware", () => {
       expect(requireTrade).toBeDefined();
-      expect(typeof requireTrade).toBe('function');
+      expect(typeof requireTrade).toBe("function");
     });
 
-    it('should export requireVerified middleware', () => {
+    it("should export requireVerified middleware", () => {
       expect(requireVerified).toBeDefined();
-      expect(typeof requireVerified).toBe('function');
+      expect(typeof requireVerified).toBe("function");
     });
 
-    it('should export requireAICredits middleware factory', () => {
+    it("should export requireAICredits middleware factory", () => {
       expect(requireAICredits).toBeDefined();
-      expect(typeof requireAICredits).toBe('function');
+      expect(typeof requireAICredits).toBe("function");
     });
 
-    it('should export getUserRateLimitKey helper', () => {
+    it("should export getUserRateLimitKey helper", () => {
       expect(getUserRateLimitKey).toBeDefined();
-      expect(typeof getUserRateLimitKey).toBe('function');
+      expect(typeof getUserRateLimitKey).toBe("function");
     });
 
-    it('should export hasRole helper', () => {
+    it("should export hasRole helper", () => {
       expect(hasRole).toBeDefined();
-      expect(typeof hasRole).toBe('function');
+      expect(typeof hasRole).toBe("function");
     });
 
-    it('should export hasAnyRole helper', () => {
+    it("should export hasAnyRole helper", () => {
       expect(hasAnyRole).toBeDefined();
-      expect(typeof hasAnyRole).toBe('function');
+      expect(typeof hasAnyRole).toBe("function");
     });
 
-    it('should export isAdmin helper', () => {
+    it("should export isAdmin helper", () => {
       expect(isAdmin).toBeDefined();
-      expect(typeof isAdmin).toBe('function');
+      expect(typeof isAdmin).toBe("function");
     });
 
-    it('should export canAccess helper', () => {
+    it("should export canAccess helper", () => {
       expect(canAccess).toBeDefined();
-      expect(typeof canAccess).toBe('function');
+      expect(typeof canAccess).toBe("function");
     });
   });
 
@@ -164,24 +164,24 @@ describe('Auth Middleware', () => {
   // Helper Function Tests (Pure functions, no mocking needed)
   // ==========================================================================
 
-  describe('Helper Functions', () => {
-    describe('hasRole', () => {
-      it('should return true when user has the specified role', () => {
-        const user = createMockUser({ role: 'admin' });
-        expect(hasRole(user, 'admin')).toBe(true);
+  describe("Helper Functions", () => {
+    describe("hasRole", () => {
+      it("should return true when user has the specified role", () => {
+        const user = createMockUser({ role: "admin" });
+        expect(hasRole(user, "admin")).toBe(true);
       });
 
-      it('should return false when user has different role', () => {
-        const user = createMockUser({ role: 'customer' });
-        expect(hasRole(user, 'admin')).toBe(false);
+      it("should return false when user has different role", () => {
+        const user = createMockUser({ role: "customer" });
+        expect(hasRole(user, "admin")).toBe(false);
       });
 
-      it('should return false for null user', () => {
-        expect(hasRole(null, 'admin')).toBe(false);
+      it("should return false for null user", () => {
+        expect(hasRole(null, "admin")).toBe(false);
       });
 
-      it('should handle all role types', () => {
-        const roles = ['customer', 'trade', 'admin', 'super-admin'] as const;
+      it("should handle all role types", () => {
+        const roles = ["customer", "trade", "admin", "super-admin"] as const;
         for (const role of roles) {
           const user = createMockUser({ role });
           expect(hasRole(user, role)).toBe(true);
@@ -189,150 +189,159 @@ describe('Auth Middleware', () => {
       });
     });
 
-    describe('hasAnyRole', () => {
-      it('should return true when user has one of the specified roles', () => {
-        const user = createMockUser({ role: 'admin' });
-        expect(hasAnyRole(user, ['admin', 'super-admin'])).toBe(true);
+    describe("hasAnyRole", () => {
+      it("should return true when user has one of the specified roles", () => {
+        const user = createMockUser({ role: "admin" });
+        expect(hasAnyRole(user, ["admin", "super-admin"])).toBe(true);
       });
 
-      it('should return true for first matching role', () => {
-        const user = createMockUser({ role: 'customer' });
-        expect(hasAnyRole(user, ['customer', 'trade'])).toBe(true);
+      it("should return true for first matching role", () => {
+        const user = createMockUser({ role: "customer" });
+        expect(hasAnyRole(user, ["customer", "trade"])).toBe(true);
       });
 
-      it('should return false when user has none of the specified roles', () => {
-        const user = createMockUser({ role: 'customer' });
-        expect(hasAnyRole(user, ['admin', 'super-admin'])).toBe(false);
+      it("should return false when user has none of the specified roles", () => {
+        const user = createMockUser({ role: "customer" });
+        expect(hasAnyRole(user, ["admin", "super-admin"])).toBe(false);
       });
 
-      it('should return false for null user', () => {
-        expect(hasAnyRole(null, ['admin', 'customer'])).toBe(false);
+      it("should return false for null user", () => {
+        expect(hasAnyRole(null, ["admin", "customer"])).toBe(false);
       });
 
-      it('should return false for empty roles array', () => {
-        const user = createMockUser({ role: 'admin' });
+      it("should return false for empty roles array", () => {
+        const user = createMockUser({ role: "admin" });
         expect(hasAnyRole(user, [])).toBe(false);
       });
 
-      it('should handle single role array', () => {
-        const user = createMockUser({ role: 'trade' });
-        expect(hasAnyRole(user, ['trade'])).toBe(true);
+      it("should handle single role array", () => {
+        const user = createMockUser({ role: "trade" });
+        expect(hasAnyRole(user, ["trade"])).toBe(true);
       });
     });
 
-    describe('isAdmin', () => {
-      it('should return true for admin role', () => {
-        const user = createMockUser({ role: 'admin' });
+    describe("isAdmin", () => {
+      it("should return true for admin role", () => {
+        const user = createMockUser({ role: "admin" });
         expect(isAdmin(user)).toBe(true);
       });
 
-      it('should return true for super-admin role', () => {
-        const user = createMockUser({ role: 'super-admin' });
+      it("should return true for super-admin role", () => {
+        const user = createMockUser({ role: "super-admin" });
         expect(isAdmin(user)).toBe(true);
       });
 
-      it('should return false for customer role', () => {
-        const user = createMockUser({ role: 'customer' });
+      it("should return false for customer role", () => {
+        const user = createMockUser({ role: "customer" });
         expect(isAdmin(user)).toBe(false);
       });
 
-      it('should return false for trade role', () => {
-        const user = createMockUser({ role: 'trade' });
+      it("should return false for trade role", () => {
+        const user = createMockUser({ role: "trade" });
         expect(isAdmin(user)).toBe(false);
       });
 
-      it('should return false for null user', () => {
+      it("should return false for null user", () => {
         expect(isAdmin(null)).toBe(false);
       });
     });
 
-    describe('canAccess', () => {
-      it('should return true when user owns the resource', () => {
-        const user = createMockUser({ id: 'user-123' });
-        expect(canAccess(user, 'user-123')).toBe(true);
+    describe("canAccess", () => {
+      it("should return true when user owns the resource", () => {
+        const user = createMockUser({ id: "user-123" });
+        expect(canAccess(user, "user-123")).toBe(true);
       });
 
-      it('should return false when user does not own the resource', () => {
-        const user = createMockUser({ id: 'user-123' });
-        expect(canAccess(user, 'user-456')).toBe(false);
+      it("should return false when user does not own the resource", () => {
+        const user = createMockUser({ id: "user-123" });
+        expect(canAccess(user, "user-456")).toBe(false);
       });
 
-      it('should return true for admin accessing any resource', () => {
-        const admin = createMockUser({ id: 'admin-1', role: 'admin' });
-        expect(canAccess(admin, 'user-456')).toBe(true);
+      it("should return true for admin accessing any resource", () => {
+        const admin = createMockUser({ id: "admin-1", role: "admin" });
+        expect(canAccess(admin, "user-456")).toBe(true);
       });
 
-      it('should return true for super-admin accessing any resource', () => {
-        const superAdmin = createMockUser({ id: 'admin-1', role: 'super-admin' });
-        expect(canAccess(superAdmin, 'user-456')).toBe(true);
+      it("should return true for super-admin accessing any resource", () => {
+        const superAdmin = createMockUser({ id: "admin-1", role: "super-admin" });
+        expect(canAccess(superAdmin, "user-456")).toBe(true);
       });
 
-      it('should return false for null user', () => {
-        expect(canAccess(null, 'user-123')).toBe(false);
+      it("should return false for null user", () => {
+        expect(canAccess(null, "user-123")).toBe(false);
       });
 
-      it('should handle trade role without admin access', () => {
-        const trade = createMockUser({ id: 'trade-1', role: 'trade' });
-        expect(canAccess(trade, 'user-456')).toBe(false);
-        expect(canAccess(trade, 'trade-1')).toBe(true);
+      it("should handle trade role without admin access", () => {
+        const trade = createMockUser({ id: "trade-1", role: "trade" });
+        expect(canAccess(trade, "user-456")).toBe(false);
+        expect(canAccess(trade, "trade-1")).toBe(true);
       });
     });
 
-    describe('getUserRateLimitKey', () => {
-      it('should return user-based key for authenticated user', () => {
+    describe("getUserRateLimitKey", () => {
+      it("should return user-based key for authenticated user", () => {
         const mockContext = {
-          get: (key: 'user') => createMockUser({ id: 'user-123' }),
+          get: (key: "user") => createMockUser({ id: "user-123" }),
           req: { header: () => undefined },
         };
-        expect(getUserRateLimitKey(mockContext)).toBe('user:user-123');
+        expect(getUserRateLimitKey(mockContext)).toBe("user:user-123");
       });
 
-      it('should return IP-based key for unauthenticated user', () => {
+      it("should return IP-based key for unauthenticated user", () => {
         const mockContext = {
           get: () => null,
-          req: { header: (name: string) => name === 'x-forwarded-for' ? '192.168.1.1' : undefined },
+          req: {
+            header: (name: string) => (name === "x-forwarded-for" ? "192.168.1.1" : undefined),
+          },
         };
-        expect(getUserRateLimitKey(mockContext)).toBe('ip:192.168.1.1');
+        expect(getUserRateLimitKey(mockContext)).toBe("ip:192.168.1.1");
       });
 
-      it('should use x-real-ip header as fallback', () => {
+      it("should use x-real-ip header as fallback", () => {
         const mockContext = {
           get: () => null,
-          req: { header: (name: string) => name === 'x-real-ip' ? '10.0.0.1' : undefined },
+          req: { header: (name: string) => (name === "x-real-ip" ? "10.0.0.1" : undefined) },
         };
-        expect(getUserRateLimitKey(mockContext)).toBe('ip:10.0.0.1');
+        expect(getUserRateLimitKey(mockContext)).toBe("ip:10.0.0.1");
       });
 
-      it('should use first IP from x-forwarded-for', () => {
+      it("should use first IP from x-forwarded-for", () => {
         const mockContext = {
           get: () => null,
-          req: { header: (name: string) => name === 'x-forwarded-for' ? '192.168.1.1, 10.0.0.1, 172.16.0.1' : undefined },
+          req: {
+            header: (name: string) =>
+              name === "x-forwarded-for" ? "192.168.1.1, 10.0.0.1, 172.16.0.1" : undefined,
+          },
         };
-        expect(getUserRateLimitKey(mockContext)).toBe('ip:192.168.1.1');
+        expect(getUserRateLimitKey(mockContext)).toBe("ip:192.168.1.1");
       });
 
-      it('should trim whitespace from IPs', () => {
+      it("should trim whitespace from IPs", () => {
         const mockContext = {
           get: () => null,
-          req: { header: (name: string) => name === 'x-forwarded-for' ? '  192.168.1.1  ' : undefined },
+          req: {
+            header: (name: string) => (name === "x-forwarded-for" ? "  192.168.1.1  " : undefined),
+          },
         };
-        expect(getUserRateLimitKey(mockContext)).toBe('ip:192.168.1.1');
+        expect(getUserRateLimitKey(mockContext)).toBe("ip:192.168.1.1");
       });
 
-      it('should return unknown for missing IP', () => {
+      it("should return unknown for missing IP", () => {
         const mockContext = {
           get: () => null,
           req: { header: () => undefined },
         };
-        expect(getUserRateLimitKey(mockContext)).toBe('ip:unknown');
+        expect(getUserRateLimitKey(mockContext)).toBe("ip:unknown");
       });
 
-      it('should prefer user ID over IP when both available', () => {
+      it("should prefer user ID over IP when both available", () => {
         const mockContext = {
-          get: (key: 'user') => createMockUser({ id: 'user-456' }),
-          req: { header: (name: string) => name === 'x-forwarded-for' ? '192.168.1.1' : undefined },
+          get: (key: "user") => createMockUser({ id: "user-456" }),
+          req: {
+            header: (name: string) => (name === "x-forwarded-for" ? "192.168.1.1" : undefined),
+          },
         };
-        expect(getUserRateLimitKey(mockContext)).toBe('user:user-456');
+        expect(getUserRateLimitKey(mockContext)).toBe("user:user-456");
       });
     });
   });
@@ -341,16 +350,16 @@ describe('Auth Middleware', () => {
   // requireAuth Middleware Tests
   // ==========================================================================
 
-  describe('requireAuth Middleware', () => {
-    it('should be defined', () => {
+  describe("requireAuth Middleware", () => {
+    it("should be defined", () => {
       expect(requireAuth).toBeDefined();
-      expect(typeof requireAuth).toBe('function');
+      expect(typeof requireAuth).toBe("function");
     });
 
-    it('should return 401 for unauthenticated requests', async () => {
+    it("should return 401 for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -359,18 +368,18 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected');
+      const res = await testApp.request("/protected");
       expect(res.status).toBe(401);
 
       const body = await res.json();
-      expect(body).toHaveProperty('error', 'Unauthorized');
-      expect(body).toHaveProperty('message');
+      expect(body).toHaveProperty("error", "Unauthorized");
+      expect(body).toHaveProperty("message");
     });
 
-    it('should have correct error message for unauthenticated requests', async () => {
+    it("should have correct error message for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -379,15 +388,15 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected');
+      const res = await testApp.request("/protected");
       const body = await res.json();
-      expect(body.message).toContain('Authentication required');
+      expect(body.message).toContain("Authentication required");
     });
 
-    it('should return JSON response for auth failure', async () => {
+    it("should return JSON response for auth failure", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -396,17 +405,17 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected');
-      expect(res.headers.get('content-type')).toContain('application/json');
+      const res = await testApp.request("/protected");
+      expect(res.headers.get("content-type")).toContain("application/json");
     });
 
-    it('should not call next handler if unauthenticated', async () => {
+    it("should not call next handler if unauthenticated", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
       const nextHandler = vi.fn();
 
-      testApp.get('/protected', requireAuth, (c) => {
+      testApp.get("/protected", requireAuth, (c) => {
         nextHandler();
-        return c.json({ message: 'success' });
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -415,14 +424,14 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      await testApp.request('/protected');
+      await testApp.request("/protected");
       expect(nextHandler).not.toHaveBeenCalled();
     });
 
-    it('should handle multiple protected routes', async () => {
+    it("should handle multiple protected routes", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected1', requireAuth, (c) => c.json({ route: 1 }));
-      testApp.get('/protected2', requireAuth, (c) => c.json({ route: 2 }));
+      testApp.get("/protected1", requireAuth, (c) => c.json({ route: 1 }));
+      testApp.get("/protected2", requireAuth, (c) => c.json({ route: 2 }));
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -430,17 +439,17 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res1 = await testApp.request('/protected1');
-      const res2 = await testApp.request('/protected2');
+      const res1 = await testApp.request("/protected1");
+      const res2 = await testApp.request("/protected2");
 
       expect(res1.status).toBe(401);
       expect(res2.status).toBe(401);
     });
 
-    it('should be usable on POST routes', async () => {
+    it("should be usable on POST routes", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.post('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.post("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -449,14 +458,14 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected', { method: 'POST' });
+      const res = await testApp.request("/protected", { method: "POST" });
       expect(res.status).toBe(401);
     });
 
-    it('should be usable on PUT routes', async () => {
+    it("should be usable on PUT routes", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.put('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.put("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -465,14 +474,14 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected', { method: 'PUT' });
+      const res = await testApp.request("/protected", { method: "PUT" });
       expect(res.status).toBe(401);
     });
 
-    it('should be usable on DELETE routes', async () => {
+    it("should be usable on DELETE routes", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.delete('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.delete("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -481,14 +490,14 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected', { method: 'DELETE' });
+      const res = await testApp.request("/protected", { method: "DELETE" });
       expect(res.status).toBe(401);
     });
 
-    it('should be usable on PATCH routes', async () => {
+    it("should be usable on PATCH routes", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.patch('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.patch("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -497,14 +506,14 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected', { method: 'PATCH' });
+      const res = await testApp.request("/protected", { method: "PATCH" });
       expect(res.status).toBe(401);
     });
 
-    it('should handle requests with invalid session cookies', async () => {
+    it("should handle requests with invalid session cookies", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -513,19 +522,19 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected', {
+      const res = await testApp.request("/protected", {
         headers: {
-          Cookie: 'masonart.session=invalid-token',
+          Cookie: "masonart.session=invalid-token",
         },
       });
 
       expect(res.status).toBe(401);
     });
 
-    it('should handle requests with malformed cookies', async () => {
+    it("should handle requests with malformed cookies", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -534,19 +543,19 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected', {
+      const res = await testApp.request("/protected", {
         headers: {
-          Cookie: 'malformed cookie data',
+          Cookie: "malformed cookie data",
         },
       });
 
       expect(res.status).toBe(401);
     });
 
-    it('should handle requests with expired sessions', async () => {
+    it("should handle requests with expired sessions", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -555,9 +564,9 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected', {
+      const res = await testApp.request("/protected", {
         headers: {
-          Cookie: 'masonart.session=expired-token',
+          Cookie: "masonart.session=expired-token",
         },
       });
 
@@ -569,84 +578,84 @@ describe('Auth Middleware', () => {
   // optionalAuth Middleware Tests
   // ==========================================================================
 
-  describe('optionalAuth Middleware', () => {
-    it('should be defined', () => {
+  describe("optionalAuth Middleware", () => {
+    it("should be defined", () => {
       expect(optionalAuth).toBeDefined();
-      expect(typeof optionalAuth).toBe('function');
+      expect(typeof optionalAuth).toBe("function");
     });
 
-    it('should allow unauthenticated requests', async () => {
+    it("should allow unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
-      testApp.get('/optional', optionalAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/optional", optionalAuth, (c) => {
+        return c.json({ message: "success" });
       });
 
-      const res = await testApp.request('/optional');
+      const res = await testApp.request("/optional");
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body).toHaveProperty('message', 'success');
+      expect(body).toHaveProperty("message", "success");
     });
 
-    it('should call next handler for unauthenticated requests', async () => {
+    it("should call next handler for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
       const nextHandler = vi.fn((c: Context) => {
-        return c.json({ message: 'success' });
+        return c.json({ message: "success" });
       });
 
-      testApp.get('/optional', optionalAuth, nextHandler);
+      testApp.get("/optional", optionalAuth, nextHandler);
 
-      await testApp.request('/optional');
+      await testApp.request("/optional");
       expect(nextHandler).toHaveBeenCalled();
     });
 
-    it('should set user to null for unauthenticated requests', async () => {
+    it("should set user to null for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
-      testApp.get('/optional', optionalAuth, (c) => {
-        const user = c.get('user');
+      testApp.get("/optional", optionalAuth, (c) => {
+        const user = c.get("user");
         return c.json({ user });
       });
 
-      const res = await testApp.request('/optional');
+      const res = await testApp.request("/optional");
       const body = await res.json();
       expect(body.user).toBeNull();
     });
 
-    it('should not block requests without cookies', async () => {
+    it("should not block requests without cookies", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
-      testApp.get('/optional', optionalAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/optional", optionalAuth, (c) => {
+        return c.json({ message: "success" });
       });
 
-      const res = await testApp.request('/optional');
+      const res = await testApp.request("/optional");
       expect(res.status).toBe(200);
     });
 
-    it('should handle invalid cookies gracefully', async () => {
+    it("should handle invalid cookies gracefully", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
-      testApp.get('/optional', optionalAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/optional", optionalAuth, (c) => {
+        return c.json({ message: "success" });
       });
 
-      const res = await testApp.request('/optional', {
+      const res = await testApp.request("/optional", {
         headers: {
-          Cookie: 'invalid cookie',
+          Cookie: "invalid cookie",
         },
       });
 
       expect(res.status).toBe(200);
     });
 
-    it('should handle expired sessions gracefully', async () => {
+    it("should handle expired sessions gracefully", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
-      testApp.get('/optional', optionalAuth, (c) => {
-        const user = c.get('user');
+      testApp.get("/optional", optionalAuth, (c) => {
+        const user = c.get("user");
         return c.json({ hasUser: !!user });
       });
 
-      const res = await testApp.request('/optional', {
+      const res = await testApp.request("/optional", {
         headers: {
-          Cookie: 'masonart.session=expired',
+          Cookie: "masonart.session=expired",
         },
       });
 
@@ -655,28 +664,28 @@ describe('Auth Middleware', () => {
       expect(body.hasUser).toBe(false);
     });
 
-    it('should be usable on all HTTP methods', async () => {
+    it("should be usable on all HTTP methods", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
-      testApp.get('/optional', optionalAuth, (c) => c.json({ method: 'GET' }));
-      testApp.post('/optional', optionalAuth, (c) => c.json({ method: 'POST' }));
+      testApp.get("/optional", optionalAuth, (c) => c.json({ method: "GET" }));
+      testApp.post("/optional", optionalAuth, (c) => c.json({ method: "POST" }));
 
-      const getRes = await testApp.request('/optional', { method: 'GET' });
-      const postRes = await testApp.request('/optional', { method: 'POST' });
+      const getRes = await testApp.request("/optional", { method: "GET" });
+      const postRes = await testApp.request("/optional", { method: "POST" });
 
       expect(getRes.status).toBe(200);
       expect(postRes.status).toBe(200);
     });
 
-    it('should not throw errors for malformed requests', async () => {
+    it("should not throw errors for malformed requests", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
-      testApp.get('/optional', optionalAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/optional", optionalAuth, (c) => {
+        return c.json({ message: "success" });
       });
 
       // Should not throw
-      const res = await testApp.request('/optional', {
+      const res = await testApp.request("/optional", {
         headers: {
-          Cookie: 'masonart.session=malformed;;;',
+          Cookie: "masonart.session=malformed;;;",
         },
       });
 
@@ -688,26 +697,26 @@ describe('Auth Middleware', () => {
   // requireRole Middleware Tests
   // ==========================================================================
 
-  describe('requireRole Middleware', () => {
-    it('should be defined', () => {
+  describe("requireRole Middleware", () => {
+    it("should be defined", () => {
       expect(requireRole).toBeDefined();
-      expect(typeof requireRole).toBe('function');
+      expect(typeof requireRole).toBe("function");
     });
 
-    it('should be a factory function', () => {
-      const middleware = requireRole('admin');
-      expect(typeof middleware).toBe('function');
+    it("should be a factory function", () => {
+      const middleware = requireRole("admin");
+      expect(typeof middleware).toBe("function");
     });
 
-    it('should accept array of roles', () => {
-      const middleware = requireRole(['admin', 'super-admin']);
+    it("should accept array of roles", () => {
+      const middleware = requireRole(["admin", "super-admin"]);
       expect(middleware).toBeDefined();
     });
 
-    it('should return 401 for unauthenticated requests', async () => {
+    it("should return 401 for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin-only', requireRole('admin'), (c) => {
-        return c.json({ message: 'admin area' });
+      testApp.get("/admin-only", requireRole("admin"), (c) => {
+        return c.json({ message: "admin area" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -716,20 +725,25 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/admin-only');
+      const res = await testApp.request("/admin-only");
       expect(res.status).toBe(401);
     });
 
-    it('should return 403 for wrong role', async () => {
+    it("should return 403 for wrong role", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin-only', (c, next) => {
-        // Mock user context with customer role
-        c.set('user', createMockUser({ role: 'customer' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireRole('admin'), (c) => {
-        return c.json({ message: 'admin area' });
-      });
+      testApp.get(
+        "/admin-only",
+        (c, next) => {
+          // Mock user context with customer role
+          c.set("user", createMockUser({ role: "customer" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireRole("admin"),
+        (c) => {
+          return c.json({ message: "admin area" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -737,21 +751,84 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/admin-only');
+      const res = await testApp.request("/admin-only");
       expect(res.status).toBe(403);
 
       const body = await res.json();
-      expect(body).toHaveProperty('error', 'Forbidden');
+      expect(body).toHaveProperty("error", "Forbidden");
     });
 
-    it('should include required role in error message', async () => {
+    it("should include required role in error message", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin-only', (c, next) => {
-        c.set('user', createMockUser({ role: 'customer' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireRole('admin'), (c) => {
-        return c.json({ message: 'success' });
+      testApp.get(
+        "/admin-only",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "customer" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireRole("admin"),
+        (c) => {
+          return c.json({ message: "success" });
+        }
+      );
+      testApp.onError((err, c) => {
+        if (err instanceof HTTPException) {
+          return err.getResponse();
+        }
+        return c.json({ error: err.message }, 500);
+      });
+
+      const res = await testApp.request("/admin-only");
+      const body = await res.json();
+      expect(body.message).toContain("admin");
+    });
+
+    it("should allow requests with correct role", async () => {
+      const testApp = new Hono<{ Variables: AuthVariables }>();
+      testApp.get(
+        "/admin-only",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "admin" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireRole("admin"),
+        (c) => {
+          return c.json({ message: "admin area" });
+        }
+      );
+
+      const res = await testApp.request("/admin-only");
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body).toHaveProperty("message", "admin area");
+    });
+
+    it("should allow access when user has one of multiple allowed roles", async () => {
+      const testApp = new Hono<{ Variables: AuthVariables }>();
+      testApp.get(
+        "/admin-area",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "super-admin" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireRole(["admin", "super-admin"]),
+        (c) => {
+          return c.json({ message: "success" });
+        }
+      );
+
+      const res = await testApp.request("/admin-area");
+      expect(res.status).toBe(200);
+    });
+
+    it("should handle null user context", async () => {
+      const testApp = new Hono<{ Variables: AuthVariables }>();
+      testApp.get("/protected", requireRole("admin"), (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -760,55 +837,7 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/admin-only');
-      const body = await res.json();
-      expect(body.message).toContain('admin');
-    });
-
-    it('should allow requests with correct role', async () => {
-      const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin-only', (c, next) => {
-        c.set('user', createMockUser({ role: 'admin' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireRole('admin'), (c) => {
-        return c.json({ message: 'admin area' });
-      });
-
-      const res = await testApp.request('/admin-only');
-      expect(res.status).toBe(200);
-
-      const body = await res.json();
-      expect(body).toHaveProperty('message', 'admin area');
-    });
-
-    it('should allow access when user has one of multiple allowed roles', async () => {
-      const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin-area', (c, next) => {
-        c.set('user', createMockUser({ role: 'super-admin' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireRole(['admin', 'super-admin']), (c) => {
-        return c.json({ message: 'success' });
-      });
-
-      const res = await testApp.request('/admin-area');
-      expect(res.status).toBe(200);
-    });
-
-    it('should handle null user context', async () => {
-      const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireRole('admin'), (c) => {
-        return c.json({ message: 'success' });
-      });
-      testApp.onError((err, c) => {
-        if (err instanceof HTTPException) {
-          return err.getResponse();
-        }
-        return c.json({ error: err.message }, 500);
-      });
-
-      const res = await testApp.request('/protected');
+      const res = await testApp.request("/protected");
       expect(res.status).toBe(401);
     });
   });
@@ -817,16 +846,16 @@ describe('Auth Middleware', () => {
   // requireAdmin Middleware Tests
   // ==========================================================================
 
-  describe('requireAdmin Middleware', () => {
-    it('should be defined', () => {
+  describe("requireAdmin Middleware", () => {
+    it("should be defined", () => {
       expect(requireAdmin).toBeDefined();
-      expect(typeof requireAdmin).toBe('function');
+      expect(typeof requireAdmin).toBe("function");
     });
 
-    it('should return 401 for unauthenticated requests', async () => {
+    it("should return 401 for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin', requireAdmin, (c) => {
-        return c.json({ message: 'admin area' });
+      testApp.get("/admin", requireAdmin, (c) => {
+        return c.json({ message: "admin area" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -835,19 +864,24 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/admin');
+      const res = await testApp.request("/admin");
       expect(res.status).toBe(401);
     });
 
-    it('should return 403 for non-admin users', async () => {
+    it("should return 403 for non-admin users", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin', (c, next) => {
-        c.set('user', createMockUser({ role: 'customer' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAdmin, (c) => {
-        return c.json({ message: 'admin area' });
-      });
+      testApp.get(
+        "/admin",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "customer" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAdmin,
+        (c) => {
+          return c.json({ message: "admin area" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -855,50 +889,65 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/admin');
+      const res = await testApp.request("/admin");
       expect(res.status).toBe(403);
     });
 
-    it('should allow admin users', async () => {
+    it("should allow admin users", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin', (c, next) => {
-        c.set('user', createMockUser({ role: 'admin' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAdmin, (c) => {
-        return c.json({ message: 'admin dashboard' });
-      });
+      testApp.get(
+        "/admin",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "admin" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAdmin,
+        (c) => {
+          return c.json({ message: "admin dashboard" });
+        }
+      );
 
-      const res = await testApp.request('/admin');
+      const res = await testApp.request("/admin");
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body).toHaveProperty('message', 'admin dashboard');
+      expect(body).toHaveProperty("message", "admin dashboard");
     });
 
-    it('should allow super-admin users', async () => {
+    it("should allow super-admin users", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin', (c, next) => {
-        c.set('user', createMockUser({ role: 'super-admin' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAdmin, (c) => {
-        return c.json({ message: 'admin dashboard' });
-      });
+      testApp.get(
+        "/admin",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "super-admin" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAdmin,
+        (c) => {
+          return c.json({ message: "admin dashboard" });
+        }
+      );
 
-      const res = await testApp.request('/admin');
+      const res = await testApp.request("/admin");
       expect(res.status).toBe(200);
     });
 
-    it('should deny trade users', async () => {
+    it("should deny trade users", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin', (c, next) => {
-        c.set('user', createMockUser({ role: 'trade' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAdmin, (c) => {
-        return c.json({ message: 'admin area' });
-      });
+      testApp.get(
+        "/admin",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "trade" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAdmin,
+        (c) => {
+          return c.json({ message: "admin area" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -906,14 +955,14 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/admin');
+      const res = await testApp.request("/admin");
       expect(res.status).toBe(403);
     });
 
-    it('should return JSON error response', async () => {
+    it("should return JSON error response", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/admin', requireAdmin, (c) => {
-        return c.json({ message: 'admin area' });
+      testApp.get("/admin", requireAdmin, (c) => {
+        return c.json({ message: "admin area" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -922,12 +971,12 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/admin');
-      expect(res.headers.get('content-type')).toContain('application/json');
+      const res = await testApp.request("/admin");
+      expect(res.headers.get("content-type")).toContain("application/json");
 
       const body = await res.json();
-      expect(body).toHaveProperty('error');
-      expect(body).toHaveProperty('message');
+      expect(body).toHaveProperty("error");
+      expect(body).toHaveProperty("message");
     });
   });
 
@@ -935,16 +984,16 @@ describe('Auth Middleware', () => {
   // requireVerified Middleware Tests
   // ==========================================================================
 
-  describe('requireVerified Middleware', () => {
-    it('should be defined', () => {
+  describe("requireVerified Middleware", () => {
+    it("should be defined", () => {
       expect(requireVerified).toBeDefined();
-      expect(typeof requireVerified).toBe('function');
+      expect(typeof requireVerified).toBe("function");
     });
 
-    it('should return 401 for unauthenticated requests', async () => {
+    it("should return 401 for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/verified-only', requireVerified, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/verified-only", requireVerified, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -953,19 +1002,24 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/verified-only');
+      const res = await testApp.request("/verified-only");
       expect(res.status).toBe(401);
     });
 
-    it('should return 403 for unverified emails', async () => {
+    it("should return 403 for unverified emails", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/verified-only', (c, next) => {
-        c.set('user', createMockUser({ emailVerified: false }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireVerified, (c) => {
-        return c.json({ message: 'success' });
-      });
+      testApp.get(
+        "/verified-only",
+        (c, next) => {
+          c.set("user", createMockUser({ emailVerified: false }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireVerified,
+        (c) => {
+          return c.json({ message: "success" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -973,34 +1027,39 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/verified-only');
+      const res = await testApp.request("/verified-only");
       expect(res.status).toBe(403);
 
       const body = await res.json();
-      expect(body.message).toContain('Email verification required');
+      expect(body.message).toContain("Email verification required");
     });
 
-    it('should allow verified emails', async () => {
+    it("should allow verified emails", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/verified-only', (c, next) => {
-        c.set('user', createMockUser({ emailVerified: true }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireVerified, (c) => {
-        return c.json({ message: 'verified user content' });
-      });
+      testApp.get(
+        "/verified-only",
+        (c, next) => {
+          c.set("user", createMockUser({ emailVerified: true }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireVerified,
+        (c) => {
+          return c.json({ message: "verified user content" });
+        }
+      );
 
-      const res = await testApp.request('/verified-only');
+      const res = await testApp.request("/verified-only");
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body).toHaveProperty('message', 'verified user content');
+      expect(body).toHaveProperty("message", "verified user content");
     });
 
-    it('should return JSON error response', async () => {
+    it("should return JSON error response", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/verified-only', requireVerified, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/verified-only", requireVerified, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1009,8 +1068,8 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/verified-only');
-      expect(res.headers.get('content-type')).toContain('application/json');
+      const res = await testApp.request("/verified-only");
+      expect(res.headers.get("content-type")).toContain("application/json");
     });
   });
 
@@ -1018,16 +1077,16 @@ describe('Auth Middleware', () => {
   // requireTrade Middleware Tests
   // ==========================================================================
 
-  describe('requireTrade Middleware', () => {
-    it('should be defined', () => {
+  describe("requireTrade Middleware", () => {
+    it("should be defined", () => {
       expect(requireTrade).toBeDefined();
-      expect(typeof requireTrade).toBe('function');
+      expect(typeof requireTrade).toBe("function");
     });
 
-    it('should return 401 for unauthenticated requests', async () => {
+    it("should return 401 for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/trade', requireTrade, (c) => {
-        return c.json({ message: 'trade area' });
+      testApp.get("/trade", requireTrade, (c) => {
+        return c.json({ message: "trade area" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1036,75 +1095,100 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/trade');
+      const res = await testApp.request("/trade");
       expect(res.status).toBe(401);
     });
 
-    it('should allow trade role', async () => {
+    it("should allow trade role", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/trade', (c, next) => {
-        c.set('user', createMockUser({ role: 'trade' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireTrade, (c) => {
-        return c.json({ message: 'trade content' });
-      });
+      testApp.get(
+        "/trade",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "trade" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireTrade,
+        (c) => {
+          return c.json({ message: "trade content" });
+        }
+      );
 
-      const res = await testApp.request('/trade');
+      const res = await testApp.request("/trade");
       expect(res.status).toBe(200);
     });
 
-    it('should allow admin role', async () => {
+    it("should allow admin role", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/trade', (c, next) => {
-        c.set('user', createMockUser({ role: 'admin' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireTrade, (c) => {
-        return c.json({ message: 'trade content' });
-      });
+      testApp.get(
+        "/trade",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "admin" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireTrade,
+        (c) => {
+          return c.json({ message: "trade content" });
+        }
+      );
 
-      const res = await testApp.request('/trade');
+      const res = await testApp.request("/trade");
       expect(res.status).toBe(200);
     });
 
-    it('should allow super-admin role', async () => {
+    it("should allow super-admin role", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/trade', (c, next) => {
-        c.set('user', createMockUser({ role: 'super-admin' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireTrade, (c) => {
-        return c.json({ message: 'trade content' });
-      });
+      testApp.get(
+        "/trade",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "super-admin" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireTrade,
+        (c) => {
+          return c.json({ message: "trade content" });
+        }
+      );
 
-      const res = await testApp.request('/trade');
+      const res = await testApp.request("/trade");
       expect(res.status).toBe(200);
     });
 
-    it('should allow customer with approved trade status', async () => {
+    it("should allow customer with approved trade status", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/trade', (c, next) => {
-        c.set('user', createMockUser({ role: 'customer', tradeStatus: 'approved' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireTrade, (c) => {
-        return c.json({ message: 'trade content' });
-      });
+      testApp.get(
+        "/trade",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "customer", tradeStatus: "approved" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireTrade,
+        (c) => {
+          return c.json({ message: "trade content" });
+        }
+      );
 
-      const res = await testApp.request('/trade');
+      const res = await testApp.request("/trade");
       expect(res.status).toBe(200);
     });
 
-    it('should deny customer without trade access', async () => {
+    it("should deny customer without trade access", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/trade', (c, next) => {
-        c.set('user', createMockUser({ role: 'customer', tradeStatus: 'none' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireTrade, (c) => {
-        return c.json({ message: 'trade content' });
-      });
+      testApp.get(
+        "/trade",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "customer", tradeStatus: "none" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireTrade,
+        (c) => {
+          return c.json({ message: "trade content" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -1112,21 +1196,26 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/trade');
+      const res = await testApp.request("/trade");
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body.message).toBe('Trade program access required');
+      expect(body.message).toBe("Trade program access required");
     });
 
-    it('should deny customer with pending trade status', async () => {
+    it("should deny customer with pending trade status", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/trade', (c, next) => {
-        c.set('user', createMockUser({ role: 'customer', tradeStatus: 'pending' }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireTrade, (c) => {
-        return c.json({ message: 'trade content' });
-      });
+      testApp.get(
+        "/trade",
+        (c, next) => {
+          c.set("user", createMockUser({ role: "customer", tradeStatus: "pending" }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireTrade,
+        (c) => {
+          return c.json({ message: "trade content" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -1134,7 +1223,7 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/trade');
+      const res = await testApp.request("/trade");
       expect(res.status).toBe(403);
     });
   });
@@ -1143,26 +1232,26 @@ describe('Auth Middleware', () => {
   // requireAICredits Middleware Tests
   // ==========================================================================
 
-  describe('requireAICredits Middleware', () => {
-    it('should be defined', () => {
+  describe("requireAICredits Middleware", () => {
+    it("should be defined", () => {
       expect(requireAICredits).toBeDefined();
-      expect(typeof requireAICredits).toBe('function');
+      expect(typeof requireAICredits).toBe("function");
     });
 
-    it('should be a factory function', () => {
+    it("should be a factory function", () => {
       const middleware = requireAICredits(1);
-      expect(typeof middleware).toBe('function');
+      expect(typeof middleware).toBe("function");
     });
 
-    it('should use default of 1 credit when no argument provided', () => {
+    it("should use default of 1 credit when no argument provided", () => {
       const middleware = requireAICredits();
       expect(middleware).toBeDefined();
     });
 
-    it('should return 401 for unauthenticated requests', async () => {
+    it("should return 401 for unauthenticated requests", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/ai', requireAICredits(1), (c) => {
-        return c.json({ message: 'ai content' });
+      testApp.get("/ai", requireAICredits(1), (c) => {
+        return c.json({ message: "ai content" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1171,33 +1260,43 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/ai');
+      const res = await testApp.request("/ai");
       expect(res.status).toBe(401);
     });
 
-    it('should allow user with sufficient credits', async () => {
+    it("should allow user with sufficient credits", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/ai', (c, next) => {
-        c.set('user', createMockUser({ aiCreditsRemaining: 5 }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAICredits(1), (c) => {
-        return c.json({ message: 'ai content' });
-      });
+      testApp.get(
+        "/ai",
+        (c, next) => {
+          c.set("user", createMockUser({ aiCreditsRemaining: 5 }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAICredits(1),
+        (c) => {
+          return c.json({ message: "ai content" });
+        }
+      );
 
-      const res = await testApp.request('/ai');
+      const res = await testApp.request("/ai");
       expect(res.status).toBe(200);
     });
 
-    it('should deny user with insufficient credits', async () => {
+    it("should deny user with insufficient credits", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/ai', (c, next) => {
-        c.set('user', createMockUser({ aiCreditsRemaining: 0 }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAICredits(1), (c) => {
-        return c.json({ message: 'ai content' });
-      });
+      testApp.get(
+        "/ai",
+        (c, next) => {
+          c.set("user", createMockUser({ aiCreditsRemaining: 0 }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAICredits(1),
+        (c) => {
+          return c.json({ message: "ai content" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -1205,21 +1304,26 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/ai');
+      const res = await testApp.request("/ai");
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body.message).toContain('Insufficient AI credits');
+      expect(body.message).toContain("Insufficient AI credits");
     });
 
-    it('should deny user with fewer credits than required', async () => {
+    it("should deny user with fewer credits than required", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/ai', (c, next) => {
-        c.set('user', createMockUser({ aiCreditsRemaining: 3 }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAICredits(5), (c) => {
-        return c.json({ message: 'ai content' });
-      });
+      testApp.get(
+        "/ai",
+        (c, next) => {
+          c.set("user", createMockUser({ aiCreditsRemaining: 3 }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAICredits(5),
+        (c) => {
+          return c.json({ message: "ai content" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -1227,38 +1331,51 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/ai');
+      const res = await testApp.request("/ai");
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body.message).toBe('Insufficient AI credits. Required: 5, Available: 3');
+      expect(body.message).toBe("Insufficient AI credits. Required: 5, Available: 3");
     });
 
-    it('should allow unlimited tier users regardless of credits', async () => {
+    it("should allow unlimited tier users regardless of credits", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/ai', (c, next) => {
-        c.set('user', createMockUser({
-          aiCreditsRemaining: 0,
-          aiSubscriptionTier: 'unlimited',
-        }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAICredits(100), (c) => {
-        return c.json({ message: 'ai content' });
-      });
+      testApp.get(
+        "/ai",
+        (c, next) => {
+          c.set(
+            "user",
+            createMockUser({
+              aiCreditsRemaining: 0,
+              aiSubscriptionTier: "unlimited",
+            })
+          );
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAICredits(100),
+        (c) => {
+          return c.json({ message: "ai content" });
+        }
+      );
 
-      const res = await testApp.request('/ai');
+      const res = await testApp.request("/ai");
       expect(res.status).toBe(200);
     });
 
-    it('should handle undefined credits as 0', async () => {
+    it("should handle undefined credits as 0", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/ai', (c, next) => {
-        c.set('user', createMockUser({ aiCreditsRemaining: undefined }));
-        c.set('session', createMockSession());
-        return next();
-      }, requireAICredits(1), (c) => {
-        return c.json({ message: 'ai content' });
-      });
+      testApp.get(
+        "/ai",
+        (c, next) => {
+          c.set("user", createMockUser({ aiCreditsRemaining: undefined }));
+          c.set("session", createMockSession());
+          return next();
+        },
+        requireAICredits(1),
+        (c) => {
+          return c.json({ message: "ai content" });
+        }
+      );
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -1266,7 +1383,7 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/ai');
+      const res = await testApp.request("/ai");
       expect(res.status).toBe(403);
     });
   });
@@ -1275,11 +1392,11 @@ describe('Auth Middleware', () => {
   // Middleware Composition Tests
   // ==========================================================================
 
-  describe('Middleware Composition', () => {
-    it('should combine requireAuth with requireAdmin', async () => {
+  describe("Middleware Composition", () => {
+    it("should combine requireAuth with requireAdmin", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/super-admin', requireAuth, requireAdmin, (c) => {
-        return c.json({ message: 'super admin area' });
+      testApp.get("/super-admin", requireAuth, requireAdmin, (c) => {
+        return c.json({ message: "super admin area" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1288,14 +1405,14 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/super-admin');
+      const res = await testApp.request("/super-admin");
       expect(res.status).toBe(401); // Fails at requireAuth
     });
 
-    it('should combine optionalAuth with requireRole', async () => {
+    it("should combine optionalAuth with requireRole", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/premium', optionalAuth, requireRole('admin'), (c) => {
-        return c.json({ message: 'premium content' });
+      testApp.get("/premium", optionalAuth, requireRole("admin"), (c) => {
+        return c.json({ message: "premium content" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1304,38 +1421,38 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/premium');
+      const res = await testApp.request("/premium");
       expect(res.status).toBe(401);
     });
 
-    it('should use multiple middleware in sequence', async () => {
+    it("should use multiple middleware in sequence", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
       testApp.get(
-        '/protected',
+        "/protected",
         optionalAuth,
         (c, next) => {
           // Mock user
-          c.set('user', createMockUser({ emailVerified: true, role: 'admin' }));
-          c.set('session', createMockSession());
+          c.set("user", createMockUser({ emailVerified: true, role: "admin" }));
+          c.set("session", createMockSession());
           return next();
         },
         requireVerified,
         requireAdmin,
         (c) => {
-          return c.json({ message: 'super protected' });
+          return c.json({ message: "super protected" });
         }
       );
 
-      const res = await testApp.request('/protected');
+      const res = await testApp.request("/protected");
       expect(res.status).toBe(200);
     });
 
-    it('should short-circuit on first failure', async () => {
+    it("should short-circuit on first failure", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      const handler3 = vi.fn((c: Context) => c.json({ message: 'success' }));
+      const handler3 = vi.fn((c: Context) => c.json({ message: "success" }));
 
       testApp.get(
-        '/protected',
+        "/protected",
         requireAuth, // Fails here
         requireAdmin,
         handler3
@@ -1347,30 +1464,33 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      await testApp.request('/protected');
+      await testApp.request("/protected");
       expect(handler3).not.toHaveBeenCalled();
     });
 
-    it('should chain requireVerified with requireAICredits', async () => {
+    it("should chain requireVerified with requireAICredits", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
       testApp.get(
-        '/ai-generate',
+        "/ai-generate",
         (c, next) => {
-          c.set('user', createMockUser({
-            emailVerified: true,
-            aiCreditsRemaining: 10,
-          }));
-          c.set('session', createMockSession());
+          c.set(
+            "user",
+            createMockUser({
+              emailVerified: true,
+              aiCreditsRemaining: 10,
+            })
+          );
+          c.set("session", createMockSession());
           return next();
         },
         requireVerified,
         requireAICredits(5),
         (c) => {
-          return c.json({ message: 'ai generated' });
+          return c.json({ message: "ai generated" });
         }
       );
 
-      const res = await testApp.request('/ai-generate');
+      const res = await testApp.request("/ai-generate");
       expect(res.status).toBe(200);
     });
   });
@@ -1379,11 +1499,11 @@ describe('Auth Middleware', () => {
   // Error Handling Tests
   // ==========================================================================
 
-  describe('Error Handling', () => {
-    it('should handle errors gracefully in requireAuth', async () => {
+  describe("Error Handling", () => {
+    it("should handle errors gracefully in requireAuth", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1392,26 +1512,26 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected', {
+      const res = await testApp.request("/protected", {
         headers: {
-          Cookie: 'masonart.session=malformed;;;data',
+          Cookie: "masonart.session=malformed;;;data",
         },
       });
 
       expect(res.status).toBe(401);
       const body = await res.json();
-      expect(body).toHaveProperty('error');
+      expect(body).toHaveProperty("error");
     });
 
-    it('should handle errors gracefully in optionalAuth', async () => {
+    it("should handle errors gracefully in optionalAuth", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables }>();
-      testApp.get('/optional', optionalAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/optional", optionalAuth, (c) => {
+        return c.json({ message: "success" });
       });
 
-      const res = await testApp.request('/optional', {
+      const res = await testApp.request("/optional", {
         headers: {
-          Cookie: 'masonart.session=malformed',
+          Cookie: "masonart.session=malformed",
         },
       });
 
@@ -1419,10 +1539,10 @@ describe('Auth Middleware', () => {
       expect(res.status).toBe(200);
     });
 
-    it('should return proper error structure', async () => {
+    it("should return proper error structure", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1431,20 +1551,20 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/protected');
+      const res = await testApp.request("/protected");
       const body = await res.json();
 
-      expect(body).toHaveProperty('error');
-      expect(body).toHaveProperty('message');
-      expect(body).toHaveProperty('code');
-      expect(typeof body.error).toBe('string');
-      expect(typeof body.message).toBe('string');
+      expect(body).toHaveProperty("error");
+      expect(body).toHaveProperty("message");
+      expect(body).toHaveProperty("code");
+      expect(typeof body.error).toBe("string");
+      expect(typeof body.message).toBe("string");
     });
 
-    it('should handle missing user context', async () => {
+    it("should handle missing user context", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/role-check', requireRole('admin'), (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/role-check", requireRole("admin"), (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1453,7 +1573,7 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const res = await testApp.request('/role-check');
+      const res = await testApp.request("/role-check");
       expect(res.status).toBe(401);
     });
   });
@@ -1462,15 +1582,15 @@ describe('Auth Middleware', () => {
   // Integration Tests
   // ==========================================================================
 
-  describe('Integration Tests', () => {
-    it('should work with real Hono app routes', async () => {
+  describe("Integration Tests", () => {
+    it("should work with real Hono app routes", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
       const api = new Hono();
 
-      api.get('/public', (c) => c.json({ public: true }));
-      api.get('/protected', requireAuth, (c) => c.json({ protected: true }));
+      api.get("/public", (c) => c.json({ public: true }));
+      api.get("/protected", requireAuth, (c) => c.json({ protected: true }));
 
-      testApp.route('/api', api);
+      testApp.route("/api", api);
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -1478,55 +1598,55 @@ describe('Auth Middleware', () => {
         return c.json({ error: err.message }, 500);
       });
 
-      const publicRes = await testApp.request('/api/public');
-      const protectedRes = await testApp.request('/api/protected');
+      const publicRes = await testApp.request("/api/public");
+      const protectedRes = await testApp.request("/api/protected");
 
       expect(publicRes.status).toBe(200);
       expect(protectedRes.status).toBe(401);
     });
 
-    it('should maintain context across middleware', async () => {
+    it("should maintain context across middleware", async () => {
       const testApp = new Hono<{ Variables: OptionalAuthVariables & { custom: string } }>();
       testApp.get(
-        '/test',
+        "/test",
         optionalAuth,
         (c, next) => {
-          c.set('custom', 'value');
+          c.set("custom", "value");
           return next();
         },
         (c) => {
-          const user = c.get('user');
-          const custom = c.get('custom');
+          const user = c.get("user");
+          const custom = c.get("custom");
           return c.json({ user, custom });
         }
       );
 
-      const res = await testApp.request('/test');
+      const res = await testApp.request("/test");
       const body = await res.json();
 
-      expect(body).toHaveProperty('user');
-      expect(body).toHaveProperty('custom', 'value');
+      expect(body).toHaveProperty("user");
+      expect(body).toHaveProperty("custom", "value");
     });
 
-    it('should support route groups with middleware', async () => {
+    it("should support route groups with middleware", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
       const adminRoutes = new Hono<{ Variables: AuthVariables }>();
 
-      adminRoutes.use('*', (c, next) => {
-        c.set('user', createMockUser({ role: 'admin' }));
-        c.set('session', createMockSession());
+      adminRoutes.use("*", (c, next) => {
+        c.set("user", createMockUser({ role: "admin" }));
+        c.set("session", createMockSession());
         return next();
       });
 
-      adminRoutes.use('*', requireAdmin);
+      adminRoutes.use("*", requireAdmin);
 
-      adminRoutes.get('/dashboard', (c) => c.json({ page: 'dashboard' }));
-      adminRoutes.get('/users', (c) => c.json({ page: 'users' }));
+      adminRoutes.get("/dashboard", (c) => c.json({ page: "dashboard" }));
+      adminRoutes.get("/users", (c) => c.json({ page: "users" }));
 
-      testApp.route('/admin', adminRoutes);
+      testApp.route("/admin", adminRoutes);
 
-      const dashRes = await testApp.request('/admin/dashboard');
-      const usersRes = await testApp.request('/admin/users');
+      const dashRes = await testApp.request("/admin/dashboard");
+      const usersRes = await testApp.request("/admin/users");
 
       expect(dashRes.status).toBe(200);
       expect(usersRes.status).toBe(200);
@@ -1537,11 +1657,11 @@ describe('Auth Middleware', () => {
   // Performance Tests
   // ==========================================================================
 
-  describe('Performance', () => {
-    it('should handle middleware quickly', async () => {
+  describe("Performance", () => {
+    it("should handle middleware quickly", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get('/protected', requireAuth, (c) => {
-        return c.json({ message: 'success' });
+      testApp.get("/protected", requireAuth, (c) => {
+        return c.json({ message: "success" });
       });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
@@ -1551,25 +1671,18 @@ describe('Auth Middleware', () => {
       });
 
       const start = Date.now();
-      await testApp.request('/protected');
+      await testApp.request("/protected");
       const duration = Date.now() - start;
 
       // Should respond quickly even with middleware
       expect(duration).toBeLessThan(100);
     });
 
-    it('should handle multiple middleware efficiently', async () => {
+    it("should handle multiple middleware efficiently", async () => {
       const testApp = new Hono<{ Variables: AuthVariables }>();
-      testApp.get(
-        '/protected',
-        optionalAuth,
-        requireAuth,
-        requireAdmin,
-        requireVerified,
-        (c) => {
-          return c.json({ message: 'success' });
-        }
-      );
+      testApp.get("/protected", optionalAuth, requireAuth, requireAdmin, requireVerified, (c) => {
+        return c.json({ message: "success" });
+      });
       testApp.onError((err, c) => {
         if (err instanceof HTTPException) {
           return err.getResponse();
@@ -1578,7 +1691,7 @@ describe('Auth Middleware', () => {
       });
 
       const start = Date.now();
-      await testApp.request('/protected');
+      await testApp.request("/protected");
       const duration = Date.now() - start;
 
       expect(duration).toBeLessThan(150);
@@ -1589,8 +1702,8 @@ describe('Auth Middleware', () => {
   // Type Definition Tests
   // ==========================================================================
 
-  describe('Type Definitions', () => {
-    it('should export AuthUser type with correct shape', () => {
+  describe("Type Definitions", () => {
+    it("should export AuthUser type with correct shape", () => {
       const user: AuthUser = createMockUser();
       expect(user.id).toBeDefined();
       expect(user.name).toBeDefined();
@@ -1599,7 +1712,7 @@ describe('Auth Middleware', () => {
       expect(user.role).toBeDefined();
     });
 
-    it('should export AuthSession type with correct shape', () => {
+    it("should export AuthSession type with correct shape", () => {
       const session: AuthSession = createMockSession();
       expect(session.id).toBeDefined();
       expect(session.token).toBeDefined();
@@ -1607,7 +1720,7 @@ describe('Auth Middleware', () => {
       expect(session.expiresAt).toBeDefined();
     });
 
-    it('should export AuthVariables type', () => {
+    it("should export AuthVariables type", () => {
       const vars: AuthVariables = {
         user: createMockUser(),
         session: createMockSession(),
@@ -1616,7 +1729,7 @@ describe('Auth Middleware', () => {
       expect(vars.session).toBeDefined();
     });
 
-    it('should export OptionalAuthVariables type', () => {
+    it("should export OptionalAuthVariables type", () => {
       const vars: OptionalAuthVariables = {
         user: null,
         session: null,

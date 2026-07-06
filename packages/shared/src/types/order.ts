@@ -5,7 +5,7 @@
  * shipping, payment, and photo approval workflow based on the requirements specification.
  */
 
-import type { Address, PaymentMethodType, CardBrand } from './user';
+import type { Address, PaymentMethodType, CardBrand } from "./user";
 import type {
   ProductConfiguration,
   ProductPriceBreakdown,
@@ -13,7 +13,7 @@ import type {
   FrameType,
   MatOption,
   GlassOption,
-} from './product';
+} from "./product";
 
 // ============================================================================
 // Enums & Literal Types
@@ -23,68 +23,65 @@ import type {
  * Order status types
  */
 export type OrderStatus =
-  | 'pending'
-  | 'confirmed'
-  | 'processing'
-  | 'awaiting-approval'
-  | 'approved'
-  | 'production'
-  | 'ready-to-ship'
-  | 'shipped'
-  | 'out-for-delivery'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded'
-  | 'on-hold';
+  | "pending"
+  | "confirmed"
+  | "processing"
+  | "awaiting-approval"
+  | "approved"
+  | "production"
+  | "ready-to-ship"
+  | "shipped"
+  | "out-for-delivery"
+  | "delivered"
+  | "cancelled"
+  | "refunded"
+  | "on-hold";
 
 /**
  * Payment status types
  */
 export type PaymentStatus =
-  | 'pending'
-  | 'authorized'
-  | 'captured'
-  | 'failed'
-  | 'refunded'
-  | 'partially-refunded'
-  | 'cancelled';
+  | "pending"
+  | "authorized"
+  | "captured"
+  | "failed"
+  | "refunded"
+  | "partially-refunded"
+  | "cancelled";
 
 /**
  * Delivery type options
  */
-export type DeliveryType =
-  | 'standard'
-  | 'express'
-  | 'scheduled';
+export type DeliveryType = "standard" | "express" | "scheduled";
 
 /**
  * Photo approval status
  */
 export type ApprovalStatus =
-  | 'not-required'
-  | 'pending-production'
-  | 'production-complete'
-  | 'pending-approval'
-  | 'approved'
-  | 'revision-requested'
-  | 'rejected';
+  | "not-required"
+  | "pending-production"
+  | "production-complete"
+  | "pending-approval"
+  | "approved"
+  | "revision-requested"
+  | "rejected";
 
 /**
  * Return/refund reason types
  */
 export type ReturnReason =
-  | 'damaged'
-  | 'wrong-item'
-  | 'quality-issue'
-  | 'not-as-described'
-  | 'changed-mind'
-  | 'wrong-size'
-  | 'other';
+  | "damaged"
+  | "wrong-item"
+  | "quality-issue"
+  | "not-as-described"
+  | "changed-mind"
+  | "wrong-size"
+  | "other";
 
 /**
  * Discount type
  */
-export type DiscountType = 'percentage' | 'fixed' | 'free-shipping';
+export type DiscountType = "percentage" | "fixed" | "free-shipping";
 
 // ============================================================================
 // Cart Types
@@ -341,7 +338,7 @@ export interface PaymentDetails {
   /** Payment ID from gateway */
   paymentId: string;
   /** Payment gateway used */
-  gateway: 'razorpay' | 'stripe' | 'payu';
+  gateway: "razorpay" | "stripe" | "payu";
   /** Payment method type */
   methodType: PaymentMethodType;
   /** Card brand (if card) */
@@ -441,7 +438,7 @@ export interface ProductionMedia {
   /** Media ID */
   id: string;
   /** Media type */
-  type: 'photo' | 'video';
+  type: "photo" | "video";
   /** Media URL */
   url: string;
   /** Thumbnail URL */
@@ -463,13 +460,13 @@ export interface OrderEvent {
   /** Event ID */
   id: string;
   /** Event type */
-  type: OrderStatus | 'note' | 'payment' | 'approval';
+  type: OrderStatus | "note" | "payment" | "approval";
   /** Event title */
   title: string;
   /** Event description */
   description?: string;
   /** Who triggered the event */
-  actorType: 'system' | 'customer' | 'admin';
+  actorType: "system" | "customer" | "admin";
   /** Actor user ID (if applicable) */
   actorUserId?: string;
   /** When the event occurred */
@@ -575,14 +572,14 @@ export interface AdminOrderListItem extends OrderListItem {
  * Return request status
  */
 export type ReturnStatus =
-  | 'requested'
-  | 'approved'
-  | 'rejected'
-  | 'pickup-scheduled'
-  | 'picked-up'
-  | 'received'
-  | 'refund-initiated'
-  | 'completed';
+  | "requested"
+  | "approved"
+  | "rejected"
+  | "pickup-scheduled"
+  | "picked-up"
+  | "received"
+  | "refund-initiated"
+  | "completed";
 
 /**
  * Return request definition
@@ -637,7 +634,7 @@ export interface CheckoutSession {
   /** Guest phone (if guest checkout) */
   guestPhone?: string;
   /** Current step */
-  currentStep: 'cart' | 'account' | 'shipping' | 'delivery' | 'payment' | 'review';
+  currentStep: "cart" | "account" | "shipping" | "delivery" | "payment" | "review";
   /** Shipping address */
   shippingAddress?: Address;
   /** Billing address (if different) */
@@ -679,16 +676,11 @@ export interface OrderFilters {
 /**
  * Order sort options
  */
-export type OrderSortField =
-  | 'createdAt'
-  | 'updatedAt'
-  | 'total'
-  | 'orderNumber'
-  | 'status';
+export type OrderSortField = "createdAt" | "updatedAt" | "total" | "orderNumber" | "status";
 
 export interface OrderSort {
   field: OrderSortField;
-  direction: 'asc' | 'desc';
+  direction: "asc" | "desc";
 }
 
 /**

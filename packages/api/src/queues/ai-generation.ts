@@ -269,11 +269,7 @@ async function refundForFailedGeneration(
   // Check if already refunded
   const existingRefund = await db.query.walletTransactions.findFirst({
     where: (wt, { and, eq }) =>
-      and(
-        eq(wt.userId, userId),
-        eq(wt.aiGenerationId, generationId),
-        eq(wt.type, "refund")
-      ),
+      and(eq(wt.userId, userId), eq(wt.aiGenerationId, generationId), eq(wt.type, "refund")),
   });
 
   if (existingRefund) {
@@ -662,7 +658,6 @@ aiGenerationWorker.on("completed", (job, result) => {
     // Log completion in non-test environments
     const logMessage = `AI generation job ${job.id} completed in ${result.processingTimeMs}ms`;
     if (process.env.NODE_ENV === "development") {
-       
       console.info(logMessage);
     }
   }
@@ -672,7 +667,6 @@ aiGenerationWorker.on("failed", (job, error) => {
   if (process.env.NODE_ENV !== "test") {
     const logMessage = `AI generation job ${job?.id} failed: ${error.message}`;
     if (process.env.NODE_ENV === "development") {
-       
       console.error(logMessage, error);
     }
   }
@@ -681,10 +675,8 @@ aiGenerationWorker.on("failed", (job, error) => {
 aiGenerationWorker.on("progress", (job, progress) => {
   if (process.env.NODE_ENV === "development") {
     const progressData = progress as AIGenerationProgress;
-     
-    console.info(
-      `AI generation job ${job.id}: ${progressData.stage} (${progressData.progress}%)`
-    );
+
+    console.info(`AI generation job ${job.id}: ${progressData.stage} (${progressData.progress}%)`);
   }
 });
 
@@ -711,9 +703,7 @@ export async function addAIGenerationJob(
 /**
  * Get job status by ID
  */
-export async function getAIGenerationJobStatus(
-  jobId: string
-): Promise<{
+export async function getAIGenerationJobStatus(jobId: string): Promise<{
   state: string;
   progress: AIGenerationProgress | number;
   result?: AIGenerationJobResult;
@@ -779,4 +769,3 @@ export async function closeAIGenerationQueue(): Promise<void> {
   await aiGenerationQueue.close();
   await aiGenerationQueueEvents.close();
 }
-

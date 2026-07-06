@@ -5,7 +5,12 @@ import { compress } from "hono/compress";
 import { checkDatabaseConnection } from "./database";
 import { isRedisConnected } from "./lib/redis";
 import redis from "./lib/redis";
-import { authRateLimit, signUpRateLimit, otpRateLimit, forgotPasswordRateLimit } from "./middleware/rate-limit";
+import {
+  authRateLimit,
+  signUpRateLimit,
+  otpRateLimit,
+  forgotPasswordRateLimit,
+} from "./middleware/rate-limit";
 import { initSentry, captureException } from "./lib/sentry";
 import { logger } from "./lib/logger";
 import { alertCritical } from "./lib/alerts";
@@ -40,11 +45,7 @@ import { trackingApp } from "./routes/tracking";
 import { notificationPreferencesApp } from "./routes/notification-preferences";
 import { addressesApp } from "./routes/addresses";
 import { approvalsApp } from "./routes/approvals";
-import {
-  productReviewsApp,
-  reviewsApp,
-  protectedReviewsApp,
-} from "./routes/reviews";
+import { productReviewsApp, reviewsApp, protectedReviewsApp } from "./routes/reviews";
 
 const app = new Hono();
 
@@ -52,8 +53,8 @@ const app = new Hono();
 if (process.env.NODE_ENV === "production" && !process.env.CORS_ORIGIN) {
   throw new Error(
     "CORS_ORIGIN environment variable is required in production. " +
-    "Set it to your production domain (e.g., https://masonart.com). " +
-    "Multiple origins can be comma-separated."
+      "Set it to your production domain (e.g., https://masonart.com). " +
+      "Multiple origins can be comma-separated."
   );
 }
 
@@ -249,9 +250,8 @@ app.get("/health", async (c) => {
     redisStatus = "unhealthy";
   }
 
-  const overallStatus = dbStatus === "healthy" && redisStatus === "healthy"
-    ? "healthy"
-    : "unhealthy";
+  const overallStatus =
+    dbStatus === "healthy" && redisStatus === "healthy" ? "healthy" : "unhealthy";
 
   const totalLatency = Number(process.hrtime.bigint() - startTime) / 1e6;
 
@@ -300,10 +300,7 @@ app.onError((err, c) => {
     `\`${c.req.method} ${c.req.path}\` threw an unhandled error:\n\`\`\`${err instanceof Error ? err.message : String(err)}\`\`\``,
     { url: c.req.url, method: c.req.method }
   );
-  return c.json(
-    { error: "Internal Server Error", message: "An unexpected error occurred" },
-    500
-  );
+  return c.json({ error: "Internal Server Error", message: "An unexpected error occurred" }, 500);
 });
 
 // Export app for testing and type inference

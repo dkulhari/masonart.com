@@ -160,9 +160,7 @@ async function getPricingConfig(key: string): Promise<number> {
   });
 
   const value =
-    config?.valueInt ??
-    WALLET_CONFIG_DEFAULTS[key as keyof typeof WALLET_CONFIG_DEFAULTS] ??
-    0;
+    config?.valueInt ?? WALLET_CONFIG_DEFAULTS[key as keyof typeof WALLET_CONFIG_DEFAULTS] ?? 0;
 
   // Cache for 5 minutes
   await setCached(cacheKey, value, 300);
@@ -188,13 +186,10 @@ export async function calculateGenerationCost(
   const apiCostUsdCents = estimateGenerationCost(provider, variationCount, falModel);
 
   // Convert to INR paise
-  const { paise: apiCostPaise, exchangeRate } =
-    await convertUsdCentsToInrPaise(apiCostUsdCents);
+  const { paise: apiCostPaise, exchangeRate } = await convertUsdCentsToInrPaise(apiCostUsdCents);
 
   // Get markup percentage from config
-  const markupPercentage = await getPricingConfig(
-    WALLET_CONFIG_KEYS.AI_GENERATION_MARKUP
-  );
+  const markupPercentage = await getPricingConfig(WALLET_CONFIG_KEYS.AI_GENERATION_MARKUP);
 
   // Apply markup: price = apiCost * (1 + markup/10000)
   // markup is in basis points (5000 = 50%)
