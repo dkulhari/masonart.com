@@ -13,7 +13,8 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, or, ilike, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, ilike, desc, asc, sql, inArray, arrayOverlaps } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { db } from "../database";
 import { products, productVariants, frames } from "../database/schema/products";
@@ -29,6 +30,23 @@ const MAX_PAGE_SIZE = 100;
 const CACHE_TTL_PRODUCTS = 300; // 5 minutes
 const CACHE_TTL_PRODUCT_DETAIL = 600; // 10 minutes
 const CACHE_TTL_FEATURED = 900; // 15 minutes
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Build a parameterized array-overlap (&&) condition from a comma-separated
+ * filter value. Returns undefined when the filter is absent or empty.
+ */
+function csvArrayOverlap(column: AnyPgColumn, csv: string | undefined) {
+  if (!csv) return undefined;
+  const values = csv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return values.length > 0 ? arrayOverlaps(column, values) : undefined;
+}
 
 // ============================================================================
 // Validation Schemas
@@ -154,28 +172,18 @@ productsApp.get(
       conditions.push(sql`${products.basePrice}::numeric <= ${priceMax}`);
     }
 
-    // Filter by array fields (styles, subjects, colors, rooms)
-    // Using array overlap operator with proper PostgreSQL array casting
-    if (styles) {
-      const styleList = styles.split(",").map(s => s.trim());
-      // Create PostgreSQL array literal: ARRAY['style1', 'style2']::text[]
-      const pgArray = sql.raw(`ARRAY[${styleList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
-      conditions.push(sql`${products.styles} && ${pgArray}`);
-    }
-    if (subjects) {
-      const subjectList = subjects.split(",").map(s => s.trim());
-      const pgArray = sql.raw(`ARRAY[${subjectList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
-      conditions.push(sql`${products.subjects} && ${pgArray}`);
-    }
-    if (colors) {
-      const colorList = colors.split(",").map(s => s.trim());
-      const pgArray = sql.raw(`ARRAY[${colorList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
-      conditions.push(sql`${products.colors} && ${pgArray}`);
-    }
-    if (rooms) {
-      const roomList = rooms.split(",").map(s => s.trim());
-      const pgArray = sql.raw(`ARRAY[${roomList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
-      conditions.push(sql`${products.rooms} && ${pgArray}`);
+    // Filter by array fields (styles, subjects, colors, rooms) using the
+    // array overlap operator (&&) with parameterized values
+    const arrayFilters = [
+      csvArrayOverlap(products.styles, styles),
+      csvArrayOverlap(products.subjects, subjects),
+      csvArrayOverlap(products.colors, colors),
+      csvArrayOverlap(products.rooms, rooms),
+    ];
+    for (const filter of arrayFilters) {
+      if (filter) {
+        conditions.push(filter);
+      }
     }
 
     // Build sort order
