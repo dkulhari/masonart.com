@@ -18,9 +18,8 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import postgres from "postgres";
 
-// Import connection modules - these should work even without database running
+// Import connection module - this should work even without database running
 import * as databaseModule from "../../src/database/index";
-import * as dbModule from "../../src/db/index";
 
 // Helper to check if database is available
 let isDatabaseAvailable = false;
@@ -118,195 +117,11 @@ describe("Database Connection Module Exports", () => {
       expect(typeof databaseModule.db.transaction).toBe("function");
     });
   });
-
-  describe("DB Utilities Module (src/db/index.ts)", () => {
-    it("should export getDatabaseUrl function", () => {
-      expect(dbModule).toHaveProperty("getDatabaseUrl");
-      expect(typeof dbModule.getDatabaseUrl).toBe("function");
-    });
-
-    it("should export createPostgresClient function", () => {
-      expect(dbModule).toHaveProperty("createPostgresClient");
-      expect(typeof dbModule.createPostgresClient).toBe("function");
-    });
-
-    it("should export createDatabase function", () => {
-      expect(dbModule).toHaveProperty("createDatabase");
-      expect(typeof dbModule.createDatabase).toBe("function");
-    });
-
-    it("should export testConnection function", () => {
-      expect(dbModule).toHaveProperty("testConnection");
-      expect(typeof dbModule.testConnection).toBe("function");
-    });
-
-    it("should export getDatabaseVersion function", () => {
-      expect(dbModule).toHaveProperty("getDatabaseVersion");
-      expect(typeof dbModule.getDatabaseVersion).toBe("function");
-    });
-
-    it("should export checkDatabaseHealth function", () => {
-      expect(dbModule).toHaveProperty("checkDatabaseHealth");
-      expect(typeof dbModule.checkDatabaseHealth).toBe("function");
-    });
-  });
 });
 
 // ============================================================================
 // Connection Configuration Tests
 // ============================================================================
-
-describe("Connection Configuration", () => {
-  describe("Database URL Configuration", () => {
-    it("getDatabaseUrl should return string", () => {
-      const url = dbModule.getDatabaseUrl();
-      expect(typeof url).toBe("string");
-    });
-
-    it("getDatabaseUrl should return valid postgresql URL format", () => {
-      const url = dbModule.getDatabaseUrl();
-      expect(url).toMatch(/^postgresql:\/\//);
-    });
-
-    it("getDatabaseUrl should contain host and database name", () => {
-      const url = dbModule.getDatabaseUrl();
-      // URL should contain localhost or other host and a database name
-      expect(url).toMatch(/postgresql:\/\/[^/]+\/[a-zA-Z_]+/);
-    });
-
-    it("should read DATABASE_URL from environment when set", () => {
-      const originalUrl = process.env.DATABASE_URL;
-      process.env.DATABASE_URL = "postgresql://test:test@testhost:5432/testdb";
-
-      const url = dbModule.getDatabaseUrl();
-      expect(url).toBe("postgresql://test:test@testhost:5432/testdb");
-
-      process.env.DATABASE_URL = originalUrl;
-    });
-
-    it("should use default URL when DATABASE_URL is not set", () => {
-      const originalUrl = process.env.DATABASE_URL;
-      delete process.env.DATABASE_URL;
-
-      const url = dbModule.getDatabaseUrl();
-      expect(url).toContain("postgresql://");
-      expect(url).toContain("poster_app");
-
-      process.env.DATABASE_URL = originalUrl;
-    });
-  });
-
-  describe("Client Creation", () => {
-    it("createPostgresClient should return a function", () => {
-      const client = dbModule.createPostgresClient("postgresql://test:test@localhost:5433/test");
-      expect(typeof client).toBe("function");
-      // Clean up
-      client.end();
-    });
-
-    it("createPostgresClient should accept custom connection string", () => {
-      const customUrl = "postgresql://custom:custom@localhost:5433/customdb";
-      const client = dbModule.createPostgresClient(customUrl);
-      expect(client).toBeDefined();
-      client.end();
-    });
-
-    it("createDatabase should return object with db and client", () => {
-      const { db, client } = dbModule.createDatabase("postgresql://test:test@localhost:5433/test");
-      expect(db).toBeDefined();
-      expect(client).toBeDefined();
-      client.end();
-    });
-
-    it("createDatabase db instance should have Drizzle methods", () => {
-      const { db, client } = dbModule.createDatabase("postgresql://test:test@localhost:5433/test");
-      expect(typeof db.select).toBe("function");
-      expect(typeof db.insert).toBe("function");
-      expect(typeof db.update).toBe("function");
-      expect(typeof db.delete).toBe("function");
-      client.end();
-    });
-  });
-});
-
-// ============================================================================
-// Connection Health Check Function Tests
-// ============================================================================
-
-describe("Connection Health Check Functions", () => {
-  describe("checkDatabaseHealth return structure", () => {
-    it("should return an object with connected property", async () => {
-      const result = await dbModule.checkDatabaseHealth();
-      expect(result).toHaveProperty("connected");
-      expect(typeof result.connected).toBe("boolean");
-    });
-
-    it("should return version when connected", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-      const result = await dbModule.checkDatabaseHealth();
-      expect(result.connected).toBe(true);
-      expect(result).toHaveProperty("version");
-      expect(typeof result.version).toBe("string");
-    });
-
-    it("should return database name when connected", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-      const result = await dbModule.checkDatabaseHealth();
-      expect(result.connected).toBe(true);
-      expect(result).toHaveProperty("database");
-      expect(typeof result.database).toBe("string");
-    });
-
-    it("should return user when connected", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-      const result = await dbModule.checkDatabaseHealth();
-      expect(result.connected).toBe(true);
-      expect(result).toHaveProperty("user");
-      expect(typeof result.user).toBe("string");
-    });
-
-    it("should return error when connection fails", async () => {
-      const result = await dbModule.checkDatabaseHealth(
-        "postgresql://invalid:invalid@nonexistent:5432/invalid"
-      );
-      expect(result.connected).toBe(false);
-      expect(result).toHaveProperty("error");
-      expect(typeof result.error).toBe("string");
-    });
-  });
-
-  describe("testConnection function", () => {
-    it("should return boolean", async () => {
-      const result = await dbModule.testConnection();
-      expect(typeof result).toBe("boolean");
-    });
-
-    it("should return true when database is available", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-      const result = await dbModule.testConnection();
-      expect(result).toBe(true);
-    });
-
-    it("should return false for invalid connection string", async () => {
-      const result = await dbModule.testConnection(
-        "postgresql://invalid:invalid@nonexistent:5432/invalid"
-      );
-      expect(result).toBe(false);
-    });
-  });
-});
 
 // ============================================================================
 // Runtime Connection Tests (require database)
@@ -320,7 +135,7 @@ describe("Runtime Connection Tests", () => {
         return;
       }
 
-      const result = await dbModule.testConnection();
+      const result = await databaseModule.checkDatabaseConnection();
       expect(result).toBe(true);
     });
 
@@ -336,13 +151,13 @@ describe("Runtime Connection Tests", () => {
     });
 
     it("should get PostgreSQL version", async () => {
-      if (!isDatabaseAvailable) {
+      if (!isDatabaseAvailable || !testClient) {
         console.log("Skipping test - database not available");
         return;
       }
 
-      const version = await dbModule.getDatabaseVersion();
-      expect(typeof version).toBe("string");
+      const result = await testClient!`SELECT version()`;
+      const version = String(result[0]!.version);
       expect(version.toLowerCase()).toContain("postgresql");
     });
 
@@ -482,35 +297,6 @@ describe("Drizzle ORM Integration", () => {
 // ============================================================================
 
 describe("Error Handling", () => {
-  describe("Connection Errors", () => {
-    it("should handle invalid host gracefully", async () => {
-      const result = await dbModule.testConnection(
-        "postgresql://user:pass@invalid-host-xyz:5432/db"
-      );
-      expect(result).toBe(false);
-    });
-
-    it("should handle invalid port gracefully", async () => {
-      // Use a valid port number that is unlikely to have anything listening
-      // Port 99999 is invalid (>65535), so we use a high valid port
-      const result = await dbModule.testConnection("postgresql://user:pass@localhost:54399/db");
-      expect(result).toBe(false);
-    });
-
-    it("should return error message for failed health check", async () => {
-      const result = await dbModule.checkDatabaseHealth("postgresql://user:pass@invalid:5432/db");
-      expect(result.connected).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(result.error!.length).toBeGreaterThan(0);
-    });
-
-    it("getDatabaseVersion should throw for invalid connection", async () => {
-      await expect(
-        dbModule.getDatabaseVersion("postgresql://invalid:invalid@nonexistent:5432/invalid")
-      ).rejects.toThrow();
-    });
-  });
-
   describe("Query Errors", () => {
     it("should handle syntax errors in raw SQL", async () => {
       if (!isDatabaseAvailable || !testClient) {
@@ -535,49 +321,6 @@ describe("Error Handling", () => {
 // ============================================================================
 // Connection Lifecycle Tests
 // ============================================================================
-
-describe("Connection Lifecycle", () => {
-  describe("Client Creation and Cleanup", () => {
-    it("should create and close client cleanly", async () => {
-      const client = dbModule.createPostgresClient("postgresql://test:test@localhost:5433/test");
-      expect(client).toBeDefined();
-
-      // Should be able to end without error
-      await expect(client.end()).resolves.not.toThrow();
-    });
-
-    it("should create database instance and close cleanly", async () => {
-      const { db, client } = dbModule.createDatabase("postgresql://test:test@localhost:5433/test");
-      expect(db).toBeDefined();
-      expect(client).toBeDefined();
-
-      await expect(client.end()).resolves.not.toThrow();
-    });
-  });
-
-  describe("Multiple Client Instances", () => {
-    it("should allow creating multiple independent clients", () => {
-      const client1 = dbModule.createPostgresClient("postgresql://test:test@localhost:5433/test1");
-      const client2 = dbModule.createPostgresClient("postgresql://test:test@localhost:5433/test2");
-
-      expect(client1).not.toBe(client2);
-
-      client1.end();
-      client2.end();
-    });
-
-    it("should allow creating multiple database instances", () => {
-      const db1 = dbModule.createDatabase("postgresql://test:test@localhost:5433/test1");
-      const db2 = dbModule.createDatabase("postgresql://test:test@localhost:5433/test2");
-
-      expect(db1.db).not.toBe(db2.db);
-      expect(db1.client).not.toBe(db2.client);
-
-      db1.client.end();
-      db2.client.end();
-    });
-  });
-});
 
 // ============================================================================
 // Environment Configuration Tests
@@ -607,71 +350,6 @@ describe("Environment Configuration", () => {
 // ============================================================================
 // Database Information Queries
 // ============================================================================
-
-describe("Database Information Queries", () => {
-  describe("PostgreSQL Version Information", () => {
-    it("should get version containing PostgreSQL", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-
-      const version = await dbModule.getDatabaseVersion();
-      expect(version.toLowerCase()).toContain("postgresql");
-    });
-
-    it("should get version number", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-
-      const version = await dbModule.getDatabaseVersion();
-      // Should contain a version number pattern like "16.0" or "15.2"
-      expect(version).toMatch(/\d+\.\d+/);
-    });
-  });
-
-  describe("Health Check Information", () => {
-    it("should return complete health information", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-
-      const health = await dbModule.checkDatabaseHealth();
-
-      expect(health.connected).toBe(true);
-      expect(health.version).toBeDefined();
-      expect(health.database).toBeDefined();
-      expect(health.user).toBeDefined();
-      expect(health.error).toBeUndefined();
-    });
-
-    it("should return expected user from health check", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-
-      const health = await dbModule.checkDatabaseHealth();
-      // User should be something like 'poster_app' based on connection URL
-      expect(typeof health.user).toBe("string");
-      expect(health.user!.length).toBeGreaterThan(0);
-    });
-
-    it("should return expected database from health check", async () => {
-      if (!isDatabaseAvailable) {
-        console.log("Skipping test - database not available");
-        return;
-      }
-
-      const health = await dbModule.checkDatabaseHealth();
-      expect(typeof health.database).toBe("string");
-      expect(health.database!.length).toBeGreaterThan(0);
-    });
-  });
-});
 
 // ============================================================================
 // Schema Table Availability Tests (Runtime)

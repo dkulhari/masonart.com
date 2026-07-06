@@ -20,7 +20,7 @@ import {
   type User,
   type Address,
   type Session,
-} from "../../src/db/schema";
+} from "../../src/database/schema";
 
 // Check if we should skip database runtime tests
 const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === "true";

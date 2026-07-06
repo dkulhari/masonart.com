@@ -13,7 +13,14 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { eq } from "drizzle-orm";
 import postgres from "postgres";
-import { users, products, productVariants, frames, orders, orderItems } from "../../src/db/schema";
+import {
+  users,
+  products,
+  productVariants,
+  frames,
+  orders,
+  orderItems,
+} from "../../src/database/schema";
 
 // Check if we should skip database runtime tests
 const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === "true";
