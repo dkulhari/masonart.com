@@ -1,5 +1,8 @@
 # Auto Claude data directory
 .auto-claude/
+.auto-claude-status
+.auto-claude-security.json
+.claude_settings.json
 
 # Dependencies
 node_modules/
@@ -15,8 +18,9 @@ build/
 .next/
 out/
 
-# Bun
+# Bun (bun.lock is the authoritative lockfile; keep npm lockfiles out)
 bun.lockb
+package-lock.json
 
 # Turbo
 .turbo/
