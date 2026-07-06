@@ -304,7 +304,7 @@ describe('Web Package Build (TanStack Start)', () => {
 
     it('should configure srcDirectory to app', () => {
       expect(viteConfig).toBeDefined();
-      expect(viteConfig).toContain("srcDirectory: './app'");
+      expect(viteConfig).toContain("srcDirectory: 'app'");
     });
 
     it('should have vite-tsconfig-paths plugin', () => {
@@ -527,7 +527,15 @@ describe('Web Package Build (TanStack Start)', () => {
 
     it('should have route directories for different sections', () => {
       const routesDir = join(appDir, 'routes');
-      const expectedDirs = ['account', 'admin', 'auth', 'cart', 'checkout', 'create', 'posters'];
+      const expectedDirs = [
+        '_authed/account',
+        'admin',
+        'auth',
+        'cart',
+        'checkout',
+        'create',
+        'posters',
+      ];
 
       expectedDirs.forEach(dir => {
         const dirPath = join(routesDir, dir);
