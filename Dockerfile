@@ -12,7 +12,9 @@ COPY packages/api/package.json ./packages/api/
 COPY packages/web/package.json ./packages/web/
 COPY packages/shared/package.json ./packages/shared/
 
-RUN bun install --frozen-lockfile --production=false
+# No --production: devDependencies are needed to build (and newer bun
+# rejects the old --production=false spelling outright).
+RUN bun install --frozen-lockfile
 
 # ---- Stage 2: Build all packages ----
 FROM oven/bun:1 AS builder
@@ -45,24 +47,24 @@ RUN bun run build
 FROM oven/bun:1-slim AS api
 WORKDIR /app
 
-RUN addgroup --system --gid 1001 masonart && \
-    adduser --system --uid 1001 --ingroup masonart appuser
+# Run as the image's built-in non-root `bun` user (uid 1000) — the slim
+# base no longer ships adduser/addgroup, so creating a custom user fails.
 
-COPY --from=builder --chown=appuser:masonart /app/packages/api/dist ./packages/api/dist
-COPY --from=builder --chown=appuser:masonart /app/packages/api/package.json ./packages/api/
+COPY --from=builder --chown=bun:bun /app/packages/api/dist ./packages/api/dist
+COPY --from=builder --chown=bun:bun /app/packages/api/package.json ./packages/api/
 # Schema migrations ship in the image: the mini has no repo checkout, so
 # `make migrate` runs drizzle-kit against these in-container. db:push is
 # never used against prod (cc #93). package-local node_modules carries the
 # drizzle-kit binary (.bin symlinks resolve into the root store below).
-COPY --from=builder --chown=appuser:masonart /app/packages/api/drizzle.config.ts ./packages/api/
-COPY --from=builder --chown=appuser:masonart /app/packages/api/src/database/migrations ./packages/api/src/database/migrations
-COPY --from=builder --chown=appuser:masonart /app/packages/api/node_modules ./packages/api/node_modules
-COPY --from=builder --chown=appuser:masonart /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder --chown=appuser:masonart /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder --chown=appuser:masonart /app/node_modules ./node_modules
-COPY --from=builder --chown=appuser:masonart /app/package.json ./
+COPY --from=builder --chown=bun:bun /app/packages/api/drizzle.config.ts ./packages/api/
+COPY --from=builder --chown=bun:bun /app/packages/api/src/database/migrations ./packages/api/src/database/migrations
+COPY --from=builder --chown=bun:bun /app/packages/api/node_modules ./packages/api/node_modules
+COPY --from=builder --chown=bun:bun /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder --chown=bun:bun /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=builder --chown=bun:bun /app/package.json ./
 
-USER appuser
+USER bun
 
 EXPOSE 3000
 ENV NODE_ENV=production
@@ -77,13 +79,12 @@ CMD ["bun", "run", "packages/api/dist/index.js"]
 FROM node:20-slim AS web
 WORKDIR /app
 
-RUN addgroup --system --gid 1001 masonart && \
-    adduser --system --uid 1001 --ingroup masonart appuser
+# Run as the image's built-in non-root `node` user (uid 1000).
 
-COPY --from=builder --chown=appuser:masonart /app/packages/web/.output ./.output
-COPY --from=builder --chown=appuser:masonart /app/packages/web/package.json ./
+COPY --from=builder --chown=node:node /app/packages/web/.output ./.output
+COPY --from=builder --chown=node:node /app/packages/web/package.json ./
 
-USER appuser
+USER node
 
 EXPOSE 3001
 ENV NODE_ENV=production
