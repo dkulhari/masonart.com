@@ -28,6 +28,12 @@ COPY packages/shared ./packages/shared
 COPY packages/api ./packages/api
 COPY packages/web ./packages/web
 
+# Baked into the browser bundle at build time. Default "" = same-origin
+# (relative) API URLs — the production ingress routes /api/* to the api
+# container, so an image built without the arg is safe by default (cc #96).
+ARG VITE_API_URL=""
+ENV VITE_API_URL=$VITE_API_URL
+
 # Build order: shared -> api -> web (enforced by turbo)
 RUN bun run build
 

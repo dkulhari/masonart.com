@@ -66,8 +66,9 @@ const fetchSession = createServerFn({ method: 'GET' }).handler(async () => {
       return null
     }
 
-    // Make server-side request to the auth API with cookies
-    const apiUrl = process.env.VITE_API_URL || 'http://localhost:3000'
+    // Make server-side request to the auth API with cookies.
+    // ?? not ||: an explicitly-set value must always win (cc #96).
+    const apiUrl = process.env.VITE_API_URL ?? 'http://localhost:3000'
     const response = await fetch(`${apiUrl}/api/auth/get-session`, {
       headers: {
         cookie: request.headers.get('cookie') || '',

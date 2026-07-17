@@ -201,7 +201,7 @@ export function safeJsonParse<T>(json: string, fallback: T): T {
 export function getAbsoluteUrl(path: string = ""): string {
   // On server, use environment variable
   if (isServer()) {
-    const baseUrl = process.env.VITE_APP_URL || "http://localhost:3001";
+    const baseUrl = process.env.VITE_APP_URL ?? "http://localhost:3001";
     return `${baseUrl}${path}`;
   }
 
@@ -222,14 +222,17 @@ export function getApiUrl(): string {
   // Default API URL for development
   const defaultApiUrl = "http://localhost:3000";
 
-  // In browser, check for environment variable
+  // In browser, check for environment variable. MUST be ?? (not ||): the
+  // production image is built with VITE_API_URL="" so browser API calls are
+  // relative (same-origin) — || would discard the empty string and bake
+  // localhost:3000 into the prod bundle (cc #96).
   if (isClient() && typeof import.meta !== "undefined") {
     const envUrl = (import.meta as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL;
-    return envUrl || defaultApiUrl;
+    return envUrl ?? defaultApiUrl;
   }
 
-  // On server, use environment variable or default
-  return process.env.VITE_API_URL || defaultApiUrl;
+  // On server (SSR container), this is a runtime env var: http://api:3000
+  return process.env.VITE_API_URL ?? defaultApiUrl;
 }
 
 /**
