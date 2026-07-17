@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "start": "node .output/server/index.mjs",
+    "start": "bun run serve.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf .output .vinxi dist .turbo node_modules/.vite",
     "test": "vitest run",

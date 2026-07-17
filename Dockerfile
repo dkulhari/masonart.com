@@ -75,22 +75,32 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 CMD ["bun", "run", "packages/api/dist/index.js"]
 
-# ---- Stage 4: Web Production Runtime ----
-FROM node:20-slim AS web
+# ---- Stage 4: Web Production Runtime (Bun serves the SSR fetch handler) ----
+FROM oven/bun:1-slim AS web
 WORKDIR /app
 
-# Run as the image's built-in non-root `node` user (uid 1000).
+# The server bundle keeps react/react-dom/@tanstack imports external, so it
+# needs real node_modules — and module resolution walks up from the FILE's
+# path, so keep the workspace layout: dist under packages/web/ next to its
+# per-package node_modules (same pattern as the api stage; proven in
+# customs-copilot's web image).
+COPY --from=builder --chown=bun:bun /app/packages/web/dist ./packages/web/dist
+COPY --from=builder --chown=bun:bun /app/packages/web/serve.ts ./packages/web/
+COPY --from=builder --chown=bun:bun /app/packages/web/package.json ./packages/web/
+COPY --from=builder --chown=bun:bun /app/packages/web/node_modules ./packages/web/node_modules
+COPY --from=builder --chown=bun:bun /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder --chown=bun:bun /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=builder --chown=bun:bun /app/package.json ./
 
-COPY --from=builder --chown=node:node /app/packages/web/.output ./.output
-COPY --from=builder --chown=node:node /app/packages/web/package.json ./
-
-USER node
+USER bun
 
 EXPOSE 3001
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV BUN_PORT=3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:3001').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+  CMD bun -e "fetch('http://localhost:3001').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["node", ".output/server/index.mjs"]
+CMD ["bun", "run", "packages/web/serve.ts"]

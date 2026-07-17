@@ -143,11 +143,12 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      # node:20-slim ships no curl — probe with the runtime.
+      # Slim images ship no curl — probe with the runtime (web runs on bun,
+      # which serves the SSR fetch handler directly).
       test:
         [
           "CMD",
-          "node",
+          "bun",
           "-e",
           "fetch('http://localhost:3001/').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))",
         ]
