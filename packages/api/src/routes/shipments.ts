@@ -108,8 +108,11 @@ function generateTrackingTimeline(shipment: {
 
 const shipmentsApp = new Hono<{ Variables: AuthVariables }>();
 
-// All routes require authentication
-shipmentsApp.use("*", requireAuth);
+// Auth is scoped to this app's own paths, never "*": the app is mounted at
+// bare /api (index.ts), so a wildcard here auth-gates every later-registered
+// /api route — including /api/health, public tracking, and payment webhooks.
+shipmentsApp.use("/orders/:orderId/shipments", requireAuth);
+shipmentsApp.use("/shipments/:id/track", requireAuth);
 
 /**
  * GET /api/orders/:orderId/shipments - Get shipments for an order

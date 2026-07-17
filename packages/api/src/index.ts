@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { compress } from "hono/compress";
@@ -290,6 +291,12 @@ app.get("/", (c) => {
 
 // Global error handler — captures to Sentry and returns 500
 app.onError((err, c) => {
+  // Expected HTTP errors (401/403/404 thrown by middleware as
+  // HTTPException) keep their status and response — they are not
+  // incidents and must not page Sentry/Slack or collapse into 500s.
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
   captureException(err, {
     url: c.req.url,
     method: c.req.method,

@@ -228,9 +228,13 @@ returnPoliciesApp.get("/", async (c) => {
   }
 });
 
-// Protected returns routes
+// Protected returns routes.
+// Auth is scoped to this app's own paths, never "*": the app is mounted at
+// bare /api (index.ts), so a wildcard here auth-gates every later-registered
+// /api route — including /api/health, public tracking, and payment webhooks.
 const returnsApp = new Hono<{ Variables: AuthVariables }>();
-returnsApp.use("*", requireAuth);
+returnsApp.use("/orders/:orderId/returns", requireAuth);
+returnsApp.use("/returns/:id", requireAuth);
 
 /**
  * GET /api/orders/:orderId/returns - Get return requests for an order
