@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1769560600185,
-      "tag": "0000_shipping-returns",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1769799222211,
-      "tag": "0001_add-photo-approvals",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1769954046967,
-      "tag": "0002_freezing_richard_fisk",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1771302109743,
-      "tag": "0003_regular_beyonder",
+      "when": 1784301479139,
+      "tag": "0000_simple_blindfold",
       "breakpoints": true
     }
   ]

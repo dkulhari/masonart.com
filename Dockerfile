@@ -50,6 +50,13 @@ RUN addgroup --system --gid 1001 masonart && \
 
 COPY --from=builder --chown=appuser:masonart /app/packages/api/dist ./packages/api/dist
 COPY --from=builder --chown=appuser:masonart /app/packages/api/package.json ./packages/api/
+# Schema migrations ship in the image: the mini has no repo checkout, so
+# `make migrate` runs drizzle-kit against these in-container. db:push is
+# never used against prod (cc #93). package-local node_modules carries the
+# drizzle-kit binary (.bin symlinks resolve into the root store below).
+COPY --from=builder --chown=appuser:masonart /app/packages/api/drizzle.config.ts ./packages/api/
+COPY --from=builder --chown=appuser:masonart /app/packages/api/src/database/migrations ./packages/api/src/database/migrations
+COPY --from=builder --chown=appuser:masonart /app/packages/api/node_modules ./packages/api/node_modules
 COPY --from=builder --chown=appuser:masonart /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder --chown=appuser:masonart /app/packages/shared/package.json ./packages/shared/
 COPY --from=builder --chown=appuser:masonart /app/node_modules ./node_modules

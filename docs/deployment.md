@@ -1,5 +1,14 @@
 # MasonArt — Deployment Guide
 
+> **⚠️ SUPERSEDED (2026-07-17).** Production deploys now use the
+> Makefile/GHCR flow behind the shared platform edge stack — see
+> [GO-LIVE-PLAN.md](GO-LIVE-PLAN.md), [OPERATIONS.md](OPERATIONS.md), and
+> `deploy/Makefile`. In particular: images are built on the dev machine
+> (never the mini), schema changes run `make -C deploy migrate`
+> (`drizzle-kit migrate` — **never `db:push` against prod**), and MasonArt
+> runs no cloudflared of its own. This file is kept for the local
+> build-on-host walkthrough only.
+
 ## Prerequisites
 
 - Docker & Docker Compose installed
