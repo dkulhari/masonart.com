@@ -75,3 +75,7 @@ CLAUDE.md
 # Local config files
 .mcp.json
 docker-compose.ticketrack.yml*
+
+# Production deploy — secrets and rendered compose never enter git
+deploy/.env
+deploy/rendered/
