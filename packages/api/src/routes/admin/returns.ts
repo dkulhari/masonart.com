@@ -22,22 +22,19 @@ import { eq, and, desc, asc, sql, gte, lte } from "drizzle-orm";
 import { db } from "../../database";
 import {
   returnRequests,
-  returnPolicies,
   returnStatusEnum,
   returnReasonEnum,
   refundTypeEnum,
   type ReturnStatus,
-  type RefundType,
+  type ReturnReason,
 } from "../../database/schema/returns";
-import { orders, paymentStatusEnum, type PaymentStatus } from "../../database/schema/orders";
+import { orders, type PaymentStatus } from "../../database/schema/orders";
 import { users } from "../../database/schema/users";
 import {
   requireAuth,
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
-import { deleteCached } from "../../lib/redis";
-import { RETURN_CACHE_PREFIX } from "../returns";
 
 // ============================================================================
 // Constants
@@ -135,7 +132,7 @@ adminReturnsApp.get(
       }
 
       if (reason) {
-        conditions.push(eq(returnRequests.reason, reason));
+        conditions.push(eq(returnRequests.reason, reason as ReturnReason));
       }
 
       if (userId) {
@@ -374,11 +371,11 @@ adminReturnsApp.get("/:id", async (c) => {
       .where(eq(returnRequests.id, returnId))
       .limit(1);
 
-    if (!returnResult.length) {
+    const returnReq = returnResult[0];
+
+    if (!returnReq) {
       return c.json({ error: "Return request not found" }, 404);
     }
-
-    const returnReq = returnResult[0];
 
     // Get customer info
     const customerResult = await db
@@ -501,11 +498,11 @@ adminReturnsApp.post("/:id/approve", async (c) => {
       .where(eq(returnRequests.id, returnId))
       .limit(1);
 
-    if (!existingResult.length) {
+    const existing = existingResult[0];
+
+    if (!existing) {
       return c.json({ error: "Return request not found" }, 404);
     }
-
-    const existing = existingResult[0];
 
     // Can only approve pending returns
     if (existing.status !== "pending") {
@@ -574,11 +571,11 @@ adminReturnsApp.post(
         .where(eq(returnRequests.id, returnId))
         .limit(1);
 
-      if (!existingResult.length) {
+      const existing = existingResult[0];
+
+      if (!existing) {
         return c.json({ error: "Return request not found" }, 404);
       }
-
-      const existing = existingResult[0];
 
       // Can only reject pending returns
       if (existing.status !== "pending") {
@@ -645,11 +642,11 @@ adminReturnsApp.post(
         .where(eq(returnRequests.id, returnId))
         .limit(1);
 
-      if (!existingResult.length) {
+      const existing = existingResult[0];
+
+      if (!existing) {
         return c.json({ error: "Return request not found" }, 404);
       }
-
-      const existing = existingResult[0];
 
       // Can only process refund for approved/received returns
       const refundableStatuses: ReturnStatus[] = ["approved", "shipped_back", "received"];

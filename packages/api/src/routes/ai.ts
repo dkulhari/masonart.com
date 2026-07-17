@@ -169,13 +169,6 @@ const UPSCALE_COST_PAISE = {
 
 type UpscaleMultiplier = "2x" | "4x";
 
-/**
- * Schema for reference image weight
- */
-const referenceWeightSchema = z.object({
-  weight: z.coerce.number().min(0.1).max(1.0).optional().default(0.5),
-});
-
 // ============================================================================
 // Route Handler
 // ============================================================================
@@ -1167,7 +1160,7 @@ aiApp.get(
       if (shuffle) {
         for (let i = suggestions.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [suggestions[i], suggestions[j]] = [suggestions[j], suggestions[i]];
+          [suggestions[i], suggestions[j]] = [suggestions[j]!, suggestions[i]!];
         }
       }
 

@@ -77,7 +77,7 @@ app.use("*", compress());
 app.use(
   "*",
   cors({
-    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+    origin: corsOrigins.length === 1 ? (corsOrigins[0] ?? "http://localhost:3001") : corsOrigins,
     credentials: true,
   })
 );
@@ -101,7 +101,7 @@ app.on(["POST", "GET"], "/api/auth/*", async (c) => {
   // Clone the request to ensure body is available for Better Auth
   // This is needed because middleware may have already read the body
   const req = c.req.raw.clone();
-  return auth.handler(req);
+  return auth.handler(req as unknown as Request);
 });
 
 // ============================================================================

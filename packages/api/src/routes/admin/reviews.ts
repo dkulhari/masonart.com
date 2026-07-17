@@ -277,11 +277,11 @@ adminReviewsApp.get("/:reviewId", async (c) => {
       .where(eq(reviews.id, reviewId))
       .limit(1);
 
-    if (!reviewResult.length) {
+    const review = reviewResult[0];
+
+    if (!review) {
       return c.json({ error: "Review not found" }, 404);
     }
-
-    const review = reviewResult[0];
 
     // Get product info
     const productResult = await db
@@ -350,11 +350,11 @@ adminReviewsApp.patch(
         .where(eq(reviews.id, reviewId))
         .limit(1);
 
-      if (!existingReview.length) {
+      const review = existingReview[0];
+
+      if (!review) {
         return c.json({ error: "Review not found" }, 404);
       }
-
-      const review = existingReview[0];
 
       // Update review
       const [updatedReview] = await db
@@ -367,6 +367,10 @@ adminReviewsApp.patch(
         })
         .where(eq(reviews.id, reviewId))
         .returning();
+
+      if (!updatedReview) {
+        return c.json({ error: "Failed to moderate review" }, 500);
+      }
 
       // Invalidate cache for this product's reviews
       await deleteCached(`${REVIEW_CACHE_PREFIX}product:${review.productId}:*`);
@@ -412,11 +416,11 @@ adminReviewsApp.delete("/:reviewId", async (c) => {
       .where(eq(reviews.id, reviewId))
       .limit(1);
 
-    if (!existingReview.length) {
+    const review = existingReview[0];
+
+    if (!review) {
       return c.json({ error: "Review not found" }, 404);
     }
-
-    const review = existingReview[0];
 
     // Delete the review
     await db.delete(reviews).where(eq(reviews.id, reviewId));

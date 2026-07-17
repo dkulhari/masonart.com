@@ -130,8 +130,8 @@ async function seedTestUsers(): Promise<void> {
         .where(eq(users.email, userData.email))
         .limit(1);
 
-      if (existing.length > 0) {
-        const existingUser = existing[0];
+      const existingUser = existing[0];
+      if (existingUser) {
         // Update existing user to ensure email is verified
         await db
           .update(users)

@@ -345,10 +345,6 @@ export async function sendTransactionalSMS(
     // Method: POST with JSON body
     const url = `${TWO_FACTOR_BASE_URL}/${TWO_FACTOR_API_KEY}/ADDON_SERVICES/SEND/TSMS`;
 
-    // Build variable string for 2Factor API (pipe-separated)
-    // Note: varValues is computed but 2Factor API requires individual VAR1, VAR2, etc.
-    const _varValues = Object.values(variables).join("|"); // eslint-disable-line @typescript-eslint/no-unused-vars
-
     const response = await fetch(url, {
       method: "POST",
       headers: {

@@ -272,11 +272,11 @@ adminShipmentsApp.get("/:id", async (c) => {
       .where(eq(orderShipments.id, shipmentId))
       .limit(1);
 
-    if (!shipmentResult.length) {
+    const shipment = shipmentResult[0];
+
+    if (!shipment) {
       return c.json({ error: "Shipment not found" }, 404);
     }
-
-    const shipment = shipmentResult[0];
 
     // Get customer info if userId exists
     let customer = null;
@@ -335,11 +335,11 @@ adminShipmentsApp.post(
         .where(eq(orders.id, orderId))
         .limit(1);
 
-      if (!orderResult.length) {
+      const order = orderResult[0];
+
+      if (!order) {
         return c.json({ error: "Order not found" }, 404);
       }
-
-      const order = orderResult[0];
 
       // Check if order can be shipped
       const shippableStatuses: OrderStatus[] = ["confirmed", "processing"];
@@ -446,11 +446,11 @@ adminShipmentsApp.patch(
         .where(eq(orderShipments.id, shipmentId))
         .limit(1);
 
-      if (!existingResult.length) {
+      const existing = existingResult[0];
+
+      if (!existing) {
         return c.json({ error: "Shipment not found" }, 404);
       }
-
-      const existing = existingResult[0];
 
       // Build update object
       const updateData: Record<string, unknown> = {};
@@ -565,11 +565,11 @@ adminShipmentsApp.post("/:id/mark-delivered", async (c) => {
       .where(eq(orderShipments.id, shipmentId))
       .limit(1);
 
-    if (!existingResult.length) {
+    const existing = existingResult[0];
+
+    if (!existing) {
       return c.json({ error: "Shipment not found" }, 404);
     }
-
-    const existing = existingResult[0];
 
     // Check if already delivered
     if (existing.status === "delivered") {

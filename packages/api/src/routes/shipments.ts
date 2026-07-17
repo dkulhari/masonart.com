@@ -143,8 +143,8 @@ shipmentsApp.get("/orders/:orderId/shipments", async (c) => {
 
     const order = orderResult[0]!;
 
-    // Check if user owns the order (unless admin)
-    if (!canAccess(user, order.userId)) {
+    // Check if user owns the order (unless admin); guest orders (null userId) are admin-only
+    if (!canAccess(user, order.userId ?? "")) {
       throw new HTTPException(403, { message: "You can only view shipments for your own orders" });
     }
 
@@ -241,8 +241,8 @@ shipmentsApp.get("/shipments/:id/track", async (c) => {
 
     const shipment = shipmentResult[0]!;
 
-    // Check if user owns the order (unless admin)
-    if (!canAccess(user, shipment.order.userId)) {
+    // Check if user owns the order (unless admin); guest orders (null userId) are admin-only
+    if (!canAccess(user, shipment.order.userId ?? "")) {
       throw new HTTPException(403, { message: "You can only track shipments for your own orders" });
     }
 

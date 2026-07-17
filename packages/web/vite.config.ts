@@ -34,10 +34,17 @@ export default defineConfig({
     chunkSizeWarningLimit: 250,
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Vendor chunks for better caching
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-router': ['@tanstack/react-router', '@tanstack/react-start'],
+        // Function form, not object form: the SSR pass externalizes react,
+        // and rollup rejects object-form manualChunks that name an external
+        // module. Externals are never passed to the function, so this
+        // applies vendor chunking to the client build only.
+        manualChunks(id) {
+          if (/[\\/]node_modules[\\/](react|react-dom)[\\/]/.test(id)) {
+            return 'vendor-react'
+          }
+          if (/[\\/]node_modules[\\/]@tanstack[\\/]react-(router|start)/.test(id)) {
+            return 'vendor-router'
+          }
         },
       },
     },

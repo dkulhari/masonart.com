@@ -623,6 +623,11 @@ function constructEnhancedPrompt(prompt: string, stylePreset: AIStylePreset): st
     photography: "professional photography, high quality, detailed, realistic, sharp focus",
     "line-art": "line art, minimalist drawing, black and white, elegant lines, sketch style",
     typography: "typography art, decorative text, letterform design, artistic composition",
+    "ink-wash": "ink wash painting, sumi-e style, flowing brushstrokes, monochrome gradients, zen, negative space",
+    "digital-art": "digital art, concept art style, vibrant colors, cinematic lighting, detailed illustration",
+    "minimalist-modern": "minimalist design, scandinavian aesthetic, clean geometric forms, muted palette, refined",
+    impressionist: "impressionist painting, visible brushstrokes, soft natural light, atmospheric, painterly",
+    "art-deco": "art deco style, 1920s glamour, geometric patterns, gold accents, symmetrical, elegant",
   };
 
   const modifier = styleModifiers[stylePreset] || "";

@@ -316,7 +316,7 @@ adminShippingApp.delete("/options/:id", async (c) => {
       return c.json({ error: "Shipping option not found" }, 404);
     }
 
-    if (!existing[0].isActive) {
+    if (!existing[0]?.isActive) {
       return c.json({ error: "Shipping option is already deactivated" }, 400);
     }
 

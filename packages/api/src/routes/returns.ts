@@ -262,8 +262,8 @@ returnsApp.get("/orders/:orderId/returns", async (c) => {
 
     const order = orderResult[0]!;
 
-    // Check if user owns the order (unless admin)
-    if (!canAccess(user, order.userId)) {
+    // Check if user owns the order (unless admin); guest orders (null userId) are admin-only
+    if (!canAccess(user, order.userId ?? "")) {
       throw new HTTPException(403, { message: "You can only view returns for your own orders" });
     }
 
