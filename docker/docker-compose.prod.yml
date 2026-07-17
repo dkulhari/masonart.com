@@ -1,63 +1,87 @@
-version: "3.8"
+# Production stack — Mac mini behind the shared platform edge
+# (docs/GO-LIVE-PLAN.md, customs-copilot docs/XTOMS-DEPLOYMENT-GUIDE.md).
+#
+# Not invoked directly on the mini — `deploy/Makefile` (run from the dev
+# machine) resolves this file + deploy/.env into one rendered compose file
+# and ships it over; the mini only ever pulls images. Ingress is the shared
+# platform stack (platform-tunnel + platform-traefik): api/web join the
+# external `platform` network and register their routes via the labels
+# below. MasonArt runs NO cloudflared and holds NO tunnel token. postgres
+# and redis stay on the stack's default network, reachable only by api/web.
+#
+# Every var whose absence would degrade silently in production carries a
+# `:?` guard naming the consequence — a missing value must kill the render,
+# not ship a stack that "deploys fine, breaks quietly" (cc #94, #131).
+
+name: masonart
+
+networks:
+  platform:
+    # Created once per host: docker network create platform
+    # (make -C deploy platform-network)
+    external: true
 
 services:
-  # ── Cloudflare Tunnel ────────────────────────────────────────────────
-  # Exposes the app to the internet via Cloudflare's network.
-  # No port forwarding or static IP needed.
-  #
-  # Setup:
-  #   1. Install cloudflared: brew install cloudflared
-  #   2. Login: cloudflared tunnel login
-  #   3. Create tunnel: cloudflared tunnel create masonart
-  #   4. Copy the tunnel credentials JSON to docker/cloudflared/
-  #   5. Set TUNNEL_TOKEN in .env (or use credentials file)
-  #
-  # See: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - web
-      - api
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: "0.25"
-
-  # ── API Server ───────────────────────────────────────────────────────
+  # ── API Server (Bun/Hono; BullMQ worker runs in-process) ─────────────
   api:
+    image: ghcr.io/dkulhari/masonart-api:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: Dockerfile
       target: api
-    expose:
-      - "3000"
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-masonart}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-masonart}
-      - REDIS_URL=redis://redis:6379
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - CORS_ORIGIN=${CORS_ORIGIN}
-      - APP_URL=${APP_URL}
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
-      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
-      - RESEND_API_KEY=${RESEND_API_KEY}
-      - EMAIL_FROM=${EMAIL_FROM:-noreply@masonart.com}
-      - TWO_FACTOR_API_KEY=${TWO_FACTOR_API_KEY}
-      - R2_ENDPOINT=${R2_ENDPOINT}
-      - R2_ACCESS_KEY=${R2_ACCESS_KEY}
-      - R2_SECRET_KEY=${R2_SECRET_KEY}
-      - R2_BUCKET=${R2_BUCKET:-masonart-prod}
-      - CDN_URL=${CDN_URL}
-      - SENTRY_DSN=${SENTRY_DSN:-}
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-masonart}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:-masonart}
+      REDIS_URL: redis://redis:6379
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in deploy/.env — sessions cannot be signed without it}
+      BETTER_AUTH_URL: https://${PUBLIC_HOSTNAME:-masonart.com}
+      APP_URL: https://${PUBLIC_HOSTNAME:-masonart.com}
+      SITE_URL: https://${PUBLIC_HOSTNAME:-masonart.com}
+      # Same-origin by construction — single hostname, path-routed (#287)
+      CORS_ORIGIN: https://${PUBLIC_HOSTNAME:-masonart.com}
+      FRONTEND_URL: https://${PUBLIC_HOSTNAME:-masonart.com}
+      # Payments — webhooks are the sole source of truth for payment state
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:?set RAZORPAY_KEY_ID in deploy/.env — checkout cannot create orders}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:?set RAZORPAY_KEY_SECRET in deploy/.env}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:?set RAZORPAY_WEBHOOK_SECRET in deploy/.env — payment webhooks would be rejected}
+      # Email — unset silently drops all email and signups dead-end (cc #131)
+      RESEND_API_KEY: ${RESEND_API_KEY:?set RESEND_API_KEY in deploy/.env — verification/order emails silently drop without it}
+      EMAIL_FROM: ${EMAIL_FROM:?set EMAIL_FROM in deploy/.env, e.g. noreply@masonart.com}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+      # SMS (India, DLT-gated)
+      TWO_FACTOR_API_KEY: ${TWO_FACTOR_API_KEY:?set TWO_FACTOR_API_KEY in deploy/.env — OTP login breaks without it}
+      TWO_FACTOR_OTP_TEMPLATE: ${TWO_FACTOR_OTP_TEMPLATE:-}
+      TWO_FACTOR_ORDER_CONFIRMED_TEMPLATE: ${TWO_FACTOR_ORDER_CONFIRMED_TEMPLATE:-}
+      TWO_FACTOR_SHIPPED_TEMPLATE: ${TWO_FACTOR_SHIPPED_TEMPLATE:-}
+      TWO_FACTOR_OUT_FOR_DELIVERY_TEMPLATE: ${TWO_FACTOR_OUT_FOR_DELIVERY_TEMPLATE:-}
+      TWO_FACTOR_DELIVERED_TEMPLATE: ${TWO_FACTOR_DELIVERED_TEMPLATE:-}
+      # Object storage / CDN — unset keys black-hole uploads (cc #94 class)
+      R2_ENDPOINT: ${R2_ENDPOINT:?set R2_ENDPOINT in deploy/.env — uploads black-hole without it}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:?set R2_ACCESS_KEY in deploy/.env}
+      R2_SECRET_KEY: ${R2_SECRET_KEY:?set R2_SECRET_KEY in deploy/.env}
+      R2_BUCKET: ${R2_BUCKET:?set R2_BUCKET in deploy/.env, e.g. masonart-prod}
+      CDN_URL: ${CDN_URL:?set CDN_URL in deploy/.env, e.g. https://cdn.masonart.com — image URLs break without it}
+      # AI generation — at least one provider key is enforced by `make gen-compose`
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+      GOOGLE_AI_STUDIO_KEY: ${GOOGLE_AI_STUDIO_KEY:-}
+      FAL_API_KEY: ${FAL_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # OAuth (optional)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # First-boot admin seed (make first-boot / admin-promote)
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
+      # Observability (optional by design — the app runs without them)
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: production
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # DB pool tunables (defaults in code)
+      DB_POOL_MAX: ${DB_POOL_MAX:-}
+      DB_POOL_IDLE_TIMEOUT: ${DB_POOL_IDLE_TIMEOUT:-}
+      DB_POOL_CONNECT_TIMEOUT: ${DB_POOL_CONNECT_TIMEOUT:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,26 +102,41 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "1.0"
+    # Guardrail on the shared 8GB mini — sharp/WebP image work is the
+    # likeliest spike; revisit this limit first if OOM-killed.
+    mem_limit: 512m
+    networks: [default, platform]
+    labels:
+      traefik.enable: "true"
+      # api sits on two networks — pin which one traefik dials.
+      traefik.docker.network: platform
+      # Longer rule outranks the web catch-all (traefik v3 length-based
+      # priority). No StripPrefix: the api serves its routes under /api.
+      traefik.http.routers.masonart-api.rule: "Host(`${PUBLIC_HOSTNAME:-masonart.com}`) && PathPrefix(`/api`)"
+      traefik.http.routers.masonart-api.entrypoints: web
+      traefik.http.services.masonart-api.loadbalancer.server.port: "3000"
 
-  # ── Web Server (SSR) ────────────────────────────────────────────────
+  # ── Web Server (React Router v7 SSR) ─────────────────────────────────
   web:
+    image: ghcr.io/dkulhari/masonart-web:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: Dockerfile
       target: web
-    expose:
-      - "3001"
+      args:
+        # Same-origin: bakes relative API URLs into the browser bundle;
+        # the ingress routes /api/* to the api container (#287, cc #96).
+        VITE_API_URL: ""
+        VITE_CDN_URL: ${CDN_URL:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - VITE_API_URL=${VITE_API_URL:-http://api:3000}
-      - VITE_CDN_URL=${VITE_CDN_URL:-}
-      - VITE_SENTRY_DSN=${VITE_SENTRY_DSN:-}
+      NODE_ENV: production
+      PORT: "3001"
+      # SSR-side fetches go over the compose network, not the public edge
+      VITE_API_URL: http://api:3000
+      VITE_APP_URL: https://${PUBLIC_HOSTNAME:-masonart.com}
+      VITE_CDN_URL: ${CDN_URL:?set CDN_URL in deploy/.env}
+      VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     depends_on:
       api:
         condition: service_healthy
@@ -115,19 +154,22 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
+    mem_limit: 256m
+    networks: [default, platform]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: platform
+      traefik.http.routers.masonart-web.rule: "Host(`${PUBLIC_HOSTNAME:-masonart.com}`)"
+      traefik.http.routers.masonart-web.entrypoints: web
+      traefik.http.services.masonart-web.loadbalancer.server.port: "3001"
 
-  # ── PostgreSQL ──────────────────────────────────────────────────────
+  # ── PostgreSQL — default network only, never on `platform` ───────────
   postgres:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-masonart}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB:-masonart}
+      POSTGRES_USER: ${POSTGRES_USER:-masonart}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-masonart}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -136,15 +178,15 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+    mem_limit: 256m
 
-  # ── Redis ───────────────────────────────────────────────────────────
+  # ── Redis — cache + BullMQ; AOF for crash recovery, no backups ───────
   redis:
     image: redis:7-alpine
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --appendonly yes
+    # noeviction, NOT allkeys-lru: BullMQ requires it — LRU eviction
+    # silently destroys queued AI-generation jobs. maxmemory sits below
+    # the container limit so redis overhead can't trip the OOM killer.
+    command: redis-server --maxmemory 96mb --maxmemory-policy noeviction --appendonly yes
     volumes:
       - redis_data:/data
     healthcheck:
@@ -153,29 +195,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-
-  # ── MinIO (optional - use if not using Cloudflare R2) ───────────────
-  # Uncomment if you want local S3-compatible storage instead of R2
-  # minio:
-  #   image: minio/minio:latest
-  #   command: server /data --console-address ":9001"
-  #   environment:
-  #     - MINIO_ROOT_USER=${R2_ACCESS_KEY:-minioadmin}
-  #     - MINIO_ROOT_PASSWORD=${R2_SECRET_KEY:-minioadmin}
-  #   volumes:
-  #     - minio_data:/data
-  #   healthcheck:
-  #     test: ["CMD", "mc", "ready", "local"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #   restart: unless-stopped
+    mem_limit: 128m
 
 volumes:
   postgres_data:
   redis_data:
-  # minio_data:

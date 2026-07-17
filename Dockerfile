@@ -32,7 +32,11 @@ COPY packages/web ./packages/web
 # (relative) API URLs — the production ingress routes /api/* to the api
 # container, so an image built without the arg is safe by default (cc #96).
 ARG VITE_API_URL=""
-ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_CDN_URL=""
+ARG VITE_SENTRY_DSN=""
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_CDN_URL=$VITE_CDN_URL \
+    VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 
 # Build order: shared -> api -> web (enforced by turbo)
 RUN bun run build
