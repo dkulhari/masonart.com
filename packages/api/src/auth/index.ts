@@ -305,6 +305,11 @@ export const auth = betterAuth({
     cookiePrefix: "masonart",
     // Generate secure session tokens
     generateId: () => crypto.randomUUID(),
+    // Behind the Cloudflare tunnel only cf-connecting-ip is trustworthy;
+    // Better Auth's default (first x-forwarded-for entry) is client-forgeable.
+    ipAddress: {
+      ipAddressHeaders: ["cf-connecting-ip", "x-real-ip"],
+    },
   },
 });
 

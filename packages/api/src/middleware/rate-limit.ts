@@ -19,14 +19,22 @@ interface RateLimitOptions {
 }
 
 /**
- * Extract client IP from request headers (supports proxies)
+ * Extract client IP from request headers.
+ *
+ * In production every socket peer is the Cloudflare tunnel, and Cloudflare
+ * APPENDS the real client IP to x-forwarded-for — the first entry is
+ * whatever the client sent and is therefore forgeable. Trust order:
+ * cf-connecting-ip (set at the edge), then the LAST x-forwarded-for hop,
+ * then x-real-ip.
  */
-function getClientIp(c: Context): string {
-  return (
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-    c.req.header("x-real-ip") ||
-    "unknown"
-  );
+export function getClientIp(c: Context): string {
+  const cfIp = c.req.header("cf-connecting-ip")?.trim();
+  if (cfIp) return cfIp;
+
+  const lastHop = c.req.header("x-forwarded-for")?.split(",").pop()?.trim();
+  if (lastHop) return lastHop;
+
+  return c.req.header("x-real-ip")?.trim() || "unknown";
 }
 
 /**
