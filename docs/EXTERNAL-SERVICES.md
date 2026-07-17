@@ -16,21 +16,21 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Cloudflare — DNS, Tunnel, edge
 
-- Zone `masonart.com` on the **Free plan**, nameservers at Cloudflare, status **Active**, in the **same account as the platform tunnel** (nothing else — tunnel hostname, Resend DNS records — resolves until it is).
+- The site lives at `masonart.xtoms.xyz` — a first-level subdomain of the existing `xtoms.xyz` zone. **No MasonArt-specific Cloudflare configuration exists or is needed**: the platform's wildcard public hostname (`*.xtoms.xyz` → `http://traefik:80`) plus the proxied `*` CNAME already route it, and the universal cert covers first-level subdomains.
 - TLS terminates at the edge; no certificates are managed on the mini.
 - **Ingress = the shared platform tunnel** (`platform-tunnel` + `platform-traefik`, customs-copilot `deploy/platform/` — see the XTOMS deployment guide). MasonArt runs **no cloudflared** and holds **no tunnel token**; cloudflared dials **outbound only**, transport pinned to `http2` (QUIC degrades through the home-router NAT).
-- One **Published application** hostname on the platform tunnel (not a Private hostname, which is WARP-gated): `masonart.com` → `http://traefik:80`. Named hostnames auto-create the proxied DNS record. Path splitting (`/api` → api:3000, rest → web:3001) is done by **traefik labels** in the prod compose overlay — `PathPrefix` is anchored by design, so the cc #97 unanchored-regex hazard is gone.
+- Path splitting (`/api` → api:3000, rest → web:3001) is done by **traefik labels** in the prod compose overlay — `PathPrefix` is anchored by design, so the cc #97 unanchored-regex hazard is gone.
 - ⚠️ The tunnel dashboard must show **exactly one connector replica**. A second process sharing the token (e.g. a natively-installed cloudflared) gets load-balanced → intermittent 502s.
-- ⚠️ Shared fate: the tunnel and traefik serve every app on the mini. `masonart.com` and `customs.xtoms.xyz` down together = platform stack, not MasonArt.
+- ⚠️ Shared fate: the tunnel and traefik serve every app on the mini. `masonart.xtoms.xyz` and `customs.xtoms.xyz` down together = platform stack, not MasonArt.
 - ⚠️ The edge caches 404s per-PoP ~5 min and browsers up to 4h — purge cache after deploys.
-- `www.masonart.com` → apex via bulk redirect.
+- A branded `masonart.com` cutover is a deliberate post-launch project (new zone + tunnel hostname + webhook/Resend re-registration + 302 legacy redirect — cc #160).
 
 ## Cloudflare R2 — image storage + CDN
 
 - Bucket `masonart-prod`, **versioning ON** (customer photo uploads and AI generations are not reproducible).
 - Scoped API token (object read/write on this bucket only) → `R2_ACCESS_KEY` / `R2_SECRET_KEY`; endpoint `https://<account-id>.r2.cloudflarestorage.com`.
-- Custom domain `cdn.masonart.com` attached to the bucket (Cloudflare creates the DNS record); `CDN_URL` / `VITE_CDN_URL` must match.
-- Smoke test: `curl -sI https://cdn.masonart.com/<known-object>` → 200.
+- Custom domain `masonart-cdn.xtoms.xyz` attached to the bucket (Cloudflare creates the DNS record); `CDN_URL` / `VITE_CDN_URL` must match.
+- Smoke test: `curl -sI https://masonart-cdn.xtoms.xyz/<known-object>` → 200.
 
 ## GHCR — image registry
 
@@ -42,14 +42,14 @@ Every third-party service production depends on: what it does, what credentials 
 ## Razorpay — payments
 
 - **Test mode at launch**: `rzp_test_` keys with the real provider code path. Flipping to live keys is a deliberate post-gate step.
-- Webhook: `https://masonart.com/api/webhooks/razorpay` (same-origin URL — update it when the single-hostname cutover lands) with `payment.captured`, `payment.failed`, `refund.processed` + order events as used. Webhook secret is self-chosen: `openssl rand -hex 32`.
+- Webhook: `https://masonart.xtoms.xyz/api/webhooks/razorpay` with `payment.captured`, `payment.failed`, `refund.processed` + order events as used. ⚠️ Registered against this exact hostname — a later `masonart.com` cutover must re-register it (webhooks don't follow redirects; this bit customs #160). Webhook secret is self-chosen: `openssl rand -hex 32`.
 - Webhooks are the **sole source of truth** for payment state; duplicates are safe (idempotency, ticket #285) — redeliver from the dashboard rather than ever editing the DB.
 - Test cards: success `4111 1111 1111 1111`, failure `4000 0000 0000 0002`, UPI `success@razorpay`.
 
 ## Resend — transactional email
 
-- Domain `masonart.com` added and **verified** (SPF + DKIM records published into the Cloudflare zone). Unverified domain = silent-looking 500s on signup.
-- Prod API key (Sending access only), `EMAIL_FROM=noreply@masonart.com` (no mailbox needed).
+- Sending domain is `xtoms.xyz`, added and **verified** in Resend (SPF + DKIM in the Cloudflare zone) — if customs-copilot already verified it, reuse the verification and just mint a MasonArt API key. Unverified domain = silent-looking 500s on signup.
+- Prod API key (Sending access only), `EMAIL_FROM=noreply@xtoms.xyz` (no mailbox needed).
 - Sends: verification, password reset, order confirmation, shipping notifications. A failed send must be loud (thrown + Sentry), never a silent fallback — `RESEND_API_KEY` carries a `:?` guard in the prod compose.
 
 ## 2Factor.in — SMS
@@ -67,4 +67,4 @@ Every third-party service production depends on: what it does, what credentials 
 
 - Sentry: separate DSNs for api (`SENTRY_DSN`) and web (`VITE_SENTRY_DSN`), environment `production`.
 - Slack incoming webhook → `#prod-alerts`: critical api errors and (via UptimeRobot) downtime alerts.
-- UptimeRobot (free tier): monitors on `https://masonart.com/api/health` and `https://masonart.com/`, 5-min interval, alert → Slack. This is the only thing watching the site when the operator isn't — customs-copilot launched without it and learned about its first outage from a user.
+- UptimeRobot (free tier): monitors on `https://masonart.xtoms.xyz/api/health` and `https://masonart.xtoms.xyz/`, 5-min interval, alert → Slack. This is the only thing watching the site when the operator isn't — customs-copilot launched without it and learned about its first outage from a user.

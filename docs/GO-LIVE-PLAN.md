@@ -6,10 +6,10 @@
 | **Date** | 2026-07-16 (rev. 2026-07-17: shared platform edge stack) |
 | **Host** | Mac mini (Apple Silicon, home LAN) — co-hosted with customs-copilot |
 | **Exposure** | Shared platform edge (platform-tunnel + platform-traefik) — zero inbound ports, no app-owned cloudflared |
-| **Public URL** | `https://masonart.com` (single hostname, path-routed) |
+| **Public URL** | `https://masonart.xtoms.xyz` (single hostname, path-routed) |
 | **Billing** | Razorpay **test mode** at launch |
 | **Email / SMS** | Resend (live) / 2Factor.in (live) |
-| **Images** | Cloudflare R2 + `cdn.masonart.com` custom domain |
+| **Images** | Cloudflare R2 + `masonart-cdn.xtoms.xyz` custom domain |
 
 This plan adapts the proven customs-copilot deployment model (`~/work/customs-copilot/docs/XTOMS-DEPLOYMENT-GUIDE.md` — the cross-installation guide, plus `deploy/PLATFORM.md`, `OPERATIONS.md`, `RUNBOOK-OUTAGE.md`) to MasonArt. **Rev. 2026-07-17**: ingress moved to the shared platform edge stack (one cloudflared + one traefik v3.7+ serving every app on the mini, routing by docker labels); MasonArt runs no cloudflared of its own. Where customs-copilot paid for a lesson with a production bug (#88–#99, #130, #131), that lesson is baked in here as a design constraint instead of a future incident.
 
@@ -22,27 +22,27 @@ Related docs: [EXTERNAL-SERVICES.md](EXTERNAL-SERVICES.md) · [OPERATIONS.md](OP
 One public hostname, path-routed. Ingress is the **shared platform edge stack** already running on the mini for customs-copilot (`~/work/customs-copilot/deploy/platform/`): `platform-tunnel` (cloudflared, owns the Cloudflare tunnel, `http2` transport) + `platform-traefik` (v3.7+, routes by Host header via docker labels). Same-origin by construction: auth cookies are first-party, CORS is moot.
 
 ```
-Users → masonart.com (Cloudflare edge, TLS) → platform-tunnel (cloudflared, outbound-only, http2)
+Users → masonart.xtoms.xyz (Cloudflare edge, TLS) → platform-tunnel (cloudflared, outbound-only, http2)
                                                       │
                                               platform-traefik (label-based routing,
                                               external `platform` docker network)
                                                       │
-        Host(`masonart.com`) && PathPrefix(`/api`) ──► api:3000  (Bun, Hono)
-        Host(`masonart.com`)  [catch-all] ───────────► web:3001  (Node, RR7 SSR)
+        Host(`masonart.xtoms.xyz`) && PathPrefix(`/api`) ──► api:3000  (Bun, Hono)
+        Host(`masonart.xtoms.xyz`)  [catch-all] ───────────► web:3001  (Node, RR7 SSR)
                                                       │
                                           postgres:5432   redis:6379
                                           (16-alpine)     (7-alpine, AOF)
                                           — compose-default network ONLY, never on `platform`
 
-        cdn.masonart.com ──► Cloudflare R2 (product + AI images; no tunnel involved)
+        masonart-cdn.xtoms.xyz ──► Cloudflare R2 (product + AI images; no tunnel involved)
 ```
 
 **Containers (4):** `api`, `web`, `postgres`, `redis` (compose project `masonart`). The tunnel and reverse proxy belong to the platform stack, shared with customs-copilot — MasonArt never runs its own cloudflared. The BullMQ AI-generation worker runs **in-process inside the api container** — there is no separate worker container, and single-instance assumptions apply (see OPERATIONS §5).
 
 **Key decisions, with rationale imported from customs-copilot:**
 
-- **Single hostname + path routing, not `api.masonart.com`.** The current `docker-compose.prod.yml` / `deployment.md` two-subdomain design reintroduces CORS and cross-subdomain cookies — exactly what customs-copilot rejected. We use `masonart.com` with path splitting done **in traefik labels**: `Host(\`masonart.com\`) && PathPrefix(\`/api\`)` → api, plain `Host(\`masonart.com\`)` → web (traefik v3 gives the longer rule priority automatically; no StripPrefix — the api serves its routes under `/api`). `PathPrefix` is anchored by design, so the unanchored-regex hazard that swallowed a Vite chunk named `api-<hash>.js` in customs-copilot (#97) is structurally gone. `www.masonart.com` gets a Cloudflare bulk redirect to the apex.
-- **Shared platform ingress, not a per-app tunnel.** Per the XTOMS deployment guide, apps never run their own cloudflared: api/web join the external `platform` docker network and register routes via labels; databases stay off that network. Cloudflare is touched exactly once for MasonArt (one published hostname on the platform tunnel, §3). No `CLOUDFLARE_TUNNEL_TOKEN` anywhere in MasonArt's env. Shared-fate corollary: if `masonart.com` and `customs.xtoms.xyz` are down together, the fault is the platform stack, not this app.
+- **Single hostname + path routing, not `api.masonart.xtoms.xyz`.** The current `docker-compose.prod.yml` / `deployment.md` two-subdomain design reintroduces CORS and cross-subdomain cookies — exactly what customs-copilot rejected. We use `masonart.xtoms.xyz` with path splitting done **in traefik labels**: `Host(\`masonart.xtoms.xyz\`) && PathPrefix(\`/api\`)` → api, plain `Host(\`masonart.xtoms.xyz\`)` → web (traefik v3 gives the longer rule priority automatically; no StripPrefix — the api serves its routes under `/api`). `PathPrefix` is anchored by design, so the unanchored-regex hazard that swallowed a Vite chunk named `api-<hash>.js` in customs-copilot (#97) is structurally gone.
+- **Shared platform ingress, not a per-app tunnel.** Per the XTOMS deployment guide, apps never run their own cloudflared: api/web join the external `platform` docker network and register routes via labels; databases stay off that network. Because `masonart.xtoms.xyz` is a first-level subdomain, the existing wildcard (`*.xtoms.xyz` public hostname → `http://traefik:80` + proxied `*` CNAME) already routes it — **zero Cloudflare configuration for MasonArt's ingress**. No `CLOUDFLARE_TUNNEL_TOKEN` anywhere in MasonArt's env. Shared-fate corollary: if `masonart.xtoms.xyz` and `customs.xtoms.xyz` are down together, the fault is the platform stack, not this app.
 - **Same-origin browser bundle.** Web image must be built with `--build-arg VITE_API_URL=""` and the client fallback must use `??` (not `||`) so the empty string survives and API calls are relative. customs-copilot shipped `http://localhost:3000` baked into prod once (#96); first real signup hung forever.
 - **Images are built on the dev machine and pushed to GHCR; the mini only pulls.** The 8GB mini cannot absorb `bun install + vite build`, especially while also running customs-copilot. Tag every push `latest` **and** the git short-sha; rollback = redeploy an older sha.
 - **Tunnel transport `http2`, not QUIC.** QUIC/UDP through the home router NAT killed long-lived streams in customs-copilot (#99). Already pinned in the platform stack's cloudflared — nothing to configure on the MasonArt side, but it's why large image uploads and slow admin requests behave.
@@ -56,26 +56,26 @@ Filed as the **`go-live`** feature (tickets #287–#294, phases Infra → Harden
 
 | # | Ticket | Why |
 |---|--------|-----|
-| **#287** | **Same-origin web bundle + single-hostname config.** Audit `packages/web` for `VITE_API_URL` fallbacks — every one must be `?? ` so `""` survives; all fetches/uploads must go through the shared API base. Update prod compose: drop `CORS_ORIGIN` multi-domain, set `APP_URL`/auth URL to `https://masonart.com`. | cc #84, #96 |
+| **#287** | **Same-origin web bundle + single-hostname config.** Audit `packages/web` for `VITE_API_URL` fallbacks — every one must be `?? ` so `""` survives; all fetches/uploads must go through the shared API base. Update prod compose: drop `CORS_ORIGIN` multi-domain, set `APP_URL`/auth URL to `https://masonart.xtoms.xyz`. | cc #84, #96 |
 | **#288** | **`deploy/` Makefile + GHCR.** Targets: `build`/`push`/`build-push` (buildx `linux/arm64`, tags `latest`+sha, web gets `--build-arg VITE_API_URL=""`), `gen-compose` (render compose + `deploy/.env` into one file, **strip `build:` keys**), `deploy` (scp rendered file → `~/masonart-docker-compose.yml`, ssh `pull && up -d` with explicit `export PATH=/opt/homebrew/bin:...` prefix), `rollback` (`IMAGE_TAG=<sha>`), `migrate`/`seed`/`admin-promote`, `first-boot`, `platform-network` (idempotent `docker network create platform` on the mini). Compose project name `masonart` so it can't collide with customs-copilot. | cc #88–#93 |
 | **#290** | **Fix prod compose healthchecks — launch blocker.** `docker/docker-compose.prod.yml` healthchecks exec `curl`, but `oven/bun:1-slim` and `node:20-slim` don't ship curl → both containers report unhealthy forever and `depends_on: condition: service_healthy` prevents `web` from ever starting. Replace with `bun -e "fetch(...)"` / `node -e "fetch(...)"` probes (the Dockerfile HEALTHCHECKs already do this correctly). | cc runbook L4 |
 | **#291** | **Trust `cf-connecting-ip` for client IPs.** `packages/api/src/middleware/rate-limit.ts:26` takes the *first* `x-forwarded-for` entry. Behind the tunnel every socket peer is cloudflared, and CF *appends* the real IP — the first entry is attacker-controlled, so rate limits are spoofable (and without the fix, all users may share one bucket). Prefer `cf-connecting-ip`, fall back to XFF last-hop; also set Better Auth's `advanced.ipAddress.ipAddressHeaders`. | cc #95 |
 | **#292** | **Prod env contract with `:?` guards.** Forward the full contract into api/web with `:?` on: `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `RAZORPAY_KEY_ID/KEY_SECRET/WEBHOOK_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `TWO_FACTOR_API_KEY`, `R2_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET`, `CDN_URL`, `REPLICATE_API_TOKEN` (and/or `GOOGLE_AI_STUDIO_KEY`). Each guard message names the consequence. No tunnel token — ingress belongs to the platform stack; this ticket also adds the `platform` external network + traefik labels to api/web. | cc #94, #131, #99 |
 | **#289** | **Ship migrations in the api image; migrate not push.** Copy `drizzle.config.ts` + `src/database/migrations/` into the api image; `make migrate` runs `drizzle-kit migrate` in-container. Pre-flight: verify `migrations/meta/_journal.json` is consistent (there are two `0002_*.sql` files — confirm both are journaled). Update deployment.md. | cc #93 |
 | **#283** | **Backups (existing ticket #283).** Nightly host cron on the mini: `pg_dump -Fc` via `docker compose exec -T`, 14-day retention, plus a **quarterly restore drill** into a scratch DB ("a backup that has never been restored is a hope"). Enable R2 bucket versioning — customer-uploaded photos and AI generations are the one non-reproducible asset class. Redis is ephemeral (AOF only, no backup). | cc OPERATIONS §2 |
-| **#278** | **Uptime monitoring (existing ticket #278).** External monitor (UptimeRobot free) on `https://masonart.com/api/health` + homepage, alerting to the already-wired Slack webhook. customs-copilot launched with none and found its power-cut outage by hand. | cc #130 gap |
+| **#278** | **Uptime monitoring (existing ticket #278).** External monitor (UptimeRobot free) on `https://masonart.xtoms.xyz/api/health` + homepage, alerting to the already-wired Slack webhook. customs-copilot launched with none and found its power-cut outage by hand. | cc #130 gap |
 | **#295** | **api tsc build broken on main (fixed 2026-07-17).** ~60 type errors across 12 files blocked the Docker image build; dev never noticed because `bun run dev` runs TS directly. Also fixed en route: base-image drift (slim images dropped adduser → use built-in `bun`/`node` users; bun rejects `--production=false`) and vite `manualChunks` vs SSR externals. | found in build verify |
 | **#296** | **Wildcard requireAuth leak + 401→500 (fixed 2026-07-17).** Sub-apps mounted at bare `/api` registered `use("*", requireAuth)`, auth-gating every later `/api` route — `/api/health` (web could never start), public tracking, and Razorpay webhooks; `onError` collapsed HTTPExceptions to 500 and paged Slack per 401. Unit suite 540 → 56 failures once fixed. | found in stack verify |
 | **#294** | **Go-live gate** — §5 checklist executed from outside the LAN, suites ×2, merge, flip this doc's status to LIVE. Remaining suite failures are stale expectations (old `/health` shape, unmodeled 429s) — burn down before the gate. | cc #86 |
 
 ## 3. Owner console steps (no code)
 
-1. **Domain**: `masonart.com` nameservers → Cloudflare (Free plan); zone shows **Active**. Bulk redirect `www` → apex.
-2. **Ingress (platform tunnel — do NOT create a MasonArt tunnel)**: the `masonart.com` zone must sit in the **same Cloudflare account** as the existing platform tunnel. On that tunnel (Zero Trust → Networks → Tunnels → Public Hostnames), add one **Published application** hostname: `masonart.com` → `http://traefik:80`. Named (non-wildcard) hostnames auto-create the proxied DNS record — no manual CNAME needed, unlike the `*.xtoms.xyz` wildcard. No path routes in Cloudflare: path splitting is traefik's job via labels. No tunnel token enters MasonArt's env. Dashboard must still show **exactly one connector replica**. Panic-switch caveat: disabling the tunnel now takes down *every* app on the mini — the per-app switch is deleting the `masonart.com` published hostname (or stopping the masonart stack).
-3. **R2**: create bucket `masonart-prod`, enable versioning, create scoped API token, attach custom domain `cdn.masonart.com`.
-4. **Resend**: add domain `masonart.com`, publish SPF/DKIM records into the Cloudflare zone, verify, create prod API key. `EMAIL_FROM=noreply@masonart.com` (needs no mailbox).
+1. **Ingress: nothing to do.** `masonart.xtoms.xyz` is a first-level subdomain of the `xtoms.xyz` zone, so the platform's existing wildcard public hostname (`*.xtoms.xyz` → `http://traefik:80`) and proxied `*` CNAME already route it, and the universal cert already covers it. Do NOT create a tunnel, a published hostname, or any DNS record — the subdomain goes live the moment the containers register their traefik labels. (A later branded `masonart.com` cutover is a separate post-launch project: new zone + tunnel hostname, Razorpay webhook re-registration — webhooks don't follow redirects — Resend re-verify, and a 302 legacy-redirect router, per the customs `app.`→`customs.` rename #160.)
+2. **Tunnel sanity (shared)**: dashboard still shows **exactly one connector replica**. Panic-switch caveat: there is no per-app Cloudflare switch under the wildcard — disabling the tunnel takes down *every* app on the mini. MasonArt's panic switch is stopping its own containers (`docker compose -f ~/masonart-docker-compose.yml stop api web`).
+3. **R2**: create bucket `masonart-prod`, enable versioning, create scoped API token, attach custom domain `masonart-cdn.xtoms.xyz` (first-level subdomain — covered by the universal cert; Cloudflare creates the DNS record itself, no tunnel involved).
+4. **Resend**: the sending domain is `xtoms.xyz` — if customs-copilot already verified it, reuse that verification and just create a MasonArt API key; otherwise add `xtoms.xyz`, publish SPF/DKIM into the zone, verify. `EMAIL_FROM=noreply@xtoms.xyz` (needs no mailbox).
 5. **2Factor.in**: confirm prod API key + sender ID; verify DLT template approval for OTP + transactional order SMS (India requirement).
-6. **Razorpay (test mode)**: `rzp_test_` keys; register webhook `https://masonart.com/api/webhooks/razorpay` (note: same-origin URL, not api.masonart.com) with `payment.captured`, `payment.failed`, `refund.processed` (+ `order.*` as used); webhook secret = `openssl rand -hex 32`.
+6. **Razorpay (test mode)**: `rzp_test_` keys; register webhook `https://masonart.xtoms.xyz/api/webhooks/razorpay` (note: same-origin URL, not api.masonart.xtoms.xyz) with `payment.captured`, `payment.failed`, `refund.processed` (+ `order.*` as used); webhook secret = `openssl rand -hex 32`.
 7. **AI provider**: Replicate token and/or Google AI Studio key with billing/quota set.
 8. **Sentry**: prod project DSNs for api + web. **Slack**: `#prod-alerts` webhook.
 9. **GHCR**: two classic PATs — `write:packages` (dev machine), `read:packages` (mini).
@@ -95,15 +95,15 @@ The mini already runs customs-copilot, so the one-time host hardening is **done*
 
 ## 5. Go-live gate — proven from OUTSIDE the LAN (phone on LTE)
 
-Every item verified against `https://masonart.com` on cellular, results recorded in the gate ticket:
+Every item verified against `https://masonart.xtoms.xyz` on cellular, results recorded in the gate ticket:
 
 1. **Auth**: signup → real Resend verification email arrives → verify → login. SMS OTP login delivers via 2Factor and completes.
-2. **Catalog**: homepage, category, and product-detail pages render; all images load from `cdn.masonart.com`.
+2. **Catalog**: homepage, category, and product-detail pages render; all images load from `masonart-cdn.xtoms.xyz`.
 3. **Purchase**: add to cart → checkout → Razorpay test card `4111 1111 1111 1111` succeeds → webhook flips the order to paid → confirmation email (and SMS if configured) arrives → order appears in account history.
 4. **Webhook idempotency**: redeliver the payment webhook from the Razorpay dashboard → duplicate is a no-op (#285 in practice). Failure card `4000 0000 0000 0002` produces a clean failed-payment state.
 5. **AI generation**: submit a prompt → BullMQ job runs → generated image lands in R2 and renders via CDN → appears in the user's creations.
 6. **Admin**: promoted admin reaches `/admin`; a normal account gets 403.
-7. **Hardening spot-checks**: hammer an auth endpoint → 429 (from a second device — proves per-IP isolation, #291); `curl -sI https://masonart.com` shows CSP/HSTS headers; forced error shows up in Sentry and fires the Slack alert; uptime monitor is green.
+7. **Hardening spot-checks**: hammer an auth endpoint → 429 (from a second device — proves per-IP isolation, #291); `curl -sI https://masonart.xtoms.xyz` shows CSP/HSTS headers; forced error shows up in Sentry and fires the Slack alert; uptime monitor is green.
 8. **Suites**: full unit + Playwright suites ×2 green before the merge.
 
 ## 6. Out of scope for launch

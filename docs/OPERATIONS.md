@@ -20,11 +20,11 @@ After every deploy: **purge the Cloudflare cache** (dashboard → Caching → Pu
 
 Verify from outside the LAN (phone on LTE, not home Wi-Fi):
 ```bash
-curl -si https://masonart.com/ | head -1          # 200
-curl -si https://masonart.com/api/health | head -1 # 200 + component status
+curl -si https://masonart.xtoms.xyz/ | head -1          # 200
+curl -si https://masonart.xtoms.xyz/api/health | head -1 # 200 + component status
 ```
 
-**Panic switch**: delete (or edit away) the `masonart.com` published hostname on the **platform tunnel** in the Cloudflare Zero Trust dashboard — instant offline for MasonArt only, restore by re-adding it. Do **not** disable the tunnel itself: it serves every app on the mini, including customs-copilot.
+**Panic switch**: `masonart.xtoms.xyz` rides the platform wildcard, so there is no per-app Cloudflare route to remove. Take MasonArt offline by stopping its containers — `ssh <mini> "docker compose -f ~/masonart-docker-compose.yml stop api web"` (traefik then serves a bare 404) — and restore with `start`. Do **not** disable the tunnel: it serves every app on the mini, including customs-copilot.
 
 ### Env contract
 
@@ -83,7 +83,7 @@ docker stats --no-stream
 - **Money is paise integers.** Never hand-insert or mutate payment/wallet rows outside a declared incident with a written record.
 - **Never run `db:push` against prod.** Schema changes go through committed drizzle migrations + `make migrate`.
 - **Never `docker compose build` on the mini.** The rendered compose file has no `build:` keys by design; if compose ever tries to build, the rendered file is stale or wrong — re-run `make gen-compose deploy`.
-- **Routing lives in traefik labels in the prod overlay.** Change routes only via a code change + deploy — never by hand-editing the rendered compose on the mini, and never by adding Cloudflare path routes (the platform hostname must stay a bare `masonart.com → http://traefik:80`).
+- **Routing lives in traefik labels in the prod overlay.** Change routes only via a code change + deploy — never by hand-editing the rendered compose on the mini, and never by adding Cloudflare routes (the platform wildcard `*.xtoms.xyz → http://traefik:80` handles everything; per-app entries would shadow it).
 - **Don't park secrets in the repo** — no PATs, no `rzp_` keys, not even in untracked files that could be committed later. `deploy/.env` only.
 
 ## 5. Standing caveats

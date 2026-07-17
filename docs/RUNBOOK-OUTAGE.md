@@ -1,4 +1,4 @@
-# RUNBOOK — "masonart.com is down"
+# RUNBOOK — "masonart.xtoms.xyz is down"
 
 Layered inside-out triage, adapted from the customs-copilot outage runbook (which was corrected against a real power-cut incident). **Work the layers in order and stop at the first failing one** — everything above it is noise until that layer is fixed. The host is a Mac mini on a home LAN, co-hosting customs-copilot; if **both** apps are down, the fault is almost certainly L1–L2 (machine/Docker), not MasonArt's containers.
 
@@ -7,16 +7,16 @@ Layered inside-out triage, adapted from the customs-copilot outage runbook (whic
 From a machine **outside the LAN** (phone on LTE) or at minimum from the dev machine:
 
 ```bash
-curl -si https://masonart.com/ | head -5
-curl -si https://masonart.com/api/health | head -5
+curl -si https://masonart.xtoms.xyz/ | head -5
+curl -si https://masonart.xtoms.xyz/api/health | head -5
 curl -si https://customs.xtoms.xyz/ | head -1   # shared-fate probe: ingress serves both apps
 ```
 
-**Shared-fate rule first**: MasonArt rides the shared platform ingress (`platform-tunnel` + `platform-traefik`). If the customs probe is down too, the fault is the platform stack or host (L1–L2/L5) — stop triaging MasonArt's containers. If customs is up and masonart.com is down, it's MasonArt's containers, labels, or its Cloudflare hostname.
+**Shared-fate rule first**: MasonArt rides the shared platform ingress (`platform-tunnel` + `platform-traefik`). If the customs probe is down too, the fault is the platform stack or host (L1–L2/L5) — stop triaging MasonArt's containers. If customs is up and masonart.xtoms.xyz is down, it's MasonArt's containers or traefik labels (both subdomains ride the same wildcard route — there is no per-app Cloudflare config to break).
 
 | Symptom | Points at |
 |---|---|
-| DNS `NXDOMAIN` / no resolution | L6 — zone paused, nameservers, domain expiry |
+| DNS `NXDOMAIN` / no resolution | L6 — `xtoms.xyz` zone paused/expired, or the wildcard `*` CNAME record was deleted |
 | Cloudflare error 530 / 1033 | L5 — tunnel down (cloudflared not connected) |
 | 502 / 504 from Cloudflare | L3/L4 — tunnel up, container behind it down/unreachable |
 | Plain `404` served by traefik | L5 — no router matched: labels missing/wrong, app off the `platform` network, or traefik < v3.7 discovering nothing |
@@ -94,7 +94,7 @@ Distinguish real outages from app-level failures that *look* like outages:
 - OTP not arriving → 2Factor balance/DLT template status.
 - Payments failing → Razorpay keys mode mismatch (`rzp_test_` vs live) or webhook secret; check webhook delivery log in the Razorpay dashboard.
 - AI generations stuck → BullMQ worker logs inside api; Replicate/Gemini quota or key.
-- Images broken but site up → R2/CDN (`curl -sI https://cdn.masonart.com/<known-object>`), not the tunnel.
+- Images broken but site up → R2/CDN (`curl -sI https://masonart-cdn.xtoms.xyz/<known-object>`), not the tunnel.
 - 429s → rate limiting working as intended, not an outage.
 
 ## L5 — Is the shared ingress (platform tunnel + traefik) healthy?
@@ -114,13 +114,13 @@ ssh <mini> "export PATH=/opt/homebrew/bin:\$PATH; docker logs --tail 50 platform
 ## L6 — DNS / Cloudflare edge
 
 ```bash
-dig masonart.com +short          # should resolve to Cloudflare anycast IPs
-dig cdn.masonart.com +short
+dig masonart.xtoms.xyz +short          # should resolve to Cloudflare anycast IPs
+dig masonart-cdn.xtoms.xyz +short
 ```
 
 - Zone paused or nameservers changed → Cloudflare dashboard → zone status **Active**.
 - 403/1020 → WAF or firewall rule blocking; check Security events.
-- `/api/*` 404s but homepage fine → the api router is gone from traefik (label edit, api container off the `platform` network) — check the traefik dashboard; also confirm nobody added a Cloudflare path route (the hostname must stay a bare `masonart.com → http://traefik:80`).
+- `/api/*` 404s but homepage fine → the api router is gone from traefik (label edit, api container off the `platform` network) — check the traefik dashboard; also confirm nobody added a per-hostname or path route in Cloudflare (routing must stay solely the wildcard `*.xtoms.xyz → http://traefik:80`; an exact-match entry would shadow it).
 - Weird stale behavior after a deploy → purge the Cloudflare cache (edge caches 404s ~5 min per PoP; browsers up to 4h — retest with cache-busting query strings before trusting a browser).
 
 ## L7 — What changed?
