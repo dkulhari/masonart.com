@@ -1,6 +1,6 @@
 # MasonArt — Operations Manual (Day-2 Runbook)
 
-Production runs on the shared Mac mini behind a Cloudflare Tunnel — see [GO-LIVE-PLAN.md](GO-LIVE-PLAN.md) for architecture and [RUNBOOK-OUTAGE.md](RUNBOOK-OUTAGE.md) for outage triage. All deploy orchestration is from the **dev machine** via `make -C deploy <target>`; the mini holds no repo checkout, no build toolchain, and no `.env` — only the rendered compose file at `~/masonart-docker-compose.yml` and a read-only GHCR credential.
+The deployed environment (`masonart.xtoms.xyz` — **staging**, production-shaped, Razorpay test mode) runs on the shared Mac mini behind a Cloudflare Tunnel — see [GO-LIVE-PLAN.md](GO-LIVE-PLAN.md) for architecture and [RUNBOOK-OUTAGE.md](RUNBOOK-OUTAGE.md) for outage triage. All deploy orchestration is from the **dev machine** via `make -C deploy <target>`; the mini holds no repo checkout, no build toolchain, and no `.env` — only the rendered compose file at `~/masonart-docker-compose.yml` and a read-only GHCR credential.
 
 ## 1. Deploying
 

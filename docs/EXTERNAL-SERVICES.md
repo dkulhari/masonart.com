@@ -41,7 +41,7 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Razorpay — payments
 
-- **Test mode at launch**: `rzp_test_` keys with the real provider code path. Flipping to live keys is a deliberate post-gate step.
+- **Test mode for the life of this staging environment**: `rzp_test_` keys with the real provider code path. Live `rzp_live_` keys arrive only with the future `masonart.com` production cutover (which also re-registers the webhook against the new hostname).
 - Webhook: `https://masonart.xtoms.xyz/api/webhooks/razorpay` with `payment.captured`, `payment.failed`, `refund.processed` + order events as used. ⚠️ Registered against this exact hostname — a later `masonart.com` cutover must re-register it (webhooks don't follow redirects; this bit customs #160). Webhook secret is self-chosen: `openssl rand -hex 32`.
 - Webhooks are the **sole source of truth** for payment state; duplicates are safe (idempotency, ticket #285) — redeliver from the dashboard rather than ever editing the DB.
 - Test cards: success `4111 1111 1111 1111`, failure `4000 0000 0000 0002`, UPI `success@razorpay`.
@@ -65,6 +65,6 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Sentry + Slack + UptimeRobot — observability
 
-- Sentry: separate DSNs for api (`SENTRY_DSN`) and web (`VITE_SENTRY_DSN`), environment `production`.
+- Sentry: separate DSNs for api (`SENTRY_DSN`) and web (`VITE_SENTRY_DSN`), environment `staging` (the compose default) — `production` is reserved for the future masonart.com deployment so events never mix.
 - Slack incoming webhook → `#prod-alerts`: critical api errors and (via UptimeRobot) downtime alerts.
 - UptimeRobot (free tier): monitors on `https://masonart.xtoms.xyz/api/health` and `https://masonart.xtoms.xyz/`, 5-min interval, alert → Slack. This is the only thing watching the site when the operator isn't — customs-copilot launched without it and learned about its first outage from a user.

@@ -75,7 +75,9 @@ services:
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
       # Observability (optional by design — the app runs without them)
       SENTRY_DSN: ${SENTRY_DSN:-}
-      SENTRY_ENVIRONMENT: production
+      # masonart.xtoms.xyz is the STAGING environment (Razorpay test mode);
+      # override to "production" only in the future masonart.com cutover.
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-staging}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # DB pool tunables (defaults in code)

@@ -3,15 +3,18 @@
 | | |
 |---|---|
 | **Status** | PLANNED |
-| **Date** | 2026-07-16 (rev. 2026-07-17: shared platform edge stack) |
+| **Environment** | **STAGING** — production is a later `masonart.com` cutover with live Razorpay keys |
+| **Date** | 2026-07-16 (rev. 2026-07-17: shared platform edge stack; 2026-07-18: staging on xtoms.xyz) |
 | **Host** | Mac mini (Apple Silicon, home LAN) — co-hosted with customs-copilot |
 | **Exposure** | Shared platform edge (platform-tunnel + platform-traefik) — zero inbound ports, no app-owned cloudflared |
 | **Public URL** | `https://masonart.xtoms.xyz` (single hostname, path-routed) |
-| **Billing** | Razorpay **test mode** at launch |
+| **Billing** | Razorpay **test mode** — for the whole life of this staging environment, not just launch |
 | **Email / SMS** | Resend (live) / 2Factor.in (live) |
 | **Images** | Cloudflare R2 + `masonart-cdn.xtoms.xyz` custom domain |
 
 This plan adapts the proven customs-copilot deployment model (`~/work/customs-copilot/docs/XTOMS-DEPLOYMENT-GUIDE.md` — the cross-installation guide, plus `deploy/PLATFORM.md`, `OPERATIONS.md`, `RUNBOOK-OUTAGE.md`) to MasonArt. **Rev. 2026-07-17**: ingress moved to the shared platform edge stack (one cloudflared + one traefik v3.7+ serving every app on the mini, routing by docker labels); MasonArt runs no cloudflared of its own. Where customs-copilot paid for a lesson with a production bug (#88–#99, #130, #131), that lesson is baked in here as a design constraint instead of a future incident.
+
+**Environment framing (2026-07-18):** everything this plan launches at `masonart.xtoms.xyz` is the **staging** deployment — production-shaped infrastructure (same images, same compose, same ops discipline) but Razorpay stays in test mode and Sentry reports as `staging`. The **production** deployment is a separate later cutover: `masonart.com` zone + tunnel hostname, live `rzp_live_` keys, webhook re-registration (webhooks don't follow redirects — cc #160), Resend on the branded domain, and its own gate.
 
 Related docs: [EXTERNAL-SERVICES.md](EXTERNAL-SERVICES.md) · [OPERATIONS.md](OPERATIONS.md) · [RUNBOOK-OUTAGE.md](RUNBOOK-OUTAGE.md) · [deployment.md](deployment.md) (interim build-on-host flow; superseded by the Makefile flow below once ticket #288 lands)
 
@@ -108,7 +111,7 @@ Every item verified against `https://masonart.xtoms.xyz` on cellular, results re
 
 ## 6. Out of scope for launch
 
-- Real Razorpay keys / live pricing (flip after the gate passes; separate checklist).
+- **The production deployment itself** — `masonart.com` zone + tunnel hostname, live `rzp_live_` keys and pricing, Razorpay webhook re-registration, Resend on the branded domain, `SENTRY_ENVIRONMENT=production`, its own gate. This staging environment stays on test keys permanently.
 - Zero-downtime / blue-green deploys — compose recreate is accepted on a single host; mitigate by purging the Cloudflare cache after deploys (edge caches 404s ~5 min per PoP, browsers up to 4h).
 - CI (GitHub Actions could replace `make push` later without changing the mini side).
 - Scaling beyond one instance — in-memory rate limits and the in-process BullMQ worker assume a single api container.
