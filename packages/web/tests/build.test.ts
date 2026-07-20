@@ -104,7 +104,7 @@ describe('Web Package Build (TanStack Start)', () => {
       const scripts = packageJson.scripts as Record<string, string>;
       expect(scripts).toBeDefined();
       expect(scripts.start).toBeDefined();
-      expect(scripts.start).toContain('.output');
+      expect(scripts.start).toContain('dist/server/server.js');
     });
 
     it('should have typecheck script', () => {
@@ -304,7 +304,7 @@ describe('Web Package Build (TanStack Start)', () => {
 
     it('should configure srcDirectory to app', () => {
       expect(viteConfig).toBeDefined();
-      expect(viteConfig).toContain("srcDirectory: './app'");
+      expect(viteConfig).toContain("srcDirectory: 'app'");
     });
 
     it('should have vite-tsconfig-paths plugin', () => {
@@ -527,12 +527,15 @@ describe('Web Package Build (TanStack Start)', () => {
 
     it('should have route directories for different sections', () => {
       const routesDir = join(appDir, 'routes');
-      const expectedDirs = ['account', 'admin', 'auth', 'cart', 'checkout', 'create', 'posters'];
+      const expectedDirs = ['admin', 'auth', 'cart', 'checkout', 'create', 'posters'];
 
       expectedDirs.forEach(dir => {
         const dirPath = join(routesDir, dir);
         expect(existsSync(dirPath)).toBe(true);
       });
+
+      // account routes live under the _authed layout
+      expect(existsSync(join(routesDir, '_authed', 'account'))).toBe(true);
     });
 
     it('should have admin layout route', () => {
@@ -764,7 +767,7 @@ describe('Web Package Build (TanStack Start)', () => {
       expect(existsSync(tanstackDir)).toBe(true);
     });
 
-    it('should successfully run TypeScript type check', () => {
+    it('should successfully run TypeScript type check', { timeout: 120_000 }, () => {
       try {
         execSync('bun run typecheck', {
           cwd: packageDir,

@@ -32,8 +32,7 @@ import { cn, getApiUrl } from '~/lib/utils'
 // Route Definition
 // ============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Route = createFileRoute('/approve/$token' as any)({
+export const Route = createFileRoute('/approve/$token')({
   head: () => ({
     meta: [
       { title: 'Review Your Production Photos | MasonArt' },

@@ -9,83 +9,53 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as TrackIndexRouteImport } from './routes/track/index'
-import { Route as PostersIndexRouteImport } from './routes/posters/index'
-import { Route as GalleryIndexRouteImport } from './routes/gallery/index'
-import { Route as CreateIndexRouteImport } from './routes/create/index'
-import { Route as CheckoutIndexRouteImport } from './routes/checkout/index'
-import { Route as CartIndexRouteImport } from './routes/cart/index'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as TrackTokenRouteImport } from './routes/track/$token'
-import { Route as PostersSlugRouteImport } from './routes/posters/$slug'
-import { Route as CheckoutSuccessRouteImport } from './routes/checkout/success'
-import { Route as AuthRegisterRouteImport } from './routes/auth/register'
-import { Route as AuthLoginRouteImport } from './routes/auth/login'
-import { Route as ApproveTokenRouteImport } from './routes/approve/$token'
-import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
-import { Route as AdminReturnsRouteImport } from './routes/admin/returns'
 import { Route as AdminAiModerationRouteImport } from './routes/admin/ai-moderation'
-import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
-import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
-import { Route as AdminApprovalsIndexRouteImport } from './routes/admin/approvals/index'
+import { Route as AdminReturnsRouteImport } from './routes/admin/returns'
+import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
+import { Route as ApproveTokenRouteImport } from './routes/approve/$token'
+import { Route as AuthLoginRouteImport } from './routes/auth/login'
+import { Route as AuthRegisterRouteImport } from './routes/auth/register'
+import { Route as CartIndexRouteImport } from './routes/cart/index'
+import { Route as CheckoutIndexRouteImport } from './routes/checkout/index'
+import { Route as CheckoutSuccessRouteImport } from './routes/checkout/success'
+import { Route as CreateIndexRouteImport } from './routes/create/index'
+import { Route as GalleryIndexRouteImport } from './routes/gallery/index'
+import { Route as PostersIndexRouteImport } from './routes/posters/index'
+import { Route as PostersSlugRouteImport } from './routes/posters/$slug'
+import { Route as TrackIndexRouteImport } from './routes/track/index'
+import { Route as TrackTokenRouteImport } from './routes/track/$token'
 import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account/index'
-import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
-import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
-import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
-import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$id'
-import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
-import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
-import { Route as AuthedAccountNotificationsRouteImport } from './routes/_authed/account/notifications'
 import { Route as AuthedAccountAddressesRouteImport } from './routes/_authed/account/addresses'
 import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
+import { Route as AuthedAccountNotificationsRouteImport } from './routes/_authed/account/notifications'
+import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
+import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
+import { Route as AdminApprovalsIndexRouteImport } from './routes/admin/approvals/index'
+import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$id'
+import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
+import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
+import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
+import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
+import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
 import { Route as AuthedAccountOrdersIdRouteImport } from './routes/_authed/account/orders.$id'
 import { Route as AuthedAccountOrdersIdReturnRouteImport } from './routes/_authed/account/orders.$id.return'
 
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TrackIndexRoute = TrackIndexRouteImport.update({
-  id: '/track/',
-  path: '/track/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PostersIndexRoute = PostersIndexRouteImport.update({
-  id: '/posters/',
-  path: '/posters/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GalleryIndexRoute = GalleryIndexRouteImport.update({
-  id: '/gallery/',
-  path: '/gallery/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CreateIndexRoute = CreateIndexRouteImport.update({
-  id: '/create/',
-  path: '/create/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CheckoutIndexRoute = CheckoutIndexRouteImport.update({
-  id: '/checkout/',
-  path: '/checkout/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CartIndexRoute = CartIndexRouteImport.update({
-  id: '/cart/',
-  path: '/cart/',
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -93,39 +63,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const TrackTokenRoute = TrackTokenRouteImport.update({
-  id: '/track/$token',
-  path: '/track/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PostersSlugRoute = PostersSlugRouteImport.update({
-  id: '/posters/$slug',
-  path: '/posters/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
-  id: '/checkout/success',
-  path: '/checkout/success',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRegisterRoute = AuthRegisterRouteImport.update({
-  id: '/auth/register',
-  path: '/auth/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthLoginRoute = AuthLoginRouteImport.update({
-  id: '/auth/login',
-  path: '/auth/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApproveTokenRoute = ApproveTokenRouteImport.update({
-  id: '/approve/$token',
-  path: '/approve/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminReviewsRoute = AdminReviewsRouteImport.update({
-  id: '/reviews',
-  path: '/reviews',
+const AdminAiModerationRoute = AdminAiModerationRouteImport.update({
+  id: '/ai-moderation',
+  path: '/ai-moderation',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminReturnsRoute = AdminReturnsRouteImport.update({
@@ -133,44 +73,106 @@ const AdminReturnsRoute = AdminReturnsRouteImport.update({
   path: '/returns',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminAiModerationRoute = AdminAiModerationRouteImport.update({
-  id: '/ai-moderation',
-  path: '/ai-moderation',
+const AdminReviewsRoute = AdminReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminProductsIndexRoute = AdminProductsIndexRouteImport.update({
-  id: '/products/',
-  path: '/products/',
-  getParentRoute: () => AdminRoute,
+const ApproveTokenRoute = ApproveTokenRouteImport.update({
+  id: '/approve/$token',
+  path: '/approve/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
-  id: '/orders/',
-  path: '/orders/',
-  getParentRoute: () => AdminRoute,
+const AuthLoginRoute = AuthLoginRouteImport.update({
+  id: '/auth/login',
+  path: '/auth/login',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AdminApprovalsIndexRoute = AdminApprovalsIndexRouteImport.update({
-  id: '/approvals/',
-  path: '/approvals/',
-  getParentRoute: () => AdminRoute,
+const AuthRegisterRoute = AuthRegisterRouteImport.update({
+  id: '/auth/register',
+  path: '/auth/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CartIndexRoute = CartIndexRouteImport.update({
+  id: '/cart/',
+  path: '/cart/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutIndexRoute = CheckoutIndexRouteImport.update({
+  id: '/checkout/',
+  path: '/checkout/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
+  id: '/checkout/success',
+  path: '/checkout/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateIndexRoute = CreateIndexRouteImport.update({
+  id: '/create/',
+  path: '/create/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GalleryIndexRoute = GalleryIndexRouteImport.update({
+  id: '/gallery/',
+  path: '/gallery/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PostersIndexRoute = PostersIndexRouteImport.update({
+  id: '/posters/',
+  path: '/posters/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PostersSlugRoute = PostersSlugRouteImport.update({
+  id: '/posters/$slug',
+  path: '/posters/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrackIndexRoute = TrackIndexRouteImport.update({
+  id: '/track/',
+  path: '/track/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrackTokenRoute = TrackTokenRouteImport.update({
+  id: '/track/$token',
+  path: '/track/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedAccountIndexRoute = AuthedAccountIndexRouteImport.update({
   id: '/account/',
   path: '/account/',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AdminProductsNewRoute = AdminProductsNewRouteImport.update({
-  id: '/products/new',
-  path: '/products/new',
-  getParentRoute: () => AdminRoute,
+const AuthedAccountAddressesRoute = AuthedAccountAddressesRouteImport.update({
+  id: '/account/addresses',
+  path: '/account/addresses',
+  getParentRoute: () => AuthedRoute,
 } as any)
-const AdminProductsIdRoute = AdminProductsIdRouteImport.update({
-  id: '/products/$id',
-  path: '/products/$id',
-  getParentRoute: () => AdminRoute,
+const AuthedAccountAiCreationsRoute =
+  AuthedAccountAiCreationsRouteImport.update({
+    id: '/account/ai-creations',
+    path: '/account/ai-creations',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAccountNotificationsRoute =
+  AuthedAccountNotificationsRouteImport.update({
+    id: '/account/notifications',
+    path: '/account/notifications',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAccountOrdersRoute = AuthedAccountOrdersRouteImport.update({
+  id: '/account/orders',
+  path: '/account/orders',
+  getParentRoute: () => AuthedRoute,
 } as any)
-const AdminOrdersIdRoute = AdminOrdersIdRouteImport.update({
-  id: '/orders/$id',
-  path: '/orders/$id',
+const AuthedAccountWalletRoute = AuthedAccountWalletRouteImport.update({
+  id: '/account/wallet',
+  path: '/account/wallet',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AdminApprovalsIndexRoute = AdminApprovalsIndexRouteImport.update({
+  id: '/approvals/',
+  path: '/approvals/',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminApprovalsIdRoute = AdminApprovalsIdRouteImport.update({
@@ -178,34 +180,31 @@ const AdminApprovalsIdRoute = AdminApprovalsIdRouteImport.update({
   path: '/approvals/$id',
   getParentRoute: () => AdminRoute,
 } as any)
-const AuthedAccountWalletRoute = AuthedAccountWalletRouteImport.update({
-  id: '/account/wallet',
-  path: '/account/wallet',
-  getParentRoute: () => AuthedRoute,
+const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
+  id: '/orders/',
+  path: '/orders/',
+  getParentRoute: () => AdminRoute,
 } as any)
-const AuthedAccountOrdersRoute = AuthedAccountOrdersRouteImport.update({
-  id: '/account/orders',
-  path: '/account/orders',
-  getParentRoute: () => AuthedRoute,
+const AdminOrdersIdRoute = AdminOrdersIdRouteImport.update({
+  id: '/orders/$id',
+  path: '/orders/$id',
+  getParentRoute: () => AdminRoute,
 } as any)
-const AuthedAccountNotificationsRoute =
-  AuthedAccountNotificationsRouteImport.update({
-    id: '/account/notifications',
-    path: '/account/notifications',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedAccountAddressesRoute =
-  AuthedAccountAddressesRouteImport.update({
-    id: '/account/addresses',
-    path: '/account/addresses',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedAccountAiCreationsRoute =
-  AuthedAccountAiCreationsRouteImport.update({
-    id: '/account/ai-creations',
-    path: '/account/ai-creations',
-    getParentRoute: () => AuthedRoute,
-  } as any)
+const AdminProductsIndexRoute = AdminProductsIndexRouteImport.update({
+  id: '/products/',
+  path: '/products/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProductsIdRoute = AdminProductsIdRouteImport.update({
+  id: '/products/$id',
+  path: '/products/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProductsNewRoute = AdminProductsNewRouteImport.update({
+  id: '/products/new',
+  path: '/products/new',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AuthedAccountOrdersIdRoute = AuthedAccountOrdersIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -231,12 +230,12 @@ export interface FileRoutesByFullPath {
   '/posters/$slug': typeof PostersSlugRoute
   '/track/$token': typeof TrackTokenRoute
   '/admin/': typeof AdminIndexRoute
-  '/cart': typeof CartIndexRoute
-  '/checkout': typeof CheckoutIndexRoute
-  '/create': typeof CreateIndexRoute
-  '/gallery': typeof GalleryIndexRoute
-  '/posters': typeof PostersIndexRoute
-  '/track': typeof TrackIndexRoute
+  '/cart/': typeof CartIndexRoute
+  '/checkout/': typeof CheckoutIndexRoute
+  '/create/': typeof CreateIndexRoute
+  '/gallery/': typeof GalleryIndexRoute
+  '/posters/': typeof PostersIndexRoute
+  '/track/': typeof TrackIndexRoute
   '/account/addresses': typeof AuthedAccountAddressesRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
@@ -246,10 +245,10 @@ export interface FileRoutesByFullPath {
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
-  '/account': typeof AuthedAccountIndexRoute
-  '/admin/approvals': typeof AdminApprovalsIndexRoute
-  '/admin/orders': typeof AdminOrdersIndexRoute
-  '/admin/products': typeof AdminProductsIndexRoute
+  '/account/': typeof AuthedAccountIndexRoute
+  '/admin/approvals/': typeof AdminApprovalsIndexRoute
+  '/admin/orders/': typeof AdminOrdersIndexRoute
+  '/admin/products/': typeof AdminProductsIndexRoute
   '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
   '/account/orders/$id/return': typeof AuthedAccountOrdersIdReturnRoute
 }
@@ -339,12 +338,12 @@ export interface FileRouteTypes {
     | '/posters/$slug'
     | '/track/$token'
     | '/admin/'
-    | '/cart'
-    | '/checkout'
-    | '/create'
-    | '/gallery'
-    | '/posters'
-    | '/track'
+    | '/cart/'
+    | '/checkout/'
+    | '/create/'
+    | '/gallery/'
+    | '/posters/'
+    | '/track/'
     | '/account/addresses'
     | '/account/ai-creations'
     | '/account/notifications'
@@ -354,10 +353,10 @@ export interface FileRouteTypes {
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
-    | '/account'
-    | '/admin/approvals'
-    | '/admin/orders'
-    | '/admin/products'
+    | '/account/'
+    | '/admin/approvals/'
+    | '/admin/orders/'
+    | '/admin/products/'
     | '/account/orders/$id'
     | '/account/orders/$id/return'
   fileRoutesByTo: FileRoutesByTo
@@ -452,20 +451,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authed': {
-      id: '/_authed'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof AuthedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -473,46 +458,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/track/': {
-      id: '/track/'
-      path: '/track'
-      fullPath: '/track'
-      preLoaderRoute: typeof TrackIndexRouteImport
+    '/_authed': {
+      id: '/_authed'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/posters/': {
-      id: '/posters/'
-      path: '/posters'
-      fullPath: '/posters'
-      preLoaderRoute: typeof PostersIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/gallery/': {
-      id: '/gallery/'
-      path: '/gallery'
-      fullPath: '/gallery'
-      preLoaderRoute: typeof GalleryIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/create/': {
-      id: '/create/'
-      path: '/create'
-      fullPath: '/create'
-      preLoaderRoute: typeof CreateIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout/': {
-      id: '/checkout/'
-      path: '/checkout'
-      fullPath: '/checkout'
-      preLoaderRoute: typeof CheckoutIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cart/': {
-      id: '/cart/'
-      path: '/cart'
-      fullPath: '/cart'
-      preLoaderRoute: typeof CartIndexRouteImport
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -522,53 +479,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/track/$token': {
-      id: '/track/$token'
-      path: '/track/$token'
-      fullPath: '/track/$token'
-      preLoaderRoute: typeof TrackTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/posters/$slug': {
-      id: '/posters/$slug'
-      path: '/posters/$slug'
-      fullPath: '/posters/$slug'
-      preLoaderRoute: typeof PostersSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout/success': {
-      id: '/checkout/success'
-      path: '/checkout/success'
-      fullPath: '/checkout/success'
-      preLoaderRoute: typeof CheckoutSuccessRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/register': {
-      id: '/auth/register'
-      path: '/auth/register'
-      fullPath: '/auth/register'
-      preLoaderRoute: typeof AuthRegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth/login': {
-      id: '/auth/login'
-      path: '/auth/login'
-      fullPath: '/auth/login'
-      preLoaderRoute: typeof AuthLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/approve/$token': {
-      id: '/approve/$token'
-      path: '/approve/$token'
-      fullPath: '/approve/$token'
-      preLoaderRoute: typeof ApproveTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/reviews': {
-      id: '/admin/reviews'
-      path: '/reviews'
-      fullPath: '/admin/reviews'
-      preLoaderRoute: typeof AdminReviewsRouteImport
+    '/admin/ai-moderation': {
+      id: '/admin/ai-moderation'
+      path: '/ai-moderation'
+      fullPath: '/admin/ai-moderation'
+      preLoaderRoute: typeof AdminAiModerationRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/returns': {
@@ -578,81 +493,116 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminReturnsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/ai-moderation': {
-      id: '/admin/ai-moderation'
-      path: '/ai-moderation'
-      fullPath: '/admin/ai-moderation'
-      preLoaderRoute: typeof AdminAiModerationRouteImport
+    '/admin/reviews': {
+      id: '/admin/reviews'
+      path: '/reviews'
+      fullPath: '/admin/reviews'
+      preLoaderRoute: typeof AdminReviewsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/products/': {
-      id: '/admin/products/'
-      path: '/products'
-      fullPath: '/admin/products'
-      preLoaderRoute: typeof AdminProductsIndexRouteImport
-      parentRoute: typeof AdminRoute
+    '/approve/$token': {
+      id: '/approve/$token'
+      path: '/approve/$token'
+      fullPath: '/approve/$token'
+      preLoaderRoute: typeof ApproveTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/admin/orders/': {
-      id: '/admin/orders/'
-      path: '/orders'
-      fullPath: '/admin/orders'
-      preLoaderRoute: typeof AdminOrdersIndexRouteImport
-      parentRoute: typeof AdminRoute
+    '/auth/login': {
+      id: '/auth/login'
+      path: '/auth/login'
+      fullPath: '/auth/login'
+      preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/admin/approvals/': {
-      id: '/admin/approvals/'
-      path: '/approvals'
-      fullPath: '/admin/approvals'
-      preLoaderRoute: typeof AdminApprovalsIndexRouteImport
-      parentRoute: typeof AdminRoute
+    '/auth/register': {
+      id: '/auth/register'
+      path: '/auth/register'
+      fullPath: '/auth/register'
+      preLoaderRoute: typeof AuthRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cart/': {
+      id: '/cart/'
+      path: '/cart'
+      fullPath: '/cart/'
+      preLoaderRoute: typeof CartIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/': {
+      id: '/checkout/'
+      path: '/checkout'
+      fullPath: '/checkout/'
+      preLoaderRoute: typeof CheckoutIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/success': {
+      id: '/checkout/success'
+      path: '/checkout/success'
+      fullPath: '/checkout/success'
+      preLoaderRoute: typeof CheckoutSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create/': {
+      id: '/create/'
+      path: '/create'
+      fullPath: '/create/'
+      preLoaderRoute: typeof CreateIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gallery/': {
+      id: '/gallery/'
+      path: '/gallery'
+      fullPath: '/gallery/'
+      preLoaderRoute: typeof GalleryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/posters/': {
+      id: '/posters/'
+      path: '/posters'
+      fullPath: '/posters/'
+      preLoaderRoute: typeof PostersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/posters/$slug': {
+      id: '/posters/$slug'
+      path: '/posters/$slug'
+      fullPath: '/posters/$slug'
+      preLoaderRoute: typeof PostersSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/track/': {
+      id: '/track/'
+      path: '/track'
+      fullPath: '/track/'
+      preLoaderRoute: typeof TrackIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/track/$token': {
+      id: '/track/$token'
+      path: '/track/$token'
+      fullPath: '/track/$token'
+      preLoaderRoute: typeof TrackTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authed/account/': {
       id: '/_authed/account/'
       path: '/account'
-      fullPath: '/account'
+      fullPath: '/account/'
       preLoaderRoute: typeof AuthedAccountIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/admin/products/new': {
-      id: '/admin/products/new'
-      path: '/products/new'
-      fullPath: '/admin/products/new'
-      preLoaderRoute: typeof AdminProductsNewRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/products/$id': {
-      id: '/admin/products/$id'
-      path: '/products/$id'
-      fullPath: '/admin/products/$id'
-      preLoaderRoute: typeof AdminProductsIdRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/orders/$id': {
-      id: '/admin/orders/$id'
-      path: '/orders/$id'
-      fullPath: '/admin/orders/$id'
-      preLoaderRoute: typeof AdminOrdersIdRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/approvals/$id': {
-      id: '/admin/approvals/$id'
-      path: '/approvals/$id'
-      fullPath: '/admin/approvals/$id'
-      preLoaderRoute: typeof AdminApprovalsIdRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/_authed/account/wallet': {
-      id: '/_authed/account/wallet'
-      path: '/account/wallet'
-      fullPath: '/account/wallet'
-      preLoaderRoute: typeof AuthedAccountWalletRouteImport
+    '/_authed/account/addresses': {
+      id: '/_authed/account/addresses'
+      path: '/account/addresses'
+      fullPath: '/account/addresses'
+      preLoaderRoute: typeof AuthedAccountAddressesRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/account/orders': {
-      id: '/_authed/account/orders'
-      path: '/account/orders'
-      fullPath: '/account/orders'
-      preLoaderRoute: typeof AuthedAccountOrdersRouteImport
+    '/_authed/account/ai-creations': {
+      id: '/_authed/account/ai-creations'
+      path: '/account/ai-creations'
+      fullPath: '/account/ai-creations'
+      preLoaderRoute: typeof AuthedAccountAiCreationsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/account/notifications': {
@@ -662,12 +612,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAccountNotificationsRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/account/ai-creations': {
-      id: '/_authed/account/ai-creations'
-      path: '/account/ai-creations'
-      fullPath: '/account/ai-creations'
-      preLoaderRoute: typeof AuthedAccountAiCreationsRouteImport
+    '/_authed/account/orders': {
+      id: '/_authed/account/orders'
+      path: '/account/orders'
+      fullPath: '/account/orders'
+      preLoaderRoute: typeof AuthedAccountOrdersRouteImport
       parentRoute: typeof AuthedRoute
+    }
+    '/_authed/account/wallet': {
+      id: '/_authed/account/wallet'
+      path: '/account/wallet'
+      fullPath: '/account/wallet'
+      preLoaderRoute: typeof AuthedAccountWalletRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/admin/approvals/': {
+      id: '/admin/approvals/'
+      path: '/approvals'
+      fullPath: '/admin/approvals/'
+      preLoaderRoute: typeof AdminApprovalsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/approvals/$id': {
+      id: '/admin/approvals/$id'
+      path: '/approvals/$id'
+      fullPath: '/admin/approvals/$id'
+      preLoaderRoute: typeof AdminApprovalsIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/orders/': {
+      id: '/admin/orders/'
+      path: '/orders'
+      fullPath: '/admin/orders/'
+      preLoaderRoute: typeof AdminOrdersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/orders/$id': {
+      id: '/admin/orders/$id'
+      path: '/orders/$id'
+      fullPath: '/admin/orders/$id'
+      preLoaderRoute: typeof AdminOrdersIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/products/': {
+      id: '/admin/products/'
+      path: '/products'
+      fullPath: '/admin/products/'
+      preLoaderRoute: typeof AdminProductsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/products/$id': {
+      id: '/admin/products/$id'
+      path: '/products/$id'
+      fullPath: '/admin/products/$id'
+      preLoaderRoute: typeof AdminProductsIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/products/new': {
+      id: '/admin/products/new'
+      path: '/products/new'
+      fullPath: '/admin/products/new'
+      preLoaderRoute: typeof AdminProductsNewRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/_authed/account/orders/$id': {
       id: '/_authed/account/orders/$id'

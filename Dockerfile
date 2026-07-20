@@ -85,7 +85,6 @@ WORKDIR /app
 # per-package node_modules (same pattern as the api stage; proven in
 # customs-copilot's web image).
 COPY --from=builder --chown=bun:bun /app/packages/web/dist ./packages/web/dist
-COPY --from=builder --chown=bun:bun /app/packages/web/serve.ts ./packages/web/
 COPY --from=builder --chown=bun:bun /app/packages/web/package.json ./packages/web/
 COPY --from=builder --chown=bun:bun /app/packages/web/node_modules ./packages/web/node_modules
 COPY --from=builder --chown=bun:bun /app/packages/shared/dist ./packages/shared/dist
@@ -103,4 +102,4 @@ ENV BUN_PORT=3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD bun -e "fetch('http://localhost:3001').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
-CMD ["bun", "run", "packages/web/serve.ts"]
+CMD ["bun", "run", "packages/web/dist/server/server.js"]
