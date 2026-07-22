@@ -14,7 +14,7 @@
 - [ ] Docker services (PostgreSQL, Redis) running
 
 ## Overview
-This document covers manual testing of the MasonArt cart page, including:
+This document covers manual testing of the chobi.art cart page, including:
 - Cart items display
 - Quantity management
 - Remove items
@@ -758,7 +758,7 @@ This document covers manual testing of the MasonArt cart page, including:
 2. Check document title
 
 **Expected Result**:
-- Title: "Shopping Cart | MasonArt"
+- Title: "Shopping Cart | chobi.art"
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -776,7 +776,7 @@ This document covers manual testing of the MasonArt cart page, including:
 
 **Expected Result**:
 - Description about cart management
-- Mentions MasonArt
+- Mentions chobi.art
 - Appropriate for cart page
 
 **Actual Result**:

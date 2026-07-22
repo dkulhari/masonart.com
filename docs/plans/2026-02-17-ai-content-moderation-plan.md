@@ -1608,7 +1608,7 @@ export const Route = createFileRoute("/admin/ai-moderation/")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "AI Moderation | Admin | MasonArt" },
+      { title: "AI Moderation | Admin | chobi.art" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -1986,7 +1986,7 @@ export const Route = createFileRoute("/admin/ai-moderation/$id")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Review Generation | Admin | MasonArt" },
+      { title: "Review Generation | Admin | chobi.art" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -2522,7 +2522,7 @@ test.describe("AI Content Moderation", () => {
     test.beforeEach(async ({ page }) => {
       // Login as admin
       await page.goto("/auth/login");
-      await page.fill('[name="email"]', "admin@masonart.com");
+      await page.fill('[name="email"]', "admin@chobi.art");
       await page.fill('[name="password"]', "admin123");
       await page.click('button[type="submit"]');
     });

@@ -18,7 +18,7 @@
 - [ ] Test user without preferences (testuser1@example.com)
 
 ## Overview
-This document covers manual testing of the MasonArt notification preferences feature:
+This document covers manual testing of the chobi.art notification preferences feature:
 - Page access and authentication
 - Email notification toggles
 - SMS notification toggles
@@ -83,7 +83,7 @@ This document covers manual testing of the MasonArt notification preferences fea
 2. Navigate to /account/notifications
 
 **Expected Result**:
-- Page title contains "Notification Preferences" and "MasonArt"
+- Page title contains "Notification Preferences" and "chobi.art"
 - H1 "Notification Preferences" visible
 - Bell icon in header
 - Page description visible

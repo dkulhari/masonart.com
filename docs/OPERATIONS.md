@@ -1,6 +1,6 @@
-# MasonArt — Operations Manual (Day-2 Runbook)
+# chobi.art — Operations Manual (Day-2 Runbook)
 
-The deployed environment (`masonart.xtoms.xyz` — **staging**, production-shaped, Razorpay test mode) runs on the shared Mac mini behind a Cloudflare Tunnel — see [GO-LIVE-PLAN.md](GO-LIVE-PLAN.md) for architecture and [RUNBOOK-OUTAGE.md](RUNBOOK-OUTAGE.md) for outage triage. All deploy orchestration is from the **dev machine** via `make -C deploy <target>`; the mini holds no repo checkout, no build toolchain, and no `.env` — only the rendered compose file at `~/masonart-docker-compose.yml` and a read-only GHCR credential.
+The deployed environment (`chobi.xtoms.xyz` — **staging**, production-shaped, Razorpay test mode) runs on the shared Mac mini behind a Cloudflare Tunnel — see [GO-LIVE-PLAN.md](GO-LIVE-PLAN.md) for architecture and [RUNBOOK-OUTAGE.md](RUNBOOK-OUTAGE.md) for outage triage. All deploy orchestration is from the **dev machine** via `make -C deploy <target>`; the mini holds no repo checkout, no build toolchain, and no `.env` — only the rendered compose file at `~/chobi-docker-compose.yml` and a read-only GHCR credential.
 
 ## 1. Deploying
 
@@ -20,11 +20,11 @@ After every deploy: **purge the Cloudflare cache** (dashboard → Caching → Pu
 
 Verify from outside the LAN (phone on LTE, not home Wi-Fi):
 ```bash
-curl -si https://masonart.xtoms.xyz/ | head -1          # 200
-curl -si https://masonart.xtoms.xyz/api/health | head -1 # 200 + component status
+curl -si https://chobi.xtoms.xyz/ | head -1          # 200
+curl -si https://chobi.xtoms.xyz/api/health | head -1 # 200 + component status
 ```
 
-**Panic switch**: `masonart.xtoms.xyz` rides the platform wildcard, so there is no per-app Cloudflare route to remove. Take MasonArt offline by stopping its containers — `ssh <mini> "docker compose -f ~/masonart-docker-compose.yml stop api web"` (traefik then serves a bare 404) — and restore with `start`. Do **not** disable the tunnel: it serves every app on the mini, including customs-copilot.
+**Panic switch**: `chobi.xtoms.xyz` rides the platform wildcard, so there is no per-app Cloudflare route to remove. Take chobi.art offline by stopping its containers — `ssh <mini> "docker compose -f ~/chobi-docker-compose.yml stop api web"` (traefik then serves a bare 404) — and restore with `start`. Do **not** disable the tunnel: it serves every app on the mini, including customs-copilot.
 
 ### Env contract
 
@@ -38,16 +38,16 @@ Postgres is the only backed-up service. No host port is published, so everything
 
 **Nightly cron on the mini** (offset from customs-copilot's 02:15 job):
 ```cron
-45 2 * * * docker compose -f ~/masonart-docker-compose.yml exec -T postgres pg_dump -U masonart -Fc masonart > /backups/masonart-$(date +\%F).dump && find /backups -name 'masonart-*.dump' -mtime +14 -delete
+45 2 * * * docker compose -f ~/chobi-docker-compose.yml exec -T postgres pg_dump -U chobi -Fc chobi > /backups/chobi-$(date +\%F).dump && find /backups -name 'chobi-*.dump' -mtime +14 -delete
 ```
 
 **Quarterly restore drill** — a backup that has never been restored is a hope, not a backup:
 ```bash
-C="docker compose -f ~/masonart-docker-compose.yml exec -T postgres"
-$C createdb -U masonart masonart_restore_test
-$C pg_restore -U masonart -d masonart_restore_test < /backups/masonart-<date>.dump
-$C psql -U masonart -d masonart_restore_test -c "SELECT count(*) FROM orders; SELECT count(*) FROM products; SELECT count(*) FROM \"user\";"
-$C dropdb -U masonart masonart_restore_test
+C="docker compose -f ~/chobi-docker-compose.yml exec -T postgres"
+$C createdb -U chobi chobi_restore_test
+$C pg_restore -U chobi -d chobi_restore_test < /backups/chobi-<date>.dump
+$C psql -U chobi -d chobi_restore_test -c "SELECT count(*) FROM orders; SELECT count(*) FROM products; SELECT count(*) FROM \"user\";"
+$C dropdb -U chobi chobi_restore_test
 ```
 
 - **R2 (images)**: customer photo uploads and AI generations are **not reproducible** — bucket versioning must stay on. Product catalog images are re-uploadable from source assets.
@@ -57,14 +57,14 @@ $C dropdb -U masonart masonart_restore_test
 
 ```bash
 # Container status — expect 4 services Up (healthy): api, web, postgres, redis
-docker compose -f ~/masonart-docker-compose.yml ps
+docker compose -f ~/chobi-docker-compose.yml ps
 
 # Shared ingress (platform stack) — expect platform-traefik + platform-tunnel Up
 docker ps --filter name=platform-
 
 # Logs (pino JSON on api)
-docker compose -f ~/masonart-docker-compose.yml logs -f api
-docker compose -f ~/masonart-docker-compose.yml logs -f web
+docker compose -f ~/chobi-docker-compose.yml logs -f api
+docker compose -f ~/chobi-docker-compose.yml logs -f web
 docker logs -f platform-tunnel        # tunnel (shared with customs-copilot)
 
 # Memory headroom — shared 6GB Colima VM with customs-copilot;
@@ -92,4 +92,4 @@ docker stats --no-stream
 - **Deploy window races**: compose recreate is not zero-downtime; deploy at low-traffic hours and purge the cache after.
 - **DNS**: the mini needs its static DHCP reservation intact; if `DEPLOY_HOST` stops answering, check whether the lease drifted (RUNBOOK L1).
 - **DLT compliance (SMS)**: 2Factor templates must remain approved; template edits require re-approval before the code referencing them ships.
-- **Co-tenancy**: customs-copilot shares the VM. Before raising any MasonArt `mem_limit`, re-check the combined budget against the 6GB VM.
+- **Co-tenancy**: customs-copilot shares the VM. Before raising any chobi.art `mem_limit`, re-check the combined budget against the 6GB VM.

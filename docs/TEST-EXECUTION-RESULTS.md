@@ -1,4 +1,4 @@
-# MasonArt Test Execution Results
+# chobi.art Test Execution Results
 
 **Date:** January 27, 2026
 **Test Framework:** Playwright (E2E)
@@ -197,4 +197,4 @@ open playwright-report/index.html
 
 ## Conclusion
 
-The MasonArt E2E test suite is now stable with 1,491 passing tests. All skipped tests are documented with clear reasons. The test infrastructure supports reliable CI/CD execution.
+The chobi.art E2E test suite is now stable with 1,491 passing tests. All skipped tests are documented with clear reasons. The test infrastructure supports reliable CI/CD execution.

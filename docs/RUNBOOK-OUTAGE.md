@@ -1,18 +1,18 @@
-# RUNBOOK — "masonart.xtoms.xyz is down"
+# RUNBOOK — "chobi.xtoms.xyz is down"
 
-Layered inside-out triage, adapted from the customs-copilot outage runbook (which was corrected against a real power-cut incident). **Work the layers in order and stop at the first failing one** — everything above it is noise until that layer is fixed. The host is a Mac mini on a home LAN, co-hosting customs-copilot; if **both** apps are down, the fault is almost certainly L1–L2 (machine/Docker), not MasonArt's containers.
+Layered inside-out triage, adapted from the customs-copilot outage runbook (which was corrected against a real power-cut incident). **Work the layers in order and stop at the first failing one** — everything above it is noise until that layer is fixed. The host is a Mac mini on a home LAN, co-hosting customs-copilot; if **both** apps are down, the fault is almost certainly L1–L2 (machine/Docker), not chobi.art's containers.
 
 ## Step 0 — Capture the outside symptom first
 
 From a machine **outside the LAN** (phone on LTE) or at minimum from the dev machine:
 
 ```bash
-curl -si https://masonart.xtoms.xyz/ | head -5
-curl -si https://masonart.xtoms.xyz/api/health | head -5
+curl -si https://chobi.xtoms.xyz/ | head -5
+curl -si https://chobi.xtoms.xyz/api/health | head -5
 curl -si https://customs.xtoms.xyz/ | head -1   # shared-fate probe: ingress serves both apps
 ```
 
-**Shared-fate rule first**: MasonArt rides the shared platform ingress (`platform-tunnel` + `platform-traefik`). If the customs probe is down too, the fault is the platform stack or host (L1–L2/L5) — stop triaging MasonArt's containers. If customs is up and masonart.xtoms.xyz is down, it's MasonArt's containers or traefik labels (both subdomains ride the same wildcard route — there is no per-app Cloudflare config to break).
+**Shared-fate rule first**: chobi.art rides the shared platform ingress (`platform-tunnel` + `platform-traefik`). If the customs probe is down too, the fault is the platform stack or host (L1–L2/L5) — stop triaging chobi.art's containers. If customs is up and chobi.xtoms.xyz is down, it's chobi.art's containers or traefik labels (both subdomains ride the same wildcard route — there is no per-app Cloudflare config to break).
 
 | Symptom | Points at |
 |---|---|
@@ -62,12 +62,12 @@ ssh <mini> "export PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH; docker ps"
 ## L3 — Are the containers up?
 
 ```bash
-ssh <mini> "export PATH=/opt/homebrew/bin:\$PATH; docker compose -f ~/masonart-docker-compose.yml ps"
+ssh <mini> "export PATH=/opt/homebrew/bin:\$PATH; docker compose -f ~/chobi-docker-compose.yml ps"
 ```
 
-Expect **4 services Up**: `api`, `web`, `postgres`, `redis` (api and web `healthy`). The tunnel and traefik are the platform stack's containers (`docker ps --filter name=platform-`), not MasonArt's.
+Expect **4 services Up**: `api`, `web`, `postgres`, `redis` (api and web `healthy`). The tunnel and traefik are the platform stack's containers (`docker ps --filter name=platform-`), not chobi.art's.
 
-- **Read the logs before restarting anything**: `docker compose -f ~/masonart-docker-compose.yml logs --tail 100 <service>`.
+- **Read the logs before restarting anything**: `docker compose -f ~/chobi-docker-compose.yml logs --tail 100 <service>`.
 - Crash-looping api: usually a failed migration, a missing env var (the `:?` guards should have caught it at render — if not, add one), or Postgres not ready.
 - Check for OOM kills (shared 6GB VM — a sharp/WebP image-processing spike is the likeliest culprit):
   ```bash
@@ -81,9 +81,9 @@ Expect **4 services Up**: `api`, `web`, `postgres`, `redis` (api and web `health
 The images have no curl/wget. Probe with the runtimes:
 
 ```bash
-docker compose -f ~/masonart-docker-compose.yml exec api \
+docker compose -f ~/chobi-docker-compose.yml exec api \
   bun -e "fetch('http://localhost:3000/api/health').then(r=>r.text()).then(console.log)"
-docker compose -f ~/masonart-docker-compose.yml exec web \
+docker compose -f ~/chobi-docker-compose.yml exec web \
   node -e "fetch('http://localhost:3001/').then(r=>console.log(r.status))"
 ```
 
@@ -108,13 +108,13 @@ ssh <mini> "export PATH=/opt/homebrew/bin:\$PATH; docker logs --tail 50 platform
 
 - Healthy tunnel: registered connections (4 edges), no reconnect churn, transport `http2` (QUIC degrades through this router's NAT).
 - Cloudflare Zero Trust → Tunnels → the platform tunnel: status HEALTHY, **exactly one replica**, architecture `linux_arm64`. Two replicas means a stray connector is sharing the token → intermittent 502s; find and kill the imposter.
-- **Traefik has no route** (edge shows a bare 404): check the router table — `ssh -L 8080:localhost:8080 dhruv@<mini>` → http://localhost:8080. MasonArt's routers come from labels on api/web; missing routers mean the containers aren't on the `platform` network, lack `traefik.enable=true`, or traefik is < v3.7 (its docker provider silently discovers nothing on Docker Engine 29).
+- **Traefik has no route** (edge shows a bare 404): check the router table — `ssh -L 8080:localhost:8080 dhruv@<mini>` → http://localhost:8080. chobi.art's routers come from labels on api/web; missing routers mean the containers aren't on the `platform` network, lack `traefik.enable=true`, or traefik is < v3.7 (its docker provider silently discovers nothing on Docker Engine 29).
 - Tunnel can't dial out → the home internet connection itself; check the router.
 
 ## L6 — DNS / Cloudflare edge
 
 ```bash
-dig masonart.xtoms.xyz +short          # should resolve to Cloudflare anycast IPs
+dig chobi.xtoms.xyz +short          # should resolve to Cloudflare anycast IPs
 dig masonart-cdn.xtoms.xyz +short
 ```
 

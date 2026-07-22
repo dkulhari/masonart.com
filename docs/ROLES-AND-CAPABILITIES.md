@@ -1,6 +1,6 @@
-# MasonArt Roles and Capabilities
+# chobi.art Roles and Capabilities
 
-A comprehensive guide to user roles, permissions, and access control in the MasonArt platform.
+A comprehensive guide to user roles, permissions, and access control in the chobi.art platform.
 
 **Last Updated:** 2026-01-27
 
@@ -23,7 +23,7 @@ A comprehensive guide to user roles, permissions, and access control in the Maso
 
 ## Role Overview
 
-MasonArt uses a role-based access control (RBAC) system with five distinct user types:
+chobi.art uses a role-based access control (RBAC) system with five distinct user types:
 
 | Role | Database Value | Description |
 |------|----------------|-------------|
@@ -319,7 +319,7 @@ When created via `init-super-admin.ts`:
 bun run packages/api/src/database/init-super-admin.ts
 
 # Environment variables (optional)
-SUPER_ADMIN_EMAIL=admin@masonart.com
+SUPER_ADMIN_EMAIL=admin@chobi.art
 SUPER_ADMIN_PASSWORD=SuperAdmin123!
 ```
 

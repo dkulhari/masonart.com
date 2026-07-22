@@ -16,7 +16,7 @@
 - [ ] Network tab accessible for API monitoring
 
 ## Overview
-This document covers manual testing of the MasonArt Zustand cart store:
+This document covers manual testing of the chobi.art Zustand cart store:
 - Cart state management
 - Add/update/remove operations
 - Optimistic updates

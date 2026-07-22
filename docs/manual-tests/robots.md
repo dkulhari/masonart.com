@@ -14,7 +14,7 @@
 - [ ] Robots.txt tester tool available
 
 ## Overview
-This document covers manual testing of the robots.txt file for the MasonArt e-commerce platform, including:
+This document covers manual testing of the robots.txt file for the chobi.art e-commerce platform, including:
 - File accessibility
 - Syntax validation
 - User-agent directives
@@ -461,7 +461,7 @@ Disallow: /api/
 
 **Expected Result**:
 ```
-Sitemap: https://masonart.com/sitemap.xml
+Sitemap: https://chobi.art/sitemap.xml
 ```
 - Sitemap directive present
 - Absolute URL used
@@ -937,7 +937,7 @@ Disallow: /cart
 Disallow: /checkout
 Disallow: /account
 
-Sitemap: https://masonart.com/sitemap.xml
+Sitemap: https://chobi.art/sitemap.xml
 ```
 
 **Common Directives:**

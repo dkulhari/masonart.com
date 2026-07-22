@@ -129,7 +129,7 @@
 - **BLOCKED**: Mobile menu interaction (extension down), responsive layout tests, performance tests, favicon tests
 
 ### 4. Product Listing (product-listing.md)
-- **PASS**: Page loads with title "Shop Posters | MasonArt", heading and subheading render, filter sidebar renders with Sort By, Orientation, Style (10 options), Subject (9 options), Color, Room, Special sections, mobile filter button present
+- **PASS**: Page loads with title "Shop Posters | chobi.art", heading and subheading render, filter sidebar renders with Sort By, Orientation, Style (10 options), Subject (9 options), Color, Room, Special sections, mobile filter button present
 - **FAIL**: "No products found" due to API timeout (#238), product cards never render
 - **BLOCKED**: All product interaction tests (filtering, sorting, pagination, card clicks)
 
@@ -138,7 +138,7 @@
 - **BLOCKED**: All product detail tests (images, variants, add to cart, reviews, related products)
 
 ### 6. Auth Pages (auth-pages.md, auth-routes.md)
-- **PASS**: Login page renders with Google OAuth, email/password form, "Forgot password?" link, "Create account" link, proper validation errors on empty submit (sign-in: 400 with clear messages), Register page renders with Google OAuth, Full Name/Email/Password/Confirm Password form with labels, "Sign in" link, terms/privacy links present, Sign-in: missing password returns 400, empty email returns 400 "Invalid email", Content-type validation returns 415 with allowed types, GET /api/auth/get-session returns null for unauth (200), POST /api/auth/sign-out returns {"success":true} (200) even without session (idempotent), Login has H1 "MasonArt", Register has H1 "MasonArt", Password validation works correctly (short password → 400 PASSWORD_TOO_SHORT)
+- **PASS**: Login page renders with Google OAuth, email/password form, "Forgot password?" link, "Create account" link, proper validation errors on empty submit (sign-in: 400 with clear messages), Register page renders with Google OAuth, Full Name/Email/Password/Confirm Password form with labels, "Sign in" link, terms/privacy links present, Sign-in: missing password returns 400, empty email returns 400 "Invalid email", Content-type validation returns 415 with allowed types, GET /api/auth/get-session returns null for unauth (200), POST /api/auth/sign-out returns {"success":true} (200) even without session (idempotent), Login has H1 "chobi.art", Register has H1 "chobi.art", Password validation works correctly (short password → 400 PASSWORD_TOO_SHORT)
 - **FAIL**: Forgot password link points to 404 (#242), Terms/Privacy links point to 404 (#240), Sign-up returns 500 for empty name, missing name, invalid email (#261 - password validation OK), Forgot password API not found, GET /api/auth/session returns 404 (only /get-session works #263)
 - **BLOCKED**: Actual sign-in (credentials timeout - DB issue), Google OAuth (requires config), phone auth, email verification, password reset flow
 
@@ -165,7 +165,7 @@
 - **BLOCKED**: Artwork interactions, likes, sharing
 
 ### 12. SEO (seo-meta.md, seo-jsonld.md, sitemap.md, robots.md)
-- **PASS**: All page titles correct and unique, meta descriptions on all pages, OG tags (title, description, type=website, site_name=MasonArt), Twitter cards (summary_large_image), theme-color #f97316, viewport on all 6 tested pages, robots.txt properly configured, /posters has canonical + full og:image, /checkout and /cart have noindex, DOCTYPE on all pages, html lang="en" on all pages, /create has page-specific OG title/description, /gallery has page-specific OG title/description
+- **PASS**: All page titles correct and unique, meta descriptions on all pages, OG tags (title, description, type=website, site_name=chobi.art), Twitter cards (summary_large_image), theme-color #f97316, viewport on all 6 tested pages, robots.txt properly configured, /posters has canonical + full og:image, /checkout and /cart have noindex, DOCTYPE on all pages, html lang="en" on all pages, /create has page-specific OG title/description, /gallery has page-specific OG title/description
 - **FAIL**: Sitemap.xml returns 404 (#241), no JSON-LD on any page (#244), robots.txt references non-existent sitemap, canonical URLs missing on /, /create, /gallery (#259), og:image missing on /, /create, /gallery, /cart, /checkout, /auth/* (#256), /cart missing H1 (#258)
 - **VERIFIED**: /posters page has exemplary SEO implementation (canonical, full OG with image dimensions, meta keywords)
 

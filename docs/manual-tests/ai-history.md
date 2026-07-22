@@ -16,7 +16,7 @@
 - [ ] Logged in as test user
 
 ## Overview
-This document covers manual testing of the MasonArt AI Creations history page:
+This document covers manual testing of the chobi.art AI Creations history page:
 - Authentication check and redirect
 - Page header with navigation
 - Filter sidebar (status and style filters)
@@ -181,7 +181,7 @@ This document covers manual testing of the MasonArt AI Creations history page:
 2. Inspect page source or DevTools
 
 **Expected Result**:
-- Title contains "AI Creations" and "MasonArt"
+- Title contains "AI Creations" and "chobi.art"
 - robots meta tag contains "noindex"
 - meta description contains "AI-generated artwork"
 

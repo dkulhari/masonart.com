@@ -14,7 +14,7 @@
 - [ ] Keyboard accessible (for accessibility testing)
 
 ## Overview
-This document covers manual testing of the MasonArt root layout components:
+This document covers manual testing of the chobi.art root layout components:
 - Header with navigation
 - Footer with links and newsletter
 - Mobile responsive menu
@@ -29,7 +29,7 @@ This document covers manual testing of the MasonArt root layout components:
 
 ### TC-001: Header Displays Logo
 
-**Description**: Verify MasonArt logo is displayed correctly
+**Description**: Verify chobi.art logo is displayed correctly
 
 **Steps**:
 1. Navigate to any page
@@ -37,7 +37,7 @@ This document covers manual testing of the MasonArt root layout components:
 3. Verify logo text and styling
 
 **Expected Result**:
-- Logo text shows "MasonArt"
+- Logo text shows "chobi.art"
 - "Art" portion styled with primary color
 - Logo is clickable
 - Logo links to home page (/)
@@ -54,7 +54,7 @@ This document covers manual testing of the MasonArt root layout components:
 
 **Steps**:
 1. Navigate to a non-home page (e.g., /posters)
-2. Click on the MasonArt logo
+2. Click on the chobi.art logo
 3. Verify navigation
 
 **Expected Result**:
@@ -481,7 +481,7 @@ Divider line present between main nav and account
 2. Check brand section
 
 **Expected Result**:
-- MasonArt logo displayed
+- chobi.art logo displayed
 - Logo links to home page
 - Description text present
 - Social media icons visible
@@ -612,7 +612,7 @@ Links present:
 **Expected Result**:
 - Copyright symbol present
 - Current year displayed (2026)
-- "MasonArt. All rights reserved." text
+- "chobi.art. All rights reserved." text
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -914,7 +914,7 @@ Each social link has aria-label:
 2. Inspect `<title>` element
 
 **Expected Result**:
-- Title: "MasonArt | Premium Posters & Frames"
+- Title: "chobi.art | Premium Posters & Frames"
 - Title in browser tab
 
 **Actual Result**:
@@ -954,7 +954,7 @@ Each social link has aria-label:
 - og:title present
 - og:description present
 - og:type: website
-- og:site_name: MasonArt
+- og:site_name: chobi.art
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -1010,7 +1010,7 @@ Each social link has aria-label:
 
 **Expected Result**:
 - theme-color present
-- Value: #f97316 (MasonArt brand orange)
+- Value: #f97316 (chobi.art brand orange)
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL

@@ -56,7 +56,7 @@ This document covers manual testing of Admin Orders Management:
 **Description**: Verify HTML title and robots meta
 
 **Expected Result**:
-- Title: "Orders - Admin - MasonArt" (or similar)
+- Title: "Orders - Admin - chobi.art" (or similar)
 - Meta robots: "noindex, nofollow"
 
 **Actual Result**:

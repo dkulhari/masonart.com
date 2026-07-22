@@ -15,7 +15,7 @@
 - [ ] Email service configured for confirmation emails (optional)
 
 ## Overview
-This document covers manual testing of the MasonArt order confirmation page, including:
+This document covers manual testing of the chobi.art order confirmation page, including:
 - Success header with order number
 - Copy order number functionality
 - Order items display
@@ -849,8 +849,8 @@ This document covers manual testing of the MasonArt order confirmation page, inc
 
 **Expected Result**:
 - Title contains "Order Confirmed"
-- Title contains "MasonArt"
-- Format: "Order Confirmed | MasonArt"
+- Title contains "chobi.art"
+- Format: "Order Confirmed | chobi.art"
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
