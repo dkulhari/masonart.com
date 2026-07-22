@@ -48,6 +48,8 @@ const TWO_FACTOR_BASE_URL = "https://2factor.in/API/V1";
 
 // OTP template name registered with 2Factor.in (DLT compliant)
 // You'll need to register this template in your 2Factor.in dashboard
+// NOTE: default keeps the legacy (formerly MasonArt) registered template name;
+// re-register chobi.art DLT templates and update env vars at domain cutover
 const OTP_TEMPLATE_NAME = process.env.TWO_FACTOR_OTP_TEMPLATE || "MasonArt";
 
 // ============================================================================
@@ -286,6 +288,8 @@ export type TransactionalSMSType =
 
 // Transactional SMS template names registered with 2Factor.in (DLT compliant)
 // These need to be registered in your 2Factor.in dashboard
+// NOTE: defaults keep the legacy (formerly MasonArt) registered template names;
+// re-register chobi.art DLT templates and update env vars at domain cutover
 const TRANSACTIONAL_TEMPLATES: Record<TransactionalSMSType, string> = {
   order_confirmation:
     process.env.TWO_FACTOR_ORDER_CONFIRMED_TEMPLATE || "MasonArtOrderConfirmed",
@@ -394,12 +398,12 @@ export function getTransactionalSMSContent(
 ): string {
   switch (type) {
     case "order_confirmation":
-      return `MasonArt: Your order ${orderNumber} is confirmed! We'll notify you when it ships. Track: masonart.com/orders`;
+      return `chobi.art: Your order ${orderNumber} is confirmed! We'll notify you when it ships. Track: chobi.art/orders`;
     case "shipped":
-      return `MasonArt: Your order ${orderNumber} has shipped! Track your order: ${trackingUrl || "masonart.com/orders"}`;
+      return `chobi.art: Your order ${orderNumber} has shipped! Track your order: ${trackingUrl || "chobi.art/orders"}`;
     case "out_for_delivery":
-      return `MasonArt: Your order ${orderNumber} is out for delivery today! Track: ${trackingUrl || "masonart.com/orders"}`;
+      return `chobi.art: Your order ${orderNumber} is out for delivery today! Track: ${trackingUrl || "chobi.art/orders"}`;
     case "delivered":
-      return `MasonArt: Your order ${orderNumber} has been delivered. Enjoy your art! Rate us: masonart.com/reviews`;
+      return `chobi.art: Your order ${orderNumber} has been delivered. Enjoy your art! Rate us: chobi.art/reviews`;
   }
 }

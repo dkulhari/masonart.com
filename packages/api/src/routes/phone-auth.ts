@@ -170,7 +170,7 @@ phoneAuthApp.post(
           .values({
             id: userId,
             name: userName,
-            email: `${normalizedPhone}@phone.masonart.com`, // Placeholder email
+            email: `${normalizedPhone}@phone.chobi.art`, // Placeholder email
             emailVerified: false,
             phone: normalizedPhone,
             phoneVerified: true,
