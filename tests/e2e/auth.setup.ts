@@ -41,7 +41,7 @@ const TEST_USERS = {
     name: "Test Trade User",
   },
   admin: {
-    email: "test-admin@masonart.com",
+    email: "test-admin@chobi.art",
     password: "TestPassword123!",
     name: "Test Admin",
   },

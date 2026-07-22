@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 /**
  * Checkout Page E2E Tests
  *
- * Tests for the MasonArt checkout page (/checkout) including:
+ * Tests for the chobi.art checkout page (/checkout) including:
  * - Page header and navigation
  * - Empty cart state
  * - Multi-step checkout flow (shipping, delivery, payment)
@@ -111,10 +111,10 @@ async function addItemToCart(page: Page, itemOverrides?: Partial<{
   };
 
   await page.evaluate((cartItem) => {
-    const existing = localStorage.getItem('masonart-cart-storage');
+    const existing = localStorage.getItem('chobi-cart-storage');
     let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
     data.state.items.push(cartItem);
-    localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
+    localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
   }, item);
 }
 
@@ -138,7 +138,7 @@ async function fillValidAddressForm(page: Page) {
 test.describe('Checkout Page - Header', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Test Poster', unitPrice: 2999 });
     await page.reload();
   });
@@ -152,7 +152,7 @@ test.describe('Checkout Page - Header', () => {
   test('should have correct page meta title', async ({ page }) => {
     const pageTitle = await page.title();
     expect(pageTitle).toContain('Checkout');
-    expect(pageTitle).toContain('MasonArt');
+    expect(pageTitle).toContain('chobi.art');
   });
 
   test('should have noindex robots meta tag', async ({ page }) => {
@@ -180,7 +180,7 @@ test.describe('Checkout Page - Empty Cart State', () => {
   test.beforeEach(async ({ page }) => {
     // Need to navigate first to access localStorage
     await page.goto('/');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await page.goto('/checkout');
   });
 
@@ -218,7 +218,7 @@ test.describe('Checkout Page - Empty Cart State', () => {
 test.describe('Checkout Page - Progress Steps', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Progress Test', unitPrice: 2999 });
     await page.reload();
   });
@@ -258,7 +258,7 @@ test.describe('Checkout Page - Progress Steps', () => {
 test.describe('Checkout Page - Shipping Step', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Shipping Test', unitPrice: 2999 });
     await page.reload();
   });
@@ -375,7 +375,7 @@ test.describe('Checkout Page - Shipping Step', () => {
 test.describe('Checkout Page - Address Form Validation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Validation Test', unitPrice: 2999 });
     await page.reload();
   });
@@ -531,7 +531,7 @@ test.describe('Checkout Page - Delivery Step', () => {
   test.beforeEach(async ({ page }) => {
     await setupShippingMock(page);
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Delivery Test', unitPrice: 2999 });
     await page.reload();
 
@@ -636,7 +636,7 @@ test.describe('Checkout Page - Free Shipping', () => {
   test('should show FREE for standard when over threshold', async ({ page }) => {
     await setupShippingMock(page, 1500);
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     // Add item over ₹999 threshold
     await addItemToCart(page, { productTitle: 'Free Shipping Test', unitPrice: 1500 });
     await page.reload();
@@ -654,7 +654,7 @@ test.describe('Checkout Page - Free Shipping', () => {
   test('should show free shipping notice when qualified', async ({ page }) => {
     await setupShippingMock(page, 1500);
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     // Add item over ₹999 threshold
     await addItemToCart(page, { productTitle: 'Free Shipping Test', unitPrice: 1500 });
     await page.reload();
@@ -672,7 +672,7 @@ test.describe('Checkout Page - Free Shipping', () => {
   test('should show shipping price when under threshold', async ({ page }) => {
     await setupShippingMock(page, 500);
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     // Add item under ₹999 threshold
     await addItemToCart(page, { productTitle: 'Paid Shipping Test', unitPrice: 500 });
     await page.reload();
@@ -696,7 +696,7 @@ test.describe('Checkout Page - Payment Step', () => {
   test.beforeEach(async ({ page }) => {
     await setupShippingMock(page);
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Payment Test', unitPrice: 2999 });
     await page.reload();
 
@@ -758,7 +758,7 @@ test.describe('Checkout Page - Payment Step', () => {
 test.describe('Checkout Page - Order Summary Sidebar', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Summary Test', unitPrice: 2999 });
     await page.reload();
   });
@@ -806,7 +806,7 @@ test.describe('Checkout Page - Order Summary Sidebar', () => {
 test.describe('Checkout Page - Trust Badges', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Trust Badge Test', unitPrice: 2999 });
     await page.reload();
   });
@@ -844,7 +844,7 @@ test.describe('Checkout Page - Trust Badges', () => {
 test.describe('Checkout Page - Customer Notes', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Notes Test', unitPrice: 2999 });
     await page.reload();
   });
@@ -882,7 +882,7 @@ test.describe('Checkout Page - Customer Notes', () => {
 test.describe('Checkout Page - Step Navigation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Navigation Test', unitPrice: 2999 });
     await page.reload();
   });
@@ -929,7 +929,7 @@ test.describe('Checkout Page - Step Navigation', () => {
 test.describe('Checkout Page - Responsive Design', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Responsive Test', unitPrice: 2999 });
     await page.reload();
   });
@@ -991,7 +991,7 @@ test.describe('Checkout Page - Responsive Design', () => {
 test.describe('Checkout Page - Accessibility', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'A11y Test', unitPrice: 2999 });
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -1058,7 +1058,7 @@ test.describe('Checkout Page - Performance', () => {
   test('should load page within acceptable time', async ({ page }) => {
     // Navigate first to access localStorage
     await page.goto('/');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
 
     const startTime = Date.now();
     await page.goto('/checkout');
@@ -1073,7 +1073,7 @@ test.describe('Checkout Page - Performance', () => {
     page.on('pageerror', (error) => errors.push(error.message));
 
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'JS Test', unitPrice: 2999 });
     await page.reload();
     await page.waitForTimeout(1000);
@@ -1094,7 +1094,7 @@ test.describe('Checkout Page - Performance', () => {
 test.describe('Checkout Page - Navigation', () => {
   test('should navigate to checkout from cart', async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { productTitle: 'Nav Test', unitPrice: 2999 });
     await page.reload();
 
@@ -1121,7 +1121,7 @@ test.describe('Checkout Page - Error Handling', () => {
 
     // Set corrupted data
     await page.evaluate(() => {
-      localStorage.setItem('masonart-cart-storage', 'corrupted-data');
+      localStorage.setItem('chobi-cart-storage', 'corrupted-data');
     });
 
     await page.reload();
@@ -1150,7 +1150,7 @@ test.describe('Checkout Page - Error Handling', () => {
 test.describe('Checkout Page - Multi-Item Cart', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
     await addItemToCart(page, { id: 'item_1', productTitle: 'Poster One', unitPrice: 1500, quantity: 1 });
     await addItemToCart(page, { id: 'item_2', productTitle: 'Poster Two', unitPrice: 2000, quantity: 2 });
     await page.reload();
@@ -1177,7 +1177,7 @@ test.describe('Checkout Page - Multi-Item Cart', () => {
 test.describe('Checkout Page - Item with Frame', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
 
     // Add item with frame
     const item = {
@@ -1201,10 +1201,10 @@ test.describe('Checkout Page - Item with Frame', () => {
     };
 
     await page.evaluate((cartItem) => {
-      const existing = localStorage.getItem('masonart-cart-storage');
+      const existing = localStorage.getItem('chobi-cart-storage');
       let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
       data.state.items.push(cartItem);
-      localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
+      localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
     }, item);
 
     await page.reload();

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 /**
  * Account Dashboard E2E Tests
  *
- * Tests for the MasonArt user account dashboard page (/account).
+ * Tests for the chobi.art user account dashboard page (/account).
  *
  * These tests use REAL authentication via stored session state.
  * The auth.setup.ts file creates and saves authentication state
@@ -50,7 +50,7 @@ test.describe('Account Page - Unauthenticated', () => {
   test('should show Sign In page title when redirected', async ({ page }) => {
     await page.goto('/account');
 
-    await expect(page).toHaveTitle(/Sign In.*MasonArt/);
+    await expect(page).toHaveTitle(/Sign In.*chobi.art/);
   });
 });
 

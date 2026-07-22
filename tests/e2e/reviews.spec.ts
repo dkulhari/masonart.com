@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Reviews Feature E2E Tests
  *
- * Tests for the MasonArt product reviews feature including:
+ * Tests for the chobi.art product reviews feature including:
  * - Review display on product pages
  * - Review filtering and sorting
  * - Verified purchase review flow from order pages

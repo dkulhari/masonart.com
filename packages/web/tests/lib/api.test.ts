@@ -1,7 +1,7 @@
 /**
  * Tests for API Client Utilities
  *
- * This test suite validates the API client functions for the MasonArt frontend.
+ * This test suite validates the API client functions for the chobi.art frontend.
  * It tests HTTP request handling, error handling, and all API endpoint wrappers.
  *
  * Test Coverage:
@@ -933,7 +933,7 @@ describe('API Client - Health Check', () => {
     const mockHealth = {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'MasonArt API',
+      service: 'chobi.art API',
       version: '1.0.0',
     };
 
@@ -956,7 +956,7 @@ describe('API Client - Health Check', () => {
     const mockHealth = {
       status: 'ok',
       timestamp: '2024-01-01T00:00:00Z',
-      service: 'MasonArt API',
+      service: 'chobi.art API',
       version: '1.0.0',
     };
 

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Product Listing Page E2E Tests
  *
- * Tests for the MasonArt product listing page (/posters) including:
+ * Tests for the chobi.art product listing page (/posters) including:
  * - Page header with title and product count
  * - Filter sidebar (desktop) and sheet (mobile)
  * - Active filter tags with clear functionality
@@ -782,9 +782,9 @@ test.describe('Product Listing - SEO Meta Tags', () => {
     await page.goto('/posters');
   });
 
-  test('should have page title with MasonArt', async ({ page }) => {
+  test('should have page title with chobi.art', async ({ page }) => {
     const title = await page.title();
-    expect(title).toContain('MasonArt');
+    expect(title).toContain('chobi.art');
     expect(title.toLowerCase()).toContain('poster');
   });
 
@@ -803,7 +803,7 @@ test.describe('Product Listing - SEO Meta Tags', () => {
   test('should have Open Graph title', async ({ page }) => {
     const ogTitle = await page.locator('meta[property="og:title"]').getAttribute('content');
     expect(ogTitle).toBeTruthy();
-    expect(ogTitle).toContain('MasonArt');
+    expect(ogTitle).toContain('chobi.art');
   });
 
   test('should have Open Graph description', async ({ page }) => {

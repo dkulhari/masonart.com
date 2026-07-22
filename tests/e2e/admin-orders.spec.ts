@@ -12,7 +12,7 @@ test.use({ storageState: ADMIN_AUTH });
 /**
  * Admin Orders Management E2E Tests
  *
- * Tests for the MasonArt admin orders management pages (/admin/orders).
+ * Tests for the chobi.art admin orders management pages (/admin/orders).
  *
  * Based on actual implementation in:
  * - packages/api/src/routes/admin/orders.ts
@@ -330,7 +330,7 @@ async function setupAdminSession(page: import('@playwright/test').Page) {
         user: {
           id: 'admin-user-id',
           name: 'Admin User',
-          email: 'admin@masonart.com',
+          email: 'admin@chobi.art',
           role: 'admin',
           emailVerified: true,
           createdAt: '2024-01-01T00:00:00Z',
@@ -554,7 +554,7 @@ test.describe('Admin Orders List Page', () => {
   });
 
   test('should have correct HTML document title', async ({ page }) => {
-    await expect(page).toHaveTitle(/Orders.*Admin.*MasonArt/);
+    await expect(page).toHaveTitle(/Orders.*Admin.*chobi.art/);
   });
 
   test('should have noindex/nofollow robots meta tag', async ({ page }) => {

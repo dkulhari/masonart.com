@@ -709,7 +709,7 @@ describe('Web Package Build (TanStack Start)', () => {
       const appConfigPath = join(packageDir, 'app.config.ts');
       const content = readFileSync(appConfigPath, 'utf-8');
       expect(content).toContain('appConfig');
-      expect(content).toContain('MasonArt');
+      expect(content).toContain('chobi.art');
     });
   });
 

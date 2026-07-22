@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Home Page E2E Tests
  *
- * Tests for the MasonArt home page including:
+ * Tests for the chobi.art home page including:
  * - Hero section with CTA buttons
  * - Featured products section
  * - Categories/Shop by Style section
@@ -420,8 +420,8 @@ test.describe('Home Page - Value Propositions Section', () => {
     await page.goto('/');
   });
 
-  test('should display Why Choose MasonArt section header', async ({ page }) => {
-    const header = page.locator('h2:has-text("Why Choose MasonArt")');
+  test('should display Why Choose chobi.art section header', async ({ page }) => {
+    const header = page.locator('h2:has-text("Why Choose chobi.art")');
     await expect(header).toBeVisible();
   });
 
@@ -464,14 +464,14 @@ test.describe('Home Page - Value Propositions Section', () => {
 
   test('should display value props in grid layout', async ({ page }) => {
     // Value props should be in a responsive grid
-    const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose MasonArt"))');
+    const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose chobi.art"))');
     const grid = valuePropsSection.locator('.grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-4');
     await expect(grid).toBeVisible();
   });
 
   test('should display icons for each value prop', async ({ page }) => {
     // Each value prop card has an icon
-    const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose MasonArt"))');
+    const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose chobi.art"))');
     const iconContainers = valuePropsSection.locator('.bg-brand-100.text-brand-600');
     await expect(iconContainers).toHaveCount(4);
   });
@@ -618,7 +618,7 @@ test.describe('Home Page - Responsive Design', () => {
     await page.goto('/');
 
     // Value props should stack on mobile (grid-cols-1)
-    const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose MasonArt"))');
+    const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose chobi.art"))');
     await expect(valuePropsSection).toBeVisible();
   });
 
@@ -647,7 +647,7 @@ test.describe('Home Page - Responsive Design', () => {
     await expect(page.locator('h2:has-text("Featured Collection")')).toBeVisible();
     await expect(page.locator('h2:has-text("Shop by Style")')).toBeVisible();
     await expect(page.locator('h2:has-text("Create Your Own Masterpiece")')).toBeVisible();
-    await expect(page.locator('h2:has-text("Why Choose MasonArt")')).toBeVisible();
+    await expect(page.locator('h2:has-text("Why Choose chobi.art")')).toBeVisible();
     await expect(page.locator('h2:has-text("Stay Inspired")')).toBeVisible();
   });
 
@@ -661,7 +661,7 @@ test.describe('Home Page - Responsive Design', () => {
     await expect(page.locator('h2:has-text("Featured Collection")')).toBeVisible();
     await expect(page.locator('h2:has-text("Shop by Style")')).toBeVisible();
     await expect(page.locator('h2:has-text("Create Your Own Masterpiece")')).toBeVisible();
-    await expect(page.locator('h2:has-text("Why Choose MasonArt")')).toBeVisible();
+    await expect(page.locator('h2:has-text("Why Choose chobi.art")')).toBeVisible();
     await expect(page.locator('h2:has-text("Stay Inspired")')).toBeVisible();
   });
 });
@@ -914,7 +914,7 @@ test.describe('Home Page - Content', () => {
 
   test('should display correct number of value propositions', async ({ page }) => {
     // Should have 4 value prop cards
-    const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose MasonArt"))');
+    const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose chobi.art"))');
     const valuePropCards = valuePropsSection.locator('h3');
     const count = await valuePropCards.count();
 

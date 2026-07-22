@@ -55,12 +55,12 @@ export const testCredentials = {
   },
   // Admins
   admin: {
-    email: 'test-admin@masonart.com',
+    email: 'test-admin@chobi.art',
     password: TEST_PASSWORD,
     name: 'Test Admin',
   },
   admin2: {
-    email: 'test-admin-2@masonart.com',
+    email: 'test-admin-2@chobi.art',
     password: TEST_PASSWORD,
     name: 'Admin Secondary',
   },

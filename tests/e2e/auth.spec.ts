@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Authentication Pages E2E Tests
  *
- * Tests for the MasonArt authentication pages including:
+ * Tests for the chobi.art authentication pages including:
  * - Login page (/auth/login)
  * - Register page (/auth/register)
  *
@@ -26,8 +26,8 @@ test.describe('Login Page', () => {
       await page.goto('/auth/login');
     });
 
-    test('should display MasonArt logo/brand', async ({ page }) => {
-      const logo = page.locator('h1:has-text("MasonArt")');
+    test('should display chobi.art logo/brand', async ({ page }) => {
+      const logo = page.locator('h1:has-text("chobi.art")');
       await expect(logo).toBeVisible();
     });
 
@@ -42,7 +42,7 @@ test.describe('Login Page', () => {
     });
 
     test('should have correct page title', async ({ page }) => {
-      await expect(page).toHaveTitle(/Sign In.*MasonArt/);
+      await expect(page).toHaveTitle(/Sign In.*chobi.art/);
     });
 
     test('should have noindex robots meta tag', async ({ page }) => {
@@ -464,7 +464,7 @@ test.describe('Login Page', () => {
       await page.setViewportSize({ width: 768, height: 1024 });
       await page.goto('/auth/login');
 
-      const logo = page.locator('h1:has-text("MasonArt")');
+      const logo = page.locator('h1:has-text("chobi.art")');
       await expect(logo).toBeVisible();
     });
 
@@ -902,8 +902,8 @@ test.describe('Register Page', () => {
       await page.goto('/auth/register');
     });
 
-    test('should display MasonArt logo/brand', async ({ page }) => {
-      const logo = page.locator('h1:has-text("MasonArt")');
+    test('should display chobi.art logo/brand', async ({ page }) => {
+      const logo = page.locator('h1:has-text("chobi.art")');
       await expect(logo).toBeVisible();
     });
 
@@ -918,7 +918,7 @@ test.describe('Register Page', () => {
     });
 
     test('should have correct page title', async ({ page }) => {
-      await expect(page).toHaveTitle(/Create Account.*MasonArt/);
+      await expect(page).toHaveTitle(/Create Account.*chobi.art/);
     });
 
     test('should have noindex robots meta tag', async ({ page }) => {
@@ -1453,7 +1453,7 @@ test.describe('Register Page', () => {
       await page.setViewportSize({ width: 768, height: 1024 });
       await page.goto('/auth/register');
 
-      const logo = page.locator('h1:has-text("MasonArt")');
+      const logo = page.locator('h1:has-text("chobi.art")');
       await expect(logo).toBeVisible();
     });
 
