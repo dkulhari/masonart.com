@@ -232,7 +232,7 @@ phoneAuthApp.post(
         .where(eq(verifications.identifier, `phone:${normalizedPhone}`));
 
       // Set session cookie
-      const cookieName = "masonart.session_token";
+      const cookieName = "chobi.session_token";
       const isProduction = process.env.NODE_ENV === "production";
 
       c.header(

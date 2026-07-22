@@ -109,7 +109,7 @@ export const aiSubscriptionTierEnum = pgEnum("ai_subscription_tier", [
 
 /**
  * Users table - Core user data for Better Auth
- * Extended with MasonArt-specific fields
+ * Extended with chobi.art-specific fields
  */
 export const users = pgTable(
   "user",
@@ -129,7 +129,7 @@ export const users = pgTable(
       .$onUpdate(() => new Date())
       .notNull(),
 
-    // MasonArt custom fields
+    // chobi.art custom fields
     firstName: text("first_name"),
     lastName: text("last_name"),
     phone: text("phone"),
@@ -267,7 +267,7 @@ export const verifications = pgTable(
 );
 
 // ============================================================================
-// Additional MasonArt Tables
+// Additional chobi.art Tables
 // ============================================================================
 
 /**

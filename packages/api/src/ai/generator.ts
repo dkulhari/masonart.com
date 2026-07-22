@@ -1,5 +1,5 @@
 /**
- * AI Image Generator Module for MasonArt Platform
+ * AI Image Generator Module for chobi.art Platform
  *
  * Provides AI image generation capabilities using multiple providers:
  * - Replicate (Stable Diffusion SDXL)

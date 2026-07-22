@@ -1,7 +1,7 @@
 /**
  * Database Schema Definitions
  *
- * Drizzle ORM schema definitions for all MasonArt database tables.
+ * Drizzle ORM schema definitions for all chobi.art database tables.
  * This file defines the structure of all tables used in the application.
  */
 
