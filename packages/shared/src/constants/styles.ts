@@ -1,5 +1,5 @@
 /**
- * Style Constants for MasonArt Platform
+ * Style Constants for chobi.art Platform
  *
  * Defines all style presets, subjects, colors, rooms, and collections
  * based on the requirements specification (Sections 4.1 and 6.2).

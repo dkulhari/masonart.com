@@ -1,5 +1,5 @@
 /**
- * AI Types for MasonArt Platform
+ * AI Types for chobi.art Platform
  *
  * Defines all AI generation-related types including prompts, style presets,
  * generation history, and community gallery based on the requirements specification.

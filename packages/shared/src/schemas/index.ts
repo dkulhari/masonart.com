@@ -1,5 +1,5 @@
 /**
- * Shared Zod schemas for MasonArt platform
+ * Shared Zod schemas for chobi.art platform
  *
  * This module contains:
  * - Product schemas

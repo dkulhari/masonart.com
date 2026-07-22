@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
- * Tests to verify Tailwind CSS and PostCSS configuration for @masonart/web package
+ * Tests to verify Tailwind CSS and PostCSS configuration for @chobi/web package
  *
  * This test suite validates:
  * - Configuration file existence and structure

@@ -1,5 +1,5 @@
 /**
- * AI Generation Schemas for MasonArt Platform
+ * AI Generation Schemas for chobi.art Platform
  *
  * Zod schemas for validating AI poster generation data including:
  * - AI generation requests

@@ -1,5 +1,5 @@
 /**
- * User Schemas for MasonArt Platform
+ * User Schemas for chobi.art Platform
  *
  * Zod schemas for validating user-related data including:
  * - Users

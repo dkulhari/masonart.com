@@ -8,7 +8,7 @@ import {
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BRAND_NAME, BRAND_TAGLINE } from '@masonart/shared'
+import { BRAND_NAME, BRAND_TAGLINE } from '@chobi/shared'
 import type * as React from 'react'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'

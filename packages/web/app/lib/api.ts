@@ -145,7 +145,7 @@ export interface ApiError {
 /**
  * Create a Hono client instance
  * Note: We use a generic client since the API types are in a separate package
- * For full type inference, you would import AppType from @masonart/api
+ * For full type inference, you would import AppType from @chobi/api
  */
 function createApiClient() {
   const baseUrl = getApiUrl();

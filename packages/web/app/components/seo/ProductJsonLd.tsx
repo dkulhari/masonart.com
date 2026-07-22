@@ -11,7 +11,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { BRAND_NAME, BRAND_URL, SUPPORT_EMAIL } from '@masonart/shared'
+import { BRAND_NAME, BRAND_URL, SUPPORT_EMAIL } from '@chobi/shared'
 
 // ============================================================================
 // Types

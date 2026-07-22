@@ -1,5 +1,5 @@
 /**
- * Shared constants for MasonArt platform
+ * Shared constants for chobi.art platform
  *
  * This module exports:
  * - Size constants (poster dimensions)
