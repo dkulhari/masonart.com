@@ -549,7 +549,7 @@ test.describe('Home Page - SEO Meta Tags', () => {
 
   test('should have correct page title', async ({ page }) => {
     const title = await page.title();
-    expect(title).toContain('MasonArt');
+    expect(title).toContain('chobi.art');
     expect(title).toContain('Premium Posters');
   });
 
@@ -563,7 +563,7 @@ test.describe('Home Page - SEO Meta Tags', () => {
   test('should have Open Graph title', async ({ page }) => {
     const ogTitle = await page.locator('meta[property="og:title"]').getAttribute('content');
     expect(ogTitle).toBeTruthy();
-    expect(ogTitle).toContain('MasonArt');
+    expect(ogTitle).toContain('chobi.art');
   });
 
   test('should have Open Graph description', async ({ page }) => {

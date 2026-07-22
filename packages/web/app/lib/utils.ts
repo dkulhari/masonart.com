@@ -1,7 +1,7 @@
 /**
  * Utility Functions
  *
- * Common utility functions for the MasonArt web application.
+ * Common utility functions for the chobi.art web application.
  * Following patterns from docs/poster-app-tech-stack.md
  */
 

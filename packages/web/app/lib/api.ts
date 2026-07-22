@@ -1,7 +1,7 @@
 /**
  * Hono API Client
  *
- * Type-safe API client for communicating with the MasonArt backend API.
+ * Type-safe API client for communicating with the chobi.art backend API.
  * Uses Hono's RPC client for end-to-end type safety.
  *
  * Following patterns from docs/poster-app-tech-stack.md

@@ -1,7 +1,7 @@
 /**
  * Better Auth React Client
  *
- * Provides authentication hooks and methods for the MasonArt frontend.
+ * Provides authentication hooks and methods for the chobi.art frontend.
  * Uses the official Better Auth React client for type-safe auth operations.
  *
  * @see https://better-auth.com/docs/installation

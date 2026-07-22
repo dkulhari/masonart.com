@@ -11,6 +11,8 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
+import { BRAND_NAME, BRAND_URL, SUPPORT_EMAIL } from '@masonart/shared'
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -84,7 +86,7 @@ export interface ProductJsonLdData {
   isAiGenerated?: boolean
   /** Product styles/categories */
   styles?: string[]
-  /** Brand name override (defaults to MasonArt) */
+  /** Brand name override (defaults to chobi.art) */
   brandName?: string
   /** Product URL override */
   productUrl?: string
@@ -101,7 +103,7 @@ export interface BreadcrumbItem {
 export interface ProductJsonLdProps {
   /** Product data */
   product: ProductJsonLdData
-  /** Base URL for the site (defaults to https://masonart.com) */
+  /** Base URL for the site (defaults to https://chobi.art) */
   baseUrl?: string
   /** Optional breadcrumb items for BreadcrumbList structured data */
   breadcrumbs?: BreadcrumbItem[]
@@ -113,8 +115,8 @@ export interface ProductJsonLdProps {
 // Constants
 // ============================================================================
 
-const DEFAULT_BASE_URL = 'https://masonart.com'
-const DEFAULT_BRAND_NAME = 'MasonArt'
+const DEFAULT_BASE_URL = BRAND_URL
+const DEFAULT_BRAND_NAME = BRAND_NAME
 const CURRENCY = 'INR'
 
 // ============================================================================
@@ -291,14 +293,14 @@ function buildOrganizationSchema(baseUrl: string): Record<string, unknown> {
     url: baseUrl,
     logo: `${baseUrl}/logo.png`,
     sameAs: [
-      'https://twitter.com/masonart',
-      'https://instagram.com/masonart',
-      'https://facebook.com/masonart',
+      'https://twitter.com/chobiart',
+      'https://instagram.com/chobiart',
+      'https://facebook.com/chobiart',
     ],
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'customer service',
-      email: 'support@masonart.com',
+      email: SUPPORT_EMAIL,
     },
   }
 }

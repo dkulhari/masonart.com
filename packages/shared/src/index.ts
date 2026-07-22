@@ -23,6 +23,7 @@ export * from './schemas/checkout';
 export * from './schemas/ai-generation';
 
 // Constants
+export * from './constants/brand';
 export * from './constants/sizes';
 export * from './constants/frames';
 export * from './constants/styles';
