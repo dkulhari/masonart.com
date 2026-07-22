@@ -204,7 +204,7 @@ describe('Email Templates', () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('MASONART');
+      expect(template.html).toContain('CHOBI.ART');
     });
   });
 

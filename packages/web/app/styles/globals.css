@@ -17,7 +17,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Primary - MasonArt brand color (warm amber/terracotta) */
+    /* Primary - chobi.art brand color (warm amber/terracotta) */
     --primary: 25 95% 53%;
     --primary-foreground: 60 9.1% 97.8%;
 
@@ -53,7 +53,7 @@
     /* Border Radius */
     --radius: 0.5rem;
 
-    /* MasonArt Brand Color Scale (warm amber/terracotta) */
+    /* chobi.art Brand Color Scale (warm amber/terracotta) */
     --brand: 25 95% 53%;
     --brand-foreground: 60 9.1% 97.8%;
     --brand-50: 36 100% 96%;

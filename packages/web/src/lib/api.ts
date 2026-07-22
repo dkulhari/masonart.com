@@ -1,7 +1,7 @@
 /**
- * API Client Utilities for MasonArt Frontend
+ * API Client Utilities for chobi.art Frontend
  *
- * This module provides typed API client functions for communicating with the MasonArt backend.
+ * This module provides typed API client functions for communicating with the chobi.art backend.
  * It handles HTTP requests, error handling, and provides a clean interface for TanStack Query hooks.
  *
  * Features:

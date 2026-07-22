@@ -384,7 +384,7 @@ function LoginPage() {
           <div className="mb-8 text-center">
             <a href="/" className="inline-block">
               <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                Mason<span className="text-brand-500">Art</span>
+                chobi<span className="text-brand-500">.art</span>
               </h1>
             </a>
             <p className="mt-2 text-sm text-muted-foreground">

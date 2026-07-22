@@ -157,7 +157,7 @@ function baseTemplate(content: string): string {
 <body>
   <div class="container">
     <div class="header">
-      <h1>MASONART</h1>
+      <h1>CHOBI.ART</h1>
     </div>
     ${content}
     <div class="footer">

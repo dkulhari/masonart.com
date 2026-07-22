@@ -504,10 +504,10 @@ test.describe('Robots.txt - Sitemap Reference', () => {
 
     expect(sitemaps.length).toBeGreaterThan(0);
     // Should reference chobi.art domain
-    const hasMasonartDomain = sitemaps.some((s) =>
+    const hasChobiDomain = sitemaps.some((s) =>
       s.value.includes('chobi.art') || s.value.includes('localhost')
     );
-    expect(hasMasonartDomain).toBe(true);
+    expect(hasChobiDomain).toBe(true);
   });
 });
 

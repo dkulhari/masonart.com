@@ -1,5 +1,5 @@
 #!/bin/bash
-# MasonArt Database Reset Script
+# chobi.art Database Reset Script
 # Drops and recreates the database, applies schema, and seeds data
 #
 # Usage:
@@ -75,7 +75,7 @@ DB_NAME="${DB_NAME:-poster_app_dev}"
 
 echo -e "${BLUE}"
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║              MasonArt Database Reset Script                  ║"
+echo "║              chobi.art Database Reset Script                  ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -202,7 +202,7 @@ if [ "$SKIP_SEED" = false ]; then
         echo ""
         echo "Test Credentials (password: TestPassword123!):"
         echo "  Customers: test-customer@example.com, test-customer-2..5@example.com"
-        echo "  Admins:    test-admin@masonart.com, test-admin-2@masonart.com"
+        echo "  Admins:    test-admin@chobi.art, test-admin-2@chobi.art"
         echo "  Trade:     test-trade@interior.com (approved)"
         echo "             test-trade-pending@interior.com (pending)"
     fi

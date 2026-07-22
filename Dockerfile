@@ -1,5 +1,5 @@
 # ============================================
-# MasonArt Production Dockerfile
+# chobi.art Production Dockerfile
 # Multi-stage build for API and Web services
 # ============================================
 

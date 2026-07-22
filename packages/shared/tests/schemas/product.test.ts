@@ -777,7 +777,7 @@ describe('Product SEO Schema', () => {
     title: 'Ocean Waves Abstract Poster - Modern Minimalist Wall Art',
     description: 'Transform your space with this serene ocean waves abstract poster.',
     keywords: ['ocean', 'waves', 'abstract', 'minimalist'],
-    canonicalUrl: 'https://masonart.com/products/ocean-waves-poster',
+    canonicalUrl: 'https://chobi.art/products/ocean-waves-poster',
   };
 
   it('should validate a complete valid SEO object', () => {
@@ -1309,7 +1309,7 @@ describe('Collection Schema', () => {
     isActive: true,
     sortOrder: 1,
     seo: {
-      title: 'New Arrivals - MasonArt',
+      title: 'New Arrivals - chobi.art',
       description: 'Shop our latest poster designs',
       keywords: ['new', 'arrivals', 'posters'],
     },

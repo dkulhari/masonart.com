@@ -6,7 +6,7 @@
 # and ships it over; the mini only ever pulls images. Ingress is the shared
 # platform stack (platform-tunnel + platform-traefik): api/web join the
 # external `platform` network and register their routes via the labels
-# below. MasonArt runs NO cloudflared and holds NO tunnel token. postgres
+# below. chobi.art runs NO cloudflared and holds NO tunnel token. postgres
 # and redis stay on the stack's default network, reachable only by api/web.
 #
 # Every var whose absence would degrade silently in production carries a
