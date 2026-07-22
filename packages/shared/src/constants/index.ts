@@ -8,6 +8,9 @@
  * - Business rules constants
  */
 
+// Export brand identity constants (single source of truth for the rebrand)
+export * from './brand.js';
+
 // Export all size-related constants and helpers
 export * from './sizes.js';
 
