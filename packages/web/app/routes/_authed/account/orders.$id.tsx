@@ -1,5 +1,5 @@
 /**
- * Order Detail Page - MasonArt E-commerce Platform
+ * Order Detail Page - chobi.art E-commerce Platform
  *
  * Displays detailed information about a specific order including:
  * - Order summary and status
@@ -43,7 +43,7 @@ import { ReviewModal } from '~/components/reviews'
 export const Route = createFileRoute('/_authed/account/orders/$id')({
   head: () => ({
     meta: [
-      { title: 'Order Details | MasonArt' },
+      { title: 'Order Details | chobi.art' },
       { name: 'description', content: 'View your order details and tracking information.' },
       { name: 'robots', content: 'noindex' },
     ],

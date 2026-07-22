@@ -1,5 +1,5 @@
 /**
- * Admin Sidebar Component - MasonArt E-commerce Platform
+ * Admin Sidebar Component - chobi.art E-commerce Platform
  *
  * Navigation sidebar for the admin panel with collapsible mobile support,
  * active state highlighting, and role-based navigation items.
@@ -199,7 +199,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-sm font-bold text-white">
                 M
               </div>
-              <span className="text-lg font-bold text-foreground">MasonArt</span>
+              <span className="text-lg font-bold text-foreground">chobi.art</span>
             </a>
           )}
           {isCollapsed && (

@@ -1,5 +1,5 @@
 /**
- * Login Page - MasonArt E-commerce Platform
+ * Login Page - chobi.art E-commerce Platform
  *
  * User authentication page with email/password, phone OTP, and Google OAuth.
  *
@@ -36,10 +36,10 @@ export const Route = createFileRoute('/auth/login')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'Sign In | MasonArt' },
+      { title: 'Sign In | chobi.art' },
       {
         name: 'description',
-        content: 'Sign in to your MasonArt account to access your orders, wishlist, and more.',
+        content: 'Sign in to your chobi.art account to access your orders, wishlist, and more.',
       },
       { name: 'robots', content: 'noindex' },
     ],

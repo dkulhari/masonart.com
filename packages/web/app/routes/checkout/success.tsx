@@ -1,5 +1,5 @@
 /**
- * Order Confirmation (Success) Page - MasonArt E-commerce Platform
+ * Order Confirmation (Success) Page - chobi.art E-commerce Platform
  *
  * Displays order confirmation after successful payment completion.
  * Shows order summary, shipping details, and next steps.
@@ -43,10 +43,10 @@ export const Route = createFileRoute('/checkout/success')({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: 'Order Confirmed | MasonArt' },
+      { title: 'Order Confirmed | chobi.art' },
       {
         name: 'description',
-        content: 'Your order has been placed successfully. Thank you for shopping with MasonArt.',
+        content: 'Your order has been placed successfully. Thank you for shopping with chobi.art.',
       },
       { name: 'robots', content: 'noindex' }, // Don't index success pages
     ],

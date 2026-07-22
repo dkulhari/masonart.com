@@ -1,5 +1,5 @@
 /**
- * Register Page - MasonArt E-commerce Platform
+ * Register Page - chobi.art E-commerce Platform
  *
  * User registration page with email/password and Google OAuth.
  *
@@ -35,10 +35,10 @@ export const Route = createFileRoute('/auth/register')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'Create Account | MasonArt' },
+      { title: 'Create Account | chobi.art' },
       {
         name: 'description',
-        content: 'Create a MasonArt account to save your favorites, track orders, and get personalized recommendations.',
+        content: 'Create a chobi.art account to save your favorites, track orders, and get personalized recommendations.',
       },
       { name: 'robots', content: 'noindex' },
     ],

@@ -1,5 +1,5 @@
 /**
- * Order History Page - MasonArt E-commerce Platform
+ * Order History Page - chobi.art E-commerce Platform
  *
  * Displays user's complete order history with filtering and pagination.
  *
@@ -35,10 +35,10 @@ export const Route = createFileRoute('/_authed/account/orders')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'Order History | MasonArt' },
+      { title: 'Order History | chobi.art' },
       {
         name: 'description',
-        content: 'View your complete order history and track your MasonArt purchases.',
+        content: 'View your complete order history and track your chobi.art purchases.',
       },
       { name: 'robots', content: 'noindex' },
     ],

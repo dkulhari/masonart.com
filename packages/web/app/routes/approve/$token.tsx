@@ -1,5 +1,5 @@
 /**
- * Token-Based Production Approval Page - MasonArt E-commerce Platform
+ * Token-Based Production Approval Page - chobi.art E-commerce Platform
  *
  * Allows customers to review production photos and approve for shipping.
  * Features full-screen photo gallery with zoom and timeline display.
@@ -35,7 +35,7 @@ import { cn, getApiUrl } from '~/lib/utils'
 export const Route = createFileRoute('/approve/$token')({
   head: () => ({
     meta: [
-      { title: 'Review Your Production Photos | MasonArt' },
+      { title: 'Review Your Production Photos | chobi.art' },
       { name: 'description', content: 'Review and approve your custom poster production photos.' },
       { name: 'robots', content: 'noindex' },
     ],
@@ -365,7 +365,7 @@ function CommentsTimeline({ comments }: CommentsTimelineProps) {
                     isAdmin ? 'text-blue-700' : 'text-gray-700'
                   )}
                 >
-                  {isAdmin ? 'MasonArt Team' : 'You'}
+                  {isAdmin ? 'chobi.art Team' : 'You'}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {new Date(comment.createdAt).toLocaleString('en-IN', {

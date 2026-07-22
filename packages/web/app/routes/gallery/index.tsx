@@ -1,5 +1,5 @@
 /**
- * AI Gallery Page - MasonArt E-commerce Platform
+ * AI Gallery Page - chobi.art E-commerce Platform
  *
  * Public gallery showcasing AI-generated artwork shared by users.
  * Features image grid, filtering by style, and pagination.
@@ -133,13 +133,13 @@ export const Route = createFileRoute('/gallery/')({
   },
   head: () => ({
     meta: [
-      { title: 'AI Art Gallery | MasonArt' },
+      { title: 'AI Art Gallery | chobi.art' },
       {
         name: 'description',
         content:
           'Explore stunning AI-generated artwork created by our community. Get inspired and create your own unique poster designs.',
       },
-      { property: 'og:title', content: 'AI Art Gallery | MasonArt' },
+      { property: 'og:title', content: 'AI Art Gallery | chobi.art' },
       {
         property: 'og:description',
         content:

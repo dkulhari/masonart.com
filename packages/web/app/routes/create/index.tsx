@@ -1,5 +1,5 @@
 /**
- * AI Generator Page - MasonArt E-commerce Platform
+ * AI Generator Page - chobi.art E-commerce Platform
  *
  * Create custom AI-generated posters with:
  * - Text prompt input with examples
@@ -71,13 +71,13 @@ interface AIGenerationStatusResponse {
 export const Route = createFileRoute('/create/')({
   head: () => ({
     meta: [
-      { title: 'Create AI Poster | MasonArt' },
+      { title: 'Create AI Poster | chobi.art' },
       {
         name: 'description',
         content:
           'Create unique, custom posters using AI. Choose from various styles like Wabi-Sabi, Abstract, Botanical, and more.',
       },
-      { property: 'og:title', content: 'Create AI Poster | MasonArt' },
+      { property: 'og:title', content: 'Create AI Poster | chobi.art' },
       {
         property: 'og:description',
         content:

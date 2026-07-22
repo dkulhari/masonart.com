@@ -170,7 +170,7 @@ export const Route = createFileRoute('/posters/$slug')({
     if (!loaderData) {
       return {
         meta: [
-          { title: 'Product Not Found | MasonArt' },
+          { title: 'Product Not Found | chobi.art' },
           { name: 'description', content: 'The product you are looking for could not be found.' },
         ],
       }
@@ -189,12 +189,12 @@ export const Route = createFileRoute('/posters/$slug')({
       ? `₹${minPrice.toLocaleString('en-IN')}`
       : `₹${minPrice.toLocaleString('en-IN')} - ₹${maxPrice.toLocaleString('en-IN')}`
 
-    const title = product.seoTitle || `${product.title} | MasonArt`
+    const title = product.seoTitle || `${product.title} | chobi.art`
     const description = product.seoDescription ||
       product.shortDescription ||
-      `Shop ${product.title} at MasonArt. ${priceText}. Premium quality poster available in multiple sizes and frames.`
-    const productUrl = `https://masonart.com/posters/${product.slug}`
-    const imageUrl = primaryImage?.url || 'https://masonart.com/og-default.jpg'
+      `Shop ${product.title} at chobi.art. ${priceText}. Premium quality poster available in multiple sizes and frames.`
+    const productUrl = `https://chobi.art/posters/${product.slug}`
+    const imageUrl = primaryImage?.url || 'https://chobi.art/og-default.jpg'
     const imageAlt = primaryImage?.alt || product.title
 
     // Build keywords from product attributes
@@ -204,7 +204,7 @@ export const Route = createFileRoute('/posters/$slug')({
       ...(product.subjects || []),
       'poster',
       'wall art',
-      'MasonArt',
+      'chobi.art',
     ].filter(Boolean).join(', ')
 
     return {
@@ -220,7 +220,7 @@ export const Route = createFileRoute('/posters/$slug')({
         { property: 'og:description', content: description },
         { property: 'og:type', content: 'product' },
         { property: 'og:url', content: productUrl },
-        { property: 'og:site_name', content: 'MasonArt' },
+        { property: 'og:site_name', content: 'chobi.art' },
         { property: 'og:image', content: imageUrl },
         { property: 'og:image:secure_url', content: imageUrl },
         { property: 'og:image:alt', content: imageAlt },
@@ -234,13 +234,13 @@ export const Route = createFileRoute('/posters/$slug')({
         { property: 'product:price:currency', content: 'INR' },
         { property: 'product:availability', content: product.variants.some(v => v.isAvailable) ? 'in stock' : 'out of stock' },
         { property: 'product:condition', content: 'new' },
-        { property: 'product:brand', content: 'MasonArt' },
+        { property: 'product:brand', content: 'chobi.art' },
         ...(product.sku ? [{ property: 'product:retailer_item_id', content: product.sku }] : []),
 
         // Twitter Card meta tags
         { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:site', content: '@masonart' },
-        { name: 'twitter:creator', content: '@masonart' },
+        { name: 'twitter:site', content: '@chobiart' },
+        { name: 'twitter:creator', content: '@chobiart' },
         { name: 'twitter:title', content: product.title },
         { name: 'twitter:description', content: description },
         { name: 'twitter:image', content: imageUrl },
@@ -394,7 +394,7 @@ function ProductJsonLd({ product }: { product: ProductDetailData }) {
     sku: product.sku,
     brand: {
       '@type': 'Brand',
-      name: 'MasonArt',
+      name: 'chobi.art',
     },
     offers: {
       '@type': 'AggregateOffer',
@@ -407,7 +407,7 @@ function ProductJsonLd({ product }: { product: ProductDetailData }) {
       itemCondition: 'https://schema.org/NewCondition',
       seller: {
         '@type': 'Organization',
-        name: 'MasonArt',
+        name: 'chobi.art',
       },
     },
     ...(product.rating && product.rating.reviewCount > 0 && {
@@ -426,7 +426,7 @@ function ProductJsonLd({ product }: { product: ProductDetailData }) {
     ...(primaryImage && {
       image: primaryImage.url,
     }),
-    url: `https://masonart.com/posters/${product.slug}`,
+    url: `https://chobi.art/posters/${product.slug}`,
   }
 
   return (

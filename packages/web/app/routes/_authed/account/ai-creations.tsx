@@ -1,5 +1,5 @@
 /**
- * AI Creations History Page - MasonArt E-commerce Platform
+ * AI Creations History Page - chobi.art E-commerce Platform
  *
  * Displays user's AI-generated artwork history with filtering and pagination.
  *
@@ -38,10 +38,10 @@ export const Route = createFileRoute('/_authed/account/ai-creations')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'AI Creations | MasonArt' },
+      { title: 'AI Creations | chobi.art' },
       {
         name: 'description',
-        content: 'View and manage your AI-generated artwork created with MasonArt.',
+        content: 'View and manage your AI-generated artwork created with chobi.art.',
       },
       { name: 'robots', content: 'noindex' },
     ],

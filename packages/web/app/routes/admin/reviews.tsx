@@ -1,5 +1,5 @@
 /**
- * Admin Reviews Moderation Page - MasonArt E-commerce Platform
+ * Admin Reviews Moderation Page - chobi.art E-commerce Platform
  *
  * Review moderation dashboard with:
  * - Stats cards showing pending, approved, rejected counts
@@ -51,7 +51,7 @@ export const Route = createFileRoute('/admin/reviews')({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Reviews | Admin | MasonArt' },
+      { title: 'Reviews | Admin | chobi.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),
