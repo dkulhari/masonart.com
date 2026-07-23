@@ -1,5 +1,5 @@
 /**
- * Wallet Page - chobi.art E-commerce Platform
+ * Wallet Page - chobii.art E-commerce Platform
  *
  * Wallet management page for adding funds and viewing transaction history.
  *
@@ -37,10 +37,10 @@ import {
 export const Route = createFileRoute('/_authed/account/wallet')({
   head: () => ({
     meta: [
-      { title: 'My Wallet | chobi.art' },
+      { title: 'My Wallet | chobii.art' },
       {
         name: 'description',
-        content: 'Add funds to your chobi.art wallet for AI art generation.',
+        content: 'Add funds to your chobii.art wallet for AI art generation.',
       },
       { name: 'robots', content: 'noindex' },
     ],
@@ -165,7 +165,7 @@ function WalletPage() {
         key: order.keyId,
         amount: order.amount.paise,
         currency: order.currency,
-        name: 'chobi.art',
+        name: 'chobii.art',
         description: 'Wallet Top-up',
         order_id: order.orderId,
         prefill: {

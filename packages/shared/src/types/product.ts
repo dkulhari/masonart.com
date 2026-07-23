@@ -1,5 +1,5 @@
 /**
- * Product Types for chobi.art Platform
+ * Product Types for chobii.art Platform
  *
  * Defines all product-related types including posters, frames, sizes,
  * and product attributes based on the requirements specification.

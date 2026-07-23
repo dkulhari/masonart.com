@@ -8,7 +8,7 @@ import {
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BRAND_NAME, BRAND_TAGLINE } from '@chobi/shared'
+import { BRAND_NAME, BRAND_TAGLINE } from '@chobii/shared'
 import type * as React from 'react'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
@@ -89,7 +89,7 @@ const fetchSession = createServerFn({ method: 'GET' }).handler(async () => {
 })
 
 /**
- * Root route configuration for the chobi.art e-commerce application.
+ * Root route configuration for the chobii.art e-commerce application.
  * Sets up global SEO metadata, stylesheets, and the main layout structure.
  * Fetches user session server-side for SSR optimization.
  */

@@ -70,7 +70,7 @@ describe('Hono Server Startup', () => {
       const res = await app.request('/');
       const data = await res.json();
 
-      expect(data.name).toBe('chobi.art API');
+      expect(data.name).toBe('chobii.art API');
     });
 
     it('should return version string', async () => {
@@ -167,7 +167,7 @@ describe('Hono Server Startup', () => {
       const res = await app.request('/api/health');
       const data = await res.json();
 
-      expect(data.service).toBe('chobi-api');
+      expect(data.service).toBe('chobii-api');
     });
 
     it('should return valid ISO timestamp', async () => {
@@ -460,9 +460,9 @@ describe('Hono Server Startup', () => {
       const dataHealth = await resHealth.json();
       const dataApiHealth = await resApiHealth.json();
 
-      expect(dataRoot.name).toBe('chobi.art API');
+      expect(dataRoot.name).toBe('chobii.art API');
       expect(dataHealth.status).toBe('healthy');
-      expect(dataApiHealth.service).toBe('chobi-api');
+      expect(dataApiHealth.service).toBe('chobii-api');
     });
   });
 

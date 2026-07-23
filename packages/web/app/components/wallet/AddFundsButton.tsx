@@ -1,5 +1,5 @@
 /**
- * Add Funds Button Component - chobi.art E-commerce Platform
+ * Add Funds Button Component - chobii.art E-commerce Platform
  *
  * Handles Razorpay wallet top-up integration including:
  * - Top-up order creation
@@ -93,7 +93,7 @@ interface AddFundsButtonProps {
 // ============================================================================
 
 const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js'
-const COMPANY_NAME = 'chobi.art'
+const COMPANY_NAME = 'chobii.art'
 const THEME_COLOR = '#10B981' // emerald-500 for wallet
 
 // ============================================================================

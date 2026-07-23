@@ -1,5 +1,5 @@
 /**
- * AI Image Generator Module for chobi.art Platform
+ * AI Image Generator Module for chobii.art Platform
  *
  * Provides AI image generation capabilities using multiple providers:
  * - Replicate (Stable Diffusion SDXL)

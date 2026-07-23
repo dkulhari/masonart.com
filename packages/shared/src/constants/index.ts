@@ -1,5 +1,5 @@
 /**
- * Shared constants for chobi.art platform
+ * Shared constants for chobii.art platform
  *
  * This module exports:
  * - Size constants (poster dimensions)

@@ -1,5 +1,5 @@
 /**
- * Account Dashboard Page - chobi.art E-commerce Platform
+ * Account Dashboard Page - chobii.art E-commerce Platform
  *
  * User account dashboard with profile overview, recent orders,
  * and quick actions.
@@ -32,10 +32,10 @@ import { OrderList, type Order } from '~/components/account/OrderList'
 export const Route = createFileRoute('/_authed/account/')({
   head: () => ({
     meta: [
-      { title: 'My Account | chobi.art' },
+      { title: 'My Account | chobii.art' },
       {
         name: 'description',
-        content: 'Manage your chobi.art account, view orders, and update your preferences.',
+        content: 'Manage your chobii.art account, view orders, and update your preferences.',
       },
       { name: 'robots', content: 'noindex' },
     ],

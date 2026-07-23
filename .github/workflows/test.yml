@@ -1,5 +1,5 @@
 # =============================================================================
-# chobi.art CI Test Pipeline
+# chobii.art CI Test Pipeline
 # =============================================================================
 # Runs all tests (unit, integration, E2E) on push and pull requests
 # Uses PostgreSQL and Redis services for database-dependent tests
@@ -72,10 +72,10 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build shared package
-        run: bun run --filter @chobi/shared build
+        run: bun run --filter @chobii/shared build
 
       - name: Run shared package tests
-        run: bun run --filter @chobi/shared test
+        run: bun run --filter @chobii/shared test
 
   # ===========================================================================
   # Unit Tests - Web Package
@@ -96,10 +96,10 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build shared package (dependency)
-        run: bun run --filter @chobi/shared build
+        run: bun run --filter @chobii/shared build
 
       - name: Run web package tests
-        run: bun run --filter @chobi/web test
+        run: bun run --filter @chobii/web test
         env:
           VITE_API_URL: http://localhost:3000
           VITE_CDN_URL: http://localhost:9000/poster-app-dev
@@ -123,10 +123,10 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build shared package (dependency)
-        run: bun run --filter @chobi/shared build
+        run: bun run --filter @chobii/shared build
 
       - name: Run API package tests (skip DB runtime tests)
-        run: bun run --filter @chobi/api test
+        run: bun run --filter @chobii/api test
         env:
           SKIP_DB_RUNTIME_TESTS: true
           SKIP_REDIS_RUNTIME_TESTS: true
@@ -186,15 +186,15 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build shared package (dependency)
-        run: bun run --filter @chobi/shared build
+        run: bun run --filter @chobii/shared build
 
       - name: Push database schema
-        run: bun run --filter @chobi/api db:push
+        run: bun run --filter @chobii/api db:push
         env:
           DATABASE_URL: postgresql://poster_app:dev_password@localhost:5432/poster_app_test
 
       - name: Run API tests with database
-        run: bun run --filter @chobi/api test
+        run: bun run --filter @chobii/api test
         env:
           SKIP_DB_RUNTIME_TESTS: false
           SKIP_REDIS_RUNTIME_TESTS: false
@@ -254,10 +254,10 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build shared package
-        run: bun run --filter @chobi/shared build
+        run: bun run --filter @chobii/shared build
 
       - name: Push database schema
-        run: bun run --filter @chobi/api db:push
+        run: bun run --filter @chobii/api db:push
         env:
           DATABASE_URL: postgresql://poster_app:dev_password@localhost:5432/poster_app_test
 
@@ -323,15 +323,15 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Build shared package
-        run: bun run --filter @chobi/shared build
+        run: bun run --filter @chobii/shared build
 
       - name: Push database schema
-        run: bun run --filter @chobi/api db:push
+        run: bun run --filter @chobii/api db:push
         env:
           DATABASE_URL: postgresql://poster_app:dev_password@localhost:5432/poster_app_test
 
       - name: Seed database
-        run: bun run --filter @chobi/api seed
+        run: bun run --filter @chobii/api seed
         env:
           DATABASE_URL: postgresql://poster_app:dev_password@localhost:5432/poster_app_test
           REDIS_URL: redis://localhost:6379
@@ -351,7 +351,7 @@ jobs:
           VITE_CDN_URL: http://localhost:9000/poster-app-test
           API_PORT: 3000
           WEB_PORT: 3001
-          APP_NAME: chobi.art
+          APP_NAME: chobii.art
           APP_URL: http://localhost:3001
 
       - name: Upload Playwright report

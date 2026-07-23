@@ -1,5 +1,5 @@
 /**
- * ProductsTable Component - chobi.art E-commerce Platform
+ * ProductsTable Component - chobii.art E-commerce Platform
  *
  * Admin products data table using TanStack Table for:
  * - Sorting, filtering, and pagination

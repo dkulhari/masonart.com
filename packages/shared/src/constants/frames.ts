@@ -1,5 +1,5 @@
 /**
- * Frame Constants for chobi.art Platform
+ * Frame Constants for chobii.art Platform
  *
  * Defines all frame options, mat options, and glass options
  * with their pricing based on the requirements specification (Section 5).

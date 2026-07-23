@@ -1,11 +1,11 @@
-# chobi.art — Deployment Guide
+# chobii.art — Deployment Guide
 
 > **⚠️ SUPERSEDED (2026-07-17).** Production deploys now use the
 > Makefile/GHCR flow behind the shared platform edge stack — see
 > [GO-LIVE-PLAN.md](GO-LIVE-PLAN.md), [OPERATIONS.md](OPERATIONS.md), and
 > `deploy/Makefile`. In particular: images are built on the dev machine
 > (never the mini), schema changes run `make -C deploy migrate`
-> (`drizzle-kit migrate` — **never `db:push` against prod**), and chobi.art
+> (`drizzle-kit migrate` — **never `db:push` against prod**), and chobii.art
 > runs no cloudflared of its own. This file is kept for the local
 > build-on-host walkthrough only.
 
@@ -19,7 +19,7 @@
 ## Architecture
 
 ```
-Users → chobi.art → Cloudflare Edge → Cloudflare Tunnel
+Users → chobii.art → Cloudflare Edge → Cloudflare Tunnel
                                               │
                                     ┌─────────┘
                                     ▼
@@ -55,7 +55,7 @@ All services run locally via Docker Compose. Cloudflare Tunnel exposes them to t
 cloudflared tunnel login
 
 # Create a tunnel
-cloudflared tunnel create chobi
+cloudflared tunnel create chobii
 
 # Note the tunnel ID and credentials file path
 # Credentials are saved to ~/.cloudflared/<TUNNEL_ID>.json
@@ -70,9 +70,9 @@ In the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/):
 
 | Subdomain | Domain | Service |
 |-----------|--------|---------|
-| (empty) | chobi.art | `http://web:3001` |
-| www | chobi.art | `http://web:3001` |
-| api | chobi.art | `http://api:3000` |
+| (empty) | chobii.art | `http://web:3001` |
+| www | chobii.art | `http://web:3001` |
+| api | chobii.art | `http://api:3000` |
 
 Or configure via CLI with a config file at `docker/cloudflared/config.yml`:
 
@@ -81,11 +81,11 @@ tunnel: <YOUR_TUNNEL_ID>
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
-  - hostname: api.chobi.art
+  - hostname: api.chobii.art
     service: http://api:3000
-  - hostname: chobi.art
+  - hostname: chobii.art
     service: http://web:3001
-  - hostname: www.chobi.art
+  - hostname: www.chobii.art
     service: http://web:3001
   - service: http_status:404
 ```
@@ -110,13 +110,13 @@ Fill in all required values:
 ```bash
 # ── Core ──────────────────────────────────────
 NODE_ENV=production
-APP_URL=https://chobi.art
-CORS_ORIGIN=https://chobi.art,https://www.chobi.art
+APP_URL=https://chobii.art
+CORS_ORIGIN=https://chobii.art,https://www.chobii.art
 
 # ── Database ──────────────────────────────────
-POSTGRES_USER=chobi
+POSTGRES_USER=chobii
 POSTGRES_PASSWORD=<strong-random-password>
-POSTGRES_DB=chobi
+POSTGRES_DB=chobii
 
 # ── Auth ──────────────────────────────────────
 BETTER_AUTH_SECRET=<generate: openssl rand -hex 32>
@@ -128,7 +128,7 @@ RAZORPAY_WEBHOOK_SECRET=<from razorpay webhook config>
 
 # ── Email ─────────────────────────────────────
 RESEND_API_KEY=<from resend.com>
-EMAIL_FROM=noreply@chobi.art
+EMAIL_FROM=noreply@chobii.art
 
 # ── SMS ───────────────────────────────────────
 TWO_FACTOR_API_KEY=<from 2factor.in>
@@ -138,11 +138,11 @@ R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 R2_ACCESS_KEY=<from R2 API tokens>
 R2_SECRET_KEY=<from R2 API tokens>
 R2_BUCKET=masonart-prod
-CDN_URL=https://cdn.chobi.art
-VITE_CDN_URL=https://cdn.chobi.art
+CDN_URL=https://cdn.chobii.art
+VITE_CDN_URL=https://cdn.chobii.art
 
 # ── Frontend ──────────────────────────────────
-VITE_API_URL=https://api.chobi.art
+VITE_API_URL=https://api.chobii.art
 
 # ── Cloudflare Tunnel ─────────────────────────
 CLOUDFLARE_TUNNEL_TOKEN=<from tunnel setup>
@@ -180,8 +180,8 @@ docker compose -f docker/docker-compose.prod.yml exec api bun run seed:admin
 
 ### 7. Verify
 
-- Open `https://chobi.art` — should load the web app
-- Check `https://api.chobi.art/health` — should return healthy status
+- Open `https://chobii.art` — should load the web app
+- Check `https://api.chobii.art/health` — should return healthy status
 - Test payments with Razorpay test mode first
 
 ## Cloudflare R2 Setup
@@ -189,7 +189,7 @@ docker compose -f docker/docker-compose.prod.yml exec api bun run seed:admin
 1. In Cloudflare dashboard → **R2** → Create bucket: `masonart-prod`
 2. Go to **R2 → Manage R2 API Tokens** → Create token with read/write access
 3. For CDN serving, connect a custom domain:
-   - R2 bucket settings → **Custom Domains** → Add `cdn.chobi.art`
+   - R2 bucket settings → **Custom Domains** → Add `cdn.chobii.art`
    - Cloudflare automatically creates the DNS record
 
 ## Day-to-Day Operations
@@ -221,7 +221,7 @@ docker compose -f docker/docker-compose.prod.yml exec api bun run db:push
 ### Health Check
 
 ```bash
-curl https://api.chobi.art/health
+curl https://api.chobii.art/health
 ```
 
 Expected response:
@@ -248,17 +248,17 @@ Expected response:
 ```bash
 # Manual backup
 docker compose -f docker/docker-compose.prod.yml exec postgres \
-  pg_dump -U chobi chobi > backup-$(date +%Y%m%d).sql
+  pg_dump -U chobii chobii > backup-$(date +%Y%m%d).sql
 
 # Automated daily backup (add to crontab)
-# 0 2 * * * cd /path/to/chobi.art && docker compose -f docker/docker-compose.prod.yml exec -T postgres pg_dump -U chobi chobi > /backups/chobi-$(date +\%Y\%m\%d).sql
+# 0 2 * * * cd /path/to/chobii.art && docker compose -f docker/docker-compose.prod.yml exec -T postgres pg_dump -U chobii chobii > /backups/chobii-$(date +\%Y\%m\%d).sql
 ```
 
 ### Restore from Backup
 
 ```bash
 docker compose -f docker/docker-compose.prod.yml exec -T postgres \
-  psql -U chobi chobi < backup-20260218.sql
+  psql -U chobii chobii < backup-20260218.sql
 ```
 
 ### Redis Data
@@ -284,7 +284,7 @@ Drizzle ORM does not support automatic rollbacks. For schema issues:
 3. Execute:
    ```bash
    docker compose -f docker/docker-compose.prod.yml exec postgres \
-     psql -U chobi chobi -f /path/to/rollback.sql
+     psql -U chobii chobii -f /path/to/rollback.sql
    ```
 
 ## Troubleshooting
@@ -303,7 +303,7 @@ Check health endpoint: `curl http://localhost:3000/health`
 
 ### Web shows blank page
 
-- Check `VITE_API_URL` is set to `https://api.chobi.art`
+- Check `VITE_API_URL` is set to `https://api.chobii.art`
 - Check web container logs for SSR errors
 
 ### Auth not working
@@ -316,16 +316,16 @@ Check health endpoint: `curl http://localhost:3000/health`
 
 - Verify using live Razorpay keys (not test keys `rzp_test_*`)
 - Check `RAZORPAY_WEBHOOK_SECRET` matches webhook config
-- Configure webhook URL in Razorpay dashboard: `https://api.chobi.art/api/webhooks/razorpay`
+- Configure webhook URL in Razorpay dashboard: `https://api.chobii.art/api/webhooks/razorpay`
 
 ### Email/SMS not sending
 
 - Check `RESEND_API_KEY` / `TWO_FACTOR_API_KEY` are set
-- Verify sender domain (`chobi.art`) is verified in Resend
+- Verify sender domain (`chobii.art`) is verified in Resend
 - Check API logs for delivery errors
 
 ### Images not loading
 
 - Verify R2 bucket exists and credentials are correct
 - Check `CDN_URL` matches the R2 custom domain
-- Test with: `curl https://cdn.chobi.art/products/test.jpg`
+- Test with: `curl https://cdn.chobii.art/products/test.jpg`

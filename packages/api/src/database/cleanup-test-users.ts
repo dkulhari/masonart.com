@@ -11,10 +11,10 @@ import { eq } from "drizzle-orm";
 
 const testEmails = [
   "test-customer@example.com",
-  "test-admin@chobi.art",
+  "test-admin@chobii.art",
   "test-trade@interior.com",
   "test-e2e-customer@example.com",
-  "test-e2e-admin@chobi.art",
+  "test-e2e-admin@chobii.art",
 ];
 
 async function cleanup() {

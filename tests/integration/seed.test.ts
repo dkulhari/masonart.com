@@ -349,7 +349,7 @@ describe('Database Seeding Tests', () => {
             '["test", "seed"]'::jsonb,
             'square',
             '[{"id": "img-1", "url": "https://example.com/test.jpg", "alt": "Test Image", "width": 800, "height": 800, "isPrimary": true, "sortOrder": 0}]'::jsonb,
-            'Test Seed Product | chobi.art',
+            'Test Seed Product | chobii.art',
             'A test product for verifying database seeding functionality',
             'active',
             true,

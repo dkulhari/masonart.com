@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 /**
  * Wallet E2E Tests
  *
- * Tests for the chobi.art wallet management page (/account/wallet).
+ * Tests for the chobii.art wallet management page (/account/wallet).
  *
  * These tests use REAL authentication via stored session state.
  * The auth.setup.ts file creates and saves authentication state

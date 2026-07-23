@@ -12,7 +12,7 @@ import { frames, users, accounts, type NewFrame } from "./schema";
 import { eq } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 
-const ADMIN_EMAIL = "admin@chobi.art";
+const ADMIN_EMAIL = "admin@chobii.art";
 const ADMIN_PASSWORD = "AdminPass123!";
 
 /**
@@ -170,7 +170,7 @@ async function seedAdmin(): Promise<void> {
     email: ADMIN_EMAIL,
     name: "Admin",
     firstName: "Admin",
-    lastName: "chobi.art",
+    lastName: "chobii.art",
     role: "admin",
     emailVerified: true,
     phoneVerified: false,
@@ -197,7 +197,7 @@ async function seedAdmin(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log("\n========================================");
-  console.log("  chobi.art Minimal Seed (Admin + Frames)");
+  console.log("  chobii.art Minimal Seed (Admin + Frames)");
   console.log("========================================\n");
 
   try {

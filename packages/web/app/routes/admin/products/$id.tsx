@@ -1,5 +1,5 @@
 /**
- * Admin Edit Product Page - chobi.art E-commerce Platform
+ * Admin Edit Product Page - chobii.art E-commerce Platform
  *
  * Page for editing an existing product with:
  * - Loading product data
@@ -34,7 +34,7 @@ import {
 export const Route = createFileRoute('/admin/products/$id')({
   head: () => ({
     meta: [
-      { title: 'Edit Product | Admin | chobi.art' },
+      { title: 'Edit Product | Admin | chobii.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

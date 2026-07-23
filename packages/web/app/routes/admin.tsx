@@ -1,5 +1,5 @@
 /**
- * Admin Layout Route - chobi.art E-commerce Platform
+ * Admin Layout Route - chobii.art E-commerce Platform
  *
  * Protected layout route that wraps all admin pages with:
  * - Role-based access control (admin only)
@@ -65,7 +65,7 @@ export const Route = createFileRoute('/admin')({
   },
   head: () => ({
     meta: [
-      { title: 'Admin Panel | chobi.art' },
+      { title: 'Admin Panel | chobii.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

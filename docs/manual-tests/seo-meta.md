@@ -16,7 +16,7 @@
 - [ ] Social media debugger tools accessible (Facebook, Twitter)
 
 ## Overview
-This document covers manual testing of SEO meta tags across all pages of the chobi.art e-commerce platform, including:
+This document covers manual testing of SEO meta tags across all pages of the chobii.art e-commerce platform, including:
 - HTML document title
 - Meta description
 - Viewport and charset meta tags
@@ -42,7 +42,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 3. Inspect `<title>` tag in page source
 
 **Expected Result**:
-- Title format: "chobi.art - Premium Art Prints & Posters" (or similar)
+- Title format: "chobii.art - Premium Art Prints & Posters" (or similar)
 - Title length: 50-60 characters
 - Brand name included
 - Compelling and descriptive
@@ -64,8 +64,8 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 4. Check if title updates
 
 **Expected Result**:
-- Base title: "Posters | chobi.art" or similar
-- With filters: "Abstract Posters | chobi.art"
+- Base title: "Posters | chobii.art" or similar
+- With filters: "Abstract Posters | chobii.art"
 - Category-specific titles when filtering
 - Brand name consistent
 
@@ -86,7 +86,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 3. Verify product name is included
 
 **Expected Result**:
-- Format: "{Product Name} | chobi.art"
+- Format: "{Product Name} | chobii.art"
 - Product name prominent
 - SEO-friendly keywords included
 - 50-60 characters or fewer
@@ -106,7 +106,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 2. Check document title
 
 **Expected Result**:
-- Format: "Shopping Cart | chobi.art"
+- Format: "Shopping Cart | chobii.art"
 - Clear indication of page purpose
 - Brand name included
 
@@ -126,7 +126,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 3. Check document title
 
 **Expected Result**:
-- Format: "Checkout | chobi.art"
+- Format: "Checkout | chobii.art"
 - Clear indication of checkout process
 - No sensitive information in title
 
@@ -147,9 +147,9 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 4. Navigate to /account (logged in)
 
 **Expected Result**:
-- Login: "Sign In | chobi.art"
-- Register: "Create Account | chobi.art"
-- Account: "My Account | chobi.art"
+- Login: "Sign In | chobii.art"
+- Register: "Create Account | chobii.art"
+- Account: "My Account | chobii.art"
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -320,7 +320,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 3. Verify URL is absolute
 
 **Expected Result**:
-- Tag exists: `<link rel="canonical" href="https://chobi.art/">`
+- Tag exists: `<link rel="canonical" href="https://chobii.art/">`
 - Uses HTTPS
 - Uses production domain (or correct environment)
 - No trailing parameters
@@ -342,7 +342,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 4. Verify canonical stays clean
 
 **Expected Result**:
-- Canonical: "https://chobi.art/posters/{category}/{slug}"
+- Canonical: "https://chobii.art/posters/{category}/{slug}"
 - No query parameters in canonical
 - Absolute URL
 - Matches actual product URL
@@ -530,7 +530,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 2. Inspect `<meta property="og:site_name">` tag
 
 **Expected Result**:
-- Tag exists: `og:site_name = "chobi.art"`
+- Tag exists: `og:site_name = "chobii.art"`
 - Consistent across all pages
 - Matches brand name
 
@@ -570,7 +570,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 - `product:price:amount` = product price
 - `product:price:currency` = "INR"
 - `product:availability` = "in stock" or "out of stock"
-- `product:brand` = "chobi.art" or artist name
+- `product:brand` = "chobii.art" or artist name
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -651,7 +651,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 2. Inspect `<meta name="twitter:site">` tag
 
 **Expected Result**:
-- Tag exists: `twitter:site = "@chobi.art"` (or company handle)
+- Tag exists: `twitter:site = "@chobii.art"` (or company handle)
 - Valid Twitter handle format
 - Consistent across all pages
 
@@ -822,7 +822,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 2. Inspect author-related meta tags
 
 **Expected Result**:
-- `<meta name="author" content="chobi.art">` (optional)
+- `<meta name="author" content="chobii.art">` (optional)
 - `<link rel="author" href="...">` (optional)
 - Consistent attribution
 
@@ -948,7 +948,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 2. Inspect meta tags
 
 **Expected Result**:
-- Title: "Page Not Found | chobi.art"
+- Title: "Page Not Found | chobii.art"
 - robots: "noindex, nofollow"
 - Description present
 - OG tags optional
@@ -969,7 +969,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 2. Inspect meta tags
 
 **Expected Result**:
-- Title: "Error | chobi.art"
+- Title: "Error | chobii.art"
 - robots: "noindex, nofollow"
 - User-friendly error page
 
@@ -990,7 +990,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 2. Inspect all meta tags
 
 **Expected Result**:
-- Title: "AI Poster Generator | chobi.art"
+- Title: "AI Poster Generator | chobii.art"
 - Description: Describes AI features
 - og:type: "website"
 - Unique image if possible
@@ -1135,7 +1135,7 @@ This document covers manual testing of SEO meta tags across all pages of the cho
 **Required Meta Tags:**
 - `<meta charset="UTF-8">`
 - `<meta name="viewport" content="width=device-width, initial-scale=1">`
-- `<title>Page Title | chobi.art</title>`
+- `<title>Page Title | chobii.art</title>`
 - `<meta name="description" content="...">`
 - `<link rel="canonical" href="...">`
 

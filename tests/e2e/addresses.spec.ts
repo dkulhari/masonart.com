@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 /**
  * Saved Addresses E2E Tests
  *
- * Tests for the chobi.art saved addresses management page (/account/addresses).
+ * Tests for the chobii.art saved addresses management page (/account/addresses).
  *
  * These tests use REAL authentication via stored session state.
  * The auth.setup.ts file creates and saves authentication state
@@ -144,7 +144,7 @@ test.describe('Addresses Page SEO', () => {
     await page.goto('/account/addresses');
     await page.waitForLoadState('networkidle');
 
-    await expect(page).toHaveTitle(/Saved Addresses.*chobi.art/);
+    await expect(page).toHaveTitle(/Saved Addresses.*chobii.art/);
   });
 
   test('should have robots noindex meta tag', async ({ page }) => {

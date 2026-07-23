@@ -1,5 +1,5 @@
 /**
- * AI Creations History Page - chobi.art E-commerce Platform
+ * AI Creations History Page - chobii.art E-commerce Platform
  *
  * Displays user's AI-generated artwork history with filtering and pagination.
  *
@@ -38,10 +38,10 @@ export const Route = createFileRoute('/_authed/account/ai-creations')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'AI Creations | chobi.art' },
+      { title: 'AI Creations | chobii.art' },
       {
         name: 'description',
-        content: 'View and manage your AI-generated artwork created with chobi.art.',
+        content: 'View and manage your AI-generated artwork created with chobii.art.',
       },
       { name: 'robots', content: 'noindex' },
     ],

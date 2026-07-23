@@ -31,7 +31,7 @@
   {
     "status": "ok",
     "timestamp": "[ISO 8601 timestamp]",
-    "service": "chobi-api",
+    "service": "chobii-api",
     "version": "1.0.0"
   }
   ```
@@ -98,7 +98,7 @@
 
 **Expected Result**:
 - Service field exists
-- Value is "chobi-api"
+- Value is "chobii-api"
 - Type is string
 
 **Actual Result**:
@@ -608,7 +608,7 @@ curl -w "Response time: %{time_total}s\n" -o /dev/null -s http://localhost:3000/
 
 **Expected Result**:
 - Status always "ok"
-- Service name always "chobi-api"
+- Service name always "chobii-api"
 - Version always "1.0.0" (or current version)
 - Only timestamp varies between requests
 
@@ -699,7 +699,7 @@ curl -w "Response time: %{time_total}s\n" -o /dev/null -s http://localhost:3000/
 - Should never cache responses
 - Must be highly reliable and available
 - Timestamp format: ISO 8601 with UTC timezone
-- Service name: "chobi-api"
+- Service name: "chobii-api"
 - Current version: "1.0.0"
 
 ## Integration Examples

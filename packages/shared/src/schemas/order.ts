@@ -1,5 +1,5 @@
 /**
- * Order Schemas for chobi.art Platform
+ * Order Schemas for chobii.art Platform
  *
  * Zod schemas for validating order-related data including:
  * - Orders

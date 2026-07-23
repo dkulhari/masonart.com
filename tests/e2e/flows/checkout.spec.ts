@@ -56,10 +56,10 @@ async function addItemToCart(page: Page, itemOverrides?: Partial<{
   };
 
   await page.evaluate((cartItem) => {
-    const existing = localStorage.getItem('chobi-cart-storage');
+    const existing = localStorage.getItem('chobii-cart-storage');
     let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
     data.state.items.push(cartItem);
-    localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
+    localStorage.setItem('chobii-cart-storage', JSON.stringify(data));
   }, item);
 }
 
@@ -68,7 +68,7 @@ async function addItemToCart(page: Page, itemOverrides?: Partial<{
  */
 async function clearCart(page: Page) {
   await page.evaluate(() => {
-    localStorage.removeItem('chobi-cart-storage');
+    localStorage.removeItem('chobii-cart-storage');
   });
 }
 
@@ -513,7 +513,7 @@ test.describe.skip('Checkout Flow - Complete Purchase', () => {
 
     // Check cart is empty
     const cartData = await page.evaluate(() => {
-      const cart = localStorage.getItem('chobi-cart-storage');
+      const cart = localStorage.getItem('chobii-cart-storage');
       return cart ? JSON.parse(cart) : null;
     });
 
@@ -691,10 +691,10 @@ test.describe.skip('Checkout Flow - Item with Frame', () => {
     };
 
     await page.evaluate((cartItem) => {
-      const existing = localStorage.getItem('chobi-cart-storage');
+      const existing = localStorage.getItem('chobii-cart-storage');
       let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
       data.state.items.push(cartItem);
-      localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
+      localStorage.setItem('chobii-cart-storage', JSON.stringify(data));
     }, framedItem);
 
     await page.reload();
@@ -761,10 +761,10 @@ test.describe.skip('Checkout Flow - AI Generated Item', () => {
     };
 
     await page.evaluate((cartItem) => {
-      const existing = localStorage.getItem('chobi-cart-storage');
+      const existing = localStorage.getItem('chobii-cart-storage');
       let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
       data.state.items.push(cartItem);
-      localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
+      localStorage.setItem('chobii-cart-storage', JSON.stringify(data));
     }, aiItem);
 
     await page.reload();
@@ -1031,7 +1031,7 @@ test.describe.skip('Checkout Flow - Complete User Journeys', () => {
 
     // Cart should be empty
     const cartData = await page.evaluate(() => {
-      const cart = localStorage.getItem('chobi-cart-storage');
+      const cart = localStorage.getItem('chobii-cart-storage');
       return cart ? JSON.parse(cart) : null;
     });
     expect(cartData?.state?.items?.length || 0).toBe(0);

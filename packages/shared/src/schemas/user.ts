@@ -1,5 +1,5 @@
 /**
- * User Schemas for chobi.art Platform
+ * User Schemas for chobii.art Platform
  *
  * Zod schemas for validating user-related data including:
  * - Users

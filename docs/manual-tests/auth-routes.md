@@ -506,7 +506,7 @@ invalid json{
 
 **Expected Result**:
 - `Set-Cookie` header present
-- Cookie name matches session cookie (e.g., `chobi.session`)
+- Cookie name matches session cookie (e.g., `chobii.session`)
 - Cookie has secure flags (HttpOnly, SameSite)
 - Cookie has expiration date
 
@@ -814,7 +814,7 @@ invalid json{
 
 **Steps**:
 1. Send logout request with invalid session cookie
-2. Use cookie: `chobi.session=invalid-token-12345`
+2. Use cookie: `chobii.session=invalid-token-12345`
 3. Check response status
 
 **Expected Result**:
@@ -944,7 +944,7 @@ invalid json{
 **Endpoint**: `GET /api/auth/session`
 
 **Steps**:
-1. Send request with invalid cookie: `chobi.session=invalid-token`
+1. Send request with invalid cookie: `chobii.session=invalid-token`
 2. Check response
 
 **Expected Result**:
@@ -1601,7 +1601,7 @@ invalid json{
 3. Verify cookie attributes
 
 **Expected Result**:
-- Cookie name: `chobi.session`
+- Cookie name: `chobii.session`
 - HttpOnly: true
 - SameSite: Lax or Strict
 - Secure: true (in production)

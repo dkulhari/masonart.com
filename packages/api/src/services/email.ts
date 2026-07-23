@@ -43,8 +43,8 @@ export interface EmailTemplate {
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const DEFAULT_FROM_EMAIL =
-  process.env.EMAIL_FROM || "chobi.art <notifications@chobi.art>";
-const DEFAULT_REPLY_TO = process.env.EMAIL_REPLY_TO || "support@chobi.art";
+  process.env.EMAIL_FROM || "chobii.art <notifications@chobii.art>";
+const DEFAULT_REPLY_TO = process.env.EMAIL_REPLY_TO || "support@chobii.art";
 
 // Initialize Resend client (only if API key is available)
 let resendClient: Resend | null = null;

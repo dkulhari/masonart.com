@@ -4,7 +4,7 @@ import { join } from 'path';
 import { execSync } from 'child_process';
 
 /**
- * Tests to verify @chobi/web package (TanStack Start) builds correctly
+ * Tests to verify @chobii/web package (TanStack Start) builds correctly
  *
  * This test suite validates:
  * - Package configuration (package.json)
@@ -70,7 +70,7 @@ describe('Web Package Build (TanStack Start)', () => {
     });
 
     it('should have correct package name', () => {
-      expect(packageJson.name).toBe('@chobi/web');
+      expect(packageJson.name).toBe('@chobii/web');
     });
 
     it('should be marked as private', () => {
@@ -168,11 +168,11 @@ describe('Web Package Build (TanStack Start)', () => {
       expect(deps.zustand).toBeDefined();
     });
 
-    it('should have @chobi/shared as a workspace dependency', () => {
+    it('should have @chobii/shared as a workspace dependency', () => {
       const deps = packageJson.dependencies as Record<string, string>;
       expect(deps).toBeDefined();
-      expect(deps['@chobi/shared']).toBeDefined();
-      expect(deps['@chobi/shared']).toBe('workspace:*');
+      expect(deps['@chobii/shared']).toBeDefined();
+      expect(deps['@chobii/shared']).toBe('workspace:*');
     });
   });
 
@@ -709,7 +709,7 @@ describe('Web Package Build (TanStack Start)', () => {
       const appConfigPath = join(packageDir, 'app.config.ts');
       const content = readFileSync(appConfigPath, 'utf-8');
       expect(content).toContain('appConfig');
-      expect(content).toContain('chobi.art');
+      expect(content).toContain('chobii.art');
     });
   });
 

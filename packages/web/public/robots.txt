@@ -1,4 +1,4 @@
-# robots.txt for chobi.art
+# robots.txt for chobii.art
 # Poster & Frame E-Commerce Platform
 
 # Allow all search engines
@@ -35,4 +35,4 @@ Disallow: /*&sort=
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://chobi.art/sitemap.xml
+Sitemap: https://chobii.art/sitemap.xml

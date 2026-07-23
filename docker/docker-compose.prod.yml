@@ -6,14 +6,14 @@
 # and ships it over; the mini only ever pulls images. Ingress is the shared
 # platform stack (platform-tunnel + platform-traefik): api/web join the
 # external `platform` network and register their routes via the labels
-# below. chobi.art runs NO cloudflared and holds NO tunnel token. postgres
+# below. chobii.art runs NO cloudflared and holds NO tunnel token. postgres
 # and redis stay on the stack's default network, reachable only by api/web.
 #
 # Every var whose absence would degrade silently in production carries a
 # `:?` guard naming the consequence — a missing value must kill the render,
 # not ship a stack that "deploys fine, breaks quietly" (cc #94, #131).
 
-name: chobi
+name: chobii
 
 networks:
   platform:
@@ -24,7 +24,7 @@ networks:
 services:
   # ── API Server (Bun/Hono; BullMQ worker runs in-process) ─────────────
   api:
-    image: ghcr.io/dkulhari/chobi-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/dkulhari/chobii-api:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -32,15 +32,15 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      DATABASE_URL: postgresql://${POSTGRES_USER:-chobi}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:-chobi}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chobii}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:-chobii}
       REDIS_URL: redis://redis:6379
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in deploy/.env — sessions cannot be signed without it}
-      BETTER_AUTH_URL: https://${PUBLIC_HOSTNAME:-chobi.xtoms.xyz}
-      APP_URL: https://${PUBLIC_HOSTNAME:-chobi.xtoms.xyz}
-      SITE_URL: https://${PUBLIC_HOSTNAME:-chobi.xtoms.xyz}
+      BETTER_AUTH_URL: https://${PUBLIC_HOSTNAME:-chobii.xtoms.xyz}
+      APP_URL: https://${PUBLIC_HOSTNAME:-chobii.xtoms.xyz}
+      SITE_URL: https://${PUBLIC_HOSTNAME:-chobii.xtoms.xyz}
       # Same-origin by construction — single hostname, path-routed (#287)
-      CORS_ORIGIN: https://${PUBLIC_HOSTNAME:-chobi.xtoms.xyz}
-      FRONTEND_URL: https://${PUBLIC_HOSTNAME:-chobi.xtoms.xyz}
+      CORS_ORIGIN: https://${PUBLIC_HOSTNAME:-chobii.xtoms.xyz}
+      FRONTEND_URL: https://${PUBLIC_HOSTNAME:-chobii.xtoms.xyz}
       # Payments — webhooks are the sole source of truth for payment state
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:?set RAZORPAY_KEY_ID in deploy/.env — checkout cannot create orders}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:?set RAZORPAY_KEY_SECRET in deploy/.env}
@@ -60,8 +60,8 @@ services:
       R2_ENDPOINT: ${R2_ENDPOINT:?set R2_ENDPOINT in deploy/.env — uploads black-hole without it}
       R2_ACCESS_KEY: ${R2_ACCESS_KEY:?set R2_ACCESS_KEY in deploy/.env}
       R2_SECRET_KEY: ${R2_SECRET_KEY:?set R2_SECRET_KEY in deploy/.env}
-      R2_BUCKET: ${R2_BUCKET:?set R2_BUCKET in deploy/.env, e.g. chobi-prod}
-      CDN_URL: ${CDN_URL:?set CDN_URL in deploy/.env, e.g. https://chobi-cdn.xtoms.xyz — image URLs break without it}
+      R2_BUCKET: ${R2_BUCKET:?set R2_BUCKET in deploy/.env, e.g. chobii-prod}
+      CDN_URL: ${CDN_URL:?set CDN_URL in deploy/.env, e.g. https://chobii-cdn.xtoms.xyz — image URLs break without it}
       # AI generation — at least one provider key is enforced by `make gen-compose`
       REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
       GOOGLE_AI_STUDIO_KEY: ${GOOGLE_AI_STUDIO_KEY:-}
@@ -75,8 +75,8 @@ services:
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
       # Observability (optional by design — the app runs without them)
       SENTRY_DSN: ${SENTRY_DSN:-}
-      # chobi.xtoms.xyz is the STAGING environment (Razorpay test mode);
-      # override to "production" only in the future chobi.art cutover.
+      # chobii.xtoms.xyz is the STAGING environment (Razorpay test mode);
+      # override to "production" only in the future chobii.art cutover.
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-staging}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -114,13 +114,13 @@ services:
       traefik.docker.network: platform
       # Longer rule outranks the web catch-all (traefik v3 length-based
       # priority). No StripPrefix: the api serves its routes under /api.
-      traefik.http.routers.chobi-api.rule: "Host(`${PUBLIC_HOSTNAME:-chobi.xtoms.xyz}`) && PathPrefix(`/api`)"
-      traefik.http.routers.chobi-api.entrypoints: web
-      traefik.http.services.chobi-api.loadbalancer.server.port: "3000"
+      traefik.http.routers.chobii-api.rule: "Host(`${PUBLIC_HOSTNAME:-chobii.xtoms.xyz}`) && PathPrefix(`/api`)"
+      traefik.http.routers.chobii-api.entrypoints: web
+      traefik.http.services.chobii-api.loadbalancer.server.port: "3000"
 
   # ── Web Server (React Router v7 SSR) ─────────────────────────────────
   web:
-    image: ghcr.io/dkulhari/chobi-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/dkulhari/chobii-web:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -136,7 +136,7 @@ services:
       PORT: "3001"
       # SSR-side fetches go over the compose network, not the public edge
       VITE_API_URL: http://api:3000
-      VITE_APP_URL: https://${PUBLIC_HOSTNAME:-chobi.xtoms.xyz}
+      VITE_APP_URL: https://${PUBLIC_HOSTNAME:-chobii.xtoms.xyz}
       VITE_CDN_URL: ${CDN_URL:?set CDN_URL in deploy/.env}
       VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     depends_on:
@@ -162,21 +162,21 @@ services:
     labels:
       traefik.enable: "true"
       traefik.docker.network: platform
-      traefik.http.routers.chobi-web.rule: "Host(`${PUBLIC_HOSTNAME:-chobi.xtoms.xyz}`)"
-      traefik.http.routers.chobi-web.entrypoints: web
-      traefik.http.services.chobi-web.loadbalancer.server.port: "3001"
+      traefik.http.routers.chobii-web.rule: "Host(`${PUBLIC_HOSTNAME:-chobii.xtoms.xyz}`)"
+      traefik.http.routers.chobii-web.entrypoints: web
+      traefik.http.services.chobii-web.loadbalancer.server.port: "3001"
 
   # ── PostgreSQL — default network only, never on `platform` ───────────
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-chobi}
+      POSTGRES_USER: ${POSTGRES_USER:-chobii}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
-      POSTGRES_DB: ${POSTGRES_DB:-chobi}
+      POSTGRES_DB: ${POSTGRES_DB:-chobii}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chobi}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chobii}"]
       interval: 10s
       timeout: 5s
       retries: 5

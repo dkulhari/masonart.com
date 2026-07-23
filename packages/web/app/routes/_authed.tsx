@@ -1,5 +1,5 @@
 /**
- * Protected Routes Layout - chobi.art E-commerce Platform
+ * Protected Routes Layout - chobii.art E-commerce Platform
  *
  * Layout route that guards all child routes requiring authentication.
  * Uses TanStack Router's beforeLoad hook to check auth state and redirect

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Cart Page E2E Tests
  *
- * Tests for the chobi.art cart page (/cart) including:
+ * Tests for the chobii.art cart page (/cart) including:
  * - Page header and title
  * - Empty cart state
  * - Cart items display
@@ -43,7 +43,7 @@ test.describe('Cart Page - Header', () => {
   test('should have correct page meta title', async ({ page }) => {
     const pageTitle = await page.title();
     expect(pageTitle).toContain('Shopping Cart');
-    expect(pageTitle).toContain('chobi.art');
+    expect(pageTitle).toContain('chobii.art');
   });
 
   test('should have noindex robots meta tag', async ({ page }) => {
@@ -61,7 +61,7 @@ test.describe('Cart Page - Empty Cart State', () => {
     // Navigate first, then clear cart data and reload
     await page.goto('/cart');
     // Clear any existing cart data
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     // Reload to show empty cart state
     await page.reload();
     // Wait for hydration to complete by checking for the h1 title
@@ -176,10 +176,10 @@ async function addItemToCart(page: typeof test.page, itemOverrides?: Partial<{
   };
 
   await page.evaluate((cartItem) => {
-    const existing = localStorage.getItem('chobi-cart-storage');
+    const existing = localStorage.getItem('chobii-cart-storage');
     let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
     data.state.items.push(cartItem);
-    localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
+    localStorage.setItem('chobii-cart-storage', JSON.stringify(data));
   }, item);
 }
 
@@ -191,7 +191,7 @@ test.describe('Cart Page - With Items', () => {
   test.beforeEach(async ({ page }) => {
     // Set up cart with items before each test
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_1',
       productTitle: 'Abstract Waves Poster',
@@ -245,7 +245,7 @@ test.describe('Cart Page - With Items', () => {
 test.describe('Cart Page - Quantity Controls', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_qty',
       productTitle: 'Quantity Test Poster',
@@ -308,7 +308,7 @@ test.describe('Cart Page - Quantity Controls', () => {
 test.describe('Cart Page - Remove Items', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_remove',
       productTitle: 'Remove Test Poster',
@@ -340,7 +340,7 @@ test.describe('Cart Page - Remove Items', () => {
 test.describe('Cart Page - Clear Cart', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_1',
       productTitle: 'First Poster',
@@ -371,7 +371,7 @@ test.describe('Cart Page - Clear Cart', () => {
 
     // Verify localStorage is cleared
     const cartData = await page.evaluate(() => {
-      const data = localStorage.getItem('chobi-cart-storage');
+      const data = localStorage.getItem('chobii-cart-storage');
       return data ? JSON.parse(data) : null;
     });
 
@@ -386,7 +386,7 @@ test.describe('Cart Page - Clear Cart', () => {
 test.describe('Cart Page - Order Summary', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_summary',
       productTitle: 'Summary Test Poster',
@@ -434,7 +434,7 @@ test.describe('Cart Page - Order Summary', () => {
 test.describe('Cart Page - Free Shipping Progress', () => {
   test('should show free shipping progress when under threshold', async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_shipping',
       productTitle: 'Shipping Test Poster',
@@ -450,7 +450,7 @@ test.describe('Cart Page - Free Shipping Progress', () => {
 
   test('should show shipping fee when under threshold', async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_shipping',
       productTitle: 'Shipping Test Poster',
@@ -468,7 +468,7 @@ test.describe('Cart Page - Free Shipping Progress', () => {
 
   test('should show FREE shipping when over threshold', async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_free_shipping',
       productTitle: 'Shipping Test Poster Over', // Avoid "Free" in product name
@@ -486,7 +486,7 @@ test.describe('Cart Page - Free Shipping Progress', () => {
 
   test('should not show progress bar when over threshold', async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_no_progress',
       productTitle: 'No Progress Test Poster',
@@ -508,7 +508,7 @@ test.describe('Cart Page - Free Shipping Progress', () => {
 test.describe('Cart Page - Checkout', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_checkout',
       productTitle: 'Checkout Test Poster',
@@ -537,7 +537,7 @@ test.describe('Cart Page - Checkout', () => {
 test.describe('Cart Page - Trust Badges', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_trust',
       productTitle: 'Trust Badge Test Poster',
@@ -570,7 +570,7 @@ test.describe('Cart Page - Trust Badges', () => {
 test.describe('Cart Page - Payment Methods', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_payment',
       productTitle: 'Payment Methods Test Poster',
@@ -613,7 +613,7 @@ test.describe('Cart Page - Payment Methods', () => {
 test.describe('Cart Page - Item with Frame', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
 
     // Add item with frame
     const item = {
@@ -637,10 +637,10 @@ test.describe('Cart Page - Item with Frame', () => {
     };
 
     await page.evaluate((cartItem) => {
-      const existing = localStorage.getItem('chobi-cart-storage');
+      const existing = localStorage.getItem('chobii-cart-storage');
       let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
       data.state.items.push(cartItem);
-      localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
+      localStorage.setItem('chobii-cart-storage', JSON.stringify(data));
     }, item);
 
     await page.reload();
@@ -666,7 +666,7 @@ test.describe('Cart Page - Item with Frame', () => {
 test.describe('Cart Page - AI Generated Item', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
 
     // Add AI generated item
     const item = {
@@ -693,10 +693,10 @@ test.describe('Cart Page - AI Generated Item', () => {
     };
 
     await page.evaluate((cartItem) => {
-      const existing = localStorage.getItem('chobi-cart-storage');
+      const existing = localStorage.getItem('chobii-cart-storage');
       let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
       data.state.items.push(cartItem);
-      localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
+      localStorage.setItem('chobii-cart-storage', JSON.stringify(data));
     }, item);
 
     await page.reload();
@@ -716,7 +716,7 @@ test.describe('Cart Page - AI Generated Item', () => {
 test.describe('Cart Page - Multiple Items', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_1',
       productTitle: 'First Poster',
@@ -763,7 +763,7 @@ test.describe('Cart Page - Multiple Items', () => {
 test.describe('Cart Page - Product Links', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_link',
       productTitle: 'Link Test Poster',
@@ -793,7 +793,7 @@ test.describe('Cart Page - Product Links', () => {
 test.describe('Cart Page - Responsive Design', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_responsive',
       productTitle: 'Responsive Test Poster',
@@ -853,7 +853,7 @@ test.describe('Cart Page - Responsive Design', () => {
 test.describe('Cart Page - Accessibility', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_a11y',
       productTitle: 'Accessibility Test Poster',
@@ -910,7 +910,7 @@ test.describe('Cart Page - Accessibility', () => {
 test.describe('Cart Page - Persistence', () => {
   test('should persist cart across page reloads', async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_persist',
       productTitle: 'Persistence Test Poster',
@@ -932,7 +932,7 @@ test.describe('Cart Page - Persistence', () => {
 
   test('should persist quantity changes', async ({ page }) => {
     await page.goto('/cart');
-    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobii-cart-storage'));
     await addItemToCart(page, {
       id: 'test_item_qty_persist',
       productTitle: 'Quantity Persist Test',
@@ -1019,7 +1019,7 @@ test.describe('Cart Page - Error Handling', () => {
 
     // Set corrupted data
     await page.evaluate(() => {
-      localStorage.setItem('chobi-cart-storage', 'corrupted-data');
+      localStorage.setItem('chobii-cart-storage', 'corrupted-data');
     });
 
     await page.reload();

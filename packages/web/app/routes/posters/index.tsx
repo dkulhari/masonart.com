@@ -1,5 +1,5 @@
 /**
- * Posters Listing Page - chobi.art E-commerce Platform
+ * Posters Listing Page - chobii.art E-commerce Platform
  *
  * Server-side rendered product listing page featuring:
  * - Product grid with pagination
@@ -188,7 +188,7 @@ export const Route = createFileRoute('/posters/')({
   shouldReload: () => true,
   head: ({ loaderData }) => {
     const defaultDescription = 'Browse our collection of premium posters.'
-    const defaultTitle = 'Shop Posters | chobi.art'
+    const defaultTitle = 'Shop Posters | chobii.art'
 
     if (!loaderData) {
       return {
@@ -213,7 +213,7 @@ export const Route = createFileRoute('/posters/')({
     if (filters.styles.length === 1 && firstStyle) {
       title = `${firstStyle.replace(/-/g, ' ').replace(/\b\w/g, (char: string) => char.toUpperCase())} Posters`
     }
-    title += ' | chobi.art'
+    title += ' | chobii.art'
 
     const description = activeFiltersCount > 0
       ? `Browse our curated collection of ${pagination.total} posters. Filter by style, subject, color, and more.`
@@ -221,7 +221,7 @@ export const Route = createFileRoute('/posters/')({
 
     // Use first product image as OG image, or fall back to default
     const firstProductImage = products[0]?.images?.[0]?.url
-    const ogImage = firstProductImage || 'https://chobi.art/og-posters-collection.jpg'
+    const ogImage = firstProductImage || 'https://chobii.art/og-posters-collection.jpg'
 
     // Build keywords from active filters
     const keywords = [
@@ -231,11 +231,11 @@ export const Route = createFileRoute('/posters/')({
       ...filters.styles,
       ...filters.subjects,
       'home decor',
-      'chobi.art',
+      'chobii.art',
     ].filter(Boolean).join(', ')
 
     // Build canonical URL (without pagination for SEO)
-    const canonicalUrl = 'https://chobi.art/posters'
+    const canonicalUrl = 'https://chobii.art/posters'
 
     return {
       meta: [
@@ -250,10 +250,10 @@ export const Route = createFileRoute('/posters/')({
         { property: 'og:description', content: description },
         { property: 'og:type', content: 'website' },
         { property: 'og:url', content: canonicalUrl },
-        { property: 'og:site_name', content: 'chobi.art' },
+        { property: 'og:site_name', content: 'chobii.art' },
         { property: 'og:image', content: ogImage },
         { property: 'og:image:secure_url', content: ogImage },
-        { property: 'og:image:alt', content: 'chobi.art Poster Collection' },
+        { property: 'og:image:alt', content: 'chobii.art Poster Collection' },
         { property: 'og:image:type', content: 'image/jpeg' },
         { property: 'og:image:width', content: '1200' },
         { property: 'og:image:height', content: '630' },
@@ -261,12 +261,12 @@ export const Route = createFileRoute('/posters/')({
 
         // Twitter Card meta tags
         { name: 'twitter:card', content: 'summary_large_image' },
-        { name: 'twitter:site', content: '@chobiart' },
-        { name: 'twitter:creator', content: '@chobiart' },
+        { name: 'twitter:site', content: '@chobiiart' },
+        { name: 'twitter:creator', content: '@chobiiart' },
         { name: 'twitter:title', content: title },
         { name: 'twitter:description', content: description },
         { name: 'twitter:image', content: ogImage },
-        { name: 'twitter:image:alt', content: 'chobi.art Poster Collection' },
+        { name: 'twitter:image:alt', content: 'chobii.art Poster Collection' },
       ],
       links: [
         {

@@ -15,7 +15,7 @@
 - [ ] PostCSS processing configured
 
 ## Overview
-This document covers manual testing of the chobi.art Tailwind CSS styling system:
+This document covers manual testing of the chobii.art Tailwind CSS styling system:
 - CSS Custom Properties (CSS Variables)
 - Tailwind Configuration
 - PostCSS Processing
@@ -76,7 +76,7 @@ This document covers manual testing of the chobi.art Tailwind CSS styling system
 
 ### TC-003: Brand Color Scale
 
-**Description**: Verify chobi.art brand color scale is defined
+**Description**: Verify chobii.art brand color scale is defined
 
 **Steps**:
 1. Open DevTools, inspect `:root` CSS variables

@@ -153,13 +153,13 @@ function getSmsMessage(type: NotificationType, order: Order): string {
 
   switch (type) {
     case "order_confirmation":
-      return `chobi.art: Your order ${orderNumber} is confirmed! We'll notify you when it ships.`;
+      return `chobii.art: Your order ${orderNumber} is confirmed! We'll notify you when it ships.`;
     case "shipped":
-      return `chobi.art: Your order ${orderNumber} has shipped! Track: ${order.shippingDetails?.trackingUrl || "chobi.art/orders"}`;
+      return `chobii.art: Your order ${orderNumber} has shipped! Track: ${order.shippingDetails?.trackingUrl || "chobii.art/orders"}`;
     case "out_for_delivery":
-      return `chobi.art: Your order ${orderNumber} is out for delivery today!`;
+      return `chobii.art: Your order ${orderNumber} is out for delivery today!`;
     case "delivered":
-      return `chobi.art: Your order ${orderNumber} has been delivered. Enjoy your art!`;
+      return `chobii.art: Your order ${orderNumber} has been delivered. Enjoy your art!`;
   }
 }
 

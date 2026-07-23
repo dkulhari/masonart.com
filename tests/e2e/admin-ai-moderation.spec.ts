@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 /**
  * Admin AI Moderation E2E Tests
  *
- * Tests for the chobi.art admin AI content moderation dashboard including:
+ * Tests for the chobii.art admin AI content moderation dashboard including:
  * - Access control
  * - Stats display
  * - Generation listing and filtering

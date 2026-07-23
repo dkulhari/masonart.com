@@ -1,5 +1,5 @@
 /**
- * OrderDetail Component - chobi.art E-commerce Platform
+ * OrderDetail Component - chobii.art E-commerce Platform
  *
  * Admin order detail view displaying:
  * - Order header with status and actions

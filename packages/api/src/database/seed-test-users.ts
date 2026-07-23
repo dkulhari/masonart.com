@@ -72,7 +72,7 @@ const testUsers = [
   // Admin user
   {
     id: "test-admin-001",
-    email: "test-admin@chobi.art",
+    email: "test-admin@chobii.art",
     name: "Test Admin",
     firstName: "Test",
     lastName: "Admin",
@@ -82,7 +82,7 @@ const testUsers = [
   // Additional admin for parallel testing
   {
     id: "test-admin-002",
-    email: "test-admin-2@chobi.art",
+    email: "test-admin-2@chobii.art",
     name: "Admin Secondary",
     firstName: "Admin",
     lastName: "Secondary",
@@ -239,8 +239,8 @@ async function seedTestUsers(): Promise<void> {
   console.log("    - test-customer-5@example.com (Dave)");
   console.log("");
   console.log("  Admins:");
-  console.log("    - test-admin@chobi.art");
-  console.log("    - test-admin-2@chobi.art");
+  console.log("    - test-admin@chobii.art");
+  console.log("    - test-admin-2@chobii.art");
   console.log("");
   console.log("  Trade:");
   console.log("    - test-trade@interior.com (approved)");

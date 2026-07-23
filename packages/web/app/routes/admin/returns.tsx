@@ -1,5 +1,5 @@
 /**
- * Admin Returns Management Page - chobi.art E-commerce Platform
+ * Admin Returns Management Page - chobii.art E-commerce Platform
  *
  * Return request management dashboard with:
  * - Stats cards showing pending, approved, refunded counts
@@ -56,7 +56,7 @@ export const Route = createFileRoute('/admin/returns')({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Returns | Admin | chobi.art' },
+      { title: 'Returns | Admin | chobii.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

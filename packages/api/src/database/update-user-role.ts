@@ -4,7 +4,7 @@
  * Updates a user's role in the database.
  * Usage: bun run packages/api/src/database/update-user-role.ts <email> <role>
  *
- * Example: bun run packages/api/src/database/update-user-role.ts test-admin@chobi.art admin
+ * Example: bun run packages/api/src/database/update-user-role.ts test-admin@chobii.art admin
  */
 
 import { db, closeDatabase } from "./index";

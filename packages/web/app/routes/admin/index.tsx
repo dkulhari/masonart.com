@@ -1,5 +1,5 @@
 /**
- * Admin Dashboard Page - chobi.art E-commerce Platform
+ * Admin Dashboard Page - chobii.art E-commerce Platform
  *
  * Main admin dashboard displaying key metrics, recent orders,
  * and quick action links for common admin tasks.
@@ -33,7 +33,7 @@ import { getApiUrl } from '~/lib/utils'
 export const Route = createFileRoute('/admin/')({
   head: () => ({
     meta: [
-      { title: 'Dashboard | Admin | chobi.art' },
+      { title: 'Dashboard | Admin | chobii.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

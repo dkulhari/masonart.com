@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 /**
  * Trade Role E2E Tests
  *
- * Tests for the chobi.art trade program user role.
+ * Tests for the chobii.art trade program user role.
  *
  * The trade role is intended for wholesale customers (interior designers,
  * architects, staging companies, etc.) who get access to:

@@ -108,7 +108,7 @@ This document covers manual testing of AI Content Moderation:
 **Description**: Verify HTML title and robots meta
 
 **Expected Result**:
-- Title: "AI Moderation - Admin - chobi.art" (or similar)
+- Title: "AI Moderation - Admin - chobii.art" (or similar)
 - Meta robots: "noindex, nofollow"
 
 **Actual Result**:
@@ -1077,7 +1077,7 @@ This document covers manual testing of AI Content Moderation:
 **Expected Result**:
 - Email received within minutes
 - Subject mentions approval
-- From: chobi.art or noreply@
+- From: chobii.art or noreply@
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -1094,7 +1094,7 @@ This document covers manual testing of AI Content Moderation:
 - Creation details (prompt, style)
 - Generated image thumbnail
 - "Add to Cart" call-to-action link
-- chobi.art branding
+- chobii.art branding
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL

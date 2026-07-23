@@ -1,4 +1,4 @@
-chobi.art Roadmap Implementation Status                                                                                                                            
+chobii.art Roadmap Implementation Status                                                                                                                            
                                                                                                                                                                     
   Based on codebase analysis, here's a summary of what's implemented vs not implemented:                                                                            
                                                                                                                                                                     

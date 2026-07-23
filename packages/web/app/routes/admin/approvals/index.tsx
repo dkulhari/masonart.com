@@ -1,5 +1,5 @@
 /**
- * Admin Approvals Management Page - chobi.art E-commerce Platform
+ * Admin Approvals Management Page - chobii.art E-commerce Platform
  *
  * Production photo approval management dashboard with:
  * - Stats cards showing pending upload, pending approval, changes requested counts
@@ -44,7 +44,7 @@ export const Route = createFileRoute('/admin/approvals/')({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Photo Approvals | Admin | chobi.art' },
+      { title: 'Photo Approvals | Admin | chobii.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

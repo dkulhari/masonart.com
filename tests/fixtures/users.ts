@@ -118,7 +118,7 @@ export function createUser(overrides?: Partial<User>): User {
 export function createAdminUser(overrides?: Partial<User>): User {
   return createUser({
     id: 'user_admin_001',
-    email: 'admin@chobi.art',
+    email: 'admin@chobii.art',
     name: 'Admin User',
     role: 'admin',
     phone: '+919876543211',
@@ -172,7 +172,7 @@ export function createUsers(count: number = 5): User[] {
   const templates = [
     { name: 'John Doe', email: 'john.doe@example.com', role: 'customer' as const },
     { name: 'Jane Smith', email: 'jane.smith@example.com', role: 'customer' as const },
-    { name: 'Admin User', email: 'admin@chobi.art', role: 'admin' as const },
+    { name: 'Admin User', email: 'admin@chobii.art', role: 'admin' as const },
     { name: 'Sarah Designer', email: 'sarah@designs.com', role: 'trade' as const },
     { name: 'Mike Johnson', email: 'mike.j@example.com', role: 'customer' as const },
   ];

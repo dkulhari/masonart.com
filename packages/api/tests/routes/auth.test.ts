@@ -583,7 +583,7 @@ describe('Authentication Routes', () => {
         const res = await app.request('/api/auth/sign-out', {
           method: 'POST',
           headers: {
-            Cookie: 'chobi.session=invalid-token-12345',
+            Cookie: 'chobii.session=invalid-token-12345',
           },
         });
 
@@ -617,7 +617,7 @@ describe('Authentication Routes', () => {
         const res = await app.request('/api/auth/sign-out', {
           method: 'POST',
           headers: {
-            Cookie: 'chobi.session=expired-token',
+            Cookie: 'chobii.session=expired-token',
           },
         });
 
@@ -651,7 +651,7 @@ describe('Authentication Routes', () => {
       it('should handle requests with invalid session cookies gracefully', async () => {
         const res = await app.request('/api/auth/get-session', {
           headers: {
-            Cookie: 'chobi.session=invalid-session-token',
+            Cookie: 'chobii.session=invalid-session-token',
           },
         });
 

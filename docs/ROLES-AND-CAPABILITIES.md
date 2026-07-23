@@ -1,6 +1,6 @@
-# chobi.art Roles and Capabilities
+# chobii.art Roles and Capabilities
 
-A comprehensive guide to user roles, permissions, and access control in the chobi.art platform.
+A comprehensive guide to user roles, permissions, and access control in the chobii.art platform.
 
 **Last Updated:** 2026-01-27
 
@@ -23,7 +23,7 @@ A comprehensive guide to user roles, permissions, and access control in the chob
 
 ## Role Overview
 
-chobi.art uses a role-based access control (RBAC) system with five distinct user types:
+chobii.art uses a role-based access control (RBAC) system with five distinct user types:
 
 | Role | Database Value | Description |
 |------|----------------|-------------|
@@ -319,7 +319,7 @@ When created via `init-super-admin.ts`:
 bun run packages/api/src/database/init-super-admin.ts
 
 # Environment variables (optional)
-SUPER_ADMIN_EMAIL=admin@chobi.art
+SUPER_ADMIN_EMAIL=admin@chobii.art
 SUPER_ADMIN_PASSWORD=SuperAdmin123!
 ```
 

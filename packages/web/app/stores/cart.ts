@@ -335,7 +335,7 @@ export const useCartStore = create<CartStore>()(
       },
     }),
     {
-      name: "chobi-cart-storage",
+      name: "chobii-cart-storage",
       storage: createJSONStorage(() => {
         // Check if we're in a browser environment
         if (typeof window === "undefined") {

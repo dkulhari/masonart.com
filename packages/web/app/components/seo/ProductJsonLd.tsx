@@ -11,7 +11,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { BRAND_NAME, BRAND_URL, SUPPORT_EMAIL } from '@chobi/shared'
+import { BRAND_NAME, BRAND_URL, SUPPORT_EMAIL } from '@chobii/shared'
 
 // ============================================================================
 // Types
@@ -86,7 +86,7 @@ export interface ProductJsonLdData {
   isAiGenerated?: boolean
   /** Product styles/categories */
   styles?: string[]
-  /** Brand name override (defaults to chobi.art) */
+  /** Brand name override (defaults to chobii.art) */
   brandName?: string
   /** Product URL override */
   productUrl?: string
@@ -103,7 +103,7 @@ export interface BreadcrumbItem {
 export interface ProductJsonLdProps {
   /** Product data */
   product: ProductJsonLdData
-  /** Base URL for the site (defaults to https://chobi.art) */
+  /** Base URL for the site (defaults to https://chobii.art) */
   baseUrl?: string
   /** Optional breadcrumb items for BreadcrumbList structured data */
   breadcrumbs?: BreadcrumbItem[]
@@ -293,9 +293,9 @@ function buildOrganizationSchema(baseUrl: string): Record<string, unknown> {
     url: baseUrl,
     logo: `${baseUrl}/logo.png`,
     sameAs: [
-      'https://twitter.com/chobiart',
-      'https://instagram.com/chobiart',
-      'https://facebook.com/chobiart',
+      'https://twitter.com/chobiiart',
+      'https://instagram.com/chobiiart',
+      'https://facebook.com/chobiiart',
     ],
     contactPoint: {
       '@type': 'ContactPoint',

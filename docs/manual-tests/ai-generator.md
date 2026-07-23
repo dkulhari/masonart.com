@@ -51,7 +51,7 @@
 3. Inspect meta description
 
 **Expected Result**:
-- Title contains "Create AI Poster" and "chobi.art"
+- Title contains "Create AI Poster" and "chobii.art"
 - Meta description mentions AI poster generation
 - Open Graph tags present
 

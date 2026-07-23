@@ -1,5 +1,5 @@
 # ============================================
-# chobi.art Production Dockerfile
+# chobii.art Production Dockerfile
 # Multi-stage build for API and Web services
 # ============================================
 

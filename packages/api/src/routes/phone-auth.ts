@@ -170,7 +170,7 @@ phoneAuthApp.post(
           .values({
             id: userId,
             name: userName,
-            email: `${normalizedPhone}@phone.chobi.art`, // Placeholder email
+            email: `${normalizedPhone}@phone.chobii.art`, // Placeholder email
             emailVerified: false,
             phone: normalizedPhone,
             phoneVerified: true,
@@ -232,7 +232,7 @@ phoneAuthApp.post(
         .where(eq(verifications.identifier, `phone:${normalizedPhone}`));
 
       // Set session cookie
-      const cookieName = "chobi.session_token";
+      const cookieName = "chobii.session_token";
       const isProduction = process.env.NODE_ENV === "production";
 
       c.header(

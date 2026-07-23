@@ -17,7 +17,7 @@ test.skip(true, 'Auth issues - storage state not applying correctly');
 /**
  * AI Creations History Page E2E Tests
  *
- * Tests for the chobi.art AI creations history page (/account/ai-creations).
+ * Tests for the chobii.art AI creations history page (/account/ai-creations).
  *
  * Based on actual implementation in:
  * - packages/web/app/routes/account/ai-creations.tsx
@@ -176,7 +176,7 @@ test.describe('AI Creations Page Header', () => {
   });
 
   test('should have correct HTML title', async ({ page }) => {
-    await expect(page).toHaveTitle(/AI Creations.*chobi.art/);
+    await expect(page).toHaveTitle(/AI Creations.*chobii.art/);
   });
 
   test('should have noindex robots meta tag', async ({ page }) => {

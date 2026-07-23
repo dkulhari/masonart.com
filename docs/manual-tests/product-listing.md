@@ -14,7 +14,7 @@
 - [ ] Docker services (PostgreSQL, Redis) running
 
 ## Overview
-This document covers manual testing of the chobi.art product listing page, including:
+This document covers manual testing of the chobii.art product listing page, including:
 - Page header with product count
 - Filter sidebar (desktop) and sheet (mobile)
 - Active filter tags
@@ -869,8 +869,8 @@ This document covers manual testing of the chobi.art product listing page, inclu
 4. Check title again
 
 **Expected Result**:
-- Default: "Shop Posters | chobi.art"
-- With style: "Abstract Posters | chobi.art"
+- Default: "Shop Posters | chobii.art"
+- With style: "Abstract Posters | chobii.art"
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -905,7 +905,7 @@ This document covers manual testing of the chobi.art product listing page, inclu
 2. Check canonical link
 
 **Expected Result**:
-- Canonical URL: https://chobi.art/posters
+- Canonical URL: https://chobii.art/posters
 - Pagination not included in canonical
 
 **Actual Result**:

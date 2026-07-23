@@ -16,7 +16,7 @@
 - [ ] Logged in as test user
 
 ## Overview
-This document covers manual testing of the chobi.art user account dashboard:
+This document covers manual testing of the chobii.art user account dashboard:
 - Authentication check and redirect
 - Profile card with user information
 - Recent orders section
@@ -120,7 +120,7 @@ This document covers manual testing of the chobi.art user account dashboard:
 2. Inspect page source or DevTools
 
 **Expected Result**:
-- Title contains "My Account" and "chobi.art"
+- Title contains "My Account" and "chobii.art"
 - robots meta tag contains "noindex"
 - meta description contains "account"
 

@@ -1,5 +1,5 @@
 /**
- * @chobi/shared - Shared types, schemas, and constants for chobi.art platform
+ * @chobii/shared - Shared types, schemas, and constants for chobii.art platform
  *
  * This package contains:
  * - TypeScript interfaces and types (./types/)

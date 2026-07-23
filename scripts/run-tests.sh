@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =============================================================================
-# chobi.art Unified Test Runner
+# chobii.art Unified Test Runner
 # =============================================================================
 # Single script for all test execution modes: unit, integration, E2E, CI, setup.
 #
@@ -72,9 +72,9 @@ OVERALL_STATUS=0
 DEV_PID=""
 
 # File paths
-PID_FILE="/tmp/chobi-dev.pid"
-CREDENTIALS_FILE="/tmp/chobi-credentials.txt"
-DEV_LOG="/tmp/chobi-dev.log"
+PID_FILE="/tmp/chobii-dev.pid"
+CREDENTIALS_FILE="/tmp/chobii-credentials.txt"
+DEV_LOG="/tmp/chobii-dev.log"
 
 # Project root (resolve from script location)
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -260,11 +260,11 @@ setup_database() {
 write_credentials_file() {
     cat > "$CREDENTIALS_FILE" << 'CRED_HEADER'
 ========================================
-  chobi.art Seeded Credentials
+  chobii.art Seeded Credentials
 ========================================
 
 Admin:
-  admin@chobi.art / AdminPass123! (admin)
+  admin@chobii.art / AdminPass123! (admin)
 CRED_HEADER
 
     if [ "$SEED_USERS" = true ]; then
@@ -278,8 +278,8 @@ Customers:
   test-customer-5@example.com / TestPassword123! (customer)
 
 Admins:
-  test-admin@chobi.art / TestPassword123! (admin)
-  test-admin-2@chobi.art / TestPassword123! (admin)
+  test-admin@chobii.art / TestPassword123! (admin)
+  test-admin-2@chobii.art / TestPassword123! (admin)
 
 Trade:
   test-trade@interior.com / TestPassword123! (trade, approved)
@@ -527,7 +527,7 @@ run_e2e_tests() {
 
 cmd_unit() {
     print_status "=========================================="
-    print_status "chobi.art Unit Tests"
+    print_status "chobii.art Unit Tests"
     print_status "=========================================="
     echo ""
     run_unit_tests
@@ -536,7 +536,7 @@ cmd_unit() {
 
 cmd_integration() {
     print_status "=========================================="
-    print_status "chobi.art Integration Tests"
+    print_status "chobii.art Integration Tests"
     print_status "=========================================="
     echo ""
     run_integration_tests
@@ -546,7 +546,7 @@ cmd_integration() {
 cmd_e2e() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              chobi.art E2E Test Suite                        ║"
+    echo "║              chobii.art E2E Test Suite                        ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 
@@ -574,7 +574,7 @@ cmd_e2e() {
 
 cmd_ci() {
     print_status "=========================================="
-    print_status "chobi.art CI Test Suite"
+    print_status "chobii.art CI Test Suite"
     print_status "=========================================="
     echo ""
 
@@ -593,7 +593,7 @@ cmd_ci() {
 cmd_setup() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              chobi.art Environment Setup                     ║"
+    echo "║              chobii.art Environment Setup                     ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 
@@ -617,7 +617,7 @@ cmd_setup() {
     echo ""
     echo "Seeded data:"
     echo "  • Frames: 8 frame options"
-    echo "  • Admin:  admin@chobi.art / AdminPass123!"
+    echo "  • Admin:  admin@chobii.art / AdminPass123!"
     [ "$SEED_PRODUCTS" = true ] && echo "  • Products: 36 sample products with variants"
     [ "$SEED_USERS" = true ] && echo "  • Test users: 9 users (customers, admins, trade)"
     echo ""
@@ -635,7 +635,7 @@ cmd_setup() {
 cmd_stop() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              chobi.art Environment Stop                      ║"
+    echo "║              chobii.art Environment Stop                      ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 
@@ -658,7 +658,7 @@ cmd_stop() {
 cmd_clean() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              chobi.art Environment Clean                     ║"
+    echo "║              chobii.art Environment Clean                     ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 
@@ -685,7 +685,7 @@ cmd_clean() {
 cmd_all() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║              chobi.art Full Test Suite                       ║"
+    echo "║              chobii.art Full Test Suite                       ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 

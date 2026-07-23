@@ -1,5 +1,5 @@
 /**
- * Order History Page - chobi.art E-commerce Platform
+ * Order History Page - chobii.art E-commerce Platform
  *
  * Displays user's complete order history with filtering and pagination.
  *
@@ -35,10 +35,10 @@ export const Route = createFileRoute('/_authed/account/orders')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'Order History | chobi.art' },
+      { title: 'Order History | chobii.art' },
       {
         name: 'description',
-        content: 'View your complete order history and track your chobi.art purchases.',
+        content: 'View your complete order history and track your chobii.art purchases.',
       },
       { name: 'robots', content: 'noindex' },
     ],

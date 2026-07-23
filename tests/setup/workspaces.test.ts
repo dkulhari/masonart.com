@@ -80,7 +80,7 @@ describe('Bun Workspaces Configuration', () => {
         it('should have proper scoped name', () => {
           const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
-          expect(packageJson.name).toBe(`@chobi/${packageName}`);
+          expect(packageJson.name).toBe(`@chobii/${packageName}`);
         });
 
         it('should be marked as private', () => {
@@ -154,8 +154,8 @@ describe('Bun Workspaces Configuration', () => {
       const packageJson = JSON.parse(readFileSync(webPackagePath, 'utf-8'));
 
       expect(packageJson.dependencies).toBeDefined();
-      expect(packageJson.dependencies).toHaveProperty('@chobi/shared');
-      expect(packageJson.dependencies['@chobi/shared']).toBe('workspace:*');
+      expect(packageJson.dependencies).toHaveProperty('@chobii/shared');
+      expect(packageJson.dependencies['@chobii/shared']).toBe('workspace:*');
     });
   });
 

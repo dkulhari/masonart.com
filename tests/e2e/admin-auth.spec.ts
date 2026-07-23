@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 /**
  * Admin Authentication & Access Control E2E Tests
  *
- * Tests for the chobi.art admin panel authentication and authorization including:
+ * Tests for the chobii.art admin panel authentication and authorization including:
  * - Unauthenticated access (should redirect to login)
  * - Non-admin user access (should be denied)
  * - Admin role access (should work)
@@ -262,9 +262,9 @@ test.describe('Admin Role Access', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Should show admin user's name or email
-    // The seeded admin is "E2E Test Admin" with email test-e2e-admin@chobi.art
+    // The seeded admin is "E2E Test Admin" with email test-e2e-admin@chobii.art
     const userInfo = page.locator('aside').filter({
-      hasText: /E2E Test Admin|test-e2e-admin@chobi.art|Admin/i
+      hasText: /E2E Test Admin|test-e2e-admin@chobii.art|Admin/i
     });
     await expect(userInfo).toBeVisible({ timeout: 10000 });
   });

@@ -39,7 +39,7 @@ This document covers end-to-end manual testing of the complete authentication us
 
 **Steps**:
 1. Navigate to /auth/register
-2. Verify chobi.art branding is visible
+2. Verify chobii.art branding is visible
 3. Fill registration form:
    - Name: New User
    - Email: newuser@example.com (use unique email)

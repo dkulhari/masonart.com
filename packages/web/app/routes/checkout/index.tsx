@@ -1,5 +1,5 @@
 /**
- * Checkout Page - chobi.art E-commerce Platform
+ * Checkout Page - chobii.art E-commerce Platform
  *
  * Multi-step checkout flow with address form, delivery options,
  * order summary, and payment integration.
@@ -40,7 +40,7 @@ import { useSession } from '~/lib/auth-client'
 export const Route = createFileRoute('/checkout/')({
   head: () => ({
     meta: [
-      { title: 'Checkout | chobi.art' },
+      { title: 'Checkout | chobii.art' },
       {
         name: 'description',
         content: 'Complete your order. Secure checkout with multiple payment options.',

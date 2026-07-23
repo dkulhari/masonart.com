@@ -58,7 +58,7 @@ This document covers manual testing of the Admin Dashboard page (`/admin/dashboa
 
 **Expected Result**:
 - H1: "Dashboard"
-- Document title contains "Dashboard" and "chobi.art"
+- Document title contains "Dashboard" and "chobii.art"
 - Welcome message with admin name
 
 **Actual Result**:

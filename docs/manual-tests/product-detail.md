@@ -15,7 +15,7 @@
 - [ ] At least one product with multiple variants and frames
 
 ## Overview
-This document covers manual testing of the chobi.art product detail page, including:
+This document covers manual testing of the chobii.art product detail page, including:
 - Product image gallery
 - Product information display
 - Size selection
@@ -831,7 +831,7 @@ This document covers manual testing of the chobi.art product detail page, includ
 2. Check document title
 
 **Expected Result**:
-- Title format: "{Product Title} | chobi.art"
+- Title format: "{Product Title} | chobii.art"
 - Or custom seoTitle if set
 
 **Actual Result**:
@@ -851,7 +851,7 @@ This document covers manual testing of the chobi.art product detail page, includ
 **Expected Result**:
 - Contains product name
 - Contains price information
-- Mentions chobi.art
+- Mentions chobii.art
 - Compelling marketing copy
 
 **Actual Result**:
@@ -914,7 +914,7 @@ This document covers manual testing of the chobi.art product detail page, includ
 2. Check canonical link element
 
 **Expected Result**:
-- Canonical URL: https://chobi.art/posters/{slug}
+- Canonical URL: https://chobii.art/posters/{slug}
 - No query parameters
 
 **Actual Result**:
@@ -937,7 +937,7 @@ This document covers manual testing of the chobi.art product detail page, includ
 - description present
 - image array
 - sku present
-- brand = "chobi.art"
+- brand = "chobii.art"
 - offers with AggregateOffer
 - lowPrice and highPrice
 - priceCurrency = "INR"
