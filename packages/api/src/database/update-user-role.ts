@@ -23,7 +23,7 @@ if (!emailArg || !roleArg) {
 const email: string = emailArg;
 const role: string = roleArg;
 
-const validRoles = ["customer", "trade", "admin", "super-admin"];
+const validRoles = ["customer", "trade", "content-manager", "admin", "super-admin"];
 if (!validRoles.includes(roleArg)) {
   console.error(`Invalid role: ${roleArg}`);
   console.error(`Valid roles: ${validRoles.join(", ")}`);
@@ -35,7 +35,12 @@ async function updateRole() {
     const result = await db
       .update(users)
       .set({
-        role: role as "customer" | "trade" | "admin" | "super-admin",
+        role: role as
+          | "customer"
+          | "trade"
+          | "content-manager"
+          | "admin"
+          | "super-admin",
         emailVerified: true,
         updatedAt: new Date(),
       })
