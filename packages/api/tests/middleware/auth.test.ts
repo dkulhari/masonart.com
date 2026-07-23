@@ -6,6 +6,7 @@ import {
   optionalAuth,
   requireRole,
   requireAdmin,
+  requireContentManager,
   requireTrade,
   requireVerified,
   requireAICredits,
@@ -13,6 +14,7 @@ import {
   hasRole,
   hasAnyRole,
   isAdmin,
+  isContentManager,
   canAccess,
   type AuthUser,
   type AuthSession,
@@ -243,6 +245,26 @@ describe('Auth Middleware', () => {
 
       it('should return false for null user', () => {
         expect(isAdmin(null)).toBe(false);
+      });
+    });
+
+    describe('isContentManager', () => {
+      it.each(['content-manager', 'admin', 'super-admin'] as const)(
+        'should return true for %s role',
+        (role) => {
+          expect(isContentManager(createMockUser({ role }))).toBe(true);
+        }
+      );
+
+      it.each(['customer', 'trade'] as const)(
+        'should return false for %s role',
+        (role) => {
+          expect(isContentManager(createMockUser({ role }))).toBe(false);
+        }
+      );
+
+      it('should return false for null user', () => {
+        expect(isContentManager(null)).toBe(false);
       });
     });
 
@@ -809,6 +831,73 @@ describe('Auth Middleware', () => {
       });
 
       const res = await testApp.request('/protected');
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // ==========================================================================
+  // requireContentManager Middleware Tests
+  // ==========================================================================
+
+  describe('requireContentManager Middleware', () => {
+    it('should be defined', () => {
+      expect(requireContentManager).toBeDefined();
+      expect(typeof requireContentManager).toBe('function');
+    });
+
+    it.each(['content-manager', 'admin', 'super-admin'] as const)(
+      'should allow %s users',
+      async (role) => {
+        const testApp = new Hono<{ Variables: AuthVariables }>();
+        testApp.get('/content', (c, next) => {
+          c.set('user', createMockUser({ role }));
+          c.set('session', createMockSession());
+          return next();
+        }, requireContentManager, (c) => {
+          return c.json({ message: 'content area' });
+        });
+
+        const res = await testApp.request('/content');
+        expect(res.status).toBe(200);
+      }
+    );
+
+    it.each(['customer', 'trade'] as const)(
+      'should deny %s users with 403',
+      async (role) => {
+        const testApp = new Hono<{ Variables: AuthVariables }>();
+        testApp.get('/content', (c, next) => {
+          c.set('user', createMockUser({ role }));
+          c.set('session', createMockSession());
+          return next();
+        }, requireContentManager, (c) => {
+          return c.json({ message: 'content area' });
+        });
+        testApp.onError((err, c) => {
+          if (err instanceof HTTPException) {
+            return err.getResponse();
+          }
+          return c.json({ error: err.message }, 500);
+        });
+
+        const res = await testApp.request('/content');
+        expect(res.status).toBe(403);
+      }
+    );
+
+    it('should return 401 for unauthenticated requests', async () => {
+      const testApp = new Hono<{ Variables: AuthVariables }>();
+      testApp.get('/content', requireContentManager, (c) => {
+        return c.json({ message: 'content area' });
+      });
+      testApp.onError((err, c) => {
+        if (err instanceof HTTPException) {
+          return err.getResponse();
+        }
+        return c.json({ error: err.message }, 500);
+      });
+
+      const res = await testApp.request('/content');
       expect(res.status).toBe(401);
     });
   });
