@@ -14,7 +14,7 @@ import { AddressSchema, AddressCreateSchema } from './order';
 /**
  * User role enum
  */
-export const UserRoleSchema = z.enum(['admin', 'customer', 'trade']);
+export const UserRoleSchema = z.enum(['customer', 'trade', 'content-manager', 'admin', 'super-admin']);
 export type UserRole = z.infer<typeof UserRoleSchema>;
 
 /**

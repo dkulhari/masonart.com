@@ -325,7 +325,12 @@ export type Auth = typeof auth;
 /**
  * User role type matching the database enum
  */
-export type UserRole = "customer" | "trade" | "admin" | "super-admin";
+export type UserRole =
+  | "customer"
+  | "trade"
+  | "content-manager"
+  | "admin"
+  | "super-admin";
 
 /**
  * Session type from Better Auth
