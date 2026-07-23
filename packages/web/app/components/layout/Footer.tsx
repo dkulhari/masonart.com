@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { Facebook, Instagram, Twitter, Mail } from 'lucide-react'
 
 /**
- * Footer component for the chobi.art e-commerce platform.
+ * Footer component for the chobii.art e-commerce platform.
  * Contains navigation links, social media, newsletter signup,
  * and legal information.
  */
@@ -17,7 +17,7 @@ export function Footer() {
           <div className="space-y-4">
             <Link to="/" className="inline-block">
               <span className="text-xl font-bold tracking-tight text-foreground">
-                chobi<span className="text-primary">.art</span>
+                chobii<span className="text-primary">.art</span>
               </span>
             </Link>
             <p className="text-sm text-muted-foreground">
@@ -118,7 +118,7 @@ export function Footer() {
         {/* Bottom Section */}
         <div className="mt-12 flex flex-col items-center justify-between space-y-4 border-t border-border pt-8 md:flex-row md:space-y-0">
           <p className="text-sm text-muted-foreground">
-            &copy; {currentYear} chobi.art. All rights reserved.
+            &copy; {currentYear} chobii.art. All rights reserved.
           </p>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             <FooterLink to="/privacy">Privacy Policy</FooterLink>

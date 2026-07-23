@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 /**
  * Order Confirmation Page E2E Tests
  *
- * Tests for the chobi.art order confirmation page (/checkout/success) including:
+ * Tests for the chobii.art order confirmation page (/checkout/success) including:
  * - Success header with order number
  * - Order number copy functionality
  * - Order items display
@@ -768,7 +768,7 @@ test.describe('Order Confirmation - SEO Meta Tags', () => {
     await page.goto('/checkout/success?orderNumber=ORD-20260119-001');
     const title = await page.title();
     expect(title).toContain('Order Confirmed');
-    expect(title).toContain('chobi.art');
+    expect(title).toContain('chobii.art');
   });
 
   test('should have noindex robots meta tag', async ({ page }) => {

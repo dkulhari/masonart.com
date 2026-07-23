@@ -503,11 +503,11 @@ test.describe('Robots.txt - Sitemap Reference', () => {
     const sitemaps = getDirectivesByType(directives, 'Sitemap');
 
     expect(sitemaps.length).toBeGreaterThan(0);
-    // Should reference chobi.art domain
-    const hasChobiDomain = sitemaps.some((s) =>
-      s.value.includes('chobi.art') || s.value.includes('localhost')
+    // Should reference chobii.art domain
+    const hasChobiiDomain = sitemaps.some((s) =>
+      s.value.includes('chobii.art') || s.value.includes('localhost')
     );
-    expect(hasChobiDomain).toBe(true);
+    expect(hasChobiiDomain).toBe(true);
   });
 });
 

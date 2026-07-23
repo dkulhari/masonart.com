@@ -1,5 +1,5 @@
 /**
- * Notification Preferences Page - chobi.art E-commerce Platform
+ * Notification Preferences Page - chobii.art E-commerce Platform
  *
  * Allows users to manage their email and SMS notification preferences.
  * Supports optimistic updates with rollback on error.
@@ -32,7 +32,7 @@ import { notificationPreferencesApi, type NotificationPreferencesResponse } from
 export const Route = createFileRoute('/_authed/account/notifications')({
   head: () => ({
     meta: [
-      { title: 'Notification Preferences | chobi.art' },
+      { title: 'Notification Preferences | chobii.art' },
       { name: 'description', content: 'Manage your email and SMS notification preferences.' },
       { name: 'robots', content: 'noindex' },
     ],

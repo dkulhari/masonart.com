@@ -1,7 +1,7 @@
 /**
  * Brand Constants Tests
  *
- * Verifies the chobi.art brand identity constants — the single source of
+ * Verifies the chobii.art brand identity constants — the single source of
  * truth used by web titles/meta, email senders, and SMS templates.
  */
 
@@ -20,23 +20,23 @@ import {
 import * as constants from '../../src/constants/index.js';
 
 describe('brand constants', () => {
-  it('exposes the chobi.art identity', () => {
-    expect(BRAND_NAME).toBe('chobi.art');
-    expect(BRAND_DOMAIN).toBe('chobi.art');
-    expect(BRAND_URL).toBe('https://chobi.art');
-    expect(STAGING_HOSTNAME).toBe('chobi.xtoms.xyz');
-    expect(STAGING_URL).toBe('https://chobi.xtoms.xyz');
-    expect(SUPPORT_EMAIL).toBe('support@chobi.art');
-    expect(NOTIFICATIONS_EMAIL).toBe('notifications@chobi.art');
+  it('exposes the chobii.art identity', () => {
+    expect(BRAND_NAME).toBe('chobii.art');
+    expect(BRAND_DOMAIN).toBe('chobii.art');
+    expect(BRAND_URL).toBe('https://chobii.art');
+    expect(STAGING_HOSTNAME).toBe('chobii.xtoms.xyz');
+    expect(STAGING_URL).toBe('https://chobii.xtoms.xyz');
+    expect(SUPPORT_EMAIL).toBe('support@chobii.art');
+    expect(NOTIFICATIONS_EMAIL).toBe('notifications@chobii.art');
     expect(BRAND_TAGLINE).toBe('Premium Posters & Frames');
   });
 
   it('formats the default email sender from the brand identity', () => {
-    expect(EMAIL_FROM).toBe('chobi.art <notifications@chobi.art>');
+    expect(EMAIL_FROM).toBe('chobii.art <notifications@chobii.art>');
   });
 
   it('is re-exported from the constants barrel', () => {
-    expect(constants.BRAND_NAME).toBe('chobi.art');
-    expect(constants.BRAND_URL).toBe('https://chobi.art');
+    expect(constants.BRAND_NAME).toBe('chobii.art');
+    expect(constants.BRAND_URL).toBe('https://chobii.art');
   });
 });

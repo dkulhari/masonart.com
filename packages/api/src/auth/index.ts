@@ -1,5 +1,5 @@
 /**
- * Better Auth Configuration for chobi.art E-Commerce Platform
+ * Better Auth Configuration for chobii.art E-Commerce Platform
  *
  * This module configures authentication with:
  * - Drizzle ORM adapter for PostgreSQL
@@ -174,7 +174,7 @@ export const auth = betterAuth({
       // TODO: Replace with actual email sending logic
       // Example with Resend:
       // await resend.emails.send({
-      //   from: 'chobi.art <noreply@chobi.art>',
+      //   from: 'chobii.art <noreply@chobii.art>',
       //   to: user.email,
       //   subject: 'Verify your email address',
       //   html: `<p>Click <a href="${url}">here</a> to verify your email.</p>`,
@@ -302,7 +302,7 @@ export const auth = betterAuth({
     // Use secure cookies in production
     useSecureCookies: process.env.NODE_ENV === "production",
     // Cookie prefix
-    cookiePrefix: "chobi",
+    cookiePrefix: "chobii",
     // Generate secure session tokens
     generateId: () => crypto.randomUUID(),
     // Behind the Cloudflare tunnel only cf-connecting-ip is trustworthy;

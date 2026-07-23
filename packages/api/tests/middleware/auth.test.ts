@@ -515,7 +515,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/protected', {
         headers: {
-          Cookie: 'chobi.session=invalid-token',
+          Cookie: 'chobii.session=invalid-token',
         },
       });
 
@@ -557,7 +557,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/protected', {
         headers: {
-          Cookie: 'chobi.session=expired-token',
+          Cookie: 'chobii.session=expired-token',
         },
       });
 
@@ -646,7 +646,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/optional', {
         headers: {
-          Cookie: 'chobi.session=expired',
+          Cookie: 'chobii.session=expired',
         },
       });
 
@@ -676,7 +676,7 @@ describe('Auth Middleware', () => {
       // Should not throw
       const res = await testApp.request('/optional', {
         headers: {
-          Cookie: 'chobi.session=malformed;;;',
+          Cookie: 'chobii.session=malformed;;;',
         },
       });
 
@@ -1394,7 +1394,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/protected', {
         headers: {
-          Cookie: 'chobi.session=malformed;;;data',
+          Cookie: 'chobii.session=malformed;;;data',
         },
       });
 
@@ -1411,7 +1411,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/optional', {
         headers: {
-          Cookie: 'chobi.session=malformed',
+          Cookie: 'chobii.session=malformed',
         },
       });
 

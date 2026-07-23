@@ -1,5 +1,5 @@
 /**
- * Return Request Page - chobi.art E-commerce Platform
+ * Return Request Page - chobii.art E-commerce Platform
  *
  * Page for requesting a return for a delivered order.
  * Shows eligibility check, return form, and existing return status.
@@ -31,7 +31,7 @@ import {
 export const Route = createFileRoute('/_authed/account/orders/$id/return')({
   head: () => ({
     meta: [
-      { title: 'Request Return | chobi.art' },
+      { title: 'Request Return | chobii.art' },
       { name: 'description', content: 'Request a return for your order.' },
       { name: 'robots', content: 'noindex' },
     ],

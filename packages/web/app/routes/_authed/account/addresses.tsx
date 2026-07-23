@@ -1,5 +1,5 @@
 /**
- * Saved Addresses Page - chobi.art E-commerce Platform
+ * Saved Addresses Page - chobii.art E-commerce Platform
  *
  * Allows users to manage their saved shipping/billing addresses.
  * Supports add, edit, delete, and set-default operations.
@@ -37,7 +37,7 @@ import AddressForm, { type AddressFormData } from '~/components/checkout/Address
 export const Route = createFileRoute('/_authed/account/addresses')({
   head: () => ({
     meta: [
-      { title: 'Saved Addresses | chobi.art' },
+      { title: 'Saved Addresses | chobii.art' },
       { name: 'description', content: 'Manage your saved shipping and billing addresses.' },
       { name: 'robots', content: 'noindex' },
     ],

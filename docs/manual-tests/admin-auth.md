@@ -59,14 +59,14 @@ This document covers manual testing of admin authentication and authorization:
 **URL**: `/admin/login`
 
 **Steps**:
-1. Enter admin email: `admin@chobi.art`
+1. Enter admin email: `admin@chobii.art`
 2. Enter password: `[valid password]`
 3. Click "Sign In"
 
 **Expected Result**:
 - Successful login
 - Redirect to `/admin/dashboard`
-- Session cookie set (`chobi.session.*`)
+- Session cookie set (`chobii.session.*`)
 - User name displayed in header
 
 **Actual Result**:
@@ -532,7 +532,7 @@ This document covers manual testing of admin authentication and authorization:
 2. Inspect session cookie in DevTools
 
 **Expected Result**:
-- Cookie name: `chobi.session.*`
+- Cookie name: `chobii.session.*`
 - HttpOnly: true
 - Secure: true (in production)
 - SameSite: Lax or Strict
@@ -805,7 +805,7 @@ This document covers manual testing of admin authentication and authorization:
 ### Authentication Configuration
 - Session duration: 7 days
 - Session cache time: 5 minutes
-- Cookie prefix: `chobi.session`
+- Cookie prefix: `chobii.session`
 
 ### Test User Credentials
 - Admin: [email] / [password]

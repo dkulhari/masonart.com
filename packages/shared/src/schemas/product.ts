@@ -1,5 +1,5 @@
 /**
- * Product Zod Schemas for chobi.art Platform
+ * Product Zod Schemas for chobii.art Platform
  *
  * Provides runtime validation for all product-related data.
  * These schemas match the types defined in ../types/product.ts

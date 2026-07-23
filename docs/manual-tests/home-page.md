@@ -14,7 +14,7 @@
 - [ ] Docker services (PostgreSQL, Redis) running
 
 ## Overview
-This document covers manual testing of the chobi.art home page, including:
+This document covers manual testing of the chobii.art home page, including:
 - Hero section with CTAs
 - Featured products grid
 - Shop by style categories
@@ -400,10 +400,10 @@ This document covers manual testing of the chobi.art home page, including:
 
 **Steps**:
 1. Navigate to home page
-2. Scroll to "Why Choose chobi.art?" section
+2. Scroll to "Why Choose chobii.art?" section
 
 **Expected Result**:
-- Section header "Why Choose chobi.art?" visible
+- Section header "Why Choose chobii.art?" visible
 - Subheading "We're committed to bringing art into every home"
 - 4 value proposition cards displayed
 
@@ -548,7 +548,7 @@ This document covers manual testing of the chobi.art home page, including:
 2. Check browser tab / document.title
 
 **Expected Result**:
-- Title: "chobi.art | Premium Posters & Custom Frames"
+- Title: "chobii.art | Premium Posters & Custom Frames"
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL

@@ -1,5 +1,5 @@
 /**
- * Admin Approval Detail Page - chobi.art E-commerce Platform
+ * Admin Approval Detail Page - chobii.art E-commerce Platform
  *
  * Production photo approval detail page with:
  * - Photo upload functionality
@@ -43,7 +43,7 @@ export const Route = createFileRoute('/admin/approvals/$id')({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Approval Details | Admin | chobi.art' },
+      { title: 'Approval Details | Admin | chobii.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

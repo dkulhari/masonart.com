@@ -1,7 +1,7 @@
 /**
  * Database Schema Definitions
  *
- * Drizzle ORM schema definitions for all chobi.art database tables.
+ * Drizzle ORM schema definitions for all chobii.art database tables.
  * This file defines the structure of all tables used in the application.
  */
 

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useCartItemCount, useCartHydration } from '~/stores/cart'
 
 /**
- * Header component for the chobi.art e-commerce platform.
+ * Header component for the chobii.art e-commerce platform.
  * Provides main navigation, cart access, and user authentication links.
  * Responsive design with mobile hamburger menu.
  */
@@ -35,7 +35,7 @@ export function Header() {
             onClick={closeMobileMenu}
           >
             <span className="text-xl font-bold tracking-tight text-foreground">
-              chobi<span className="text-primary">.art</span>
+              chobii<span className="text-primary">.art</span>
             </span>
           </Link>
 

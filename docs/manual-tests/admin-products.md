@@ -56,7 +56,7 @@ This document covers manual testing of Admin Products Management:
 **Description**: Verify HTML title and robots meta
 
 **Expected Result**:
-- Title: "Products - Admin - chobi.art" (or similar)
+- Title: "Products - Admin - chobii.art" (or similar)
 - Meta robots: "noindex, nofollow"
 
 **Actual Result**:

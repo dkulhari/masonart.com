@@ -1,6 +1,6 @@
 # Test Maintenance Guide
 
-A comprehensive guide for maintaining and updating tests as the chobi.art platform evolves.
+A comprehensive guide for maintaining and updating tests as the chobii.art platform evolves.
 
 **Last Updated:** 2026-01-27
 

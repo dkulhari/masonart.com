@@ -12,7 +12,7 @@ const ADMIN_AUTH = path.join(__dirname, '..', '.auth', 'admin.json');
 /**
  * Admin Products Management E2E Tests
  *
- * Tests for the chobi.art admin products management page (/admin/products).
+ * Tests for the chobii.art admin products management page (/admin/products).
  *
  * Based on actual implementation in:
  * - packages/api/src/routes/admin/products.ts
@@ -414,7 +414,7 @@ test.describe('Admin Products List Page', () => {
   });
 
   test('should have correct HTML document title', async ({ page }) => {
-    await expect(page).toHaveTitle(/Products.*Admin.*chobi.art/);
+    await expect(page).toHaveTitle(/Products.*Admin.*chobii.art/);
   });
 
   test('should have noindex/nofollow robots meta tag', async ({ page }) => {

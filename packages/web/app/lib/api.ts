@@ -1,7 +1,7 @@
 /**
  * Hono API Client
  *
- * Type-safe API client for communicating with the chobi.art backend API.
+ * Type-safe API client for communicating with the chobii.art backend API.
  * Uses Hono's RPC client for end-to-end type safety.
  *
  * Following patterns from docs/poster-app-tech-stack.md
@@ -145,7 +145,7 @@ export interface ApiError {
 /**
  * Create a Hono client instance
  * Note: We use a generic client since the API types are in a separate package
- * For full type inference, you would import AppType from @chobi/api
+ * For full type inference, you would import AppType from @chobii/api
  */
 function createApiClient() {
   const baseUrl = getApiUrl();

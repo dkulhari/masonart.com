@@ -18,7 +18,7 @@
 - [ ] At least one order has tracking information
 
 ## Overview
-This document covers manual testing of the chobi.art guest order tracking feature:
+This document covers manual testing of the chobii.art guest order tracking feature:
 - Public tracking page access
 - Guest order lookup via email
 - Guest order lookup via phone
@@ -64,7 +64,7 @@ This document covers manual testing of the chobi.art guest order tracking featur
 2. Inspect page source or DevTools
 
 **Expected Result**:
-- Title contains "Track" and "chobi.art"
+- Title contains "Track" and "chobii.art"
 - Meta description references order tracking
 - Page is indexable (public page)
 

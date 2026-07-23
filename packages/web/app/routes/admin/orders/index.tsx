@@ -1,5 +1,5 @@
 /**
- * Admin Orders List Page - chobi.art E-commerce Platform
+ * Admin Orders List Page - chobii.art E-commerce Platform
  *
  * Orders management page with:
  * - Order listing with TanStack Table
@@ -68,7 +68,7 @@ export const Route = createFileRoute('/admin/orders/')({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Orders | Admin | chobi.art' },
+      { title: 'Orders | Admin | chobii.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

@@ -95,7 +95,7 @@ test.describe('SEO - Global Meta Tags', () => {
 
   test('should have theme-color meta tag', async ({ page }) => {
     const themeColor = await getMetaByName(page, 'theme-color');
-    expect(themeColor).toBe('#f97316'); // chobi.art brand orange color
+    expect(themeColor).toBe('#f97316'); // chobii.art brand orange color
   });
 
   test('should have favicon link', async ({ page }) => {
@@ -119,7 +119,7 @@ test.describe('SEO - Global Meta Tags', () => {
 
   test('should have Open Graph site_name', async ({ page }) => {
     const siteName = await getMetaByProperty(page, 'og:site_name');
-    expect(siteName).toBe('chobi.art');
+    expect(siteName).toBe('chobii.art');
   });
 
   test('should have html lang attribute set to english', async ({ page }) => {
@@ -139,7 +139,7 @@ test.describe('SEO - Home Page Meta Tags', () => {
 
   test('should have correct page title', async ({ page }) => {
     const title = await page.title();
-    expect(title).toContain('chobi.art');
+    expect(title).toContain('chobii.art');
     expect(title).toContain('Premium');
     expect(title).toContain('Posters');
   });
@@ -162,7 +162,7 @@ test.describe('SEO - Home Page Meta Tags', () => {
   test('should have Open Graph title', async ({ page }) => {
     const ogTitle = await getMetaByProperty(page, 'og:title');
     expect(ogTitle).toBeTruthy();
-    expect(ogTitle).toContain('chobi.art');
+    expect(ogTitle).toContain('chobii.art');
   });
 
   test('should have Open Graph description', async ({ page }) => {
@@ -182,7 +182,7 @@ test.describe('SEO - Home Page Meta Tags', () => {
 
     const twitterTitle = await getMetaByName(page, 'twitter:title');
     expect(twitterTitle).toBeTruthy();
-    expect(twitterTitle).toContain('chobi.art');
+    expect(twitterTitle).toContain('chobii.art');
   });
 
   test('should have Twitter description', async ({ page }) => {
@@ -211,7 +211,7 @@ test.describe('SEO - Posters Listing Page Meta Tags', () => {
   test('should have page title with Shop Posters', async ({ page }) => {
     const title = await page.title();
     expect(title).toContain('Posters');
-    expect(title).toContain('chobi.art');
+    expect(title).toContain('chobii.art');
   });
 
   test('should have meta description for posters', async ({ page }) => {
@@ -270,7 +270,7 @@ test.describe('SEO - Filtered Posters Page Meta Tags', () => {
 
     // Title should reflect the filter
     expect(title.toLowerCase()).toContain('abstract');
-    expect(title).toContain('chobi.art');
+    expect(title).toContain('chobii.art');
   });
 
   test('should set noindex for paginated pages', async ({ page }) => {
@@ -307,7 +307,7 @@ test.describe('SEO - AI Generator Page Meta Tags', () => {
   test('should have page title with AI Poster', async ({ page }) => {
     const title = await page.title();
     expect(title.toLowerCase()).toContain('ai');
-    expect(title).toContain('chobi.art');
+    expect(title).toContain('chobii.art');
   });
 
   test('should have meta description mentioning AI creation', async ({ page }) => {
@@ -345,7 +345,7 @@ test.describe('SEO - Cart Page Meta Tags', () => {
   test('should have page title with Shopping Cart', async ({ page }) => {
     const title = await page.title();
     expect(title.toLowerCase()).toContain('cart');
-    expect(title).toContain('chobi.art');
+    expect(title).toContain('chobii.art');
   });
 
   test('should have noindex directive', async ({ page }) => {
@@ -370,7 +370,7 @@ test.describe('SEO - Auth Pages Meta Tags', () => {
     await page.goto('/auth/login');
     const title = await page.title();
     expect(title.toLowerCase()).toContain('sign in');
-    expect(title).toContain('chobi.art');
+    expect(title).toContain('chobii.art');
   });
 
   test('login page should have noindex directive', async ({ page }) => {
@@ -421,7 +421,7 @@ test.describe('SEO - Checkout Page Meta Tags', () => {
   test('should have page title with Checkout', async ({ page }) => {
     const title = await page.title();
     const lowerTitle = title.toLowerCase();
-    expect(lowerTitle.includes('checkout') || lowerTitle.includes('chobi.art')).toBe(true);
+    expect(lowerTitle.includes('checkout') || lowerTitle.includes('chobii.art')).toBe(true);
   });
 
   test('should have noindex directive for checkout', async ({ page }) => {
@@ -726,7 +726,7 @@ test.describe('SEO - Meta Tag Consistency', () => {
 
     expect(ogTitle).toBeTruthy();
     // OG title should contain key parts of the page title
-    const titleKeyword = 'chobi.art';
+    const titleKeyword = 'chobii.art';
     expect(title).toContain(titleKeyword);
     expect(ogTitle).toContain(titleKeyword);
   });
@@ -738,7 +738,7 @@ test.describe('SEO - Meta Tag Consistency', () => {
 
     if (ogTitle && twitterTitle) {
       // They should be the same or very similar
-      expect(twitterTitle).toContain('chobi.art');
+      expect(twitterTitle).toContain('chobii.art');
     }
   });
 

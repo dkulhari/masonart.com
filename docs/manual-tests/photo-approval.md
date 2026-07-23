@@ -19,7 +19,7 @@
 - [ ] Production approval record exists in database
 
 ## Overview
-This document covers manual testing of the chobi.art production photo approval workflow:
+This document covers manual testing of the chobii.art production photo approval workflow:
 
 **Admin Workflow**:
 - Admin approvals dashboard
@@ -291,7 +291,7 @@ This document covers manual testing of the chobi.art production photo approval w
 - Admin comments styled distinctly
 - Customer comments styled distinctly
 - Timestamps shown
-- Author type (chobi.art Team / Customer) indicated
+- Author type (chobii.art Team / Customer) indicated
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -311,7 +311,7 @@ This document covers manual testing of the chobi.art production photo approval w
 
 **Expected Result**:
 - Comment added to timeline
-- Comment shows as "chobi.art Team" / "Admin"
+- Comment shows as "chobii.art Team" / "Admin"
 - Timestamp shown
 - Input cleared after submission
 

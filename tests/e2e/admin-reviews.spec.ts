@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 /**
  * Admin Reviews Moderation E2E Tests
  *
- * Tests for the chobi.art admin reviews moderation dashboard including:
+ * Tests for the chobii.art admin reviews moderation dashboard including:
  * - Access control
  * - Stats display
  * - Review listing and filtering

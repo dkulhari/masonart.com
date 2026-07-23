@@ -1,4 +1,4 @@
-# chobi.art
+# chobii.art
 
 A modern e-commerce platform for custom art posters and AI-generated artwork, built with a monorepo architecture.
 
@@ -12,7 +12,7 @@ A modern e-commerce platform for custom art posters and AI-generated artwork, bu
 ## Project Structure
 
 ```
-chobi/
+chobii/
 ├── packages/
 │   ├── api/          # Hono backend API
 │   ├── web/          # TanStack Start frontend
@@ -39,7 +39,7 @@ chobi/
 1. **Clone the repository:**
    ```bash
    git clone <repository-url>
-   cd chobi
+   cd chobii
    ```
 
 2. **Install dependencies:**
@@ -85,7 +85,7 @@ chobi/
 
 ## Testing
 
-chobi.art uses a comprehensive testing strategy with multiple layers:
+chobii.art uses a comprehensive testing strategy with multiple layers:
 
 | Layer | Framework | Location |
 |-------|-----------|----------|

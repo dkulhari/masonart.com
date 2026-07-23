@@ -1,5 +1,5 @@
 /**
- * ProductForm Component - chobi.art E-commerce Platform
+ * ProductForm Component - chobii.art E-commerce Platform
  *
  * Form component for creating and editing products with:
  * - Basic info (title, SKU, slug, description)

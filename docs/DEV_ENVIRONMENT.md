@@ -1,6 +1,6 @@
-# chobi.art Development Environment Setup
+# chobii.art Development Environment Setup
 
-This guide explains how to set up and run the chobi.art e-commerce platform locally.
+This guide explains how to set up and run the chobii.art e-commerce platform locally.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ This guide explains how to set up and run the chobi.art e-commerce platform loca
 
 ```bash
 # 1. Navigate to the project directory
-cd /path/to/chobi.art
+cd /path/to/chobii.art
 
 # 2. Start Docker services (PostgreSQL, Redis, MinIO)
 cd docker && docker compose up -d && cd ..
@@ -212,7 +212,7 @@ Redis is optional in development. The API will gracefully handle missing Redis c
 ## Project Structure
 
 ```
-chobi/
+chobii/
 ├── docker/
 │   └── docker-compose.yml    # Docker services config
 ├── docs/

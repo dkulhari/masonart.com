@@ -1,5 +1,5 @@
 /**
- * Token-Based Order Tracking Page - chobi.art E-commerce Platform
+ * Token-Based Order Tracking Page - chobii.art E-commerce Platform
  *
  * Allows direct access to order tracking via a token link from confirmation emails.
  * No order number or email required - the token validates access.
@@ -32,8 +32,8 @@ import { TrackingTimeline } from '~/components/order/TrackingTimeline'
 export const Route = createFileRoute('/track/$token')({
   head: () => ({
     meta: [
-      { title: 'Track Your Order | chobi.art' },
-      { name: 'description', content: 'Track your chobi.art order status and shipping progress.' },
+      { title: 'Track Your Order | chobii.art' },
+      { name: 'description', content: 'Track your chobii.art order status and shipping progress.' },
       { name: 'robots', content: 'noindex' }, // Don't index token URLs
     ],
   }),

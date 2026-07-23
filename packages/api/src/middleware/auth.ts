@@ -30,7 +30,7 @@ export interface AuthUser {
   createdAt: Date;
   updatedAt: Date;
   role: UserRole;
-  // Custom chobi.art fields
+  // Custom chobii.art fields
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;

@@ -202,7 +202,7 @@ test.describe('Customer Approval - Pending Approval State', () => {
 
   test('displays admin comments', async ({ page }) => {
     await expect(page.getByText('Your production photos are ready for review')).toBeVisible();
-    await expect(page.getByText(/chobi.art Team/i)).toBeVisible();
+    await expect(page.getByText(/chobii.art Team/i)).toBeVisible();
   });
 
   test('shows action buttons for approval and changes', async ({ page }) => {

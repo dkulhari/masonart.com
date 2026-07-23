@@ -1,5 +1,5 @@
 /**
- * Checkout & Order Zod Schemas for chobi.art Platform
+ * Checkout & Order Zod Schemas for chobii.art Platform
  *
  * Provides runtime validation for checkout, cart, order, and user-related data.
  * These schemas match the types defined in ../types/order.ts and ../types/user.ts

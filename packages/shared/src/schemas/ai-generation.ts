@@ -1,5 +1,5 @@
 /**
- * AI Generation Zod Schemas for chobi.art Platform
+ * AI Generation Zod Schemas for chobii.art Platform
  *
  * Provides runtime validation for AI generation-related data.
  * These schemas match the types defined in ../types/ai.ts

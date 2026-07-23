@@ -22,7 +22,7 @@ import { getCached, setCached, CacheKeys } from "../lib/redis";
 // Constants
 // ============================================================================
 
-const SITE_URL = process.env.SITE_URL || "https://chobi.xtoms.xyz";
+const SITE_URL = process.env.SITE_URL || "https://chobii.xtoms.xyz";
 const CACHE_TTL_SITEMAP = 3600; // 1 hour
 const CACHE_KEY_SITEMAP = `${CacheKeys.PRODUCT}sitemap`;
 

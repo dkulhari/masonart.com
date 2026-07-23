@@ -26,10 +26,10 @@ test.describe('Root Layout - Header', () => {
     const header = page.locator('header');
     await expect(header).toBeVisible();
 
-    // Check for chobi.art logo/brand text
+    // Check for chobii.art logo/brand text
     const logo = header.locator('a[href="/"]').first();
     await expect(logo).toBeVisible();
-    await expect(logo).toContainText('chobi.art');
+    await expect(logo).toContainText('chobii.art');
   });
 
   test('should display main navigation links on desktop', async ({ page }) => {
@@ -209,10 +209,10 @@ test.describe('Root Layout - Footer', () => {
   test('should display company logo/brand in footer', async ({ page }) => {
     const footer = page.locator('footer');
 
-    // Footer should contain chobi.art branding
+    // Footer should contain chobii.art branding
     const footerLogo = footer.locator('a[href="/"]').first();
     await expect(footerLogo).toBeVisible();
-    await expect(footerLogo).toContainText('chobi.art');
+    await expect(footerLogo).toContainText('chobii.art');
   });
 
   test('should display company description', async ({ page }) => {
@@ -287,7 +287,7 @@ test.describe('Root Layout - Footer', () => {
     const currentYear = new Date().getFullYear();
 
     // Copyright text
-    const copyright = footer.locator(`text=© ${currentYear} chobi.art`);
+    const copyright = footer.locator(`text=© ${currentYear} chobii.art`);
     await expect(copyright).toBeVisible();
   });
 
@@ -561,7 +561,7 @@ test.describe('Root Layout - Accessibility', () => {
 
     // Title should exist and be descriptive - matches __root.tsx
     expect(title).toBeTruthy();
-    expect(title).toContain('chobi.art');
+    expect(title).toContain('chobii.art');
     expect(title).toContain('Premium Posters');
   });
 

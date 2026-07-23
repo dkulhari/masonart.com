@@ -1,5 +1,5 @@
 /**
- * AI Types for chobi.art Platform
+ * AI Types for chobii.art Platform
  *
  * Defines all AI generation-related types including prompts, style presets,
  * generation history, and community gallery based on the requirements specification.

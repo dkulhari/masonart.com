@@ -14,7 +14,7 @@
 - [ ] Database seeded with test data (`bun run db:seed`)
 - [ ] Docker services (PostgreSQL, Redis) running (`docker compose up -d`)
 - [ ] Admin user account created:
-  - Email: admin@chobi.art
+  - Email: admin@chobii.art
   - Role: admin or super-admin
 - [ ] Test products and orders in database
 - [ ] Non-admin user account for access control testing

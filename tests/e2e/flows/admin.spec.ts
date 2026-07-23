@@ -254,7 +254,7 @@ async function setupAdminSession(page: Page) {
         user: {
           id: 'admin-user-id',
           name: 'Admin User',
-          email: 'admin@chobi.art',
+          email: 'admin@chobii.art',
           role: 'admin',
           emailVerified: true,
           createdAt: '2024-01-01T00:00:00Z',

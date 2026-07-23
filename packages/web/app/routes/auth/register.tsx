@@ -1,5 +1,5 @@
 /**
- * Register Page - chobi.art E-commerce Platform
+ * Register Page - chobii.art E-commerce Platform
  *
  * User registration page with email/password and Google OAuth.
  *
@@ -35,10 +35,10 @@ export const Route = createFileRoute('/auth/register')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
-      { title: 'Create Account | chobi.art' },
+      { title: 'Create Account | chobii.art' },
       {
         name: 'description',
-        content: 'Create a chobi.art account to save your favorites, track orders, and get personalized recommendations.',
+        content: 'Create a chobii.art account to save your favorites, track orders, and get personalized recommendations.',
       },
       { name: 'robots', content: 'noindex' },
     ],
@@ -231,7 +231,7 @@ function RegisterPage() {
           <div className="mb-8 text-center">
             <a href="/" className="inline-block">
               <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                chobi<span className="text-brand-500">.art</span>
+                chobii<span className="text-brand-500">.art</span>
               </h1>
             </a>
             <p className="mt-2 text-sm text-muted-foreground">

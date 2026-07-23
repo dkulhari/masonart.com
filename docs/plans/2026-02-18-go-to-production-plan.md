@@ -1,4 +1,4 @@
-# chobi.art — Go to Production Plan
+# chobii.art — Go to Production Plan
 
 **Date:** 2026-02-18
 **Current Production Readiness Score:** 58/100
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-chobi.art has a strong foundation — 86.6% feature completion (200/231 tickets), solid CI pipeline, and production-ready payment/email/SMS integrations. However, critical gaps in deployment infrastructure, security headers, routing bugs, and observability must be addressed before launch.
+chobii.art has a strong foundation — 86.6% feature completion (200/231 tickets), solid CI pipeline, and production-ready payment/email/SMS integrations. However, critical gaps in deployment infrastructure, security headers, routing bugs, and observability must be addressed before launch.
 
 ---
 

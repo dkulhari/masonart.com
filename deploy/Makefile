@@ -18,13 +18,13 @@
 export
 
 REGISTRY       := ghcr.io/dkulhari
-API_IMAGE      := $(REGISTRY)/chobi-api
-WEB_IMAGE      := $(REGISTRY)/chobi-web
+API_IMAGE      := $(REGISTRY)/chobii-api
+WEB_IMAGE      := $(REGISTRY)/chobii-web
 GIT_SHA        := $(shell git -C .. rev-parse --short HEAD)
 PLATFORM       := linux/arm64
 IMAGE_TAG      ?= latest
 SSH            := ssh $(DEPLOY_USER)@$(DEPLOY_HOST)
-REMOTE_COMPOSE := ~/chobi-docker-compose.yml
+REMOTE_COMPOSE := ~/chobii-docker-compose.yml
 COMPOSE        := docker compose -f docker/docker-compose.prod.yml
 # Non-interactive `ssh host "cmd"` only sources .zshenv — Homebrew's PATH
 # (where Colima's docker CLI lives) never applies. Prefix every remote
@@ -107,7 +107,7 @@ seed-admin:
 
 admin-promote:
 	@test -n "$(EMAIL)" || (echo "Usage: make admin-promote EMAIL=<owner-email>" && exit 1)
-	$(SSH) "$(REMOTE_PATH) docker compose -f $(REMOTE_COMPOSE) exec -T postgres psql -U chobi -d chobi -c \"UPDATE \\\"user\\\" SET role='admin' WHERE email='$(EMAIL)';\""
+	$(SSH) "$(REMOTE_PATH) docker compose -f $(REMOTE_COMPOSE) exec -T postgres psql -U chobii -d chobii -c \"UPDATE \\\"user\\\" SET role='admin' WHERE email='$(EMAIL)';\""
 
 first-boot: migrate seed seed-admin
 	@echo "Migrate/seed done. Sign up through the UI, then: make -C deploy admin-promote EMAIL=<owner-email>"

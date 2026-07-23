@@ -1,5 +1,5 @@
 /**
- * Admin Products List Page - chobi.art E-commerce Platform
+ * Admin Products List Page - chobii.art E-commerce Platform
  *
  * Products management page with:
  * - Product listing with TanStack Table
@@ -41,7 +41,7 @@ export const Route = createFileRoute('/admin/products/')({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: 'Products | Admin | chobi.art' },
+      { title: 'Products | Admin | chobii.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

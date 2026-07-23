@@ -16,7 +16,7 @@
 - [ ] Google Rich Results Test accessible
 
 ## Overview
-This document covers manual testing of JSON-LD structured data across all pages of the chobi.art e-commerce platform, including:
+This document covers manual testing of JSON-LD structured data across all pages of the chobii.art e-commerce platform, including:
 - Organization schema
 - WebSite schema
 - Product schema
@@ -111,13 +111,13 @@ This document covers manual testing of JSON-LD structured data across all pages 
 {
   "@context": "https://schema.org",
   "@type": "Organization",
-  "name": "chobi.art",
-  "url": "https://chobi.art",
-  "logo": "https://chobi.art/logo.png",
+  "name": "chobii.art",
+  "url": "https://chobii.art",
+  "logo": "https://chobii.art/logo.png",
   "sameAs": [
-    "https://facebook.com/chobi",
-    "https://instagram.com/chobi",
-    "https://twitter.com/chobi"
+    "https://facebook.com/chobii",
+    "https://instagram.com/chobii",
+    "https://twitter.com/chobii"
   ]
 }
 ```
@@ -187,11 +187,11 @@ This document covers manual testing of JSON-LD structured data across all pages 
 {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  "name": "chobi.art",
-  "url": "https://chobi.art",
+  "name": "chobii.art",
+  "url": "https://chobii.art",
   "potentialAction": {
     "@type": "SearchAction",
-    "target": "https://chobi.art/search?q={search_term_string}",
+    "target": "https://chobii.art/search?q={search_term_string}",
     "query-input": "required name=search_term_string"
   }
 }
@@ -247,7 +247,7 @@ This document covers manual testing of JSON-LD structured data across all pages 
   "image": ["https://..."],
   "brand": {
     "@type": "Brand",
-    "name": "chobi.art"
+    "name": "chobii.art"
   }
 }
 ```
@@ -313,13 +313,13 @@ This document covers manual testing of JSON-LD structured data across all pages 
 ```json
 "offers": {
   "@type": "Offer",
-  "url": "https://chobi.art/posters/...",
+  "url": "https://chobii.art/posters/...",
   "priceCurrency": "INR",
   "price": "1499",
   "availability": "https://schema.org/InStock",
   "seller": {
     "@type": "Organization",
-    "name": "chobi.art"
+    "name": "chobii.art"
   }
 }
 ```
@@ -478,13 +478,13 @@ This document covers manual testing of JSON-LD structured data across all pages 
       "@type": "ListItem",
       "position": 1,
       "name": "Home",
-      "item": "https://chobi.art/"
+      "item": "https://chobii.art/"
     },
     {
       "@type": "ListItem",
       "position": 2,
       "name": "Posters",
-      "item": "https://chobi.art/posters"
+      "item": "https://chobii.art/posters"
     }
   ]
 }

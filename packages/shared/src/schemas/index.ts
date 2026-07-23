@@ -1,5 +1,5 @@
 /**
- * Shared Zod schemas for chobi.art platform
+ * Shared Zod schemas for chobii.art platform
  *
  * This module contains:
  * - Product schemas

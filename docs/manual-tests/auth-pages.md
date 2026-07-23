@@ -16,7 +16,7 @@
 - [ ] Docker services (PostgreSQL, Redis) running
 
 ## Overview
-This document covers manual testing of the chobi.art authentication UI pages:
+This document covers manual testing of the chobii.art authentication UI pages:
 - Login page (/auth/login)
 - Register page (/auth/register)
 - Google OAuth integration
@@ -38,7 +38,7 @@ This document covers manual testing of the chobi.art authentication UI pages:
 2. Observe the page layout
 
 **Expected Result**:
-- chobi.art logo visible with "Art" in brand color (brand-500)
+- chobii.art logo visible with "Art" in brand color (brand-500)
 - "Welcome back" message displayed
 - Google OAuth button visible
 - "or sign in with email" divider visible
@@ -54,11 +54,11 @@ This document covers manual testing of the chobi.art authentication UI pages:
 
 ### TC-002: Logo Links to Home
 
-**Description**: Verify chobi.art logo navigates to home page
+**Description**: Verify chobii.art logo navigates to home page
 
 **Steps**:
 1. Navigate to login page
-2. Click on the chobi.art logo
+2. Click on the chobii.art logo
 
 **Expected Result**:
 - Navigation to http://localhost:3001/
@@ -79,7 +79,7 @@ This document covers manual testing of the chobi.art authentication UI pages:
 2. Inspect page source or DevTools
 
 **Expected Result**:
-- Title contains "Sign In" and "chobi.art"
+- Title contains "Sign In" and "chobii.art"
 - robots meta tag contains "noindex"
 - meta description contains "Sign in"
 
@@ -575,7 +575,7 @@ This document covers manual testing of the chobi.art authentication UI pages:
 2. Observe the page layout
 
 **Expected Result**:
-- chobi.art logo visible with "Art" in brand color
+- chobii.art logo visible with "Art" in brand color
 - "Create your account to get started" message displayed
 - Google OAuth button visible
 - "or sign up with email" divider visible
@@ -598,7 +598,7 @@ This document covers manual testing of the chobi.art authentication UI pages:
 2. Inspect page source or DevTools
 
 **Expected Result**:
-- Title contains "Create Account" and "chobi.art"
+- Title contains "Create Account" and "chobii.art"
 - robots meta tag contains "noindex"
 - meta description contains "Create"
 
@@ -914,7 +914,7 @@ This document covers manual testing of the chobi.art authentication UI pages:
 2. Inspect headings
 
 **Expected Result**:
-- Single H1 (chobi.art logo/brand)
+- Single H1 (chobii.art logo/brand)
 - No skipped heading levels
 
 **Actual Result**:

@@ -34,7 +34,7 @@ import { eq } from "drizzle-orm";
 // Constants
 // ============================================================================
 
-const APPROVAL_BASE_URL = process.env.APP_URL || "https://chobi.xtoms.xyz";
+const APPROVAL_BASE_URL = process.env.APP_URL || "https://chobii.xtoms.xyz";
 
 // ============================================================================
 // Validation Schemas

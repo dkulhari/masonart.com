@@ -15,7 +15,7 @@
 - [ ] User logged in for authenticated checkout tests
 
 ## Overview
-This document covers manual testing of the chobi.art checkout page, including:
+This document covers manual testing of the chobii.art checkout page, including:
 - Multi-step checkout flow (Shipping, Delivery, Payment)
 - Progress steps indicator
 - Shipping address form validation
@@ -42,7 +42,7 @@ This document covers manual testing of the chobi.art checkout page, including:
 
 **Expected Result**:
 - "Checkout" heading (h1) visible
-- Page title contains "Checkout | chobi.art"
+- Page title contains "Checkout | chobii.art"
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL

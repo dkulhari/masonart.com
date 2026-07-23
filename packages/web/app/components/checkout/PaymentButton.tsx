@@ -1,5 +1,5 @@
 /**
- * Payment Button Component - chobi.art E-commerce Platform
+ * Payment Button Component - chobii.art E-commerce Platform
  *
  * Handles Razorpay checkout integration including:
  * - Order creation
@@ -86,7 +86,7 @@ interface PaymentButtonProps {
 // ============================================================================
 
 const RAZORPAY_SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js'
-const COMPANY_NAME = 'chobi.art'
+const COMPANY_NAME = 'chobii.art'
 const THEME_COLOR = '#C89B5E' // brand-500 color
 
 // ============================================================================
