@@ -69,8 +69,8 @@ build-push: push
 ## ship it to the mini. The compose :? guards fire here, at render time ---
 
 gen-compose:
-	@test -n "$(REPLICATE_API_TOKEN)$(GOOGLE_AI_STUDIO_KEY)" || \
-		(echo "ERROR: set REPLICATE_API_TOKEN and/or GOOGLE_AI_STUDIO_KEY in deploy/.env — AI generation has no provider" && exit 1)
+	@test -n "$(REPLICATE_API_TOKEN)$(GOOGLE_AI_STUDIO_KEY)$(FAL_API_KEY)" || \
+		(echo "ERROR: set REPLICATE_API_TOKEN, GOOGLE_AI_STUDIO_KEY and/or FAL_API_KEY in deploy/.env — AI generation has no provider" && exit 1)
 	mkdir -p rendered
 	cd .. && IMAGE_TAG=$(IMAGE_TAG) $(COMPOSE) --env-file deploy/.env config --format json > deploy/rendered/docker-compose.yml
 	bun -e 'const fs=require("fs");const p="rendered/docker-compose.yml";const d=JSON.parse(fs.readFileSync(p,"utf8"));for(const s of Object.values(d.services??{}))delete s.build;fs.writeFileSync(p,JSON.stringify(d,null,2));'
