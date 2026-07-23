@@ -150,7 +150,10 @@ export const FAL_MODELS = {
  * Google Gemini model identifiers
  */
 export const GEMINI_MODELS = {
-  flash: "gemini-2.0-flash-exp", // Gemini 2.0 Flash with image generation
+  // Overridable via env: Google retires experimental model ids without notice
+  // (gemini-2.0-flash-exp started 404ing mid-2026). Requires a BILLED key —
+  // the Gemini API free tier has zero image-generation quota.
+  flash: process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image",
 } as const;
 
 // ============================================================================
