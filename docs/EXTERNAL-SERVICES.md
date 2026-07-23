@@ -9,6 +9,7 @@ Every third-party service production depends on: what it does, what credentials 
 | Razorpay | Payments (orders, wallet) | Key id + secret + webhook secret | `deploy/.env` |
 | Resend | Transactional email | API key | `deploy/.env` |
 | 2Factor.in | SMS OTP + transactional SMS | API key | `deploy/.env` |
+| Google OAuth (Cloud Console) | "Continue with Google" login | Client id + secret — client owned by dk.jarvis1.ai@gmail.com (GCP project 756865349904) | `deploy/.env` |
 | Replicate / Google AI Studio | AI poster generation | API token / key | `deploy/.env` |
 | Sentry | Error tracking (api + web) | 2 DSNs (not secret-critical) | `deploy/.env` |
 | Slack | Alerts (`#prod-alerts`) | Incoming webhook URL | `deploy/.env` |
@@ -56,6 +57,13 @@ Every third-party service production depends on: what it does, what credentials 
 
 - OTP login + transactional order SMS (India).
 - ⚠️ **DLT compliance**: sender ID and message templates must be DLT-registered and approved; template text changes require re-approval *before* deploying code that uses them. Keep an eye on account balance — exhausted credits look like an app bug ("OTP never arrives").
+
+## Google OAuth — social login
+
+- The OAuth 2.0 client (`GOOGLE_CLIENT_ID`, prefix `756865349904-…`) lives in Google Cloud project number **756865349904** under the account **dk.jarvis1.ai@gmail.com** — *not* dhruv.kulhari@gmail.com (which owns Cloudflare). Console shortcut: `https://console.cloud.google.com/welcome?project=756865349904`.
+- The client is **shared with customs-copilot**: when a hostname changes, ADD the new redirect URI (`https://<hostname>/api/auth/callback/google`) — never replace the list, or the other app's Google login breaks.
+- Redirect URIs are exact-hostname registrations (same class as Razorpay webhooks / Resend domains): the chobii.art production cutover must add its own URI (see cutover checklist ticket #316).
+- Gotcha: a missing URI fails with Google's `Error 400: redirect_uri_mismatch` before any app code runs — nothing appears in api logs.
 
 ## Replicate / Google AI Studio — AI generation
 
