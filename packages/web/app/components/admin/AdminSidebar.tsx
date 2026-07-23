@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { authApi } from '~/lib/api'
+import { isAdminNavItemVisible } from '~/lib/admin-nav'
 
 // ============================================================================
 // Types
@@ -135,6 +136,14 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
   // Get current path for active state
   const currentPath = router.state.location.pathname
 
+  // Filter navigation by role (content-managers only see catalog sections)
+  const visibleNavItems = NAV_ITEMS.filter((item) =>
+    isAdminNavItemVisible(user?.role, item.href)
+  )
+  const visibleSecondaryNavItems = SECONDARY_NAV_ITEMS.filter((item) =>
+    isAdminNavItemVisible(user?.role, item.href)
+  )
+
   // Check if a nav item is active
   const isActive = (href: string) => {
     if (href === '/admin') {
@@ -239,7 +248,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
         <nav className="flex-1 overflow-y-auto p-3">
           {/* Main Navigation */}
           <div className="space-y-1">
-            {NAV_ITEMS.map((item) => (
+            {visibleNavItems.map((item) => (
               <NavLink
                 key={item.href}
                 item={item}
@@ -260,7 +269,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
                 Settings
               </p>
             )}
-            {SECONDARY_NAV_ITEMS.map((item) => (
+            {visibleSecondaryNavItems.map((item) => (
               <NavLink
                 key={item.href}
                 item={item}
