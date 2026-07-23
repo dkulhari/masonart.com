@@ -20,6 +20,7 @@ import {
   type AIModelProvider,
 } from "../database/schema";
 import { refundToWallet } from "../services/wallet";
+import { generateImages } from "../ai/generator";
 
 // ============================================================================
 // Type Definitions
@@ -300,55 +301,62 @@ async function refundForFailedGeneration(
 // ============================================================================
 
 /**
- * Generate images using the configured AI provider
- *
- * This function handles the actual AI API calls.
- * In production, this would call Replicate, OpenAI, FAL.ai, etc.
+ * Generate images by delegating to the real provider engine in ai/generator
+ * (Replicate, DALL-E, FAL.ai, Gemini). The worker must never fabricate
+ * placeholder output — a failed generation fails the job so the user is
+ * refunded rather than receiving a broken image.
  */
-async function generateImagesWithAI(
+export async function generateImagesWithAI(
   job: Job<AIGenerationJobData, AIGenerationJobResult>
 ): Promise<GeneratedImageBuffer[]> {
-  const { prompt, stylePreset, aspectRatio, variationCount, modelProvider, seed } = job.data;
+  const {
+    prompt,
+    negativePrompt,
+    stylePreset,
+    aspectRatio,
+    colorMood,
+    colorPalette,
+    variationCount,
+    modelProvider,
+    seed,
+  } = job.data;
 
-  // Get dimensions based on aspect ratio
-  const dimensions = getImageDimensions(aspectRatio);
+  await job.updateProgress({
+    stage: "generating",
+    progress: 20,
+    message: `Generating ${variationCount} image${variationCount > 1 ? "s" : ""}...`,
+    currentVariation: 1,
+    totalVariations: variationCount,
+  } satisfies AIGenerationProgress);
 
-  // Construct enhanced prompt with style modifiers
-  const enhancedPrompt = constructEnhancedPrompt(prompt, stylePreset);
+  const result = await generateImages(
+    {
+      prompt,
+      negativePrompt,
+      stylePreset,
+      aspectRatio,
+      colorMood,
+      colorPalette,
+      seed,
+      provider: modelProvider,
+    },
+    variationCount
+  );
 
-  // Generate images based on provider
-  const images: GeneratedImageBuffer[] = [];
-
-  for (let i = 0; i < variationCount; i++) {
-    await job.updateProgress({
-      stage: "generating",
-      progress: 10 + Math.floor((i / variationCount) * 50),
-      message: `Generating image ${i + 1} of ${variationCount}...`,
-      currentVariation: i + 1,
-      totalVariations: variationCount,
-    } satisfies AIGenerationProgress);
-
-    // Generate unique seed for this variation
-    const variationSeed = seed ? seed + i : Math.floor(Math.random() * 2147483647);
-
-    // Call AI provider API
-    const imageBuffer = await callAIProvider(modelProvider, {
-      prompt: enhancedPrompt,
-      width: dimensions.width,
-      height: dimensions.height,
-      seed: variationSeed,
-    });
-
-    images.push({
-      buffer: imageBuffer,
-      width: dimensions.width,
-      height: dimensions.height,
-      seed: variationSeed,
-      variationIndex: i,
-    });
+  if (!result.success) {
+    throw new Error(result.error || "AI generation failed");
+  }
+  if (result.images.length === 0) {
+    throw new Error("AI generation returned no images");
   }
 
-  return images;
+  return result.images.map((img) => ({
+    buffer: img.buffer,
+    width: img.width,
+    height: img.height,
+    seed: img.seed,
+    variationIndex: img.variationIndex,
+  }));
 }
 
 /**
@@ -362,110 +370,6 @@ interface GeneratedImageBuffer {
   variationIndex: number;
 }
 
-/**
- * Call the AI provider API to generate an image
- *
- * This is a placeholder that should be implemented with actual API calls.
- * Each provider has different SDKs/APIs.
- */
-async function callAIProvider(
-  provider: AIModelProvider,
-  params: {
-    prompt: string;
-    width: number;
-    height: number;
-    seed: number;
-  }
-): Promise<Buffer> {
-  switch (provider) {
-    case "stable-diffusion":
-      return callReplicateAPI(params);
-    case "dall-e-3":
-      return callOpenAIAPI(params);
-    case "fal-ai":
-      return callFalAI(params);
-    default:
-      return callReplicateAPI(params);
-  }
-}
-
-/**
- * Call Replicate API (Stable Diffusion)
- *
- * Placeholder - implement with Replicate SDK
- * @see https://replicate.com/docs
- */
-async function callReplicateAPI(params: {
-  prompt: string;
-  width: number;
-  height: number;
-  seed: number;
-}): Promise<Buffer> {
-  // TODO: Implement with Replicate SDK
-  // const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-  // const output = await replicate.run("stability-ai/sdxl:...", { input: params });
-
-  // For now, return a placeholder (in production, this would be real AI output)
-  return createPlaceholderImage(params.width, params.height, params.seed);
-}
-
-/**
- * Call OpenAI DALL-E 3 API
- *
- * Placeholder - implement with OpenAI SDK
- * @see https://platform.openai.com/docs/api-reference/images
- */
-async function callOpenAIAPI(params: {
-  prompt: string;
-  width: number;
-  height: number;
-  seed: number;
-}): Promise<Buffer> {
-  // TODO: Implement with OpenAI SDK
-  // const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  // const response = await openai.images.generate({ prompt: params.prompt, ... });
-
-  return createPlaceholderImage(params.width, params.height, params.seed);
-}
-
-/**
- * Call FAL.ai API
- *
- * Placeholder - implement with FAL SDK
- * @see https://fal.ai/docs
- */
-async function callFalAI(params: {
-  prompt: string;
-  width: number;
-  height: number;
-  seed: number;
-}): Promise<Buffer> {
-  // TODO: Implement with FAL SDK
-  // import * as fal from "@fal-ai/serverless-client";
-  // const result = await fal.run("fal-ai/flux/schnell", { input: { prompt: params.prompt } });
-
-  return createPlaceholderImage(params.width, params.height, params.seed);
-}
-
-/**
- * Create a placeholder image buffer
- *
- * This is a development placeholder. In production, this would be
- * replaced by actual AI-generated images from the provider APIs.
- */
-function createPlaceholderImage(width: number, height: number, seed: number): Buffer {
-  // Create a simple PNG placeholder
-  // In production, this would be the actual generated image
-  const placeholderData = JSON.stringify({
-    type: "placeholder",
-    width,
-    height,
-    seed,
-    generatedAt: new Date().toISOString(),
-  });
-
-  return Buffer.from(placeholderData);
-}
 
 // ============================================================================
 // Image Upload Logic
@@ -586,53 +490,6 @@ async function notifyUserOfCompletion(userId: string, generationId: string): Pro
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Get image dimensions based on aspect ratio
- */
-function getImageDimensions(aspectRatio: AIAspectRatio): { width: number; height: number } {
-  // Using standard SDXL dimensions
-  const dimensions: Record<AIAspectRatio, { width: number; height: number }> = {
-    square: { width: 1024, height: 1024 },
-    portrait: { width: 832, height: 1216 },
-    landscape: { width: 1216, height: 832 },
-    panoramic: { width: 1344, height: 768 },
-  };
-
-  return dimensions[aspectRatio] || dimensions.square;
-}
-
-/**
- * Construct enhanced prompt with style modifiers
- *
- * This adds style-specific keywords to improve generation quality.
- * Full style presets are defined in src/ai/style-presets.ts
- */
-function constructEnhancedPrompt(prompt: string, stylePreset: AIStylePreset): string {
-  // Basic style modifiers (full implementation in style-presets.ts)
-  const styleModifiers: Record<AIStylePreset, string> = {
-    "wabi-sabi":
-      "minimalist, imperfect, natural textures, muted earth tones, japanese aesthetic, serene",
-    "abstract-expression":
-      "abstract expressionism, bold brushstrokes, emotional, dynamic, gestural",
-    botanical: "botanical illustration, soft watercolor, delicate details, nature, organic forms",
-    "geometric-modern": "geometric shapes, modern design, clean lines, minimalist, contemporary",
-    "vintage-poster": "vintage poster art, retro, nostalgic, film grain, warm tones, classic",
-    "pop-art": "pop art style, bold colors, high contrast, comic book aesthetic, vibrant",
-    watercolor: "watercolor painting, soft edges, flowing colors, artistic, ethereal",
-    photography: "professional photography, high quality, detailed, realistic, sharp focus",
-    "line-art": "line art, minimalist drawing, black and white, elegant lines, sketch style",
-    typography: "typography art, decorative text, letterform design, artistic composition",
-    "ink-wash": "ink wash painting, sumi-e style, flowing brushstrokes, monochrome gradients, zen, negative space",
-    "digital-art": "digital art, concept art style, vibrant colors, cinematic lighting, detailed illustration",
-    "minimalist-modern": "minimalist design, scandinavian aesthetic, clean geometric forms, muted palette, refined",
-    impressionist: "impressionist painting, visible brushstrokes, soft natural light, atmospheric, painterly",
-    "art-deco": "art deco style, 1920s glamour, geometric patterns, gold accents, symmetrical, elegant",
-  };
-
-  const modifier = styleModifiers[stylePreset] || "";
-  return modifier ? `${prompt}, ${modifier}` : prompt;
-}
 
 // ============================================================================
 // Worker Instance
