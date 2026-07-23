@@ -30,7 +30,7 @@ import {
 } from "../../database/schema/products";
 import {
   requireAuth,
-  requireAdmin,
+  requireContentManager,
   type AuthVariables,
 } from "../../middleware/auth";
 import { deleteCached, CacheKeys } from "../../lib/redis";
@@ -150,9 +150,10 @@ const updateVariantSchema = createVariantSchema.partial();
 
 const adminProductsApp = new Hono<{ Variables: AuthVariables }>();
 
-// Apply authentication and admin role requirement to all routes
+// Apply authentication and content management role requirement to all routes
+// (content-manager, admin, or super-admin)
 adminProductsApp.use("*", requireAuth);
-adminProductsApp.use("*", requireAdmin);
+adminProductsApp.use("*", requireContentManager);
 
 // ============================================================================
 // GET /api/admin/products - List Products (Admin)
