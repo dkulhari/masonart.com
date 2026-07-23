@@ -12,7 +12,7 @@
 /**
  * User role types
  */
-export type UserRole = 'customer' | 'trade' | 'admin' | 'super-admin';
+export type UserRole = 'customer' | 'trade' | 'content-manager' | 'admin' | 'super-admin';
 
 /**
  * Authentication provider types

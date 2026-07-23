@@ -27,6 +27,10 @@ const STORAGE_DIR = path.join(__dirname, "..", ".auth");
 export const CUSTOMER_STORAGE_STATE = path.join(STORAGE_DIR, "customer.json");
 export const TRADE_STORAGE_STATE = path.join(STORAGE_DIR, "trade.json");
 export const ADMIN_STORAGE_STATE = path.join(STORAGE_DIR, "admin.json");
+export const CONTENT_MANAGER_STORAGE_STATE = path.join(
+  STORAGE_DIR,
+  "content-manager.json"
+);
 
 // Test user credentials - must match seed-test-users.ts
 const TEST_USERS = {
@@ -44,6 +48,11 @@ const TEST_USERS = {
     email: "test-admin@chobii.art",
     password: "TestPassword123!",
     name: "Test Admin",
+  },
+  "content-manager": {
+    email: "test-content-manager@chobii.art",
+    password: "TestPassword123!",
+    name: "Test Content Manager",
   },
 };
 
@@ -252,4 +261,41 @@ setup("authenticate as admin", async ({ page }) => {
   // Save the storage state
   await page.context().storageState({ path: ADMIN_STORAGE_STATE });
   console.log(`[Auth Setup] Admin auth state saved to: ${ADMIN_STORAGE_STATE}`);
+});
+
+/**
+ * Setup: Authenticate as Content Manager
+ *
+ * Registers content-manager account if needed, updates role, logs in, and
+ * saves storage state
+ */
+setup("authenticate as content manager", async ({ page }) => {
+  const credentials = TEST_USERS["content-manager"];
+  console.log(`[Auth Setup] Setting up content manager: ${credentials.email}`);
+
+  // Try to register (will fail silently if user exists)
+  await registerUser(page, credentials);
+
+  // Update role to content-manager (works whether just registered or already existed)
+  console.log(`[Auth Setup] Updating role to content-manager for: ${credentials.email}`);
+  updateUserRole(credentials.email, "content-manager");
+
+  // Login
+  const loggedIn = await loginUser(page, credentials);
+
+  if (!loggedIn) {
+    throw new Error(`Failed to login as content manager: ${credentials.email}`);
+  }
+
+  // Verify authentication by visiting account page
+  await page.goto("/account");
+  await page.waitForLoadState("networkidle");
+
+  if (page.url().includes("/auth/login")) {
+    throw new Error("Content manager authentication failed - redirected back to login");
+  }
+
+  // Save the storage state
+  await page.context().storageState({ path: CONTENT_MANAGER_STORAGE_STATE });
+  console.log(`[Auth Setup] Content manager auth state saved to: ${CONTENT_MANAGER_STORAGE_STATE}`);
 });

@@ -15,6 +15,7 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { ShieldAlert } from 'lucide-react'
 import { cn } from '~/lib/utils'
+import { isContentManagerPathAllowed } from '~/lib/admin-nav'
 import { AdminSidebar, MobileAdminHeader } from '~/components/admin/AdminSidebar'
 
 // ============================================================================
@@ -47,17 +48,43 @@ export const Route = createFileRoute('/admin')({
     }
 
     const userRole = context.session.user.role?.toLowerCase()
+    const isAdminRole = userRole === 'admin' || userRole === 'super-admin'
+    const isContentManagerRole = userRole === 'content-manager'
 
-    // Check for admin or super-admin role
-    if (userRole !== 'admin' && userRole !== 'super-admin') {
-      // User is authenticated but not an admin - return flag for component
+    // Only admin, super-admin, and content-manager may enter the admin panel
+    if (!isAdminRole && !isContentManagerRole) {
+      // User is authenticated but not authorized - return flag for component
       return {
         user: context.session.user,
         isUnauthorized: true,
       }
     }
 
-    // User is admin - pass to component
+    // Content-managers only get the catalog sections; the dashboard and all
+    // other sections stay admin-only
+    if (isContentManagerRole) {
+      const path = location.pathname.replace(/\/+$/, '') || '/admin'
+      if (path === '/admin') {
+        // No dashboard for content-managers - land on products
+        throw redirect({
+          to: '/admin/products',
+          search: {
+            page: 1,
+            pageSize: 20,
+            sortBy: 'createdAt',
+            sortOrder: 'desc',
+          },
+        })
+      }
+      if (!isContentManagerPathAllowed(path)) {
+        return {
+          user: context.session.user,
+          isUnauthorized: true,
+        }
+      }
+    }
+
+    // User is authorized for this section - pass to component
     return {
       user: context.session.user,
       isUnauthorized: false,

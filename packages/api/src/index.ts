@@ -25,6 +25,7 @@ import { razorpayWebhooksApp } from "./routes/webhooks/razorpay";
 import { walletWebhookApp } from "./routes/webhooks/wallet";
 import { adminProductsApp } from "./routes/admin/products";
 import { adminOrdersApp } from "./routes/admin/orders";
+import { adminCustomersApp } from "./routes/admin/customers";
 import { adminWalletConfigApp } from "./routes/admin/wallet-config";
 import { adminReviewsApp } from "./routes/admin/reviews";
 import { adminShippingApp } from "./routes/admin/shipping";
@@ -91,7 +92,7 @@ app.use(
 //          /api/auth/session, /api/auth/callback/:provider, etc.
 
 // Rate limit sensitive auth endpoints
-app.post("/api/auth/sign-in/*", signUpRateLimit); // 5/min
+app.post("/api/auth/sign-in/*", authRateLimit); // 5/min
 app.post("/api/auth/sign-up/*", signUpRateLimit); // 3/min
 app.post("/api/auth/forgot-password", forgotPasswordRateLimit); // 3/min
 
@@ -173,6 +174,9 @@ app.route("/api/admin/products", adminProductsApp);
 
 // Admin Orders API - order management
 app.route("/api/admin/orders", adminOrdersApp);
+
+// Admin Customers API - user list and role assignment
+app.route("/api/admin/customers", adminCustomersApp);
 
 // Admin Wallet Config API - pricing and stats
 app.route("/api/admin/wallet-config", adminWalletConfigApp);

@@ -19,7 +19,7 @@ import {
 // User-Related Enum Schemas
 // ============================================================================
 
-export const userRoleSchema = z.enum(['customer', 'trade', 'admin', 'super-admin']);
+export const userRoleSchema = z.enum(['customer', 'trade', 'content-manager', 'admin', 'super-admin']);
 
 export const authProviderSchema = z.enum(['email', 'google', 'facebook', 'apple', 'phone']);
 

@@ -262,6 +262,24 @@ export function requireRole(roles: UserRole | UserRole[]) {
 export const requireAdmin = requireRole(["admin", "super-admin"]);
 
 /**
+ * Require content management access (content-manager, admin, or super-admin)
+ *
+ * Gates product/content management routes. Content-managers can manage the
+ * catalog but have no access to orders, customers, or other admin areas.
+ * Must be used after requireAuth middleware.
+ *
+ * @example
+ * ```typescript
+ * app.use('/api/admin/products/*', requireAuth, requireContentManager);
+ * ```
+ */
+export const requireContentManager = requireRole([
+  "content-manager",
+  "admin",
+  "super-admin",
+]);
+
+/**
  * Require trade program access
  *
  * Checks if user has trade role OR admin role.
@@ -423,6 +441,13 @@ export function hasAnyRole(
  */
 export function isAdmin(user: AuthUser | null): boolean {
   return hasAnyRole(user, ["admin", "super-admin"]);
+}
+
+/**
+ * Check if user can manage content (content-manager, admin, or super-admin)
+ */
+export function isContentManager(user: AuthUser | null): boolean {
+  return hasAnyRole(user, ["content-manager", "admin", "super-admin"]);
 }
 
 /**

@@ -73,6 +73,18 @@ export const tradeRole = ac.newRole({
 });
 
 /**
+ * Content manager role - Catalog management for poster creators
+ * Product CRUD and publishing, plus the base customer permissions.
+ * No orders, customers, trade, or admin management access.
+ */
+export const contentManagerRole = ac.newRole({
+  product: ["create", "read", "update", "delete", "publish"],
+  order: ["create", "read:own"],
+  review: ["create", "read"],
+  ai: ["generate", "view:gallery"],
+});
+
+/**
  * Admin role - Full access to admin panel and management
  * Includes all permissions from Better Auth's admin role
  */
@@ -285,6 +297,7 @@ export const auth = betterAuth({
       roles: {
         customer: customerRole,
         trade: tradeRole,
+        "content-manager": contentManagerRole,
         admin: adminRole,
         "super-admin": superAdminRole,
       },
@@ -325,7 +338,12 @@ export type Auth = typeof auth;
 /**
  * User role type matching the database enum
  */
-export type UserRole = "customer" | "trade" | "admin" | "super-admin";
+export type UserRole =
+  | "customer"
+  | "trade"
+  | "content-manager"
+  | "admin"
+  | "super-admin";
 
 /**
  * Session type from Better Auth

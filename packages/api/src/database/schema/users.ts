@@ -56,6 +56,7 @@ export const defaultNotificationPreferences: NotificationPreferences = {
 export const userRoleEnum = pgEnum("user_role", [
   "customer",
   "trade",
+  "content-manager",
   "admin",
   "super-admin",
 ]);

@@ -89,6 +89,16 @@ const testUsers = [
     role: "admin" as const,
     emailVerified: true,
   },
+  // Content manager user
+  {
+    id: "test-content-manager-001",
+    email: "test-content-manager@chobii.art",
+    name: "Test Content Manager",
+    firstName: "Test",
+    lastName: "ContentManager",
+    role: "content-manager" as const,
+    emailVerified: true,
+  },
   // Trade user
   {
     id: "test-trade-001",

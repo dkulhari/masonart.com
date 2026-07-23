@@ -2,7 +2,7 @@
 
 A comprehensive guide to user roles, permissions, and access control in the chobii.art platform.
 
-**Last Updated:** 2026-01-27
+**Last Updated:** 2026-07-23
 
 ---
 
@@ -12,24 +12,26 @@ A comprehensive guide to user roles, permissions, and access control in the chob
 2. [Guest (Unauthenticated)](#guest-unauthenticated)
 3. [Customer](#customer)
 4. [Trade](#trade)
-5. [Admin](#admin)
-6. [Super-Admin](#super-admin)
-7. [Role Comparison Matrix](#role-comparison-matrix)
-8. [Middleware Reference](#middleware-reference)
-9. [Test Coverage](#test-coverage)
-10. [Future Considerations](#future-considerations)
+5. [Content Manager](#content-manager)
+6. [Admin](#admin)
+7. [Super-Admin](#super-admin)
+8. [Role Comparison Matrix](#role-comparison-matrix)
+9. [Middleware Reference](#middleware-reference)
+10. [Test Coverage](#test-coverage)
+11. [Future Considerations](#future-considerations)
 
 ---
 
 ## Role Overview
 
-chobii.art uses a role-based access control (RBAC) system with five distinct user types:
+chobii.art uses a role-based access control (RBAC) system with six distinct user types:
 
 | Role | Database Value | Description |
 |------|----------------|-------------|
 | Guest | N/A (no user record) | Unauthenticated visitors |
 | Customer | `customer` | Regular registered users |
 | Trade | `trade` | Trade program members (wholesale) |
+| Content Manager | `content-manager` | Catalog staff (poster creation & merchandising) |
 | Admin | `admin` | Platform administrators |
 | Super-Admin | `super-admin` | System-level administrators |
 
@@ -37,12 +39,16 @@ chobii.art uses a role-based access control (RBAC) system with five distinct use
 ```
 super-admin
     └── admin
-        └── trade
-            └── customer
-                └── guest
+        ├── trade ──────────┐
+        ├── content-manager ┤   (parallel branches off customer;
+        │                   │    content-manager does NOT inherit trade)
+        └────── customer ◄──┘
+                    └── guest
 ```
 
 Higher roles inherit capabilities from lower roles (with some exceptions).
+Content Manager and Trade are parallel branches: a content-manager gets no
+wholesale/trade access, and a trade member gets no catalog access.
 
 ---
 
@@ -203,7 +209,54 @@ Trade routes (requireTrade):
 requireTrade // Checks for trade role OR approved tradeStatus
 ```
 
-**Note:** The `requireTrade` middleware also allows `admin` and `super-admin` roles.
+**Note:** The `requireTrade` middleware also allows `admin` and `super-admin` roles (but NOT `content-manager`).
+
+---
+
+## Content Manager
+
+Catalog staff whose job is creating and managing poster listings for the `/posters` listing page. Least-privilege role for poster creators: full product management without any access to orders, customer data, or other admin areas.
+
+### Capabilities
+
+| Feature | Access | Notes |
+|---------|--------|-------|
+| All customer capabilities | ✅ Yes | Inherited (storefront, account, AI, wallet) |
+| Admin panel entry | ✅ Yes | Lands on `/admin/products` (no dashboard) |
+| Product management | ✅ Yes | Full CRUD, variants, images |
+| Direct publishing | ✅ Yes | `draft` → `active` themselves (trusted publisher) |
+| Collections & categories | ✅ Yes | Merchandising the listing page |
+| Admin dashboard / KPIs | ❌ No | Redirects to products |
+| Orders, returns, shipments | ❌ No | Access Denied |
+| Customers / role management | ❌ No | Access Denied (cannot manage roles) |
+| Reviews, AI moderation, reports | ❌ No | Access Denied |
+| Trade features / wholesale pricing | ❌ No | Parallel branch, not inherited |
+
+### Role Assignment
+
+Admins grant/revoke the role from the **Customers** page (`/admin/customers`) via a role dropdown, or via CLI:
+
+```bash
+bun run packages/api/src/database/update-user-role.ts user@example.com content-manager
+```
+
+The assignment API (`PUT /api/admin/customers/:id/role`) only accepts `customer` and `content-manager` — it can never grant `admin`/`super-admin`, and existing admin accounts cannot be modified through it.
+
+### Routes
+
+```
+Content-manager admin routes (requireContentManager):
+- /admin/products (landing page; list, create, edit)
+- /admin/collections
+- /admin/categories
+- /api/admin/products/* (full product CRUD API)
+```
+
+### Middleware
+
+```typescript
+requireContentManager // Accepts 'content-manager', 'admin', or 'super-admin'
+```
 
 ---
 
@@ -225,7 +278,8 @@ Platform administrators with access to the admin panel for managing products, or
 | Trade application review | ✅ Yes | Approve/reject applications |
 | Content management | ✅ Yes | Banners, featured products |
 | Reports & analytics | ✅ Yes | Sales, traffic reports |
-| User role management | ❌ No | Reserved for super-admin |
+| Content-manager assignment | ✅ Yes | Via `/admin/customers` role dropdown (capped at `content-manager`) |
+| User role management (full) | ❌ No | Reserved for super-admin |
 | System settings | ❌ No | Reserved for super-admin |
 
 ### Admin Panel Sections
@@ -339,37 +393,41 @@ requireSuperAdmin // Would accept only 'super-admin' role
 
 ### Feature Access by Role
 
-| Feature | Guest | Customer | Trade | Admin | Super-Admin |
-|---------|-------|----------|-------|-------|-------------|
-| Browse products | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Add to cart | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Checkout | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Account dashboard | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Order history | ❌ | ✅ | ✅ | ✅ | ✅ |
-| AI generation | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Wallet | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Wholesale pricing | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Trade dashboard | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Admin panel | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Product management | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Order management | ❌ | ❌ | ❌ | ✅ | ✅ |
-| User management | ❌ | ❌ | ❌ | ❌ | 🔮 |
-| System settings | ❌ | ❌ | ❌ | ❌ | 🔮 |
+| Feature | Guest | Customer | Trade | Content Manager | Admin | Super-Admin |
+|---------|-------|----------|-------|-----------------|-------|-------------|
+| Browse products | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Add to cart | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Checkout | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Account dashboard | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Order history | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| AI generation | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Wallet | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Wholesale pricing | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Trade dashboard | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Admin panel (products only) | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Product management | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Admin dashboard | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Order management | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Content-manager assignment | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| User management (full) | ❌ | ❌ | ❌ | ❌ | ❌ | 🔮 |
+| System settings | ❌ | ❌ | ❌ | ❌ | ❌ | 🔮 |
 
 **Legend:** ✅ = Available, ❌ = Not available, 🔮 = Planned
 
 ### API Access by Role
 
-| Endpoint Pattern | Guest | Customer | Trade | Admin |
-|-----------------|-------|----------|-------|-------|
-| `GET /api/products` | ✅ | ✅ | ✅ | ✅ |
-| `GET /api/cart` | ✅ | ✅ | ✅ | ✅ |
-| `POST /api/orders` | ✅ | ✅ | ✅ | ✅ |
-| `GET /api/account/*` | ❌ | ✅ | ✅ | ✅ |
-| `POST /api/ai/generate` | ❌ | ✅ | ✅ | ✅ |
-| `GET /api/wallet` | ❌ | ✅ | ✅ | ✅ |
-| `GET /api/trade/*` | ❌ | ❌ | ✅ | ✅ |
-| `* /api/admin/*` | ❌ | ❌ | ❌ | ✅ |
+| Endpoint Pattern | Guest | Customer | Trade | Content Manager | Admin |
+|-----------------|-------|----------|-------|-----------------|-------|
+| `GET /api/products` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `GET /api/cart` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `POST /api/orders` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `GET /api/account/*` | ❌ | ✅ | ✅ | ✅ | ✅ |
+| `POST /api/ai/generate` | ❌ | ✅ | ✅ | ✅ | ✅ |
+| `GET /api/wallet` | ❌ | ✅ | ✅ | ✅ | ✅ |
+| `GET /api/trade/*` | ❌ | ❌ | ✅ | ❌ | ✅ |
+| `* /api/admin/products/*` | ❌ | ❌ | ❌ | ✅ | ✅ |
+| `* /api/admin/customers/*` | ❌ | ❌ | ❌ | ❌ | ✅ |
+| `* /api/admin/*` (other) | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
@@ -384,9 +442,10 @@ requireSuperAdmin // Would accept only 'super-admin' role
 requireAuth          // User must be logged in
 
 // Role-based
-requireRole(roles)   // User must have one of specified roles
-requireAdmin         // Shorthand for requireRole(['admin', 'super-admin'])
-requireTrade         // Trade, admin, or super-admin role
+requireRole(roles)     // User must have one of specified roles
+requireAdmin           // Shorthand for requireRole(['admin', 'super-admin'])
+requireContentManager  // Shorthand for requireRole(['content-manager', 'admin', 'super-admin'])
+requireTrade           // Trade, admin, or super-admin role (NOT content-manager)
 
 // Feature-specific
 requireVerified      // Email must be verified
@@ -424,6 +483,9 @@ hasAnyRole(user, ['admin', 'super-admin'])  // boolean
 // Check if user is admin (admin or super-admin)
 isAdmin(user)                    // boolean
 
+// Check if user can manage content (content-manager, admin, or super-admin)
+isContentManager(user)           // boolean
+
 // Check if user can access resource (owner or admin)
 canAccess(user, resourceOwnerId) // boolean
 ```
@@ -439,6 +501,7 @@ canAccess(user, resourceOwnerId) // boolean
 | Guest | N/A | Multiple (unauthenticated sections) | ✅ Covered |
 | Customer | `customer.json` | account, wallet, ai-generator, ai-history | ✅ Covered |
 | Trade | `trade.json` | trade.spec.ts | ✅ Covered |
+| Content Manager | `content-manager.json` | content-manager.spec.ts | ✅ Covered |
 | Admin | `admin.json` | admin-auth, admin-dashboard, admin-orders, admin-products | ✅ Covered |
 | Super-Admin | ❌ None | ❌ None | ⚠️ **Not needed yet** |
 
@@ -466,6 +529,14 @@ canAccess(user, resourceOwnerId) // boolean
   - Customer features (account, wallet, AI generator, shopping)
   - Admin restriction (verifies trade cannot access admin)
   - Placeholder tests for future trade-specific features (skipped)
+
+**Content Manager:**
+- `tests/e2e/content-manager.spec.ts` - Access matrix in both directions:
+  - `/admin` redirects to `/admin/products` (no dashboard)
+  - Product management and new-product form reachable
+  - Sidebar shows only catalog sections
+  - Access Denied on orders/customers/reviews
+  - Customer regression (cannot reach product management)
 
 **Admin:**
 - `tests/e2e/admin-auth.spec.ts`
@@ -511,7 +582,8 @@ features. Remove `.skip` when implementing each feature.
 
 3. **Permission Granularity**
    - Resource-level permissions
-   - Custom admin roles (e.g., "order-manager", "content-editor")
+   - Additional custom admin roles (e.g., "order-manager") — "content-editor"
+     shipped as the `content-manager` role (2026-07-23)
    - Permission groups
 
 4. **Security Enhancements**
@@ -528,6 +600,7 @@ features. Remove `.skip` when implementing each feature.
 export const userRoleEnum = pgEnum("user_role", [
   "customer",
   "trade",
+  "content-manager",
   "admin",
   "super-admin",
 ]);
