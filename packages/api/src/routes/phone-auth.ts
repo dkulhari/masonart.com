@@ -11,6 +11,7 @@ import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
 import { db } from "../database";
 import { users, verifications, sessions } from "../database/schema";
+import { buildSessionCookie } from "../lib/session-cookie";
 import {
   sendOTP,
   verifyOTP,
@@ -231,13 +232,16 @@ phoneAuthApp.post(
         .delete(verifications)
         .where(eq(verifications.identifier, `phone:${normalizedPhone}`));
 
-      // Set session cookie
-      const cookieName = "chobii.session_token";
+      // Set session cookie in Better Auth's exact format (__Secure- prefix on
+      // HTTPS, HMAC-signed value) or get-session silently rejects it
       const isProduction = process.env.NODE_ENV === "production";
 
       c.header(
         "Set-Cookie",
-        `${cookieName}=${sessionToken}; Path=/; HttpOnly; ${isProduction ? "Secure; " : ""}SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
+        buildSessionCookie(sessionToken, {
+          secure: isProduction,
+          secret: process.env.BETTER_AUTH_SECRET || "",
+        })
       );
 
       return c.json({
