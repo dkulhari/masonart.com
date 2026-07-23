@@ -14,6 +14,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAiModerationRouteImport } from './routes/admin/ai-moderation'
+import { Route as AdminCustomersRouteImport } from './routes/admin/customers'
 import { Route as AdminReturnsRouteImport } from './routes/admin/returns'
 import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
 import { Route as ApproveTokenRouteImport } from './routes/approve/$token'
@@ -66,6 +67,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminAiModerationRoute = AdminAiModerationRouteImport.update({
   id: '/ai-moderation',
   path: '/ai-moderation',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCustomersRoute = AdminCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminReturnsRoute = AdminReturnsRouteImport.update({
@@ -221,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin/ai-moderation': typeof AdminAiModerationRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/approve/$token': typeof ApproveTokenRoute
@@ -255,6 +262,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/approve/$token': typeof ApproveTokenRoute
@@ -292,6 +300,7 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
   '/admin/ai-moderation': typeof AdminAiModerationRoute
+  '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/approve/$token': typeof ApproveTokenRoute
@@ -329,6 +338,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/admin/ai-moderation'
+    | '/admin/customers'
     | '/admin/returns'
     | '/admin/reviews'
     | '/approve/$token'
@@ -363,6 +373,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin/ai-moderation'
+    | '/admin/customers'
     | '/admin/returns'
     | '/admin/reviews'
     | '/approve/$token'
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/_authed'
     | '/admin'
     | '/admin/ai-moderation'
+    | '/admin/customers'
     | '/admin/returns'
     | '/admin/reviews'
     | '/approve/$token'
@@ -484,6 +496,13 @@ declare module '@tanstack/react-router' {
       path: '/ai-moderation'
       fullPath: '/admin/ai-moderation'
       preLoaderRoute: typeof AdminAiModerationRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/customers': {
+      id: '/admin/customers'
+      path: '/customers'
+      fullPath: '/admin/customers'
+      preLoaderRoute: typeof AdminCustomersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/returns': {
@@ -739,6 +758,7 @@ const AuthedRouteWithChildren =
 
 interface AdminRouteChildren {
   AdminAiModerationRoute: typeof AdminAiModerationRoute
+  AdminCustomersRoute: typeof AdminCustomersRoute
   AdminReturnsRoute: typeof AdminReturnsRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -753,6 +773,7 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAiModerationRoute: AdminAiModerationRoute,
+  AdminCustomersRoute: AdminCustomersRoute,
   AdminReturnsRoute: AdminReturnsRoute,
   AdminReviewsRoute: AdminReviewsRoute,
   AdminIndexRoute: AdminIndexRoute,
