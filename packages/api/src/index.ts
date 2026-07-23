@@ -92,7 +92,7 @@ app.use(
 //          /api/auth/session, /api/auth/callback/:provider, etc.
 
 // Rate limit sensitive auth endpoints
-app.post("/api/auth/sign-in/*", signUpRateLimit); // 5/min
+app.post("/api/auth/sign-in/*", authRateLimit); // 5/min
 app.post("/api/auth/sign-up/*", signUpRateLimit); // 3/min
 app.post("/api/auth/forgot-password", forgotPasswordRateLimit); // 3/min
 
