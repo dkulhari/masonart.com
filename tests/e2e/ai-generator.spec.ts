@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * AI Generator Page E2E Tests
  *
- * Tests for the MasonArt AI poster generator page (/create) including:
+ * Tests for the chobi.art AI poster generator page (/create) including:
  * - Page header section
  * - Prompt input with character count
  * - Example prompts
@@ -430,7 +430,7 @@ test.describe('AI Generator - SEO Meta Tags', () => {
   test('should have correct page title', async ({ page }) => {
     const title = await page.title();
     expect(title).toContain('Create AI Poster');
-    expect(title).toContain('MasonArt');
+    expect(title).toContain('chobi.art');
   });
 
   test('should have meta description', async ({ page }) => {

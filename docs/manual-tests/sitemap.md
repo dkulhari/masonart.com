@@ -15,7 +15,7 @@
 - [ ] Google Search Console access (for production testing)
 
 ## Overview
-This document covers manual testing of the XML sitemap for the MasonArt e-commerce platform, including:
+This document covers manual testing of the XML sitemap for the chobi.art e-commerce platform, including:
 - Sitemap accessibility
 - XML format validation
 - URL completeness
@@ -170,7 +170,7 @@ This document covers manual testing of the XML sitemap for the MasonArt e-commer
 **Expected Result**:
 ```xml
 <url>
-  <loc>https://masonart.com/page</loc>
+  <loc>https://chobi.art/page</loc>
   <lastmod>2026-01-19</lastmod>
   <changefreq>weekly</changefreq>
   <priority>0.8</priority>
@@ -258,7 +258,7 @@ This document covers manual testing of the XML sitemap for the MasonArt e-commer
 2. Verify it exists with high priority
 
 **Expected Result**:
-- Home page URL: https://masonart.com/
+- Home page URL: https://chobi.art/
 - Priority: 1.0 (highest)
 - changefreq: daily or weekly
 
@@ -593,7 +593,7 @@ This document covers manual testing of the XML sitemap for the MasonArt e-commer
 ```xml
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
-    <loc>https://masonart.com/sitemap-products.xml</loc>
+    <loc>https://chobi.art/sitemap-products.xml</loc>
     <lastmod>2026-01-19</lastmod>
   </sitemap>
 </sitemapindex>
@@ -701,7 +701,7 @@ This document covers manual testing of the XML sitemap for the MasonArt e-commer
 
 **Expected Result**:
 ```
-Sitemap: https://masonart.com/sitemap.xml
+Sitemap: https://chobi.art/sitemap.xml
 ```
 - Sitemap URL absolute
 - Matches actual sitemap location

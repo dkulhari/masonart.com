@@ -1627,7 +1627,7 @@ async function seedFrames(): Promise<void> {
  */
 async function seed(): Promise<void> {
   console.log("\n========================================");
-  console.log("  MasonArt Database Seed Script");
+  console.log("  chobi.art Database Seed Script");
   console.log("========================================\n");
 
   try {

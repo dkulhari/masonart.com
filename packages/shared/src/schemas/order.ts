@@ -1,5 +1,5 @@
 /**
- * Order Schemas for MasonArt Platform
+ * Order Schemas for chobi.art Platform
  *
  * Zod schemas for validating order-related data including:
  * - Orders

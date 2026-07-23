@@ -256,13 +256,13 @@ test.describe('JSON-LD - Product Brand', () => {
     }
   });
 
-  test('brand should have name MasonArt', async ({ page }) => {
+  test('brand should have name chobi.art', async ({ page }) => {
     const productUrl = await navigateToProductPage(page);
     if (productUrl) {
       const productSchema = await findSchemaByType(page, 'Product');
       if (productSchema && productSchema.brand) {
         const brand = productSchema.brand as JsonLdScript;
-        expect(brand.name).toBe('MasonArt');
+        expect(brand.name).toBe('chobi.art');
       }
     }
   });
@@ -369,7 +369,7 @@ test.describe('JSON-LD - Product Offers (AggregateOffer)', () => {
         if (offers.seller) {
           const seller = offers.seller as JsonLdScript;
           expect(seller['@type']).toBe('Organization');
-          expect(seller.name).toBe('MasonArt');
+          expect(seller.name).toBe('chobi.art');
         }
       }
     }
@@ -570,7 +570,7 @@ test.describe('JSON-LD - Organization Schema (Optional)', () => {
     await page.goto('/');
     const orgSchema = await findSchemaByType(page, 'Organization');
     if (orgSchema) {
-      expect(orgSchema.name).toBe('MasonArt');
+      expect(orgSchema.name).toBe('chobi.art');
     }
   });
 
@@ -869,11 +869,11 @@ test.describe('JSON-LD - Consistency with Page Content', () => {
       const productSchema = await findSchemaByType(page, 'Product');
       if (productSchema && productSchema.brand) {
         const brand = productSchema.brand as JsonLdScript;
-        expect(brand.name).toBe('MasonArt');
+        expect(brand.name).toBe('chobi.art');
       }
 
-      // Also check page has MasonArt branding
-      const logo = page.locator('a[href="/"] >> text=MasonArt');
+      // Also check page has chobi.art branding
+      const logo = page.locator('a[href="/"] >> text=chobi.art');
       const logoCount = await logo.count();
       expect(logoCount).toBeGreaterThanOrEqual(0);
     }

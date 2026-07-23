@@ -1,5 +1,5 @@
 /**
- * Checkout Order Summary Component - MasonArt E-commerce Platform
+ * Checkout Order Summary Component - chobi.art E-commerce Platform
  *
  * Displays order summary during checkout with itemized list, pricing breakdown,
  * and coupon code functionality.

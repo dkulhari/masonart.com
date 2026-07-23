@@ -170,7 +170,7 @@ phoneAuthApp.post(
           .values({
             id: userId,
             name: userName,
-            email: `${normalizedPhone}@phone.masonart.com`, // Placeholder email
+            email: `${normalizedPhone}@phone.chobi.art`, // Placeholder email
             emailVerified: false,
             phone: normalizedPhone,
             phoneVerified: true,
@@ -232,7 +232,7 @@ phoneAuthApp.post(
         .where(eq(verifications.identifier, `phone:${normalizedPhone}`));
 
       // Set session cookie
-      const cookieName = "masonart.session_token";
+      const cookieName = "chobi.session_token";
       const isProduction = process.env.NODE_ENV === "production";
 
       c.header(

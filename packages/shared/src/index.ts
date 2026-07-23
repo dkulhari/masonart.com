@@ -1,5 +1,5 @@
 /**
- * @masonart/shared - Shared types, schemas, and constants for MasonArt platform
+ * @chobi/shared - Shared types, schemas, and constants for chobi.art platform
  *
  * This package contains:
  * - TypeScript interfaces and types (./types/)
@@ -23,6 +23,7 @@ export * from './schemas/checkout';
 export * from './schemas/ai-generation';
 
 // Constants
+export * from './constants/brand';
 export * from './constants/sizes';
 export * from './constants/frames';
 export * from './constants/styles';

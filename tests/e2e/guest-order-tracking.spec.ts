@@ -141,7 +141,7 @@ test.describe('Guest Order Tracking', () => {
     test('should have proper page title', async ({ page }) => {
       await page.goto('/track', { waitUntil: 'networkidle' });
 
-      await expect(page).toHaveTitle(/Track.*Order.*MasonArt/i);
+      await expect(page).toHaveTitle(/Track.*Order.*chobi.art/i);
     });
 
     test('should display lookup form', async ({ page }) => {

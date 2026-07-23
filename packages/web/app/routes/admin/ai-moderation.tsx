@@ -1,5 +1,5 @@
 /**
- * Admin AI Moderation Dashboard - MasonArt E-commerce Platform
+ * Admin AI Moderation Dashboard - chobi.art E-commerce Platform
  *
  * AI generation moderation dashboard with:
  * - Stats cards showing pending, approved, rejected, flagged counts
@@ -59,7 +59,7 @@ export const Route = createFileRoute("/admin/ai-moderation")({
   validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
-      { title: "AI Moderation | Admin | MasonArt" },
+      { title: "AI Moderation | Admin | chobi.art" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),

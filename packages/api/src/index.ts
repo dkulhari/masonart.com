@@ -53,7 +53,7 @@ const app = new Hono();
 if (process.env.NODE_ENV === "production" && !process.env.CORS_ORIGIN) {
   throw new Error(
     "CORS_ORIGIN environment variable is required in production. " +
-    "Set it to your production domain (e.g., https://masonart.com). " +
+    "Set it to your production domain (e.g., https://chobi.art). " +
     "Multiple origins can be comma-separated."
   );
 }
@@ -258,7 +258,7 @@ app.get("/health", async (c) => {
 
   const body = {
     status: overallStatus,
-    service: "masonart-api",
+    service: "chobi-api",
     version: "1.0.0",
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
@@ -283,7 +283,7 @@ app.get("/api/health", async (c) => {
 // API root
 app.get("/", (c) => {
   return c.json({
-    name: "MasonArt API",
+    name: "chobi.art API",
     version: "0.0.1",
     documentation: "/docs",
   });

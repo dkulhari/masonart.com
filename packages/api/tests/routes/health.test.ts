@@ -255,12 +255,12 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
     expect(data).toHaveProperty('service');
   });
 
-  it('should return service as "masonart-api"', async () => {
+  it('should return service as "chobi-api"', async () => {
     if (!app) return;
 
     const res = await app.request('/api/health');
     const data = await res.json();
-    expect(data.service).toBe('masonart-api');
+    expect(data.service).toBe('chobi-api');
   });
 
   it('should return timestamp field', async () => {
@@ -304,7 +304,7 @@ describe('API Health Endpoint Response Format (/api/health)', () => {
 
     expect(data).toMatchObject({
       status: 'ok',
-      service: 'masonart-api',
+      service: 'chobi-api',
       timestamp: expect.any(String),
     });
   });
@@ -746,7 +746,7 @@ describe('Health Check Consistency', () => {
       responses.map(res => res.json().then((d: { service: string }) => d.service))
     );
 
-    expect(services).toEqual(['masonart-api', 'masonart-api']);
+    expect(services).toEqual(['chobi-api', 'chobi-api']);
   });
 
   it('should have different timestamps on sequential requests', async () => {
@@ -1058,7 +1058,7 @@ describe('Health Check Use Cases', () => {
     const data = await res.json();
 
     // Service name should be identifiable
-    expect(data.service).toBe('masonart-api');
+    expect(data.service).toBe('chobi-api');
     expect(data.service).toBeTruthy();
     expect(typeof data.service).toBe('string');
   });

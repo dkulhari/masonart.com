@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 /**
  * Payment Processing Flow E2E Tests
  *
- * Tests for the MasonArt payment processing using Razorpay:
+ * Tests for the chobi.art payment processing using Razorpay:
  * - Payment button states and interactions
  * - Payment initiation flow
  * - Razorpay checkout modal loading
@@ -53,10 +53,10 @@ async function addItemToCart(page: Page, itemOverrides?: Partial<{
   };
 
   await page.evaluate((cartItem) => {
-    const existing = localStorage.getItem('masonart-cart-storage');
+    const existing = localStorage.getItem('chobi-cart-storage');
     let data = existing ? JSON.parse(existing) : { state: { items: [] }, version: 0 };
     data.state.items.push(cartItem);
-    localStorage.setItem('masonart-cart-storage', JSON.stringify(data));
+    localStorage.setItem('chobi-cart-storage', JSON.stringify(data));
   }, item);
 }
 
@@ -78,7 +78,7 @@ async function fillValidAddressForm(page: Page) {
  */
 async function navigateToPaymentStep(page: Page) {
   await page.goto('/checkout');
-  await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+  await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
   await addItemToCart(page, { productTitle: 'Payment Test Poster', unitPrice: 2999 });
   await page.reload();
 
@@ -419,7 +419,7 @@ test.describe.skip('Payment Processing - Success Flow', () => {
 
     // Check cart is cleared in localStorage
     const cartData = await page.evaluate(() => {
-      const cart = localStorage.getItem('masonart-cart-storage');
+      const cart = localStorage.getItem('chobi-cart-storage');
       return cart ? JSON.parse(cart) : null;
     });
 
@@ -808,7 +808,7 @@ test.describe('Payment Processing - Multiple Items', () => {
     await setupRazorpayMocks(page);
 
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
 
     // Add multiple items
     await addItemToCart(page, { id: 'item_1', productTitle: 'Poster One', unitPrice: 1500 });
@@ -831,7 +831,7 @@ test.describe('Payment Processing - Multiple Items', () => {
     await setupRazorpayMocks(page);
 
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
 
     // Add multiple items
     await addItemToCart(page, { id: 'item_1', productTitle: 'Poster One', unitPrice: 1500 });
@@ -1033,7 +1033,7 @@ test.describe('Payment Processing - High Value Orders', () => {
     await setupRazorpayMocks(page);
 
     await page.goto('/checkout');
-    await page.evaluate(() => localStorage.removeItem('masonart-cart-storage'));
+    await page.evaluate(() => localStorage.removeItem('chobi-cart-storage'));
 
     // Add high value item
     await addItemToCart(page, {

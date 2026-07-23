@@ -1,5 +1,5 @@
 /**
- * Home Page - MasonArt E-commerce Platform
+ * Home Page - chobi.art E-commerce Platform
  *
  * Server-side rendered home page featuring:
  * - Hero section with CTA
@@ -68,13 +68,13 @@ export const Route = createFileRoute('/')({
   },
   head: () => ({
     meta: [
-      { title: 'MasonArt | Premium Posters & Custom Frames' },
+      { title: 'chobi.art | Premium Posters & Custom Frames' },
       {
         name: 'description',
         content:
-          'Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection of wall art to transform your space.',
+          'Discover premium posters and custom frames at chobi.art. Create unique AI-generated art or choose from our curated collection of wall art to transform your space.',
       },
-      { property: 'og:title', content: 'MasonArt | Premium Posters & Custom Frames' },
+      { property: 'og:title', content: 'chobi.art | Premium Posters & Custom Frames' },
       {
         property: 'og:description',
         content:
@@ -477,7 +477,7 @@ function ValuePropsSection() {
         {/* Section Header */}
         <div className="mb-12 text-center">
           <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Why Choose MasonArt?
+            Why Choose chobi.art?
           </h2>
           <p className="mt-2 text-lg text-muted-foreground">
             We&apos;re committed to bringing art into every home

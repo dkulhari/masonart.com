@@ -27,7 +27,7 @@ export function initSentry(): void {
     tracesSampleRate: parseFloat(
       (import.meta as any).env?.VITE_SENTRY_TRACES_SAMPLE_RATE || "0.1"
     ),
-    release: (import.meta as any).env?.VITE_SENTRY_RELEASE || "masonart-web@1.0.0",
+    release: (import.meta as any).env?.VITE_SENTRY_RELEASE || "chobi-web@1.0.0",
     integrations: [
       Sentry.browserTracingIntegration(),
       Sentry.replayIntegration({

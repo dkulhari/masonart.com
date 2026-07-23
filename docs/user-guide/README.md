@@ -1,6 +1,6 @@
-# MasonArt User Guide
+# chobi.art User Guide
 
-Welcome to MasonArt - a premium e-commerce platform for posters and photo frames with AI-powered custom artwork generation.
+Welcome to chobi.art - a premium e-commerce platform for posters and photo frames with AI-powered custom artwork generation.
 
 This guide covers everything you need to know to get started based on your role.
 

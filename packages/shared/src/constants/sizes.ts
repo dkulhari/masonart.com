@@ -1,5 +1,5 @@
 /**
- * Size Constants for MasonArt Platform
+ * Size Constants for chobi.art Platform
  *
  * Defines all available product sizes with their dimensions, price tiers,
  * and display labels based on the requirements specification (Section 4.3).

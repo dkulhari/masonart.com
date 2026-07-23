@@ -24,7 +24,7 @@ export function initSentry(): void {
     dsn,
     environment,
     tracesSampleRate,
-    release: process.env.SENTRY_RELEASE || "masonart-api@1.0.0",
+    release: process.env.SENTRY_RELEASE || "chobi-api@1.0.0",
     integrations: [
       Sentry.onUnhandledRejectionIntegration(),
     ],

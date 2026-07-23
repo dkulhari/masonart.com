@@ -1,5 +1,5 @@
 /**
- * AI Style Presets for MasonArt Platform
+ * AI Style Presets for chobi.art Platform
  *
  * Comprehensive style preset configurations for AI image generation.
  * Each preset includes prompt modifiers, negative prompts, and model parameters

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /**
  * Product Detail Page E2E Tests
  *
- * Tests for the MasonArt product detail page (/posters/:slug) including:
+ * Tests for the chobi.art product detail page (/posters/:slug) including:
  * - Breadcrumb navigation
  * - Product image gallery with navigation
  * - Product information (title, artist, rating, SKU)

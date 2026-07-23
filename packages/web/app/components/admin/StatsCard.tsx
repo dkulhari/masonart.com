@@ -1,5 +1,5 @@
 /**
- * StatsCard Component - MasonArt E-commerce Platform
+ * StatsCard Component - chobi.art E-commerce Platform
  *
  * Reusable stats card for displaying key metrics in the admin dashboard.
  * Supports different variants, trends, and loading states.

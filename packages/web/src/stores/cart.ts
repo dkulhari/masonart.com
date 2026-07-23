@@ -1,7 +1,7 @@
 /**
  * Cart Store using Zustand
  *
- * This module provides a Zustand store for managing shopping cart state in the MasonArt frontend.
+ * This module provides a Zustand store for managing shopping cart state in the chobi.art frontend.
  * It handles cart items, quantities, customization options, and synchronizes with the backend API.
  *
  * Features:

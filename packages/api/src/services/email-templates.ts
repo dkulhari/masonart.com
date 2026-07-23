@@ -2,7 +2,7 @@
  * Email Templates for Order Notifications
  *
  * Responsive HTML email templates for order-related notifications.
- * All templates include MasonArt branding and are mobile-friendly.
+ * All templates include chobi.art branding and are mobile-friendly.
  */
 
 import type { Order } from "../database/schema/orders";
@@ -36,7 +36,7 @@ function baseTemplate(content: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MasonArt</title>
+  <title>chobi.art</title>
   <style>
     body {
       margin: 0;
@@ -157,18 +157,18 @@ function baseTemplate(content: string): string {
 <body>
   <div class="container">
     <div class="header">
-      <h1>MASONART</h1>
+      <h1>CHOBI.ART</h1>
     </div>
     ${content}
     <div class="footer">
-      <p>Thank you for choosing MasonArt</p>
+      <p>Thank you for choosing chobi.art</p>
       <div class="social-links">
-        <a href="https://masonart.com">Website</a> |
-        <a href="https://instagram.com/masonart">Instagram</a> |
-        <a href="mailto:support@masonart.com">Support</a>
+        <a href="https://chobi.art">Website</a> |
+        <a href="https://instagram.com/chobiart">Instagram</a> |
+        <a href="mailto:support@chobi.art">Support</a>
       </div>
       <p style="font-size: 12px; color: #999; margin-top: 16px;">
-        &copy; ${new Date().getFullYear()} MasonArt. All rights reserved.
+        &copy; ${new Date().getFullYear()} chobi.art. All rights reserved.
       </p>
     </div>
   </div>
@@ -262,7 +262,7 @@ export function getOrderConfirmationTemplate(order: Order): EmailTemplate {
       <p>We'll send you another email when your order ships with tracking information.</p>
 
       <center>
-        <a href="https://masonart.com/orders/${order.orderNumber}" class="button">View Order</a>
+        <a href="https://chobi.art/orders/${order.orderNumber}" class="button">View Order</a>
       </center>
     </div>
   `;
@@ -282,9 +282,9 @@ Order Details:
 
 We'll send you another email when your order ships.
 
-View your order: https://masonart.com/orders/${order.orderNumber}
+View your order: https://chobi.art/orders/${order.orderNumber}
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -300,7 +300,7 @@ Thank you for choosing MasonArt!
 export function getShippedTemplate(order: Order): EmailTemplate {
   const trackingUrl =
     order.shippingDetails?.trackingUrl ||
-    `https://masonart.com/track/${order.orderNumber}`;
+    `https://chobi.art/track/${order.orderNumber}`;
   const carrier = order.shippingDetails?.carrier || "our carrier partner";
   const trackingNumber = order.shippingDetails?.trackingNumber || "";
   const estimatedDelivery = order.shippingDetails?.estimatedDelivery;
@@ -359,7 +359,7 @@ Track your order: ${trackingUrl}
 
 Order Number: ${order.orderNumber}
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -375,7 +375,7 @@ Thank you for choosing MasonArt!
 export function getOutForDeliveryTemplate(order: Order): EmailTemplate {
   const trackingUrl =
     order.shippingDetails?.trackingUrl ||
-    `https://masonart.com/track/${order.orderNumber}`;
+    `https://chobi.art/track/${order.orderNumber}`;
 
   const content = `
     <div class="content">
@@ -422,7 +422,7 @@ Track delivery: ${trackingUrl}
 
 Order Number: ${order.orderNumber}
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -457,11 +457,11 @@ export function getDeliveredTemplate(order: Order): EmailTemplate {
       <p>If you have any questions about your order or need assistance, our support team is here to help.</p>
 
       <center>
-        <a href="https://masonart.com/reviews/new?order=${order.orderNumber}" class="button">Leave a Review</a>
+        <a href="https://chobi.art/reviews/new?order=${order.orderNumber}" class="button">Leave a Review</a>
       </center>
 
       <p style="text-align: center; color: #777; font-size: 14px; margin-top: 24px;">
-        Love your art? Share it on Instagram and tag us <strong>@masonart</strong>!
+        Love your art? Share it on Instagram and tag us <strong>@chobiart</strong>!
       </p>
     </div>
   `;
@@ -476,13 +476,13 @@ Your art has arrived! We hope you love it as much as we loved creating it for yo
 Order Number: ${order.orderNumber}
 Delivered On: ${formatDate(new Date())}
 
-Leave a review: https://masonart.com/reviews/new?order=${order.orderNumber}
+Leave a review: https://chobi.art/reviews/new?order=${order.orderNumber}
 
-Love your art? Share it on Instagram and tag us @masonart!
+Love your art? Share it on Instagram and tag us @chobiart!
 
-If you have any questions, contact us at support@masonart.com
+If you have any questions, contact us at support@chobi.art
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -593,7 +593,7 @@ ${orderItem.snapshot?.sizeLabel ? `- Size: ${orderItem.snapshot.sizeLabel}` : ""
 
 Note: If we don't hear from you by the deadline, we'll proceed with shipping based on the current production.
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -665,7 +665,7 @@ Order Details:
 
 We're committed to making sure you're 100% happy with your order!
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -716,7 +716,7 @@ export function getApprovalConfirmedTemplate(
       </div>
 
       <center>
-        <a href="https://masonart.com/orders/${order.orderNumber}" class="button">View Order</a>
+        <a href="https://chobi.art/orders/${order.orderNumber}" class="button">View Order</a>
       </center>
 
       <p style="text-align: center; color: #777;">
@@ -740,11 +740,11 @@ Order Details:
 - Item: ${productTitle}
 - Status: Approved ✓
 
-View your order: https://masonart.com/orders/${order.orderNumber}
+View your order: https://chobi.art/orders/${order.orderNumber}
 
 Thank you for trusting us with your custom art!
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -818,7 +818,7 @@ Order Details:
 
 If you've already reviewed and approved, please disregard this email.
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -883,7 +883,7 @@ export function getAIGenerationApprovedTemplate(
       </div>
 
       <center>
-        <a href="https://masonart.com/account/ai-creations/${generationId}" class="button">View Your Creation</a>
+        <a href="https://chobi.art/account/ai-creations/${generationId}" class="button">View Your Creation</a>
       </center>
 
       <p style="text-align: center; color: #777; margin-top: 24px;">
@@ -904,11 +904,11 @@ Creation Details:
 - Prompt: ${truncatedPrompt}
 - Status: Approved ✓
 
-View your creation: https://masonart.com/account/ai-creations/${generationId}
+View your creation: https://chobi.art/account/ai-creations/${generationId}
 
 Ready to bring your art to life? Add it to your cart and we'll print it beautifully!
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {
@@ -942,7 +942,7 @@ export function getAIGenerationRejectedTemplate(
     <div class="content">
       <h2>AI Creation Review Update</h2>
       <p>Hi ${displayName},</p>
-      <p>Thank you for using MasonArt's AI art generator. Unfortunately, your recent creation could not be approved for printing or gallery sharing.</p>
+      <p>Thank you for using chobi.art's AI art generator. Unfortunately, your recent creation could not be approved for printing or gallery sharing.</p>
 
       <div class="tracking-box" style="background-color: #fef2f2; border-left: 4px solid #ef4444;">
         <h3 style="color: #dc2626;">Reason: ${categoryDisplay}</h3>
@@ -970,7 +970,7 @@ export function getAIGenerationRejectedTemplate(
       <p>You're welcome to create a new artwork with a different prompt. Our content guidelines ensure all artwork is appropriate for printing and display.</p>
 
       <center>
-        <a href="https://masonart.com/create" class="button">Create New Artwork</a>
+        <a href="https://chobi.art/create" class="button">Create New Artwork</a>
       </center>
 
       <p style="text-align: center; color: #777; margin-top: 24px;">
@@ -984,7 +984,7 @@ AI Creation Review Update
 
 Hi ${displayName},
 
-Thank you for using MasonArt's AI art generator. Unfortunately, your recent creation could not be approved for printing or gallery sharing.
+Thank you for using chobi.art's AI art generator. Unfortunately, your recent creation could not be approved for printing or gallery sharing.
 
 Reason: ${categoryDisplay}
 ${rejectionReason}
@@ -996,11 +996,11 @@ Creation Details:
 
 You're welcome to create a new artwork with a different prompt. Our content guidelines ensure all artwork is appropriate for printing and display.
 
-Create new artwork: https://masonart.com/create
+Create new artwork: https://chobi.art/create
 
 Questions? Contact our support team and we'll be happy to help.
 
-Thank you for choosing MasonArt!
+Thank you for choosing chobi.art!
   `.trim();
 
   return {

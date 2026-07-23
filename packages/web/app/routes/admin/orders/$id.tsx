@@ -1,5 +1,5 @@
 /**
- * Admin Order Detail Page - MasonArt E-commerce Platform
+ * Admin Order Detail Page - chobi.art E-commerce Platform
  *
  * Order detail page with:
  * - Full order information display
@@ -34,7 +34,7 @@ import type { OrderStatus } from '~/components/admin/OrdersTable'
 export const Route = createFileRoute('/admin/orders/$id')({
   head: () => ({
     meta: [
-      { title: 'Order Details | Admin | MasonArt' },
+      { title: 'Order Details | Admin | chobi.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

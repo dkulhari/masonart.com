@@ -1,4 +1,4 @@
-# MasonArt Test Execution Remediation Plan
+# chobi.art Test Execution Remediation Plan
 
 > **Historical Document — Do Not Modify**
 >
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-Task 004 (QA Testing) created comprehensive test infrastructure but tests were never executed against a running application stack. This document outlined the steps needed to properly validate the MasonArt platform through actual test execution.
+Task 004 (QA Testing) created comprehensive test infrastructure but tests were never executed against a running application stack. This document outlined the steps needed to properly validate the chobi.art platform through actual test execution.
 
 **Final Results:** 1,491 passing tests, 277 skipped tests, 0 failing tests.
 
@@ -215,4 +215,4 @@ open playwright-report/index.html
 - `playwright.config.ts` - E2E test configuration
 - `tests/e2e/` - All E2E test files
 - `tests/fixtures/` - Test data fixtures
-- `.auto-claude/specs/004-masonart-qa-testing/` - Original task spec
+- `.auto-claude/specs/004-chobi-qa-testing/` - Original task spec

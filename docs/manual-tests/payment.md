@@ -17,7 +17,7 @@
 - [ ] User logged in for authenticated checkout
 
 ## Overview
-This document covers manual testing of the MasonArt payment processing flow, including:
+This document covers manual testing of the chobi.art payment processing flow, including:
 - Payment button states and interactions
 - Razorpay checkout modal integration
 - Payment success flow

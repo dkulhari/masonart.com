@@ -1,5 +1,5 @@
 /**
- * User Types for MasonArt Platform
+ * User Types for chobi.art Platform
  *
  * Defines all user-related types including authentication, addresses,
  * preferences, and trade account information based on the requirements specification.

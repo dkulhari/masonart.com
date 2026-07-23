@@ -46,7 +46,7 @@ const REMINDER_HOURS_BEFORE_DEADLINE = 24;
  * Base URL for approval pages
  */
 const APPROVAL_BASE_URL =
-  process.env.APP_URL || "https://masonart.com";
+  process.env.APP_URL || "https://chobi.xtoms.xyz";
 
 // ============================================================================
 // Service Functions

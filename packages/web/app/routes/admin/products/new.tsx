@@ -1,5 +1,5 @@
 /**
- * Admin New Product Page - MasonArt E-commerce Platform
+ * Admin New Product Page - chobi.art E-commerce Platform
  *
  * Page for creating a new product with:
  * - Product form with all fields
@@ -22,7 +22,7 @@ import { ProductForm, type ProductFormData } from '~/components/admin/ProductFor
 export const Route = createFileRoute('/admin/products/new')({
   head: () => ({
     meta: [
-      { title: 'New Product | Admin | MasonArt' },
+      { title: 'New Product | Admin | chobi.art' },
       { name: 'robots', content: 'noindex, nofollow' },
     ],
   }),

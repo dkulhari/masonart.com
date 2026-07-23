@@ -515,7 +515,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/protected', {
         headers: {
-          Cookie: 'masonart.session=invalid-token',
+          Cookie: 'chobi.session=invalid-token',
         },
       });
 
@@ -557,7 +557,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/protected', {
         headers: {
-          Cookie: 'masonart.session=expired-token',
+          Cookie: 'chobi.session=expired-token',
         },
       });
 
@@ -646,7 +646,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/optional', {
         headers: {
-          Cookie: 'masonart.session=expired',
+          Cookie: 'chobi.session=expired',
         },
       });
 
@@ -676,7 +676,7 @@ describe('Auth Middleware', () => {
       // Should not throw
       const res = await testApp.request('/optional', {
         headers: {
-          Cookie: 'masonart.session=malformed;;;',
+          Cookie: 'chobi.session=malformed;;;',
         },
       });
 
@@ -1394,7 +1394,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/protected', {
         headers: {
-          Cookie: 'masonart.session=malformed;;;data',
+          Cookie: 'chobi.session=malformed;;;data',
         },
       });
 
@@ -1411,7 +1411,7 @@ describe('Auth Middleware', () => {
 
       const res = await testApp.request('/optional', {
         headers: {
-          Cookie: 'masonart.session=malformed',
+          Cookie: 'chobi.session=malformed',
         },
       });
 

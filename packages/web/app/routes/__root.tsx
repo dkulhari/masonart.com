@@ -8,6 +8,7 @@ import {
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BRAND_NAME, BRAND_TAGLINE } from '@chobi/shared'
 import type * as React from 'react'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
@@ -88,7 +89,7 @@ const fetchSession = createServerFn({ method: 'GET' }).handler(async () => {
 })
 
 /**
- * Root route configuration for the MasonArt e-commerce application.
+ * Root route configuration for the chobi.art e-commerce application.
  * Sets up global SEO metadata, stylesheets, and the main layout structure.
  * Fetches user session server-side for SSR optimization.
  */
@@ -107,21 +108,19 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'MasonArt | Premium Posters & Frames',
+        title: `${BRAND_NAME} | ${BRAND_TAGLINE}`,
       },
       {
         name: 'description',
-        content:
-          'Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection of wall art for your space.',
+        content: `Discover premium posters and custom frames at ${BRAND_NAME}. Create unique AI-generated art or choose from our curated collection of wall art for your space.`,
       },
       {
         property: 'og:title',
-        content: 'MasonArt | Premium Posters & Frames',
+        content: `${BRAND_NAME} | ${BRAND_TAGLINE}`,
       },
       {
         property: 'og:description',
-        content:
-          'Discover premium posters and custom frames at MasonArt. Create unique AI-generated art or choose from our curated collection.',
+        content: `Discover premium posters and custom frames at ${BRAND_NAME}. Create unique AI-generated art or choose from our curated collection.`,
       },
       {
         property: 'og:type',
@@ -129,7 +128,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       },
       {
         property: 'og:site_name',
-        content: 'MasonArt',
+        content: BRAND_NAME,
       },
       {
         name: 'twitter:card',
@@ -137,7 +136,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       },
       {
         name: 'twitter:title',
-        content: 'MasonArt | Premium Posters & Frames',
+        content: `${BRAND_NAME} | ${BRAND_TAGLINE}`,
       },
       {
         name: 'twitter:description',

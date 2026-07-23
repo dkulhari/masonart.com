@@ -1,5 +1,5 @@
 /**
- * Cart Page - MasonArt E-commerce Platform
+ * Cart Page - chobi.art E-commerce Platform
  *
  * Full cart page showing all items, order summary, and checkout options.
  * Cart data is stored in localStorage via Zustand.
@@ -35,11 +35,11 @@ import { CartItem } from '~/components/cart/CartItem'
 export const Route = createFileRoute('/cart/')({
   head: () => ({
     meta: [
-      { title: 'Shopping Cart | MasonArt' },
+      { title: 'Shopping Cart | chobi.art' },
       {
         name: 'description',
         content:
-          'View and manage items in your shopping cart. Premium posters and custom frames from MasonArt.',
+          'View and manage items in your shopping cart. Premium posters and custom frames from chobi.art.',
       },
       { name: 'robots', content: 'noindex' }, // Don't index cart pages
     ],

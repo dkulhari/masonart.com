@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 /**
  * Admin Dashboard E2E Tests
  *
- * Tests for the MasonArt admin dashboard page (/admin).
+ * Tests for the chobi.art admin dashboard page (/admin).
  *
  * These tests use REAL authentication via stored session state.
  * The auth.setup.ts file creates and saves authentication state
@@ -166,7 +166,7 @@ test.describe('Admin Dashboard Page Header', () => {
   });
 
   test('should have correct HTML document title', async ({ page }) => {
-    await expect(page).toHaveTitle(/Dashboard.*Admin.*MasonArt/);
+    await expect(page).toHaveTitle(/Dashboard.*Admin.*chobi.art/);
   });
 
   test('should have noindex/nofollow robots meta tag', async ({ page }) => {

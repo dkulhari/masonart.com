@@ -69,7 +69,7 @@ export async function sendAlert(options: AlertOptions): Promise<void> {
         elements: [
           {
             type: "mrkdwn",
-            text: `*Service:* masonart-api | *Time:* ${new Date().toISOString()}`,
+            text: `*Service:* chobi-api | *Time:* ${new Date().toISOString()}`,
           },
         ],
       },

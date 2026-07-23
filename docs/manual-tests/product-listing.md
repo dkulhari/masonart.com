@@ -14,7 +14,7 @@
 - [ ] Docker services (PostgreSQL, Redis) running
 
 ## Overview
-This document covers manual testing of the MasonArt product listing page, including:
+This document covers manual testing of the chobi.art product listing page, including:
 - Page header with product count
 - Filter sidebar (desktop) and sheet (mobile)
 - Active filter tags
@@ -869,8 +869,8 @@ This document covers manual testing of the MasonArt product listing page, includ
 4. Check title again
 
 **Expected Result**:
-- Default: "Shop Posters | MasonArt"
-- With style: "Abstract Posters | MasonArt"
+- Default: "Shop Posters | chobi.art"
+- With style: "Abstract Posters | chobi.art"
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -905,7 +905,7 @@ This document covers manual testing of the MasonArt product listing page, includ
 2. Check canonical link
 
 **Expected Result**:
-- Canonical URL: https://masonart.com/posters
+- Canonical URL: https://chobi.art/posters
 - Pagination not included in canonical
 
 **Actual Result**:

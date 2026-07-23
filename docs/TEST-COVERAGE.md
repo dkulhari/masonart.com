@@ -1,11 +1,11 @@
-# MasonArt Test Coverage Report
+# chobi.art Test Coverage Report
 
 **Last Updated:** 2026-01-28
 **Testing Framework Version:** Vitest 4.0.17, Playwright 1.57.0
 
 ## Executive Summary
 
-The MasonArt e-commerce platform has comprehensive test coverage across all layers:
+The chobi.art e-commerce platform has comprehensive test coverage across all layers:
 
 | Category | Test Files | Test Cases | Status |
 |----------|-----------|------------|--------|
@@ -23,7 +23,7 @@ The MasonArt e-commerce platform has comprehensive test coverage across all laye
 
 ## Test Coverage by Package
 
-### 1. Shared Package (`@masonart/shared`)
+### 1. Shared Package (`@chobi/shared`)
 
 **Location:** `packages/shared/tests/`
 
@@ -45,7 +45,7 @@ cd packages/shared && bun run test
 
 ---
 
-### 2. API Package (`@masonart/api`)
+### 2. API Package (`@chobi/api`)
 
 **Location:** `packages/api/tests/`
 
@@ -114,7 +114,7 @@ cd packages/api && SKIP_DB_RUNTIME_TESTS=true SKIP_REDIS_RUNTIME_TESTS=true bun 
 
 ---
 
-### 3. Web Package (`@masonart/web`)
+### 3. Web Package (`@chobi/web`)
 
 **Location:** `packages/web/tests/`
 
@@ -556,7 +556,7 @@ open packages/web/coverage/index.html
 
 ## Conclusion
 
-The MasonArt platform has achieved comprehensive test coverage across:
+The chobi.art platform has achieved comprehensive test coverage across:
 
 - ✅ **Schema Validation** - All Zod schemas tested
 - ✅ **API Endpoints** - All routes tested with auth/validation

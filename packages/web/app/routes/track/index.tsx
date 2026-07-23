@@ -1,5 +1,5 @@
 /**
- * Public Order Tracking Page - MasonArt E-commerce Platform
+ * Public Order Tracking Page - chobi.art E-commerce Platform
  *
  * Allows guests to track their orders without logging in.
  * Requires order number and email/phone for verification.
@@ -40,8 +40,8 @@ export const Route = createFileRoute('/track/')({
   }),
   head: () => ({
     meta: [
-      { title: 'Track Your Order | MasonArt' },
-      { name: 'description', content: 'Track your MasonArt order status and shipping progress.' },
+      { title: 'Track Your Order | chobi.art' },
+      { name: 'description', content: 'Track your chobi.art order status and shipping progress.' },
     ],
   }),
   component: TrackOrderPage,

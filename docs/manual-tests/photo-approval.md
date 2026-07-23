@@ -19,7 +19,7 @@
 - [ ] Production approval record exists in database
 
 ## Overview
-This document covers manual testing of the MasonArt production photo approval workflow:
+This document covers manual testing of the chobi.art production photo approval workflow:
 
 **Admin Workflow**:
 - Admin approvals dashboard
@@ -291,7 +291,7 @@ This document covers manual testing of the MasonArt production photo approval wo
 - Admin comments styled distinctly
 - Customer comments styled distinctly
 - Timestamps shown
-- Author type (MasonArt Team / Customer) indicated
+- Author type (chobi.art Team / Customer) indicated
 
 **Actual Result**:
 - [ ] PASS / [ ] FAIL
@@ -311,7 +311,7 @@ This document covers manual testing of the MasonArt production photo approval wo
 
 **Expected Result**:
 - Comment added to timeline
-- Comment shows as "MasonArt Team" / "Admin"
+- Comment shows as "chobi.art Team" / "Admin"
 - Timestamp shown
 - Input cleared after submission
 

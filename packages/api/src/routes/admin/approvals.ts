@@ -45,7 +45,7 @@ import {
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
-const APPROVAL_BASE_URL = process.env.APP_URL || "https://masonart.com";
+const APPROVAL_BASE_URL = process.env.APP_URL || "https://chobi.xtoms.xyz";
 
 // ============================================================================
 // Validation Schemas

@@ -1,10 +1,10 @@
-# MasonArt — External Services
+# chobi.art — External Services
 
 Every third-party service production depends on: what it does, what credentials it needs, where they live, and the gotchas already paid for (mostly by customs-copilot's first deploy). All secrets live in `deploy/.env` on the dev machine only — never in the repo, never loose on the mini.
 
 | Service | Purpose | Credentials | Where stored |
 |---|---|---|---|
-| Cloudflare (DNS + Tunnel + R2) | DNS, TLS, ingress (shared platform tunnel), image storage/CDN | R2 access key pair (tunnel token lives with the platform stack, not MasonArt) | `deploy/.env` |
+| Cloudflare (DNS + Tunnel + R2) | DNS, TLS, ingress (shared platform tunnel), image storage/CDN | R2 access key pair (tunnel token lives with the platform stack, not chobi.art) | `deploy/.env` |
 | GHCR | Private image registry | 2 classic PATs (write / read) | dev keychain / mini `~/.docker/config.json` |
 | Razorpay | Payments (orders, wallet) | Key id + secret + webhook secret | `deploy/.env` |
 | Resend | Transactional email | API key | `deploy/.env` |
@@ -16,14 +16,14 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Cloudflare — DNS, Tunnel, edge
 
-- The site lives at `masonart.xtoms.xyz` — a first-level subdomain of the existing `xtoms.xyz` zone. **No MasonArt-specific Cloudflare configuration exists or is needed**: the platform's wildcard public hostname (`*.xtoms.xyz` → `http://traefik:80`) plus the proxied `*` CNAME already route it, and the universal cert covers first-level subdomains.
+- The site lives at `chobi.xtoms.xyz` — a first-level subdomain of the existing `xtoms.xyz` zone. **No chobi.art-specific Cloudflare configuration exists or is needed**: the platform's wildcard public hostname (`*.xtoms.xyz` → `http://traefik:80`) plus the proxied `*` CNAME already route it, and the universal cert covers first-level subdomains.
 - TLS terminates at the edge; no certificates are managed on the mini.
-- **Ingress = the shared platform tunnel** (`platform-tunnel` + `platform-traefik`, customs-copilot `deploy/platform/` — see the XTOMS deployment guide). MasonArt runs **no cloudflared** and holds **no tunnel token**; cloudflared dials **outbound only**, transport pinned to `http2` (QUIC degrades through the home-router NAT).
+- **Ingress = the shared platform tunnel** (`platform-tunnel` + `platform-traefik`, customs-copilot `deploy/platform/` — see the XTOMS deployment guide). chobi.art runs **no cloudflared** and holds **no tunnel token**; cloudflared dials **outbound only**, transport pinned to `http2` (QUIC degrades through the home-router NAT).
 - Path splitting (`/api` → api:3000, rest → web:3001) is done by **traefik labels** in the prod compose overlay — `PathPrefix` is anchored by design, so the cc #97 unanchored-regex hazard is gone.
 - ⚠️ The tunnel dashboard must show **exactly one connector replica**. A second process sharing the token (e.g. a natively-installed cloudflared) gets load-balanced → intermittent 502s.
-- ⚠️ Shared fate: the tunnel and traefik serve every app on the mini. `masonart.xtoms.xyz` and `customs.xtoms.xyz` down together = platform stack, not MasonArt.
+- ⚠️ Shared fate: the tunnel and traefik serve every app on the mini. `chobi.xtoms.xyz` and `customs.xtoms.xyz` down together = platform stack, not chobi.art.
 - ⚠️ The edge caches 404s per-PoP ~5 min and browsers up to 4h — purge cache after deploys.
-- A branded `masonart.com` cutover is a deliberate post-launch project (new zone + tunnel hostname + webhook/Resend re-registration + 302 legacy redirect — cc #160).
+- A branded `chobi.art` cutover is a deliberate post-launch project (new zone + tunnel hostname + webhook/Resend re-registration + 302 legacy redirect — cc #160).
 
 ## Cloudflare R2 — image storage + CDN
 
@@ -34,21 +34,21 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## GHCR — image registry
 
-- Private packages `ghcr.io/<owner>/masonart-api` and `ghcr.io/<owner>/masonart-web`; every push tags `latest` + git short-sha (sha tags are the rollback mechanism).
+- Private packages `ghcr.io/<owner>/chobi-api` and `ghcr.io/<owner>/chobi-web`; every push tags `latest` + git short-sha (sha tags are the rollback mechanism).
 - Two **classic** PATs (fine-grained PATs have patchy GHCR support): `write:packages` on the dev machine, `read:packages` (least privilege) on the mini.
 - ⚠️ On the mini, `~/.docker/config.json` must **not** use `credsStore: osxkeychain` — the keychain is unreachable from non-interactive SSH, so pulls fail. Remove it; the PAT lives base64 in the file on the headless box.
 - ⚠️ Never park a PAT in a repo file, even untracked.
 
 ## Razorpay — payments
 
-- **Test mode for the life of this staging environment**: `rzp_test_` keys with the real provider code path. Live `rzp_live_` keys arrive only with the future `masonart.com` production cutover (which also re-registers the webhook against the new hostname).
-- Webhook: `https://masonart.xtoms.xyz/api/webhooks/razorpay` with `payment.captured`, `payment.failed`, `refund.processed` + order events as used. ⚠️ Registered against this exact hostname — a later `masonart.com` cutover must re-register it (webhooks don't follow redirects; this bit customs #160). Webhook secret is self-chosen: `openssl rand -hex 32`.
+- **Test mode for the life of this staging environment**: `rzp_test_` keys with the real provider code path. Live `rzp_live_` keys arrive only with the future `chobi.art` production cutover (which also re-registers the webhook against the new hostname).
+- Webhook: `https://chobi.xtoms.xyz/api/webhooks/razorpay` with `payment.captured`, `payment.failed`, `refund.processed` + order events as used. ⚠️ Registered against this exact hostname — a later `chobi.art` cutover must re-register it (webhooks don't follow redirects; this bit customs #160). Webhook secret is self-chosen: `openssl rand -hex 32`.
 - Webhooks are the **sole source of truth** for payment state; duplicates are safe (idempotency, ticket #285) — redeliver from the dashboard rather than ever editing the DB.
 - Test cards: success `4111 1111 1111 1111`, failure `4000 0000 0000 0002`, UPI `success@razorpay`.
 
 ## Resend — transactional email
 
-- Sending domain is `xtoms.xyz`, added and **verified** in Resend (SPF + DKIM in the Cloudflare zone) — if customs-copilot already verified it, reuse the verification and just mint a MasonArt API key. Unverified domain = silent-looking 500s on signup.
+- Sending domain is `xtoms.xyz`, added and **verified** in Resend (SPF + DKIM in the Cloudflare zone) — if customs-copilot already verified it, reuse the verification and just mint a chobi.art API key. Unverified domain = silent-looking 500s on signup.
 - Prod API key (Sending access only), `EMAIL_FROM=noreply@xtoms.xyz` (no mailbox needed).
 - Sends: verification, password reset, order confirmation, shipping notifications. A failed send must be loud (thrown + Sentry), never a silent fallback — `RESEND_API_KEY` carries a `:?` guard in the prod compose.
 
@@ -65,6 +65,6 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Sentry + Slack + UptimeRobot — observability
 
-- Sentry: separate DSNs for api (`SENTRY_DSN`) and web (`VITE_SENTRY_DSN`), environment `staging` (the compose default) — `production` is reserved for the future masonart.com deployment so events never mix.
+- Sentry: separate DSNs for api (`SENTRY_DSN`) and web (`VITE_SENTRY_DSN`), environment `staging` (the compose default) — `production` is reserved for the future chobi.art deployment so events never mix.
 - Slack incoming webhook → `#prod-alerts`: critical api errors and (via UptimeRobot) downtime alerts.
-- UptimeRobot (free tier): monitors on `https://masonart.xtoms.xyz/api/health` and `https://masonart.xtoms.xyz/`, 5-min interval, alert → Slack. This is the only thing watching the site when the operator isn't — customs-copilot launched without it and learned about its first outage from a user.
+- UptimeRobot (free tier): monitors on `https://chobi.xtoms.xyz/api/health` and `https://chobi.xtoms.xyz/`, 5-min interval, alert → Slack. This is the only thing watching the site when the operator isn't — customs-copilot launched without it and learned about its first outage from a user.

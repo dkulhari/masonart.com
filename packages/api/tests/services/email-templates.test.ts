@@ -176,7 +176,7 @@ describe('Email Templates', () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain(`masonart.com/orders/${order.orderNumber}`);
+      expect(template.html).toContain(`chobi.art/orders/${order.orderNumber}`);
     });
 
     it('should have plain text version with order details', () => {
@@ -200,11 +200,11 @@ describe('Email Templates', () => {
       expect(template.html).toContain('there');
     });
 
-    it('should include MasonArt branding', () => {
+    it('should include chobi.art branding', () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('MASONART');
+      expect(template.html).toContain('CHOBI.ART');
     });
   });
 
@@ -252,7 +252,7 @@ describe('Email Templates', () => {
       const template = getShippedTemplate(order);
 
       // Should use default tracking URL
-      expect(template.html).toContain(`masonart.com/track/${order.orderNumber}`);
+      expect(template.html).toContain(`chobi.art/track/${order.orderNumber}`);
     });
 
     it('should handle order without tracking number', () => {
@@ -355,7 +355,7 @@ describe('Email Templates', () => {
       const template = getDeliveredTemplate(order);
 
       expect(template.html.toLowerCase()).toContain('instagram');
-      expect(template.html).toContain('@masonart');
+      expect(template.html).toContain('@chobiart');
     });
 
     it('should include customer name', () => {
@@ -418,8 +418,8 @@ describe('Email Templates', () => {
       const order = createMockOrder();
       const template = getOrderConfirmationTemplate(order);
 
-      expect(template.html).toContain('instagram.com/masonart');
-      expect(template.html).toContain('support@masonart.com');
+      expect(template.html).toContain('instagram.com/chobiart');
+      expect(template.html).toContain('support@chobi.art');
     });
   });
 

@@ -30,7 +30,7 @@ export interface AuthUser {
   createdAt: Date;
   updatedAt: Date;
   role: UserRole;
-  // Custom MasonArt fields
+  // Custom chobi.art fields
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;

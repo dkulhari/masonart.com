@@ -1,5 +1,5 @@
 /**
- * Order Types for MasonArt Platform
+ * Order Types for chobi.art Platform
  *
  * Defines all order-related types including cart, checkout, order items,
  * shipping, payment, and photo approval workflow based on the requirements specification.

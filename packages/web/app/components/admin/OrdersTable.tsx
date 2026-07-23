@@ -1,5 +1,5 @@
 /**
- * OrdersTable Component - MasonArt E-commerce Platform
+ * OrdersTable Component - chobi.art E-commerce Platform
  *
  * Admin orders data table using TanStack Table for:
  * - Sorting, filtering, and pagination

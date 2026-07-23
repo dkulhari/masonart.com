@@ -146,7 +146,7 @@ describe('Email Service', () => {
         to: TEST_EMAIL,
         subject: TEST_SUBJECT,
         html: TEST_HTML,
-        from: 'custom@masonart.com',
+        from: 'custom@chobi.art',
       };
 
       const result = await sendEmail(options);
@@ -159,7 +159,7 @@ describe('Email Service', () => {
         to: TEST_EMAIL,
         subject: TEST_SUBJECT,
         html: TEST_HTML,
-        replyTo: 'reply@masonart.com',
+        replyTo: 'reply@chobi.art',
       };
 
       const result = await sendEmail(options);
@@ -189,8 +189,8 @@ describe('Email Service', () => {
         subject: TEST_SUBJECT,
         html: TEST_HTML,
         text: TEST_TEXT,
-        from: 'Custom <custom@masonart.com>',
-        replyTo: 'support@masonart.com',
+        from: 'Custom <custom@chobi.art>',
+        replyTo: 'support@chobi.art',
         tags: [{ name: 'test', value: 'true' }],
       };
 
@@ -248,7 +248,7 @@ describe('Email Service', () => {
       };
 
       const result = await sendTemplateEmail(TEST_EMAIL, template, {
-        from: 'Custom <custom@masonart.com>',
+        from: 'Custom <custom@chobi.art>',
         replyTo: 'reply@example.com',
         tags: [{ name: 'template_test', value: 'true' }],
       });

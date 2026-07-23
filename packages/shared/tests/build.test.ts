@@ -4,7 +4,7 @@ import { join } from 'path';
 import { execSync } from 'child_process';
 
 /**
- * Tests to verify @masonart/shared package builds correctly
+ * Tests to verify @chobi/shared package builds correctly
  *
  * This test suite validates:
  * - Package configuration (package.json)
@@ -48,7 +48,7 @@ describe('Shared Package Build', () => {
     });
 
     it('should have correct package name', () => {
-      expect(packageJson.name).toBe('@masonart/shared');
+      expect(packageJson.name).toBe('@chobi/shared');
     });
 
     it('should be marked as private', () => {

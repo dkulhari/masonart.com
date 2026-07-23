@@ -1,5 +1,5 @@
 // Shipping options and order shipments database schema
-// Part of the Shipping & Returns feature for MasonArt E-Commerce Platform
+// Part of the Shipping & Returns feature for chobi.art E-Commerce Platform
 
 import {
   pgTable,

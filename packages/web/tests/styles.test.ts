@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
- * Tests to verify Tailwind CSS and PostCSS configuration for @masonart/web package
+ * Tests to verify Tailwind CSS and PostCSS configuration for @chobi/web package
  *
  * This test suite validates:
  * - Configuration file existence and structure
@@ -1039,9 +1039,9 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
     });
   });
 
-  describe('MasonArt Brand Theming', () => {
-    it('should have MasonArt brand color comment', () => {
-      expect(tailwindConfig).toContain('// MasonArt brand colors');
+  describe('chobi.art Brand Theming', () => {
+    it('should have chobi.art brand color comment', () => {
+      expect(tailwindConfig).toContain('// chobi.art brand colors');
     });
 
     it('should have brand primary color as warm amber/terracotta', () => {
@@ -1061,7 +1061,7 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
     });
 
     it('should have poster-specific aspect ratios', () => {
-      // MasonArt-specific poster aspect ratios
+      // chobi.art-specific poster aspect ratios
       expect(tailwindConfig).toContain("poster: '2/3'");
       expect(tailwindConfig).toContain("'poster-landscape': '3/2'");
       expect(tailwindConfig).toContain("'poster-square': '1/1'");

@@ -5,7 +5,7 @@
  * Uses Better Auth's internal API to ensure proper password hashing.
  *
  * Environment Variables:
- * - SUPER_ADMIN_EMAIL: Email for super-admin (default: admin@masonart.com)
+ * - SUPER_ADMIN_EMAIL: Email for super-admin (default: admin@chobi.art)
  * - SUPER_ADMIN_PASSWORD: Password for super-admin (default: SuperAdmin123!)
  *
  * Run with: bun run packages/api/src/database/init-super-admin.ts
@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import { auth } from "../auth";
 
 // Default super-admin credentials (can be overridden via env vars)
-const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || "admin@masonart.com";
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || "admin@chobi.art";
 const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || "SuperAdmin123!";
 const SUPER_ADMIN_NAME = "Super Admin";
 

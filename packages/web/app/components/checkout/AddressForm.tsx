@@ -1,5 +1,5 @@
 /**
- * Address Form Component - MasonArt E-commerce Platform
+ * Address Form Component - chobi.art E-commerce Platform
  *
  * Form for entering shipping and billing addresses during checkout.
  * Includes validation for Indian addresses (phone, postal code).
