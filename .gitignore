@@ -79,3 +79,4 @@ docker-compose.ticketrack.yml*
 # Production deploy — secrets and rendered compose never enter git
 deploy/.env
 deploy/rendered/
+deploy/pre-cutover-*.sql

@@ -115,7 +115,10 @@ services:
       traefik.docker.network: platform
       # Longer rule outranks the web catch-all (traefik v3 length-based
       # priority). No StripPrefix: the api serves its routes under /api.
-      traefik.http.routers.chobii-api.rule: "Host(`${PUBLIC_HOSTNAME:-chobii.art}`) && PathPrefix(`/api`)"
+      # /sitemap.xml is served by the api (routes/sitemap.ts) but sits outside
+      # the /api prefix — without the extra Path() it falls through to web's
+      # 404 while robots.txt advertises it (pre-cutover latent bug).
+      traefik.http.routers.chobii-api.rule: "Host(`${PUBLIC_HOSTNAME:-chobii.art}`) && (PathPrefix(`/api`) || Path(`/sitemap.xml`))"
       traefik.http.routers.chobii-api.entrypoints: web
       traefik.http.services.chobii-api.loadbalancer.server.port: "3000"
 
