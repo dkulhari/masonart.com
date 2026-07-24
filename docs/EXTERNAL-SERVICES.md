@@ -50,8 +50,8 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Resend — transactional email
 
-- Sending domain is `chobii.art`, added and **verified** in Resend (DKIM/SPF/Return-Path records in the chobii.art Cloudflare zone; DMARC `p=none` to start). Unverified domain = silent-looking 500s on signup. (`xtoms.xyz` remains verified as the rollback sender.)
-- Prod API key (Sending access only), `EMAIL_FROM=chobii.art <notifications@chobii.art>` (no mailbox needed).
+- Sending domain is `chobii.art` in a **dedicated Resend account** (free tier = 1 domain/account; the original account's `xtoms.xyz` verification is shared with customs-copilot — never delete it). DKIM/SPF records live in the chobii.art Cloudflare zone; DMARC `p=none` to start. Unverified domain = silent-looking 500s on signup. (`xtoms.xyz` in the old account remains the rollback sender — rollback needs both `EMAIL_FROM` and `RESEND_API_KEY` reverted.)
+- API key `chobii-prod` (Sending access, scoped to chobii.art only), `EMAIL_FROM=chobii.art <notifications@chobii.art>` (no mailbox needed). Free tier: 100 emails/day, 3k/month — upgrade this account when volume grows.
 - Sends: verification, password reset, order confirmation, shipping notifications. A failed send must be loud (thrown + Sentry), never a silent fallback — `RESEND_API_KEY` carries a `:?` guard in the prod compose.
 
 ## 2Factor.in — SMS

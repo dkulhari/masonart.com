@@ -32,11 +32,16 @@ go-live) · email sender moves to `notifications@chobii.art`.
 - [ ] **R2** → bucket `chobii-staging` → Settings → add custom domain
       `cdn.chobii.art`. KEEP `chobii-cdn.xtoms.xyz` attached (old emails
       embed it forever). Verify `https://cdn.chobii.art/<existing-key>` → 200.
-- [ ] **Resend**: add domain `chobii.art`; publish the DKIM/SPF/Return-Path
-      records it gives you into the chobii.art Cloudflare zone; add DMARC
-      TXT `v=DMARC1; p=none;`. Wait for **Verified** — HARD gate for deploy
-      (EMAIL_FROM is already flipped in deploy/.env; deploying unverified
-      silently kills signup emails).
+- [ ] **Resend**: chobii.art uses a **dedicated Resend account** (free tier
+      allows one domain; the original account's `xtoms.xyz` domain is shared
+      plumbing with customs-copilot — never delete it). Add domain
+      `chobii.art` there; publish the DKIM/SPF records it gives you into the
+      chobii.art Cloudflare zone (DMARC `v=DMARC1; p=none;` already set).
+      Wait for **Verified** — HARD gate for deploy (EMAIL_FROM is already
+      flipped in deploy/.env; deploying unverified silently kills signup
+      emails). API key `chobii-prod` (Sending access, scoped to chobii.art)
+      is already swapped into deploy/.env; free tier = 100 emails/day —
+      upgrade THIS account when volume grows.
 - [ ] **Google OAuth** (console under **dk.jarvis1.ai@gmail.com**, project
       756865349904 — client is SHARED with customs-copilot, so **ADD, never
       replace**): add redirect URI
@@ -100,7 +105,9 @@ go-live) · email sender moves to `notifications@chobii.art`.
 ## Rollback (single change)
 
 Revert `deploy/.env` (`PUBLIC_HOSTNAME=chobii.xtoms.xyz`,
-`CDN_URL=https://chobii-cdn.xtoms.xyz`, `EMAIL_FROM=no-reply@xtoms.xyz`) and
+`CDN_URL=https://chobii-cdn.xtoms.xyz`, `EMAIL_FROM=no-reply@xtoms.xyz`, and
+`RESEND_API_KEY` back to the old shared-account key — kept in a comment next
+to the new one) and
 run `make -C deploy build-push-deploy` (full target — the CDN value is
 build-time). Everything old-side still exists until Phase 5 cleanup: the
 wildcard tunnel route, old Google redirect URI, old Razorpay webhook, old R2
