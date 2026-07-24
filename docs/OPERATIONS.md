@@ -1,6 +1,6 @@
 # chobii.art — Operations Manual (Day-2 Runbook)
 
-The deployed environment (`chobii.xtoms.xyz` — **staging**, production-shaped, Razorpay test mode) runs on the shared Mac mini behind a Cloudflare Tunnel — see [GO-LIVE-PLAN.md](GO-LIVE-PLAN.md) for architecture and [RUNBOOK-OUTAGE.md](RUNBOOK-OUTAGE.md) for outage triage. All deploy orchestration is from the **dev machine** via `make -C deploy <target>`; the mini holds no repo checkout, no build toolchain, and no `.env` — only the rendered compose file at `~/chobii-docker-compose.yml` and a read-only GHCR credential.
+The deployed environment (`chobii.art` — **production**; Razorpay still in test mode until the live-keys go-live step) runs on the shared Mac mini behind a Cloudflare Tunnel — see [GO-LIVE-PLAN.md](GO-LIVE-PLAN.md) for architecture and [RUNBOOK-OUTAGE.md](RUNBOOK-OUTAGE.md) for outage triage. All deploy orchestration is from the **dev machine** via `make -C deploy <target>`; the mini holds no repo checkout, no build toolchain, and no `.env` — only the rendered compose file at `~/chobii-docker-compose.yml` and a read-only GHCR credential.
 
 ## 1. Deploying
 
@@ -20,11 +20,11 @@ After every deploy: **purge the Cloudflare cache** (dashboard → Caching → Pu
 
 Verify from outside the LAN (phone on LTE, not home Wi-Fi):
 ```bash
-curl -si https://chobii.xtoms.xyz/ | head -1          # 200
-curl -si https://chobii.xtoms.xyz/api/health | head -1 # 200 + component status
+curl -si https://chobii.art/ | head -1          # 200
+curl -si https://chobii.art/api/health | head -1 # 200 + component status
 ```
 
-**Panic switch**: `chobii.xtoms.xyz` rides the platform wildcard, so there is no per-app Cloudflare route to remove. Take chobii.art offline by stopping its containers — `ssh <mini> "docker compose -f ~/chobii-docker-compose.yml stop api web"` (traefik then serves a bare 404) — and restore with `start`. Do **not** disable the tunnel: it serves every app on the mini, including customs-copilot.
+**Panic switch**: `chobii.art` is routed by its own tunnel public hostname, but the fastest off-switch is still the containers, not Cloudflare. Take chobii.art offline by stopping its containers — `ssh <mini> "docker compose -f ~/chobii-docker-compose.yml stop api web"` (traefik then serves a bare 404) — and restore with `start`. Do **not** disable the tunnel: it serves every app on the mini, including customs-copilot.
 
 ### Env contract
 

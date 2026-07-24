@@ -1,9 +1,15 @@
 # chobii.art — Go-Live Plan (Mac mini + Cloudflare Tunnel)
 
+> **2026-07-24 update:** the domain cutover happened — the public URL is now
+> **`https://chobii.art`** and `chobii.xtoms.xyz` was dropped (no redirect).
+> See [CUTOVER-CHOBII-ART.md](CUTOVER-CHOBII-ART.md) for the executed cutover
+> checklist. The staging-era framing below is kept as a historical record;
+> the remaining production step is live Razorpay keys.
+
 | | |
 |---|---|
-| **Status** | PLANNED |
-| **Environment** | **STAGING** — production is a later `chobii.art` cutover with live Razorpay keys |
+| **Status** | LAUNCHED — URL cutover done 2026-07-24; Razorpay live keys pending |
+| **Environment** | **PRODUCTION** at `chobii.art` (Razorpay still test mode) |
 | **Date** | 2026-07-16 (rev. 2026-07-17: shared platform edge stack; 2026-07-18: staging on xtoms.xyz) |
 | **Host** | Mac mini (Apple Silicon, home LAN) — co-hosted with customs-copilot |
 | **Exposure** | Shared platform edge (platform-tunnel + platform-traefik) — zero inbound ports, no app-owned cloudflared |

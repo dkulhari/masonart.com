@@ -1,4 +1,4 @@
-# RUNBOOK — "chobii.xtoms.xyz is down"
+# RUNBOOK — "chobii.art is down"
 
 Layered inside-out triage, adapted from the customs-copilot outage runbook (which was corrected against a real power-cut incident). **Work the layers in order and stop at the first failing one** — everything above it is noise until that layer is fixed. The host is a Mac mini on a home LAN, co-hosting customs-copilot; if **both** apps are down, the fault is almost certainly L1–L2 (machine/Docker), not chobii.art's containers.
 
@@ -7,12 +7,12 @@ Layered inside-out triage, adapted from the customs-copilot outage runbook (whic
 From a machine **outside the LAN** (phone on LTE) or at minimum from the dev machine:
 
 ```bash
-curl -si https://chobii.xtoms.xyz/ | head -5
-curl -si https://chobii.xtoms.xyz/api/health | head -5
+curl -si https://chobii.art/ | head -5
+curl -si https://chobii.art/api/health | head -5
 curl -si https://customs.xtoms.xyz/ | head -1   # shared-fate probe: ingress serves both apps
 ```
 
-**Shared-fate rule first**: chobii.art rides the shared platform ingress (`platform-tunnel` + `platform-traefik`). If the customs probe is down too, the fault is the platform stack or host (L1–L2/L5) — stop triaging chobii.art's containers. If customs is up and chobii.xtoms.xyz is down, it's chobii.art's containers or traefik labels (both subdomains ride the same wildcard route — there is no per-app Cloudflare config to break).
+**Shared-fate rule first**: chobii.art rides the shared platform ingress (`platform-tunnel` + `platform-traefik`). If the customs probe is down too, the fault is the platform stack or host (L1–L2/L5) — stop triaging chobii.art's containers. If customs is up and chobii.art is down, it's chobii.art's containers, traefik labels, or the chobii.art zone itself (unlike the wildcard-riding staging era, chobii.art has its own Cloudflare zone + tunnel public hostname — check the zone is active and the tunnel hostname `chobii.art → http://traefik:80` still exists in Zero Trust).
 
 | Symptom | Points at |
 |---|---|
@@ -114,7 +114,7 @@ ssh <mini> "export PATH=/opt/homebrew/bin:\$PATH; docker logs --tail 50 platform
 ## L6 — DNS / Cloudflare edge
 
 ```bash
-dig chobii.xtoms.xyz +short          # should resolve to Cloudflare anycast IPs
+dig chobii.art +short          # should resolve to Cloudflare anycast IPs
 dig masonart-cdn.xtoms.xyz +short
 ```
 

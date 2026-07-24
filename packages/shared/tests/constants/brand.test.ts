@@ -10,8 +10,6 @@ import {
   BRAND_NAME,
   BRAND_DOMAIN,
   BRAND_URL,
-  STAGING_HOSTNAME,
-  STAGING_URL,
   SUPPORT_EMAIL,
   NOTIFICATIONS_EMAIL,
   EMAIL_FROM,
@@ -24,8 +22,6 @@ describe('brand constants', () => {
     expect(BRAND_NAME).toBe('chobii.art');
     expect(BRAND_DOMAIN).toBe('chobii.art');
     expect(BRAND_URL).toBe('https://chobii.art');
-    expect(STAGING_HOSTNAME).toBe('chobii.xtoms.xyz');
-    expect(STAGING_URL).toBe('https://chobii.xtoms.xyz');
     expect(SUPPORT_EMAIL).toBe('support@chobii.art');
     expect(NOTIFICATIONS_EMAIL).toBe('notifications@chobii.art');
     expect(BRAND_TAGLINE).toBe('Premium Posters & Frames');

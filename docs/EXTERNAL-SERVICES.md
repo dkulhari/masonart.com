@@ -17,21 +17,22 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Cloudflare — DNS, Tunnel, edge
 
-- The site lives at `chobii.xtoms.xyz` — a first-level subdomain of the existing `xtoms.xyz` zone. **No chobii.art-specific Cloudflare configuration exists or is needed**: the platform's wildcard public hostname (`*.xtoms.xyz` → `http://traefik:80`) plus the proxied `*` CNAME already route it, and the universal cert covers first-level subdomains.
+- The site lives at `chobii.art` — its own Cloudflare zone (same account as `xtoms.xyz` and the platform tunnel; nameservers pointed from GoDaddy). Ingress is still the shared platform tunnel: a public hostname `chobii.art → http://traefik:80` on the platform tunnel in Zero Trust (dashboard-managed; creates a proxied flattened apex CNAME). `www.chobii.art` 301s to the apex via a zone Redirect Rule. Universal SSL covers apex + first-level subdomains.
+- The old staging URL `chobii.xtoms.xyz` was dropped at the 2026-07-24 cutover (404s at traefik; the `*.xtoms.xyz` wildcard route itself still serves other apps).
 - TLS terminates at the edge; no certificates are managed on the mini.
 - **Ingress = the shared platform tunnel** (`platform-tunnel` + `platform-traefik`, customs-copilot `deploy/platform/` — see the XTOMS deployment guide). chobii.art runs **no cloudflared** and holds **no tunnel token**; cloudflared dials **outbound only**, transport pinned to `http2` (QUIC degrades through the home-router NAT).
 - Path splitting (`/api` → api:3000, rest → web:3001) is done by **traefik labels** in the prod compose overlay — `PathPrefix` is anchored by design, so the cc #97 unanchored-regex hazard is gone.
 - ⚠️ The tunnel dashboard must show **exactly one connector replica**. A second process sharing the token (e.g. a natively-installed cloudflared) gets load-balanced → intermittent 502s.
-- ⚠️ Shared fate: the tunnel and traefik serve every app on the mini. `chobii.xtoms.xyz` and `customs.xtoms.xyz` down together = platform stack, not chobii.art.
+- ⚠️ Shared fate: the tunnel and traefik serve every app on the mini. `chobii.art` and `customs.xtoms.xyz` down together = platform stack, not chobii.art.
 - ⚠️ The edge caches 404s per-PoP ~5 min and browsers up to 4h — purge cache after deploys.
-- A branded `chobii.art` cutover is a deliberate post-launch project (new zone + tunnel hostname + webhook/Resend re-registration + 302 legacy redirect — cc #160).
+- The branded `chobii.art` cutover was executed 2026-07-24 (zone + tunnel hostname + webhook/Resend re-registration; the old staging URL was dropped without a redirect by decision).
 
 ## Cloudflare R2 — image storage + CDN
 
-- Bucket `masonart-prod`, **versioning ON** (customer photo uploads and AI generations are not reproducible).
+- Bucket `chobii-staging` (name is historical — R2 buckets can't be renamed; it is the production bucket), **versioning ON** (customer photo uploads and AI generations are not reproducible).
 - Scoped API token (object read/write on this bucket only) → `R2_ACCESS_KEY` / `R2_SECRET_KEY`; endpoint `https://<account-id>.r2.cloudflarestorage.com`.
-- Custom domain `masonart-cdn.xtoms.xyz` attached to the bucket (Cloudflare creates the DNS record); `CDN_URL` / `VITE_CDN_URL` must match.
-- Smoke test: `curl -sI https://masonart-cdn.xtoms.xyz/<known-object>` → 200.
+- Custom domains attached to the bucket: `cdn.chobii.art` (primary; `CDN_URL` / `VITE_CDN_URL` must match) **and** `chobii-cdn.xtoms.xyz` (kept indefinitely — every email sent before the cutover embeds absolute old-CDN image URLs).
+- Smoke test: `curl -sI https://cdn.chobii.art/<known-object>` → 200.
 
 ## GHCR — image registry
 
@@ -42,15 +43,15 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Razorpay — payments
 
-- **Test mode for the life of this staging environment**: `rzp_test_` keys with the real provider code path. Live `rzp_live_` keys arrive only with the future `chobii.art` production cutover (which also re-registers the webhook against the new hostname).
-- Webhook: `https://chobii.xtoms.xyz/api/webhooks/razorpay` with `payment.captured`, `payment.failed`, `refund.processed` + order events as used. ⚠️ Registered against this exact hostname — a later `chobii.art` cutover must re-register it (webhooks don't follow redirects; this bit customs #160). Webhook secret is self-chosen: `openssl rand -hex 32`.
+- **Still test mode after the URL cutover**: `rzp_test_` keys with the real provider code path. Switching to live `rzp_live_` keys (+ registering the webhook in the live-mode dashboard) is the remaining go-live step.
+- Webhook: `https://chobii.art/api/webhooks/razorpay` with `payment.captured`, `payment.failed`, `refund.processed` + order events as used (re-registered at the 2026-07-24 cutover — webhooks don't follow redirects; this bit customs #160 — and check the wallet webhook `/api/webhooks/wallet` if separately registered). Webhook secret is self-chosen: `openssl rand -hex 32`.
 - Webhooks are the **sole source of truth** for payment state; duplicates are safe (idempotency, ticket #285) — redeliver from the dashboard rather than ever editing the DB.
 - Test cards: success `4111 1111 1111 1111`, failure `4000 0000 0000 0002`, UPI `success@razorpay`.
 
 ## Resend — transactional email
 
-- Sending domain is `xtoms.xyz`, added and **verified** in Resend (SPF + DKIM in the Cloudflare zone) — if customs-copilot already verified it, reuse the verification and just mint a chobii.art API key. Unverified domain = silent-looking 500s on signup.
-- Prod API key (Sending access only), `EMAIL_FROM=noreply@xtoms.xyz` (no mailbox needed).
+- Sending domain is `chobii.art`, added and **verified** in Resend (DKIM/SPF/Return-Path records in the chobii.art Cloudflare zone; DMARC `p=none` to start). Unverified domain = silent-looking 500s on signup. (`xtoms.xyz` remains verified as the rollback sender.)
+- Prod API key (Sending access only), `EMAIL_FROM=chobii.art <notifications@chobii.art>` (no mailbox needed).
 - Sends: verification, password reset, order confirmation, shipping notifications. A failed send must be loud (thrown + Sentry), never a silent fallback — `RESEND_API_KEY` carries a `:?` guard in the prod compose.
 
 ## 2Factor.in — SMS
@@ -73,6 +74,6 @@ Every third-party service production depends on: what it does, what credentials 
 
 ## Sentry + Slack + UptimeRobot — observability
 
-- Sentry: separate DSNs for api (`SENTRY_DSN`) and web (`VITE_SENTRY_DSN`), environment `staging` (the compose default) — `production` is reserved for the future chobii.art deployment so events never mix.
+- Sentry: separate DSNs for api (`SENTRY_DSN`) and web (`VITE_SENTRY_DSN`), environment `production` (the compose default since the chobii.art cutover). DSNs are currently unset — wiring Sentry up is still pending.
 - Slack incoming webhook → `#prod-alerts`: critical api errors and (via UptimeRobot) downtime alerts.
-- UptimeRobot (free tier): monitors on `https://chobii.xtoms.xyz/api/health` and `https://chobii.xtoms.xyz/`, 5-min interval, alert → Slack. This is the only thing watching the site when the operator isn't — customs-copilot launched without it and learned about its first outage from a user.
+- UptimeRobot (free tier): monitors on `https://chobii.art/api/health` and `https://chobii.art/`, 5-min interval, alert → Slack. This is the only thing watching the site when the operator isn't — customs-copilot launched without it and learned about its first outage from a user.
