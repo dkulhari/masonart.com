@@ -34,6 +34,7 @@ import {
   type AuthVariables,
 } from "../../middleware/auth";
 import { deleteCached, CacheKeys } from "../../lib/redis";
+import { uploadOptimizedImage, StoragePaths } from "../../lib/storage";
 
 // ============================================================================
 // Constants
@@ -154,6 +155,55 @@ const adminProductsApp = new Hono<{ Variables: AuthVariables }>();
 // (content-manager, admin, or super-admin)
 adminProductsApp.use("*", requireAuth);
 adminProductsApp.use("*", requireContentManager);
+
+// ============================================================================
+// POST /api/admin/products/upload-image - Upload Product Image
+// ============================================================================
+
+const PRODUCT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_PRODUCT_IMAGE_MB = 10;
+
+adminProductsApp.post("/upload-image", async (c) => {
+  const formData = await c.req.formData();
+  const file = formData.get("file") as File | null;
+
+  if (!file) {
+    return c.json({ error: "No file provided" }, 400);
+  }
+  if (!PRODUCT_IMAGE_TYPES.includes(file.type)) {
+    return c.json(
+      { error: "Invalid file type. Supported: JPEG, PNG, WebP" },
+      400
+    );
+  }
+  if (file.size > MAX_PRODUCT_IMAGE_MB * 1024 * 1024) {
+    return c.json(
+      { error: `File too large. Maximum size is ${MAX_PRODUCT_IMAGE_MB}MB` },
+      400
+    );
+  }
+
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const result = await uploadOptimizedImage(buffer, file.name, file.type, {
+      prefix: StoragePaths.PRODUCTS,
+    });
+
+    return c.json(
+      {
+        success: true,
+        url: result.url,
+        key: result.key,
+        webpUrl: result.webpUrl,
+        variants: result.variants,
+      },
+      201
+    );
+  } catch (error) {
+    console.error("[AdminProducts] Image upload failed:", error);
+    return c.json({ error: "Failed to upload image" }, 500);
+  }
+});
 
 // ============================================================================
 // GET /api/admin/products - List Products (Admin)

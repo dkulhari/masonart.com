@@ -11,7 +11,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Save,
   Plus,
@@ -19,10 +19,11 @@ import {
   ImageIcon,
   AlertCircle,
   Loader2,
+  Upload as UploadIcon,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { cn, getApiUrl } from '~/lib/utils'
 
 // ============================================================================
 // Types
@@ -302,6 +303,9 @@ export function ProductForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [autoSlug, setAutoSlug] = useState(!isEditing)
+  const [isUploadingImages, setIsUploadingImages] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Update slug when title changes (only if autoSlug is enabled)
   useEffect(() => {
@@ -373,7 +377,7 @@ export function ProductForm({
     }
   }
 
-  // Add image placeholder (in a real app, this would open a file picker or modal)
+  // Manual URL row (fallback for images hosted elsewhere)
   const addImagePlaceholder = () => {
     const newImage: ProductImage = {
       id: `temp-${Date.now()}`,
@@ -383,6 +387,53 @@ export function ProductForm({
       sortOrder: formData.images.length,
     }
     updateField('images', [...formData.images, newImage])
+  }
+
+  // Upload picked files to R2 via the admin endpoint, then append the CDN urls
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = '' // allow re-picking the same file
+    if (files.length === 0) return
+
+    setIsUploadingImages(true)
+    setUploadError(null)
+    try {
+      for (const file of files) {
+        const body = new FormData()
+        body.append('file', file)
+        const response = await fetch(`${getApiUrl()}/api/admin/products/upload-image`, {
+          method: 'POST',
+          credentials: 'include',
+          body,
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || `Upload failed for ${file.name}`)
+        }
+        const newImage: ProductImage = {
+          id: `upload-${Date.now()}-${file.name}`,
+          url: data.url,
+          alt: '',
+          isPrimary: false,
+          sortOrder: 0,
+        }
+        setFormData((prev) => ({
+          ...prev,
+          images: [
+            ...prev.images,
+            {
+              ...newImage,
+              isPrimary: prev.images.length === 0,
+              sortOrder: prev.images.length,
+            },
+          ],
+        }))
+      }
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Image upload failed')
+    } finally {
+      setIsUploadingImages(false)
+    }
   }
 
   const updateImage = (id: string, updates: Partial<ProductImage>) => {
@@ -765,15 +816,41 @@ export function ProductForm({
             </div>
           )}
 
-          {/* Add image button */}
-          <button
-            type="button"
-            onClick={addImagePlaceholder}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-6 text-muted-foreground transition-colors hover:border-brand-200 hover:text-brand-500"
-          >
-            <Plus className="h-5 w-5" />
-            Add Image
-          </button>
+          {/* Upload / add image controls */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={handleFilesSelected}
+          />
+          {uploadError && (
+            <p className="mb-2 text-sm text-red-500">{uploadError}</p>
+          )}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingImages}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border-2 border-dashed border-brand-300 py-6 text-brand-600 transition-colors hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isUploadingImages ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <UploadIcon className="h-5 w-5" />
+              )}
+              {isUploadingImages ? 'Uploading…' : 'Upload Images'}
+            </button>
+            <button
+              type="button"
+              onClick={addImagePlaceholder}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-6 text-muted-foreground transition-colors hover:border-brand-200 hover:text-brand-500"
+            >
+              <Plus className="h-5 w-5" />
+              Add by URL
+            </button>
+          </div>
         </div>
       </FormSection>
 
