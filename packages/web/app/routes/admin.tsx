@@ -12,6 +12,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
+import { useState } from 'react'
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { ShieldAlert } from 'lucide-react'
 import { cn } from '~/lib/utils'
@@ -105,6 +106,7 @@ export const Route = createFileRoute('/admin')({
 
 function AdminLayout() {
   const { user, isUnauthorized } = Route.useRouteContext()
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   // Unauthorized state (non-admin user)
   if (isUnauthorized) {
@@ -126,6 +128,8 @@ function AdminLayout() {
               }
             : undefined
         }
+        collapsed={isSidebarCollapsed}
+        onCollapsedChange={setIsSidebarCollapsed}
       />
 
       {/* Mobile Header */}
@@ -135,10 +139,10 @@ function AdminLayout() {
       <main
         className={cn(
           'min-h-screen transition-all duration-300',
-          // Desktop: offset for sidebar (default expanded width)
-          'lg:ml-64',
+          // Desktop: offset tracks the sidebar's collapse state
+          isSidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-64',
           // Mobile: add top padding for fixed header
-          'pt-16 lg:pt-0'
+          'pt-16 md:pt-0'
         )}
       >
         <div className="p-4 lg:p-6">

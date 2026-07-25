@@ -52,6 +52,9 @@ interface AdminSidebarProps {
     image?: string
     role?: string
   }
+  /** Controlled collapse state — lets the admin layout offset content to match */
+  collapsed?: boolean
+  onCollapsedChange?: (collapsed: boolean) => void
 }
 
 // ============================================================================
@@ -128,8 +131,18 @@ const SECONDARY_NAV_ITEMS: NavItem[] = [
 // Main Component
 // ============================================================================
 
-export function AdminSidebar({ className, user }: AdminSidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+export function AdminSidebar({
+  className,
+  user,
+  collapsed,
+  onCollapsedChange,
+}: AdminSidebarProps) {
+  const [internalCollapsed, setInternalCollapsed] = useState(false)
+  const isCollapsed = collapsed ?? internalCollapsed
+  const setIsCollapsed = (value: boolean) => {
+    setInternalCollapsed(value)
+    onCollapsedChange?.(value)
+  }
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const router = useRouter()
 
@@ -178,7 +191,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
       <button
         type="button"
         onClick={() => setIsMobileOpen(true)}
-        className="fixed left-4 top-4 z-50 rounded-lg bg-card p-2 shadow-md lg:hidden"
+        className="fixed left-4 top-4 z-50 rounded-lg bg-card p-2 shadow-md md:hidden"
         aria-label="Open menu"
       >
         <Menu className="h-6 w-6 text-foreground" />
@@ -187,7 +200,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
       {/* Mobile Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
@@ -197,7 +210,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
         className={cn(
           'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-card transition-all duration-300',
           isCollapsed ? 'w-[72px]' : 'w-64',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
           className
         )}
       >
@@ -223,7 +236,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
           <button
             type="button"
             onClick={() => setIsMobileOpen(false)}
-            className="rounded-lg p-1 hover:bg-muted lg:hidden"
+            className="rounded-lg p-1 hover:bg-muted md:hidden"
             aria-label="Close menu"
           >
             <X className="h-5 w-5 text-muted-foreground" />
@@ -233,7 +246,7 @@ export function AdminSidebar({ className, user }: AdminSidebarProps) {
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden rounded-lg p-1 hover:bg-muted lg:block"
+            className="hidden rounded-lg p-1 hover:bg-muted md:block"
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isCollapsed ? (
@@ -386,7 +399,7 @@ function NavLink({ item, isActive, isCollapsed, onClick }: NavLinkProps) {
 
 export function MobileAdminHeader() {
   return (
-    <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 pl-16 lg:hidden">
+    <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 pl-16 md:hidden">
       <span className="text-lg font-bold text-foreground">Admin Panel</span>
       <a
         href="/"

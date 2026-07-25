@@ -4,6 +4,7 @@ import {
   Outlet,
   Scripts,
   createRootRouteWithContext,
+  useRouterState,
 } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
@@ -197,6 +198,11 @@ function RootComponent() {
  * Includes Head content, scripts, and the main layout structure.
  */
 function RootDocument({ children }: { children: React.ReactNode }) {
+  // Admin has its own chrome (fixed sidebar + mobile header); the storefront
+  // Header/Footer there duplicated navigation and sat underneath the sidebar
+  const { location } = useRouterState()
+  const isAdminRoute = location.pathname.startsWith('/admin')
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -204,9 +210,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <div className="relative flex min-h-screen flex-col">
-          <Header />
+          {!isAdminRoute && <Header />}
           <main className="flex-1">{children}</main>
-          <Footer />
+          {!isAdminRoute && <Footer />}
         </div>
         <Scripts />
       </body>
