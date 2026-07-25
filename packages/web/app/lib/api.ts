@@ -864,7 +864,9 @@ export const authApi = {
    * Get current session
    */
   async getSession() {
-    const response = await fetch(`${getApiUrl()}/api/auth/session`, {
+    // Better Auth's endpoint is get-session; /api/auth/session 404s and the
+    // resulting null bounced logged-in users to the login page
+    const response = await fetch(`${getApiUrl()}/api/auth/get-session`, {
       method: "GET",
       credentials: "include",
       headers: {
