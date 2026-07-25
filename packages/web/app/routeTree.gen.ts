@@ -11,7 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as CookiesRouteImport } from './routes/cookies'
+import { Route as FaqRouteImport } from './routes/faq'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ReturnsRouteImport } from './routes/returns'
+import { Route as ShippingRouteImport } from './routes/shipping'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAiModerationRouteImport } from './routes/admin/ai-moderation'
 import { Route as AdminCustomersRouteImport } from './routes/admin/customers'
@@ -34,6 +42,7 @@ import { Route as AuthedAccountAddressesRouteImport } from './routes/_authed/acc
 import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
 import { Route as AuthedAccountNotificationsRouteImport } from './routes/_authed/account/notifications'
 import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
+import { Route as AuthedAccountSettingsRouteImport } from './routes/_authed/account/settings'
 import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
 import { Route as AdminApprovalsIndexRouteImport } from './routes/admin/approvals/index'
 import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$id'
@@ -54,9 +63,49 @@ const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CookiesRoute = CookiesRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReturnsRoute = ReturnsRouteImport.update({
+  id: '/returns',
+  path: '/returns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShippingRoute = ShippingRouteImport.update({
+  id: '/shipping',
+  path: '/shipping',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -171,6 +220,11 @@ const AuthedAccountOrdersRoute = AuthedAccountOrdersRouteImport.update({
   path: '/account/orders',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAccountSettingsRoute = AuthedAccountSettingsRouteImport.update({
+  id: '/account/settings',
+  path: '/account/settings',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAccountWalletRoute = AuthedAccountWalletRouteImport.update({
   id: '/account/wallet',
   path: '/account/wallet',
@@ -225,7 +279,15 @@ const AuthedAccountOrdersIdReturnRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
+  '/faq': typeof FaqRoute
+  '/privacy': typeof PrivacyRoute
+  '/returns': typeof ReturnsRoute
+  '/shipping': typeof ShippingRoute
+  '/terms': typeof TermsRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
@@ -247,6 +309,7 @@ export interface FileRoutesByFullPath {
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
   '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
+  '/account/settings': typeof AuthedAccountSettingsRoute
   '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
@@ -261,6 +324,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
+  '/faq': typeof FaqRoute
+  '/privacy': typeof PrivacyRoute
+  '/returns': typeof ReturnsRoute
+  '/shipping': typeof ShippingRoute
+  '/terms': typeof TermsRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
@@ -282,6 +353,7 @@ export interface FileRoutesByTo {
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
   '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
+  '/account/settings': typeof AuthedAccountSettingsRoute
   '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
@@ -298,7 +370,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
+  '/about': typeof AboutRoute
   '/admin': typeof AdminRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
+  '/faq': typeof FaqRoute
+  '/privacy': typeof PrivacyRoute
+  '/returns': typeof ReturnsRoute
+  '/shipping': typeof ShippingRoute
+  '/terms': typeof TermsRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
@@ -320,6 +400,7 @@ export interface FileRoutesById {
   '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/_authed/account/notifications': typeof AuthedAccountNotificationsRoute
   '/_authed/account/orders': typeof AuthedAccountOrdersRouteWithChildren
+  '/_authed/account/settings': typeof AuthedAccountSettingsRoute
   '/_authed/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
@@ -336,7 +417,15 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/admin'
+    | '/contact'
+    | '/cookies'
+    | '/faq'
+    | '/privacy'
+    | '/returns'
+    | '/shipping'
+    | '/terms'
     | '/admin/ai-moderation'
     | '/admin/customers'
     | '/admin/returns'
@@ -358,6 +447,7 @@ export interface FileRouteTypes {
     | '/account/ai-creations'
     | '/account/notifications'
     | '/account/orders'
+    | '/account/settings'
     | '/account/wallet'
     | '/admin/approvals/$id'
     | '/admin/orders/$id'
@@ -372,6 +462,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
+    | '/contact'
+    | '/cookies'
+    | '/faq'
+    | '/privacy'
+    | '/returns'
+    | '/shipping'
+    | '/terms'
     | '/admin/ai-moderation'
     | '/admin/customers'
     | '/admin/returns'
@@ -393,6 +491,7 @@ export interface FileRouteTypes {
     | '/account/ai-creations'
     | '/account/notifications'
     | '/account/orders'
+    | '/account/settings'
     | '/account/wallet'
     | '/admin/approvals/$id'
     | '/admin/orders/$id'
@@ -408,7 +507,15 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authed'
+    | '/about'
     | '/admin'
+    | '/contact'
+    | '/cookies'
+    | '/faq'
+    | '/privacy'
+    | '/returns'
+    | '/shipping'
+    | '/terms'
     | '/admin/ai-moderation'
     | '/admin/customers'
     | '/admin/returns'
@@ -430,6 +537,7 @@ export interface FileRouteTypes {
     | '/_authed/account/ai-creations'
     | '/_authed/account/notifications'
     | '/_authed/account/orders'
+    | '/_authed/account/settings'
     | '/_authed/account/wallet'
     | '/admin/approvals/$id'
     | '/admin/orders/$id'
@@ -446,7 +554,15 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
+  AboutRoute: typeof AboutRoute
   AdminRoute: typeof AdminRouteWithChildren
+  ContactRoute: typeof ContactRoute
+  CookiesRoute: typeof CookiesRoute
+  FaqRoute: typeof FaqRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ReturnsRoute: typeof ReturnsRoute
+  ShippingRoute: typeof ShippingRoute
+  TermsRoute: typeof TermsRoute
   ApproveTokenRoute: typeof ApproveTokenRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRegisterRoute: typeof AuthRegisterRoute
@@ -477,11 +593,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cookies': {
+      id: '/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof CookiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/returns': {
+      id: '/returns'
+      path: '/returns'
+      fullPath: '/returns'
+      preLoaderRoute: typeof ReturnsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shipping': {
+      id: '/shipping'
+      path: '/shipping'
+      fullPath: '/shipping'
+      preLoaderRoute: typeof ShippingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -638,6 +810,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAccountOrdersRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/account/settings': {
+      id: '/_authed/account/settings'
+      path: '/account/settings'
+      fullPath: '/account/settings'
+      preLoaderRoute: typeof AuthedAccountSettingsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/account/wallet': {
       id: '/_authed/account/wallet'
       path: '/account/wallet'
@@ -740,6 +919,7 @@ interface AuthedRouteChildren {
   AuthedAccountAiCreationsRoute: typeof AuthedAccountAiCreationsRoute
   AuthedAccountNotificationsRoute: typeof AuthedAccountNotificationsRoute
   AuthedAccountOrdersRoute: typeof AuthedAccountOrdersRouteWithChildren
+  AuthedAccountSettingsRoute: typeof AuthedAccountSettingsRoute
   AuthedAccountWalletRoute: typeof AuthedAccountWalletRoute
   AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
 }
@@ -749,6 +929,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAccountAiCreationsRoute: AuthedAccountAiCreationsRoute,
   AuthedAccountNotificationsRoute: AuthedAccountNotificationsRoute,
   AuthedAccountOrdersRoute: AuthedAccountOrdersRouteWithChildren,
+  AuthedAccountSettingsRoute: AuthedAccountSettingsRoute,
   AuthedAccountWalletRoute: AuthedAccountWalletRoute,
   AuthedAccountIndexRoute: AuthedAccountIndexRoute,
 }
@@ -791,7 +972,15 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
+  AboutRoute: AboutRoute,
   AdminRoute: AdminRouteWithChildren,
+  ContactRoute: ContactRoute,
+  CookiesRoute: CookiesRoute,
+  FaqRoute: FaqRoute,
+  PrivacyRoute: PrivacyRoute,
+  ReturnsRoute: ReturnsRoute,
+  ShippingRoute: ShippingRoute,
+  TermsRoute: TermsRoute,
   ApproveTokenRoute: ApproveTokenRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthRegisterRoute: AuthRegisterRoute,
