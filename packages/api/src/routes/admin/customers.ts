@@ -34,7 +34,7 @@ import {
  * admin/super-admin — full role management is reserved for super-admin (future).
  */
 const roleAssignmentSchema = z.object({
-  role: z.enum(["customer", "content-manager"]),
+  role: z.enum(["customer", "content-manager", "admin"]),
 });
 
 // ============================================================================
@@ -90,11 +90,35 @@ adminCustomersApp.put(
       );
     }
 
-    if (target.role === "admin" || target.role === "super-admin") {
+    if (target.role === "super-admin") {
       return c.json(
         {
           error: "Forbidden",
-          message: "Cannot change the role of admin accounts",
+          message: "Cannot change the role of super-admin accounts",
+          code: "FORBIDDEN",
+        },
+        403
+      );
+    }
+
+    const currentUser = c.get("user");
+    if (currentUser && currentUser.id === target.id) {
+      return c.json(
+        {
+          error: "Forbidden",
+          message: "You cannot change your own role",
+          code: "FORBIDDEN",
+        },
+        403
+      );
+    }
+
+    if (target.role === "trade") {
+      return c.json(
+        {
+          error: "Forbidden",
+          message:
+            "Trade accounts are managed through the trade application workflow",
           code: "FORBIDDEN",
         },
         403

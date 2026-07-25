@@ -1,7 +1,9 @@
-import { Link } from '@tanstack/react-router'
-import { Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
+import { Link, useRouteContext } from '@tanstack/react-router'
+import { LayoutDashboard, Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useCartItemCount, useCartHydration } from '~/stores/cart'
+
+const STAFF_ROLES = ['content-manager', 'admin', 'super-admin']
 
 /**
  * Header component for the chobii.art e-commerce platform.
@@ -12,6 +14,12 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
+
+  // Session comes from the root route's beforeLoad; staff get an Admin link
+  const { session } = useRouteContext({ from: '__root__' }) as {
+    session?: { user?: { role?: string } } | null
+  }
+  const isStaff = STAFF_ROLES.includes(session?.user?.role ?? '')
 
   // Only show cart count after hydration to avoid SSR mismatch
   const displayCartCount = isHydrated ? cartItemCount : 0
@@ -58,6 +66,15 @@ export function Header() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex md:items-center md:space-x-4">
+            {isStaff && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
             <Link
               to="/cart"
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -127,6 +144,12 @@ export function Header() {
                 About
               </MobileNavLink>
               <div className="my-2 border-t border-border" />
+              {isStaff && (
+                <MobileNavLink to="/admin" onClick={closeMobileMenu}>
+                  <LayoutDashboard className="mr-2 inline h-4 w-4" />
+                  Admin Panel
+                </MobileNavLink>
+              )}
               <MobileNavLink to="/account" onClick={closeMobileMenu}>
                 <User className="mr-2 h-4 w-4" />
                 Account

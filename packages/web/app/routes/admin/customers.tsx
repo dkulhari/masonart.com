@@ -52,7 +52,7 @@ interface AdminCustomer {
 }
 
 /** Roles assignable from this page (API enforces the same cap) */
-const ASSIGNABLE_ROLES = ['customer', 'content-manager'] as const
+const ASSIGNABLE_ROLES = ['customer', 'content-manager', 'admin'] as const
 
 // ============================================================================
 // API Functions
@@ -287,9 +287,9 @@ function AdminCustomersPage() {
               </tr>
             ) : (
               filteredCustomers.map((customer) => {
-                // Only customer <-> content-manager is toggleable here.
-                // Admin/super-admin are immutable via this endpoint, and trade
-                // users are left alone so their trade access isn't wiped.
+                // customer/content-manager/admin are assignable. Super-admin
+                // is immutable, your own row is locked (API enforces both),
+                // and trade users are managed via the trade workflow.
                 const isAssignable = ASSIGNABLE_ROLES.includes(
                   customer.role as (typeof ASSIGNABLE_ROLES)[number]
                 )
@@ -325,6 +325,7 @@ function AdminCustomersPage() {
                           <option value="content-manager">
                             Content Manager
                           </option>
+                          <option value="admin">Admin</option>
                         </select>
                       )}
                     </td>
