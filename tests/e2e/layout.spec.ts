@@ -471,6 +471,16 @@ test.describe('Root Layout - Accessibility', () => {
     await page.goto('/');
   });
 
+  test('skip-to-content link is first focusable and targets main (#246)', async ({
+    page,
+  }) => {
+    await page.keyboard.press('Tab');
+    const skipLink = page.locator('a[href="#main-content"]');
+    await expect(skipLink).toBeFocused();
+    await expect(skipLink).toBeVisible(); // becomes visible on focus
+    await expect(page.locator('main#main-content')).toHaveCount(1);
+  });
+
   test('should have proper ARIA landmarks', async ({ page }) => {
     // Check for main landmarks
     const header = page.locator('header');

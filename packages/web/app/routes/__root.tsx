@@ -209,9 +209,19 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
+        {/* Keyboard/screen-reader shortcut past the navigation (#246) —
+            visually hidden until focused */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-brand-500 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+        >
+          Skip to content
+        </a>
         <div className="relative flex min-h-screen flex-col">
           {!isAdminRoute && <Header />}
-          <main className="flex-1">{children}</main>
+          <main id="main-content" tabIndex={-1} className="flex-1">
+            {children}
+          </main>
           {!isAdminRoute && <Footer />}
         </div>
         <Scripts />
