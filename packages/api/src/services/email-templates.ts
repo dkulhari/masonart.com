@@ -1015,6 +1015,20 @@ Thank you for choosing chobii.art!
 // ============================================================================
 
 /**
+ * Escape user-controlled values before HTML interpolation. Signup names are
+ * attacker-controlled — without this, a name like "<img onerror=...>" would
+ * inject markup into the email body.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
  * Email Verification Template
  *
  * Sent by Better Auth's sendVerificationEmail hook on sign-up. The URL is
@@ -1025,7 +1039,8 @@ export function getVerificationEmailTemplate(params: {
   name: string;
   url: string;
 }): EmailTemplate {
-  const { name, url } = params;
+  const name = escapeHtml(params.name || "");
+  const url = escapeHtml(params.url);
   const content = `
     <div class="content">
       <h2>Verify your email</h2>
@@ -1068,7 +1083,8 @@ export function getPasswordResetTemplate(params: {
   name: string;
   url: string;
 }): EmailTemplate {
-  const { name, url } = params;
+  const name = escapeHtml(params.name || "");
+  const url = escapeHtml(params.url);
   const content = `
     <div class="content">
       <h2>Reset your password</h2>
