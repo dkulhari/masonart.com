@@ -114,6 +114,13 @@ export default defineConfig({
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,
+        env: {
+          // E2E auth setup logs in as 4 roles back-to-back; all dev traffic
+          // shares one "unknown" IP bucket, so the sliding-window limiter
+          // always trips. The bypass is inert under NODE_ENV=production —
+          // see packages/api/src/middleware/rate-limit.ts (#332).
+          DISABLE_RATE_LIMIT: 'true',
+        },
       },
     ],
   }),

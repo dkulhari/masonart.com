@@ -410,7 +410,9 @@ describe('Runtime Connection Tests', () => {
       }
 
       for (let i = 0; i < 3; i++) {
-        const result = await testClient`SELECT ${i} as value`;
+        // ::int cast — postgres.js sends JS numbers as text parameters, so
+        // without it the driver returns '0' (string) and the equality fails
+        const result = await testClient`SELECT ${i}::int as value`;
         expect(result[0].value).toBe(i);
       }
     });

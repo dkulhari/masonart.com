@@ -47,6 +47,17 @@ export function getClientIp(c: Context): string {
  */
 export function rateLimit(options: RateLimitOptions) {
   return async (c: Context, next: Next) => {
+    // Test-environment bypass (#332): the E2E auth setup makes more auth
+    // POSTs per run than the window allows, and all dev traffic shares one
+    // "unknown" IP bucket. NEVER honored in production — checked per-request
+    // so a stray env var cannot silently disable prod limiting.
+    if (
+      process.env.DISABLE_RATE_LIMIT === "true" &&
+      process.env.NODE_ENV !== "production"
+    ) {
+      return next();
+    }
+
     // Skip rate limiting if Redis is not available
     if (!isRedisConnected()) {
       return next();

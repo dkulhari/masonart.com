@@ -7,9 +7,18 @@
  * spoofable (go-live ticket #291, cc #95).
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Context } from "hono";
-import { getClientIp } from "../../src/middleware/rate-limit";
+import { getClientIp, rateLimit } from "../../src/middleware/rate-limit";
+
+vi.mock("../../src/lib/redis", () => ({
+  isRedisConnected: () => true,
+  checkRateLimit: vi.fn().mockResolvedValue({
+    success: false,
+    remaining: 0,
+    resetIn: 60,
+  }),
+}));
 
 function contextWithHeaders(headers: Record<string, string>): Context {
   const lookup = Object.fromEntries(
@@ -57,5 +66,68 @@ describe("getClientIp", () => {
       "x-forwarded-for": " 6.6.6.6 , 198.51.100.24 ",
     });
     expect(getClientIp(c)).toBe("198.51.100.24");
+  });
+});
+
+describe("DISABLE_RATE_LIMIT bypass (#332)", () => {
+  // The E2E auth setup performs more auth POSTs per run than the sliding
+  // window allows, and all dev traffic shares one "unknown" IP bucket —
+  // test environments need a way to switch limiting off. The bypass must
+  // be inert in production no matter what the env says.
+
+  function limiterContext(): { c: Context; nextCalled: () => boolean } {
+    let called = false;
+    const c = {
+      req: { header: () => undefined },
+      header: () => {},
+      json: (body: unknown, status?: number) => ({ body, status }),
+    } as unknown as Context;
+    return {
+      c,
+      nextCalled: () => called,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      next: (async () => {
+        called = true;
+      }) as any,
+    } as any;
+  }
+
+  afterEach(() => {
+    delete process.env.DISABLE_RATE_LIMIT;
+    vi.unstubAllEnvs();
+  });
+
+  it("skips limiting when DISABLE_RATE_LIMIT=true outside production", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("DISABLE_RATE_LIMIT", "true");
+    const middleware = rateLimit({ limit: 1, windowSeconds: 60, keyPrefix: "t" });
+    const { c, nextCalled, next } = limiterContext() as any;
+
+    // checkRateLimit is mocked to always report "limit exceeded" — reaching
+    // next() therefore proves the limiter was bypassed, not merely passed.
+    const result = await middleware(c, next);
+    expect(nextCalled()).toBe(true);
+    expect(result).toBeUndefined();
+  });
+
+  it("still limits in production even when DISABLE_RATE_LIMIT=true", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DISABLE_RATE_LIMIT", "true");
+    const middleware = rateLimit({ limit: 1, windowSeconds: 60, keyPrefix: "t" });
+    const { c, nextCalled, next } = limiterContext() as any;
+
+    const result = (await middleware(c, next)) as { status?: number };
+    expect(nextCalled()).toBe(false);
+    expect(result?.status).toBe(429);
+  });
+
+  it("limits normally when DISABLE_RATE_LIMIT is unset", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    const middleware = rateLimit({ limit: 1, windowSeconds: 60, keyPrefix: "t" });
+    const { c, nextCalled, next } = limiterContext() as any;
+
+    const result = (await middleware(c, next)) as { status?: number };
+    expect(nextCalled()).toBe(false);
+    expect(result?.status).toBe(429);
   });
 });

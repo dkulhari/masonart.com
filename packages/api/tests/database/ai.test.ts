@@ -13,6 +13,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import postgres from 'postgres';
+import { getDestructiveDbUrl, destructiveDbSkipReason } from '../helpers/destructive-db';
 import {
   users,
   aiGenerations,
@@ -37,7 +38,12 @@ beforeAll(async () => {
   }
 
   try {
-    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    // #332 guard: destructive suite — only ever a disposable *_test database
+    const databaseUrl = getDestructiveDbUrl();
+    if (!databaseUrl) {
+      console.warn(destructiveDbSkipReason());
+      return;
+    }
     client = postgres(databaseUrl, {
       max: 1,
       connect_timeout: 5,

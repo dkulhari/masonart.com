@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import postgres from 'postgres';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, resolve } from 'path';
+import { getDestructiveDbUrl, destructiveDbSkipReason } from '../helpers/destructive-db';
 
 // Check if we should skip database runtime tests
 const SKIP_TESTS = process.env.SKIP_DB_RUNTIME_TESTS === 'true';
@@ -271,7 +272,12 @@ beforeAll(async () => {
 
   try {
     // Use test database URL or fall back to development
-    const databaseUrl = process.env.DATABASE_URL || 'postgresql://poster_app:dev_password@localhost:5433/poster_app_test';
+    // #332 guard: destructive suite — only ever a disposable *_test database
+    const databaseUrl = getDestructiveDbUrl();
+    if (!databaseUrl) {
+      console.warn(destructiveDbSkipReason());
+      return;
+    }
     client = postgres(databaseUrl, {
       max: 1,
       connect_timeout: 5,
