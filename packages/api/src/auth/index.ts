@@ -17,6 +17,24 @@ import { createAccessControl } from "better-auth/plugins/access";
 import { defaultStatements, adminAc } from "better-auth/plugins/admin/access";
 import { db } from "../database";
 import * as schema from "../database/schema";
+import { sendEmail } from "../services/email";
+import {
+  getVerificationEmailTemplate,
+  getPasswordResetTemplate,
+} from "../services/email-templates";
+
+/**
+ * Auth emails always send in production. Outside production they are logged
+ * instead (opt in with SEND_AUTH_EMAILS=true) — the dev .env carries a REAL
+ * Resend key, and E2E/dev signups use fake @example.com addresses whose
+ * bounces would hurt the domain's sending reputation (#342).
+ */
+function shouldSendAuthEmails(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.SEND_AUTH_EMAILS === "true"
+  );
+}
 
 // ============================================================================
 // Access Control Statements
@@ -165,6 +183,21 @@ export const auth = betterAuth({
     // Password requirements
     minPasswordLength: 8,
     maxPasswordLength: 128,
+    // Forgot-password flow (#242): Better Auth disables the
+    // /request-password-reset endpoint entirely when this hook is absent.
+    sendResetPassword: async ({ user, url }, _request) => {
+      if (!shouldSendAuthEmails()) {
+        console.log(`[Auth] (not sent) Password reset for ${user.email}: ${url}`);
+        return;
+      }
+      const template = getPasswordResetTemplate({ name: user.name, url });
+      await sendEmail({
+        to: user.email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
+    },
   },
 
   /**
@@ -174,23 +207,22 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60 * 24, // 24 hours
-    sendVerificationEmail: async ({ user, url, token }, _request) => {
-      // TODO: Integrate with Resend email service
-      // For now, log the verification URL in development
-      if (process.env.NODE_ENV === "development") {
-        console.log(`[Auth] Verification email for ${user.email}:`);
-        console.log(`[Auth] URL: ${url}`);
-        console.log(`[Auth] Token: ${token}`);
+    sendVerificationEmail: async ({ user, url }, _request) => {
+      // #342: this was a console.log stub — production signups dead-ended
+      // because requireEmailVerification is true there and no email was
+      // ever sent. A failed send must be loud (sendEmail throws), never a
+      // silent fallback (cc #131).
+      if (!shouldSendAuthEmails()) {
+        console.log(`[Auth] (not sent) Verification email for ${user.email}: ${url}`);
+        return;
       }
-
-      // TODO: Replace with actual email sending logic
-      // Example with Resend:
-      // await resend.emails.send({
-      //   from: 'chobii.art <noreply@chobii.art>',
-      //   to: user.email,
-      //   subject: 'Verify your email address',
-      //   html: `<p>Click <a href="${url}">here</a> to verify your email.</p>`,
-      // });
+      const template = getVerificationEmailTemplate({ name: user.name, url });
+      await sendEmail({
+        to: user.email,
+        subject: template.subject,
+        html: template.html,
+        text: template.text,
+      });
     },
   },
 

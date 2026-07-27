@@ -1009,3 +1009,94 @@ Thank you for choosing chobii.art!
     text,
   };
 }
+
+// ============================================================================
+// Auth Emails (#342 verification, #242 password reset)
+// ============================================================================
+
+/**
+ * Email Verification Template
+ *
+ * Sent by Better Auth's sendVerificationEmail hook on sign-up. The URL is
+ * Better Auth's /api/auth/verify-email link (24h expiry configured in
+ * auth/index.ts).
+ */
+export function getVerificationEmailTemplate(params: {
+  name: string;
+  url: string;
+}): EmailTemplate {
+  const { name, url } = params;
+  const content = `
+    <div class="content">
+      <h2>Verify your email</h2>
+      <p>Hi ${name || "there"},</p>
+      <p>Welcome to chobii.art! Please confirm your email address to finish
+      setting up your account.</p>
+      <div style="text-align: center;">
+        <a href="${url}" class="button">Verify Email</a>
+      </div>
+      <p>This link expires in 24 hours. If the button doesn't work, copy and
+      paste this URL into your browser:</p>
+      <p style="word-break: break-all;"><a href="${url}">${url}</a></p>
+      <p>If you didn't create a chobii.art account, you can safely ignore
+      this email.</p>
+    </div>
+  `.trim();
+
+  const text = `Hi ${name || "there"},
+
+Welcome to chobii.art! Verify your email address to finish setting up your account:
+
+${url}
+
+This link expires in 24 hours. If you didn't create a chobii.art account, ignore this email.`;
+
+  return {
+    subject: "Verify your chobii.art email",
+    html: baseTemplate(content),
+    text,
+  };
+}
+
+/**
+ * Password Reset Template
+ *
+ * Sent by Better Auth's sendResetPassword hook when a user requests a
+ * password reset (#242). The URL carries the one-time reset token.
+ */
+export function getPasswordResetTemplate(params: {
+  name: string;
+  url: string;
+}): EmailTemplate {
+  const { name, url } = params;
+  const content = `
+    <div class="content">
+      <h2>Reset your password</h2>
+      <p>Hi ${name || "there"},</p>
+      <p>We received a request to reset the password for your chobii.art
+      account. Click the button below to choose a new password.</p>
+      <div style="text-align: center;">
+        <a href="${url}" class="button">Reset Password</a>
+      </div>
+      <p>If the button doesn't work, copy and paste this URL into your
+      browser:</p>
+      <p style="word-break: break-all;"><a href="${url}">${url}</a></p>
+      <p>If you didn't request a password reset, you can safely ignore this
+      email — your password will not change.</p>
+    </div>
+  `.trim();
+
+  const text = `Hi ${name || "there"},
+
+We received a request to reset your chobii.art password. Choose a new password here:
+
+${url}
+
+If you didn't request this, ignore this email — your password will not change.`;
+
+  return {
+    subject: "Reset your chobii.art password",
+    html: baseTemplate(content),
+    text,
+  };
+}

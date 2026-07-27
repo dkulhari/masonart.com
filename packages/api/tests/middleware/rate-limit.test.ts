@@ -121,8 +121,11 @@ describe("DISABLE_RATE_LIMIT bypass (#332)", () => {
     expect(result?.status).toBe(429);
   });
 
-  it("limits normally when DISABLE_RATE_LIMIT is unset", async () => {
+  it("limits normally when DISABLE_RATE_LIMIT is not exactly 'true'", async () => {
     vi.stubEnv("NODE_ENV", "test");
+    // vitest.config sets DISABLE_RATE_LIMIT=true globally for unit tests —
+    // pin it to a non-'true' value to prove only the exact string bypasses
+    vi.stubEnv("DISABLE_RATE_LIMIT", "false");
     const middleware = rateLimit({ limit: 1, windowSeconds: 60, keyPrefix: "t" });
     const { c, nextCalled, next } = limiterContext() as any;
 

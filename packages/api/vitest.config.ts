@@ -18,6 +18,10 @@ export default defineConfig({
       // *_test database — see tests/helpers/destructive-db.ts (#332).
       TEST_DATABASE_URL: process.env.TEST_DATABASE_URL || '',
       REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6380',
+      // Unit tests never exercise rate limiting (the limiter's own tests
+      // stub this explicitly) — without it, suites that hammer auth
+      // endpoints trip the shared per-IP bucket and 429 (#332)
+      DISABLE_RATE_LIMIT: 'true',
       BETTER_AUTH_SECRET: 'test-secret-key-minimum-32-characters-long-for-testing',
       PORT: '3000',
       CORS_ORIGIN: 'http://localhost:3001',
