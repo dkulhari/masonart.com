@@ -45,13 +45,13 @@ export function Footer() {
                 <FooterLink to="/posters">All Posters</FooterLink>
               </li>
               <li>
-                <FooterLink to="/posters?style=abstract">Abstract Art</FooterLink>
+                <FooterLink to="/posters?styles=abstract">Abstract Art</FooterLink>
               </li>
               <li>
-                <FooterLink to="/posters?style=botanical">Botanical</FooterLink>
+                <FooterLink to="/posters?styles=botanical">Botanical</FooterLink>
               </li>
               <li>
-                <FooterLink to="/posters?style=minimalist">Minimalist</FooterLink>
+                <FooterLink to="/posters?styles=minimalist">Minimalist</FooterLink>
               </li>
               <li>
                 <FooterLink to="/create">Create with AI</FooterLink>
