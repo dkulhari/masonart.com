@@ -184,6 +184,12 @@ services:
       traefik.http.middlewares.chobii-web-headers.headers.contentTypeNosniff: "true"
       traefik.http.middlewares.chobii-web-headers.headers.referrerPolicy: strict-origin-when-cross-origin
       traefik.http.middlewares.chobii-web-headers.headers.customResponseHeaders.Permissions-Policy: "camera=(), microphone=(), geolocation=()"
+      # CSP in REPORT-ONLY mode (#344): observe violations in browser consoles
+      # before enforcing. 'unsafe-inline' script-src is required by TanStack
+      # Start SSR hydration (no nonce path through a static traefik header);
+      # Razorpay checkout needs its script + frame + API origins; product
+      # images come from the CDN pair (+ unsplash seed data).
+      traefik.http.middlewares.chobii-web-headers.headers.customResponseHeaders.Content-Security-Policy-Report-Only: "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.chobii.art https://chobii-cdn.xtoms.xyz https://images.unsplash.com https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self'"
 
   # ── PostgreSQL — default network only, never on `platform` ───────────
   postgres:
