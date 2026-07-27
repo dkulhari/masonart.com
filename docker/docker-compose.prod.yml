@@ -177,6 +177,9 @@ services:
       traefik.http.routers.chobii-web.middlewares: chobii-web-headers
       traefik.http.middlewares.chobii-web-headers.headers.stsSeconds: "15552000"
       traefik.http.middlewares.chobii-web-headers.headers.stsIncludeSubdomains: "true"
+      # TLS terminates at the Cloudflare edge, so traefik sees plain HTTP and
+      # would suppress STS without this
+      traefik.http.middlewares.chobii-web-headers.headers.forceSTSHeader: "true"
       traefik.http.middlewares.chobii-web-headers.headers.customFrameOptionsValue: SAMEORIGIN
       traefik.http.middlewares.chobii-web-headers.headers.contentTypeNosniff: "true"
       traefik.http.middlewares.chobii-web-headers.headers.referrerPolicy: strict-origin-when-cross-origin
