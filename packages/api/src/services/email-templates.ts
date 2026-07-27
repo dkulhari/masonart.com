@@ -217,7 +217,8 @@ function formatShippingAddress(order: Order): string {
     `${addr.city}, ${addr.state} ${addr.postalCode}`,
   ].filter(Boolean);
 
-  return parts.join("<br>");
+  // Escape each customer-supplied part; the <br> joins must stay literal
+  return parts.map((part) => escapeHtml(String(part))).join("<br>");
 }
 
 // ============================================================================
@@ -231,7 +232,7 @@ export function getOrderConfirmationTemplate(order: Order): EmailTemplate {
   const content = `
     <div class="content">
       <h2>Order Confirmed!</h2>
-      <p>Hi ${order.shippingAddress?.fullName || "there"},</p>
+      <p>Hi ${escapeHtml(order.shippingAddress?.fullName || "there")},</p>
       <p>Thank you for your order! We're excited to get your art on its way to you.</p>
 
       <div class="order-box">
@@ -308,7 +309,7 @@ export function getShippedTemplate(order: Order): EmailTemplate {
   const content = `
     <div class="content">
       <h2>Your Order Has Shipped!</h2>
-      <p>Hi ${order.shippingAddress?.fullName || "there"},</p>
+      <p>Hi ${escapeHtml(order.shippingAddress?.fullName || "there")},</p>
       <p>Great news! Your order is on its way to you.</p>
 
       <div class="tracking-box">
@@ -380,7 +381,7 @@ export function getOutForDeliveryTemplate(order: Order): EmailTemplate {
   const content = `
     <div class="content">
       <h2>Out for Delivery Today!</h2>
-      <p>Hi ${order.shippingAddress?.fullName || "there"},</p>
+      <p>Hi ${escapeHtml(order.shippingAddress?.fullName || "there")},</p>
       <p>Exciting news! Your order is out for delivery and should arrive today.</p>
 
       <div class="tracking-box">
@@ -439,7 +440,7 @@ export function getDeliveredTemplate(order: Order): EmailTemplate {
   const content = `
     <div class="content">
       <h2>Your Order Has Been Delivered!</h2>
-      <p>Hi ${order.shippingAddress?.fullName || "there"},</p>
+      <p>Hi ${escapeHtml(order.shippingAddress?.fullName || "there")},</p>
       <p>Your art has arrived! We hope you love it as much as we loved creating it for you.</p>
 
       <div class="order-box">
@@ -532,8 +533,8 @@ export function getPhotoReadyForReviewTemplate(
   const content = `
     <div class="content">
       <h2>Your Production Photos Are Ready!</h2>
-      <p>Hi ${customerName},</p>
-      <p>Great news! We've completed production of <strong>${productTitle}</strong> and have taken photos for your review.</p>
+      <p>Hi ${escapeHtml(customerName)},</p>
+      <p>Great news! We've completed production of <strong>${escapeHtml(productTitle)}</strong> and have taken photos for your review.</p>
 
       <div class="tracking-box">
         <h3>Action Required</h3>
@@ -554,7 +555,7 @@ export function getPhotoReadyForReviewTemplate(
         </div>
         <div class="order-detail">
           <span class="label">Item</span>
-          <span class="value">${productTitle}</span>
+          <span class="value">${escapeHtml(productTitle)}</span>
         </div>
         ${orderItem.snapshot?.sizeLabel ? `
         <div class="order-detail">
@@ -618,8 +619,8 @@ export function getChangesRequestedResponseTemplate(
   const content = `
     <div class="content">
       <h2>We've Made the Changes You Requested</h2>
-      <p>Hi ${customerName},</p>
-      <p>Thank you for your feedback! We've addressed your concerns and uploaded ${photoCount} new photo${photoCount !== 1 ? "s" : ""} of <strong>${productTitle}</strong> for your review.</p>
+      <p>Hi ${escapeHtml(customerName)},</p>
+      <p>Thank you for your feedback! We've addressed your concerns and uploaded ${photoCount} new photo${photoCount !== 1 ? "s" : ""} of <strong>${escapeHtml(productTitle)}</strong> for your review.</p>
 
       <div class="tracking-box">
         <h3>Ready for Your Review</h3>
@@ -640,7 +641,7 @@ export function getChangesRequestedResponseTemplate(
         </div>
         <div class="order-detail">
           <span class="label">Item</span>
-          <span class="value">${productTitle}</span>
+          <span class="value">${escapeHtml(productTitle)}</span>
         </div>
       </div>
 
@@ -689,8 +690,8 @@ export function getApprovalConfirmedTemplate(
   const content = `
     <div class="content">
       <h2>Thank You for Your Approval!</h2>
-      <p>Hi ${customerName},</p>
-      <p>You've approved <strong>${productTitle}</strong> for shipping. We're now preparing your order for dispatch.</p>
+      <p>Hi ${escapeHtml(customerName)},</p>
+      <p>You've approved <strong>${escapeHtml(productTitle)}</strong> for shipping. We're now preparing your order for dispatch.</p>
 
       <div class="tracking-box">
         <h3>What's Next?</h3>
@@ -707,7 +708,7 @@ export function getApprovalConfirmedTemplate(
         </div>
         <div class="order-detail">
           <span class="label">Item</span>
-          <span class="value">${productTitle}</span>
+          <span class="value">${escapeHtml(productTitle)}</span>
         </div>
         <div class="order-detail">
           <span class="label">Status</span>
@@ -768,8 +769,8 @@ export function getApprovalDeadlineReminderTemplate(
   const content = `
     <div class="content">
       <h2>Reminder: Review Your Production Photos</h2>
-      <p>Hi ${customerName},</p>
-      <p>We noticed you haven't reviewed the production photos for <strong>${productTitle}</strong> yet.</p>
+      <p>Hi ${escapeHtml(customerName)},</p>
+      <p>We noticed you haven't reviewed the production photos for <strong>${escapeHtml(productTitle)}</strong> yet.</p>
 
       <div class="tracking-box" style="background-color: #fef3c7; border-color: #f59e0b;">
         <h3 style="color: #92400e;">Deadline Approaching</h3>
@@ -790,7 +791,7 @@ export function getApprovalDeadlineReminderTemplate(
         </div>
         <div class="order-detail">
           <span class="label">Item</span>
-          <span class="value">${productTitle}</span>
+          <span class="value">${escapeHtml(productTitle)}</span>
         </div>
       </div>
 
@@ -857,7 +858,7 @@ export function getAIGenerationApprovedTemplate(
   const content = `
     <div class="content">
       <h2>Your AI Creation is Approved! ✨</h2>
-      <p>Hi ${displayName},</p>
+      <p>Hi ${escapeHtml(displayName)},</p>
       <p>Great news! Your AI-generated artwork has been reviewed and approved. You can now add it to your cart and share it in the gallery.</p>
 
       ${imageUrl ? `
@@ -874,7 +875,7 @@ export function getAIGenerationApprovedTemplate(
         </div>
         <div class="order-detail">
           <span class="label">Prompt</span>
-          <span class="value">${truncatedPrompt}</span>
+          <span class="value">${escapeHtml(truncatedPrompt)}</span>
         </div>
         <div class="order-detail">
           <span class="label">Status</span>
@@ -941,13 +942,13 @@ export function getAIGenerationRejectedTemplate(
   const content = `
     <div class="content">
       <h2>AI Creation Review Update</h2>
-      <p>Hi ${displayName},</p>
+      <p>Hi ${escapeHtml(displayName)},</p>
       <p>Thank you for using chobii.art's AI art generator. Unfortunately, your recent creation could not be approved for printing or gallery sharing.</p>
 
       <div class="tracking-box" style="background-color: #fef2f2; border-left: 4px solid #ef4444;">
         <h3 style="color: #dc2626;">Reason: ${categoryDisplay}</h3>
         <p style="margin: 0; color: #991b1b;">
-          ${rejectionReason}
+          ${escapeHtml(rejectionReason)}
         </p>
       </div>
 
@@ -959,7 +960,7 @@ export function getAIGenerationRejectedTemplate(
         </div>
         <div class="order-detail">
           <span class="label">Prompt</span>
-          <span class="value">${truncatedPrompt}</span>
+          <span class="value">${escapeHtml(truncatedPrompt)}</span>
         </div>
         <div class="order-detail">
           <span class="label">Status</span>
