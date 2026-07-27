@@ -169,6 +169,18 @@ services:
       traefik.http.routers.chobii-web.rule: "Host(`${PUBLIC_HOSTNAME:-chobii.art}`)"
       traefik.http.routers.chobii-web.entrypoints: web
       traefik.http.services.chobii-web.loadbalancer.server.port: "3001"
+      # Security headers for SSR pages (#264). The api sets its own via Hono
+      # secureHeaders; the RR7 SSR server sets none, so traefik adds them at
+      # the edge for every web response. CSP deliberately deferred — needs a
+      # policy compatible with SSR hydration inline scripts (scope recorded
+      # in ticket #264's comments; roll out Report-Only before enforcing).
+      traefik.http.routers.chobii-web.middlewares: chobii-web-headers
+      traefik.http.middlewares.chobii-web-headers.headers.stsSeconds: "15552000"
+      traefik.http.middlewares.chobii-web-headers.headers.stsIncludeSubdomains: "true"
+      traefik.http.middlewares.chobii-web-headers.headers.customFrameOptionsValue: SAMEORIGIN
+      traefik.http.middlewares.chobii-web-headers.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.chobii-web-headers.headers.referrerPolicy: strict-origin-when-cross-origin
+      traefik.http.middlewares.chobii-web-headers.headers.customResponseHeaders.Permissions-Policy: "camera=(), microphone=(), geolocation=()"
 
   # ── PostgreSQL — default network only, never on `platform` ───────────
   postgres:
