@@ -33,6 +33,9 @@ vi.mock('../../../src/auth', () => ({
 
 const TARGET_CUSTOMER_ID = 'cust-role-test-target';
 const TARGET_ADMIN_ID = 'admin-role-test-target';
+const TARGET_SUPER_ADMIN_ID = 'superadmin-role-test-target';
+const TARGET_TRADE_ID = 'trade-role-test-target';
+const CALLER_ID = 'role-test-caller';
 
 function sessionFor(role: string) {
   const now = new Date();
@@ -90,20 +93,50 @@ async function seedTargets() {
         email: 'target-admin-role-test@example.com',
         role: 'admin',
       },
+      {
+        id: TARGET_SUPER_ADMIN_ID,
+        name: 'Target Super Admin',
+        email: 'target-superadmin-role-test@example.com',
+        role: 'super-admin',
+      },
+      {
+        id: TARGET_TRADE_ID,
+        name: 'Target Trade',
+        email: 'target-trade-role-test@example.com',
+        role: 'trade',
+      },
+      {
+        // The caller must exist as a row for the self-change guard test
+        id: CALLER_ID,
+        name: 'Role Test Caller',
+        email: 'role-test-caller@example.com',
+        role: 'admin',
+      },
     ])
     .onConflictDoNothing();
-  // Reset in case a previous run left the customer promoted
+  // Reset in case a previous run left targets modified
   await db
     .update(users)
     .set({ role: 'customer' })
     .where(eq(users.id, TARGET_CUSTOMER_ID));
+  await db
+    .update(users)
+    .set({ role: 'admin' })
+    .where(eq(users.id, TARGET_ADMIN_ID));
 }
 
 async function cleanupTargets() {
   const { db } = await import('../../../src/database');
   const { users } = await import('../../../src/database/schema/users');
-  await db.delete(users).where(eq(users.id, TARGET_CUSTOMER_ID));
-  await db.delete(users).where(eq(users.id, TARGET_ADMIN_ID));
+  for (const id of [
+    TARGET_CUSTOMER_ID,
+    TARGET_ADMIN_ID,
+    TARGET_SUPER_ADMIN_ID,
+    TARGET_TRADE_ID,
+    CALLER_ID,
+  ]) {
+    await db.delete(users).where(eq(users.id, id));
+  }
 }
 
 beforeAll(seedTargets);
@@ -180,12 +213,17 @@ describe('PUT /api/admin/customers/:id/role', () => {
     expect(res2.status).toBe(200);
   });
 
-  it('rejects role=admin with 400 (zod)', async () => {
+  it('admin can promote customer to admin (and demote an admin)', async () => {
+    // Contract widened 2026-07-27: admin is assignable; only super-admin,
+    // self, and trade targets are protected.
     mockGetSession.mockResolvedValue(sessionFor('admin'));
     const app = await buildApp();
 
-    const res = await putRole(app, TARGET_CUSTOMER_ID, 'admin');
-    expect(res.status).toBe(400);
+    const res = await putRole(app, TARGET_ADMIN_ID, 'customer');
+    expect(res.status).toBe(200);
+
+    const res2 = await putRole(app, TARGET_ADMIN_ID, 'admin');
+    expect(res2.status).toBe(200);
   });
 
   it('rejects role=super-admin with 400 (zod)', async () => {
@@ -196,11 +234,27 @@ describe('PUT /api/admin/customers/:id/role', () => {
     expect(res.status).toBe(400);
   });
 
-  it('cannot change role of an admin user (403)', async () => {
+  it('cannot change role of a super-admin user (403)', async () => {
     mockGetSession.mockResolvedValue(sessionFor('admin'));
     const app = await buildApp();
 
-    const res = await putRole(app, TARGET_ADMIN_ID, 'customer');
+    const res = await putRole(app, TARGET_SUPER_ADMIN_ID, 'customer');
+    expect(res.status).toBe(403);
+  });
+
+  it('cannot change your own role (403)', async () => {
+    mockGetSession.mockResolvedValue(sessionFor('admin'));
+    const app = await buildApp();
+
+    const res = await putRole(app, CALLER_ID, 'customer');
+    expect(res.status).toBe(403);
+  });
+
+  it('cannot change a trade account role (403)', async () => {
+    mockGetSession.mockResolvedValue(sessionFor('admin'));
+    const app = await buildApp();
+
+    const res = await putRole(app, TARGET_TRADE_ID, 'customer');
     expect(res.status).toBe(403);
   });
 
