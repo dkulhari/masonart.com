@@ -42,7 +42,7 @@ const validStylePresets = [
   'abstract-expression',
   'botanical',
   'vintage-poster',
-  'minimalist',
+  'minimalist-modern',
   'geometric',
   'watercolor',
   'line-art',
@@ -81,7 +81,7 @@ const validModelProviders = ['stable-diffusion', 'midjourney', 'dalle', 'leonard
 const validGenerationData = {
   prompt: 'A beautiful mountain landscape at sunset with vibrant colors',
   negativePrompt: 'blurry, low quality, distorted',
-  stylePreset: 'minimalist',
+  stylePreset: 'minimalist-modern',
   aspectRatio: 'landscape',
   colorMood: 'warm',
   colorPalette: ['#FF5733', '#33FF57', '#3357FF'],
@@ -95,7 +95,7 @@ const validGenerationData = {
  */
 const minimalGenerationData = {
   prompt: 'A simple test prompt',
-  stylePreset: 'minimalist',
+  stylePreset: 'minimalist-modern',
   aspectRatio: 'square',
 };
 
@@ -197,6 +197,27 @@ describe('AI Route Availability', () => {
     // Test public endpoint
     const res = await app.request('/api/ai/style-presets');
     expect(res.status).not.toBe(404);
+  });
+
+  it('style presets include description and keywords metadata (#257)', async () => {
+    if (!app) return;
+
+    const res = await app.request('/api/ai/style-presets');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: Array<{
+        id: string;
+        name: string;
+        description?: string;
+        keywords?: string[];
+        recommendedAspectRatios?: string[];
+      }>;
+    };
+    expect(body.items.length).toBeGreaterThan(0);
+    for (const item of body.items) {
+      expect(item.description, `${item.id} missing description`).toBeTruthy();
+      expect(Array.isArray(item.keywords), `${item.id} missing keywords`).toBe(true);
+    }
   });
 
   it('should have generate route at /api/ai/generate', async () => {
@@ -450,7 +471,7 @@ describe('AI Generation Request Validation', () => {
     });
 
     it('should include minimalist as valid preset', () => {
-      expect(validStylePresets).toContain('minimalist');
+      expect(validStylePresets).toContain('minimalist-modern');
     });
 
     it('should include wabi-sabi as valid preset', () => {
@@ -553,7 +574,7 @@ describe('AI Generations List Query Validation', () => {
     });
 
     it('should accept valid stylePreset filter values', () => {
-      expect(validStylePresets).toContain('minimalist');
+      expect(validStylePresets).toContain('minimalist-modern');
     });
   });
 });
@@ -574,7 +595,7 @@ describe('AI Gallery Query Validation', () => {
     it('should accept valid stylePreset filter', async () => {
       if (!app) return;
 
-      const res = await app.request('/api/ai/gallery?stylePreset=minimalist');
+      const res = await app.request('/api/ai/gallery?stylePreset=minimalist-modern');
       expect([200, 500].includes(res.status)).toBe(true);
     });
 
@@ -885,11 +906,13 @@ describe('AI Style Presets Endpoint', () => {
       const json = await res.json();
 
       const presetIds = json.items.map((p: { id: string }) => p.id);
-      expect(presetIds).toContain('minimalist');
+      // 'minimalist-modern' is a poster style, not an AI preset — the enum ships
+      // wabi-sabi, abstract-expression, botanical, etc.
+      expect(presetIds).toContain('abstract-expression');
       expect(presetIds).toContain('wabi-sabi');
     });
 
-    it('should format preset names with title case', async () => {
+    it('should use curated display names from the preset configs', async () => {
       if (!app) return;
 
       const res = await app.request('/api/ai/style-presets');
@@ -897,7 +920,9 @@ describe('AI Style Presets Endpoint', () => {
 
       const wabiSabi = json.items.find((p: { id: string }) => p.id === 'wabi-sabi');
       if (wabiSabi) {
-        expect(wabiSabi.name).toBe('Wabi Sabi');
+        // Names come from STYLE_PRESETS configs since #257 (curated
+        // typography like "Wabi-Sabi"), not auto title-casing of the id
+        expect(wabiSabi.name).toBe('Wabi-Sabi');
       }
     });
   });
@@ -1029,7 +1054,7 @@ describe('AI Runtime Tests (Database Required)', () => {
       }
       if (!app) return;
 
-      const res = await app.request('/api/ai/gallery?stylePreset=minimalist');
+      const res = await app.request('/api/ai/gallery?stylePreset=minimalist-modern');
       expect(res.status).toBe(200);
 
       const json = await res.json();

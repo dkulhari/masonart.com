@@ -47,6 +47,7 @@ import {
 import { deductFromWallet } from "../services/wallet";
 import { checkPromptSafety } from "../services/ai-moderation";
 import { addAIGenerationJob } from "../queues/ai-generation";
+import { STYLE_PRESETS } from "../ai/style-presets";
 import { getCached, setCached, CacheKeys, redis } from "../lib/redis";
 import {
   uploadReferenceImage,
@@ -866,15 +867,24 @@ aiApp.get("/status/:id", requireAuth, async (c) => {
 // ============================================================================
 
 aiApp.get("/style-presets", async (c) => {
-  // This could be expanded to include full style preset details
-  // including prompt modifiers, thumbnails, etc.
-  const stylePresets = aiStylePresetEnum.enumValues.map((preset) => ({
-    id: preset,
-    name: preset
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" "),
-  }));
+  // Client-facing metadata from the AI pipeline configs (#257). Prompt
+  // modifiers/negative prompts/model params stay server-side — they are
+  // generation internals, not display data.
+  const stylePresets = aiStylePresetEnum.enumValues.map((preset) => {
+    const config = STYLE_PRESETS[preset];
+    return {
+      id: preset,
+      name:
+        config?.name ??
+        preset
+          .split("-")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" "),
+      description: config?.description ?? "",
+      keywords: config?.keywords ?? [],
+      recommendedAspectRatios: config?.recommendedAspectRatios ?? [],
+    };
+  });
 
   return c.json({ items: stylePresets });
 });
