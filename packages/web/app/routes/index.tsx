@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { productsApi } from '~/lib/api'
 import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
+import { OrganizationJsonLd } from '~/components/seo/ProductJsonLd'
 
 // ============================================================================
 // Types
@@ -96,6 +97,9 @@ function HomePage() {
 
   return (
     <div className="flex flex-col">
+      {/* Organization structured data for search engines (#244) */}
+      <OrganizationJsonLd />
+
       {/* Hero Section */}
       <HeroSection />
 

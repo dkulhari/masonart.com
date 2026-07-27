@@ -407,3 +407,59 @@ export function generateOrganizationJsonLd(
 }
 
 export default ProductJsonLd
+
+// ============================================================================
+// Standalone Schemas (#244 — home + listing pages)
+// ============================================================================
+
+/**
+ * OrganizationJsonLd - site-wide Organization schema for the home page
+ */
+export function OrganizationJsonLd({
+  baseUrl = DEFAULT_BASE_URL,
+}: {
+  baseUrl?: string
+}) {
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(buildOrganizationSchema(baseUrl)),
+      }}
+    />
+  )
+}
+
+export interface ItemListEntry {
+  name: string
+  slug: string
+}
+
+/**
+ * ItemListJsonLd - ItemList schema for the /posters listing page
+ */
+export function ItemListJsonLd({
+  items,
+  baseUrl = DEFAULT_BASE_URL,
+}: {
+  items: ItemListEntry[]
+  baseUrl?: string
+}) {
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    numberOfItems: items.length,
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      url: `${baseUrl}/posters/${item.slug}`,
+    })),
+  }
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  )
+}

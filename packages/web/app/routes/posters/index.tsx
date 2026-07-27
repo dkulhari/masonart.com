@@ -32,6 +32,7 @@ import {
   type SortOrder,
 } from '~/components/product/ProductFilters'
 import type { ProductCardData } from '~/components/product/ProductCard'
+import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
 
 // ============================================================================
 // Types
@@ -511,6 +512,10 @@ function PostersPage() {
             {/* Product Grid */}
             {products.length > 0 ? (
               <>
+                {/* ItemList structured data for the visible page (#244) */}
+                <ItemListJsonLd
+                  items={products.map((p) => ({ name: p.title, slug: p.slug }))}
+                />
                 <ProductGrid
                   products={products}
                   columns={{ default: 2, sm: 2, md: 3, lg: 4 }}
