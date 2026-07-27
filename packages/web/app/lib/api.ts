@@ -923,25 +923,9 @@ export const authApi = {
     return response.json();
   },
 
-  /**
-   * Sign out
-   */
-  async signOut() {
-    const response = await fetch(`${getApiUrl()}/api/auth/sign-out`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Sign out failed");
-    }
-
-    return response.json();
-  },
+  // signOut intentionally lives in ~/lib/auth-client (Better Auth client),
+  // not here: a raw body-less JSON POST to /api/auth/sign-out 500s through
+  // the production edge (empty body re-framed as chunked) — see #341.
 
   /**
    * Get OAuth sign-in URL

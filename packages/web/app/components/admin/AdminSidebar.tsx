@@ -29,7 +29,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
-import { authApi } from '~/lib/api'
+import { signOut } from '~/lib/auth-client'
 import { isAdminNavItemVisible } from '~/lib/admin-nav'
 
 // ============================================================================
@@ -165,14 +165,18 @@ export function AdminSidebar({
     return currentPath.startsWith(href)
   }
 
-  // Handle sign out
+  // Handle sign out via the Better Auth client — same path as the account
+  // page. A hand-rolled body-less fetch here once 500'd through the prod
+  // edge (empty POST re-framed as chunked) and left sessions alive (#341).
   const handleSignOut = async () => {
     try {
-      await authApi.signOut()
-      window.location.href = '/'
-    } catch {
-      window.location.href = '/'
+      await signOut()
+    } catch (error) {
+      // Surface the failure instead of silently redirecting with a live
+      // session — that's exactly how #341 stayed invisible.
+      console.error('Sign out failed:', error)
     }
+    window.location.href = '/'
   }
 
   // Get user initials for avatar

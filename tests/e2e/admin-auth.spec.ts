@@ -368,6 +368,28 @@ test.describe('Admin Sign Out', () => {
     await expect(page).toHaveURL(/localhost:\d+\/$|\/auth\/login/, { timeout: 15000 });
   });
 
+  test('sign-out request carries a JSON body (prod edge compat)', async ({ page }) => {
+    // Regression for #341: the sidebar once sent a body-less POST with a JSON
+    // content-type. Locally that works, but through Cloudflare/tunnel/traefik
+    // the empty body is re-framed as chunked and Better Auth 500s — so the
+    // session survived "sign out" in production. Pinning "sign-out always
+    // sends a body" keeps dev tests honest about the prod edge.
+    await Promise.all([
+      page.waitForResponse(resp => resp.url().includes('/api/admin/') && resp.status() === 200),
+      page.goto('/admin')
+    ]);
+
+    const [signOutRequest] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/api/auth/sign-out'), { timeout: 15000 }),
+      page.locator('button:has-text("Sign Out")').click(),
+    ]);
+
+    expect(signOutRequest.postData(), 'sign-out POST must not have an empty body').toBeTruthy();
+
+    const response = await signOutRequest.response();
+    expect(response?.status()).toBe(200);
+  });
+
   test('should not allow access to admin after sign out', async ({ page }) => {
     // Navigate and wait for dashboard API call (proves React hydration)
     await Promise.all([
