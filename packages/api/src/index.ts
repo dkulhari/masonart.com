@@ -289,7 +289,7 @@ app.get("/", (c) => {
   return c.json({
     name: "chobii.art API",
     version: "0.0.1",
-    documentation: "/docs",
+    health: "/api/health",
   });
 });
 
