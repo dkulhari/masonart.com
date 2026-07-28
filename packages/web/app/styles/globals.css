@@ -347,3 +347,26 @@
     animation-delay: 1000ms;
   }
 }
+
+/* ============================================================================
+ * Mobile form controls — prevent iOS Safari auto-zoom (#349)
+ *
+ * iOS Safari zooms the viewport whenever a focused control has a computed
+ * font-size below 16px, and it never zooms back out on blur. Fields across the
+ * app are styled `text-sm` (14px), so tapping any input left mobile users
+ * pinch-zoomed — worst on checkout, ten fields deep.
+ *
+ * This lives outside @layer and uses :not() to clear the specificity of the
+ * `.text-sm` utility (0,1,0), which would otherwise win. Applied below the
+ * Tailwind `md` breakpoint only, so desktop keeps the tighter 14px styling.
+ *
+ * Checkboxes and radios are excluded: they render no text and never trigger
+ * the zoom.
+ * ========================================================================= */
+@media (max-width: 767.98px) {
+  input:not([type='checkbox']):not([type='radio']),
+  textarea:not([hidden]),
+  select:not([hidden]) {
+    font-size: 16px;
+  }
+}
