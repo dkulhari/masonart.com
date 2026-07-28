@@ -1,6 +1,6 @@
 import { Link, useRouteContext } from '@tanstack/react-router'
 import { LayoutDashboard, Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useCartItemCount, useCartHydration } from '~/stores/cart'
 
 const STAFF_ROLES = ['content-manager', 'admin', 'super-admin']
@@ -32,9 +32,30 @@ export function Header() {
     setIsMobileMenuOpen(false)
   }
 
+  // Lock body scroll and wire Escape while the drawer is open, so the page
+  // behind it cannot scroll away under the user's thumb (#348). Same approach
+  // as MobileFiltersSheet on /posters.
+  useEffect(() => {
+    if (!isMobileMenuOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileMenuOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [isMobileMenuOpen])
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container-wide">
+    <>
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container-wide">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link
@@ -124,12 +145,44 @@ export function Header() {
               )}
             </button>
           </div>
+          </div>
         </div>
+      </header>
 
-        {/* Mobile Navigation */}
-        {isMobileMenuOpen && (
-          <nav className="border-t border-border py-4 md:hidden">
-            <div className="flex flex-col space-y-3">
+      {/* Mobile Navigation
+       *
+       * Rendered as a real drawer rather than an expanded header. Previously
+       * this was a bare <nav> inside the header, so it inherited the header's
+       * translucent bg-background/60 + blur — fine for a 64px strip, illegible
+       * for a ~360px panel over page content (#348).
+       *
+       * Deliberately a SIBLING of <header>, not a child: the header sets
+       * backdrop-blur, and a backdrop-filter establishes a containing block
+       * for fixed-position descendants. Nested here, the scrim resolved
+       * against the 64px header box and collapsed to zero height instead of
+       * covering the viewport.
+       *
+       * Mirrors the filter sheet on /posters: scrim, opaque panel, scroll
+       * lock, Escape, dialog semantics.
+       */}
+      {isMobileMenuOpen && (
+          <>
+            {/* Scrim */}
+            <div
+              data-testid="mobile-nav-scrim"
+              className="fixed inset-0 top-16 z-40 bg-black/50 md:hidden"
+              onClick={closeMobileMenu}
+              aria-hidden="true"
+            />
+
+            <nav
+              id="mobile-nav"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Site menu"
+              className="fixed inset-x-0 top-16 z-40 max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-border bg-background py-4 shadow-xl md:hidden"
+            >
+              <div className="container-wide flex flex-col space-y-3">
               <MobileNavLink to="/posters" onClick={closeMobileMenu}>
                 Posters
               </MobileNavLink>
@@ -150,15 +203,15 @@ export function Header() {
                   Admin Panel
                 </MobileNavLink>
               )}
-              <MobileNavLink to="/account" onClick={closeMobileMenu}>
-                <User className="mr-2 h-4 w-4" />
-                Account
-              </MobileNavLink>
-            </div>
-          </nav>
+                <MobileNavLink to="/account" onClick={closeMobileMenu}>
+                  <User className="mr-2 h-4 w-4" />
+                  Account
+                </MobileNavLink>
+              </div>
+            </nav>
+          </>
         )}
-      </div>
-    </header>
+    </>
   )
 }
 
