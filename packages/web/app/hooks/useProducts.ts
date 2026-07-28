@@ -16,6 +16,7 @@ import {
 } from "@tanstack/react-query";
 import {
   productsApi,
+  toFeaturedProducts,
   type ProductFilters,
   type ProductSearchParams,
   type FeaturedProductsParams,
@@ -251,7 +252,11 @@ export function useFeaturedProducts(
 ) {
   return useQuery({
     queryKey: productKeys.featured(params),
-    queryFn: () => productsApi.featured(params) as Promise<ProductListItem[]>,
+    // The endpoint returns an { items } envelope, not a bare array. The old
+    // cast asserted otherwise, so consumers would have received an object
+    // where they expected a list — same defect as the home page (#351).
+    queryFn: async () =>
+      toFeaturedProducts(await productsApi.featured<ProductListItem>(params)),
     staleTime: 1000 * 60 * 15, // 15 minutes
     ...options,
   });

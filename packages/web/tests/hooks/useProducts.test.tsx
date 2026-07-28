@@ -23,6 +23,9 @@ vi.mock('~/lib/api', () => ({
     getByIds: vi.fn(),
   },
   getApiUrl: vi.fn(() => 'http://localhost:3000'),
+  // Pure envelope unwrapper — keep the real behaviour so the hook's use of it
+  // is actually exercised rather than stubbed away.
+  toFeaturedProducts: (response: { items?: unknown[] }) => response?.items ?? [],
 }));
 
 // Import after mock
@@ -527,9 +530,14 @@ describe('useFeaturedProducts Hook', () => {
     queryClient.clear();
   });
 
+  // GET /api/products/featured responds with an { items } envelope, NOT a bare
+  // array. These mocks previously returned an array, which matched the hook's
+  // old (incorrect) cast rather than the real endpoint — so the tests passed
+  // while consumers received an object where they expected a list (#351).
+  const featuredEnvelope = { items: [mockProduct] };
+
   it('should fetch featured products', async () => {
-    const featuredProducts = [mockProduct];
-    (productsApi.featured as any).mockResolvedValueOnce(featuredProducts);
+    (productsApi.featured as any).mockResolvedValueOnce(featuredEnvelope);
 
     const { result } = renderHook(() => useFeaturedProducts(), {
       wrapper: createWrapper(queryClient),
@@ -539,13 +547,13 @@ describe('useFeaturedProducts Hook', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data).toEqual(featuredProducts);
+    // The hook unwraps the envelope, so consumers get a plain array.
+    expect(result.current.data).toEqual([mockProduct]);
     expect(productsApi.featured).toHaveBeenCalledWith(undefined);
   });
 
   it('should fetch featured products with limit', async () => {
-    const featuredProducts = [mockProduct];
-    (productsApi.featured as any).mockResolvedValueOnce(featuredProducts);
+    (productsApi.featured as any).mockResolvedValueOnce(featuredEnvelope);
 
     const { result } = renderHook(() => useFeaturedProducts({ limit: 8 }), {
       wrapper: createWrapper(queryClient),
@@ -559,8 +567,7 @@ describe('useFeaturedProducts Hook', () => {
   });
 
   it('should use longer stale time (15 minutes)', async () => {
-    const featuredProducts = [mockProduct];
-    (productsApi.featured as any).mockResolvedValueOnce(featuredProducts);
+    (productsApi.featured as any).mockResolvedValueOnce(featuredEnvelope);
 
     const { result } = renderHook(() => useFeaturedProducts(), {
       wrapper: createWrapper(queryClient),

@@ -43,6 +43,27 @@ export interface FeaturedProductsParams {
   limit?: number;
 }
 
+/**
+ * Envelope returned by GET /api/products/featured.
+ *
+ * The API wraps the list in `items` — NOT `products`. Typing this explicitly
+ * makes a mismatch a compile error instead of a silently empty array (#351).
+ */
+export interface FeaturedProductsResponse<T = unknown> {
+  items: T[];
+}
+
+/**
+ * Read the product list out of the featured-products envelope.
+ *
+ * Kept next to the client so callers never have to guess the key name.
+ */
+export function toFeaturedProducts<T>(
+  response: FeaturedProductsResponse<T>
+): T[] {
+  return response?.items ?? [];
+}
+
 // Cart item input for adding to cart
 export interface CartItemInput {
   productId: string;
@@ -243,7 +264,9 @@ export const productsApi = {
   /**
    * Get featured products
    */
-  async featured(params?: FeaturedProductsParams) {
+  async featured<T = unknown>(
+    params?: FeaturedProductsParams
+  ): Promise<FeaturedProductsResponse<T>> {
     const queryString = params?.limit
       ? new URLSearchParams({ limit: String(params.limit) }).toString()
       : "";

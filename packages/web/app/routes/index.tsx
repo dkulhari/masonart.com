@@ -22,7 +22,7 @@ import {
   Star,
   ChevronRight,
 } from 'lucide-react'
-import { productsApi } from '~/lib/api'
+import { productsApi, toFeaturedProducts } from '~/lib/api'
 import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
 import { OrganizationJsonLd } from '~/components/seo/ProductJsonLd'
 
@@ -45,10 +45,13 @@ export interface HomePageData {
 const getHomePageData = createServerFn({ method: 'GET' }).handler(
   async (): Promise<HomePageData> => {
     try {
-      // Fetch featured products from API
-      const featuredResponse = await productsApi.featured({ limit: 8 })
+      // Fetch featured products from API. The envelope key is `items` — see
+      // toFeaturedProducts, which is the only place that name is spelled out.
+      const featuredResponse = await productsApi.featured<ProductCardData>({
+        limit: 8,
+      })
       return {
-        featuredProducts: featuredResponse.products || [],
+        featuredProducts: toFeaturedProducts(featuredResponse),
       }
     } catch (error) {
       // Return empty data on error to allow graceful fallback
