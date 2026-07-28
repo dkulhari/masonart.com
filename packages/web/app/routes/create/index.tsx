@@ -362,8 +362,30 @@ function CreatePage() {
   // Check if form is valid
   const isFormValid = prompt.trim().length >= 3 && prompt.trim().length <= 500
 
+  // On mobile the inline Generate button sits ~3 screens down, below 15 style
+  // presets and the ratio picker, so the primary action is invisible for most
+  // of the flow (#356). A sticky bar surfaces it — but only while the real
+  // button is off-screen, so the two never compete.
+  const inlineGenerateRef = useRef<HTMLButtonElement>(null)
+  const [isInlineGenerateVisible, setIsInlineGenerateVisible] = useState(true)
+
+  useEffect(() => {
+    const target = inlineGenerateRef.current
+    if (!target || typeof IntersectionObserver === 'undefined') return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsInlineGenerateVisible(entry?.isIntersecting ?? true),
+      { rootMargin: '0px 0px -80px 0px' }
+    )
+    observer.observe(target)
+
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div className="flex flex-col">
+    // Bottom padding on mobile reserves room for the sticky generate bar so
+    // it never covers the last of the page content.
+    <div className="flex flex-col pb-24 md:pb-0">
       {/* Page Header */}
       <section className="border-b border-border bg-gradient-to-br from-primary/5 via-background to-primary/10 py-8 sm:py-12">
         <div className="container-wide">
@@ -467,6 +489,7 @@ function CreatePage() {
                 )}
 
               <button
+                ref={inlineGenerateRef}
                 type="button"
                 onClick={handleGenerate}
                 disabled={!isFormValid || isGenerating || !!(user && walletBalance && costEstimate && !costEstimate.canUseFreeGeneration && walletBalance.balance.paise < costEstimate.cost.userPricePaise)}
@@ -516,8 +539,74 @@ function CreatePage() {
           </div>
         </div>
       </div>
+
+      {/* Sticky mobile generate bar (#356).
+       *
+       * Mirrors the "Apply Filters" affordance on /posters. Shown only while
+       * the inline button is scrolled out of view, so there is never a pair of
+       * competing CTAs, and it doubles as a readout of the current selection —
+       * otherwise nothing on screen confirms a style was picked.
+       */}
+      {!isInlineGenerateVisible && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 shadow-[0_-4px_16px_rgb(0_0_0_/_8%)] backdrop-blur md:hidden">
+          <div className="container-wide flex items-center gap-3 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
+                {formatPresetLabel(selectedStyle)}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {formatPresetLabel(selectedAspectRatio)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={
+                !isFormValid ||
+                isGenerating ||
+                !!(
+                  user &&
+                  walletBalance &&
+                  costEstimate &&
+                  !costEstimate.canUseFreeGeneration &&
+                  walletBalance.balance.paise < costEstimate.cost.userPricePaise
+                )
+              }
+              className={cn(
+                'flex flex-shrink-0 items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-all',
+                isFormValid && !isGenerating
+                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25'
+                  : 'cursor-not-allowed bg-muted text-muted-foreground'
+              )}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4" />
+                  Generate
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+/**
+ * Turn a kebab-case preset id into something readable ("wabi-sabi" ->
+ * "Wabi Sabi") for the compact mobile readout.
+ */
+function formatPresetLabel(value: string): string {
+  return value
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 // ============================================================================
