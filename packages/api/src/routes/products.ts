@@ -74,6 +74,14 @@ const featuredProductsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(50).optional().default(12),
 });
 
+/**
+ * Query parameters for related products. Defaults to 5 — the number of slots
+ * the product page's "You May Also Like" row renders.
+ */
+const relatedProductsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(20).optional().default(5),
+});
+
 // ============================================================================
 // Route Handler
 // ============================================================================
@@ -497,6 +505,107 @@ productsApp.get("/:slug", async (c) => {
     return c.json({ error: "Failed to fetch product" }, 500);
   }
 });
+
+// ============================================================================
+// GET /api/products/:slug/related - Get Related Products
+// ============================================================================
+
+productsApp.get(
+  "/:slug/related",
+  zValidator("query", relatedProductsQuerySchema),
+  async (c) => {
+    const { slug } = c.req.param();
+    const { limit } = c.req.valid("query");
+
+    if (!slug || !/^[a-z0-9-]+$/.test(slug)) {
+      return c.json({ error: "Invalid slug format" }, 400);
+    }
+
+    const cacheKey = `${CacheKeys.PRODUCT}related:${slug}:${limit}`;
+    const cached = await getCached<unknown[]>(cacheKey);
+    if (cached) {
+      return c.json({ items: cached, fromCache: true });
+    }
+
+    try {
+      const source = await db
+        .select({
+          id: products.id,
+          styles: products.styles,
+          subjects: products.subjects,
+        })
+        .from(products)
+        .where(and(eq(products.slug, slug), eq(products.status, "active")))
+        .limit(1);
+
+      if (source.length === 0) {
+        return c.json({ error: "Product not found" }, 404);
+      }
+
+      const { id, styles, subjects } = source[0]!;
+
+      // Interpolating a JS array straight into a sql`` template binds it as a
+      // record tuple — Postgres then rejects it with "cannot cast type record
+      // to text[]". Build a real ARRAY[...] literal with each element as its
+      // own bound parameter instead.
+      const toTextArray = (values: string[]) =>
+        values.length === 0
+          ? sql`ARRAY[]::text[]`
+          : sql`ARRAY[${sql.join(
+              values.map((value) => sql`${value}`),
+              sql`, `
+            )}]::text[]`;
+
+      const styleList = toTextArray(styles ?? []);
+      const subjectList = toTextArray(subjects ?? []);
+
+      // Rank by how many tag families overlap, so a product sharing both a
+      // style and a subject outranks one sharing only a style.
+      //
+      // && is the Postgres array-overlap operator. Note there is no core `&`
+      // intersection operator for text[] (that belongs to the intarray
+      // extension, integers only), so this scores 0-2 by family rather than
+      // counting individual shared tags.
+      const overlapScore = sql<number>`(
+        (case when ${products.styles} && ${styleList} then 1 else 0 end) +
+        (case when ${products.subjects} && ${subjectList} then 1 else 0 end)
+      )`;
+
+      const related = await db
+        .select({
+          id: products.id,
+          sku: products.sku,
+          title: products.title,
+          slug: products.slug,
+          basePrice: products.basePrice,
+          styles: products.styles,
+          subjects: products.subjects,
+          colors: products.colors,
+          orientation: products.orientation,
+          images: products.images,
+          isAiGenerated: products.isAiGenerated,
+        })
+        .from(products)
+        .where(
+          and(
+            eq(products.status, "active"),
+            // Never recommend the product the user is already looking at.
+            sql`${products.id} <> ${id}`,
+            sql`(${products.styles} && ${styleList} OR ${products.subjects} && ${subjectList})`
+          )
+        )
+        .orderBy(desc(overlapScore), desc(products.createdAt))
+        .limit(limit);
+
+      await setCached(cacheKey, related, CACHE_TTL_FEATURED);
+
+      return c.json({ items: related });
+    } catch (error) {
+      console.error("Error fetching related products:", error);
+      return c.json({ error: "Failed to fetch related products" }, 500);
+    }
+  }
+);
 
 // ============================================================================
 // GET /api/products/:slug/variants - Get Product Variants

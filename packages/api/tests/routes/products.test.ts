@@ -374,6 +374,69 @@ describe('Products Query Parameter Validation', () => {
     });
   });
 
+  // The PDP's "You May Also Like" section rendered a hardcoded skeleton
+  // because no endpoint existed to fill it (#352).
+  describe('GET /api/products/:slug/related', () => {
+    it('returns an items envelope for a real product', async () => {
+      if (!app || !isDatabaseAvailable) return;
+
+      const listRes = await app.request('/api/products?page=1&pageSize=1');
+      const list = (await listRes.json()) as { items?: Array<{ slug: string }> };
+      const slug = list.items?.[0]?.slug;
+      if (!slug) return;
+
+      const res = await app.request(`/api/products/${slug}/related`);
+      expect(res.status).toBe(200);
+
+      const json = (await res.json()) as { items: unknown[] };
+      expect(Array.isArray(json.items)).toBe(true);
+    });
+
+    it('never includes the product itself', async () => {
+      if (!app || !isDatabaseAvailable) return;
+
+      const listRes = await app.request('/api/products?page=1&pageSize=1');
+      const list = (await listRes.json()) as { items?: Array<{ slug: string }> };
+      const slug = list.items?.[0]?.slug;
+      if (!slug) return;
+
+      const res = await app.request(`/api/products/${slug}/related`);
+      const json = (await res.json()) as { items: Array<{ slug: string }> };
+
+      expect(json.items.map((item) => item.slug)).not.toContain(slug);
+    });
+
+    it('respects the limit parameter', async () => {
+      if (!app || !isDatabaseAvailable) return;
+
+      const listRes = await app.request('/api/products?page=1&pageSize=1');
+      const list = (await listRes.json()) as { items?: Array<{ slug: string }> };
+      const slug = list.items?.[0]?.slug;
+      if (!slug) return;
+
+      const res = await app.request(`/api/products/${slug}/related?limit=2`);
+      const json = (await res.json()) as { items: unknown[] };
+
+      expect(json.items.length).toBeLessThanOrEqual(2);
+    });
+
+    it('rejects a limit above the maximum', async () => {
+      if (!app) return;
+
+      const res = await app.request('/api/products/any-slug/related?limit=100');
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 404 for an unknown product', async () => {
+      if (!app || !isDatabaseAvailable) return;
+
+      const res = await app.request(
+        '/api/products/definitely-not-a-real-product-slug/related'
+      );
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('GET /api/products/:slug - Get Product by Slug', () => {
     it('should reject invalid slug format (uppercase)', async () => {
       if (!app) return;

@@ -6,7 +6,8 @@
  */
 
 import { createFileRoute, notFound } from '@tanstack/react-router'
-import { productsApi } from '~/lib/api'
+import { productsApi, toFeaturedProducts } from '~/lib/api'
+import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
 import {
   ProductDetail,
   ProductDetailSkeleton,
@@ -152,6 +153,23 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
   }
 }
 
+/**
+ * Fetch products related to this one for the "You May Also Like" row.
+ *
+ * Never throws: the section is supplementary, so a failure here should hide
+ * it rather than take down the product page.
+ */
+async function fetchRelatedProducts(slug: string): Promise<ProductCardData[]> {
+  try {
+    const response = await productsApi.related<ProductCardData>(slug, {
+      limit: 5,
+    })
+    return toFeaturedProducts(response)
+  } catch {
+    return []
+  }
+}
+
 // ============================================================================
 // Route Definition
 // ============================================================================
@@ -164,7 +182,9 @@ export const Route = createFileRoute('/posters/$slug')({
       throw notFound()
     }
 
-    return { product }
+    const related = await fetchRelatedProducts(params.slug)
+
+    return { product, related }
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
@@ -268,7 +288,7 @@ export const Route = createFileRoute('/posters/$slug')({
 // ============================================================================
 
 function ProductPage() {
-  const { product } = Route.useLoaderData()
+  const { product, related } = Route.useLoaderData()
 
   return (
     <>
@@ -285,7 +305,7 @@ function ProductPage() {
       <ProductReviews productId={product.id} />
 
       {/* Related Products Section (placeholder) */}
-      <RelatedProductsSection />
+      <RelatedProductsSection products={related} />
     </>
   )
 }
@@ -438,23 +458,31 @@ function ProductJsonLd({ product }: { product: ProductDetailData }) {
 }
 
 /**
- * Related products section placeholder
+ * Related products row.
+ *
+ * Data is loaded server-side alongside the product, so there is no loading
+ * state to render — previously this section showed five permanently pulsing
+ * skeletons because it was a placeholder that never got implemented (#352).
+ *
+ * Renders nothing when there is nothing to recommend, rather than an empty
+ * shell.
  */
-function RelatedProductsSection() {
+function RelatedProductsSection({ products }: { products: ProductCardData[] }) {
+  if (products.length === 0) {
+    return null
+  }
+
   return (
     <section className="border-t border-border bg-muted/30">
       <div className="container-wide py-12">
         <h2 className="mb-6 text-xl font-bold text-foreground">You May Also Like</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {/* Placeholder for related products - will be implemented with actual products */}
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="animate-pulse">
-              <div className="aspect-[2/3] rounded-lg bg-muted" />
-              <div className="mt-2 space-y-1">
-                <div className="h-4 w-3/4 rounded bg-muted" />
-                <div className="h-4 w-1/2 rounded bg-muted" />
-              </div>
-            </div>
+          {products.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              uniformAspectRatio="aspect-[2/3]"
+            />
           ))}
         </div>
       </div>

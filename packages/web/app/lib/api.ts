@@ -291,6 +291,38 @@ export const productsApi = {
   },
 
   /**
+   * Get products related to a given one, for the product page's
+   * "You May Also Like" row. Same { items } envelope as featured.
+   */
+  async related<T = unknown>(
+    slug: string,
+    params?: { limit?: number }
+  ): Promise<FeaturedProductsResponse<T>> {
+    const queryString = params?.limit
+      ? `?${new URLSearchParams({ limit: String(params.limit) }).toString()}`
+      : "";
+
+    const response = await fetch(
+      `${getApiUrl()}/api/products/${slug}/related${queryString}`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      // A missing or unrelated product should not break the page — the
+      // section just renders nothing.
+      return { items: [] };
+    }
+
+    return response.json();
+  },
+
+  /**
    * Get product by slug
    */
   async getBySlug(slug: string) {
