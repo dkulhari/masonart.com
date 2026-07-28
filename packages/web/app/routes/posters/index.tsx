@@ -520,6 +520,7 @@ function PostersPage() {
                   products={products}
                   columns={{ default: 2, sm: 2, md: 3, lg: 4 }}
                   gap="md"
+                  uniformAspectRatio="aspect-[2/3]"
                 />
 
                 {/* Pagination */}
