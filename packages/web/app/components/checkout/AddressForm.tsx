@@ -220,6 +220,7 @@ export function AddressForm({
             <input
               type="text"
               id="fullName"
+              autoComplete="name"
               value={formData.fullName}
               onChange={(e) => handleChange('fullName', e.target.value)}
               onBlur={() => handleBlur('fullName')}
@@ -248,6 +249,7 @@ export function AddressForm({
             <input
               type="email"
               id="email"
+              autoComplete="email"
               value={formData.email}
               onChange={(e) => handleChange('email', e.target.value)}
               onBlur={() => handleBlur('email')}
@@ -275,6 +277,8 @@ export function AddressForm({
               <input
                 type="tel"
                 id="phone"
+                autoComplete="tel"
+                inputMode="numeric"
                 value={formData.phone}
                 onChange={(e) => handleChange('phone', e.target.value)}
                 onBlur={() => handleBlur('phone')}
@@ -303,6 +307,7 @@ export function AddressForm({
             <Home className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <textarea
               id="addressLine1"
+              autoComplete="address-line1"
               value={formData.addressLine1}
               onChange={(e) => handleChange('addressLine1', e.target.value)}
               onBlur={() => handleBlur('addressLine1')}
@@ -332,6 +337,7 @@ export function AddressForm({
             <input
               type="text"
               id="addressLine2"
+              autoComplete="address-line2"
               value={formData.addressLine2}
               onChange={(e) => handleChange('addressLine2', e.target.value)}
               placeholder="Area, Sector, Locality"
@@ -373,6 +379,7 @@ export function AddressForm({
               <input
                 type="text"
                 id="city"
+                autoComplete="address-level2"
                 value={formData.city}
                 onChange={(e) => handleChange('city', e.target.value)}
                 onBlur={() => handleBlur('city')}
@@ -399,6 +406,7 @@ export function AddressForm({
             <div className="relative">
               <select
                 id="state"
+                autoComplete="address-level1"
                 value={formData.state}
                 onChange={(e) => handleChange('state', e.target.value)}
                 onBlur={() => handleBlur('state')}
@@ -433,6 +441,9 @@ export function AddressForm({
             <input
               type="text"
               id="postalCode"
+              autoComplete="postal-code"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
               value={formData.postalCode}
               onChange={(e) => handleChange('postalCode', e.target.value.replace(/\D/g, '').slice(0, 6))}
               onBlur={() => handleBlur('postalCode')}
