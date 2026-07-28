@@ -336,6 +336,25 @@ describe("Reviews Route Availability", () => {
     expect(res.headers.get("content-type")).toContain("application/json");
   });
 
+  // The product detail page calls this on every load. It was never defined,
+  // so it 404'd three times per PDP view and the review summary sat in a
+  // permanent skeleton (#353).
+  it("GET /api/products/:productId/reviews/stats route exists", async () => {
+    if (!app) {
+      console.log("App not available, skipping route availability test");
+      return;
+    }
+
+    const res = await app.request(`/api/products/${VALID_UUID}/reviews/stats`);
+
+    // A missing route falls through to the API's HTML/JSON 404 handler. The
+    // route existing means we get a handled JSON response, and specifically
+    // not a "route not found" 404.
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.error).not.toBe("Not Found");
+  });
+
   it("POST /api/products/:productId/reviews route should NOT create reviews (removed for verified purchase reviews)", async () => {
     if (!app) {
       console.log("App not available, skipping route availability test");
@@ -401,7 +420,106 @@ describe("Reviews Route Availability", () => {
 // Input Validation Tests (Always Run via App)
 // ============================================================================
 
+describe("buildReviewStats", () => {
+  it("computes average, totals and percentages from grouped counts", async () => {
+    const { buildReviewStats } = await import("../../src/routes/reviews");
+
+    // 5x2, 4x1, 1x1 => 4 reviews, sum 15, average 3.75 -> 3.8
+    const stats = buildReviewStats([
+      { rating: 5, count: 2 },
+      { rating: 4, count: 1 },
+      { rating: 1, count: 1 },
+    ]);
+
+    expect(stats.totalReviews).toBe(4);
+    expect(stats.averageRating).toBe(3.8);
+    expect(stats.distribution).toEqual([
+      { rating: 5, count: 2, percentage: 50 },
+      { rating: 4, count: 1, percentage: 25 },
+      { rating: 3, count: 0, percentage: 0 },
+      { rating: 2, count: 0, percentage: 0 },
+      { rating: 1, count: 1, percentage: 25 },
+    ]);
+  });
+
+  it("always returns five buckets, highest rating first", async () => {
+    const { buildReviewStats } = await import("../../src/routes/reviews");
+
+    const stats = buildReviewStats([{ rating: 3, count: 1 }]);
+
+    expect(stats.distribution.map((d) => d.rating)).toEqual([5, 4, 3, 2, 1]);
+  });
+
+  it("returns zeros rather than NaN when a product has no reviews", async () => {
+    const { buildReviewStats } = await import("../../src/routes/reviews");
+
+    const stats = buildReviewStats([]);
+
+    expect(stats.averageRating).toBe(0);
+    expect(stats.totalReviews).toBe(0);
+    expect(stats.distribution.every((d) => d.count === 0)).toBe(true);
+    expect(stats.distribution.every((d) => d.percentage === 0)).toBe(true);
+  });
+
+  it("coerces string counts, which pg returns for aggregates", async () => {
+    const { buildReviewStats } = await import("../../src/routes/reviews");
+
+    const stats = buildReviewStats([
+      { rating: "5", count: "3" },
+      { rating: "1", count: "1" },
+    ]);
+
+    // String concatenation instead of addition would give 4 -> "31".
+    expect(stats.totalReviews).toBe(4);
+    expect(stats.averageRating).toBe(4);
+  });
+});
+
 describe("Reviews Input Validation", () => {
+  describe("GET /api/products/:productId/reviews/stats", () => {
+    it("should reject invalid productId format", async () => {
+      if (!app) return;
+
+      const res = await app.request(
+        `/api/products/${INVALID_UUID}/reviews/stats`
+      );
+      expect(res.status).toBe(400);
+
+      const json = await res.json();
+      expect(json.error).toBe("Invalid product ID");
+    });
+
+    it("should return the shape the product page consumes", async () => {
+      if (!app || !isDatabaseAvailable) return;
+
+      const res = await app.request(
+        `/api/products/${VALID_UUID}/reviews/stats`
+      );
+
+      // Unknown product is a legitimate 404; what matters is that a 200
+      // carries the contract useReviews.ts expects.
+      if (res.status !== 200) {
+        expect([404, 500].includes(res.status)).toBe(true);
+        return;
+      }
+
+      const json = await res.json();
+      expect(typeof json.averageRating).toBe("number");
+      expect(typeof json.totalReviews).toBe("number");
+      expect(Array.isArray(json.distribution)).toBe(true);
+
+      // Always five buckets, one per star rating, highest first.
+      expect(json.distribution).toHaveLength(5);
+      expect(json.distribution.map((d: { rating: number }) => d.rating)).toEqual(
+        [5, 4, 3, 2, 1]
+      );
+      for (const bucket of json.distribution) {
+        expect(typeof bucket.count).toBe("number");
+        expect(typeof bucket.percentage).toBe("number");
+      }
+    });
+  });
+
   describe("GET /api/products/:productId/reviews", () => {
     it("should reject invalid productId format", async () => {
       if (!app) return;

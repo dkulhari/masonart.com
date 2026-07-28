@@ -30,7 +30,7 @@ import {
   type AuthVariables,
   type OptionalAuthVariables,
 } from "../middleware/auth";
-import { getCached, setCached, deleteCached } from "../lib/redis";
+import { getCached, setCached, deleteCachedPattern } from "../lib/redis";
 
 // ============================================================================
 // Constants
@@ -74,6 +74,75 @@ const listReviewsQuerySchema = z.object({
   sortBy: z.enum(["newest", "highest", "lowest"]).default("newest"),
 });
 
+/**
+ * Rating summary for a product. Mirrors ReviewStatsResponse in
+ * packages/web/app/hooks/useReviews.ts — keep the two in step.
+ */
+interface ReviewStatsPayload {
+  averageRating: number;
+  totalReviews: number;
+  distribution: Array<{
+    rating: number;
+    count: number;
+    percentage: number;
+  }>;
+}
+
+/**
+ * Turn per-rating counts into the summary the product page renders.
+ *
+ * Exported so the arithmetic — average rounding, percentages, and the
+ * always-five-buckets guarantee — can be tested without a database. Seeding
+ * real reviews requires a full order chain, since reviews.order_item_id is
+ * NOT NULL with an FK.
+ */
+export function buildReviewStats(
+  rows: Array<{ rating: number | string; count: number | string }>
+): ReviewStatsPayload {
+  const countByRating = new Map(
+    rows.map((row) => [Number(row.rating), Number(row.count)])
+  );
+
+  const totalReviews = [...countByRating.values()].reduce(
+    (sum, count) => sum + count,
+    0
+  );
+  const ratingSum = [...countByRating.entries()].reduce(
+    (sum, [rating, count]) => sum + rating * count,
+    0
+  );
+
+  return {
+    // One decimal place — matches how the summary renders it.
+    averageRating: totalReviews
+      ? Math.round((ratingSum / totalReviews) * 10) / 10
+      : 0,
+    totalReviews,
+    distribution: [5, 4, 3, 2, 1].map((rating) => {
+      const count = countByRating.get(rating) ?? 0;
+      return {
+        rating,
+        count,
+        percentage: totalReviews ? Math.round((count / totalReviews) * 100) : 0,
+      };
+    }),
+  };
+}
+
+/**
+ * Drop every cached read for a product's reviews — the paginated lists and
+ * the rating summary.
+ *
+ * The list keys embed page/pageSize/sortBy, so clearing them needs a pattern
+ * delete. The previous code passed a "...:*" string to deleteCached, which
+ * deletes one exact key; the wildcard was never expanded, so stale review
+ * lists survived edits and deletions for the full 5-minute TTL.
+ */
+async function invalidateProductReviewCaches(productId: string): Promise<void> {
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:${productId}:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}stats:${productId}`);
+}
+
 // ============================================================================
 // Route Handlers
 // ============================================================================
@@ -83,6 +152,65 @@ const productReviewsApp = new Hono<{ Variables: OptionalAuthVariables }>();
 
 // Apply optional auth to list reviews (shows user's own pending reviews if logged in)
 productReviewsApp.use("*", optionalAuth);
+
+/**
+ * GET /api/products/:productId/reviews/stats - Rating summary for a product
+ *
+ * Consumed by the product detail page's review summary block. Registered
+ * before "/" so the literal segment is matched first.
+ *
+ * Returns every star bucket, including empty ones, so the UI can render a
+ * stable five-row distribution without filling gaps itself.
+ */
+productReviewsApp.get("/stats", async (c) => {
+  const productId = c.req.param("productId");
+
+  if (!productId || !/^[0-9a-f-]{36}$/i.test(productId)) {
+    return c.json({ error: "Invalid product ID" }, 400);
+  }
+
+  const cacheKey = `${REVIEW_CACHE_PREFIX}stats:${productId}`;
+  const cached = await getCached<ReviewStatsPayload>(cacheKey);
+  if (cached) {
+    return c.json(cached);
+  }
+
+  try {
+    const product = await db
+      .select({ id: products.id })
+      .from(products)
+      .where(eq(products.id, productId))
+      .limit(1);
+
+    if (product.length === 0) {
+      return c.json({ error: "Product not found" }, 404);
+    }
+
+    // One grouped query rather than five counts.
+    const rows = await db
+      .select({
+        rating: reviews.rating,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.productId, productId),
+          eq(reviews.status, "approved" as ReviewStatus)
+        )
+      )
+      .groupBy(reviews.rating);
+
+    const payload = buildReviewStats(rows);
+
+    await setCached(cacheKey, payload, CACHE_TTL_REVIEWS);
+
+    return c.json(payload);
+  } catch (error) {
+    console.error("Error fetching review stats:", error);
+    return c.json({ error: "Failed to fetch review stats" }, 500);
+  }
+});
 
 /**
  * GET /api/products/:productId/reviews - List reviews for a product
@@ -346,8 +474,10 @@ protectedReviewsApp.patch(
         .where(eq(reviews.id, reviewId))
         .returning();
 
-      // Invalidate cache
-      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0]!.productId}:*`);
+      // Invalidate cache. These are wildcard keys, so they need
+      // deleteCachedPattern — deleteCached takes an exact key and was
+      // silently deleting a literal "...:*" that never existed.
+      await invalidateProductReviewCaches(existingReview[0]!.productId);
 
       return c.json({
         message: "Review updated successfully",
@@ -405,7 +535,7 @@ protectedReviewsApp.delete("/:reviewId", async (c) => {
     await db.delete(reviews).where(eq(reviews.id, reviewId));
 
     // Invalidate cache
-    await deleteCached(`${REVIEW_CACHE_PREFIX}product:${existingReview[0]!.productId}:*`);
+    await invalidateProductReviewCaches(existingReview[0]!.productId);
 
     return c.json({ message: "Review deleted successfully" });
   } catch (error) {
