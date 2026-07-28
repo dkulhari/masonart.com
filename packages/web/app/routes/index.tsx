@@ -320,7 +320,10 @@ const categories = [
     slug: 'minimalist',
     description: 'Clean lines, simple beauty',
     image: '/images/categories/minimalist.jpg',
-    color: 'from-gray-600/70 to-slate-600/70',
+    // Deeper than the original gray-600/slate-600: a desaturated wash over a
+    // deliberately light minimalist photo left white text with almost nothing
+    // to sit against (#357).
+    color: 'from-slate-700/80 to-slate-900/70',
   },
   {
     name: 'Typography',
@@ -365,17 +368,31 @@ function CategoriesSection() {
                 }}
               />
 
-              {/* Gradient overlay for text readability */}
+              {/* Brand gradient — carries the category's colour identity */}
               <div
                 className={`absolute inset-0 bg-gradient-to-br ${category.color} opacity-75 transition-opacity duration-300 group-hover:opacity-90`}
               />
 
+              {/* Text-protection scrim.
+               *
+               * The colour gradient alone is not enough: it is translucent, so
+               * a light, high-key category photo reads straight through it.
+               * That is what made the Minimalist caption illegible — its
+               * grey/slate wash had nothing like the masking power of the
+               * saturated purple/green/amber ones (#357).
+               *
+               * A flat scrim under the text keeps every card legible
+               * regardless of which image sits behind it, including any added
+               * later.
+               */}
+              <div className="absolute inset-0 bg-black/25" />
+
               {/* Text content */}
               <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-white">
-                <h3 className="text-lg font-bold sm:text-xl">
+                <h3 className="text-lg font-bold sm:text-xl [text-shadow:0_1px_3px_rgb(0_0_0_/_45%)]">
                   {category.name}
                 </h3>
-                <p className="mt-1 text-sm text-white/80">
+                <p className="mt-1 text-sm text-white/90 [text-shadow:0_1px_3px_rgb(0_0_0_/_45%)]">
                   {category.description}
                 </p>
                 <span className="mt-3 inline-flex items-center text-sm font-medium opacity-0 transition-opacity group-hover:opacity-100">
