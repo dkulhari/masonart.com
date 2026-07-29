@@ -22,10 +22,12 @@ go-live) · email sender moves to `notifications@chobii.art`.
 - [ ] **Zero Trust → Networks → Tunnels → platform tunnel → Public hostnames**:
       add `chobii.art` → `http://traefik:80`. (Dashboard auto-creates the
       proxied, flattened apex CNAME.)
-- [ ] **www**: add proxied DNS record for `www` (easiest: second tunnel
+- [x] **www**: add proxied DNS record for `www` (easiest: second tunnel
       public hostname `www.chobii.art` → `http://traefik:80`), then zone
       **Redirect Rule**: `www.chobii.art/*` → 301 `https://chobii.art/$1`.
       Do NOT add www to any traefik Host rule.
+      *Done 2026-07-29 (#334): redirect rule live, query string preserved,
+      single hop to apex. Edge-only — no traefik Host rule touched.*
 - [ ] **Pre-flight**: `curl -sI https://chobii.art` returns traefik
       `404 page not found` — that 404 IS success (edge → tunnel → traefik
       proven before the app flips).
@@ -76,8 +78,9 @@ go-live) · email sender moves to `notifications@chobii.art`.
 
 ## Phase 4 — verification gate (from OUTSIDE the LAN, on LTE)
 
-- [ ] `https://chobii.art` → 200 with CSP/HSTS; `www.chobii.art/x` → 301 to
+- [x] `https://chobii.art` → 200 with CSP/HSTS; `www.chobii.art/x` → 301 to
       apex; `chobii.xtoms.xyz` → 404 (intended drop).
+      *Verified 2026-07-29: all three clauses pass.*
 - [ ] Fresh signup → verification email arrives FROM
       `chobii.art <notifications@chobii.art>`, DKIM/SPF pass, link works.
 - [ ] Google OAuth round-trip; session survives reload. (Everyone's old
