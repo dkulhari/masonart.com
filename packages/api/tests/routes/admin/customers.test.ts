@@ -37,6 +37,21 @@ const TARGET_SUPER_ADMIN_ID = 'superadmin-role-test-target';
 const TARGET_TRADE_ID = 'trade-role-test-target';
 const CALLER_ID = 'role-test-caller';
 
+/**
+ * Filter fixtures. `createdAt` values sit in a synthetic 2029 window so the
+ * joined-date-range assertions cannot collide with real rows in the dev
+ * database. START/END sit exactly on the range bounds — they prove the range
+ * is inclusive on both ends.
+ */
+const FILTER_RANGE_START_ID = 'filter-test-range-start';
+const FILTER_RANGE_END_ID = 'filter-test-range-end';
+const FILTER_OUT_OF_RANGE_ID = 'filter-test-out-of-range';
+const FILTER_FROM = '2029-03-01';
+const FILTER_TO = '2029-03-31';
+const FILTER_RANGE_START_AT = new Date('2029-03-01T00:00:00.000Z');
+const FILTER_RANGE_END_AT = new Date('2029-03-31T23:59:59.000Z');
+const FILTER_OUT_OF_RANGE_AT = new Date('2029-04-15T12:00:00.000Z');
+
 function sessionFor(role: string) {
   const now = new Date();
   return {
@@ -112,6 +127,30 @@ async function seedTargets() {
         email: 'role-test-caller@example.com',
         role: 'admin',
       },
+      {
+        id: FILTER_RANGE_START_ID,
+        name: 'Filter Fixture Range Start',
+        email: 'filter-fixture-range-start@example.com',
+        role: 'customer',
+        status: 'active',
+        createdAt: FILTER_RANGE_START_AT,
+      },
+      {
+        id: FILTER_RANGE_END_ID,
+        name: 'Filter Fixture Range End',
+        email: 'filter-fixture-range-end@example.com',
+        role: 'customer',
+        status: 'suspended',
+        createdAt: FILTER_RANGE_END_AT,
+      },
+      {
+        id: FILTER_OUT_OF_RANGE_ID,
+        name: 'Filter Fixture Out Of Range',
+        email: 'filter-fixture-out-of-range@example.com',
+        role: 'customer',
+        status: 'active',
+        createdAt: FILTER_OUT_OF_RANGE_AT,
+      },
     ])
     .onConflictDoNothing();
   // Reset in case a previous run left targets modified
@@ -134,6 +173,9 @@ async function cleanupTargets() {
     TARGET_SUPER_ADMIN_ID,
     TARGET_TRADE_ID,
     CALLER_ID,
+    FILTER_RANGE_START_ID,
+    FILTER_RANGE_END_ID,
+    FILTER_OUT_OF_RANGE_ID,
   ]) {
     await db.delete(users).where(eq(users.id, id));
   }
@@ -153,9 +195,9 @@ describe('GET /api/admin/customers', () => {
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(Array.isArray(body.customers)).toBe(true);
-    expect(body.customers.length).toBeGreaterThan(0);
-    const first = body.customers[0];
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.length).toBeGreaterThan(0);
+    const first = body.data[0];
     expect(first).toHaveProperty('id');
     expect(first).toHaveProperty('name');
     expect(first).toHaveProperty('email');
@@ -176,6 +218,138 @@ describe('GET /api/admin/customers', () => {
 
     const res = await app.request('/api/admin/customers');
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/admin/customers - filtering, sorting, pagination', () => {
+  beforeEach(() => mockGetSession.mockReset());
+
+  async function listAs(query: string) {
+    mockGetSession.mockResolvedValue(sessionFor('admin'));
+    const app = await buildApp();
+    return app.request(`/api/admin/customers${query}`);
+  }
+
+  async function listOk(query: string) {
+    const res = await listAs(query);
+    expect(res.status).toBe(200);
+    return res.json();
+  }
+
+  const idsOf = (body: { data: Array<{ id: string }> }) =>
+    body.data.map((u) => u.id);
+
+  it('returns a pagination envelope and honours pageSize', async () => {
+    const body = await listOk('?page=1&pageSize=2');
+
+    expect(body.data.length).toBeLessThanOrEqual(2);
+    expect(body.pagination).toMatchObject({ page: 1, pageSize: 2 });
+    expect(typeof body.pagination.total).toBe('number');
+    expect(typeof body.pagination.totalPages).toBe('number');
+    // total counts every match, not just the returned page
+    expect(body.pagination.total).toBeGreaterThanOrEqual(body.data.length);
+  });
+
+  it('filters by role', async () => {
+    const body = await listOk('?role=trade&pageSize=100');
+
+    expect(body.data.length).toBeGreaterThan(0);
+    expect(body.data.every((u: { role: string }) => u.role === 'trade')).toBe(
+      true
+    );
+    expect(idsOf(body)).toContain(TARGET_TRADE_ID);
+  });
+
+  it('filters by several roles at once (repeated param)', async () => {
+    const body = await listOk('?role=trade&role=super-admin&pageSize=100');
+
+    expect(
+      body.data.every((u: { role: string }) =>
+        ['trade', 'super-admin'].includes(u.role)
+      )
+    ).toBe(true);
+    expect(idsOf(body)).toEqual(
+      expect.arrayContaining([TARGET_TRADE_ID, TARGET_SUPER_ADMIN_ID])
+    );
+  });
+
+  it('filters by status', async () => {
+    const body = await listOk('?status=suspended&pageSize=100');
+
+    expect(
+      body.data.every((u: { status: string }) => u.status === 'suspended')
+    ).toBe(true);
+    expect(idsOf(body)).toContain(FILTER_RANGE_END_ID);
+  });
+
+  it('searches name and email server-side', async () => {
+    const byEmail = await listOk('?search=filter-fixture-range-start');
+    expect(idsOf(byEmail)).toContain(FILTER_RANGE_START_ID);
+
+    const byName = await listOk('?search=Fixture%20Out%20Of%20Range');
+    expect(idsOf(byName)).toContain(FILTER_OUT_OF_RANGE_ID);
+    expect(idsOf(byName)).not.toContain(FILTER_RANGE_START_ID);
+  });
+
+  it('filters by joined date range, inclusive on both ends', async () => {
+    const body = await listOk(
+      `?joinedFrom=${FILTER_FROM}&joinedTo=${FILTER_TO}&pageSize=100`
+    );
+
+    const ids = idsOf(body);
+    // Both fixtures sit exactly on a bound — inclusive means both are returned
+    expect(ids).toEqual(
+      expect.arrayContaining([FILTER_RANGE_START_ID, FILTER_RANGE_END_ID])
+    );
+    expect(ids).not.toContain(FILTER_OUT_OF_RANGE_ID);
+
+    for (const u of body.data as Array<{ createdAt: string }>) {
+      expect(new Date(u.createdAt).getTime()).toBeGreaterThanOrEqual(
+        new Date(`${FILTER_FROM}T00:00:00.000Z`).getTime()
+      );
+      expect(new Date(u.createdAt).getTime()).toBeLessThanOrEqual(
+        new Date(`${FILTER_TO}T23:59:59.999Z`).getTime()
+      );
+    }
+  });
+
+  it('accepts an open-ended joined range (from only)', async () => {
+    const body = await listOk(`?joinedFrom=${FILTER_FROM}&pageSize=100`);
+
+    expect(idsOf(body)).toEqual(
+      expect.arrayContaining([FILTER_RANGE_START_ID, FILTER_OUT_OF_RANGE_ID])
+    );
+  });
+
+  it('rejects an inverted date range with 400', async () => {
+    const res = await listAs('?joinedFrom=2029-04-01&joinedTo=2029-03-01');
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects unknown filter values with 400', async () => {
+    expect((await listAs('?role=wizard')).status).toBe(400);
+    expect((await listAs('?status=nonsense')).status).toBe(400);
+    expect((await listAs('?joinedFrom=01-03-2029')).status).toBe(400);
+    expect((await listAs('?pageSize=500')).status).toBe(400);
+  });
+
+  it('sorts by the requested column and direction', async () => {
+    const range = `joinedFrom=${FILTER_FROM}&joinedTo=${FILTER_TO}&pageSize=100`;
+
+    const asc = await listOk(`?${range}&sortBy=createdAt&sortOrder=asc`);
+    expect(idsOf(asc)).toEqual([FILTER_RANGE_START_ID, FILTER_RANGE_END_ID]);
+
+    const desc = await listOk(`?${range}&sortBy=createdAt&sortOrder=desc`);
+    expect(idsOf(desc)).toEqual([FILTER_RANGE_END_ID, FILTER_RANGE_START_ID]);
+  });
+
+  it('combines filters conjunctively', async () => {
+    const body = await listOk(
+      `?joinedFrom=${FILTER_FROM}&joinedTo=${FILTER_TO}&status=active&pageSize=100`
+    );
+
+    expect(idsOf(body)).toEqual([FILTER_RANGE_START_ID]);
+    expect(body.pagination.total).toBe(1);
   });
 });
 

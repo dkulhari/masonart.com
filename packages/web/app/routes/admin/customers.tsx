@@ -1,26 +1,31 @@
 /**
  * Admin Customers Page - chobii.art E-commerce Platform
  *
- * User list with role assignment:
- * - Lists all users (name, email, role, status, joined date)
- * - Role dropdown per row to toggle customer <-> content-manager
+ * User list with per-field filtering and role assignment:
+ * - Filters (search, role, status, joined date range) live in URL search
+ *   params and are evaluated server-side, so the list is shareable,
+ *   back-button safe and does not depend on loading the whole user table.
+ * - Role dropdown per row to toggle customer <-> content-manager <-> admin
  * - Admin/super-admin rows show their role as static text (immutable here;
  *   the API also refuses to modify them)
  *
  * This page is admin-only: it sits outside the content-manager allowed
  * prefixes, so the /admin layout guard blocks content-managers.
  *
- * Following patterns from routes/admin/reviews.tsx
+ * Following the search-param pattern from routes/admin/products/index.tsx
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { z } from 'zod'
 import {
   RefreshCw,
   AlertCircle,
   Users,
   Search,
   CheckCircle2,
+  X,
+  ArrowUpDown,
 } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
 
@@ -28,7 +33,61 @@ import { cn, getApiUrl } from '~/lib/utils'
 // Route Configuration
 // ============================================================================
 
+/**
+ * Every role a user row can carry. Wider than ASSIGNABLE_ROLES on purpose:
+ * `trade` and `super-admin` are not assignable from this page, but such users
+ * exist and have to be findable.
+ */
+const FILTERABLE_ROLES = [
+  'customer',
+  'trade',
+  'content-manager',
+  'admin',
+  'super-admin',
+] as const
+
+const FILTERABLE_STATUSES = [
+  'active',
+  'inactive',
+  'suspended',
+  'pending-verification',
+] as const
+
+const SORTABLE_COLUMNS = ['createdAt', 'name', 'email', 'role'] as const
+
+const calendarDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+
+/**
+ * The app's router keeps every search param a string and stringifies with
+ * `String(value)` (see app/router.tsx), so an array round-trips as a
+ * comma-joined string — `?role=admin,trade`. Accept either shape.
+ */
+const roleListParam = z.preprocess(
+  (value) => {
+    if (value === undefined || value === '') return undefined
+    if (Array.isArray(value)) return value
+    if (typeof value === 'string') return value.split(',').filter(Boolean)
+    return value
+  },
+  z.array(z.enum(FILTERABLE_ROLES)).min(1).optional()
+)
+
+const searchParamsSchema = z.object({
+  page: z.coerce.number().positive().optional().default(1),
+  pageSize: z.coerce.number().positive().max(100).optional().default(20),
+  search: z.string().optional(),
+  role: roleListParam,
+  status: z.enum(FILTERABLE_STATUSES).optional(),
+  joinedFrom: calendarDay.optional(),
+  joinedTo: calendarDay.optional(),
+  sortBy: z.enum(SORTABLE_COLUMNS).optional().default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
+})
+
+type SearchParams = z.infer<typeof searchParamsSchema>
+
 export const Route = createFileRoute('/admin/customers')({
+  validateSearch: (search) => searchParamsSchema.parse(search),
   head: () => ({
     meta: [
       { title: 'Customers | Admin | chobii.art' },
@@ -51,26 +110,69 @@ interface AdminCustomer {
   createdAt: string
 }
 
+interface CustomersResponse {
+  data: AdminCustomer[]
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+    totalPages: number
+  }
+}
+
 /** Roles assignable from this page (API enforces the same cap) */
 const ASSIGNABLE_ROLES = ['customer', 'content-manager', 'admin'] as const
+
+const ROLE_LABELS: Record<string, string> = {
+  customer: 'Customer',
+  trade: 'Trade',
+  'content-manager': 'Content Manager',
+  admin: 'Admin',
+  'super-admin': 'Super Admin',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  active: 'Active',
+  inactive: 'Inactive',
+  suspended: 'Suspended',
+  'pending-verification': 'Pending Verification',
+}
 
 // ============================================================================
 // API Functions
 // ============================================================================
 
-async function fetchCustomers(): Promise<AdminCustomer[]> {
-  const response = await fetch(`${getApiUrl()}/api/admin/customers`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-  })
+async function fetchCustomers(
+  params: SearchParams
+): Promise<CustomersResponse> {
+  const query = new URLSearchParams()
+
+  query.set('page', String(params.page))
+  query.set('pageSize', String(params.pageSize))
+  query.set('sortBy', params.sortBy)
+  query.set('sortOrder', params.sortOrder)
+
+  if (params.search) query.set('search', params.search)
+  if (params.status) query.set('status', params.status)
+  if (params.joinedFrom) query.set('joinedFrom', params.joinedFrom)
+  if (params.joinedTo) query.set('joinedTo', params.joinedTo)
+  // Repeated `role=` params — the API reads roles as a list
+  for (const role of params.role ?? []) query.append('role', role)
+
+  const response = await fetch(
+    `${getApiUrl()}/api/admin/customers?${query.toString()}`,
+    {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    }
+  )
 
   if (!response.ok) {
     throw new Error('Failed to fetch customers')
   }
 
-  const data = await response.json()
-  return data.customers
+  return response.json()
 }
 
 async function updateCustomerRole(id: string, role: string): Promise<void> {
@@ -116,15 +218,38 @@ function roleBadgeClasses(role: string): string {
   }
 }
 
+/** True when anything narrows the list beyond the default view */
+function hasActiveFilters(params: SearchParams): boolean {
+  return Boolean(
+    params.search ||
+      params.status ||
+      params.joinedFrom ||
+      params.joinedTo ||
+      (params.role && params.role.length > 0)
+  )
+}
+
+const inputClasses =
+  'h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500'
+
 // ============================================================================
 // Component
 // ============================================================================
 
 function AdminCustomersPage() {
+  const navigate = useNavigate()
+  const searchParams = Route.useSearch()
+
   const [customers, setCustomers] = useState<AdminCustomer[]>([])
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 0,
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState(searchParams.search ?? '')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error'
@@ -135,13 +260,15 @@ function AdminCustomersPage() {
     setIsLoading(true)
     setError(null)
     try {
-      setCustomers(await fetchCustomers())
+      const body = await fetchCustomers(searchParams)
+      setCustomers(body.data)
+      setPagination(body.pagination)
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [searchParams])
 
   useEffect(() => {
     void loadCustomers()
@@ -153,6 +280,61 @@ function AdminCustomersPage() {
     const timer = setTimeout(() => setFeedback(null), 4000)
     return () => clearTimeout(timer)
   }, [feedback])
+
+  // Update URL params — any filter change resets to the first page
+  const updateSearch = useCallback(
+    (updates: Partial<SearchParams>) => {
+      navigate({
+        to: '/admin/customers',
+        search: { ...searchParams, ...updates, page: updates.page ?? 1 },
+      })
+    },
+    [navigate, searchParams]
+  )
+
+  // Keep the input in sync when the URL changes underneath us (back button)
+  useEffect(() => {
+    setSearchInput(searchParams.search ?? '')
+  }, [searchParams.search])
+
+  // Debounce typing into a search-param update
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const next = searchInput.trim()
+      if (next === (searchParams.search ?? '')) return
+      updateSearch({ search: next || undefined })
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchInput, searchParams.search, updateSearch])
+
+  const toggleRole = (role: (typeof FILTERABLE_ROLES)[number]) => {
+    const current = searchParams.role ?? []
+    const next = current.includes(role)
+      ? current.filter((r) => r !== role)
+      : [...current, role]
+    updateSearch({ role: next.length > 0 ? next : undefined })
+  }
+
+  const toggleSort = (column: (typeof SORTABLE_COLUMNS)[number]) => {
+    const sortOrder =
+      searchParams.sortBy === column && searchParams.sortOrder === 'asc'
+        ? 'desc'
+        : 'asc'
+    updateSearch({ sortBy: column, sortOrder })
+  }
+
+  const clearAllFilters = () => {
+    setSearchInput('')
+    navigate({
+      to: '/admin/customers',
+      search: {
+        page: 1,
+        pageSize: searchParams.pageSize,
+        sortBy: searchParams.sortBy,
+        sortOrder: searchParams.sortOrder,
+      },
+    })
+  }
 
   const handleRoleChange = async (customer: AdminCustomer, role: string) => {
     if (role === customer.role) return
@@ -168,7 +350,7 @@ function AdminCustomersPage() {
       await updateCustomerRole(customer.id, role)
       setFeedback({
         type: 'success',
-        message: `${customer.name || customer.email} is now ${role === 'content-manager' ? 'a content manager' : 'a customer'}`,
+        message: `${customer.name || customer.email} is now ${ROLE_LABELS[role] ?? role}`,
       })
     } catch (err) {
       // Roll back on failure
@@ -183,13 +365,33 @@ function AdminCustomersPage() {
     }
   }
 
-  const filteredCustomers = customers.filter((c) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q)
+  const filtersActive = hasActiveFilters(searchParams)
+
+  const sortIndicator = (column: (typeof SORTABLE_COLUMNS)[number]) =>
+    searchParams.sortBy === column ? (
+      <span aria-hidden="true">
+        {searchParams.sortOrder === 'asc' ? '▲' : '▼'}
+      </span>
+    ) : (
+      <ArrowUpDown className="h-3 w-3 opacity-40" aria-hidden="true" />
     )
-  })
+
+  const sortableHeader = (
+    column: (typeof SORTABLE_COLUMNS)[number],
+    label: string
+  ) => (
+    <th className="px-4 py-3 font-medium">
+      <button
+        type="button"
+        onClick={() => toggleSort(column)}
+        className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-foreground"
+        aria-label={`Sort by ${label}`}
+      >
+        {label}
+        {sortIndicator(column)}
+      </button>
+    </th>
+  )
 
   return (
     <div className="space-y-6">
@@ -234,16 +436,142 @@ function AdminCustomersPage() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or email..."
-          className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
+      {/* Filter bar */}
+      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Search */}
+          <div className="relative sm:col-span-2 lg:col-span-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search by name or email..."
+              aria-label="Search by name or email"
+              className={cn(inputClasses, 'w-full pl-9')}
+            />
+          </div>
+
+          {/* Status */}
+          <div>
+            <label
+              htmlFor="status-filter"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              Status
+            </label>
+            <select
+              id="status-filter"
+              value={searchParams.status ?? ''}
+              onChange={(e) =>
+                updateSearch({
+                  status: (e.target.value ||
+                    undefined) as SearchParams['status'],
+                })
+              }
+              className={cn(inputClasses, 'w-full')}
+            >
+              <option value="">All statuses</option>
+              {FILTERABLE_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Joined from */}
+          <div>
+            <label
+              htmlFor="joined-from"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              Joined from
+            </label>
+            <input
+              id="joined-from"
+              type="date"
+              value={searchParams.joinedFrom ?? ''}
+              max={searchParams.joinedTo}
+              onChange={(e) =>
+                updateSearch({ joinedFrom: e.target.value || undefined })
+              }
+              className={cn(inputClasses, 'w-full')}
+            />
+          </div>
+
+          {/* Joined to */}
+          <div>
+            <label
+              htmlFor="joined-to"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              Joined to
+            </label>
+            <input
+              id="joined-to"
+              type="date"
+              value={searchParams.joinedTo ?? ''}
+              min={searchParams.joinedFrom}
+              onChange={(e) =>
+                updateSearch({ joinedTo: e.target.value || undefined })
+              }
+              className={cn(inputClasses, 'w-full')}
+            />
+          </div>
+        </div>
+
+        {/* Role multi-select */}
+        <fieldset>
+          <legend className="mb-2 text-xs font-medium text-muted-foreground">
+            Role
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {FILTERABLE_ROLES.map((role) => {
+              const checked = (searchParams.role ?? []).includes(role)
+              return (
+                <label
+                  key={role}
+                  className={cn(
+                    'inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                    checked
+                      ? 'border-brand-500 bg-brand-500/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleRole(role)}
+                    className="h-3.5 w-3.5 rounded border-border accent-brand-500"
+                  />
+                  {ROLE_LABELS[role]}
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
+
+        {/* Result count + clear all */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+          <p className="text-sm text-muted-foreground">
+            {isLoading
+              ? 'Loading…'
+              : `${pagination.total} ${pagination.total === 1 ? 'user' : 'users'}${
+                  filtersActive ? ' match these filters' : ' total'
+                }`}
+          </p>
+          {filtersActive && (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error state */}
@@ -259,11 +587,11 @@ function AdminCustomersPage() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-border bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Email</th>
-              <th className="px-4 py-3 font-medium">Role</th>
+              {sortableHeader('name', 'Name')}
+              {sortableHeader('email', 'Email')}
+              {sortableHeader('role', 'Role')}
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Joined</th>
+              {sortableHeader('createdAt', 'Joined')}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -276,7 +604,7 @@ function AdminCustomersPage() {
                   Loading customers...
                 </td>
               </tr>
-            ) : filteredCustomers.length === 0 ? (
+            ) : customers.length === 0 ? (
               <tr>
                 <td
                   colSpan={5}
@@ -286,7 +614,7 @@ function AdminCustomersPage() {
                 </td>
               </tr>
             ) : (
-              filteredCustomers.map((customer) => {
+              customers.map((customer) => {
                 // customer/content-manager/admin are assignable. Super-admin
                 // is immutable, your own row is locked (API enforces both),
                 // and trade users are managed via the trade workflow.
@@ -351,6 +679,33 @@ function AdminCustomersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {!isLoading && pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            Page {pagination.page} of {pagination.totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => updateSearch({ page: pagination.page - 1 })}
+              disabled={pagination.page <= 1}
+              className="flex h-9 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => updateSearch({ page: pagination.page + 1 })}
+              disabled={pagination.page >= pagination.totalPages}
+              className="flex h-9 items-center justify-center rounded-lg border border-border bg-background px-4 text-sm text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
