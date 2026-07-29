@@ -9,6 +9,7 @@
 
 import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
 import path from 'node:path'
+import { shouldRejectNonHtmlRequest } from '~/lib/html-accept'
 
 declare const Bun: { file(path: string): { exists(): Promise<boolean> } } | undefined
 
@@ -35,22 +36,14 @@ export default createServerEntry({
       }
     }
 
-    // #268: TanStack Start's router handler rejects Accept headers lacking
-    // text/html or */* with a JSON **500** (start-server-core
-    // createStartHandler). Mirror its exact predicate and answer 406 —
-    // strictly better for the only requests that would have 500'd, and
-    // untouched flows (browsers, server functions) never match it.
-    if (request.method === 'GET' || request.method === 'HEAD') {
-      const acceptParts = (request.headers.get('Accept') || '*/*').split(',')
-      const htmlSupported = ['*/*', 'text/html'].some((mimeType) =>
-        acceptParts.some((part) => part.trim().startsWith(mimeType)),
-      )
-      if (!htmlSupported) {
-        return new Response('Not Acceptable: this server serves text/html', {
-          status: 406,
-          headers: { 'Content-Type': 'text/plain' },
-        })
-      }
+    // #268: answer 406 for page requests that can't take HTML, which the
+    // router branch would otherwise 500 on. Server-fn RPCs are exempt —
+    // see app/lib/html-accept.ts.
+    if (shouldRejectNonHtmlRequest(request)) {
+      return new Response('Not Acceptable: this server serves text/html', {
+        status: 406,
+        headers: { 'Content-Type': 'text/plain' },
+      })
     }
 
     return handler.fetch(request)
