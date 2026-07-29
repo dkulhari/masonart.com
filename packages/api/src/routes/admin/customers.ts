@@ -174,7 +174,7 @@ adminCustomersApp.get(
     // Tie-break on id so pagination stays stable across pages
     const orderBy = [direction(SORT_COLUMNS[sortBy]), asc(users.id)];
 
-    const [[{ total }], data] = await Promise.all([
+    const [countRows, data] = await Promise.all([
       db.select({ total: count() }).from(users).where(where),
       db
         .select({
@@ -191,6 +191,10 @@ adminCustomersApp.get(
         .limit(pageSize)
         .offset((page - 1) * pageSize),
     ]);
+
+    // count() always returns exactly one row; the ?? 0 satisfies
+    // noUncheckedIndexedAccess without pretending the row can be missing
+    const total = countRows[0]?.total ?? 0;
 
     return c.json({
       data,
