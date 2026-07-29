@@ -105,7 +105,12 @@ export const Route = createFileRoute('/admin')({
 // ============================================================================
 
 function AdminLayout() {
-  const { user, isUnauthorized } = Route.useRouteContext()
+  const context = Route.useRouteContext()
+  const { isUnauthorized } = context
+  // Better Auth's inferred session user has no `role`; the field is added by
+  // the additionalFields config, so narrow to the local shape once here
+  // instead of reaching for `user.role` untyped at each use site.
+  const user = context.user as User | undefined
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   // Unauthorized state (non-admin user)
@@ -133,7 +138,7 @@ function AdminLayout() {
       />
 
       {/* Mobile Header */}
-      <MobileAdminHeader />
+      <MobileAdminHeader role={user?.role} />
 
       {/* Main Content Area */}
       <main

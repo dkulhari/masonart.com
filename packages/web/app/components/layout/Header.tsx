@@ -2,8 +2,11 @@ import { Link, useRouteContext } from '@tanstack/react-router'
 import { LayoutDashboard, Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useCartItemCount, useCartHydration } from '~/stores/cart'
-
-const STAFF_ROLES = ['content-manager', 'admin', 'super-admin']
+import {
+  ADMIN_PRODUCTS_SEARCH,
+  staffAreaHref,
+  staffAreaLabel,
+} from '~/lib/admin-nav'
 
 /**
  * Header component for the chobii.art e-commerce platform.
@@ -15,11 +18,15 @@ export function Header() {
   const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
 
-  // Session comes from the root route's beforeLoad; staff get an Admin link
+  // Session comes from the root route's beforeLoad; staff get an entry into
+  // the staff area, labelled for what their role can actually reach (#362).
   const { session } = useRouteContext({ from: '__root__' }) as {
     session?: { user?: { role?: string } } | null
   }
-  const isStaff = STAFF_ROLES.includes(session?.user?.role ?? '')
+  const staffLabel = staffAreaLabel(session?.user?.role)
+  const staffHref = staffAreaHref(session?.user?.role)
+  const staffSearch =
+    staffHref === '/admin/products' ? ADMIN_PRODUCTS_SEARCH : undefined
 
   // Only show cart count after hydration to avoid SSR mismatch
   const displayCartCount = isHydrated ? cartItemCount : 0
@@ -87,13 +94,14 @@ export function Header() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex md:items-center md:space-x-4">
-            {isStaff && (
+            {staffLabel && staffHref && (
               <Link
-                to="/admin"
+                to={staffHref}
+                search={staffSearch}
                 className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <LayoutDashboard className="h-4 w-4" />
-                Admin
+                {staffLabel}
               </Link>
             )}
             <Link
@@ -197,10 +205,14 @@ export function Header() {
                 About
               </MobileNavLink>
               <div className="my-2 border-t border-border" />
-              {isStaff && (
-                <MobileNavLink to="/admin" onClick={closeMobileMenu}>
+              {staffLabel && staffHref && (
+                <MobileNavLink
+                  to={staffHref}
+                  search={staffSearch}
+                  onClick={closeMobileMenu}
+                >
                   <LayoutDashboard className="mr-2 inline h-4 w-4" />
-                  Admin Panel
+                  {staffLabel}
                 </MobileNavLink>
               )}
                 <MobileNavLink to="/account" onClick={closeMobileMenu}>
@@ -246,16 +258,19 @@ function NavLink({
  */
 function MobileNavLink({
   to,
+  search,
   children,
   onClick,
 }: {
   to: string
+  search?: Record<string, unknown>
   children: React.ReactNode
   onClick?: () => void
 }) {
   return (
     <Link
       to={to}
+      search={search}
       onClick={onClick}
       className="flex items-center px-2 py-2 text-base font-medium text-muted-foreground transition-colors hover:text-foreground"
       activeProps={{

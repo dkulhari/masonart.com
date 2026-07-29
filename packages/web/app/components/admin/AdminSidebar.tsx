@@ -27,10 +27,11 @@ import {
   MessageSquare,
   RotateCcw,
   ShieldCheck,
+  Store,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
-import { isAdminNavItemVisible } from '~/lib/admin-nav'
+import { isAdminNavItemVisible, staffAreaLabel } from '~/lib/admin-nav'
 
 // ============================================================================
 // Types
@@ -335,6 +336,22 @@ export function AdminSidebar({
             </div>
           )}
 
+          {/* Back to the customer site — the only way out of /admin on
+              desktop, so it has to keep an accessible name once the sidebar
+              collapses to icons (#362). */}
+          <a
+            href="/"
+            aria-label="View Store"
+            title={isCollapsed ? 'View Store' : undefined}
+            className={cn(
+              'mt-3 flex w-full items-center gap-3 rounded-lg p-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+              isCollapsed ? 'justify-center' : ''
+            )}
+          >
+            <Store className="h-5 w-5 flex-shrink-0" />
+            {!isCollapsed && <span>View Store</span>}
+          </a>
+
           {/* Sign Out Button */}
           <button
             type="button"
@@ -401,13 +418,19 @@ function NavLink({ item, isActive, isCollapsed, onClick }: NavLinkProps) {
 // Mobile Admin Header Component (for use in layout)
 // ============================================================================
 
-export function MobileAdminHeader() {
+export function MobileAdminHeader({ role }: { role?: string }) {
+  // Same label the customer header uses to get here, so the destination
+  // matches the door (#362).
+  const title = staffAreaLabel(role) ?? 'Admin Panel'
+
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 pl-16 md:hidden">
-      <span className="text-lg font-bold text-foreground">Admin Panel</span>
+      <span className="text-lg font-bold text-foreground">{title}</span>
+      {/* The only way out of /admin on a phone — the bare text link was a
+          20px-tall tap target, well under the 44px minimum (#362). */}
       <a
         href="/"
-        className="text-sm text-muted-foreground hover:text-foreground"
+        className="-mr-2 inline-flex min-h-11 items-center rounded-lg px-2 text-sm text-muted-foreground hover:text-foreground"
       >
         View Store
       </a>

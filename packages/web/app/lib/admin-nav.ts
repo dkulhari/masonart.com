@@ -27,6 +27,56 @@ export function isContentManagerPathAllowed(pathname: string): boolean {
 }
 
 /**
+ * Default search params for /admin/products.
+ *
+ * The route declares these as zod defaults in validateSearch, but links from
+ * outside the route have to spell them out so the URL we push already
+ * satisfies the schema.
+ */
+export const ADMIN_PRODUCTS_SEARCH = {
+  page: 1,
+  pageSize: 20,
+  sortBy: 'createdAt',
+  sortOrder: 'desc',
+} as const
+
+/**
+ * Label for the staff area entry point, by role. null = not staff, show nothing.
+ *
+ * Content managers only get the catalog sections, so calling their entry
+ * "Admin" reads as somewhere they aren't allowed — which is why it went
+ * unnoticed (#362).
+ */
+export function staffAreaLabel(role: string | undefined): string | null {
+  switch (role?.toLowerCase()) {
+    case 'content-manager':
+      return 'Manage Content'
+    case 'admin':
+    case 'super-admin':
+      return 'Manage Store'
+    default:
+      return null
+  }
+}
+
+/**
+ * Where the staff area entry point should land, by role. null = not staff.
+ */
+export function staffAreaHref(role: string | undefined): string | null {
+  switch (role?.toLowerCase()) {
+    // Content managers have no dashboard — /admin only bounces them here
+    // (see the beforeLoad redirect in routes/admin.tsx).
+    case 'content-manager':
+      return '/admin/products'
+    case 'admin':
+    case 'super-admin':
+      return '/admin'
+    default:
+      return null
+  }
+}
+
+/**
  * Whether a nav item with the given href should be visible for the role
  */
 export function isAdminNavItemVisible(
