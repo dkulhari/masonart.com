@@ -1,0 +1,87 @@
+ticket_number: 328
+title: Frontend - Admin customers page with role dropdown
+description: |-
+  ## Task
+  Create the `/admin/customers` page (sidebar already links to it, but the route file does not exist): a user list table with a role dropdown per row allowing admins to toggle `customer` <-> `content-manager`.
+
+  ## Context
+  Part of feature: content-manager-role
+  Phase: Frontend
+
+  - Data: `GET /api/admin/customers`; mutation: `PUT /api/admin/customers/:id/role` (both created in the backend phase)
+  - Follow the structure of an existing admin list page (e.g. `packages/web/app/routes/admin/orders/` or `reviews.tsx`) for loader/fetch patterns and table styling; use shadcn/ui Select for the dropdown
+  - Rows whose role is `admin`/`super-admin` render the role as static text (no dropdown) — the API refuses to modify them anyway
+  - This page is admin-only: it's outside the content-manager allowed prefixes, so the layout guard from the earlier ticket already blocks content-managers
+  - Show a toast/inline feedback on success or failure of role change
+feature: content-manager-role
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T11:50:47.707Z"
+last_updated: "2026-07-23T12:10:28.768Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T12:08:56.949Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-23T12:10:28.768Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T12:11:21.667Z"
+    text: |-
+      ✅ Implemented in commit 11e2c5d1. /admin/customers page: user table (name, email, role, status, joined) with search, refresh, role dropdown (native select, matching admin page conventions — no shadcn Select in this repo) restricted to customer <-> content-manager. Admin/super-admin AND trade rows render static badges — trade left untouched so their access isn't silently wiped. Optimistic update with rollback + feedback banner. Route tree regenerated. Typecheck clean.
+
+      Follow-up commit a6beb0fc applied backend phase review findings (all MINOR, no critical/important): contentManagerRole entry in Better Auth roles map, content-manager in update-user-role.ts CLI, checkout userRoleSchema widened. 157 affected API tests green.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 325
+    feature: content-manager-role
+    description: Backend API - Admin customers list + role-assignment endpoints
+  - ticket: 326
+    feature: content-manager-role
+    description: Frontend - Role-aware admin layout with content-manager section guards
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: "Create the customers page route: fetch customer list, render table (name, email, role, joined), role Select on customer/content-manager rows calling the PUT endpoint, optimistic update + error feedback. Follow existing admin list page patterns for the API client and table components."
+    file: packages/web/app/routes/admin/customers.tsx
+    status: pending
+    code: |-
+      // createFileRoute('/admin/customers') following existing admin pages
+      // loader/query: GET /api/admin/customers -> { customers }
+      // per-row (role !== 'admin' && role !== 'super-admin'):
+      // <Select value={row.role} onValueChange={(role) => updateRole(row.id, role)}>
+      //   <SelectItem value="customer">Customer</SelectItem>
+      //   <SelectItem value="content-manager">Content Manager</SelectItem>
+      // </Select>
+      // updateRole: PUT /api/admin/customers/:id/role { role } -> refresh list, toast on error
+  - id: 2
+    action: verify-pass
+    description: Typecheck and build pass
+    command: bun run typecheck && bun run build
+    expected_result: PASS
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: "Manual smoke: page renders user list as admin in dev, role change persists after reload"
+    command: bun run dev
+    expected_result: Role dropdown updates role; value persists on reload
+    status: pending
+  - id: 4
+    action: commit
+    description: "Commit changes (replace #TICKET with this ticket's number)"
+    command: "git add -A && git commit -m \"feat(web): admin customers page with role assignment (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-23T12:08:56.948Z"
+completed: "2026-07-23T12:10:28.768Z"

@@ -1,0 +1,78 @@
+ticket_number: 287
+title: ProductCard - Add uniformAspectRatio prop
+description: |-
+  ## Task
+  Add an optional `uniformAspectRatio` prop to the shared ProductCard component that overrides the orientation-based aspect ratio. This enables grid views to force consistent card heights.
+
+  ## Context
+  Part of feature: hero-grid-alignment
+  Phase: 1 - ProductCard Enhancement
+
+  ## Implementation Steps
+
+  - [ ] **Step 1 [implement]**: Add uniformAspectRatio prop to ProductCardProps interface
+    - File: `packages/web/app/components/product/ProductCard.tsx`
+    - Add to ProductCardProps:
+    ```tsx
+    /** Override aspect ratio for uniform grid alignment (e.g. 'aspect-[3/4]') */
+    uniformAspectRatio?: string
+    ```
+    - Destructure in component function:
+    ```tsx
+    export function ProductCard({
+      product,
+      showFeaturedBadge = true,
+      showAiBadge = true,
+      className,
+      size = 'md',
+      uniformAspectRatio,
+    }: ProductCardProps) {
+    ```
+
+  - [ ] **Step 2 [implement]**: Use uniformAspectRatio when provided, fall back to orientation-based ratio
+    - File: `packages/web/app/components/product/ProductCard.tsx`
+    - Change the aspectRatioClass line from:
+    ```tsx
+    const aspectRatioClass =
+      ASPECT_RATIO_MAP[product.orientation] || ASPECT_RATIO_MAP.portrait
+    ```
+    - To:
+    ```tsx
+    const aspectRatioClass =
+      uniformAspectRatio || ASPECT_RATIO_MAP[product.orientation] || ASPECT_RATIO_MAP.portrait
+    ```
+
+  - [ ] **Step 3 [verify-pass]**: Run typecheck to confirm no type errors
+    - Run: `cd packages/web && bunx tsc --noEmit --pretty 2>&1 | head -30`
+    - Expected: No errors related to ProductCard
+
+  - [ ] **Step 4 [commit]**: Commit changes
+    - Run: `git add packages/web/app/components/product/ProductCard.tsx && git commit -m "feat(ui): add uniformAspectRatio prop to ProductCard (#287)"`
+feature: hero-grid-alignment
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-19T09:35:00.000Z'
+last_updated: '2026-07-27T15:13:50.748Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria:
+  - ProductCard accepts optional uniformAspectRatio prop
+  - When set, uniformAspectRatio overrides orientation-based ratio
+  - When not set, behavior is identical to before (backwards-compatible)
+comments:
+  - author: system
+    timestamp: '2026-07-27T15:13:50.762Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks:
+  - 288
+  - 289
+attachments: []
+completed: '2026-07-27T15:13:50.748Z'

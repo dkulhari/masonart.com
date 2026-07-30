@@ -1,0 +1,46 @@
+ticket_number: 250
+title: Gallery API (/api/ai/gallery) and Featured Products API (/api/products/featured) both hang/timeout
+description: |-
+  ## Bug
+  Two more API endpoints exhibit the same hanging behavior as /api/products:
+  - `GET /api/ai/gallery` - times out (HTTP 000 after 5s)
+  - `GET /api/products/featured` - times out (HTTP 000 after 5s)
+
+  These are likely related to the same root cause as #238.
+
+  ## Impact
+  - Gallery page shows "0 artworks" / "No artworks yet"
+  - Home page featured products section shows "Coming Soon" placeholder
+  - Multiple pages have missing content due to backend timeouts
+
+  ## Working endpoints for comparison
+  - `/api/ai/styles` returns 401 (fast, correct)
+  - `/api/auth/get-session` returns null (fast, correct)
+  - `/health` returns 200 (fast, correct)
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T21:00:22.386Z"
+last_updated: "2026-07-27T13:43:19.274Z"
+time_spent_minutes: 0
+labels:
+  - api
+  - P0
+  - timeout
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T13:43:19.279Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T13:43:37.552Z"
+    text: "✅ Closed as no-longer-reproducible (2026-07-27): GET /api/ai/gallery → 200 in 0.28s, GET /api/products/featured → 200 in 0.02s on local dev. Same Feb-era DB-hang class as #238 (closed with same evidence). Note: #251 and #252 are duplicate filings of this same report."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T13:43:19.274Z"

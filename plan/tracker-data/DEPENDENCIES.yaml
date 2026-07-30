@@ -1,6 +1,214 @@
 dependencies:
-  last_updated: '2026-02-17T22:59:07.458Z'
+  last_updated: '2026-07-29T06:23:17.873Z'
   features:
+    chobi-external-services:
+      - ticket_number: 315
+        title: AI Provider - Confirm generation key (Replicate placeholder vs Google AI Studio)
+        blocks: []
+        blocked_by:
+          - ticket_number: 312
+            title: R2 - Provision chobi bucket, credentials and chobi-cdn CDN route
+    content-manager-role:
+      - ticket_number: 323
+        title: Backend API - requireContentManager middleware and isContentManager helper
+        blocks: []
+        blocked_by:
+          - ticket_number: 322
+            title: Types & Schema - Add content-manager to role enums and migration
+      - ticket_number: 324
+        title: Backend API - Re-gate admin product routes to requireContentManager
+        blocks: []
+        blocked_by:
+          - ticket_number: 323
+            title: Backend API - requireContentManager middleware and isContentManager helper
+      - ticket_number: 325
+        title: Backend API - Admin customers list + role-assignment endpoints
+        blocks: []
+        blocked_by:
+          - ticket_number: 322
+            title: Types & Schema - Add content-manager to role enums and migration
+      - ticket_number: 326
+        title: Frontend - Role-aware admin layout with content-manager section guards
+        blocks: []
+        blocked_by:
+          - ticket_number: 324
+            title: Backend API - Re-gate admin product routes to requireContentManager
+      - ticket_number: 327
+        title: Frontend - AdminSidebar role-based nav filtering
+        blocks: []
+        blocked_by:
+          - ticket_number: 326
+            title: Frontend - Role-aware admin layout with content-manager section guards
+      - ticket_number: 328
+        title: Frontend - Admin customers page with role dropdown
+        blocks: []
+        blocked_by:
+          - ticket_number: 325
+            title: Backend API - Admin customers list + role-assignment endpoints
+          - ticket_number: 326
+            title: Frontend - Role-aware admin layout with content-manager section guards
+      - ticket_number: 329
+        title: E2E - content-manager auth fixture and seeded test user
+        blocks: []
+        blocked_by:
+          - ticket_number: 322
+            title: Types & Schema - Add content-manager to role enums and migration
+      - ticket_number: 330
+        title: E2E - content-manager access matrix spec
+        blocks: []
+        blocked_by:
+          - ticket_number: 324
+            title: Backend API - Re-gate admin product routes to requireContentManager
+          - ticket_number: 326
+            title: Frontend - Role-aware admin layout with content-manager section guards
+          - ticket_number: 327
+            title: Frontend - AdminSidebar role-based nav filtering
+          - ticket_number: 329
+            title: E2E - content-manager auth fixture and seeded test user
+      - ticket_number: 331
+        title: Docs - Document content-manager role in ROLES-AND-CAPABILITIES
+        blocks: []
+        blocked_by:
+          - ticket_number: 330
+            title: E2E - content-manager access matrix spec
+    go-to-production:
+      - ticket_number: 274
+        title: Choose deployment target and add deployment configuration
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 277
+        title: Set up error alerting via Slack webhook or email
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 279
+        title: Create deployment documentation and operational runbook
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 278
+        title: Set up external uptime monitoring for production
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 283
+        title: Document and configure database backup procedures
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+    hero-grid-alignment:
+      - ticket_number: 287
+        title: ProductCard - Add uniformAspectRatio prop
+        blocks:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+        blocked_by: []
+      - ticket_number: 288
+        title: ProductGrid - Pass uniformAspectRatio to ProductCard
+        blocks:
+          - title: 'Ticket #undefined'
+        blocked_by:
+          - title: 'Ticket #undefined'
+      - ticket_number: 289
+        title: Hero Page - Replace inline ProductCard with shared component
+        blocks: []
+        blocked_by:
+          - title: 'Ticket #undefined'
+          - title: 'Ticket #undefined'
+    rebrand-chobi-art:
+      - ticket_number: 299
+        title: Web SEO - Root meta, OG tags, and JSON-LD use chobi.art brand constants
+        blocks: []
+        blocked_by:
+          - ticket_number: 298
+            title: Brand Constants - Create brand.ts with chobi.art identity in shared package
+      - ticket_number: 300
+        title: Web UI - Header/Footer wordmark and layout brand strings
+        blocks: []
+        blocked_by:
+          - ticket_number: 298
+            title: Brand Constants - Create brand.ts with chobi.art identity in shared package
+      - ticket_number: 301
+        title: Web Routes - Page titles and copy across all routes to chobi.art
+        blocks: []
+        blocked_by:
+          - ticket_number: 298
+            title: Brand Constants - Create brand.ts with chobi.art identity in shared package
+      - ticket_number: 302
+        title: Web Tests - Update remaining E2E specs and fixtures to chobi.art
+        blocks: []
+        blocked_by:
+          - ticket_number: 299
+            title: Web SEO - Root meta, OG tags, and JSON-LD use chobi.art brand constants
+          - ticket_number: 300
+            title: Web UI - Header/Footer wordmark and layout brand strings
+          - ticket_number: 301
+            title: Web Routes - Page titles and copy across all routes to chobi.art
+      - ticket_number: 303
+        title: API Email - Sender identity and email templates to chobi.art
+        blocks: []
+        blocked_by:
+          - ticket_number: 298
+            title: Brand Constants - Create brand.ts with chobi.art identity in shared package
+      - ticket_number: 304
+        title: API SMS - Notification SMS templates and phone placeholder domain to chobi.art
+        blocks: []
+        blocked_by:
+          - ticket_number: 298
+            title: Brand Constants - Create brand.ts with chobi.art identity in shared package
+      - ticket_number: 305
+        title: API Identifiers - Cookie prefix, service names, URL defaults, seeds, Sentry
+        blocks: []
+        blocked_by:
+          - ticket_number: 298
+            title: Brand Constants - Create brand.ts with chobi.art identity in shared package
+      - ticket_number: 306
+        title: Packages - Rename masonart/@masonart/* to chobi/@chobi/* repo-wide
+        blocks: []
+        blocked_by:
+          - ticket_number: 302
+            title: Web Tests - Update remaining E2E specs and fixtures to chobi.art
+          - ticket_number: 303
+            title: API Email - Sender identity and email templates to chobi.art
+          - ticket_number: 304
+            title: API SMS - Notification SMS templates and phone placeholder domain to chobi.art
+          - ticket_number: 305
+            title: API Identifiers - Cookie prefix, service names, URL defaults, seeds, Sentry
+      - ticket_number: 307
+        title: Infra - Docker compose (dev + prod) renamed to chobi
+        blocks: []
+        blocked_by:
+          - ticket_number: 306
+            title: Packages - Rename masonart/@masonart/* to chobi/@chobi/* repo-wide
+      - ticket_number: 308
+        title: Infra - deploy/Makefile, .env.example, remote compose renamed to chobi
+        blocks: []
+        blocked_by:
+          - ticket_number: 306
+            title: Packages - Rename masonart/@masonart/* to chobi/@chobi/* repo-wide
+      - ticket_number: 309
+        title: Docs - Rebrand CLAUDE.md, README, external services and deploy docs
+        blocks: []
+        blocked_by:
+          - ticket_number: 306
+            title: Packages - Rename masonart/@masonart/* to chobi/@chobi/* repo-wide
+      - ticket_number: 310
+        title: Deploy - Fresh chobi DB, staging live at chobi.xtoms.xyz, smoke test
+        blocks: []
+        blocked_by:
+          - ticket_number: 307
+            title: Infra - Docker compose (dev + prod) renamed to chobi
+          - ticket_number: 308
+            title: Infra - deploy/Makefile, .env.example, remote compose renamed to chobi
+      - ticket_number: 311
+        title: Verify - Repo-wide masonart sweep and full test suites
+        blocks: []
+        blocked_by:
+          - ticket_number: 309
+            title: Docs - Rebrand CLAUDE.md, README, external services and deploy docs
+          - ticket_number: 310
+            title: Deploy - Fresh chobi DB, staging live at chobi.xtoms.xyz, smoke test
     saved-addresses:
       - ticket_number: 227
         title: Create address CRUD API route
@@ -205,6 +413,45 @@ dependencies:
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
+    go-live:
+      - ticket_number: 293
+        title: 'Ops: owner console setup + mini bootstrap execution'
+        blocks: []
+        blocked_by:
+          - ticket_number: 287
+            title: ProductCard - Add uniformAspectRatio prop
+          - ticket_number: 288
+            title: ProductGrid - Pass uniformAspectRatio to ProductCard
+          - ticket_number: 289
+            title: Hero Page - Replace inline ProductCard with shared component
+          - ticket_number: 290
+            title: Hero Page - Add category images for Shop by Style section
+          - ticket_number: 291
+            title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+          - ticket_number: 292
+            title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+      - ticket_number: 294
+        title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
+        blocks: []
+        blocked_by:
+          - ticket_number: 287
+            title: ProductCard - Add uniformAspectRatio prop
+          - ticket_number: 288
+            title: ProductGrid - Pass uniformAspectRatio to ProductCard
+          - ticket_number: 289
+            title: Hero Page - Replace inline ProductCard with shared component
+          - ticket_number: 290
+            title: Hero Page - Add category images for Shop by Style section
+          - ticket_number: 291
+            title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+          - ticket_number: 292
+            title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+          - ticket_number: 293
+            title: 'Ops: owner console setup + mini bootstrap execution'
+          - ticket_number: 278
+            title: Set up external uptime monitoring for production
+          - ticket_number: 283
+            title: Document and configure database backup procedures
 metadata:
   format_version: 1
   description: Ticket dependency tracking with bidirectional relationships

@@ -1,0 +1,47 @@
+name: chobi-external-services
+title: Chobi External Services
+priority: high
+created: "2026-07-23T07:29:37.058Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  # chobi.art External Service Dependencies
+
+  ## Overview
+  Resolve the external-service gaps left after the chobi.art rebrand: placeholder credentials in deploy/.env that silently disable staging features (R2 storage, 2Factor SMS, AI provider), rebrand-deferred legacy resources (masonart-named R2 bucket/CDN, DLT SMS templates), and the bundle of registrations required for the future chobi.art production domain cutover.
+
+  ## Goals
+  - Staging at chobi.xtoms.xyz fully functional: uploads, AI generation, SMS/OTP
+  - No remaining legacy masonart-named external resources in active use
+  - Documented, ticketed gate for the chobi.art production cutover (Razorpay webhooks, Resend domain, Cloudflare zone)
+
+  ## Scope
+  **In scope:** R2 bucket + CDN migration to chobi names, 2Factor.in key + chobi DLT templates, BETTER_AUTH_SECRET rotation, AI provider key confirmation, production cutover checklist ticket.
+  **Out of scope:** UptimeRobot monitoring (already ticket #278 in go-to-production), purchasing the chobi.art domain itself, repo directory rename.
+
+  ## Context
+  Sourced from docs/EXTERNAL-SERVICES.md and claude-mem observations #4715/#4872/#4874/#4904. Key gotchas: Razorpay webhooks don't follow redirects (exact-hostname registration); unverified Resend domain = silent 500s on signup; DLT template names are registered IDs — renaming without re-registration breaks SMS; CDN_URL is baked into the web image at build time.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    "316": Production Cutover Gate - chobi.art domain external registrations
+  in_progress: {}
+  done:
+    "312": R2 - Provision chobi bucket, credentials and chobi-cdn CDN route
+    "313": 2Factor.in - API key + chobi.art DLT template registration
+    "314": Auth - Rotate BETTER_AUTH_SECRET on staging
+    "315": AI Provider - Confirm generation key (Replicate placeholder vs Google AI Studio)
+    "320": "Bug - Google OAuth redirect_uri_mismatch: chobii.xtoms.xyz callback not registered in Google Cloud Console"
+total_tickets: 6
+completion_percentage: 83
+is_completed: false

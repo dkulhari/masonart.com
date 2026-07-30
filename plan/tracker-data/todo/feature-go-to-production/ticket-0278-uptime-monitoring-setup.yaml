@@ -1,5 +1,5 @@
 ticket_number: 278
-title: "Set up external uptime monitoring for production"
+title: Set up external uptime monitoring for production
 description: |-
   ## Task
   Configure external uptime monitoring to detect outages before users report them.
@@ -24,8 +24,8 @@ priority: medium
 status: todo
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-02-18T08:30:00.000Z"
 time_spent_minutes: 0
 labels:
   - observability
@@ -35,7 +35,10 @@ acceptance_criteria:
   - External monitor checking /api/health every 60s
   - Alerts sent within 2 minutes of detected downtime
   - Uptime dashboard accessible
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: "2026-07-17T15:28:01.877Z"
+    text: "2026-07-17: /api/health endpoint exists and is the prod compose healthcheck path; Slack webhook env is wired (SLACK_WEBHOOK_URL, optional in the env contract). REMAINING (owner, console-only, after the site is reachable): create UptimeRobot monitors on https://masonart.com/api/health and https://masonart.com/ (5-min interval), alert contact = the #prod-alerts Slack webhook. No code changes needed."
 work_sessions: []
 related_tickets:
   - 270

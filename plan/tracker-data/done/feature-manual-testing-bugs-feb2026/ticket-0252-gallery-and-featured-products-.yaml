@@ -1,0 +1,30 @@
+ticket_number: 252
+title: Gallery and Featured Products APIs both timeout
+description: Two more API endpoints hang like the products API. The gallery API and featured products API both timeout after 5 seconds with HTTP 000. This causes the Gallery page to show 0 artworks and the home page to show Coming Soon placeholder. Related to ticket 238.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T21:01:43.210Z"
+last_updated: "2026-07-27T13:43:25.059Z"
+time_spent_minutes: 0
+labels:
+  - api
+  - P0
+  - timeout
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T13:43:25.061Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T13:43:42.263Z"
+    text: "✅ Closed — duplicate of #250 (identical report text), which was closed as no-longer-reproducible on 2026-07-27 with fresh 200-response evidence for both endpoints."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T13:43:25.059Z"

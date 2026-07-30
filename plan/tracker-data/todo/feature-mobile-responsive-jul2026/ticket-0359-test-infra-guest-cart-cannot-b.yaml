@@ -1,0 +1,78 @@
+ticket_number: 359
+title: 'TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests'
+description: |-
+  ## Problem
+
+  No Playwright test can currently reach the checkout form. `/checkout` short-circuits to "Your cart is empty" unless the cart has an item, and adding one from a fresh browser context does not stick: the guest cart depends on a session cookie that is not established across the origin split in local dev (web on its Vite port, API on :3000).
+
+  Observed while working #350: the add-to-cart click fires and the button is enabled, but the header badge never gains a count, so `#fullName` never renders and every downstream assertion times out.
+
+  ## Why this matters beyond one ticket
+
+  Checkout is the highest-value flow in the app and it currently has **no browser-level test coverage that can even load the form**. #350 and #355 were verified with a component test instead — correct for asserting markup attributes, but it cannot cover the things that actually need a browser: multi-step navigation, payment handoff, validation gating on the Continue button, or the saved-address path from #231.
+
+  This is a pre-existing gap that the mobile sweep exposed; it is not a regression from #350.
+
+  ## What to investigate
+
+  1. Whether the guest cart needs a cookie the cross-origin dev setup never sets (check `credentials: 'include'` + CORS `Access-Control-Allow-Credentials` and `SameSite` on the cart cookie)
+  2. Whether the API-side dev proxy that once existed should return — there is history here (a Vite proxy was added then removed; see `packages/web/CLAUDE.md` notes on cookie handling)
+  3. Whether a test fixture should seed the cart via a direct API call and inject the resulting cookie into the browser context, sidestepping the UI entirely — usually the most robust option
+
+  Option 3 is likely the fastest route to unblocking; options 1/2 matter if guest carts are also broken for real users in some deployment shapes, which is worth confirming either way.
+
+  ## Acceptance criteria
+
+  - A reusable fixture/helper puts an item in a guest cart from a fresh Playwright context
+  - A smoke test navigates to `/checkout` and sees the address form render
+  - The removed `tests/e2e/checkout-autofill.spec.ts` coverage can be reinstated at browser level if desired (the component test stays regardless — it is faster and asserts the right layer)
+feature: mobile-responsive-jul2026
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-28T15:37:49.241Z'
+last_updated: '2026-07-28T15:37:49.241Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+  - checkout
+  - infrastructure
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: 'Reproduce: fresh Playwright context, add to cart from a PDP, observe the header badge never updating. Capture the Set-Cookie / CORS headers on the cart request.'
+    command: SKIP_E2E_SERVER=true E2E_BASE_URL=http://localhost:4321 bunx playwright test --project=chromium --no-deps
+    status: pending
+  - id: 2
+    action: implement
+    description: Add a cart-seeding fixture that creates a guest cart via the API and injects the session cookie into the browser context
+    file: tests/e2e/fixtures/cart.ts
+    status: pending
+  - id: 3
+    action: write-test
+    description: Smoke test asserting /checkout renders the address form after seeding
+    file: tests/e2e/checkout-smoke.spec.ts
+    expected_result: PASS once the fixture works
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Smoke test green from a cold browser context
+    command: bunx playwright test tests/e2e/checkout-smoke.spec.ts --project=chromium --no-deps
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fixture and smoke test
+    command: 'git add tests/e2e/ && git commit -m "test(e2e): guest cart seeding fixture unblocks checkout browser tests"'
+    status: pending
+current_step: 1

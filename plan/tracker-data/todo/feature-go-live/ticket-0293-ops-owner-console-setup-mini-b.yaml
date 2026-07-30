@@ -1,0 +1,72 @@
+ticket_number: 293
+title: "Ops: owner console setup + mini bootstrap execution"
+description: |-
+  Phase: Ops. Execute the no-code setup from docs/GO-LIVE-PLAN.md §3–§4 and docs/EXTERNAL-SERVICES.md. Mostly owner console work + hands-on-mini steps.
+
+  Checklist:
+  - Cloudflare: masonart.com zone Active; tunnel 'masonart' created, token → deploy/.env; TWO Published-application routes with ANCHORED path regex ^/api/.* ordered before catch-all; www → apex bulk redirect; dashboard shows exactly ONE connector replica (linux_arm64).
+  - R2: bucket masonart-prod, versioning ON, scoped token, custom domain cdn.masonart.com; curl -sI a known object → 200.
+  - Resend: domain verified (SPF/DKIM in the CF zone), prod API key, EMAIL_FROM=noreply@masonart.com.
+  - 2Factor.in: prod key, DLT-approved sender ID + templates, balance check.
+  - Razorpay TEST: rzp_test keys; webhook https://masonart.com/api/webhooks/razorpay (payment.captured, payment.failed, refund.processed + order events); secret via openssl rand -hex 32.
+  - AI provider: Replicate/Google AI Studio key with billing limits set.
+  - Sentry prod DSNs (api+web); Slack #prod-alerts webhook.
+  - GHCR: two classic PATs; make login-remote on the mini; remove credsStore osxkeychain from mini's ~/.docker/config.json.
+  - Mini: static DHCP reservation; wired Ethernet confirmed (cc #100 — Wi-Fi ran at 88% loss); mkdir /backups; install nightly pg_dump cron (OPERATIONS §2, 02:45 slot); docker stats headroom check after first deploy.
+  - First boot: make build-push-deploy && make first-boot (migrate → seed → seed:admin), sign up, make admin-promote EMAIL=<owner>.
+
+  Acceptance: every checklist line executed and recorded on this ticket; stack Up (healthy) on the mini pulling from GHCR.
+  Lessons: cc #85, #88, #97 (anchored regex), #130 (autostart chain already installed host-wide).
+feature: go-live
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: "2026-07-16T14:22:12.970Z"
+last_updated: "2026-07-16T14:22:12.970Z"
+time_spent_minutes: 0
+labels:
+  - go-live
+  - phase-ops
+  - owner-action
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: "2026-07-17T15:06:42.763Z"
+    text: "AMENDED 2026-07-17 (platform edge stack): replace the Cloudflare checklist line with — masonart.com zone Active in the SAME Cloudflare account as the platform tunnel; on that tunnel add ONE Published-application hostname `masonart.com` → http://traefik:80 (named hostnames auto-create the proxied DNS record; NO path routes in Cloudflare — traefik labels do path splitting); www → apex bulk redirect; still exactly one connector replica. Do NOT create a masonart tunnel; no tunnel token in deploy/.env. Mini bootstrap adds: verify platform-traefik (≥ v3.7) + platform-tunnel are Up, and `make -C deploy platform-network` before first deploy. Panic switch = remove the masonart.com published hostname, never disable the shared tunnel. See updated docs/GO-LIVE-PLAN.md §3–§4."
+  - author: mcp-client
+    timestamp: "2026-07-17T19:26:53.856Z"
+    text: "CORRECTION 2026-07-18 (owner-confirmed): public URL is masonart.xtoms.xyz, NOT masonart.com. Checklist deltas: (a) Cloudflare ingress line is now a NO-OP — the *.xtoms.xyz wildcard hostname + proxied * CNAME already route the subdomain; do not create any tunnel, hostname, or DNS record; (b) R2 custom domain is masonart-cdn.xtoms.xyz; (c) Resend sending domain is xtoms.xyz (reuse customs-copilot's verification if present) with EMAIL_FROM=noreply@xtoms.xyz; (d) Razorpay webhook URL is https://masonart.xtoms.xyz/api/webhooks/razorpay — registered against this exact hostname, a later masonart.com cutover must re-register it; (e) panic switch = stop the masonart containers (no per-app Cloudflare route exists under the wildcard). Docs updated in commit d6a4/… (fix(go-live): public hostname is masonart.xtoms.xyz)."
+  - author: mcp-client
+    timestamp: "2026-07-17T19:27:00.518Z"
+    text: "(Correction to previous comment: the docs commit is a18570ae.)"
+  - author: mcp-client
+    timestamp: "2026-07-17T19:30:53.728Z"
+    text: "2026-07-18 framing (owner-confirmed): the masonart.xtoms.xyz deployment is the STAGING environment — Razorpay stays in test mode for its whole life, SENTRY_ENVIRONMENT=staging (compose default). When executing this checklist use rzp_test_ keys and a staging-labeled Sentry setup. The production deployment (masonart.com, rzp_live_, SENTRY_ENVIRONMENT=production, webhook re-registration) is a separate future project with its own checklist/gate — commit 0-ref: docs updated in 'docs(go-live): frame masonart.xtoms.xyz as the staging environment'."
+  - author: mcp-client
+    timestamp: "2026-07-17T21:04:23.571Z"
+    text: "2026-07-18 STAGING DEPLOYED AND LIVE at https://masonart.xtoms.xyz (images d79cb4f6, latest+sha on GHCR). Executed: platform-network verified, deploy (rendered compose → mini, pull, up — 4/4 containers healthy), first-boot (migrate 32 tables + seed + seed-admin). Verified externally through the CF edge: / 200, /api/health 200 (db+redis healthy), hashed asset 200, /api/products returns seeded catalog, customs.xtoms.xyz unaffected. Zero Cloudflare changes were needed (wildcard). REMAINING owner items, currently on marked placeholders in deploy/.env: (1) TWO_FACTOR_API_KEY — SMS OTP login disabled until set; (2) REPLICATE_API_TOKEN or GOOGLE_AI_STUDIO_KEY — AI generation disabled; (3) real R2 bucket masonart-staging + scoped token + custom domain masonart-cdn.xtoms.xyz — uploads/CDN images broken until then; (4) register Razorpay webhook https://masonart.xtoms.xyz/api/webhooks/razorpay with the RAZORPAY_WEBHOOK_SECRET value already generated in deploy/.env — until then payments won't flip to paid; (5) nightly backup cron + /backups dir on the mini; (6) UptimeRobot monitors (#278). Resend email works now (customs' verified xtoms.xyz domain, no-reply@xtoms.xyz); Razorpay order creation works (rzp_test_ keys shared with customs). After filling each key: make -C deploy deploy (no rebuild needed)."
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 287
+    feature: go-live
+    description: "Infra: same-origin web bundle + single-hostname config"
+  - ticket: 288
+    feature: go-live
+    description: "Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls"
+  - ticket: 289
+    feature: go-live
+    description: "Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate"
+  - ticket: 290
+    feature: go-live
+    description: "BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start"
+  - ticket: 291
+    feature: go-live
+    description: "SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel"
+  - ticket: 292
+    feature: go-live
+    description: "Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget"
+blocks: []
+attachments: []

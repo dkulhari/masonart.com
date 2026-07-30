@@ -1,0 +1,84 @@
+ticket_number: 299
+title: Web SEO - Root meta, OG tags, and JSON-LD use chobi.art brand constants
+description: |-
+  ## Task
+  Replace MasonArt in root document metadata and structured data with brand constants: packages/web/app/routes/__root.tsx (title, description, og:title/description/site_name, twitter meta — 7 refs), packages/web/app/components/seo/ProductJsonLd.tsx (8 refs: brand/seller names, URLs), packages/web/app/lib/utils.ts and packages/web/app/lib/sentry.ts (release masonart-web@ → chobi-web@).
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 2 - Web User-Facing Strings
+  Import { BRAND_NAME, BRAND_URL, BRAND_TAGLINE } from the shared package. Title format: "chobi.art | Premium Posters & Frames". tests/e2e/home.spec.ts asserts the home title — update it FIRST as the failing test.
+feature: rebrand-chobi-art
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-22T08:07:04.473Z'
+last_updated: '2026-07-22T08:35:12.581Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - seo
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-22T08:21:12.920Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-07-22T08:35:12.591Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 298
+    feature: rebrand-chobi-art
+    description: Brand Constants - Create brand.ts with chobi.art identity in shared package
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Update home E2E title assertion to expect chobi.art
+    file: tests/e2e/home.spec.ts
+    command: bunx playwright test tests/e2e/home.spec.ts --grep title
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // In tests/e2e/home.spec.ts, change every title/brand assertion, e.g.:
+      // await expect(page).toHaveTitle(/chobi\.art/i);
+      // expect(title).toContain("chobi.art | Premium Posters & Frames");
+  - id: 2
+    action: verify-fail
+    description: Confirm E2E title check fails against running app
+    command: bunx playwright test tests/e2e/home.spec.ts
+    expected_result: FAIL - title still MasonArt
+    status: pending
+  - id: 3
+    action: implement
+    description: Swap __root.tsx meta, ProductJsonLd, utils, sentry release to brand constants
+    file: packages/web/app/routes/__root.tsx
+    status: pending
+    code: |-
+      import { BRAND_NAME, BRAND_TAGLINE, BRAND_URL } from "@masonart/shared";
+      // title: `${BRAND_NAME} | ${BRAND_TAGLINE}`  → "chobi.art | Premium Posters & Frames"
+      // description: `Discover premium posters and custom frames at ${BRAND_NAME}. ...`
+      // og:site_name: BRAND_NAME
+      // ProductJsonLd.tsx: brand: { "@type": "Brand", name: BRAND_NAME }, seller name BRAND_NAME, url BRAND_URL
+      // packages/web/app/lib/sentry.ts: release: "chobi-web@1.0.0"
+      // packages/web/app/lib/utils.ts + api.ts + auth-client.ts: replace MasonArt/masonart comment+string refs
+  - id: 4
+    action: verify-pass
+    description: Home E2E passes; typecheck clean
+    command: bun run typecheck && bunx playwright test tests/e2e/home.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit SEO rebrand
+    command: 'git add packages/web tests/e2e/home.spec.ts && git commit -m "feat(web): chobi.art brand in root meta, OG and JSON-LD (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-07-22T08:21:12.905Z'
+completed: '2026-07-22T08:35:12.581Z'

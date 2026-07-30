@@ -25,10 +25,14 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 1
+  total_duration: "00:20:00"
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 1
+      duration: "00:20:00"
+      tokens: 0
 tickets:
   todo: {}
   in_progress: {}
@@ -37,6 +41,10 @@ tickets:
     "187": "Bug: Admin sign out tests fail after domcontentloaded migration"
     "188": "Bug: Admin dashboard tests fail due to non-waiting assertions and hydration timing"
     "190": "Bug: Admin orders date filter test fails due to hydration timing"
-total_tickets: 4
+    "339": "Bug - Admin sidebar covers page: site header overlap, drawer below 1024px, dead gap when collapsed"
+    "340": "Bug - Add Product has no file picker: image upload was never implemented (URL-only placeholder)"
+    "341": "BUG: Admin sidebar sign-out redirects home without ending the session"
+    "363": "Admin customers: per-field filtering incl. joined date range, server-side"
+total_tickets: 8
 completion_percentage: 100
 is_completed: true

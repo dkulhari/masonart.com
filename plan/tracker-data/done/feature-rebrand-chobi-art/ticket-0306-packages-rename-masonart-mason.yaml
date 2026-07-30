@@ -1,0 +1,73 @@
+ticket_number: 306
+title: Packages - Rename masonart/@masonart/* to chobi/@chobi/* repo-wide
+description: |-
+  ## Task
+  Rename the workspace: root package.json name masonart → chobi; @masonart/api|web|shared → @chobi/api|web|shared in all package.json files, all import statements (~10 files), tsconfig path aliases if present, and vite/app.config + tailwind config references. Reinstall to regenerate bun.lock. Update tests/setup/workspaces.test.ts expectations.
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 4 - Package Renames
+  Runs AFTER all string tickets so diffs stay reviewable. Mechanical sed + verify.
+feature: rebrand-chobi-art
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-22T08:09:04.359Z'
+last_updated: '2026-07-22T09:31:31.177Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - frontend
+  - refactor
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-22T09:22:46.654Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-07-22T09:31:31.186Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 302
+    feature: rebrand-chobi-art
+    description: Web Tests - Update remaining E2E specs and fixtures to chobi.art
+  - ticket: 303
+    feature: rebrand-chobi-art
+    description: API Email - Sender identity and email templates to chobi.art
+  - ticket: 304
+    feature: rebrand-chobi-art
+    description: API SMS - Notification SMS templates and phone placeholder domain to chobi.art
+  - ticket: 305
+    feature: rebrand-chobi-art
+    description: API Identifiers - Cookie prefix, service names, URL defaults, seeds, Sentry
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Sed rename package scope and names, reinstall
+    file: package.json
+    status: pending
+    code: |-
+      grep -rl "@masonart/" --include="*.ts" --include="*.tsx" --include="*.json" packages tests | xargs sed -i '' 's/@masonart\//@chobi\//g'
+      sed -i '' 's/"name": "masonart"/"name": "chobi"/' package.json
+      grep -rn "masonart" packages/*/package.json package.json tsconfig*.json packages/web/app.config.ts packages/web/tailwind.config.ts
+      bun install
+  - id: 2
+    action: verify-pass
+    description: Install, typecheck, full unit suite green
+    command: bun install && bun run typecheck && bun run test
+    expected_result: PASS
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit package rename
+    command: 'git add -A && git commit -m "refactor: rename workspace to chobi, @masonart/* -> @chobi/* (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-07-22T09:22:46.651Z'
+completed: '2026-07-22T09:31:31.177Z'

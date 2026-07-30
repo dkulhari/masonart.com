@@ -1,0 +1,79 @@
+ticket_number: 294
+title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
+description: |-
+  Phase: Gate. The launch proof — every item verified against https://masonart.com from OUTSIDE the LAN (phone on LTE), results recorded here. Blocked by all other go-live tickets plus go-to-production #278 (uptime monitoring) and #283 (backups).
+
+  Checklist (docs/GO-LIVE-PLAN.md §5):
+  1. Signup → real Resend verification email → verify → login; SMS OTP login via 2Factor completes.
+  2. Homepage/category/product pages render; images load from cdn.masonart.com.
+  3. Cart → checkout → Razorpay test card 4111 1111 1111 1111 → webhook flips order to paid → confirmation email arrives → order in account history.
+  4. Webhook redelivery from Razorpay dashboard is a no-op; failure card 4000 0000 0000 0002 yields clean failed state.
+  5. AI generation: prompt → BullMQ job → image in R2 → renders via CDN → in user's creations.
+  6. Admin: promoted admin reaches /admin; normal account 403s.
+  7. Hardening: auth hammer → 429 (second device unaffected — proves per-IP buckets); CSP/HSTS headers present; forced error lands in Sentry + fires Slack; UptimeRobot green.
+  8. Full unit + Playwright suites x2 green; merge; flip docs/GO-LIVE-PLAN.md status PLANNED → LIVE; record a launch exit statement listing owner-pending items (real Razorpay keys/pricing, cache-purge automation, CI).
+
+  Acceptance: all items pass and are recorded; status flipped; exit statement written.
+  Lesson: cc #86 gate pattern.
+feature: go-live
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-16T14:22:14.943Z'
+last_updated: '2026-07-20T10:09:26.871Z'
+time_spent_minutes: 0
+labels:
+  - go-live
+  - phase-gate
+  - gate
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-07-17T16:46:17.587Z'
+    text: '2026-07-17 pre-gate status: all code tickets done (#287-#292, #289, plus new blockers #295 tsc-build and #296 auth-leak/HTTPException, both fixed). Verified locally: prod compose renders with :? guards (positive+negative), api image builds and runs HEALTHY in the rendered prod stack, /api/health 200 with db+redis components, in-container `drizzle-kit migrate` applies the squashed baseline (32 tables). Unit suite 3218 passed / 56 failed — the 56 are stale test expectations (old minimal /health shape; rate-limiter 429s the tests don''t model), burn these down (tt-fix-tests) before running suites ×2 for the gate. Web runtime image not yet built only because Docker Hub pulls of node:20-slim wedged on the dev machine''s network late in the session — the web vite build itself passed inside the Docker builder stage; first `make -C deploy build-push-deploy` will complete it. E2E suite not run this session (gate item). Blocked on #293 owner-console/mini steps before the gate can execute.'
+  - author: mcp-client
+    timestamp: '2026-07-17T19:27:01.882Z'
+    text: '2026-07-18: gate URLs corrected — every §5 check runs against https://masonart.xtoms.xyz (and images from https://masonart-cdn.xtoms.xyz). Hostname fixed in commit a18570ae after owner confirmation; masonart.com is a post-launch cutover, not part of this gate.'
+  - author: user
+    timestamp: '2026-07-20T10:09:26.871Z'
+    text: |-
+      What's still gated on placeholder values in deploy/.env (each can be enabled with a redeploy, no rebuild):
+
+      SMS OTP login — needs TWO_FACTOR_API_KEY
+      AI poster generation — needs REPLICATE_API_TOKEN or GOOGLE_AI_STUDIO_KEY
+      Image uploads/CDN — needs R2 bucket credentials + masonart-cdn.xtoms.xyz
+      Payment completion — needs the Razorpay webhook registered at https://masonart.xtoms.xyz/api/webhooks/razorpay
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 287
+    feature: go-live
+    description: 'Infra: same-origin web bundle + single-hostname config'
+  - ticket: 288
+    feature: go-live
+    description: 'Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls'
+  - ticket: 289
+    feature: go-live
+    description: 'Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate'
+  - ticket: 290
+    feature: go-live
+    description: 'BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start'
+  - ticket: 291
+    feature: go-live
+    description: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+  - ticket: 292
+    feature: go-live
+    description: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+  - ticket: 293
+    feature: go-live
+    description: 'Ops: owner console setup + mini bootstrap execution'
+  - ticket: 278
+    feature: go-to-production
+    description: Set up external uptime monitoring for production
+  - ticket: 283
+    feature: go-to-production
+    description: Document and configure database backup procedures
+blocks: []
+attachments: []

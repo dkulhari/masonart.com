@@ -1,0 +1,89 @@
+ticket_number: 264
+title: Web server (SSR) missing ALL security headers
+description: |-
+  ## Bug
+
+  The React Router v7 SSR web server (localhost:3001) serves pages with NO security headers at all, while the API server (localhost:3000) has comprehensive security headers.
+
+  ## Web Server Headers (Missing ALL)
+  ```
+  HTTP/1.1 200 
+  Vary: Origin
+  content-type: text/html; charset=utf-8
+  Date: ...
+  Connection: keep-alive
+  ```
+
+  ## API Server Headers (Comprehensive)
+  ```
+  Strict-Transport-Security: max-age=15552000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  X-XSS-Protection: 0
+  Referrer-Policy: no-referrer
+  Cross-Origin-Resource-Policy: same-origin
+  Cross-Origin-Opener-Policy: same-origin
+  X-DNS-Prefetch-Control: off
+  X-Download-Options: noopen
+  X-Permitted-Cross-Domain-Policies: none
+  ```
+
+  ## Missing Security Headers on Web
+  - `Strict-Transport-Security` (HSTS)
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: SAMEORIGIN`
+  - `Content-Security-Policy`
+  - `Referrer-Policy`
+  - `Permissions-Policy`
+
+  ## Impact
+  - **Clickjacking vulnerability**: No X-Frame-Options means site can be embedded in iframes
+  - **MIME type sniffing**: No X-Content-Type-Options
+  - **No HSTS**: Browser won't enforce HTTPS
+  - **No CSP**: No Content Security Policy protection
+  - Affects ALL pages (/, /posters, /create, /gallery, /cart, /checkout, /auth/*)
+
+  ## Suggestion
+  Add security headers middleware to the React Router v7 SSR server, similar to what the API uses (likely `helmet` or equivalent for Hono).
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T22:34:23.189Z"
+last_updated: "2026-07-27T14:51:07.480Z"
+time_spent_minutes: 0
+labels:
+  - security
+  - web
+  - headers
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T14:03:10.760Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-07-27T14:10:15.318Z"
+    text: |-
+      🔧 Implementation committed (28db3e80), verification pending deploy. Traefik middleware `chobii-web-headers` on the web router now adds: HSTS (15552000, includeSubdomains), X-Frame-Options SAMEORIGIN, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy (camera/mic/geo off). Verified present in the rendered compose labels; observable on production only after the next deploy — verify with `curl -sI https://chobii.art/` then close.
+
+      **CSP deliberately deferred** (ticket-creation tooling is erroring right now, so recording scope here): TanStack Start SSR hydration uses inline scripts, so CSP needs either nonces or unsafe-inline, plus img-src self + cdn.chobii.art + data:, connect-src self, and the Razorpay checkout script/frame domains on payment pages. Roll out as Content-Security-Policy-Report-Only via the same middleware, watch for violations, then enforce.
+  - author: system
+    timestamp: "2026-07-27T14:51:07.771Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T14:51:10.567Z"
+    text: |-
+      ✅ **Completed and verified on production** (2026-07-27 deploy).
+
+      `curl -sI https://chobii.art/` now returns: strict-transport-security: max-age=15552000; includeSubDomains · x-frame-options: SAMEORIGIN · x-content-type-options: nosniff · referrer-policy: strict-origin-when-cross-origin · permissions-policy: camera=(), microphone=(), geolocation=().
+
+      Commits: 28db3e80 (traefik chobii-web-headers middleware) + df976afc (forceSTSHeader — traefik suppresses STS behind the TLS-terminating Cloudflare edge without it; found during live verification). CSP remains deferred with full scope recorded in the previous comment.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-07-27T14:03:10.751Z"
+completed: "2026-07-27T14:51:07.480Z"

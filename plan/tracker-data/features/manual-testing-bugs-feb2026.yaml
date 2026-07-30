@@ -37,7 +37,10 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo:
+  todo: {}
+  in_progress:
+    "344": "Content-Security-Policy for SSR pages (deferred from #264)"
+  done:
     "238": Products API (/api/products) hangs indefinitely - empty reply from server
     "239": Cart API (/api/cart) hangs indefinitely - empty reply from server
     "240": All static/info pages return 404 (about, contact, faq, shipping, returns, privacy, terms, cookies)
@@ -69,8 +72,9 @@ tickets:
     "266": No rate limiting on authentication endpoints
     "267": "Inconsistent query parameter naming: style vs styles on category links"
     "268": Web server returns 500 instead of 406 for non-HTML Accept headers
-  in_progress: {}
-  done: {}
-total_tickets: 31
-completion_percentage: 0
+    "342": "BUG: verification emails never sent — sendVerificationEmail is a console.log stub (production signup dead-end)"
+    "345": Content-Security-Policy for SSR pages - deferred from 264
+    "346": Content-Security-Policy for SSR pages, deferred from 264
+total_tickets: 35
+completion_percentage: 97
 is_completed: false

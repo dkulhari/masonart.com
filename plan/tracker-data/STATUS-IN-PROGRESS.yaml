@@ -1,10 +1,17 @@
 status: in-progress
-last_updated: '2026-02-17T22:59:01.892Z'
-total_tickets: 0
+last_updated: '2026-07-29T06:23:17.386Z'
+total_tickets: 1
 summary:
   critical: 0
   high: 0
-  medium: 0
+  medium: 1
   low: 0
-priorities: {}
+priorities:
+  medium:
+    - feature: manual-testing-bugs-feb2026
+      tickets:
+        - ticket_number: 344
+          title: 'Content-Security-Policy for SSR pages (deferred from #264)'
+          assignee: unassigned
+          blocked_by: []
 blocked_tickets: []

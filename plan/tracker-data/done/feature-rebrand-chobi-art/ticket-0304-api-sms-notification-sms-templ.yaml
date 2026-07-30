@@ -1,0 +1,74 @@
+ticket_number: 304
+title: API SMS - Notification SMS templates and phone placeholder domain to chobi.art
+description: |-
+  ## Task
+  Rebrand SMS copy in packages/api/src/services/notifications.ts (4 templates: "MasonArt: Your order ... confirmed/shipped/out for delivery/delivered", tracking fallback URL masonart.com/orders) and packages/api/src/routes/phone-auth.ts placeholder email domain @phone.masonart.com → @phone.chobi.art.
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 3 - API User-Facing Strings
+  SMS prefix becomes "chobi.art:". Keep messages within SMS length limits (chobi.art is shorter than MasonArt — safe). DLT template registration with 2Factor.in is unchanged for staging.
+feature: rebrand-chobi-art
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-22T08:08:36.352Z'
+last_updated: '2026-07-22T09:14:09.750Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - sms
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-22T09:08:05.844Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-07-22T09:14:09.757Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 298
+    feature: rebrand-chobi-art
+    description: Brand Constants - Create brand.ts with chobi.art identity in shared package
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Update notifications service test for chobi.art SMS copy
+    file: packages/api/tests/services/notifications.test.ts
+    command: bunx vitest run packages/api/tests --testNamePattern sms
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // expect(smsMessage).toMatch(/^chobi\.art: Your order/);
+      // expect(smsMessage).not.toContain("MasonArt");
+  - id: 2
+    action: implement
+    description: Swap SMS templates to BRAND_NAME and fix phone placeholder domain
+    file: packages/api/src/services/notifications.ts
+    status: pending
+    code: |-
+      import { BRAND_NAME, BRAND_DOMAIN } from "@masonart/shared";
+      // `${BRAND_NAME}: Your order ${orderNumber} is confirmed! ...`
+      // trackingUrl fallback: `${BRAND_DOMAIN}/orders`
+      // phone-auth.ts: email: `${normalizedPhone}@phone.${BRAND_DOMAIN}`
+  - id: 3
+    action: verify-pass
+    description: API unit tests pass
+    command: bunx vitest run packages/api/tests
+    expected_result: PASS
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit SMS rebrand
+    command: 'git add packages/api && git commit -m "feat(api): chobi.art SMS templates and phone placeholder domain (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-07-22T09:08:05.841Z'
+completed: '2026-07-22T09:14:09.750Z'

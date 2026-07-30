@@ -1,0 +1,30 @@
+ticket_number: 345
+title: Content-Security-Policy for SSR pages - deferred from 264
+description: |-
+  Ticket 264 added HSTS, X-Frame-Options, nosniff, Referrer-Policy and Permissions-Policy to SSR responses via the traefik chobii-web-headers middleware in docker/docker-compose.prod.yml. CSP was deliberately deferred because TanStack Start SSR hydration uses inline scripts and a naive policy breaks the app.
+
+  Scope: inventory what SSR output needs - inline hydration script via nonce or unsafe-inline, img-src self plus cdn.chobii.art plus data:, connect-src self, Razorpay checkout script domain for payment pages. Add CSP via the same traefik middleware, starting with Content-Security-Policy-Report-Only to validate, then enforce. Verify checkout with Razorpay, AI generator, and image rendering under the enforced policy on production.
+feature: manual-testing-bugs-feb2026
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-27T14:06:04.246Z'
+last_updated: '2026-07-27T14:59:29.359Z'
+time_spent_minutes: 0
+labels:
+  - security
+  - web
+  - headers
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-27T14:59:29.360Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-27T14:59:29.359Z'

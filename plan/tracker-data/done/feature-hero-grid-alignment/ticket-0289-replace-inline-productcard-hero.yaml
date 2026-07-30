@@ -1,0 +1,97 @@
+ticket_number: 289
+title: Hero Page - Replace inline ProductCard with shared component
+description: |-
+  ## Task
+  Remove the ~70 line inline ProductCard from the hero page (index.tsx) and use the shared ProductCard component with uniformAspectRatio="aspect-[3/4]" for consistent grid alignment.
+
+  ## Context
+  Part of feature: hero-grid-alignment
+  Phase: 2 - Hero Page Refactor
+
+  ## Implementation Steps
+
+  - [ ] **Step 1 [implement]**: Add imports for shared ProductCard
+    - File: `packages/web/app/routes/index.tsx`
+    - Add import at the top (after existing imports):
+    ```tsx
+    import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
+    ```
+
+  - [ ] **Step 2 [implement]**: Remove inline types that duplicate shared ones
+    - File: `packages/web/app/routes/index.tsx`
+    - Delete the `ProductImage` interface (lines 31-36) — use the one from shared component
+    - Delete the `FeaturedProduct` interface (lines 38-47) — replace with `ProductCardData`
+    - Update `HomePageData` to use `ProductCardData[]`:
+    ```tsx
+    export interface HomePageData {
+      featuredProducts: ProductCardData[]
+    }
+    ```
+
+  - [ ] **Step 3 [implement]**: Delete the inline ProductCard function
+    - File: `packages/web/app/routes/index.tsx`
+    - Delete the entire inline `ProductCard` component (lines 274-352)
+    - Delete the `ProductCardProps` interface (lines 278-280)
+
+  - [ ] **Step 4 [implement]**: Update FeaturedProductsSection to use shared ProductCard with uniform ratio
+    - File: `packages/web/app/routes/index.tsx`
+    - Update FeaturedProductsSectionProps:
+    ```tsx
+    interface FeaturedProductsSectionProps {
+      products: ProductCardData[]
+    }
+    ```
+    - In the grid, pass uniformAspectRatio:
+    ```tsx
+    <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+      {products.map((product) => (
+        <ProductCard
+          key={product.id}
+          product={product}
+          uniformAspectRatio="aspect-[3/4]"
+        />
+      ))}
+    </div>
+    ```
+
+  - [ ] **Step 5 [verify-pass]**: Run typecheck to confirm no type errors
+    - Run: `cd packages/web && bunx tsc --noEmit --pretty 2>&1 | head -30`
+    - Expected: No errors
+
+  - [ ] **Step 6 [verify-pass]**: Start dev server and visually verify hero page
+    - Run: `bun run dev` (check in browser)
+    - Expected: All product cards in the featured section have uniform 3:4 aspect ratio, text aligned
+
+  - [ ] **Step 7 [commit]**: Commit changes
+    - Run: `git add packages/web/app/routes/index.tsx && git commit -m "refactor(hero): replace inline ProductCard with shared component (#289)"`
+feature: hero-grid-alignment
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-19T09:35:00.000Z'
+last_updated: '2026-07-27T15:13:53.247Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - refactor
+acceptance_criteria:
+  - Inline ProductCard and related types removed from index.tsx
+  - Shared ProductCard imported and used with uniformAspectRatio="aspect-[3/4]"
+  - All featured product cards display at consistent 3:4 ratio
+  - Text (title, styles, price) aligns across cards in the same row
+  - Hero page still renders correctly with featured products
+comments:
+  - author: system
+    timestamp: '2026-07-27T15:13:53.247Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 287
+  - 288
+blocks: []
+attachments: []
+completed: '2026-07-27T15:13:53.247Z'

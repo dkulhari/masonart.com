@@ -1,0 +1,54 @@
+ticket_number: 315
+title: AI Provider - Confirm generation key (Replicate placeholder vs Google AI Studio)
+description: |-
+  ## Task
+  REPLICATE_API_TOKEN is PLACEHOLDER in deploy/.env. The deploy gen-compose guard passed, implying GOOGLE_AI_STUDIO_KEY is set — but confirm it is a REAL working key and that AI poster generation succeeds end-to-end on staging. Either provision a real Replicate token or explicitly standardize on the Gemini direct provider (feature gemini-direct-provider is completed) and remove the Replicate placeholder to avoid confusion.
+
+  ## Context
+  Part of feature: chobi-external-services
+  Depends on R2 ticket for storing generation outputs — verify after R2 is provisioned.
+feature: chobi-external-services
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T07:30:39.847Z"
+last_updated: "2026-07-23T11:46:25.043Z"
+time_spent_minutes: 0
+labels:
+  - infra
+  - ai
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T11:09:42.649Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-23T11:46:25.043Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T11:46:28.648Z"
+    text: "✅ CLOSED — provider keys confirmed and pipeline fixed; actual generation deferred by user decision (\"not important right now\"). Findings: (1) Replicate placeholder was poisoning provider fallback — removed; (2) FAL_API_KEY valid but account unfunded — parked (commented) in deploy/.env; (3) GOOGLE_AI_STUDIO_KEY valid but Gemini API free tier has ZERO image-generation quota — image gen is paid-only on every provider; (4) uncovered and fixed critical worker stub bug #321 + retired Gemini model id (env-overridable now via GEMINI_IMAGE_MODEL). To enable generation later: fund fal.ai (~$0.003/img, un-comment FAL_API_KEY) OR enable Google billing (~$0.04/img), then deploy and verify a real PNG lands on chobii-cdn."
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 312
+    feature: chobi-external-services
+    description: R2 - Provision chobi bucket, credentials and chobi-cdn CDN route
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Verify/provision provider key in deploy/.env; remove dead placeholder
+    file: deploy/.env
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: Run a full AI generation on staging (create page) and confirm image persists and renders
+    expected_result: PASS - generation completes, image served from CDN
+    status: pending
+current_step: 1
+started: "2026-07-23T11:09:42.646Z"
+completed: "2026-07-23T11:46:25.043Z"

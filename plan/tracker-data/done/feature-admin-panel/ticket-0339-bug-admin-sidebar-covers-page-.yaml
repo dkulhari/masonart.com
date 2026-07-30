@@ -1,0 +1,57 @@
+ticket_number: 339
+title: "Bug - Admin sidebar covers page: site header overlap, drawer below 1024px, dead gap when collapsed"
+description: |-
+  ## Bug
+  User report: opening the admin sidebar hides the page. Reproduced with screenshots — three stacked layout defects:
+  1. Admin pages render inside the public site layout; the fixed sidebar (z-50, inset-y-0) overlays the public header (logo/hamburger collision) and duplicates navigation.
+  2. Drawer breakpoint is lg (1024px): any window narrower — common laptop split-screen — gets the mobile drawer that dims and covers the whole page instead of a persistent sidebar.
+  3. Collapsing the sidebar leaves main content at ml-64 — a dead gap; margin doesn't track collapse state.
+
+  ## Fix
+  - Hide the public Header/Footer on /admin routes (admin gets its own chrome)
+  - Drop the persistent-sidebar breakpoint lg→md (768px)
+  - Lift isCollapsed state to the admin layout so main margin tracks 72px/256px
+
+  Files: packages/web/app/routes/__root.tsx, packages/web/app/routes/admin.tsx, packages/web/app/components/admin/AdminSidebar.tsx
+feature: admin-panel
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-25T12:32:36.383Z"
+last_updated: "2026-07-25T12:41:39.349Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - admin
+  - ui
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-25T12:41:39.356Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-25T12:41:50.827Z"
+    text: "✅ **Completed** — commit 3391faf2. Three stacked defects fixed: (1) storefront Header/Footer now hidden on /admin (useRouterState pathname check in __root.tsx) — sidebar no longer overlaps the site header; (2) persistent-sidebar breakpoint lowered lg→md so ≥768px windows get a real sidebar instead of the page-covering drawer; (3) collapse state lifted to admin.tsx so content margin tracks 72px/256px (no dead gap). Browser-verified at 1280px (header hidden ✅, collapse offset ✅) and 900px (persistent sidebar, no hamburger ✅). Deploy to production in flight."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Hide public chrome on /admin; md breakpoint; collapse-aware margin
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: "Screenshots at 1280/900/collapsed: no overlap, persistent sidebar at 900, no gap"
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit
+    status: pending
+current_step: 1
+completed: "2026-07-25T12:41:39.349Z"

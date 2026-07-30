@@ -1,0 +1,62 @@
+ticket_number: 308
+title: Infra - deploy/Makefile, .env.example, remote compose renamed to chobi
+description: |-
+  ## Task
+  Rename deploy tooling: deploy/Makefile (API_IMAGE/WEB_IMAGE → ghcr.io/dkulhari/chobi-api|chobi-web, REMOTE_COMPOSE ~/chobi-docker-compose.yml, psql -U chobi -d chobi in admin target), .env.example comment domains (masonart.com → chobi.art / chobi.xtoms.xyz), and any deploy/rendered artifacts regenerated.
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 5 - Deploy Infrastructure
+  Remote host keeps the old ~/masonart-docker-compose.yml until the deploy ticket pushes the new file; the old masonart stack is stopped during cutover (deploy ticket handles runtime).
+feature: rebrand-chobi-art
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-22T08:10:08.788Z'
+last_updated: '2026-07-22T09:36:11.069Z'
+time_spent_minutes: 0
+labels:
+  - infra
+  - deploy
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-22T09:34:22.849Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-07-22T09:36:11.076Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 306
+    feature: rebrand-chobi-art
+    description: Packages - Rename masonart/@masonart/* to chobi/@chobi/* repo-wide
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Sweep deploy/Makefile and .env.example to chobi names
+    file: deploy/Makefile
+    status: pending
+    code: |-
+      sed -i '' 's/masonart-api/chobi-api/g; s/masonart-web/chobi-web/g; s/masonart-docker-compose/chobi-docker-compose/g; s/-U masonart -d masonart/-U chobi -d chobi/g' deploy/Makefile
+      sed -i '' 's/masonart\.com/chobi.art/g; s/masonart\.xtoms\.xyz/chobi.xtoms.xyz/g' .env.example
+      grep -rn masonart deploy/ .env.example  # expect only historical notes, ideally nothing
+  - id: 2
+    action: verify-pass
+    description: Makefile parses and image vars resolve to chobi names
+    command: make -C deploy -n build-push-deploy | grep -m2 chobi
+    expected_result: PASS - dry-run shows ghcr.io/dkulhari/chobi-api and chobi-web
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit deploy tooling rebrand
+    command: 'git add deploy .env.example && git commit -m "feat(deploy): chobi image names, remote compose and db targets (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-07-22T09:34:22.645Z'
+completed: '2026-07-22T09:36:11.069Z'

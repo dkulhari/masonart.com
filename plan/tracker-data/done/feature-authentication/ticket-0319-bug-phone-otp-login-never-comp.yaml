@@ -1,0 +1,86 @@
+ticket_number: 319
+title: "Bug - Phone OTP login never completes: session cookie doesn't match Better Auth format"
+description: |-
+  ## Bug
+  Phone-OTP login silently fails on any HTTPS deployment: the user enters the correct OTP, the server verifies it (POST /api/phone-auth/verify-otp returns 200 and logs "User logged in via phone"), but the browser stays on the login screen — the session is never recognized.
+
+  ## Root Cause
+  packages/api/src/routes/phone-auth.ts creates the Better Auth session row manually and hand-rolls the Set-Cookie header. Two mismatches vs what Better Auth's get-session actually reads:
+  1. **Cookie name**: on secure (HTTPS) deployments Better Auth uses `__Secure-chobii.session_token`; the code set the unprefixed `chobii.session_token`.
+  2. **Cookie value**: Better Auth cookies are signed — `<token>.<url-encoded base64 HMAC-SHA256(secret, token)>`; the code set the raw unsigned token, which fails signature validation even under the right name.
+
+  Result: get-session finds no valid cookie → returns null → login UI never advances. Latent day-one bug — phone login has never worked over HTTPS; it surfaced during the first real OTP test on staging (2Factor key provisioning, cc #313). Signature format was confirmed by reproducing a captured live Better Auth signature byte-for-byte with HMAC-SHA256.
+
+  ## Fix
+  New helper packages/api/src/lib/session-cookie.ts — buildSessionCookie()/signSessionToken() emit Better Auth's exact name + signed value; phone-auth.ts now uses it. TDD: packages/api/tests/lib/session-cookie.test.ts (3 tests, incl. a regression anchor against the captured live signature). Side effect: 2 previously-failing phone-auth.test.ts assertions now pass (18 pre-existing DB-dependent failures remain vs 20 before).
+
+  ## Commit
+  d058e0b1 fix(api): phone-auth session cookie now matches Better Auth format (pushed to main)
+
+  ## Verification
+  - Unit: session-cookie tests 3/3 green; signature matches live Better Auth cookie
+  - Staging: api image rebuild + deploy in flight; final gate = user retests phone OTP login on https://chobii.xtoms.xyz and lands in their account
+feature: authentication
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T10:05:29.938Z"
+last_updated: "2026-07-23T10:45:56.561Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - auth
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T10:05:57.632Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-07-23T10:06:01.833Z"
+    text: "Fix implemented, committed (d058e0b1) and DEPLOYED to staging — chobii-api rebuilt and healthy at chobii.xtoms.xyz. Steps 1–4 done (TDD helper + wiring + unit verification against a captured live Better Auth signature). Remaining: step 5 live gate — user retests phone OTP login on https://chobii.xtoms.xyz/auth/login (OTP arrives via voice call until DLT templates are registered, cc #313). On confirmation, move to done."
+  - author: system
+    timestamp: "2026-07-23T10:45:56.574Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T10:46:02.633Z"
+    text: "✅ CLOSED — user confirmed live on staging: phone OTP login now completes and lands in the account. Fix d058e0b1 (Better Auth-format session cookie: __Secure- prefix + HMAC-signed value) verified end-to-end."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Failing test for Better Auth cookie format (name prefix + HMAC-signed value)
+    file: packages/api/tests/lib/session-cookie.test.ts
+    command: bunx vitest run tests/lib/session-cookie.test.ts
+    expected_result: FAIL - module missing
+    status: done
+  - id: 2
+    action: implement
+    description: buildSessionCookie helper + wire into phone-auth verify-otp
+    file: packages/api/src/lib/session-cookie.ts
+    status: done
+  - id: 3
+    action: verify-pass
+    description: 3/3 helper tests pass; signature matches captured live Better Auth cookie
+    command: bunx vitest run tests/lib/session-cookie.test.ts
+    expected_result: PASS
+    status: done
+  - id: 4
+    action: commit
+    description: Commit and push fix
+    command: git commit (d058e0b1), pushed to main
+    status: done
+  - id: 5
+    action: verify-pass
+    description: "Live gate: user completes phone OTP login on staging after deploy"
+    expected_result: PASS - login lands in account
+    status: pending
+current_step: 1
+started: "2026-07-23T10:05:57.632Z"
+completed: "2026-07-23T10:45:56.561Z"

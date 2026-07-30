@@ -1,0 +1,73 @@
+ticket_number: 332
+title: "BUG: database unit tests DROP and recreate real dev-DB tables with stale schemas"
+description: |-
+  ## Problem
+  Several unit test files in `packages/api/tests/database/` (at least products.test.ts, users.test.ts, orders.test.ts, cart.test.ts, migrations.test.ts) execute `DROP TABLE ... CASCADE` and `CREATE TABLE` with **hand-written, outdated column lists** directly against whatever database DATABASE_URL points to — the shared dev database.
+
+  ## Impact (observed 2026-07-23 during content-manager-role implementation)
+  Running the full `vitest` suite:
+  - Dropped `ai_generations` and other tables entirely
+  - Recreated `products` without `rooms`, `tags`, `is_ai_generated`, etc. (schema drift → all product queries 500)
+  - Created junk duplicate tables (`users`, `sessions`, `addresses` alongside the real `user`, `session`, `address`)
+  - Destroyed all seeded data; 44 unrelated test failures; dev environment broken until manual repair
+
+  Recovery required: `DROP SCHEMA public CASCADE` + `DROP SCHEMA drizzle CASCADE`, re-run `drizzle-kit migrate` (baseline 0000 + 0001), re-run seed.ts and seed-test-users.ts.
+
+  ## Fix options
+  1. Point tests at a dedicated throwaway test database (TEST_DATABASE_URL) and refuse to run destructive setup when the URL matches the dev DB
+  2. Derive test tables from the Drizzle schema (drizzle-kit push onto a temp schema) instead of hand-written CREATE TABLE statements that drift
+  3. At minimum: guard the DROP/CREATE blocks behind an explicit env flag
+
+  ## Related
+  Also worth fixing while in here: sliding-window auth rate limiters share one "unknown" IP bucket in dev, which blocks the Playwright auth setup (worked around by clearing rate-limit:* Redis keys; a DISABLE_RATE_LIMIT env bypass for test runs would be cleaner). Sign-in limiter wiring bug already fixed in commit 27746e37.
+feature: qa-testing
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T12:42:21.172Z"
+last_updated: "2026-07-27T13:40:56.594Z"
+time_spent_minutes: 0
+labels:
+  - testing
+  - database
+  - tech-debt
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T13:21:05.386Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-27T13:40:56.644Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T13:41:06.324Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commits**: `3bb5f048` (guard + bypass), `7e80dfe6` (customers test alignment)
+
+      **Root cause pinpointed deeper than filed**: vitest.config.ts hardcoded the dev DATABASE_URL into every test run, overriding the destructive suites' own *_test fallback intent. Six (not five — ai.test.ts also DROPs ai_generations AND users) suites then ran DROP/CREATE DDL against the dev DB.
+
+      **Implemented**:
+      - `tests/helpers/destructive-db.ts` — destructive suites only receive a connection URL when it points at a `*_test` database (TEST_DATABASE_URL preferred; non-disposable override fails safe → loud skip). TDD: 10 unit tests red→green.
+      - All 6 destructive suites (products, users, orders, cart, migrations, ai) routed through the guard.
+      - vitest.config respects external DATABASE_URL/REDIS_URL, passes TEST_DATABASE_URL through.
+      - `DISABLE_RATE_LIMIT=true` bypass in rate-limit middleware (TDD, 3 tests incl. production-inert assertion) + wired into Playwright webServer → E2E auth setup passes 4/4 with ZERO redis-flushing workarounds.
+      - Fixed pre-existing connection.test.ts '0'-vs-0 flake (::int cast).
+      - .env.example documents TEST_DATABASE_URL + DISABLE_RATE_LIMIT.
+
+      **Verification** (incident scenario re-run):
+      - `bunx vitest run` (full API suite) against dev DB → schema and data INTACT afterward (rooms column ✓, ai_generations ✓, 40 products ✓); destructive suites skip loudly. Remaining 29 failures are pre-existing environmental (phone-auth mocking etc., match incident-era baseline).
+      - With TEST_DATABASE_URL → DDL runs against poster_app_test (DROP notices observed), dev DB untouched.
+      - Touched suites: 98/98 passing.
+
+      **Discovery / follow-up candidate**: the destructive suites use `it.skipIf(shouldSkip())` evaluated at collection time — their assertions have NEVER run anywhere (only the DDL side effects did). They also build tables from the dead legacy `src/db/schema`. A rewrite against the real schema would make them meaningful; today they are safely caged.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-07-27T13:21:05.384Z"
+completed: "2026-07-27T13:40:56.594Z"

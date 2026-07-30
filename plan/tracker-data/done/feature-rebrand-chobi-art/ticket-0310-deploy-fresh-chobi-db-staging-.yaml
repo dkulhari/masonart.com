@@ -1,0 +1,76 @@
+ticket_number: 310
+title: Deploy - Fresh chobi DB, staging live at chobi.xtoms.xyz, smoke test
+description: |-
+  ## Task
+  Cut staging over to chobi: build and push chobi-api/chobi-web images, ship new compose to the Mac mini, stop the old masonart stack, start chobi stack with PUBLIC_HOSTNAME=chobi.xtoms.xyz and fresh postgres volume, run migrations + seed-admin + seed-test-users, then smoke test: /api/health OK, homepage title chobi.art, admin login works (Better Auth trustedOrigins/BETTER_AUTH_URL must be the new hostname).
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 5 - Deploy Infrastructure
+  *.xtoms.xyz wildcard tunnel means chobi.xtoms.xyz needs zero Cloudflare config. deploy/.env on the remote must get POSTGRES_USER/DB=chobi and PUBLIC_HOSTNAME=chobi.xtoms.xyz. Old masonart volume left in place for manual pruning later.
+feature: rebrand-chobi-art
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-22T08:10:46.339Z"
+last_updated: "2026-07-23T06:41:55.847Z"
+time_spent_minutes: 0
+labels:
+  - infra
+  - deploy
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-22T09:40:14.740Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-07-22T09:48:32.612Z"
+    text: "🚀 build-push-deploy running in background (buildx linux/arm64 → GHCR → Mac mini). Local deploy/.env updated: PUBLIC_HOSTNAME=chobi.xtoms.xyz; R2_BUCKET/CDN_URL intentionally left on legacy masonart names (real Cloudflare resources — separate migration). Remote cutover plan: deploy chobi stack, stop old masonart stack (volumes retained), first-boot (migrate+seed+seed-admin), smoke test health + homepage + login."
+  - author: mcp-client
+    timestamp: "2026-07-22T16:24:52.163Z"
+    text: "⚠️ BLOCKED at deploy step. Images built + pushed OK: ghcr.io/dkulhari/chobi-api and chobi-web, tags latest + 4a6cb54c. Compose rendered. But scp/ssh to DEPLOY_HOST=192.168.29.27 fails (No route to host). The mini IS online — masonart.xtoms.xyz serves 200 via the tunnel; chobi.xtoms.xyz 404s (no route yet, expected). Diagnosis: this MacBook's current network can't reach the mini's LAN IP; a full-subnet SSH host-key sweep found no matching host (only this machine), and dkmac.local (mDNS, IPv6) rejects our key — it is not the deploy target. Needs user: correct network/VPN or the mini's current address, then rerun: make -C deploy deploy && ssh mini \"docker compose -f ~/masonart-docker-compose.yml down\" && make -C deploy first-boot, then smoke test https://chobi.xtoms.xyz."
+  - author: system
+    timestamp: "2026-07-23T06:41:55.849Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T06:42:01.351Z"
+    text: "✅ Cutover complete. chobi stack deployed to the mini (chobi-api/web/postgres/redis all healthy, fresh chobi DB), migrations + seed + seed-admin ran (admin@chobi.art created), old masonart stack stopped (volumes retained for later pruning). Smoke: https://chobi.xtoms.xyz/api/health healthy (db+redis), homepage 200 with title \"chobi.art | Premium Posters & Custom Frames\", zero masonart refs in served HTML, admin login POST 200 (trustedOrigins OK). masonart.xtoms.xyz now 404 as expected. Images: ghcr.io/dkulhari/chobi-api|chobi-web @ latest/4a6cb54c."
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 307
+    feature: rebrand-chobi-art
+    description: Infra - Docker compose (dev + prod) renamed to chobi
+  - ticket: 308
+    feature: rebrand-chobi-art
+    description: Infra - deploy/Makefile, .env.example, remote compose renamed to chobi
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Build, push, and deploy chobi stack with fresh DB
+    file: deploy/Makefile
+    status: pending
+    code: |-
+      make -C deploy build-push-deploy
+      # remote: update deploy/.env (PUBLIC_HOSTNAME=chobi.xtoms.xyz, POSTGRES_USER=chobi, POSTGRES_DB=chobi)
+      # remote: docker compose -f ~/masonart-docker-compose.yml down   # stop old stack, keep volumes
+      # remote: docker compose -f ~/chobi-docker-compose.yml up -d
+      # remote: run migrations + bun run seed-admin + seed-test-users inside api container
+  - id: 2
+    action: verify-pass
+    description: Smoke test staging
+    command: curl -fsS https://chobi.xtoms.xyz/api/health && curl -fsS https://chobi.xtoms.xyz | grep -io 'chobi.art' | head -1
+    expected_result: PASS - health OK, homepage serves chobi.art title; manual admin login succeeds
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit any deploy config deltas from cutover
+    command: "git add deploy && git commit -m \"chore(deploy): chobi.xtoms.xyz staging cutover (#TICKET)\" || echo 'nothing to commit'"
+    status: pending
+current_step: 1
+started: "2026-07-22T09:40:14.737Z"
+completed: "2026-07-23T06:41:55.847Z"

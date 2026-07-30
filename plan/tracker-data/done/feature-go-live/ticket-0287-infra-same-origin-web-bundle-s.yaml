@@ -1,0 +1,40 @@
+ticket_number: 287
+title: 'Infra: same-origin web bundle + single-hostname config'
+description: |-
+  Phase: Infra. Switch from the two-subdomain design (api.masonart.com) to a single hostname, path-routed.
+
+  Work items:
+  - Audit packages/web for every VITE_API_URL fallback — each must use ?? (not ||) so an empty-string build arg survives and bakes relative same-origin URLs. All fetches, uploads, and the API client must go through the shared base.
+  - Dockerfile builder stage: ARG VITE_API_URL (default preserves dev behavior).
+  - Prod compose: APP_URL/BETTER_AUTH_URL = https://masonart.com; drop multi-domain CORS_ORIGIN; webhook URL becomes https://masonart.com/api/webhooks/razorpay.
+  - Defense in depth: verify no emitted web asset filename can start with 'api' (Vite chunk naming), so even a mis-edited tunnel route regex cannot swallow assets. Do NOT rename the SSR entry (cc #98 crash-loop).
+
+  Acceptance: compose config resolves; local prod-mode stack serves web+api on one origin; login cookie is first-party; grep shows zero || fallbacks on VITE_API_URL.
+  Lessons: cc #84, #96, #97, #98.
+feature: go-live
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-16T14:21:29.340Z'
+last_updated: '2026-07-17T15:15:32.184Z'
+time_spent_minutes: 0
+labels:
+  - go-live
+  - infra
+  - phase-infra
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-07-17T15:06:28.126Z'
+    text: 'AMENDED 2026-07-17 (platform edge stack, see customs-copilot docs/XTOMS-DEPLOYMENT-GUIDE.md): path routing is now done by platform-traefik labels (Host(`masonart.com`) && PathPrefix(`/api`)), not a Cloudflare tunnel route regex. The "tunnel route regex cannot swallow assets" defense-in-depth item is structurally satisfied (PathPrefix is anchored by design) — keep the Vite chunk-name check as belt-and-braces only. All other work items unchanged.'
+  - author: system
+    timestamp: '2026-07-17T15:15:32.184Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-17T15:15:32.184Z'

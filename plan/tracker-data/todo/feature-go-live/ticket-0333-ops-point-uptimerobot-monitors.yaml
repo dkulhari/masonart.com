@@ -1,0 +1,34 @@
+ticket_number: 333
+title: 'Ops: point UptimeRobot monitors at https://chobii.art'
+description: |-
+  ## Task
+  Create/repoint the external UptimeRobot monitors to production:
+  - `https://chobii.art/api/health` (HTTP 200 check, 5-min interval)
+  - `https://chobii.art/` (homepage 200)
+  Alerts wired to the existing Slack #prod-alerts webhook.
+
+  ## Context
+  Domain cutover to chobii.art executed 2026-07-25 (commits 31fee0d0, 65ef70f2, 718ae9af); the old chobii.xtoms.xyz URL now 404s by design, so any monitor still pointing there alarms forever — and none may exist yet. Related: ticket #278 (go-to-production, uptime monitoring setup) — this is the production-URL half of that scope; doing both together should close #278.
+
+  ## Acceptance
+  Both monitors green in UptimeRobot; a deliberate container stop (panic switch, docs/OPERATIONS.md) fires a Slack alert within 10 minutes; monitors restored to green afterwards.
+feature: go-live
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-24T20:50:00.084Z'
+last_updated: '2026-07-24T20:50:00.084Z'
+time_spent_minutes: 0
+labels:
+  - ops
+  - monitoring
+  - post-cutover
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

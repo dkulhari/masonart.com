@@ -1,0 +1,70 @@
+ticket_number: 331
+title: Docs - Document content-manager role in ROLES-AND-CAPABILITIES
+description: |-
+  ## Task
+  Update `docs/ROLES-AND-CAPABILITIES.md` for the new role.
+
+  ## Context
+  Part of feature: content-manager-role
+  Phase: E2E Tests & Docs
+
+  Updates needed:
+  - Role Overview table + hierarchy diagram: content-manager as a branch off customer (NOT inheriting trade), between trade and admin in privilege
+  - New "Content Manager" section: capabilities table (product CRUD, collections/categories, direct publish; no orders/customers/dashboard/trade/AI/reports), routes, `requireContentManager` middleware
+  - Admin section: note role assignment via /admin/customers (capped at content-manager)
+  - Role Comparison Matrix + API Access table: add content-manager column
+  - Middleware Reference: add `requireContentManager` and `isContentManager`
+  - Test Coverage: add content-manager row (`content-manager.json`, content-manager.spec.ts)
+  - Future Considerations: remove/adjust the now-implemented "content-editor" custom role bullet
+  - Update the "Last Updated" date
+feature: content-manager-role
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T11:50:57.105Z"
+last_updated: "2026-07-23T12:27:11.612Z"
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T12:25:54.594Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-23T12:27:11.620Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T12:27:14.511Z"
+    text: "✅ Implemented in commit b0a7f039. Updated: role overview table + hierarchy diagram (content-manager as parallel branch to trade off customer), new Content Manager section (capabilities, role assignment via /admin/customers + CLI, routes, middleware), admin section (content-manager assignment capability), both comparison matrices with content-manager column, middleware reference (requireContentManager, isContentManager), test coverage (content-manager.json + content-manager.spec.ts), future considerations note that content-editor shipped as content-manager, DB schema snippet, TOC, and Last Updated date. 21 mentions across all sections."
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 330
+    feature: content-manager-role
+    description: E2E - content-manager access matrix spec
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Update all sections listed in the task context
+    file: docs/ROLES-AND-CAPABILITIES.md
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: Review rendered markdown for consistency (tables aligned, role appears in every matrix)
+    command: grep -n "content-manager" docs/ROLES-AND-CAPABILITIES.md
+    expected_result: Role present in overview, section, matrices, middleware reference, test coverage
+    status: pending
+  - id: 3
+    action: commit
+    description: "Commit changes (replace #TICKET with this ticket's number)"
+    command: "git add docs/ROLES-AND-CAPABILITIES.md && git commit -m \"docs: document content-manager role (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-23T12:25:54.594Z"
+completed: "2026-07-23T12:27:11.612Z"

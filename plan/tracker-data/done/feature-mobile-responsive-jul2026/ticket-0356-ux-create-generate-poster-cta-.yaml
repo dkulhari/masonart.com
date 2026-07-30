@@ -1,0 +1,102 @@
+ticket_number: 356
+title: "UX: /create 'Generate Poster' CTA sits 3.2 screens down on mobile"
+description: |-
+  ## Problem
+
+  On the AI generator page the primary action — **Generate Poster** — sits at y=**2726px** on a 844px-tall viewport, i.e. **3.2 full screens** below the fold. The user must scroll past 15 style-preset cards laid out 2-across and then the aspect-ratio selector before the button that actually does the thing comes into view.
+
+  **Verified on production chobii.art at 390x844, 2026-07-28.** Page height 4702px; CTA computed `position: static` (not sticky).
+
+  There is no persistent affordance — once the user scrolls into the preset grid, nothing on screen indicates how to proceed or that a selection has been registered.
+
+  ## Suggested fix
+
+  Make the generate action reachable from anywhere in the flow. Options, roughly in order of preference:
+  1. **Sticky bottom action bar** on mobile showing the current selection (style + ratio) with the Generate button — mirrors the 'Apply Filters' pattern already used well in the `/posters` filter drawer
+  2. Collapse the preset grid to a horizontally-scrolling row or a 'show all' expander so the CTA moves near the fold
+  3. Duplicate the CTA above the preset grid
+
+  Option 1 matches an existing pattern in this codebase and also solves the no-feedback problem.
+
+  ## Acceptance criteria
+
+  - Generate action is reachable without hunting, from any scroll position on mobile
+  - Current style + aspect-ratio selection is visible alongside it
+  - Desktop layout is not regressed
+feature: mobile-responsive-jul2026
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:42.758Z"
+last_updated: "2026-07-28T16:11:23.196Z"
+time_spent_minutes: 0
+labels:
+  - mobile
+  - frontend
+  - ai-generator
+  - conversion
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T16:11:23.196Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T16:12:17.644Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `60769492` — feat(web): sticky generate bar on the mobile create page
+
+      **Files Changed**:
+      - `packages/web/app/routes/create/index.tsx`
+
+      **Implementation**: option 1 from the ticket — a sticky bottom bar on mobile carrying the generate action plus a readout of the selected style and aspect ratio, mirroring the "Apply Filters" affordance on `/posters`. It also solves the no-feedback problem: previously nothing on screen confirmed a style had registered.
+
+      An `IntersectionObserver` hides the bar whenever the inline button is genuinely on screen, so the two never appear together — the bar is a way to reach the action early, not a duplicate CTA. Disabled state and wallet-balance gating are shared with the inline button. `pb-24 md:pb-0` on the page wrapper reserves room so the bar never covers content.
+
+      **Verification** (390×844, local dev):
+      - At `scrollY: 0` (inline button ~2700px away) → bar visible, showing "Wabi Sabi / Portrait", Generate correctly disabled on an empty prompt
+      - Scrolled to the inline button (`scrollY: 2258`, in view) → sticky bar removed from the DOM
+      - Screenshot confirms placement and readout
+      - Web suite 1362/1362; typecheck 26 errors = `main` baseline
+
+      Desktop layout untouched (`md:hidden`).
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Test asserting a generate control is visible in the viewport at any scroll position on mobile
+    file: tests/e2e/create-mobile-cta.spec.ts
+    command: bunx playwright test tests/e2e/create-mobile-cta.spec.ts
+    expected_result: FAIL — CTA at y=2726 is off-screen until deep scrolling
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the CTA is not reachable from the top of the page
+    command: bunx playwright test tests/e2e/create-mobile-cta.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add a sticky bottom action bar on mobile showing selected style + ratio with the Generate button
+    file: packages/web/app/routes/create/index.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: CTA visible at all scroll positions on mobile; desktop unchanged
+    command: bunx playwright test tests/e2e/create-mobile-cta.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the change
+    command: "git add packages/web/app/routes/create/ tests/e2e/create-mobile-cta.spec.ts && git commit -m \"feat(web): sticky generate action bar on mobile create page\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T16:11:23.196Z"

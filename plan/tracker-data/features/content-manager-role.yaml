@@ -1,0 +1,147 @@
+name: content-manager-role
+title: Content Manager Role
+priority: medium
+created: "2026-07-23T11:39:50.360Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  A new `content-manager` role for staff whose job is creating and managing poster listings for the /posters listing page. They get product CRUD, image upload, and merchandising (banners/featured content) in the admin panel — nothing else. Closes the least-privilege gap where poster creators currently need full `admin` (which exposes orders, refunds, customer PII, and trade application review).
+
+  ## Goals
+  - Poster creators can create, edit, and publish products end-to-end without admin access
+  - No access to orders, customers, trade applications, AI oversight, reports, or role management
+  - Admins can grant/revoke the role from the admin customers page
+
+  ## Scope
+  **In scope:**
+  - `content-manager` added to `userRoleEnum` (Postgres enum migration) and all role type definitions
+  - `requireContentManager` middleware = `requireRole(['content-manager', 'admin', 'super-admin'])`
+  - Product API routes re-gated from `requireAdmin` to `requireContentManager`
+  - Admin panel access: content-manager lands on `/admin/products`; sidebar shows only Products/Collections/Categories; other sections hidden and admin-gated (Access Denied on direct URL entry)
+  - Direct publishing via existing `draft` -> `active` product status flow (trusted publisher)
+  - Role assignment UI: new minimal `/admin/customers` page (sidebar already links to it but page does not exist) with role dropdown restricted to `customer` <-> `content-manager`
+  - New API routes: `GET /api/admin/customers` + `PUT /api/admin/customers/:id/role` (Zod-restricted to customer|content-manager), gated `requireAdmin`
+  - E2E auth fixture (`content-manager.json`) + access-matrix spec
+  - Update `docs/ROLES-AND-CAPABILITIES.md`
+
+  **Out of scope (YAGNI):** approval workflows, granular permissions tables, KPI dashboard for content-managers, trade inheritance, super-admin differentiation.
+
+  ## Key Decisions
+  1. Enum role, not a permissions system — smallest change, follows existing `requireRole` pattern, migrates cleanly to permission groups later.
+  2. Trusted publisher — products default to `draft`, no approval queue.
+  3. Role assignment capped at content-manager — dropdown/API can never grant admin/super-admin (no privilege escalation).
+  4. No trade inheritance — `requireTrade` and wholesale pricing untouched.
+
+  ## Technical Considerations
+  - Postgres enum change needs `ALTER TYPE ... ADD VALUE` (Drizzle); non-reversible in PG — acceptable.
+  - Shared Zod `UserRoleSchema` (packages/shared/src/schemas/user.ts:17) is already missing `super-admin` — fix alongside adding `content-manager`.
+  - packages/web/app/routes/admin.tsx beforeLoad + AdminSidebar hardcode admin/super-admin; need role-aware gating + per-section guards.
+  - Role definitions live in 4 places: packages/api/src/database/schema/users.ts:56, packages/api/src/auth/index.ts:328, packages/shared/src/types/user.ts:15, packages/shared/src/schemas/user.ts:17.
+
+  ## Implementation Plan
+
+  **Note**: Each ticket uses TDD with structured steps (exact code, file paths, test commands).
+
+  ### Phase 1: Types & Database Schema
+  Location: packages/shared/src, packages/api/src/database
+  Pattern: pgEnum + TS union types + Zod enum, kept in sync manually
+  - [ ] Add `content-manager` to all 4 role definitions + Drizzle migration (+ tests)
+
+  ### Phase 2: Backend API
+  Location: packages/api/src
+  Pattern: Hono sub-apps with `app.use("*", requireAdmin)` gating; vitest unit + integration tests
+  - [ ] `requireContentManager` middleware + `isContentManager` helper (+ unit tests)
+  - [ ] Re-gate admin products routes to `requireContentManager` (+ integration tests)
+  - [ ] New admin customers API: list users + update role, capped at content-manager (+ tests)
+
+  ### Phase 3: Frontend
+  Location: packages/web/app
+  Pattern: TanStack Router beforeLoad guards, AdminSidebar nav array, shadcn/ui
+  - [ ] Role-aware admin layout: allow content-manager, redirect to /admin/products, section guards
+  - [ ] AdminSidebar role-based nav filtering
+  - [ ] New /admin/customers page with role dropdown
+
+  ### Final Phase: E2E Tests & Docs
+  Location: tests/e2e
+  Pattern: auth.setup.ts storage states + playwright projects per role
+  - [ ] content-manager auth fixture + seeded test user + playwright project
+  - [ ] content-manager.spec.ts access matrix
+  - [ ] Update docs/ROLES-AND-CAPABILITIES.md
+
+  ## Technical Notes
+  - Project type: Bun monorepo (Hono API + React Router v7 web + shared package)
+  - Key frameworks: Drizzle ORM, Better Auth, Zod, TanStack Router, Playwright, Vitest
+  - Patterns to follow: requireRole middleware factory (auth.ts:227), admin route gating (products.ts:155), auth.setup.ts storage states
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 1
+  total_duration: "00:14:00"
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: "00:14:00"
+      tokens: 0
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "322": Types & Schema - Add content-manager to role enums and migration
+    "323": Backend API - requireContentManager middleware and isContentManager helper
+    "324": Backend API - Re-gate admin product routes to requireContentManager
+    "325": Backend API - Admin customers list + role-assignment endpoints
+    "326": Frontend - Role-aware admin layout with content-manager section guards
+    "327": Frontend - AdminSidebar role-based nav filtering
+    "328": Frontend - Admin customers page with role dropdown
+    "329": E2E - content-manager auth fixture and seeded test user
+    "330": E2E - content-manager access matrix spec
+    "331": Docs - Document content-manager role in ROLES-AND-CAPABILITIES
+    "362": Role-aware two-way navigation between the store and the staff area
+total_tickets: 11
+completion_percentage: 100
+is_completed: true
+design:
+  approach: Add 'content-manager' as a new value in the existing userRoleEnum, gate product/content routes with a requireContentManager middleware built on the existing requireRole helper (allowing content-manager, admin, super-admin), add role-aware admin panel gating (sidebar filtering + per-section guards, landing on /admin/products), and a minimal admin UI (role dropdown on customers page) restricted to toggling customer <-> content-manager.
+  decisions:
+    - Enum role
+    - not a granular permissions system — smallest change
+    - follows existing requireRole pattern
+    - migrates cleanly to permission groups later
+    - Trusted publisher — content-managers publish directly via existing draft -> active product status flow; no approval queue (products default to draft so nothing goes live accidentally)
+    - Role assignment capped at content-manager — admin customers-page dropdown can only toggle customer <-> content-manager
+    - never grant admin/super-admin (prevents privilege escalation; full role management stays reserved for super-admin)
+    - No trade inheritance — content-manager branches off customer in the hierarchy; requireTrade and wholesale pricing untouched
+    - No dashboard access — content-managers land on /admin/products; orders
+    - customers
+    - AI
+    - trade
+    - reports remain admin-only with Access Denied on direct URL entry
+  approved: true
+  approved_at: "2026-07-23T11:39:58.454Z"
+plan:
+  phases:
+    - name: Types & Database Schema
+      location: packages/shared/src, packages/api/src/database
+      tickets:
+        - 322
+    - name: Backend API
+      location: packages/api/src
+      tickets:
+        - 323
+        - 324
+        - 325
+    - name: Frontend
+      location: packages/web/app
+      tickets:
+        - 326
+        - 327
+        - 328
+    - name: E2E Tests & Docs
+      location: tests/e2e, docs
+      tickets:
+        - 329
+        - 330
+        - 331
+  generated_at: "2026-07-23T11:51:28.927Z"

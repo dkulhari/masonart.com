@@ -1,0 +1,24 @@
+ticket_number: 347
+title: Add Content-Security-Policy header for SSR pages
+description: Deferred from ticket 264. Add CSP to the traefik chobii-web-headers middleware. Needs nonce or unsafe-inline for TanStack SSR hydration scripts, img-src for cdn.chobii.art, and the Razorpay checkout script domain. Roll out as Report-Only first, then enforce after verifying checkout, AI generator and images on production.
+feature: qa-testing
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-27T14:07:50.479Z'
+last_updated: '2026-07-27T14:59:31.471Z'
+time_spent_minutes: 0
+labels: []
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-27T14:59:31.471Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-27T14:59:31.471Z'

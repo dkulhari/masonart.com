@@ -1,0 +1,113 @@
+ticket_number: 350
+title: "BUG: Checkout address form has zero autocomplete attributes — mobile autofill cannot work"
+description: |-
+  ## Problem
+
+  Not one field on the checkout shipping form carries an `autocomplete` attribute. Browser and OS address autofill therefore cannot populate any of them, so mobile users must hand-type their full name, email, phone, street address, city, state and PIN code on a phone keyboard.
+
+  **Verified on production chobii.art at 390x844, 2026-07-28.** All 10 checkout fields returned `autocomplete: null`:
+  fullName, email, phone, addressLine1, addressLine2, landmark, city, state, postalCode, order notes.
+
+  ## This is an oversight, not a project convention
+
+  The **auth** forms do this correctly — the login page ships `autocomplete="email"` and `autocomplete="current-password"`. Only checkout was missed, which is the one form where autofill matters most for conversion.
+
+  ## Fix
+
+  Add the standard autofill tokens:
+
+  | Field | autocomplete |
+  |---|---|
+  | fullName | `name` |
+  | email | `email` |
+  | phone | `tel` |
+  | addressLine1 | `address-line1` |
+  | addressLine2 | `address-line2` |
+  | city | `address-level2` |
+  | state | `address-level1` |
+  | postalCode | `postal-code` |
+
+  Wrap the address fields so the browser reads them as one address group.
+
+  ## Acceptance criteria
+
+  - Every checkout field has the correct autocomplete token
+  - Saved iOS/Android contact + address autofills the form in one tap
+  - Landmark and order notes may stay without a token (no standard equivalent)
+feature: mobile-responsive-jul2026
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:32.134Z"
+last_updated: "2026-07-28T15:20:20.526Z"
+time_spent_minutes: 0
+labels:
+  - mobile
+  - frontend
+  - checkout
+  - forms
+  - conversion
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T15:20:20.526Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T15:21:01.429Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5eb3c0e3` — fix(web): autofill tokens and numeric keypads on the checkout address form
+
+      **Files Changed**:
+      - `packages/web/app/components/checkout/AddressForm.tsx` — all 8 tokens added
+      - `packages/web/tests/components/checkout/AddressForm.test.tsx` — new component test
+
+      **Tokens applied**: `name`, `email`, `tel`, `address-line1`, `address-line2`, `address-level2` (city), `address-level1` (state), `postal-code`. Landmark and order notes left without tokens — no standard equivalent.
+
+      **Test-location note**: covered by a component test rather than E2E. `/checkout` short-circuits to "Your cart is empty" without a seeded cart, and seeding a guest cart cross-origin (web :4321 → api :3000) fails on session cookies — a test-infra problem unrelated to these attributes. The component test asserts the rendered markup, which is exactly what browser autofill heuristics read, and needs no server. The E2E spec I first wrote was removed rather than left failing.
+
+      **Verification**:
+      - RED against production (unfixed): 11 failed, every field reporting `autocomplete: null`
+      - RED against the pre-fix component (fix git-stashed): 11 of 14 failed — the 3 passes are pre-existing `maxlength`/`type=text` plus the render guard
+      - GREEN: `bunx vitest run tests/components/checkout/AddressForm.test.tsx` → 14 passed / 14
+      - Full suite: 1362 passed / 1362
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Test asserting each checkout field carries its expected autocomplete token
+    file: tests/e2e/checkout-autofill.spec.ts
+    command: bunx playwright test tests/e2e/checkout-autofill.spec.ts
+    expected_result: "FAIL — all fields report autocomplete: null"
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm every field is missing its token
+    command: bunx playwright test tests/e2e/checkout-autofill.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add autocomplete attributes to the checkout shipping address form per the mapping table
+    file: packages/web/app/routes/checkout/index.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: All tokens present and correct
+    command: bunx playwright test tests/e2e/checkout-autofill.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: "git add packages/web/app/routes/checkout/ tests/e2e/checkout-autofill.spec.ts && git commit -m \"fix(web): autocomplete tokens on checkout address form for mobile autofill\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T15:20:20.526Z"

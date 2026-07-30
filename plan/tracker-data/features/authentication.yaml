@@ -34,6 +34,8 @@ tickets:
   done:
     "5": Configure Better Auth with RBAC
     "193": "Bug: Auth flow OAuth divider test expects wrong text on login page"
-total_tickets: 2
+    "319": "Bug - Phone OTP login never completes: session cookie doesn't match Better Auth format"
+    "336": Bug - authApi.getSession hits wrong endpoint (/api/auth/session), bouncing Orders and AI Creations to login
+total_tickets: 4
 completion_percentage: 100
 is_completed: true

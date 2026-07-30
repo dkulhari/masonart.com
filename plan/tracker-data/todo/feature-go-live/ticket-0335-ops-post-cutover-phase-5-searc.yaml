@@ -1,0 +1,36 @@
+ticket_number: 335
+title: 'Ops: post-cutover Phase 5 — Search Console + old-URL registration cleanup'
+description: |-
+  ## Task
+  Remaining Phase 5 items from docs/CUTOVER-CHOBII-ART.md:
+  1. **Google Search Console**: add `chobii.art` as a Domain property (DNS TXT verification — one click with the zone on Cloudflare), then submit `https://chobii.art/sitemap.xml` (verified serving 200 with chobii.art URLs after the traefik routing fix in commit 718ae9af).
+  2. **After ~2 weeks of stable operation** (rollback window closed):
+     - Delete the old `https://chobii.xtoms.xyz/api/webhooks/razorpay` webhook in the Razorpay test dashboard (the chobii.art twin is live).
+     - Optionally remove the `chobii.xtoms.xyz` redirect URI from the shared Google OAuth client (console under dk.jarvis1.ai@gmail.com — REMOVE ONLY the chobii staging entry, never touch customs-copilot's entries).
+     - Do NOT detach the `chobii-cdn.xtoms.xyz` R2 custom domain — it stays forever (already-sent emails embed those image URLs).
+
+  ## Context
+  No Change-of-Address is possible in Search Console since the old URL 404s instead of redirecting (accepted decision); mitigated by staging pages having always canonicalized to chobii.art. NOT in scope here: live Razorpay keys + Sentry DSN wiring — that is the separate final go-live gate.
+
+  ## Acceptance
+  Search Console property verified and sitemap submitted (shows Discovered URLs); after the waiting period, old webhook deleted and OAuth list pruned without breaking customs-copilot login.
+feature: go-live
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-24T20:50:02.050Z'
+last_updated: '2026-07-24T20:50:02.050Z'
+time_spent_minutes: 0
+labels:
+  - ops
+  - seo
+  - post-cutover
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

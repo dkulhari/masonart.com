@@ -1,0 +1,72 @@
+ticket_number: 302
+title: Web Tests - Update remaining E2E specs and fixtures to chobi.art
+description: |-
+  ## Task
+  Update every remaining test file asserting the old brand: ~20 specs in tests/e2e/ (product-detail, cart, account, admin-*, ai-generator, wallet, addresses, guest-order-tracking, order-confirmation, customer-approval, product-listing), tests/fixtures/users.ts + playwright.ts (test emails @masonart.com → @chobi.art), tests/setup/workspaces.test.ts and tests/integration/seed.test.ts (package/seed name expectations — coordinate with seed data ticket).
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 2 - Web User-Facing Strings (test layer)
+  Test-account emails must match what seed scripts create — the API identifiers ticket renames seeds to @chobi.art; keep both in lockstep.
+feature: rebrand-chobi-art
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-22T08:07:29.664Z"
+last_updated: "2026-07-22T09:03:02.859Z"
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-22T08:39:18.162Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-22T09:03:02.896Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-22T09:03:24.231Z"
+    text: "✅ Swept all brand refs in tests/ (root E2E + fixtures) and packages/web/tests, plus tailwind.config.ts brand comment and app.config.ts name. Fixture emails now @chobi.art (lockstep with #305 seed rename). Unit tests: 456 passed on affected files. Full E2E run deferred to #311 gate (requires seeded dev stack, which #305 seed rename feeds). Commit: eedc0064."
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 299
+    feature: rebrand-chobi-art
+    description: Web SEO - Root meta, OG tags, and JSON-LD use chobi.art brand constants
+  - ticket: 300
+    feature: rebrand-chobi-art
+    description: Web UI - Header/Footer wordmark and layout brand strings
+  - ticket: 301
+    feature: rebrand-chobi-art
+    description: Web Routes - Page titles and copy across all routes to chobi.art
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Sweep tests/ for brand refs and update assertions + fixture emails
+    file: tests/
+    status: pending
+    code: |-
+      grep -rn "MasonArt\|masonart" tests/
+      # Title assertions: /chobi\.art/i
+      # Fixture emails: test-admin@chobi.art, test-e2e-admin@chobi.art, etc.
+      # workspaces.test.ts: expect package names @chobi/* AFTER the package-rename ticket lands — if running before it, leave those two assertions and mark with TODO(#rename-ticket)
+  - id: 2
+    action: verify-pass
+    description: Full E2E suite green against dev stack
+    command: bun run test && bun run test:e2e
+    expected_result: PASS
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit test rebrand
+    command: "git add tests && git commit -m \"test: assert chobi.art branding across e2e suite (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-22T08:39:18.159Z"
+completed: "2026-07-22T09:03:02.859Z"

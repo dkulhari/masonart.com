@@ -1,0 +1,39 @@
+ticket_number: 295
+title: 'BUG: api tsc build broken on main — ~60 type errors block the production image build'
+description: |-
+  Found while executing #294-adjacent verification: `bun run build` (tsc) in packages/api fails with ~60 errors across 12 files (admin/returns, admin/reviews, admin/shipments, admin/shipping, admin/notifications, returns, shipments, ai, queues/ai-generation, services/sms, database/seed-test-users, index.ts). Dev never noticed because `bun run dev` executes TS directly. The Docker api image runs `bun run build`, so this is a hard launch blocker.
+
+  Error classes: TS18048/TS2532 possibly-undefined after .returning()/[0] indexing (add guards matching surrounding route idioms), TS6133 unused declarations (remove), TS2739 style-prompt Record missing 5 newer art styles in ai-generation.ts, TS2322/TS2345 CORS origin + undici/bun Request mismatch in index.ts, string|null narrowing in returns/shipments notification calls.
+
+  Acceptance: bunx tsc --noEmit clean in packages/api; docker build --target api succeeds; unit suite no worse than before.
+feature: go-live
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-17T15:33:35.747Z'
+last_updated: '2026-07-17T15:55:32.248Z'
+time_spent_minutes: 0
+labels:
+  - go-live
+  - bug
+  - phase-gate
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-17T15:34:26.477Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-07-17T15:40:27.912Z'
+    text: 'Fixed in e3359f9b. tsc --noEmit clean in packages/api; docker build --target api succeeds (900MB image); unit suite improved 540→410 failures — the remaining 410 are a PRE-EXISTING test-env issue (unauthenticated requests get 500 instead of 401 from requireAuth; DB-backed assertions), verified unrelated via stash comparisons by three independent agents. That test-env repair should be handled before the #294 gate (which requires suites ×2 green). Also fixed en route: base-image drift (oven/bun:1-slim / node:20-slim no longer ship adduser — now using built-in bun/node users; bun rejects --production=false) and vite manualChunks vs SSR externals.'
+  - author: system
+    timestamp: '2026-07-17T15:55:32.248Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-07-17T15:34:26.477Z'
+completed: '2026-07-17T15:55:32.248Z'

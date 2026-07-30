@@ -1,0 +1,49 @@
+ticket_number: 343
+title: Escape user-controlled values in order/approval email templates (pre-existing pattern)
+description: |-
+  ## Task
+  The order/shipping/approval templates in packages/api/src/services/email-templates.ts interpolate user-controlled values (shippingAddress.fullName, address lines, review comments, AI prompt text) into HTML without escaping — same class as the auth-template issue fixed in commit 87a8e456 (which added an `escapeHtml` helper to this file).
+
+  ## Scope
+  Apply `escapeHtml` to every user-originated interpolation in the pre-existing templates (getOrderConfirmationTemplate, getShippedTemplate, getOutForDeliveryTemplate, getDeliveredTemplate, formatShippingAddress — note it joins with <br> so escape the parts, not the joined string — approval + AI templates with user prompts/comments). Add tests mirroring tests/services/auth-email-templates.test.ts.
+
+  ## Context
+  HTML injection in emails = phishing-content injection risk; requires a paying customer (address fields) or generation user (prompts), so lower urgency than the signup-name vector, but same fix.
+feature: qa-testing
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-27T14:01:28.557Z"
+last_updated: "2026-07-27T15:05:18.204Z"
+time_spent_minutes: 0
+labels:
+  - security
+  - email
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T15:02:08.617Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-27T15:05:18.219Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T15:05:21.596Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `2c284e9d` - fix(api): escape user-controlled values in order/approval/AI email templates
+
+      **Coverage**: TDD — 11 new tests red (raw `<img onerror>` present in every template family) → green. Escaped: order greetings ×4, formatShippingAddress (each part escaped individually, <br> joins literal), approval customerName + productTitle ×4 templates (12 sites), AI displayName/truncatedPrompt/rejectionReason. Plain-text variants verified to stay raw.
+
+      **Verification**: `bunx vitest run tests/services/` → 12 files, 260 passed / 2 skipped. Typecheck clean. Needs deploy to reach production (will batch with the rest of this session's fixes).
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-07-27T15:02:08.582Z"
+completed: "2026-07-27T15:05:18.204Z"

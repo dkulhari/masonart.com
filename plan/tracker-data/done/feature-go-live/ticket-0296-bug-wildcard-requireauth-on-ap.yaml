@@ -1,0 +1,31 @@
+ticket_number: 296
+title: 'BUG: wildcard requireAuth on /api-mounted sub-apps gated health/tracking/webhooks; onError collapsed HTTPExceptions to 500'
+description: |-
+  Two compounding production bugs found while booting the prod stack: (1) shipmentsApp and returnsApp are mounted at bare /api but registered `use("*", requireAuth)`, which auth-gated every later-registered /api route — /api/health (healthcheck could never pass, so web could never start), public order tracking, approvals, and Razorpay webhooks (payments would break). (2) app.onError converted every HTTPException (401/403/404) into a 500 and paged Sentry/Slack for each, which is also why ~500 unit tests appeared to fail with 500-instead-of-401 and were being misread as environmental.
+
+  Fix: scope the middleware to each sub-app's own route patterns; add an HTTPException passthrough at the top of onError (expected HTTP errors keep status, no alerting). Unit suite: 540 failures → 56 (remaining are stale expectations: old /health shape, unmodeled 429s).
+feature: go-live
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-17T15:51:46.679Z'
+last_updated: '2026-07-17T15:51:59.928Z'
+time_spent_minutes: 0
+labels:
+  - go-live
+  - bug
+  - security
+  - phase-gate
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-17T15:51:59.928Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-17T15:51:59.928Z'

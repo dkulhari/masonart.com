@@ -1,0 +1,114 @@
+ticket_number: 348
+title: "BUG: Mobile nav drawer is transparent — page content bleeds through, menu illegible"
+description: |-
+  ## Problem
+
+  On mobile (<768px) the hamburger menu opens a nav panel that has **no background of its own**. It is rendered as a plain `<nav>` inside the sticky `<header>`, so it inherits the header's translucent `bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60`.
+
+  A 60%-opaque white + 8px blur reads fine over a 64px header strip, but the expanded menu panel is ~359px tall and sits over vivid page content. On the homepage the saturated 'Shop by Style' cards (purple/pink, green/teal) show straight through the open menu, and the nav labels — Posters, Create with AI, Gallery, About, Account — become very hard to read.
+
+  **Verified on production chobii.art at 390x844, 2026-07-28.**
+
+  Measured computed styles with the menu open:
+  - `header` → `background-color: rgba(255, 255, 255, 0.6)`, `backdrop-filter: blur(8px)`, height grows 64px → 359px
+  - the mobile `<nav>` itself → `background-color: rgba(0, 0, 0, 0)`
+  - no scrim/overlay element exists behind the panel (queried for fixed elements with z-index > 10 and height > 500 → none)
+
+  This affects **every page on mobile**, since the header is global.
+
+  ## Root cause
+
+  `packages/web/app/components/layout/Header.tsx:131` renders the mobile menu as:
+  ```tsx
+  <nav className="border-t border-border py-4 md:hidden">
+  ```
+  with no background, inside the translucent header declared at `Header.tsx:36`.
+
+  ## Note — the fix pattern already exists in this codebase
+
+  The mobile **Filters** drawer on `/posters` is built correctly: solid background, backdrop scrim, sticky 'Apply Filters' CTA. The header should use that same Sheet component rather than expanding the header element. Preferred fix is to render the mobile nav as a Sheet; the minimal fix is to give the `<nav>` an opaque `bg-background` and add a scrim.
+
+  ## Acceptance criteria
+
+  - Open mobile menu on the homepage → no page content visible through the panel
+  - A scrim covers the rest of the viewport; tapping it closes the menu
+  - Body scroll is locked while the menu is open
+  - Escape closes the menu and focus is trapped within it while open
+feature: mobile-responsive-jul2026
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:28.931Z"
+last_updated: "2026-07-28T16:11:22.364Z"
+time_spent_minutes: 0
+labels:
+  - mobile
+  - frontend
+  - navigation
+  - regression-risk
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T16:11:22.365Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T16:12:17.140Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5c0e0730` — fix(web): opaque mobile nav drawer with scrim, scroll lock and Escape
+
+      **Files Changed**:
+      - `packages/web/app/components/layout/Header.tsx` — rebuilt the mobile menu as a real drawer
+      - `tests/e2e/mobile-nav.spec.ts` — new spec (8 tests)
+
+      **Implementation**: took the ticket's preferred route — matched the pattern `MobileFiltersSheet` on `/posters` already uses (scrim, opaque panel, scroll lock, Escape, `role="dialog"` + `aria-modal`). Did not extract a shared Sheet component: that would have meant touching the working filter drawer, which is a refactor rather than this fix.
+
+      **A second bug surfaced during implementation.** My first attempt nested the drawer inside `<header>` and the spec failed — the scrim measured `height: 0`. Cause: the header sets `backdrop-blur`, and a `backdrop-filter` establishes a containing block for fixed-position descendants, so `fixed inset-0` resolved against the 64px header box instead of the viewport. The drawer is now a **sibling** of `<header>`, with a comment recording why. Without the scrim assertion this would have shipped looking fine in a screenshot.
+
+      **Verification**:
+      - RED against production (unfixed): 7 of 8 failed. The single pass was "scroll restored after closing" — trivially true when scroll was never locked.
+      - GREEN against local dev: `8 passed`
+      - Live check at 390×844: drawer background `rgb(255, 255, 255)` (alpha 1), scrim present, `body overflow: hidden`, Escape and scrim-tap both close. Screenshot confirms nav labels legible with the page dimmed behind.
+      - Full web suite after the change: 1362 passed / 1362
+
+      **Test-robustness note**: the spec retries the open click until the toggle reports `aria-expanded="true"`. The button is server-rendered and clickable before hydration, so a single early click lands on inert markup and the menu never opens — the same hydration race that breaks cart seeding in #359.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: E2E test asserting the open mobile nav panel is opaque and a scrim exists
+    file: tests/e2e/mobile-nav.spec.ts
+    command: bunx playwright test tests/e2e/mobile-nav.spec.ts
+    expected_result: FAIL — nav panel computed background-color is rgba(0,0,0,0) and no scrim element is found
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the test reproduces the transparency bug
+    command: bunx playwright test tests/e2e/mobile-nav.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: "Render the mobile nav via the Sheet component used by the /posters Filters drawer (solid bg + scrim + scroll lock + Escape + focus trap). Minimal alternative: add opaque bg-background to the nav and a scrim overlay."
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm panel is opaque, scrim closes menu, scroll locked, Escape works
+    command: bunx playwright test tests/e2e/mobile-nav.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: "git add packages/web/app/components/layout/Header.tsx tests/e2e/mobile-nav.spec.ts && git commit -m \"fix(web): opaque mobile nav drawer with scrim and scroll lock\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T16:11:22.364Z"

@@ -1,0 +1,48 @@
+ticket_number: 290
+title: "BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start"
+description: |-
+  Phase: Hardening. docker/docker-compose.prod.yml healthchecks use ['CMD','curl','-f',...] but oven/bun:1-slim (api) and node:20-slim (web) ship no curl. Both containers report unhealthy forever; web's depends_on api service_healthy therefore blocks web from EVER starting. Launch blocker found in plan review.
+
+  Fix: replace compose healthchecks with runtime probes, matching the (already correct) Dockerfile HEALTHCHECKs:
+  - api: bun -e "fetch('http://localhost:3000/api/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+  - web: node -e equivalent against :3001.
+  Note /health vs /api/health inconsistency between compose and Dockerfile — standardize on /api/health.
+
+  Acceptance: prod-mode compose up shows api and web reach healthy; docker inspect health log shows passing probes.
+  Lesson: cc runbook L4 (bun-slim has no curl).
+feature: go-live
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-16T14:21:35.214Z"
+last_updated: "2026-07-17T15:10:16.933Z"
+time_spent_minutes: 0
+labels:
+  - go-live
+  - bug
+  - phase-hardening
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-17T15:10:16.935Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T15:14:03.483Z"
+    text: |-
+      ✅ Completed in commit f737d383 — generated the four missing /images/categories/*.jpg (abstract, nature, minimalist, typography) as programmatic placeholder art via sharp; all serve 200 and render under the existing gradient overlay. Swap for real photography when brand assets exist.
+
+      Also closing #287/#288/#289 as verified-already-implemented: ProductCard has the typed uniformAspectRatio prop with orientation fallback (ProductCard.tsx:52,92), ProductGrid accepts and forwards it (ProductGrid.tsx:41,133), and the hero page uses the shared ProductCard with uniformAspectRatio="aspect-[3/4]" (routes/index.tsx:239-242) — no inline card remains. Typecheck clean; home + posters SSR render verified this session.
+  - author: mcp-client
+    timestamp: "2026-07-27T15:14:33.562Z"
+    text: |-
+      ⚠️ Correction: the previous comment belongs to a DIFFERENT ticket — TickeTrack has a numbering collision: #290 exists twice (this go-live "healthchecks exec curl" bug AND hero-grid-alignment's "category images" task). The status API resolves #290 to the hero ticket while the comment API resolves to this one.
+
+      As for THIS ticket's actual subject: it is FIXED — docker/docker-compose.prod.yml healthchecks now probe with `bun -e "fetch(...)"` (lines ~96-102 api, ~152-158 web; comments in the file explicitly note "slim images ship no curl"), and production containers show healthy (chobii-web-1/chobii-api-1 "Up 27 hours (healthy)" on the mini as of 2026-07-27). This ticket can be closed; flagging the duplicate-number data issue to the user rather than mutating status by ambiguous number.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-17T15:10:16.933Z"

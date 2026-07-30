@@ -1,0 +1,162 @@
+ticket_number: 325
+title: Backend API - Admin customers list + role-assignment endpoints
+description: |-
+  ## Task
+  Create a new admin customers route file with two endpoints:
+  - `GET /api/admin/customers` — paginated user list (id, name, email, role, createdAt)
+  - `PUT /api/admin/customers/:id/role` — assign role, Zod-restricted to `customer | content-manager`
+
+  Both gated `requireAuth` + `requireAdmin` (NOT requireContentManager — content-managers must not manage roles).
+
+  ## Context
+  Part of feature: content-manager-role
+  Phase: Backend API
+
+  No admin customers route exists yet (`packages/api/src/routes/admin/` has no customers.ts). Follow the sub-app pattern of sibling files (e.g. products.ts): create Hono sub-app, gate with `.use("*", ...)`, register in `packages/api/src/index.ts` alongside the other /api/admin/* mounts.
+
+  Security invariants (design decision 3 — no privilege escalation):
+  - Zod schema only accepts `customer` or `content-manager` — sending `admin`/`super-admin` is a 400
+  - Targets that are currently `admin` or `super-admin` cannot be modified — 403
+  - Verify the exact users table export name in packages/api/src/database/schema/users.ts before writing queries.
+feature: content-manager-role
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T11:49:32.752Z"
+last_updated: "2026-07-23T12:05:57.560Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T12:04:29.411Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-23T12:05:57.563Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T12:06:03.413Z"
+    text: "✅ Implemented in commit abde8c58. TDD: 9 tests red (module missing) → 9/9 green. Coverage: admin list 200 with id/name/email/role; promote/demote persists in real DB; role=admin and role=super-admin rejected 400 by Zod; admin targets immutable 403; content-manager caller 403; unknown id 404. Mounted at /api/admin/customers in index.ts."
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 322
+    feature: content-manager-role
+    description: Types & Schema - Add content-manager to role enums and migration
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: "Write failing integration tests: admin lists customers (200); admin sets customer -> content-manager (200, role persisted); role 'admin' in body rejected 400; targeting an admin user rejected 403; content-manager caller rejected 403; unknown user id 404."
+    file: packages/api/tests/routes/admin/customers.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('PUT /api/admin/customers/:id/role', () => {
+        it('admin can promote customer to content-manager', async () => { /* 200, db role updated */ });
+        it('rejects role=admin with 400 (zod)', async () => { /* body { role: 'admin' } -> 400 */ });
+        it('cannot change role of an admin user (403)', async () => { /* target user role admin -> 403 */ });
+        it('content-manager caller gets 403', async () => { /* requireAdmin gate */ });
+        it('unknown user id returns 404', async () => {});
+      });
+      describe('GET /api/admin/customers', () => {
+        it('admin gets user list with id/name/email/role', async () => { /* 200 */ });
+        it('customer gets 403', async () => {});
+      });
+  - id: 2
+    action: verify-fail
+    description: Confirm tests fail (route not found, 404)
+    command: cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts
+    expected_result: FAIL - 404 route not mounted
+    status: pending
+  - id: 3
+    action: implement
+    description: Create admin customers sub-app (verify users table export name in schema before writing queries)
+    file: packages/api/src/routes/admin/customers.ts
+    status: pending
+    code: |-
+      import { Hono } from "hono";
+      import { zValidator } from "@hono/zod-validator";
+      import { z } from "zod";
+      import { eq } from "drizzle-orm";
+      import { db } from "../../database";
+      import { users } from "../../database/schema/users"; // verify export name
+      import {
+        requireAuth,
+        requireAdmin,
+        type AuthVariables,
+      } from "../../middleware/auth";
+
+      const roleAssignmentSchema = z.object({
+        role: z.enum(["customer", "content-manager"]),
+      });
+
+      export const adminCustomersApp = new Hono<{ Variables: AuthVariables }>();
+
+      adminCustomersApp.use("*", requireAuth, requireAdmin);
+
+      adminCustomersApp.get("/", async (c) => {
+        const list = await db
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+            createdAt: users.createdAt,
+          })
+          .from(users)
+          .orderBy(users.createdAt);
+        return c.json({ customers: list });
+      });
+
+      adminCustomersApp.put(
+        "/:id/role",
+        zValidator("json", roleAssignmentSchema),
+        async (c) => {
+          const id = c.req.param("id");
+          const { role } = c.req.valid("json");
+
+          const [target] = await db.select().from(users).where(eq(users.id, id));
+          if (!target) {
+            return c.json({ error: "NotFound", message: "User not found" }, 404);
+          }
+          if (target.role === "admin" || target.role === "super-admin") {
+            return c.json(
+              { error: "Forbidden", message: "Cannot change role of admin accounts" },
+              403
+            );
+          }
+
+          await db.update(users).set({ role }).where(eq(users.id, id));
+          return c.json({ success: true, id, role });
+        }
+      );
+  - id: 4
+    action: implement
+    description: Mount the sub-app in the API index alongside other admin routes
+    file: packages/api/src/index.ts
+    status: pending
+    code: |-
+      import { adminCustomersApp } from "./routes/admin/customers";
+      // with the other /api/admin mounts:
+      app.route("/api/admin/customers", adminCustomersApp);
+  - id: 5
+    action: verify-pass
+    description: Customers route tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: "Commit changes (replace #TICKET with this ticket's number)"
+    command: "git add -A && git commit -m \"feat(api): admin customers list and role-assignment endpoints (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-23T12:04:29.411Z"
+completed: "2026-07-23T12:05:57.560Z"

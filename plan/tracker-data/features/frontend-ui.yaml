@@ -35,6 +35,8 @@ tickets:
   in_progress: {}
   done:
     "10": Initialize TanStack Start with Tailwind CSS
-total_tickets: 1
+    "337": Bug - Settings icon and quick-action link to /account/settings which does not exist (404)
+    "338": "Bug - 8 footer/info links 404: about, contact, faq, shipping, returns, privacy, terms, cookies"
+total_tickets: 3
 completion_percentage: 100
 is_completed: true

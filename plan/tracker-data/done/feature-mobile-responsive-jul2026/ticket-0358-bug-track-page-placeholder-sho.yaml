@@ -1,0 +1,87 @@
+ticket_number: 358
+title: "BUG: Track page placeholder shows stale 'MA-2024-001234' masonart order prefix"
+description: |-
+  ## Problem
+
+  The order-number field on `/track` uses the placeholder `e.g., MA-2024-001234`. The `MA-` prefix is left over from the pre-rebrand **masonart** identity. After the rename to chobii.art this either misleads customers about their order-number format, or points at a real inconsistency if orders genuinely still carry an `MA-` prefix.
+
+  **Verified on production chobii.art at 390x844, 2026-07-28.**
+
+  The rebrand tickets (#298-#311, plus corrections #317/#318) swept the codebase for masonart references; this placeholder string was missed.
+
+  ## Fix
+
+  First determine what prefix the order-number generator actually emits today, then either:
+  - update the placeholder to match the real format, or
+  - if orders really are still prefixed `MA-`, raise that separately — it is a bigger rebrand gap than a placeholder string
+
+  While in here, grep for any other surviving `MA-` / `masonart` user-facing strings.
+
+  ## Acceptance criteria
+
+  - The placeholder matches the order-number format the system actually generates
+  - No user-facing `masonart` or `MA-` references remain
+feature: mobile-responsive-jul2026
+type: bug
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:47.143Z"
+last_updated: "2026-07-28T16:11:23.797Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - branding
+  - content
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T16:11:23.797Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T16:12:17.993Z"
+    text: |-
+      ❌ **Closed — not a bug. The premise was wrong.**
+
+      No code change. The placeholder `e.g., MA-2024-001234` is **accurate**: the system really does generate order numbers in that format today.
+
+      ```ts
+      // packages/api/src/routes/orders.ts:47
+      const ORDER_NUMBER_PREFIX = "MA";
+      // packages/api/src/routes/admin/orders.ts:50
+      const ORDER_NUMBER_PREFIX = "MA";
+      ```
+
+      `generateOrderNumber()` emits `MA-YYYY-NNNNNN`. I filed this ticket assuming the string was rebrand leftover; it is the **order-number scheme itself** that still carries the masonart prefix. The ticket did hedge this ("if orders really are still prefixed MA-, raise that separately — it is a bigger rebrand gap"), and that is what happened.
+
+      **Why I did not just change the prefix**: it is a one-line edit with real consequences and it is a product/ops decision, not a bug fix — historical orders are `MA-`, customers hold those numbers in emails and tracking links, and admin lookup keys off the prefix in four places. Changing the constant would silently break lookup of every existing order.
+
+      Raised as **#361** for a decision. Closing this one as invalid.
+
+      Also checked while here: no other user-facing `masonart` strings remain.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Check the order-number generator for the real prefix, update the track page placeholder to match, and grep for other surviving masonart/MA- user-facing strings
+    file: packages/web/app/routes/track/index.tsx
+    command: grep -rn 'MA-\|masonart' packages/web/app packages/api/src --include=*.ts --include=*.tsx
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: Placeholder matches the generated format; no stale brand strings remain
+    command: grep -rn 'MA-\|masonart' packages/web/app packages/api/src --include=*.ts --include=*.tsx
+    expected_result: No user-facing matches
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit the fix
+    command: "git add packages/web/app/routes/track/ && git commit -m \"fix(web): track page placeholder uses current order-number format\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T16:11:23.797Z"

@@ -1,0 +1,64 @@
+ticket_number: 301
+title: Web Routes - Page titles and copy across all routes to chobi.art
+description: |-
+  ## Task
+  Replace remaining MasonArt/masonart strings in all route files under packages/web/app/routes/: page titles ("... | MasonArt"), meta descriptions, and inline copy. Heaviest: posters/$slug.tsx (13), posters/index.tsx (11), index.tsx (5), _authed/account/wallet.tsx (4); plus cart, checkout (incl. Razorpay checkout name in PaymentButton/AddFundsButton), auth login/register, account pages, track, gallery, create, approve, admin routes and admin components.
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 2 - Web User-Facing Strings
+  Use BRAND_NAME constant in title template literals: `Cart | ${BRAND_NAME}`. Comments mentioning MasonArt may be updated mechanically. Verify zero remaining refs with grep.
+feature: rebrand-chobi-art
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-22T08:07:20.747Z'
+last_updated: '2026-07-22T08:39:03.645Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-22T08:37:36.948Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-07-22T08:39:03.652Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 298
+    feature: rebrand-chobi-art
+    description: Brand Constants - Create brand.ts with chobi.art identity in shared package
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Sweep all route + component files, replacing brand strings with BRAND_NAME constant
+    file: packages/web/app/routes/
+    status: pending
+    code: |-
+      # Find every remaining ref (after t2/t3):
+      grep -rn "MasonArt\|masonart" packages/web/app --include="*.tsx" --include="*.ts"
+      # For titles use: title: `Posters | ${BRAND_NAME}`
+      # Razorpay options name: BRAND_NAME (PaymentButton.tsx, AddFundsButton.tsx)
+      # Placeholder emails in forms: you@example.com style stays generic
+  - id: 2
+    action: verify-pass
+    description: No masonart refs remain in web app source; typecheck + unit tests pass
+    command: '! grep -rqi masonart packages/web/app && bun run typecheck && bun run test'
+    expected_result: PASS - grep finds nothing, tests green
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit route title rebrand
+    command: 'git add packages/web && git commit -m "feat(web): chobi.art page titles and copy across routes (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-07-22T08:37:36.944Z'
+completed: '2026-07-22T08:39:03.645Z'

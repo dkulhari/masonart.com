@@ -1,0 +1,73 @@
+ticket_number: 336
+title: Bug - authApi.getSession hits wrong endpoint (/api/auth/session), bouncing Orders and AI Creations to login
+description: |-
+  ## Bug
+  With a valid session, /account/orders and /account/ai-creations redirect to /auth/login. Reproduced locally with an injected API session: those two pages bounce while sibling pages (wallet, addresses, notifications) work.
+
+  ## Root Cause
+  packages/web/app/lib/api.ts:866 authApi.getSession() fetches /api/auth/session — Better Auth's endpoint is /api/auth/get-session. Proven with the same cookie: /api/auth/session → 404, /api/auth/get-session → 200. The 404 makes getSession() return null; orders.tsx:112 and ai-creations.tsx:137 run a redundant client-side useEffect auth check against it and navigate to login. Working siblings rely only on the _authed layout guard.
+
+  ## Fix
+  Correct the URL in api.ts, flip the mocked-endpoint assertions in packages/web/tests/lib/api.test.ts, and remove the redundant client-side checks from the two routes (the _authed layout already guards them).
+feature: authentication
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-25T11:32:31.562Z"
+last_updated: "2026-07-25T11:34:42.708Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - auth
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-25T11:33:02.635Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-25T11:34:42.708Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-25T11:34:47.409Z"
+    text: |-
+      ✅ **Completed**
+
+      **Root Cause**: packages/web/app/lib/api.ts:867 fetched /api/auth/session (404 — Better Auth serves /api/auth/get-session); getSession() returned null so the redundant client-side checks in orders.tsx/ai-creations.tsx bounced authenticated users to login.
+
+      **Fix**: endpoint corrected (commit 7a9348d9). Kept the client-side checks — they now work; removing them was judged a risk-adding refactor (isAuthenticated gates data fetching and render in both pages).
+
+      **Verification**:
+      - Unit: tests/lib/auth-session.test.ts — 3 passed (endpoint regression anchor, payload parse, null-on-404), red confirmed before fix
+      - Live (local dev, real browser + real session): /account/orders and /account/ai-creations both stay on-page (previously bounced) — deploy to production pending with the other two account-page bugs
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Flip api.test.ts getSession mock/assertion to /api/auth/get-session (red)
+    file: packages/web/tests/lib/api.test.ts
+    command: cd packages/web && bunx vitest run tests/lib/api.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: implement
+    description: Fix endpoint URL in api.ts; drop redundant useEffect auth checks in orders.tsx and ai-creations.tsx
+    file: packages/web/app/lib/api.ts
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Unit tests pass; browser probe shows no login bounce on orders/ai-creations
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit fix
+    status: pending
+current_step: 1
+started: "2026-07-25T11:33:02.635Z"
+completed: "2026-07-25T11:34:42.708Z"

@@ -1,0 +1,80 @@
+ticket_number: 321
+title: "Bug - AI generation worker never calls real providers: stub pipeline stores JSON placeholders"
+description: |-
+  ## Bug
+  Every AI generation "succeeds" but stores a 107-byte JSON placeholder ({"type":"placeholder",...}) as the image, served with content-type image/png. Discovered during #315 provider verification on staging: generation completed instantly and the CDN object was not an image.
+
+  ## Root Cause
+  Two parallel implementations exist and were never connected:
+  - packages/api/src/ai/generator.ts exports generateImages() — the REAL implementation (Replicate/DALL-E/FAL/Gemini, built by gemini-direct-provider feature) — but it is never called from anywhere (repo-wide grep: zero call sites).
+  - packages/api/src/queues/ai-generation.ts (the BullMQ worker that processes every job) has its own older generateImagesWithAI() whose callReplicateAPI/callOpenAIAPI/callFalAI are all TODO stubs returning createPlaceholderImage(), and its dispatch switch has no "gemini" case (falls through to the Replicate stub).
+
+  So AI generation has never produced a real image in any environment; keys were never the issue.
+
+  ## Fix
+  Wire the worker to the real engine: generateImagesWithAI() delegates to generateImages() from ../ai/generator (which handles provider selection, prompt enhancement, dimensions, and per-provider calls), maps GeneratedImage[] → the worker's GeneratedImageBuffer[] (shapes are near-identical), throws on failure so jobs fail honestly instead of storing placeholders, and the dead stub functions are deleted.
+
+  ## Verification
+  Unit: mocked-generator delegation test. Live: real generation on staging via gemini → actual PNG bytes stored in chobii-staging R2 and served from chobii-cdn.
+feature: full-ai-generator
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T11:22:39.350Z"
+last_updated: "2026-07-23T11:46:22.094Z"
+time_spent_minutes: 0
+labels:
+  - backend
+  - ai
+  - queues
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T11:26:08.940Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-07-23T11:31:34.075Z"
+    text: |-
+      Wiring fix deployed and live-verified in behavior: generation job now honestly FAILS ("AI generation returned no images") instead of storing a placeholder — refund path triggers. Two further blockers found and addressed during the live gate:
+      1. gemini-2.0-flash-exp was retired by Google (404) — fixed: default now gemini-2.5-flash-image with GEMINI_IMAGE_MODEL env override (commit 3f1f124a; needs next deploy to take effect).
+      2. HARD BLOCKER for the final PNG-on-CDN gate: the Gemini API free tier has ZERO image-generation quota — all image models (2.5-flash-image, 3.1-flash-image, 3-pro-image) return quota-exceeded on an unbilled key. Real generation requires either billing enabled on the Google key (~$0.04/img flash image) or funded fal.ai credits (~$0.003/img FLUX schnell — key already in deploy/.env, parked). User decision pending.
+  - author: system
+    timestamp: "2026-07-23T11:46:22.098Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T11:46:30.761Z"
+    text: "✅ CLOSED — the bug itself (placeholder-storing stub pipeline) is fixed, unit-tested (3/3), deployed, and live-verified: jobs now fail honestly with refund instead of storing fake images. Commits d894a16e branch series: wiring fix + gemini-2.5-flash-image default with GEMINI_IMAGE_MODEL override (3f1f124a — rides the next deploy). Final real-PNG-on-CDN verification deferred with #315: blocked only on provider funding (user deprioritized image generation)."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: "Failing test: worker image generation delegates to ai/generator generateImages and maps results"
+    file: packages/api/tests/queues/ai-generation-wiring.test.ts
+    command: bunx vitest run tests/queues/ai-generation-wiring.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 2
+    action: implement
+    description: Replace stub pipeline in queues/ai-generation.ts with delegation to generateImages(); delete placeholder stubs
+    file: packages/api/src/queues/ai-generation.ts
+    status: done
+  - id: 3
+    action: verify-pass
+    description: Unit tests pass; typecheck clean
+    command: bunx vitest run tests/queues/ai-generation-wiring.test.ts
+    expected_result: PASS
+    status: done
+  - id: 4
+    action: commit
+    description: Commit, deploy, live-verify real image bytes on CDN
+    status: pending
+current_step: 4
+started: "2026-07-23T11:26:08.939Z"
+completed: "2026-07-23T11:46:22.094Z"

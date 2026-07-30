@@ -1,0 +1,60 @@
+ticket_number: 361
+title: 'DECISION: order numbers still use the masonart MA- prefix after the rebrand'
+description: |-
+  ## What #358 actually turned up
+
+  #358 assumed the `/track` placeholder `e.g., MA-2024-001234` was a stale string missed by the rebrand. It is not — **it accurately describes what the system generates today**.
+
+  ```ts
+  // packages/api/src/routes/orders.ts:47
+  const ORDER_NUMBER_PREFIX = "MA";
+  // packages/api/src/routes/admin/orders.ts:50
+  const ORDER_NUMBER_PREFIX = "MA";
+  ```
+
+  `generateOrderNumber()` emits `MA-YYYY-NNNNNN`. So every order placed on chobii.art still carries the **masonart** prefix. The placeholder was right; the underlying format is the gap.
+
+  The rebrand tickets (#298-#311, corrections #317/#318) swept code, docs and infra but did not touch the order-number scheme.
+
+  ## Why this was not changed as part of the sweep
+
+  Flipping the constant is a one-line edit with real consequences, and it is a product/ops decision rather than a bug fix:
+
+  1. **Historical orders** — any existing production order is `MA-…`. Admin lookup keys off the prefix (`id.startsWith(ORDER_NUMBER_PREFIX)` at `admin/orders.ts:436`, `592`, `703`, `817`), so changing the constant makes those lookups stop recognising older numbers unless the check accepts both.
+  2. **Customers hold the old numbers** — they appear in confirmation emails, SMS and tracking links already sent.
+  3. **The sequence counter is prefix-scoped** — `generateOrderNumber` counts existing rows matching `PREFIX-YYYY-%`, so a new prefix restarts numbering at 000001 for the year, which could collide with nothing today but muddles reporting.
+
+  The dev database currently has 0 orders, so local impact is nil; production is the question.
+
+  ## Decide
+
+  - **Keep `MA-`** — accept it as an opaque internal identifier, and close this. No code change; the placeholder already matches.
+  - **Switch to a chobii prefix** (e.g. `CH-`) — then also: accept both prefixes in admin lookup, decide whether the year sequence continues or resets, and update the `/track` placeholder to match.
+
+  If switching, do it before order volume grows — the cost only increases.
+
+  ## Acceptance criteria
+
+  - A recorded decision either way
+  - If switched: both prefixes resolve in admin lookup, existing orders remain findable, and the `/track` placeholder matches the new format
+feature: mobile-responsive-jul2026
+type: spike
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-28T16:11:16.549Z'
+last_updated: '2026-07-28T16:11:16.549Z'
+time_spent_minutes: 0
+labels:
+  - branding
+  - api
+  - orders
+  - needs-decision
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

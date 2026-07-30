@@ -1,0 +1,57 @@
+ticket_number: 342
+title: "BUG: verification emails never sent — sendVerificationEmail is a console.log stub (production signup dead-end)"
+description: |-
+  ## Bug
+  packages/api/src/auth/index.ts:177 — `emailVerification.sendVerificationEmail` is a TODO stub that only console.logs the verification URL in development. No email is ever sent in any environment.
+
+  Production sets `requireEmailVerification: true` (line 164), so on chobii.art every email/password signup creates an account that can never be verified → the user cannot complete signup. Silent dead-end: no error surfaces anywhere.
+
+  ## Impact
+  - All production email/password signups since go-live are dead-ended (Google OAuth users unaffected — no verification needed).
+  - Any real user who registered on chobii.art with email+password is stuck.
+
+  ## Fix (being done together with #242, same subsystem)
+  - Real verification-email sender using the existing `sendEmail` service (services/email.ts) + a branded template.
+  - While in there: `emailAndPassword.sendResetPassword` hook (currently absent) for the #242 forgot-password flow.
+
+  ## Follow-up after deploy
+  Check production for users with `email_verified = false` created since 2026-07-25 and either resend verification or manually verify them.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-27T13:45:35.758Z"
+last_updated: "2026-07-27T13:56:38.366Z"
+time_spent_minutes: 0
+labels:
+  - auth
+  - email
+  - P0
+  - production
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T13:56:38.446Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T13:56:44.756Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `89806688` (shared with #242 — same subsystem)
+
+      **Fix**: `sendVerificationEmail` now sends a branded verification email through the Resend email service (was a console.log stub). Failed sends throw loudly (cc #131 class). Outside production, hooks log the URL instead of sending unless SEND_AUTH_EMAILS=true — dev/E2E signups use fake @example.com addresses whose bounces would damage the chobii.art sender reputation.
+
+      **Verification**: tests/routes/auth-emails.test.ts — signup → sendEmail called once with subject containing "verify" and a verify-email link; 4/4 passing (TDD red→green).
+
+      **⚠️ Follow-ups**:
+      1. Needs production deploy (batched with #341/#242).
+      2. After deploy: check production for `email_verified = false` users created since 2026-07-25 go-live and resend/manually verify them (the ticket's original recovery note).
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T13:56:38.366Z"

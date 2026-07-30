@@ -1,0 +1,41 @@
+ticket_number: 261
+title: Auth sign-up endpoint returns 500 for all validation errors
+description: "POST /api/auth/sign-up/email returns HTTP 500 for ALL invalid input scenarios instead of 400 with validation messages. Tested: missing email, invalid email format, short name (1 char), XSS in name field - all return 500 with empty body. In contrast, the sign-in endpoint correctly returns 400 with descriptive errors for missing password and empty email. This suggests the sign-up validation middleware or handler has an unhandled exception. Severity is high because: 1) Users get no feedback on what they did wrong, 2) A 500 indicates unhandled exceptions which may leak info in production, 3) This is a core user flow."
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T22:13:01.331Z"
+last_updated: "2026-07-27T14:03:03.856Z"
+time_spent_minutes: 0
+labels:
+  - api
+  - auth
+  - error-handling
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: "2026-02-17T22:27:42.688Z"
+    text: |-
+      UPDATE: More detailed testing shows sign-up validation is PARTIALLY working:
+
+      - Password validation works correctly: `{"email":"test@test.com","password":"12","name":"Test"}` → 400 `{"code":"PASSWORD_TOO_SHORT","message":"Password too short"}` ✅
+      - Empty name → 500 (should be 400) ❌
+      - Missing name field → 500 (should be 400) ❌
+      - Invalid email format → 500 (should be 400) ❌
+
+      The issue appears to be specifically in name and email validation, NOT password validation. Password validation is handled by Better Auth itself, while name/email validation may have a bug in the custom validation layer or the error is thrown by the database constraint rather than caught by validation.
+  - author: system
+    timestamp: "2026-07-27T14:03:03.920Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T14:03:07.855Z"
+    text: "✅ Closed as fixed by intervening work (2026-07-27). Fresh verification: POST /api/auth/sign-up/email with invalid email → 400 {\"code\":\"VALIDATION_ERROR\",\"message\":\"[body.email] Invalid email address\"}; with missing name → 400 {\"code\":\"VALIDATION_ERROR\",\"message\":\"[body.name] ...\"}. The Feb-era 500s are gone — proper 400s with descriptive codes across the validation matrix."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T14:03:03.856Z"

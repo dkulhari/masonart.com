@@ -1,0 +1,54 @@
+ticket_number: 334
+title: 'Ops: Cloudflare redirect rule www.chobii.art -> chobii.art (301)'
+description: |-
+  ## Task
+  Deploy the www-to-apex redirect in the chobii.art Cloudflare zone. Easiest path: Rules -> Create rule -> template "Redirect from WWW to Root". Manual equivalent: If Hostname equals `www.chobii.art` -> Dynamic redirect `concat("https://chobii.art", http.request.uri.path)`, status 301, preserve query string.
+
+  ## Context
+  `www.chobii.art` currently returns a bare traefik "404 page not found" to real visitors (verified live 2026-07-25): the proxied `www` CNAME makes the name resolve, but no traefik router matches the www host — intentionally, since Better Auth cookies are host-only and canonicals are apex. The redirect must happen at the Cloudflare edge, NOT by adding www to traefik Host rules (that would fork sessions).
+
+  ## Acceptance
+  `curl -sI https://www.chobii.art/x` returns 301 with `location: https://chobii.art/x`; a browser visit to www lands on the apex store.
+feature: go-live
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-24T20:50:01.056Z'
+last_updated: '2026-07-29T08:10:27.441Z'
+time_spent_minutes: 0
+labels:
+  - ops
+  - dns
+  - post-cutover
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-07-29T08:10:18.731Z'
+    text: |-
+      Redirect rule deployed manually in the chobii.art Cloudflare zone (dashboard, by Dhruv) on 2026-07-29. Verified live from outside the LAN at 08:01 UTC:
+
+      - `curl -sI https://www.chobii.art/x` -> 301, `location: https://chobii.art/x` (acceptance criterion, met)
+      - `curl -sI https://www.chobii.art/` -> 301, `location: https://chobii.art/`
+      - `curl -sI "https://www.chobii.art/products?a=1&b=2"` -> 301, `location: https://chobii.art/products?a=1&b=2` (query string preserved)
+      - `curl -sL https://www.chobii.art/` -> final url `https://chobii.art/`, 200, num_redirects=1 (single hop, no loop) — browser criterion met
+      - Apex regression check: `https://chobii.art/` still 200 with 0 redirects
+
+      Pre-fix baseline for the record: www returned a bare traefik `404 page not found` with no app headers. Fix is edge-only; no traefik Host rule was touched, so Better Auth host-only cookies remain apex-scoped and sessions cannot fork.
+
+      Also satisfies the www half of the Phase 4 verification gate in docs/CUTOVER-CHOBII-ART.md:79-80.
+  - author: system
+    timestamp: '2026-07-29T08:10:27.442Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+verification:
+  tests_passed: true
+  test_command: curl -sI https://www.chobii.art/x ; curl -sI "https://www.chobii.art/products?a=1&b=2" ; curl -sL -o /dev/null -w "%{url_effective} %{http_code} %{num_redirects}" https://www.chobii.art/
+  test_output: 'All acceptance checks pass (live, 2026-07-29 08:01 UTC). /x -> 301 location: https://chobii.art/x. Query string preserved: /products?a=1&b=2 -> 301 https://chobii.art/products?a=1&b=2. Follow-redirect: final url https://chobii.art/, 200, num_redirects=1. Apex regression: https://chobii.art/ 200, 0 redirects. Ops-only change (Cloudflare edge redirect rule); no code, so no build run.'
+  verified_at: '2026-07-29T08:10:24.388Z'
+completed: '2026-07-29T08:10:27.441Z'

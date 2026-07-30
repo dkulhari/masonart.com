@@ -1,0 +1,74 @@
+ticket_number: 341
+title: "BUG: Admin sidebar sign-out redirects home without ending the session"
+description: |-
+  ## Bug
+  Clicking **Sign Out** at the bottom-left of the admin sidebar redirects to the home page but does NOT log the user out — revisiting /admin shows the panel with the session intact. Observed on production (chobii.art) 2026-07-26.
+
+  ## Root cause (confirmed by probing production)
+  `AdminSidebar.handleSignOut` (packages/web/app/components/admin/AdminSidebar.tsx:169-175) calls the hand-rolled `authApi.signOut()` (packages/web/app/lib/api.ts:929), which POSTs `/api/auth/sign-out` with `Content-Type: application/json` and **no request body**. Better Auth fails to parse the empty JSON body and returns **500**:
+
+  ```
+  POST /api/auth/sign-out  (Content-Type: application/json, no body)  -> HTTP 500
+  POST /api/auth/sign-out  (same, body '{}')                          -> HTTP 200 {"success":true}
+  ```
+
+  The sidebar's `catch` block then swallows the error and unconditionally redirects to `/`, so the failure is invisible and the session cookie is never cleared.
+
+  The account page's sign-out (packages/web/app/routes/_authed/account/index.tsx:154) works because it uses the official Better Auth React client `signOut()` from `~/lib/auth-client`.
+
+  ## Fix
+  Use the proven Better Auth client path in the sidebar and delete the broken duplicate:
+  1. In AdminSidebar.tsx: import `signOut` from `~/lib/auth-client`, call it in `handleSignOut`, keep the hard redirect (`window.location.href = '/'`) so client state resets; log the error in the catch instead of swallowing silently.
+  2. Remove `authApi.signOut` from packages/web/app/lib/api.ts (AdminSidebar is its only consumer — grep confirmed).
+
+  ## Notes
+  - Existing E2E coverage: tests/e2e/admin-auth.spec.ts "Admin Sign Out" describe (lines ~353-388) asserts exactly this behavior (sign out then /admin redirects to login) — investigate why it did not catch the bug (it appeared among skipped tests in the last full run; check for .skip / project filters / button-selector mismatch) and make sure it runs in the chromium project going forward.
+  - After the fix lands, production deploy is required (web image rebuild: `make -C deploy build-push-deploy`).
+feature: admin-panel
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-26T06:22:20.825Z"
+last_updated: "2026-07-27T13:20:04.074Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - auth
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T13:00:40.572Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-27T13:20:04.166Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T13:20:11.147Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `03de3f42` - fix(web): admin sidebar sign-out now actually ends the session
+
+      **Root Cause** (deeper than first diagnosed): the sidebar's hand-rolled `authApi.signOut()` sent a body-less POST with a JSON content-type. That works locally (Content-Length: 0), but through the production edge the empty body is re-framed as `Transfer-Encoding: chunked`, and Better Auth 500s parsing it — **reproduced against the exact prod image**: chunked-empty → 500, Content-Length:0 → 200. This is why the existing E2E sign-out tests passed locally while production was broken. The silent catch then redirected home with the session alive.
+
+      **Files Changed**:
+      - `packages/web/app/components/admin/AdminSidebar.tsx` — sign out via Better Auth client (same path as account page); failures logged, not swallowed
+      - `packages/web/app/lib/api.ts` — removed footgun `authApi.signOut` (comment points to auth-client)
+      - `tests/e2e/admin-auth.spec.ts` — new test "sign-out request carries a JSON body (prod edge compat)" — red against old code (postData empty), green after fix
+
+      **Verification**:
+      - Command: `bunx playwright test tests/e2e/admin-auth.spec.ts --project=chromium`
+      - Result: PASS (37/37; new body-assertion test red-then-green)
+      - Typecheck: no new errors in touched files
+
+      **⚠️ Not yet on production** — needs `make -C deploy build-push-deploy` (web image rebuild). Until then, admin sign-out on chobii.art remains broken; account-page sign-out works.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-07-27T13:00:40.566Z"
+completed: "2026-07-27T13:20:04.074Z"

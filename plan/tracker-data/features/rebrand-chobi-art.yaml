@@ -1,0 +1,183 @@
+name: rebrand-chobi-art
+title: Rebrand Chobi Art
+priority: high
+created: "2026-07-22T07:31:31.874Z"
+assignee: unassigned
+tags: []
+description: |-
+  # Rebrand MasonArt → chobi.art
+
+  ## Overview
+  Rebrand the platform from MasonArt to **chobi.art** — the lowercase domain form is the brand, used everywhere customers see a name (UI wordmark, page titles, emails, SMS, SEO metadata). Full-depth rename: user-facing strings, code identifiers (@masonart/* → @chobi/*), and deploy infrastructure (Docker images, database, staging hostname chobi.xtoms.xyz). Existing visual design (colors, typography, layout) stays as-is; staging data is disposable — a fresh chobi-named database replaces the old one.
+
+  ## Goals
+  - Every customer touchpoint says "chobi.art" with zero remaining "MasonArt" references (UI, transactional email/SMS, meta tags, JSON-LD, sitemap, legal pages)
+  - Internal naming consistent: packages, imports, Docker images, compose services, DB/user/volumes, deploy Makefile targets
+  - Staging serves at chobi.xtoms.xyz under the existing *.xtoms.xyz wildcard tunnel
+  - Brand name and domain live in one shared constant so any future rename is a one-file change
+
+  ## Scope
+  **In scope:**
+  - Shared brand constants (BRAND_NAME = "chobi.art", BRAND_DOMAIN, support email/sender identities) in the shared package
+  - All user-facing strings: Header/Footer wordmark, page titles, meta/OG tags, ProductJsonLd, sitemap, auth pages, account pages, checkout, order tracking, email templates, SMS templates, notification copy
+  - Package renames: masonart → chobi, @masonart/api|web|shared → @chobi/... including every import across the monorepo
+  - Better Auth config (app name, cookie prefix, trusted origins for chobi.xtoms.xyz), Sentry project tags, alert copy
+  - Deploy infra: image names chobi-api/chobi-web, compose service/volume/DB/user names, deploy/Makefile variables, remote compose filename, fresh chobi Postgres DB with migrations + seeds
+  - Staging hostname chobi.xtoms.xyz (wildcard tunnel — no per-app Cloudflare config)
+  - Docs: CLAUDE.md, README, EXTERNAL-SERVICES.md, deploy docs
+  - Test fixtures/E2E assertions that reference the brand
+
+  **Out of scope (YAGNI):**
+  - Purchasing/wiring the real chobi.art domain (separate go-live step later)
+  - New logo, colors, typography, or layout changes
+  - Renaming the git repo/directory masonart.com
+  - Migrating existing staging data (fresh DB instead)
+  - Historical ticket/tracker data, git history, past docs — history stays as written
+
+  ## Design
+  - **Approach**: Layered rebrand with a central brand constant. Layer 1: add BRAND constants to shared package and route all user-facing strings through them. Layer 2: rename packages/imports (@masonart/* → @chobi/*, root package masonart → chobi). Layer 3: deploy infra (images, compose, Makefile, fresh DB, chobi.xtoms.xyz hostname). Each layer independently verified (typecheck + unit + E2E for layers 1–2; build-push-deploy + smoke test for layer 3).
+  - **Key decisions**:
+    - Brand displayed as lowercase "chobi.art" everywhere (URL-as-brand style) — user's explicit choice
+    - Staging renamed to chobi.xtoms.xyz now; real chobi.art domain wired later as a separate go-live step
+    - Name swap only — no visual identity changes
+    - Fresh chobi-named Postgres DB/volumes on staging; old masonart data discarded
+    - Single source of truth for brand strings in shared constants to make future renames trivial
+
+  ## Technical Considerations
+  - Better Auth: trustedOrigins/baseURL must include chobi.xtoms.xyz or logins break after hostname switch; cookiePrefix "masonart" → "chobi" invalidates existing sessions (acceptable on staging); phone-auth.ts hardcodes "masonart.session_token" cookie name — must change in lockstep with cookiePrefix
+  - Email/SMS senders (Resend, 2Factor.in): sender display names and template copy change; actual sending domain/DLT templates unchanged until real domain is wired
+  - deploy/Makefile: API_IMAGE/WEB_IMAGE → ghcr.io/dkulhari/chobi-api|chobi-web; REMOTE_COMPOSE filename and psql commands reference new DB/user names
+  - Docker compose (dev + prod): postgres DB/user, volume names, traefik router names — fresh volumes mean re-running migrations and seed scripts on staging
+  - 168 files reference masonart; mechanical replacements must exclude plan/tracker-data/, docs/bugs/, and git history artifacts
+  - E2E tests and fixtures assert brand strings in titles/emails — must update in the same layer as the strings they assert on
+  - Sentry (packages/api/src/lib/sentry.ts, packages/web/app/lib/sentry.ts) release names masonart-api@/masonart-web@ → chobi-api@/chobi-web@
+
+  ## Implementation Plan
+
+  **Note**: Each ticket carries structured TDD steps with exact files and commands.
+
+  ### Phase 1: Brand Constants (Foundation)
+  Location: packages/shared/src/constants/
+  Pattern: named exports from constants/*.ts, re-exported via constants/index.ts
+  - [ ] Create brand.ts with chobi.art identity constants (+ vitest test)
+
+  ### Phase 2: Web User-Facing Strings
+  Location: packages/web/app/
+  Pattern: TanStack Start routes with head/meta helpers; components in app/components/
+  - [ ] Root meta/OG/JSON-LD (__root.tsx, ProductJsonLd.tsx) via brand constants (TDD against tests/e2e/home.spec.ts title)
+  - [ ] Header/Footer wordmark + copyright
+  - [ ] Page titles across all routes (posters, cart, checkout, auth, account, track, gallery, create, approve, admin)
+  - [ ] Update remaining E2E specs + fixtures asserting the old brand
+
+  ### Phase 3: API User-Facing Strings & Identifiers
+  Location: packages/api/src/
+  Pattern: services for email/sms; env-var defaults inline in routes
+  - [ ] Email sender identity + email-templates.ts (34 refs) via brand constants
+  - [ ] SMS notification templates + phone placeholder email domain
+  - [ ] Cookie prefix, service names, sitemap/APP_URL defaults, seed admin emails, Sentry releases, alerts
+
+  ### Phase 4: Package Renames
+  Location: package.json files + all imports
+  - [ ] masonart → chobi, @masonart/* → @chobi/* repo-wide; reinstall; typecheck; full unit suite
+
+  ### Phase 5: Deploy Infrastructure
+  Location: docker/, deploy/, .env.example
+  - [ ] docker-compose.yml + docker-compose.prod.yml: project/images/DB/user/traefik/hostname → chobi
+  - [ ] deploy/Makefile + .env.example + remote compose filename
+  - [ ] Docs sweep: CLAUDE.md, README, docs/EXTERNAL-SERVICES.md, docker/CLAUDE.md, deploy/CLAUDE.md
+  - [ ] Deploy staging: fresh chobi DB, build-push-deploy, smoke test https://chobi.xtoms.xyz (health + login)
+
+  ### Final Phase: Verification
+  - [ ] Repo-wide masonart sweep (excluding history dirs) + full unit & E2E suites
+
+  ## Technical Notes
+  - Project type: Bun monorepo (workspaces: packages/api Hono, packages/web TanStack Start SSR, packages/shared)
+  - Tests: Vitest (bunx vitest run <path>), Playwright (bun run test:e2e)
+  - Deploy: make -C deploy build-push-deploy (ghcr.io/dkulhari images → Mac mini via SSH, traefik + cloudflared wildcard *.xtoms.xyz)
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "298": Brand Constants - Create brand.ts with chobi.art identity in shared package
+    "299": Web SEO - Root meta, OG tags, and JSON-LD use chobi.art brand constants
+    "300": Web UI - Header/Footer wordmark and layout brand strings
+    "301": Web Routes - Page titles and copy across all routes to chobi.art
+    "302": Web Tests - Update remaining E2E specs and fixtures to chobi.art
+    "303": API Email - Sender identity and email templates to chobi.art
+    "304": API SMS - Notification SMS templates and phone placeholder domain to chobi.art
+    "305": API Identifiers - Cookie prefix, service names, URL defaults, seeds, Sentry
+    "306": Packages - Rename masonart/@masonart/* to chobi/@chobi/* repo-wide
+    "307": Infra - Docker compose (dev + prod) renamed to chobi
+    "308": Infra - deploy/Makefile, .env.example, remote compose renamed to chobi
+    "309": Docs - Rebrand CLAUDE.md, README, external services and deploy docs
+    "310": Deploy - Fresh chobi DB, staging live at chobi.xtoms.xyz, smoke test
+    "311": Verify - Repo-wide masonart sweep and full test suites
+    "317": Correction - Rebrand chobi.art to chobii.art (code, tests, docs)
+    "318": "Correction - chobii infra: R2 bucket/CDN, images, DB, staging cutover"
+total_tickets: 16
+completion_percentage: 100
+is_completed: true
+design:
+  approach: "Layered rebrand with a central brand constant: (1) add BRAND_NAME/BRAND_DOMAIN constants to the shared package and route all user-facing strings (UI, SEO, emails, SMS) through them; (2) rename code identifiers — root package masonart → chobi, @masonart/* → @chobi/* with all imports; (3) rename deploy infrastructure — Docker images chobi-api/chobi-web, compose services/volumes, fresh chobi Postgres DB with migrations+seeds, staging hostname chobi.xtoms.xyz under the *.xtoms.xyz wildcard tunnel. Each layer verified independently (typecheck + tests for 1–2; build-push-deploy + smoke test for 3)."
+  decisions:
+    - Brand displayed as lowercase "chobi.art" everywhere (URL-as-brand style) — user's explicit choice over "Chobi" or "Chobi.art"
+    - "Full-depth rebrand: user-facing strings + package names + deploy infra"
+    - per user selection
+    - Staging renamed to chobi.xtoms.xyz now; wiring the real chobi.art domain is a separate later go-live step
+    - Name swap only — no new logo
+    - colors
+    - typography
+    - or layout changes
+    - Fresh chobi-named Postgres DB and volumes on staging (data disposable); no in-place DB rename
+    - Brand strings centralized in shared constants so future renames are a one-file change
+    - "Out of scope: repo/directory rename"
+    - historical tracker data
+    - git history
+  approved: true
+  approved_at: "2026-07-22T07:31:47.586Z"
+plan:
+  phases:
+    - name: Brand Constants
+      location: packages/shared/src/constants
+      tickets:
+        - 298
+    - name: Web User-Facing Strings
+      location: packages/web/app
+      tickets:
+        - 299
+        - 300
+        - 301
+        - 302
+    - name: API User-Facing Strings & Identifiers
+      location: packages/api/src
+      tickets:
+        - 303
+        - 304
+        - 305
+    - name: Package Renames
+      location: package.json + imports
+      tickets:
+        - 306
+    - name: Deploy Infrastructure
+      location: docker/, deploy/, docs
+      tickets:
+        - 307
+        - 308
+        - 309
+        - 310
+    - name: Verification
+      location: repo-wide
+      tickets:
+        - 311
+  generated_at: "2026-07-22T08:11:50.025Z"
+review:
+  status: approved
+  reviewed_at: "2026-07-22T08:13:17.176Z"
+  notes: Design and plan approved by user in-session; instructed to proceed autonomously with implementation.

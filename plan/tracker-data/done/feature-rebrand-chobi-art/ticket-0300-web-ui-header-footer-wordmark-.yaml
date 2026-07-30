@@ -1,0 +1,74 @@
+ticket_number: 300
+title: Web UI - Header/Footer wordmark and layout brand strings
+description: |-
+  ## Task
+  Replace the MasonArt wordmark and copy in layout components: packages/web/app/components/layout/Header.tsx (logo text) and Footer.tsx (wordmark, "© {year} MasonArt. All rights reserved.", about blurb) with BRAND_NAME from shared constants.
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 2 - Web User-Facing Strings
+  Name swap only — no layout/styling changes. Wordmark renders lowercase "chobi.art".
+feature: rebrand-chobi-art
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-22T08:07:15.166Z'
+last_updated: '2026-07-22T08:37:29.490Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-22T08:35:22.161Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-07-22T08:37:29.498Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 298
+    feature: rebrand-chobi-art
+    description: Brand Constants - Create brand.ts with chobi.art identity in shared package
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Update E2E header/footer brand assertions (home.spec/account.spec footer checks)
+    file: tests/e2e/home.spec.ts
+    command: grep -rn "MasonArt" tests/e2e/home.spec.ts
+    expected_result: FAIL - assertions updated to chobi.art, app still renders MasonArt
+    status: pending
+    code: |-
+      // Update header/footer locator assertions to expect "chobi.art", e.g.
+      // await expect(page.getByRole("link", { name: "chobi.art" })).toBeVisible();
+      // await expect(footer).toContainText(`© ${new Date().getFullYear()} chobi.art`);
+  - id: 2
+    action: implement
+    description: Swap Header/Footer wordmark and copyright to BRAND_NAME
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+    code: |-
+      import { BRAND_NAME } from "@masonart/shared";
+      // Header logo: <span ...>{BRAND_NAME}</span>
+      // Footer: &copy; {currentYear} {BRAND_NAME}. All rights reserved.
+      // Footer about text: replace MasonArt with {BRAND_NAME}
+  - id: 3
+    action: verify-pass
+    description: Typecheck + affected E2E pass
+    command: bun run typecheck && bunx playwright test tests/e2e/home.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit layout rebrand
+    command: 'git add packages/web tests/e2e && git commit -m "feat(web): chobi.art wordmark in header/footer (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-07-22T08:35:22.155Z'
+completed: '2026-07-22T08:37:29.490Z'

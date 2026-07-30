@@ -1,0 +1,38 @@
+ticket_number: 288
+title: 'Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls'
+description: |-
+  Phase: Infra. Create deploy/Makefile driven entirely from the dev machine; the mini holds no repo, no builds, no .env.
+
+  Targets: build/push/build-push (docker buildx linux/arm64 for api+web, tags latest + git short-sha; web build passes --build-arg VITE_API_URL='' in the RAW BUILDX path, not just compose); gen-compose (render compose + deploy/.env into deploy/rendered/docker-compose.yml via --format json, STRIP build: keys); deploy (scp rendered file → ~/masonart-docker-compose.yml, ssh 'pull && up -d' — every remote command prefixed with export PATH=/opt/homebrew/bin:...); rollback (deploy IMAGE_TAG=<sha>); migrate/seed/admin-promote (docker compose exec over ssh); first-boot; login-remote; build-push-deploy alias.
+
+  Also: deploy/.env.example committed, deploy/.env + deploy/rendered/ gitignored; compose project name masonart (no collision with co-hosted customs-copilot); GHCR private packages masonart-api/masonart-web; two classic PATs (write:packages dev / read:packages mini); mini's ~/.docker/config.json must not use credsStore osxkeychain.
+
+  Acceptance: make build-push-deploy from the dev machine brings the stack up on the mini pulling from GHCR; rendered file contains no build: keys and no unexpanded vars; rollback to a prior sha verified.
+  Lessons: cc #88, #89, #90, #91, #92.
+feature: go-live
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-16T14:21:31.142Z'
+last_updated: '2026-07-17T15:17:39.076Z'
+time_spent_minutes: 0
+labels:
+  - go-live
+  - infra
+  - phase-infra
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-07-17T15:06:30.523Z'
+    text: 'AMENDED 2026-07-17 (platform edge stack): add a `platform-network` target (idempotent `docker network create platform` on the mini, matching customs-copilot deploy/Makefile). No tunnel profile / no cloudflared anywhere in the render — ingress belongs to the shared platform stack deployed from customs-copilot''s repo. Everything else unchanged (buildx arm64, latest+sha tags, gen-compose strips build:, scp+ssh deploy with PATH prefix, project name masonart).'
+  - author: system
+    timestamp: '2026-07-17T15:17:39.076Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-17T15:17:39.076Z'

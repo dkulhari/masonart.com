@@ -1,0 +1,49 @@
+ticket_number: 317
+title: Correction - Rebrand chobi.art to chobii.art (code, tests, docs)
+description: |-
+  ## Task
+  Brand correction: the actual brand/domain is chobii.art (double i), not chobi.art. Repo-wide single-pass sweep chobi->chobii across brand constants, all user-facing strings, package scope @chobi/*->@chobii/*, cookie prefix, seeds, hostnames (chobii.xtoms.xyz), image/compose/DB names, docs, tests. Regenerate lockfile, rebuild shared, verify with typecheck + unit + E2E title checks.
+
+  ## Context
+  Part of feature: rebrand-chobi-art (correction). Single-pass sed only — chobi is a substring of chobii; running twice would produce chobiii. Exclusions: plan/tracker-data, docs/bugs, R2 account endpoint hex.
+feature: rebrand-chobi-art
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T09:35:31.603Z"
+last_updated: "2026-07-23T09:43:02.738Z"
+time_spent_minutes: 0
+labels:
+  - rebrand
+  - frontend
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T09:43:02.738Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T09:43:06.538Z"
+    text: "✅ Single-pass sweep chobi→chobii across 210 files (commit 9661c6b0, merged to main d894a16e). Brand constants, user-facing strings, @chobii/* packages, cookie prefix, seeds, hostnames, CI filters, docs, tests. Gates: no bare \"chobi\", no accidental \"chobiii\", brand tests 3/3, workspace tests 33/33, no import errors in typecheck."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Single-pass s/chobi/chobii/g on tracked files; bun install; rebuild shared
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: grep gate + typecheck + unit + home E2E title
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit and merge
+    status: pending
+current_step: 1
+completed: "2026-07-23T09:43:02.738Z"

@@ -1,0 +1,184 @@
+ticket_number: 363
+title: "Admin customers: per-field filtering incl. joined date range, server-side"
+description: |
+  ## Problem
+
+  The admin customers section has almost no filtering. Today:
+
+  - `GET /api/admin/customers` (`packages/api/src/routes/admin/customers.ts:53`) selects **every** user with no query params at all — no filtering, no pagination, ordered `desc(createdAt)`.
+  - The page (`packages/web/app/routes/admin/customers.tsx:186`) fetches that whole list and does one **client-side** substring match over name/email (`customers.tsx:127`, `:244`).
+
+  So there is no way to filter by role, by status, or by when someone joined, and the list will not scale as the user table grows.
+
+  ## Wanted
+
+  Filter by each field shown in the table, evaluated server-side:
+
+  | Field | Control |
+  |---|---|
+  | name / email | search box (existing, moved server-side) |
+  | role | multi-select — `customer`, `trade`, `content-manager`, `admin`, `super-admin` |
+  | status | select — `active` / the other values in `users.status` |
+  | joined (`createdAt`) | **date range** — from / to, inclusive, either end optional |
+
+  Plus sorting (`createdAt`, `name`, `email`, `role`) and pagination, so the endpoint stops returning the entire table.
+
+  Filters belong in URL search params via `validateSearch`, matching the pattern already used by `packages/web/app/routes/admin/products/index.tsx:29-41` — shareable, back-button safe, and SSR-friendly. Include a "clear all" affordance and show the active result count.
+
+  Note `users.role` includes `trade` and `super-admin`, which the role-assignment dropdown deliberately excludes — the **filter** should still list them, since such users exist and need to be findable.
+
+  ## Implementation Steps
+
+  - [ ] **Step 1 [write-test]**: Write failing API tests for the new query params
+    - File: `packages/api/tests/routes/admin/customers.test.ts` (extend the existing suite)
+    - Run: `cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts`
+    - Expected: FAIL — params are ignored today, so every request returns all users
+    ```ts
+    it('filters by role', async () => {
+      const res = await app.request('/api/admin/customers?role=content-manager', { headers: adminHeaders })
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.data.every((u: { role: string }) => u.role === 'content-manager')).toBe(true)
+    })
+
+    it('filters by joined date range, inclusive on both ends', async () => {
+      const res = await app.request(
+        '/api/admin/customers?joinedFrom=2026-01-01&joinedTo=2026-01-31',
+        { headers: adminHeaders },
+      )
+      const body = await res.json()
+      for (const u of body.data) {
+        expect(new Date(u.createdAt) >= new Date('2026-01-01T00:00:00.000Z')).toBe(true)
+        expect(new Date(u.createdAt) <= new Date('2026-01-31T23:59:59.999Z')).toBe(true)
+      }
+    })
+
+    it('rejects an inverted date range with 400', async () => {
+      const res = await app.request(
+        '/api/admin/customers?joinedFrom=2026-02-01&joinedTo=2026-01-01',
+        { headers: adminHeaders },
+      )
+      expect(res.status).toBe(400)
+    })
+
+    it('paginates and reports the unfiltered-page total', async () => {
+      const res = await app.request('/api/admin/customers?page=1&pageSize=2', { headers: adminHeaders })
+      const body = await res.json()
+      expect(body.data.length).toBeLessThanOrEqual(2)
+      expect(body.pagination).toMatchObject({ page: 1, pageSize: 2 })
+      expect(typeof body.pagination.total).toBe('number')
+    })
+    ```
+
+  - [ ] **Step 2 [verify-fail]**: Confirm the tests fail
+    - Run: `cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts`
+    - Expected: FAIL
+
+  - [ ] **Step 3 [implement]**: Add a zod-validated query schema and build the query with Drizzle
+    - File: `packages/api/src/routes/admin/customers.ts`
+    - Add `zValidator("query", customerQuerySchema)` with `search`, `role` (repeatable), `status`, `joinedFrom`, `joinedTo`, `sortBy`, `sortOrder`, `page`, `pageSize` (max 100). Compose `and(...)` from `ilike` on name/email, `inArray` on role, `eq` on status, and `gte`/`lte` on `createdAt` — `joinedTo` must be widened to end-of-day so the range is inclusive. Refine the schema so `joinedFrom > joinedTo` is a 400. Return `{ data, pagination: { page, pageSize, total, totalPages } }` and keep the `requireAuth` + `requireAdmin` gating untouched.
+    - Note: this changes the response from a bare array to an envelope — update the web fetcher in the same change.
+
+  - [ ] **Step 4 [verify-pass]**: API tests pass
+    - Run: `cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts`
+    - Expected: PASS
+
+  - [ ] **Step 5 [implement]**: Filter bar + URL search params on the page
+    - File: `packages/web/app/routes/admin/customers.tsx`
+    - Add `searchParamsSchema` + `validateSearch` mirroring `admin/products/index.tsx:29-41`, drive the fetch from those params (debounced search), and replace the client-side `filteredCustomers` filter. Controls: search box, role multi-select, status select, joined from/to date inputs, clear-all, result count, and pagination.
+
+  - [ ] **Step 6 [verify-pass]**: Web suite and typecheck clean
+    - Run: `cd packages/web && bunx vitest run && bunx tsc --noEmit -p tsconfig.json`
+    - Expected: PASS (no new type errors beyond the known pre-existing ones)
+
+  - [ ] **Step 7 [verify-pass]**: Manual check
+    - Sign in as an admin, open `/admin/customers`: each filter narrows the list, the joined range includes rows dated exactly on both bounds, filters survive a page reload and the back button, and clear-all resets to the unfiltered first page.
+
+  - [ ] **Step 8 [commit]**: Commit
+    - Run: `git add packages/api/src/routes/admin/customers.ts packages/api/tests/routes/admin/customers.test.ts packages/web/app/routes/admin/customers.tsx && git commit -m "feat(admin): filter customers by field and joined date range (#{ticket-number})"`
+feature: admin-panel
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-29T06:23:16.162Z"
+last_updated: "2026-07-29T07:59:18.190Z"
+time_spent_minutes: 20
+labels:
+  - admin-panel
+  - api
+  - web
+  - filtering
+  - customers
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-29T07:38:40.679Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-29T07:59:18.191Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-29T07:59:36.796Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f9aa99d0` - feat(admin): filter customers by field and joined date range
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/customers.ts` - zod query schema + Drizzle filter/sort/paginate; response is now a `{ data, pagination }` envelope
+      - `packages/api/tests/routes/admin/customers.test.ts` - 11 new tests + 3 date-controlled fixtures; existing list test updated to the envelope
+      - `packages/web/app/routes/admin/customers.tsx` - `validateSearch` search params, filter bar, sortable headers, pagination; client-side filter removed
+
+      **Summary**:
+      All filters evaluate server-side. Query params: `search`, `role` (repeatable), `status`, `joinedFrom`, `joinedTo`, `sortBy`, `sortOrder`, `page`, `pageSize` (max 100). `joinedTo` is widened to end-of-day so the range is inclusive of both bounds; an inverted range is a 400. LIKE wildcards in user input are escaped as literals, and pagination tie-breaks on `id` so pages stay stable. The role filter deliberately lists `trade` and `super-admin` even though this page cannot assign them.
+
+      **Bug found during manual verification** (the reason step 7 mattered): the role multi-select initially failed with `Expected array, received string`, error-boundarying the route. This app overrides TanStack Router's search serialization (`packages/web/app/router.tsx:21-41`) to keep every param a string and stringify via `String(value)` — so an array round-trips comma-joined as `?role=admin,trade`, never as JSON. The schema now parses either shape.
+
+      **Verification**:
+      - Command: `cd packages/api && DATABASE_URL=...@localhost:5440/poster_app_dev bunx vitest run tests/routes/admin/customers.test.ts`
+      - Result: PASS (22 tests, 22 passing) — was 12 failing / 10 passing at the red step
+      - Command: `cd packages/web && bunx vitest run`
+      - Result: PASS (35 files, 1380 tests passing)
+      - Command: `cd packages/web && bunx tsc --noEmit -p tsconfig.json`
+      - Result: 23 errors, all pre-existing in untouched files; 0 in `customers.tsx` (a transient 24th introduced by copying the products page's `search: (prev) => ...` updater was fixed rather than inherited)
+      - Manual (headless Chromium, signed in as `test-admin@chobii.art`, API on :3000 + web on :3001): 11/11 checks passed — unfiltered list renders, role filter narrows to 2 rows and writes to the URL, filters survive reload, single-day joined range `2026-07-23..2026-07-23` returns 10 rows all dated 23 Jul (proving both-ends inclusivity), back button restores filters, clear-all resets to 18 rows, debounced search hits the server, pagination advances pages.
+      - Live API spot checks also confirmed 400s for inverted range, unknown role, `pageSize=500`, and `DD-MM-YYYY` dates.
+
+      **Note for whoever runs these tests next**: `packages/api/tests/setup.ts` defaults `DATABASE_URL` to port **5433**, which is a different project's Postgres. The chobii dev DB is `poster-app-postgres` on **5440** — without the override the suite fails on `password authentication failed for user "poster_app"`.
+work_sessions:
+  - start: "2026-07-29T07:38:46.601Z"
+    agent: claude-code
+    summary: "Implemented server-side customer filtering (search, role multi-select, status, inclusive joined date range), sorting and pagination across API and web. TDD: 11 new API tests written red, then green. Browser verification caught and fixed a real bug in the role search-param round-trip."
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: "2026-07-29T07:59:12.420Z"
+    duration: "00:20:25"
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-07-29T07:38:40.600Z"
+work_session_summary:
+  total_sessions: 1
+  total_duration: "00:20:00"
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: "00:20:00"
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && DATABASE_URL=...@localhost:5440/poster_app_dev bunx vitest run tests/routes/admin/customers.test.ts; cd packages/web && bunx vitest run
+  test_output: "API: 22/22 passed (11 new filter/sort/pagination tests). Web: 35 files, 1380/1380 passed."
+  build_passed: true
+  build_command: cd packages/web && bunx tsc --noEmit -p tsconfig.json
+  verified_at: "2026-07-29T07:59:10.256Z"
+completed: "2026-07-29T07:59:18.190Z"

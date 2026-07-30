@@ -1,0 +1,30 @@
+ticket_number: 251
+title: Gallery API and Featured Products API both hang and timeout
+description: "Two more API endpoints exhibit the same hanging behavior as /api/products: GET /api/ai/gallery times out (HTTP 000 after 5s), and GET /api/products/featured times out (HTTP 000 after 5s). These are likely related to the same root cause as ticket 238. Gallery page shows 0 artworks and home page featured products shows Coming Soon placeholder. Working endpoints for comparison: /api/ai/styles returns 401 fast, /api/auth/get-session returns null fast, /health returns 200 fast."
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T21:01:01.060Z"
+last_updated: "2026-07-27T13:43:21.970Z"
+time_spent_minutes: 0
+labels:
+  - api
+  - P0
+  - timeout
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T13:43:21.973Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T13:43:40.566Z"
+    text: "✅ Closed — duplicate of #250 (identical report text), which was closed as no-longer-reproducible on 2026-07-27 with fresh 200-response evidence for both endpoints."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T13:43:21.970Z"

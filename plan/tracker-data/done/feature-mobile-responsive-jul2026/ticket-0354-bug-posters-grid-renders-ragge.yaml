@@ -1,0 +1,123 @@
+ticket_number: 354
+title: "BUG: /posters grid renders ragged — uniformAspectRatio is never passed to ProductGrid"
+description: |-
+  ## Problem
+
+  The product listing grid on `/posters` is visually ragged: cards in the same row have images of different heights, so titles and prices sit at different baselines, and row heights jump between rows. It is most obvious on mobile, where the 2-column layout puts two mismatched cards side by side at all times.
+
+  **Verified on production chobii.art at 390x844, 2026-07-28.** Measured card heights in one grid: **368px, 263px, 207px**. Within the first row alone the two images measured **254px vs 169px** tall.
+
+  Each card wraps its image in a per-orientation aspect class — `aspect-[2/3]`, `aspect-square`, `aspect-[3/2]`, `aspect-video` — driven by `product.orientation`.
+
+  ## Root cause — the fix already exists but is not wired up
+
+  Tickets **#287** (ProductCard — add `uniformAspectRatio` prop) and **#288** (ProductGrid — pass `uniformAspectRatio` to ProductCard) are both **done**, and the plumbing is present:
+  - `ProductCard.tsx:52` accepts `uniformAspectRatio`
+  - `ProductCard.tsx:92` — `uniformAspectRatio || ASPECT_RATIO_MAP[product.orientation]`
+  - `ProductGrid.tsx:133` forwards it
+
+  But the main catalog page never passes it:
+  ```tsx
+  // packages/web/app/routes/posters/index.tsx:519
+  <ProductGrid
+    products={products}
+    columns={{ default: 2, sm: 2, md: 3, lg: 4 }}
+    gap="md"
+  />
+  ```
+
+  The hero-grid-alignment work only covered the homepage grid; the listing page was left on per-orientation ratios.
+
+  ## Fix
+
+  Pass `uniformAspectRatio="aspect-[2/3]"` (portrait — matches the majority of the catalogue and the existing skeleton at `ProductCard.tsx:222`) to the ProductGrid on the listing page. Audit any other ProductGrid call sites for the same omission.
+
+  ## Acceptance criteria
+
+  - All cards in the `/posters` grid have identical height
+  - Image heights match within and across rows; titles and prices align on a common baseline
+  - Verified at 390px and at desktop widths
+feature: mobile-responsive-jul2026
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:38.807Z"
+last_updated: "2026-07-28T15:20:19.327Z"
+time_spent_minutes: 0
+labels:
+  - mobile
+  - frontend
+  - product-catalog
+  - visual
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T15:20:19.328Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T15:21:00.347Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `c386e8a5` — fix(web): uniform aspect ratio on the posters listing grid
+
+      **Files Changed**:
+      - `packages/web/app/routes/posters/index.tsx` — pass `uniformAspectRatio="aspect-[2/3]"` to ProductGrid
+
+      **Root Cause**: the listing page never passed the prop, so each card fell back to `ASPECT_RATIO_MAP[product.orientation]`. The plumbing from #287/#288 only reached the home page.
+
+      **Ratio choice**: `aspect-[2/3]` matches `ProductCardSkeleton`, so cards do not shift when skeletons resolve. Note the home page uses `aspect-[3/4]` (set deliberately in #289) — left as-is, but the skeleton/card mismatch there is a latent layout-shift source worth a separate look.
+
+      **Audit**: `/posters` is the only ProductGrid consumer in the app; no other call sites to fix.
+
+      **Verification** (local dev, 390x844, measured via getBoundingClientRect):
+      - Before: card heights `[368, 263, 207]`, image heights `[254, 169, 113, 95]`, 4 distinct aspect classes
+      - After: image heights `[254]` — all identical; aspect classes `[aspect-[2/3]]` — all identical
+      - Titles and prices now share a baseline within each row (screenshot confirmed)
+      - Residual: card heights `[368, 348]` — a 20px cross-row variance from cards having 1 vs 2 metadata lines. Not visually ragged, since grid rows stretch and images align. Flagging rather than clamping the text, as that is a design call.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Test asserting every product card in the /posters grid has identical height at a 390px viewport
+    file: tests/e2e/catalog-grid-alignment.spec.ts
+    command: bunx playwright test tests/e2e/catalog-grid-alignment.spec.ts
+    expected_result: FAIL — distinct card heights 368/263/207 observed
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the mismatched heights
+    command: bunx playwright test tests/e2e/catalog-grid-alignment.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Pass uniformAspectRatio to ProductGrid on the listing page and audit other call sites
+    file: packages/web/app/routes/posters/index.tsx
+    status: pending
+    code: |-
+      <ProductGrid
+        products={products}
+        columns={{ default: 2, sm: 2, md: 3, lg: 4 }}
+        gap="md"
+        uniformAspectRatio="aspect-[2/3]"
+      />
+  - id: 4
+    action: verify-pass
+    description: All card heights identical
+    command: bunx playwright test tests/e2e/catalog-grid-alignment.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: "git add packages/web/app/routes/posters/index.tsx tests/e2e/catalog-grid-alignment.spec.ts && git commit -m \"fix(web): uniform aspect ratio on posters listing grid\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T15:20:19.327Z"

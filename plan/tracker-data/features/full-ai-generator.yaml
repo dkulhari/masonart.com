@@ -49,6 +49,7 @@ tickets:
     "54": Frontend - Prompt Suggestions UI
     "55": Frontend - Upscale UI and Results Enhancement
     "56": Tests - Full AI Generator Feature Test Suite
-total_tickets: 12
+    "321": "Bug - AI generation worker never calls real providers: stub pipeline stores JSON placeholders"
+total_tickets: 13
 completion_percentage: 100
 is_completed: true

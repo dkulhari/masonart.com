@@ -1,0 +1,46 @@
+ticket_number: 268
+title: Web server returns 500 instead of 406 for non-HTML Accept headers
+description: |-
+  When a request is made to the web server with Accept: application/json or Accept: text/plain, it returns HTTP 500 with body {"error":"Only HTML requests are supported here"}.
+
+  The HTTP status should be 406 Not Acceptable, not 500 Internal Server Error.
+
+  Test results:
+  - Accept: application/json → 500 (should be 406)
+  - Accept: text/plain → 500 (should be 406)  
+  - Accept: */* → 200 (correct)
+  - No Accept header → 200 (correct)
+
+  Affects all web routes (/, /posters, /create, etc.).
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T22:58:58.038Z"
+last_updated: "2026-07-27T19:09:15.929Z"
+time_spent_minutes: 0
+labels:
+  - web
+  - http
+  - error-handling
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T19:09:16.001Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T19:09:46.638Z"
+    text: |-
+      ✅ **Completed and verified on production** (commit 16b29250, deployed 2026-07-27).
+
+      Root cause: framework-level — TanStack Start's createStartHandler hard-returns a JSON 500 when Accept lacks text/html or */*. Fix: packages/web/app/server.tsx mirrors that exact rejection predicate for GET/HEAD and answers 406 first; only requests that would have 500'd can match, so browsers/crawlers/server-functions are untouched.
+
+      Verification: TDD via new tests/e2e/accept-header.spec.ts (red 500 → green 406; wildcard + browser Accepts still 200 text/html); regression smoke layout+home 142 passed; production: Accept: application/xml → 406 "Not Acceptable: this server serves text/html". Closes the last of the 13 Feb-2026 manual-testing tickets.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T19:09:15.929Z"

@@ -1,0 +1,124 @@
+ticket_number: 352
+title: "BUG: PDP 'You May Also Like' is a hardcoded permanent skeleton — never implemented"
+description: |-
+  ## Problem
+
+  The 'You May Also Like' section on every product detail page renders five `animate-pulse` grey placeholder blocks that never resolve into products. It is not a loading state — the section was shipped as a hardcoded placeholder and the real implementation never landed.
+
+  **Verified on production chobii.art at 390x844, 2026-07-28** on `/posters/cosmic-harmony`. At 2 columns on mobile this consumes roughly 800px of continuously-pulsing dead space near the bottom of the page, reading as a permanently broken section.
+
+  ## Root cause
+
+  `packages/web/app/routes/posters/$slug.tsx:443-461`:
+  ```tsx
+  function RelatedProductsSection() {
+    return (
+      <section ...>
+        <h2>You May Also Like</h2>
+        <div className="grid grid-cols-2 ...">
+          {/* Placeholder for related products - will be implemented with actual products */}
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="animate-pulse">...</div>
+          ))}
+  ```
+
+  There is no data fetch behind it. Confirmed `GET /api/products/:id/related` → **404** (no such endpoint exists, by id or by slug).
+
+  ## Fix — decide scope
+
+  Two options; either is acceptable, pick one:
+  1. **Implement it** — add a related-products API endpoint (match on shared styles/subjects, exclude the current product, limit 5) and wire the section to it with a real loading state and an empty fallback.
+  2. **Remove it** — delete the section until it can be built properly. A missing section is strictly better than a permanently pulsing one.
+
+  Option 2 is the fast unblock; option 1 is the real fix.
+
+  ## Acceptance criteria
+
+  - No permanently-animating skeleton on the PDP
+  - If implemented: real related products render, with a genuine loading state and an empty-state fallback
+  - If removed: the section is gone and page flow is intact on mobile
+feature: mobile-responsive-jul2026
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:35.212Z"
+last_updated: "2026-07-28T16:11:22.611Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - pdp
+  - merchandising
+  - mobile
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T16:11:22.611Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T16:12:17.317Z"
+    text: |-
+      ✅ **Completed** — implemented rather than removed
+
+      **Commit**: `b8cfaa66` — feat: related products on the product page
+
+      **Scope call**: the ticket allowed either building it or deleting the section. Built it — the row is already part of the design and the matching data (styles/subjects) is already on every product, so the endpoint was the only missing piece.
+
+      **Files Changed**:
+      - `packages/api/src/routes/products.ts` — new `GET /api/products/:slug/related`
+      - `packages/api/tests/routes/products.test.ts` — 5 tests
+      - `packages/web/app/lib/api.ts` — `productsApi.related()`
+      - `packages/web/app/routes/posters/$slug.tsx` — loader fetch + real section
+
+      **Matching**: products sharing a style or subject, active only, self excluded, ranked by how many tag families overlap (both style and subject beats style alone), cached like featured. Data loads in the route loader alongside the product, so there is no loading state left to get stuck in, and the section renders nothing when there is nothing to recommend.
+
+      **Two Postgres gotchas worth remembering**:
+      1. `text[]` has no core `&` intersection operator — that is the `intarray` extension and integers only. First attempt failed with `cannot cast type record to text[]`; the score now uses two `&&` overlap checks, giving 0-2 by family rather than counting individual shared tags.
+      2. Interpolating a JS array into a drizzle `sql``` template binds it as a **record tuple**, not an array. Arrays are now built as real `ARRAY[...]` literals with each element bound separately.
+
+      **Verification** (live against dev DB):
+      - `synthetic-nature` → 16 matches, exactly the count a direct SQL query returns
+      - Ranking correct: `floating-islands` first (shares `modern-contemporary` **and** `nature-landscape` → score 2), style-only matches after
+      - Self excluded; `limit=2` → 2 items; unknown slug → 404; `limit=100` → 400
+      - PDP renders 5 real cards; `.animate-pulse` count on the page is **0** after hydration
+      - Web suite 1362/1362; API failures 83 vs 86 on `main` (no new ones)
+
+      **Note**: the 5 API runtime tests skip locally — the vitest process cannot reach the database (see #359 for the same root cause). They are written to run in CI where it can; the behaviour above was verified against the live API instead.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Test asserting the PDP has no animate-pulse elements remaining after load settles
+    file: tests/e2e/pdp-related.spec.ts
+    command: bunx playwright test tests/e2e/pdp-related.spec.ts
+    expected_result: FAIL — 5 permanent animate-pulse blocks found
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the permanent skeletons
+    command: bunx playwright test tests/e2e/pdp-related.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Either add GET /api/products/:id/related and wire the section to it, or remove RelatedProductsSection entirely
+    file: packages/web/app/routes/posters/$slug.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: No permanent skeleton remains
+    command: bunx playwright test tests/e2e/pdp-related.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: "git add packages/web/app/routes/posters/ tests/e2e/pdp-related.spec.ts && git commit -m \"fix(web): resolve permanent related-products skeleton on PDP\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T16:11:22.611Z"

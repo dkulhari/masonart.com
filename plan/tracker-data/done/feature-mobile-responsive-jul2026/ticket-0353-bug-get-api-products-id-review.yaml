@@ -1,0 +1,117 @@
+ticket_number: 353
+title: "BUG: GET /api/products/:id/reviews/stats returns 404 — 3 console errors per PDP load"
+description: |-
+  ## Problem
+
+  Every product detail page load fires `GET /api/products/:productId/reviews/stats`, which returns **404**. The request is issued three times per page load, producing three console errors, and the review summary block stays in a skeleton state.
+
+  **Verified on production chobii.art, 2026-07-28** on `/posters/cosmic-harmony`:
+  ```
+  [ERROR] Failed to load resource: 404 @ /api/products/84341a4e-.../reviews/stats  (x3)
+  ```
+
+  Endpoint probe:
+  - `GET /api/products/:id/reviews` → **200** (works)
+  - `GET /api/products/:id/reviews/stats` → **404**
+
+  ## Root cause
+
+  The client calls it at `packages/web/app/hooks/useReviews.ts:107`:
+  ```ts
+  const response = await fetch(`${API_BASE}/products/${productId}/reviews/stats`, ...)
+  ```
+
+  But `productReviewsApp` — mounted at `/api/products/:productId/reviews` (`packages/api/src/index.ts:136`) — defines exactly one route, the list handler at `packages/api/src/routes/reviews.ts:90`. There is no `/stats` sub-route, so the path 404s.
+
+  Note an admin equivalent does exist (`/api/admin/reviews/stats`), but no public per-product one.
+
+  ## Fix
+
+  Add `GET /stats` to `productReviewsApp` returning the per-product aggregate the hook expects (average rating, total count, and the 1-5 star distribution). Also worth investigating why the request fires three times per load — likely a missing query key or an unmemoised effect dependency.
+
+  ## Acceptance criteria
+
+  - `GET /api/products/:id/reviews/stats` returns 200 with average, total and distribution
+  - No console errors on PDP load
+  - The review summary renders real values instead of a skeleton
+  - The endpoint is requested once per page load, not three times
+feature: mobile-responsive-jul2026
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:36.547Z"
+last_updated: "2026-07-28T16:11:22.913Z"
+time_spent_minutes: 0
+labels:
+  - api
+  - pdp
+  - reviews
+  - console-errors
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T16:11:22.914Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T16:12:17.449Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `361bffa9` — feat(api): per-product review stats endpoint
+
+      **Files Changed**:
+      - `packages/api/src/routes/reviews.ts` — `GET /stats` on `productReviewsApp`, plus `buildReviewStats()` and a cache-invalidation helper
+      - `packages/api/tests/routes/reviews.test.ts` — route, validation and aggregation tests
+
+      **Returns** the shape `useReviews.ts` already expects: `averageRating` (1 dp), `totalReviews`, and a `distribution` of all five star buckets highest-first — empty ones included, so the UI renders a stable five-row breakdown without filling gaps itself. Single grouped query, cached for the same 5 minutes as the review lists.
+
+      **Testability**: the aggregation is a separate exported function so its arithmetic can be tested without a database. Seeding real reviews is not viable locally — `reviews.order_item_id` is NOT NULL with an FK and the dev DB has zero `order_items`. One of the tests covers pg returning aggregate counts as **strings**, where a missing `Number()` would concatenate instead of add.
+
+      **Bonus fix — cache invalidation was broken.** Both existing call sites passed a `"...:*"` wildcard to `deleteCached`, which deletes one exact key; the wildcard was never expanded. Edited and deleted reviews therefore kept serving stale lists for the full TTL. Now routed through `invalidateProductReviewCaches()` using `deleteCachedPattern`, covering the new stats key too.
+
+      **Verification**:
+      - RED: 2 failed before the route existed (404 where 400/handled JSON expected)
+      - GREEN: `bunx vitest run tests/routes/reviews.test.ts` → **51 passed / 51**
+      - Live against dev DB: 200 with the exact contract; `400` for a malformed product id
+      - API suite: 83 failures vs 86 on `main` — no new ones
+
+      **Not verified**: a product with actual reviews, for the FK reason above. The empty-state path is verified live and the arithmetic is unit-tested.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: API test asserting GET /api/products/:id/reviews/stats returns 200 with average, total and distribution
+    file: packages/api/tests/routes/reviews.test.ts
+    command: bun run test packages/api/tests/routes/reviews.test.ts
+    expected_result: FAIL — 404, route not defined
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the 404
+    command: bun run test packages/api/tests/routes/reviews.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the GET /stats route to productReviewsApp aggregating approved reviews for the product
+    file: packages/api/src/routes/reviews.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Endpoint returns 200; PDP console is clean and the summary renders
+    command: bun run test packages/api/tests/routes/reviews.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: "git add packages/api/src/routes/reviews.ts packages/api/tests/routes/reviews.test.ts && git commit -m \"feat(api): per-product review stats endpoint\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T16:11:22.913Z"

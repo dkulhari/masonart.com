@@ -1,0 +1,36 @@
+ticket_number: 291
+title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+description: |-
+  Phase: Hardening. packages/api/src/middleware/rate-limit.ts:26 takes the FIRST x-forwarded-for entry. Behind the tunnel every socket peer is cloudflared and Cloudflare APPENDS the real client IP — the first entry is attacker-controlled, so per-IP rate limits are trivially bypassed by rotating fake XFF values; conversely a naive peer-address fallback would collapse all users into one shared bucket.
+
+  Fix (TDD):
+  - clientIp(): prefer cf-connecting-ip header; fall back to XFF LAST-hop, then socket peer.
+  - Better Auth: advanced.ipAddress.ipAddressHeaders = ['cf-connecting-ip','x-forwarded-for'].
+  - Tests: spoofed-first-XFF request does not evade the limit; two distinct cf-connecting-ip values get distinct buckets.
+
+  Acceptance: unit tests green; gate walkthrough verifies 429 from one device while a second device is unaffected.
+  Lesson: cc #95.
+feature: go-live
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-16T14:21:37.420Z'
+last_updated: '2026-07-17T15:11:45.074Z'
+time_spent_minutes: 0
+labels:
+  - go-live
+  - security
+  - phase-hardening
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-17T15:11:45.074Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-17T15:11:45.074Z'

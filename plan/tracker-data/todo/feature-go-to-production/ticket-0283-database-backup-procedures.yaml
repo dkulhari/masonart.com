@@ -1,5 +1,5 @@
 ticket_number: 283
-title: "Document and configure database backup procedures"
+title: Document and configure database backup procedures
 description: |-
   ## Task
   Set up automated database backups and document restore procedures.
@@ -25,8 +25,8 @@ priority: low
 status: todo
 assignee: unassigned
 reporter: cli
-created: '2026-02-18T08:30:00.000Z'
-last_updated: '2026-02-18T08:30:00.000Z'
+created: "2026-02-18T08:30:00.000Z"
+last_updated: "2026-02-18T08:30:00.000Z"
 time_spent_minutes: 0
 labels:
   - database
@@ -36,7 +36,10 @@ acceptance_criteria:
   - Daily automated backups running
   - Restore procedure documented and tested
   - Backup failure alerting configured
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: "2026-07-17T15:27:59.732Z"
+    text: "2026-07-17: Doc portion complete — OPERATIONS.md §2 has the nightly pg_dump cron line (02:45 slot, offset from customs-copilot's 02:15; user/db/compose-path match the new prod compose defaults), 14-day retention, and the quarterly restore-drill procedure. R2 bucket versioning is in the #293 owner checklist. REMAINING (owner, on the mini after first deploy): mkdir -p /backups, install the cron line, run one manual dump + restore drill to prove the pipeline before relying on it."
 work_sessions: []
 related_tickets:
   - 274

@@ -1,0 +1,38 @@
+ticket_number: 289
+title: 'Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate'
+description: |-
+  Phase: Infra. The mini has no checkout, and db:push is unsafe against a production schema.
+
+  Work items:
+  - Dockerfile api stage: COPY drizzle.config.ts + src/database/migrations/ (including meta/ journal) into the image.
+  - make migrate → ssh + docker compose exec api drizzle-kit migrate (working dir /app/packages/api).
+  - Pre-flight: verify migrations/meta/_journal.json is consistent — there are two 0002_*.sql files (0002_add_gemini_provider.sql, 0002_freezing_richard_fisk.sql); confirm both are journaled and apply cleanly on a fresh DB.
+  - Update docs/deployment.md: remove db:push instructions for prod.
+
+  Acceptance: fresh postgres + make migrate produces the full schema; running migrate twice is a no-op.
+  Lesson: cc #93.
+feature: go-live
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-16T14:21:33.310Z'
+last_updated: '2026-07-17T15:19:21.126Z'
+time_spent_minutes: 0
+labels:
+  - go-live
+  - infra
+  - phase-infra
+  - database
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-17T15:19:21.127Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-17T15:19:21.126Z'

@@ -1,0 +1,56 @@
+ticket_number: 318
+title: "Correction - chobii infra: R2 bucket/CDN, images, DB, staging cutover"
+description: |-
+  ## Task
+  Infra side of the chobii correction: create R2 bucket chobii-staging + chobii-cdn.xtoms.xyz custom domain (delete chobi-staging; token may need re-scoping by user), update deploy/.env (hostname chobii.xtoms.xyz, bucket, CDN), build/push chobii-api|chobii-web images, deploy new stack, stop chobi stack, first-boot fresh chobii DB, smoke test https://chobii.xtoms.xyz (health, title, login, upload via CDN).
+
+  ## Context
+  Part of feature: rebrand-chobi-art (correction). Wildcard *.xtoms.xyz covers the new hostname — zero Cloudflare routing config needed.
+feature: rebrand-chobi-art
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T09:35:39.564Z"
+last_updated: "2026-07-23T09:52:57.366Z"
+time_spent_minutes: 0
+labels:
+  - rebrand
+  - infra
+  - deploy
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T09:43:04.833Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: "2026-07-23T09:43:09.042Z"
+    text: "🔄 Nearly done: R2 chobii-staging bucket + chobii-cdn.xtoms.xyz created (old chobi bucket/CDN deleted — note: wrangler r2 object delete silently targets its local simulator, deletions done via Cloudflare REST API); chobii-api/web images built+pushed; stack deployed, old chobi stack stopped; fresh chobii DB migrated+seeded (admin@chobii.art). Smoke: health healthy/chobii-api, title \"chobii.art | Premium Posters & Custom Frames\", admin login 200, old chobi.xtoms.xyz 404. REMAINING: user must re-scope the R2 API token from chobi-staging to chobii-staging (currently AccessDenied), then verify upload serves from chobii-cdn."
+  - author: system
+    timestamp: "2026-07-23T09:52:57.369Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T09:53:00.346Z"
+    text: "✅ Complete. User re-scoped the R2 token to chobii-staging; verified live: admin login on chobii.xtoms.xyz, POST /api/ai/reference-image succeeded, object serves 200 from https://chobii-cdn.xtoms.xyz. Full chobii infra cutover done."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: R2 chobii bucket + CDN domain via wrangler; deploy/.env updates
+    status: pending
+  - id: 2
+    action: implement
+    description: build-push-deploy chobii images; stop chobi stack; first-boot
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: "Smoke: health, title chobii.art, admin login, upload serves from chobii-cdn"
+    status: pending
+current_step: 1
+started: "2026-07-23T09:43:04.832Z"
+completed: "2026-07-23T09:52:57.366Z"

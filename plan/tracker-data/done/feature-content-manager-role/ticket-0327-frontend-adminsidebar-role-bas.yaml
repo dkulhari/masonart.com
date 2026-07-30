@@ -1,0 +1,92 @@
+ticket_number: 327
+title: Frontend - AdminSidebar role-based nav filtering
+description: |-
+  ## Task
+  Filter the admin sidebar navigation by role: content-managers see only Products, Collections, and Categories; admins see everything (unchanged).
+
+  ## Context
+  Part of feature: content-manager-role
+  Phase: Frontend
+
+  `packages/web/app/components/admin/AdminSidebar.tsx` defines nav item arrays (Dashboard, Products, Orders, Reviews, AI Moderation, Returns, AI Generations, Customers, Analytics, then Collections/Categories/Settings) and already receives a `user` prop including `role` from admin.tsx. Filter against the same allowed hrefs used by the layout guard (`/admin/products`, `/admin/collections`, `/admin/categories`) so the two stay consistent — consider exporting the allowed-prefixes constant from a shared location (e.g. `packages/web/app/lib/admin-nav.ts`) and importing it in both files. Also apply the filter to MobileAdminHeader if it renders nav items.
+feature: content-manager-role
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T11:50:43.187Z"
+last_updated: "2026-07-23T12:08:51.036Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T12:07:47.333Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-23T12:08:51.037Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T12:08:53.115Z"
+    text: "✅ Implemented in commit f5f90a0f. NAV_ITEMS and SECONDARY_NAV_ITEMS now filtered through isAdminNavItemVisible (lib/admin-nav.ts, shared with the layout guard from #326) — content-manager sees Products, Collections, Categories; admin/super-admin see everything. MobileAdminHeader renders no nav items, so no change needed there. Typecheck clean for touched files."
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 326
+    feature: content-manager-role
+    description: Frontend - Role-aware admin layout with content-manager section guards
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Create shared constant for content-manager allowed admin prefixes and helper to filter nav items by role
+    file: packages/web/app/lib/admin-nav.ts
+    status: pending
+    code: |-
+      export const CONTENT_MANAGER_ALLOWED_PREFIXES = [
+        '/admin/products',
+        '/admin/collections',
+        '/admin/categories',
+      ] as const
+
+      export function isAdminNavItemVisible(role: string | undefined, href: string): boolean {
+        const r = role?.toLowerCase()
+        if (r === 'admin' || r === 'super-admin') return true
+        if (r === 'content-manager') {
+          return CONTENT_MANAGER_ALLOWED_PREFIXES.some(
+            (p) => href === p || href.startsWith(p + '/')
+          )
+        }
+        return false
+      }
+  - id: 2
+    action: implement
+    description: Filter nav item arrays in AdminSidebar (and MobileAdminHeader if it renders nav) using isAdminNavItemVisible with the user role prop; update admin.tsx to import CONTENT_MANAGER_ALLOWED_PREFIXES from the new shared module instead of a local copy
+    file: packages/web/app/components/admin/AdminSidebar.tsx
+    status: pending
+    code: |-
+      import { isAdminNavItemVisible } from '~/lib/admin-nav'
+
+      // where nav items are rendered:
+      const visibleItems = NAV_ITEMS.filter((item) =>
+        isAdminNavItemVisible(user?.role, item.href)
+      )
+      // render visibleItems instead of NAV_ITEMS (repeat for secondary/content nav array)
+  - id: 3
+    action: verify-pass
+    description: Typecheck and build pass
+    command: bun run typecheck && bun run build
+    expected_result: PASS
+    status: pending
+  - id: 4
+    action: commit
+    description: "Commit changes (replace #TICKET with this ticket's number)"
+    command: "git add -A && git commit -m \"feat(web): filter admin sidebar nav by role (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-23T12:07:47.333Z"
+completed: "2026-07-23T12:08:51.036Z"

@@ -1,0 +1,63 @@
+ticket_number: 313
+title: 2Factor.in - API key + chobi.art DLT template registration
+description: |-
+  ## Task
+  TWO_FACTOR_API_KEY is PLACEHOLDER in deploy/.env — phone/OTP login and order SMS are dead on staging. Also the code's template-name defaults are still the legacy registered IDs (MasonArt, MasonArtOrderConfirmed, MasonArtShipped, MasonArtOutForDelivery, MasonArtDelivered in packages/api/src/services/sms.ts).
+
+  Steps: activate/fund the 2Factor.in account and put the real API key in deploy/.env; register chobi.art-branded DLT templates (1 OTP + 4 transactional — DLT approval takes time, start early); once approved, set TWO_FACTOR_OTP_TEMPLATE and TWO_FACTOR_*_TEMPLATE env vars in deploy/.env and docker/docker-compose.prod.yml env passthrough; then remove the legacy defaults + 'formerly MasonArt' comments from sms.ts.
+
+  ## Context
+  Part of feature: chobi-external-services
+  Gotcha from EXTERNAL-SERVICES.md: exhausted SMS credits masquerade as app bugs; DLT templates must be pre-approved before any transactional SMS sends.
+feature: chobi-external-services
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T07:30:24.429Z"
+last_updated: "2026-07-23T10:46:00.828Z"
+time_spent_minutes: 0
+labels:
+  - infra
+  - sms
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T09:31:34.649Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-23T10:46:00.829Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T10:46:05.548Z"
+    text: "✅ CLOSED for staging — real TWO_FACTOR_API_KEY deployed and verified: 200 transactional credits, OTP delivered (via voice-call fallback since no DLT-approved SMS template exists on the account — expected under Indian DLT rules) and phone login completes end-to-end after the #319 cookie fix. Remaining work (register chobii.art-branded DLT SMS templates + sender ID, set TWO_FACTOR_*_TEMPLATE env vars, drop legacy defaults from sms.ts) is deliberately deferred to the #316 production cutover so templates are registered once under the final brand. Order-status transactional SMS stays non-functional until then (no voice fallback on that endpoint); email notifications cover the gap."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Set real TWO_FACTOR_API_KEY in deploy/.env; submit chobi.art DLT templates for approval
+    file: deploy/.env
+    status: pending
+  - id: 2
+    action: implement
+    description: "After approval: set template env vars, drop legacy defaults from sms.ts"
+    file: packages/api/src/services/sms.ts
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Trigger OTP login on staging with a real phone; confirm SMS arrives with chobi.art branding
+    expected_result: PASS - OTP received
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit sms.ts cleanup
+    command: "git add packages/api && git commit -m \"feat(api): chobi.art DLT SMS templates live (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-23T09:31:34.646Z"
+completed: "2026-07-23T10:46:00.828Z"

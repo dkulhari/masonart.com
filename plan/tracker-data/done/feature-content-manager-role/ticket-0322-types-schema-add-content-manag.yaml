@@ -1,0 +1,134 @@
+ticket_number: 322
+title: Types & Schema - Add content-manager to role enums and migration
+description: |-
+  ## Task
+  Add `content-manager` as a new role value in ALL FOUR role definitions, then generate/apply the Drizzle migration (Postgres `ALTER TYPE "user_role" ADD VALUE`).
+
+  ## Context
+  Part of feature: content-manager-role
+  Phase: Types & Database Schema
+
+  Role definitions live in 4 places that must stay in sync:
+  1. `packages/api/src/database/schema/users.ts:56` — `userRoleEnum` pgEnum
+  2. `packages/api/src/auth/index.ts:328` — `UserRole` TS union
+  3. `packages/shared/src/types/user.ts:15` — shared `UserRole` TS union
+  4. `packages/shared/src/schemas/user.ts:17` — `UserRoleSchema` Zod enum (NOTE: this one is already missing `super-admin` — fix that too)
+
+  Insert `content-manager` between `trade` and `admin` to reflect hierarchy position. Postgres enum ADD VALUE is non-reversible — accepted in design.
+feature: content-manager-role
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T11:48:57.247Z"
+last_updated: "2026-07-23T12:01:33.299Z"
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T12:00:05.906Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-23T12:01:33.302Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T12:01:35.609Z"
+    text: |-
+      ✅ Implemented in commit d2bdd724 on feature/content-manager-role.
+
+      TDD evidence: tests/schema/user-role.test.ts failed red (enum had 4 values), passed green after adding 'content-manager' to all 4 role definitions. Migration 0001_wide_zaladane.sql generated (ALTER TYPE "public"."user_role" ADD VALUE 'content-manager' BEFORE 'admin') and applied to local DB — verified enum_range now {customer,trade,content-manager,admin,super-admin}. Also fixed shared UserRoleSchema which was missing 'super-admin'. API/shared typecheck clean; web typecheck has 48 pre-existing errors (identical count before/after change, verified via stash).
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test asserting userRoleEnum contains all five roles
+    file: packages/api/tests/schema/user-role.test.ts
+    command: cd packages/api && bunx vitest run tests/schema/user-role.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from "vitest";
+      import { userRoleEnum } from "../../src/database/schema/users";
+
+      describe("userRoleEnum", () => {
+        it("includes all five roles in hierarchy order", () => {
+          expect(userRoleEnum.enumValues).toEqual([
+            "customer",
+            "trade",
+            "content-manager",
+            "admin",
+            "super-admin",
+          ]);
+        });
+      });
+  - id: 2
+    action: verify-fail
+    description: Confirm test fails (enum has only 4 values)
+    command: cd packages/api && bunx vitest run tests/schema/user-role.test.ts
+    expected_result: FAIL - expected array to contain content-manager
+    status: pending
+  - id: 3
+    action: implement
+    description: Add content-manager to userRoleEnum pgEnum (between trade and admin)
+    file: packages/api/src/database/schema/users.ts
+    status: pending
+    code: |-
+      export const userRoleEnum = pgEnum("user_role", [
+        "customer",
+        "trade",
+        "content-manager",
+        "admin",
+        "super-admin",
+      ]);
+  - id: 4
+    action: implement
+    description: Add content-manager to UserRole union in API auth
+    file: packages/api/src/auth/index.ts
+    status: pending
+    code: export type UserRole = "customer" | "trade" | "content-manager" | "admin" | "super-admin";
+  - id: 5
+    action: implement
+    description: Add content-manager to shared UserRole type
+    file: packages/shared/src/types/user.ts
+    status: pending
+    code: export type UserRole = 'customer' | 'trade' | 'content-manager' | 'admin' | 'super-admin';
+  - id: 6
+    action: implement
+    description: Add content-manager AND missing super-admin to shared Zod UserRoleSchema
+    file: packages/shared/src/schemas/user.ts
+    status: pending
+    code: export const UserRoleSchema = z.enum(['customer', 'trade', 'content-manager', 'admin', 'super-admin']);
+  - id: 7
+    action: verify-pass
+    description: Enum test passes
+    command: cd packages/api && bunx vitest run tests/schema/user-role.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 8
+    action: implement
+    description: Generate Drizzle migration and apply to local DB. Verify generated SQL contains ALTER TYPE "user_role" ADD VALUE 'content-manager'
+    command: cd packages/api && bun run db:generate && bun run db:push
+    expected_result: Migration generated with ALTER TYPE ... ADD VALUE 'content-manager'; push succeeds
+    status: pending
+  - id: 9
+    action: verify-pass
+    description: Full typecheck passes across monorepo
+    command: bun run typecheck
+    expected_result: PASS - no type errors
+    status: pending
+  - id: 10
+    action: commit
+    description: "Commit changes (replace #TICKET with this ticket's number)"
+    command: "git add -A && git commit -m \"feat(auth): add content-manager role to role enums and schema (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-23T12:00:05.903Z"
+completed: "2026-07-23T12:01:33.299Z"

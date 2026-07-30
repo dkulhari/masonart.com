@@ -1,0 +1,65 @@
+ticket_number: 312
+title: R2 - Provision chobi bucket, credentials and chobi-cdn CDN route
+description: |-
+  ## Task
+  Replace the legacy masonart R2 setup with chobi-named resources and real credentials. Currently R2_ENDPOINT/R2_ACCESS_KEY/R2_SECRET_KEY are PLACEHOLDER in deploy/.env and R2_BUCKET/CDN_URL still point at masonart-staging / masonart-cdn.xtoms.xyz — uploads and AI-generation storage are broken on staging.
+
+  Steps: create Cloudflare R2 bucket `chobi-staging` with **versioning enabled** (customer uploads and AI generations are non-reproducible); create an R2 API token scoped to the bucket; add custom domain `chobi-cdn.xtoms.xyz` for the bucket (rides the existing zone); update deploy/.env (R2_ENDPOINT, R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET=chobi-staging, CDN_URL=https://chobi-cdn.xtoms.xyz); remove the 'legacy' annotations in deploy/.env.example.
+
+  ## Context
+  Part of feature: chobi-external-services
+  ⚠️ CDN_URL is baked into the web browser bundle at BUILD time (VITE_CDN_URL build arg) — a web image rebuild + redeploy is REQUIRED, not just a container restart: make -C deploy build-push-deploy.
+feature: chobi-external-services
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T07:30:18.077Z"
+last_updated: "2026-07-23T08:43:57.802Z"
+time_spent_minutes: 0
+labels:
+  - infra
+  - cloudflare
+  - r2
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T07:37:58.188Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-23T08:43:57.833Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T08:44:02.651Z"
+    text: "✅ R2 fully provisioned and verified end-to-end. Bucket chobi-staging created via wrangler (R2 was never enabled on the account before — user enabled it); custom domain chobi-cdn.xtoms.xyz attached to the bucket; user-created scoped S3 token installed in deploy/.env (stale placeholders removed, endpoint/bucket/CDN_URL set to chobi values). Direct S3 PUT verified, then web image rebuilt (bakes VITE_CDN_URL) and stack redeployed. Live verification on staging: authenticated POST /api/ai/reference-image succeeded, returned https://chobi-cdn.xtoms.xyz/ai-reference-images/... and the object serves 200 via the CDN. .env.example annotations cleaned (commit ae431319). Legacy masonart R2 names fully retired — nothing to migrate since the old bucket never existed."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Create bucket + token + custom domain in Cloudflare dashboard, update deploy/.env and .env.example
+    file: deploy/.env
+    status: pending
+  - id: 2
+    action: implement
+    description: Rebuild and redeploy so the new CDN_URL is baked into the web bundle
+    command: make -C deploy build-push-deploy
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Upload an image via admin product form on staging; confirm it serves from https://chobi-cdn.xtoms.xyz
+    command: curl -sI https://chobi-cdn.xtoms.xyz/<uploaded-key> | head -3
+    expected_result: PASS - 200 from chobi-cdn
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit .env.example annotation removal
+    command: "git add deploy/.env.example && git commit -m \"chore(deploy): chobi R2 bucket and CDN provisioned (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-23T07:37:58.186Z"
+completed: "2026-07-23T08:43:57.802Z"

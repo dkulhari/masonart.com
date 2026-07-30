@@ -1,0 +1,228 @@
+ticket_number: 362
+title: Role-aware two-way navigation between the store and the staff area
+description: |
+  ## Problem
+
+  Admin and content-manager users report having no visible way to reach the staff area — they have to type `/admin` in the URL — and no obvious way back to the customer site once inside it.
+
+  Partial plumbing already exists (commit f7400014), so this is about making it correct, role-aware and discoverable rather than building it from scratch:
+
+  - `packages/web/app/components/layout/Header.tsx:6` — `STAFF_ROLES = ['content-manager', 'admin', 'super-admin']`
+  - `Header.tsx:90` — desktop pill labelled **"Admin"**, links to `/admin`
+  - `Header.tsx:200` — mobile drawer item labelled **"Admin Panel"**, links to `/admin`
+  - `packages/web/app/components/admin/AdminSidebar.tsx:409` — sidebar footer **"View Store"** → `/`
+  - `AdminSidebar.tsx` `MobileAdminHeader` — **"View Store"** → `/`
+
+  ## Gaps to close
+
+  1. **Labels are not role-aware.** A content manager only gets the catalog sections (`admin.tsx` beforeLoad redirects them off the dashboard and `isContentManagerPathAllowed` gates the rest), yet the entry point says "Admin" / "Admin Panel", which reads as inaccessible and is why it goes unnoticed.
+     - content-manager → **"Manage Content"**
+     - admin / super-admin → **"Manage Store"** (chosen for parallelism with "Manage Content"; it covers orders, customers, analytics and settings, unlike the bare word "Admin")
+  2. **Content managers should link straight to `/admin/products`**, not `/admin` — today they hit `/admin` and get bounced by a redirect in `admin.tsx` beforeLoad.
+  3. **Verify the return path is always reachable**: sidebar footer "View Store" when the sidebar is collapsed, and `MobileAdminHeader` on small screens. Confirm both render and are tappable; also confirm the header entry renders in the mobile drawer for both staff roles.
+  4. Also verify the entry renders at all in production for a logged-in staff user — it is gated on `session.user.role`, which comes from the root route's `fetchSession`.
+
+  Scope is navigation affordances and copy only. No permission changes — `STAFF_ROLES`, `isContentManagerPathAllowed` and `isAdminNavItemVisible` keep their current behaviour.
+
+  ## Suggested shape
+
+  Add two helpers to `packages/web/app/lib/admin-nav.ts` so Header and AdminSidebar share one source of truth:
+
+  ```ts
+  export function staffAreaLabel(role: string | undefined): string | null
+  export function staffAreaHref(role: string | undefined): string | null
+  ```
+
+  returning `('Manage Content', '/admin/products')` for `content-manager`, `('Manage Store', '/admin')` for `admin` / `super-admin`, and `null` for everyone else.
+
+  ## Implementation Steps
+
+  - [ ] **Step 1 [write-test]**: Write failing tests for the role→label/href helpers
+    - File: `packages/web/tests/lib/admin-nav.test.ts`
+    - Run: `cd packages/web && bunx vitest run tests/lib/admin-nav.test.ts`
+    - Expected: FAIL — `staffAreaLabel` / `staffAreaHref` do not exist yet
+    ```ts
+    import { describe, it, expect } from 'vitest'
+    import { staffAreaLabel, staffAreaHref } from '~/lib/admin-nav'
+
+    describe('staff area entry point', () => {
+      it('labels the entry "Manage Content" for content managers', () => {
+        expect(staffAreaLabel('content-manager')).toBe('Manage Content')
+      })
+
+      it('sends content managers straight to the products list', () => {
+        expect(staffAreaHref('content-manager')).toBe('/admin/products')
+      })
+
+      it('labels the entry "Manage Store" for admins and super-admins', () => {
+        expect(staffAreaLabel('admin')).toBe('Manage Store')
+        expect(staffAreaLabel('super-admin')).toBe('Manage Store')
+        expect(staffAreaHref('admin')).toBe('/admin')
+      })
+
+      it('shows nothing for customers, trade users and signed-out visitors', () => {
+        expect(staffAreaLabel('customer')).toBeNull()
+        expect(staffAreaLabel('trade')).toBeNull()
+        expect(staffAreaLabel(undefined)).toBeNull()
+      })
+    })
+    ```
+
+  - [ ] **Step 2 [verify-fail]**: Confirm the tests fail
+    - Run: `cd packages/web && bunx vitest run tests/lib/admin-nav.test.ts`
+    - Expected: FAIL
+
+  - [ ] **Step 3 [implement]**: Add the helpers
+    - File: `packages/web/app/lib/admin-nav.ts`
+    ```ts
+    /** Label and entry path for the staff area, by role. null = not staff. */
+    export function staffAreaLabel(role: string | undefined): string | null {
+      switch (role?.toLowerCase()) {
+        case 'content-manager':
+          return 'Manage Content'
+        case 'admin':
+        case 'super-admin':
+          return 'Manage Store'
+        default:
+          return null
+      }
+    }
+
+    export function staffAreaHref(role: string | undefined): string | null {
+      switch (role?.toLowerCase()) {
+        // Content managers have no dashboard — /admin only bounces them here.
+        case 'content-manager':
+          return '/admin/products'
+        case 'admin':
+        case 'super-admin':
+          return '/admin'
+        default:
+          return null
+      }
+    }
+    ```
+
+  - [ ] **Step 4 [verify-pass]**: Confirm the helper tests pass
+    - Run: `cd packages/web && bunx vitest run tests/lib/admin-nav.test.ts`
+    - Expected: PASS
+
+  - [ ] **Step 5 [implement]**: Use the helpers in the customer header
+    - File: `packages/web/app/components/layout/Header.tsx`
+    - Replace the `STAFF_ROLES` / `isStaff` check with `staffAreaLabel(session?.user?.role)` and `staffAreaHref(...)`, and render the label instead of the hardcoded "Admin" (desktop, ~line 90) and "Admin Panel" (mobile drawer, ~line 200). Content-manager search params for `/admin/products` must match the route's `validateSearch` defaults (`page`, `pageSize`, `sortBy`, `sortOrder`).
+
+  - [ ] **Step 6 [implement]**: Make the return path unmistakable in the staff area
+    - File: `packages/web/app/components/admin/AdminSidebar.tsx`
+    - Keep "View Store" reachable when the sidebar is collapsed (icon + accessible name), and confirm `MobileAdminHeader` shows it on small screens. Retitle the mobile header from "Admin Panel" to the role-aware label from `staffAreaLabel`.
+
+  - [ ] **Step 7 [verify-pass]**: Full web suite, no regressions
+    - Run: `cd packages/web && bunx vitest run && bunx tsc --noEmit -p tsconfig.json`
+    - Expected: PASS (typecheck: no new errors beyond the known pre-existing ones)
+
+  - [ ] **Step 8 [verify-pass]**: Manual check with the seeded staff accounts
+    - Seeded users: `packages/api/src/database/seed-test-users.ts` (`test-content-manager@chobii.art`)
+    - Sign in as a content manager → header shows "Manage Content" → lands on `/admin/products` with no redirect hop → "View Store" returns to `/`. Repeat as admin → "Manage Store" → `/admin`. Check desktop, collapsed sidebar and mobile widths.
+
+  - [ ] **Step 9 [commit]**: Commit
+    - Run: `git add packages/web/app/lib/admin-nav.ts packages/web/app/components/layout/Header.tsx packages/web/app/components/admin/AdminSidebar.tsx packages/web/tests/lib/admin-nav.test.ts && git commit -m "feat(web): role-aware staff area navigation (#{ticket-number})"`
+feature: content-manager-role
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-29T06:22:44.718Z"
+last_updated: "2026-07-29T07:32:40.496Z"
+time_spent_minutes: 14
+labels:
+  - web
+  - navigation
+  - rbac
+  - content-manager
+  - admin-panel
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-29T07:18:44.497Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-29T07:32:40.497Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-29T07:32:57.517Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d1a6d486` - feat(web): role-aware two-way navigation between store and staff area
+
+      **Files Changed**:
+      - `packages/web/app/lib/admin-nav.ts` — added `staffAreaLabel()`, `staffAreaHref()` and `ADMIN_PRODUCTS_SEARCH` as the shared source of truth
+      - `packages/web/app/components/layout/Header.tsx` — replaced `STAFF_ROLES`/`isStaff` with the helpers; desktop pill and mobile drawer now render the role-aware label and href
+      - `packages/web/app/components/admin/AdminSidebar.tsx` — added a "View Store" link to the sidebar footer that keeps its accessible name when collapsed; `MobileAdminHeader` takes a `role` prop, is retitled with the role-aware label, and its "View Store" tap target went from 20px to 44px tall
+      - `packages/web/app/routes/admin.tsx` — passes `role` to `MobileAdminHeader`; narrows the route-context user to the local `User` shape once
+      - `packages/web/tests/lib/admin-nav.test.ts` — new, 5 tests
+      - `packages/web/tests/components/admin/AdminSidebar.test.tsx` — new, 6 tests
+
+      **Summary**:
+      - content-manager → **"Manage Content"** → `/admin/products` (no redirect hop through `/admin`)
+      - admin / super-admin → **"Manage Store"** → `/admin`
+      - everyone else (customer, trade, signed out) → nothing rendered
+
+      No permission changes: `STAFF_ROLES`, `isContentManagerPathAllowed` and `isAdminNavItemVisible` keep their behaviour.
+
+      **Extra finding (fixed)**: gap 3 turned up a real defect — the sidebar footer had no "View Store" link at all (only `MobileAdminHeader` did), so on desktop there was no way back from `/admin` except editing the URL. Added. The mobile header's "View Store" was also a 20px-tall tap target, well under the 44px minimum; now 85x44.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run`
+      - Result: PASS (35 files, 1380 tests passing, 0 failing — 11 of them new)
+      - Command: `cd packages/web && bunx tsc --noEmit -p tsconfig.json`
+      - Result: 23 errors, all pre-existing. Baseline before this change was 26; the `admin.tsx` narrowing cleared 3 (TS6196 unused `User`, and two `role does not exist` TS2339). No new errors.
+
+      **Manual check (Step 8)** — real dev app on `localhost:3001` against the dev DB (port 5440), both seeded staff accounts, headless Chrome:
+
+      | Check | content-manager | admin |
+      |---|---|---|
+      | desktop header label | Manage Content ✓ | Manage Store ✓ |
+      | href | `/admin/products?page=1&pageSize=20&sortBy=createdAt&sortOrder=desc` | `/admin` |
+      | landed on (no redirect hop) | `/admin/products…` ✓ | `/admin` ✓ |
+      | sidebar View Store, expanded | visible, `href="/"` ✓ | visible ✓ |
+      | sidebar View Store, collapsed | visible, 47x36, named ✓ | visible ✓ |
+      | mobile drawer entry (390px) | Manage Content ✓ | Manage Store ✓ |
+      | mobile admin header title | Manage Content ✓ | Manage Store ✓ |
+      | mobile View Store | 85x44, returns to `/` ✓ | ✓ |
+
+      Signed-out visitor: header contains no "Manage …" entry ✓
+work_sessions:
+  - start: "2026-07-29T07:18:47.310Z"
+    agent: claude-code
+    summary: Added staffAreaLabel/staffAreaHref helpers, wired role-aware entry into Header (desktop pill + mobile drawer), added a View Store return link to the AdminSidebar footer that survives collapse, retitled MobileAdminHeader with the role-aware label and fixed its 20px tap target. 11 new tests, full web suite 1380 passing, no new type errors (26 -> 23). Verified end-to-end in the running dev app as both seeded staff roles.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: "2026-07-29T07:32:35.793Z"
+    duration: "00:13:48"
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-07-29T07:18:44.490Z"
+work_session_summary:
+  total_sessions: 1
+  total_duration: "00:14:00"
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: "00:14:00"
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run
+  test_output: Test Files 35 passed (35), Tests 1380 passed (1380) — includes 5 new tests in tests/lib/admin-nav.test.ts and 6 in tests/components/admin/AdminSidebar.test.tsx
+  build_passed: true
+  build_command: cd packages/web && bunx tsc --noEmit -p tsconfig.json
+  verified_at: "2026-07-29T07:32:37.662Z"
+completed: "2026-07-29T07:32:40.496Z"

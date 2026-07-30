@@ -1,0 +1,74 @@
+ticket_number: 360
+title: 'Product grid card sizing: residual height variance + home/listing ratio mismatch'
+description: |-
+  ## Context
+
+  Two loose ends left deliberately after #354, both design calls rather than defects, recorded so they are not lost.
+
+  ## 1. Residual 20px cross-row card height variance
+
+  After #354 the `/posters` grid has uniform image heights (all 254px at 390px wide) and titles/prices align within each row. Card *container* heights still differ: measured `[368, 348]`.
+
+  The cause is the metadata block — some cards show two style lines ("Botanical" + "Modern Contemporary"), others one. This is not visually ragged, because CSS grid rows stretch to the tallest item and the images all align, so it was left alone.
+
+  If perfectly uniform cards are wanted, clamp the metadata to a fixed line count (`line-clamp-1` on the style row, or reserve two lines always). That is a visual-design decision — reserving a blank line for single-style products trades one kind of unevenness for whitespace.
+
+  ## 2. Home page uses a different aspect ratio than the listing — and disagrees with its own skeleton
+
+  - Listing (`/posters`) → `aspect-[2/3]`, matching `ProductCardSkeleton` (`ProductCard.tsx:222`)
+  - Home page → `aspect-[3/4]`, set deliberately in #289
+  - `ProductCardSkeleton` → `aspect-[2/3]`
+
+  So on the home page the skeleton reserves a **2/3** box and the real card renders **3/4** — a guaranteed layout shift as featured products resolve. This was invisible until #351, because the featured grid always rendered its empty state and the skeleton path was never exercised with real data.
+
+  Decide one of:
+  - Align the home page to `aspect-[2/3]` (removes the shift, makes the two grids consistent)
+  - Keep `aspect-[3/4]` as an intentional hero treatment and make the skeleton accept a matching ratio prop
+
+  The second preserves #289's intent; the first is simpler. Either fixes the shift.
+
+  ## Acceptance criteria
+
+  - Home page skeleton and resolved card occupy the same box — no visible shift when featured products load
+  - A conscious decision recorded on whether card heights should be perfectly uniform, applied consistently across both grids
+feature: mobile-responsive-jul2026
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-28T15:37:51.348Z'
+last_updated: '2026-07-28T15:37:51.348Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - product-catalog
+  - visual
+  - design-decision
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: 'Measure the home page layout shift with real featured data (now rendering after #351) — confirm skeleton 2/3 vs card 3/4 box change'
+    status: pending
+  - id: 2
+    action: implement
+    description: 'Apply the chosen resolution: align home to aspect-[2/3], or give ProductCardSkeleton a matching ratio prop'
+    file: packages/web/app/components/product/ProductCard.tsx
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: No box-size change between skeleton and resolved card on the home page; grids consistent
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app/ && git commit -m "fix(web): align product card skeleton and card aspect ratios"'
+    status: pending
+current_step: 1

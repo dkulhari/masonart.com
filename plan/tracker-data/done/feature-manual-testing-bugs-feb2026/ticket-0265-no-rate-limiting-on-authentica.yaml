@@ -1,0 +1,66 @@
+ticket_number: 265
+title: No rate limiting on authentication endpoints
+description: |-
+  ## Bug
+
+  Authentication endpoints (sign-in, sign-up) have no rate limiting headers and no apparent rate limiting enforcement.
+
+  ## Testing
+  ```bash
+  # No rate limit headers found on any auth endpoint
+  curl -sI -X POST http://localhost:3000/api/auth/sign-in/email \
+    -H "Content-Type: application/json" \
+    -d '{"email":"t@t.com","password":"t"}'
+  # No X-RateLimit-*, Retry-After, or similar headers
+  ```
+
+  ## Impact
+  - **Brute force attacks**: Attackers can try unlimited password combinations
+  - **Credential stuffing**: No protection against automated credential testing
+  - **Account enumeration**: No throttling on sign-up/sign-in attempts
+  - **DoS vector**: Auth endpoints likely hit the database per request
+
+  ## Expected Behavior
+  Auth endpoints should:
+  1. Return rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
+  2. Return 429 Too Many Requests after threshold (e.g., 5 attempts per minute per IP)
+  3. Implement progressive delays or CAPTCHA after repeated failures
+
+  ## Note
+  The API middleware directory has `rate-limit` referenced. Redis is available for rate limiting. The infrastructure exists but may not be applied to auth routes.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T22:34:48.461Z"
+last_updated: "2026-07-27T16:19:29.049Z"
+time_spent_minutes: 0
+labels:
+  - security
+  - api
+  - auth
+  - rate-limiting
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T16:19:29.080Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T16:19:53.748Z"
+    text: |-
+      ✅ Closed as no-longer-valid (2026-07-27), same for duplicate #266. Auth rate limiting is live and verified ON PRODUCTION: 7 rapid POST /api/auth/sign-in/email attempts → 401, 401, then 429×5 with x-ratelimit-limit/remaining/reset headers. Redis sliding-window limiters registered in index.ts (authRateLimit/signUpRateLimit, per-IP via cf-connecting-ip per #291); test environments bypass via DISABLE_RATE_LIMIT (#332).
+
+      Batch-closing evidence for siblings closed alongside:
+      - #247: GET /api/products → 200 in <1s (hang gone); trailing-slash /api/products/ → conventional 404, no bogus 401.
+      - #263: /api/auth/session is not a Better Auth endpoint — /get-session is the canonical name and the client library uses it; works-as-designed, no alias warranted.
+      - #262: DELETE /api/cart routes correctly; the 404 is the handler's own "No cart found" for callers with neither a session nor a guest-cart cookie. Cart is guest-capable by design, so the requested 401 would be incorrect semantics.
+      - #253: superseded duplicate of #256 (og:image DOES exist on /posters; the real gap — home/create/gallery — is #256's exact scope, being fixed now).
+      - #245: health response now includes service + version (the substantive gap); "healthy" vs "ok" wording retained deliberately — richer than the Feb spec sketch, and UptimeRobot/mini healthchecks assert on HTTP 200, not the string.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T16:19:29.049Z"

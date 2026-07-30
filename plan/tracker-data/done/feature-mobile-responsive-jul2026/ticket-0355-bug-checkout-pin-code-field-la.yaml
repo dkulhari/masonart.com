@@ -1,0 +1,94 @@
+ticket_number: 355
+title: "BUG: Checkout PIN code field lacks inputmode=numeric — QWERTY keyboard for a 6-digit PIN"
+description: |-
+  ## Problem
+
+  The checkout `postalCode` field is `type="text"` with no `inputmode`, so mobile users get a full QWERTY keyboard when entering a 6-digit Indian PIN code. They have to switch to the numeric layout manually.
+
+  **Verified on production chobii.art at 390x844, 2026-07-28.** The field reports `type: text`, `inputmode: null`, `pattern: null`.
+
+  By contrast the `phone` field is correctly `type="tel"` and does get a numeric keypad — so the pattern is understood elsewhere in the same form.
+
+  ## Fix
+
+  Add `inputMode="numeric"` and `pattern="[0-9]{6}"` with `maxLength={6}` to the PIN code field. Keep `type="text"` so leading zeros are preserved (`type="number"` is the wrong tool here — it strips them and adds unwanted spinners).
+
+  ## Acceptance criteria
+
+  - Focusing PIN code on mobile opens the numeric keypad
+  - Leading zeros are preserved
+  - Existing PIN validation still rejects non-6-digit input
+feature: mobile-responsive-jul2026
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:40.599Z"
+last_updated: "2026-07-28T15:20:20.944Z"
+time_spent_minutes: 0
+labels:
+  - mobile
+  - frontend
+  - checkout
+  - forms
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T15:20:20.944Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T15:21:01.653Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5eb3c0e3` — fix(web): autofill tokens and numeric keypads on the checkout address form (shipped with #350, same file and test pass)
+
+      **Files Changed**:
+      - `packages/web/app/components/checkout/AddressForm.tsx` — PIN code gains `inputMode="numeric"` and `pattern="[0-9]{6}"`; phone gains `inputMode="numeric"` alongside its existing `type="tel"`
+
+      **Kept `type="text"`** as the ticket specified: `type="number"` strips leading zeros and adds spinners, both wrong for a fixed-width PIN. The existing `maxLength={6}` and the non-digit strip in `onChange` were already correct and are untouched.
+
+      **Verification**:
+      - `inputmode="numeric"` and `pattern="[0-9]{6}"` assert green; `type` still `text`
+      - Leading-zero behaviour covered: field holds `012345` intact
+      - Command: `bunx vitest run tests/components/checkout/AddressForm.test.tsx` → 14 passed / 14
+
+      **Not verified on hardware**: `inputmode` drives the on-screen keyboard, which Playwright's desktop Chromium does not emulate. The attribute is correct per spec, but worth a real-device glance when someone next has a phone in hand.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Test asserting the postalCode field exposes inputmode=numeric and a 6-digit pattern
+    file: tests/e2e/checkout-autofill.spec.ts
+    command: bunx playwright test tests/e2e/checkout-autofill.spec.ts
+    expected_result: FAIL — inputmode is null
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the missing attribute
+    command: bunx playwright test tests/e2e/checkout-autofill.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add inputMode=numeric, pattern=[0-9]{6} and maxLength=6 to the PIN code field, keeping type=text
+    file: packages/web/app/routes/checkout/index.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Numeric keypad opens; leading zeros preserved; validation intact
+    command: bunx playwright test tests/e2e/checkout-autofill.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: "git add packages/web/app/routes/checkout/ && git commit -m \"fix(web): numeric keypad for checkout PIN code field\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T15:20:20.944Z"

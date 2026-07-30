@@ -1,0 +1,40 @@
+name: mobile-responsive-jul2026
+title: Mobile Responsive Jul2026
+priority: high
+created: "2026-07-28T12:24:04.198Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Bugs found during a mobile-viewport sweep of production (chobii.art) at 390x844 (iPhone 14/15) on 2026-07-28. Covered home, product listing, product detail, AI create, gallery, cart, checkout, track, auth, and the 8 static info pages via Playwright-driven Chrome. Findings are a mix of mobile-only defects (transparent nav drawer, iOS input auto-zoom, missing autofill) and viewport-agnostic bugs that the sweep surfaced (empty featured collection, unimplemented related-products section, 404 reviews/stats endpoint). Structural health was good overall: zero horizontal overflow on every page tested, correct viewport meta, and no sub-12px text.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    "359": "TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests"
+    "360": "Product grid card sizing: residual height variance + home/listing ratio mismatch"
+    "361": "DECISION: order numbers still use the masonart MA- prefix after the rebrand"
+  in_progress: {}
+  done:
+    "348": "BUG: Mobile nav drawer is transparent — page content bleeds through, menu illegible"
+    "349": "BUG: All form inputs render at 14px — iOS Safari auto-zooms the viewport on every focus"
+    "350": "BUG: Checkout address form has zero autocomplete attributes — mobile autofill cannot work"
+    "351": "BUG: Homepage Featured Collection is always empty — loader reads .products, API returns .items"
+    "352": "BUG: PDP 'You May Also Like' is a hardcoded permanent skeleton — never implemented"
+    "353": "BUG: GET /api/products/:id/reviews/stats returns 404 — 3 console errors per PDP load"
+    "354": "BUG: /posters grid renders ragged — uniformAspectRatio is never passed to ProductGrid"
+    "355": "BUG: Checkout PIN code field lacks inputmode=numeric — QWERTY keyboard for a 6-digit PIN"
+    "356": "UX: /create 'Generate Poster' CTA sits 3.2 screens down on mobile"
+    "357": "BUG: Home 'Minimalist' style card caption is illegible — grey overlay too weak over a light image"
+    "358": "BUG: Track page placeholder shows stale 'MA-2024-001234' masonart order prefix"
+total_tickets: 14
+completion_percentage: 79
+is_completed: false

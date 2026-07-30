@@ -1,0 +1,56 @@
+ticket_number: 316
+title: Production Cutover Gate - chobi.art domain external registrations
+description: |-
+  ## Task
+  Checklist ticket for the future chobi.art production domain cutover — every item is an exact-hostname external registration that will NOT carry over from chobi.xtoms.xyz:
+
+  1. **Domain**: purchase chobi.art, create Cloudflare zone, add tunnel public hostname (the *.xtoms.xyz wildcard does NOT cover it)
+  2. **Razorpay**: swap rzp_test_ → rzp_live_ keys; RE-REGISTER webhook against https://chobi.art (webhooks do not follow redirects — silent payment-callback failure otherwise); new RAZORPAY_WEBHOOK_SECRET
+  3. **Resend**: verify chobi.art sending domain (SPF + DKIM) — unverified domain causes silent 500s on signup; switch EMAIL_FROM from noreply@xtoms.xyz to the branded domain
+  4. **Sentry**: SENTRY_ENVIRONMENT=production for the new stack
+  5. **SEO**: 301 redirect router chobi.xtoms.xyz → chobi.art (pattern from customs #160 app.→customs. rename)
+  6. **R2/CDN**: decide whether production gets its own bucket (chobi-prod) per .env.example
+
+  ## Context
+  Part of feature: chobi-external-services
+  Blocked on: domain purchase (user decision). Sources: docs/EXTERNAL-SERVICES.md, claude-mem #4872/#4874. Keep staging permanently on Razorpay test mode per docs/GO-LIVE-PLAN.md.
+feature: chobi-external-services
+type: story
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T07:30:48.040Z"
+last_updated: "2026-07-23T07:30:48.040Z"
+time_spent_minutes: 0
+labels:
+  - infra
+  - go-live
+  - checklist
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: "2026-07-23T10:11:17.333Z"
+    text: "➕ Cutover checklist addition: register `https://chobii.art/api/auth/callback/google` (+ JS origin) on the Google OAuth client at domain cutover — same class of exact-hostname registration as Razorpay webhooks/Resend. Staging equivalent tracked as the redirect_uri_mismatch bug ticket (chobii.xtoms.xyz callback)."
+  - author: mcp-client
+    timestamp: "2026-07-23T10:46:09.430Z"
+    text: "➕ Cutover checklist addition (from #313): register chobii.art-branded DLT sender ID + SMS templates with 2Factor.in (1 OTP + 4 transactional), set TWO_FACTOR_OTP_TEMPLATE / TWO_FACTOR_*_TEMPLATE env vars, remove legacy MasonArt* defaults from packages/api/src/services/sms.ts. Until then staging OTP arrives via voice-call fallback and order-status SMS is disabled (email covers it). DLT approval has multi-day lead time — submit early in the cutover window."
+  - author: mcp-client
+    timestamp: "2026-07-23T11:46:34.242Z"
+    text: "➕ Cutover checklist addition (from #315/#321): fund an image-generation provider before launch — fal.ai credits (~$0.003/img FLUX schnell; un-comment FAL_API_KEY in deploy/.env) or Google billing (~$0.04/img; GEMINI_IMAGE_MODEL env override available). Gemini API free tier has zero image-gen quota. After funding: deploy (picks up commit 3f1f124a) and verify a real PNG serves from the CDN. Until then the AI generator fails cleanly with wallet refunds."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Work the checklist top-to-bottom on cutover day; each external registration verified before DNS flip
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: "Post-cutover smoke: signup email, live payment + webhook delivery, Sentry event tagged production"
+    expected_result: PASS - all three verified on chobi.art
+    status: pending
+current_step: 1

@@ -1,0 +1,76 @@
+ticket_number: 288
+title: ProductGrid - Pass uniformAspectRatio to ProductCard
+description: |-
+  ## Task
+  Add `uniformAspectRatio` prop to ProductGrid and pass it through to each ProductCard. This lets grid consumers set a uniform ratio for all cards.
+
+  ## Context
+  Part of feature: hero-grid-alignment
+  Phase: 1 - ProductCard Enhancement
+
+  ## Implementation Steps
+
+  - [ ] **Step 1 [implement]**: Add uniformAspectRatio prop to ProductGridProps
+    - File: `packages/web/app/components/product/ProductGrid.tsx`
+    - Add to ProductGridProps interface:
+    ```tsx
+    /** Override aspect ratio for uniform card alignment (e.g. 'aspect-[3/4]') */
+    uniformAspectRatio?: string
+    ```
+    - Destructure in component function and pass to ProductCard:
+    ```tsx
+    export function ProductGrid({
+      products,
+      columns = { default: 2, sm: 2, md: 3, lg: 4 },
+      gap = 'md',
+      isLoading = false,
+      skeletonCount = 8,
+      emptyState,
+      className,
+      cardSize = 'md',
+      uniformAspectRatio,
+    }: ProductGridProps) {
+    ```
+    - In the render section, pass to ProductCard:
+    ```tsx
+    <ProductCard
+      key={product.id}
+      product={product}
+      size={cardSize}
+      uniformAspectRatio={uniformAspectRatio}
+    />
+    ```
+
+  - [ ] **Step 2 [verify-pass]**: Run typecheck
+    - Run: `cd packages/web && bunx tsc --noEmit --pretty 2>&1 | head -30`
+    - Expected: No errors
+
+  - [ ] **Step 3 [commit]**: Commit changes
+    - Run: `git add packages/web/app/components/product/ProductGrid.tsx && git commit -m "feat(ui): pass uniformAspectRatio through ProductGrid (#288)"`
+feature: hero-grid-alignment
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-19T09:35:00.000Z'
+last_updated: '2026-07-27T15:13:52.452Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria:
+  - ProductGrid accepts optional uniformAspectRatio prop
+  - Prop is forwarded to all ProductCard children
+comments:
+  - author: system
+    timestamp: '2026-07-27T15:13:52.453Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - 287
+blocks:
+  - 289
+attachments: []
+completed: '2026-07-27T15:13:52.452Z'

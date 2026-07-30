@@ -1,7 +1,7 @@
 name: hero-grid-alignment
 title: Hero Page Product Grid Alignment
 priority: medium
-created: '2026-02-19T09:30:00.000Z'
+created: "2026-02-19T09:30:00.000Z"
 assignee: unassigned
 tags:
   - frontend
@@ -68,3 +68,6 @@ tickets:
   - 288
   - 289
   - 290
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

@@ -1,0 +1,42 @@
+ticket_number: 239
+title: Cart API (/api/cart) hangs indefinitely - empty reply from server
+description: |-
+  ## Bug
+  GET `/api/cart` never returns a response. Same behavior as Products API - hangs for ~5+ seconds then empty reply.
+
+  ## Steps to Reproduce
+  1. `curl --max-time 5 http://localhost:3000/api/cart`
+  2. Observe timeout with HTTP 000
+
+  ## Note
+  Cart page still works because it uses client-side Zustand store, but server-side cart operations are broken.
+
+  ## Expected
+  401 Unauthorized (for unauthenticated) or 200 OK with cart contents
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T20:51:09.296Z"
+last_updated: "2026-07-27T13:42:38.253Z"
+time_spent_minutes: 0
+labels:
+  - api
+  - cart
+  - P0
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T13:42:38.255Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T13:42:41.468Z"
+    text: "✅ Closed as no-longer-reproducible (2026-07-27). GET /api/cart returns 200 in 0.11s on local dev. Same root class as #238 (Feb-era API hang), fixed by intervening work. Checkout E2E flows exercising server cart operations pass in the current suite."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T13:42:38.253Z"

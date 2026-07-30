@@ -1,0 +1,53 @@
+ticket_number: 340
+title: "Bug - Add Product has no file picker: image upload was never implemented (URL-only placeholder)"
+description: |-
+  ## Bug
+  User report: no way to open files to upload a picture in Add Product. Confirmed: ProductForm.tsx:376 comment "in a real app, this would open a file picker" — the Add Image button only appends an empty row with a manual URL field. No product-image upload endpoint exists either.
+
+  ## Fix
+  - API: POST /api/admin/products/upload-image (behind existing requireContentManager guard) — multipart file, JPEG/PNG/WebP, size cap, stored via uploadOptimizedImage() under products/ in R2, returns CDN url
+  - Web: ProductForm gets an Upload Image button wired to a hidden file input (multiple), per-file upload with progress state, appends returned URLs to the images list; manual URL row retained as fallback
+
+  Files: packages/api/src/routes/admin/products.ts, packages/web/app/components/admin/ProductForm.tsx
+feature: admin-panel
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-25T12:32:39.359Z"
+last_updated: "2026-07-25T12:41:42.304Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - backend
+  - admin
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-25T12:41:42.307Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-25T12:41:56.562Z"
+    text: "✅ **Completed** — commit 43f4bcbf. New POST /api/admin/products/upload-image behind the existing requireAuth+requireContentManager guards: multipart file, JPEG/PNG/WebP only, 10MB cap, stored via uploadOptimizedImage() under products/ (WebP + responsive variants generated). ProductForm: \"Upload Images\" button with hidden multi-file input, per-file sequential upload, spinner + inline error display; first image auto-primary; manual \"Add by URL\" retained. Browser-verified locally: picked a real PNG → thumbnail appears with the stored URL, no errors. Env note: local MinIO lacked the poster-app-dev bucket entirely (created it — any dev upload would have 500'd before). Production uses the chobii-staging R2 bucket + cdn.chobii.art, already verified serving. Deploy in flight."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Upload endpoint + ProductForm file picker wiring
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: "Browser: pick a real PNG in Add Product, thumbnail renders from CDN url; API rejects non-image"
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit
+    status: pending
+current_step: 1
+completed: "2026-07-25T12:41:42.304Z"

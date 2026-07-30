@@ -1,0 +1,64 @@
+ticket_number: 320
+title: "Bug - Google OAuth redirect_uri_mismatch: chobii.xtoms.xyz callback not registered in Google Cloud Console"
+description: |-
+  ## Bug
+  Google sign-in on staging fails with **Error 400: redirect_uri_mismatch** — Google rejects the flow before any app code runs:
+  ```
+  redirect_uri=https://chobii.xtoms.xyz/api/auth/callback/google
+  flowName=GeneralOAuthFlow
+  ```
+
+  ## Root Cause
+  No code bug. Better Auth derives the callback URL from BETTER_AUTH_URL (now https://chobii.xtoms.xyz after the rebrand), but the Google Cloud Console OAuth client only has the old hostname(s) in its Authorized redirect URIs. Note: GOOGLE_CLIENT_ID/SECRET are reused from the customs-copilot OAuth client (per claude-mem #4904), so the client also serves customs.xtoms.xyz — the fix is to ADD the new URI, not replace existing ones.
+
+  ## Fix (Google Cloud Console — user/dashboard only, no code change)
+  1. console.cloud.google.com → APIs & Services → Credentials → the OAuth 2.0 Client ID used by GOOGLE_CLIENT_ID
+  2. Authorized redirect URIs → ADD: `https://chobii.xtoms.xyz/api/auth/callback/google`
+  3. Authorized JavaScript origins → ADD: `https://chobii.xtoms.xyz` (if origins are enforced)
+  4. Optionally prune stale masonart.xtoms.xyz / chobi.xtoms.xyz entries
+  5. Google propagation can take a few minutes
+
+  ## Cutover Note
+  The future chobii.art production domain needs the same registration (`https://chobii.art/api/auth/callback/google`) — tracked in cutover checklist #316.
+
+  ## Context
+  Config lives in packages/api/src/auth/index.ts:189 (google provider) with BETTER_AUTH_URL from docker/docker-compose.prod.yml. Manual verification — no automated test applicable (external service registration).
+feature: chobi-external-services
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-23T10:11:02.194Z"
+last_updated: "2026-07-23T10:45:58.046Z"
+time_spent_minutes: 0
+labels:
+  - auth
+  - oauth
+  - external-config
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-23T10:45:58.046Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-23T10:46:03.541Z"
+    text: ✅ CLOSED — user added https://chobii.xtoms.xyz/api/auth/callback/google to the OAuth client (account dk.jarvis1.ai@gmail.com, GCP project 756865349904) and confirmed Google login works on staging. JS origins intentionally not required (server-side redirect flow only, no Google JS SDK). Owner account + shared-client gotchas documented in docs/EXTERNAL-SERVICES.md (6f222e29) and project memory.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Add https://chobii.xtoms.xyz/api/auth/callback/google to Authorized redirect URIs (and origin) on the Google OAuth client — Google Cloud Console, user action
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: "Manual: 'Continue with Google' on https://chobii.xtoms.xyz/auth/login completes and lands in the account; also confirm customs.xtoms.xyz Google login still works (shared client)"
+    expected_result: PASS - Google login works on both apps
+    status: pending
+current_step: 1
+completed: "2026-07-23T10:45:58.046Z"

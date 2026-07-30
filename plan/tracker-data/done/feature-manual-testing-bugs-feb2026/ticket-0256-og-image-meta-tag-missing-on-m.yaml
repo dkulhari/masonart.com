@@ -1,0 +1,37 @@
+ticket_number: 256
+title: og:image meta tag missing on most pages except /posters
+description: "The og:image Open Graph meta tag is properly set on the /posters page with a custom collection image, but is completely missing on all other pages tested: home /, /create, /gallery, /auth/login, /cart, /checkout. Social media shares from these pages will have no preview image. The /posters page has excellent OG implementation with og:image, og:image:secure_url, og:image:alt, og:image:type, og:image:width, og:image:height. This should be replicated to other public pages using appropriate default images."
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T21:39:44.190Z"
+last_updated: "2026-07-27T16:46:52.719Z"
+time_spent_minutes: 0
+labels:
+  - seo
+  - frontend
+  - meta-tags
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T16:46:52.720Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T16:47:05.743Z"
+    text: |-
+      ✅ **Completed and live on production** (2026-07-27, commit a083173c — covers #259 too).
+
+      Root cause was worse than reported: BOTH og image assets the site referenced (og-default.jpg fallback on product pages, og-posters-collection.jpg on /posters) never existed — social shares had broken previews site-wide even where the meta tag was present. Fix: generated both 1200x630 brand banners (sharp), added og:image/og:url/og:image dimensions/twitter:image AND canonical links to home, /create, and /gallery heads (the three pages missing them; /posters and product detail already had the tags).
+
+      **Verification on chobii.art post-deploy**: og-default.jpg → 200 image/jpeg; home SSR contains og:image + rel=canonical (python string checks — ugrep patterns proved unreliable for this).
+
+      Batch-close notes for siblings: #259 same commit/same verification (canonical on all three pages); #267 commit 7fa82410 (footer's 3 category links now use ?styles= which the listing actually parses — filter verified returning results); #249 commit 4dc75317 (root now advertises /api/health instead of the nonexistent /docs); #257 commit 071c3df0 (style-presets returns curated description/keywords/recommendedAspectRatios from the AI pipeline configs; verified on prod — note: category/isPremium were never product concepts, all presets are free until the subscription feature exists; side effect: ai.test.ts 138/138 green for the first time after fixing stale 'minimalist' fixtures).
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T16:46:52.719Z"

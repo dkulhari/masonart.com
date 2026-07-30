@@ -1,0 +1,102 @@
+ticket_number: 349
+title: "BUG: All form inputs render at 14px — iOS Safari auto-zooms the viewport on every focus"
+description: |-
+  ## Problem
+
+  Every text input, select and textarea in the app computes to `font-size: 14px`. iOS Safari automatically zooms the viewport whenever a focused input has a font-size below **16px**, and it does not zoom back out on blur. On a real iPhone the user is left pinch-zoomed after tapping any field, and must manually zoom out before continuing.
+
+  **Verified on production chobii.art at 390x844, 2026-07-28.** Confirmed 14px on:
+  - **Checkout** — all 10 fields: fullName, email, phone, addressLine1, addressLine2, landmark, city, state, postalCode, order notes
+  - **Login** — email, password
+  - **Create** — the prompt textarea
+  - **Footer newsletter** — email (present on every page)
+
+  This is worst on checkout, where the user tabs through ten fields in sequence and gets zoomed on each one.
+
+  ## Fix
+
+  Raise the base input font-size to 16px at mobile widths. Since this is the shared shadcn/ui input styling, fix it at the component level rather than per-page — e.g. `text-base md:text-sm` on the Input/Textarea/Select primitives, which keeps the 14px look on desktop while satisfying iOS below the md breakpoint.
+
+  ## Acceptance criteria
+
+  - Every input, textarea and select computes to >= 16px font-size below 768px
+  - Desktop appearance is unchanged
+  - Verified on checkout, login, register, create, and the footer newsletter
+feature: mobile-responsive-jul2026
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:30.681Z"
+last_updated: "2026-07-28T15:20:19.923Z"
+time_spent_minutes: 0
+labels:
+  - mobile
+  - frontend
+  - ios
+  - forms
+  - conversion
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T15:20:19.923Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T15:21:00.762Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `9bd4dade` — fix(web): 16px form controls on mobile to stop iOS Safari auto-zoom
+
+      **Files Changed**:
+      - `packages/web/app/styles/globals.css` — one media-query rule below the `md` breakpoint
+      - `tests/e2e/mobile-input-zoom.spec.ts` — new spec
+
+      **Approach note**: the ticket assumed a shared Input primitive to patch. There isn't one — `packages/web/app/components/ui/` holds only `OptimizedImage.tsx`, and field styling is inlined as `text-sm` across 34 files (96 matches, including non-inputs). Per-field edits would have been noisy and easy to miss, so this is a single rule instead. It also covers controls added later.
+
+      The rule sits outside `@layer` and uses `:not()` to clear the specificity of the `.text-sm` utility (0,1,0), which would otherwise win regardless of source order. Checkboxes and radios are excluded — they render no text and never trigger the zoom.
+
+      **Verification**:
+      - RED against production (unfixed): 7 failed, all reporting 14px — `/checkout`, `/auth/login`, `/auth/register`, `/auth/forgot-password`, `/create`, `/track`, footer newsletter
+      - GREEN against local dev with the fix: `7 passed`
+      - Live spot-check at 390px: login email/password/footer-email all `16px`; at 1280px all three still `14px`
+
+      **Test-quality note**: an earlier run of this spec passed 7/8 against `localhost:5173` — which turned out to be a *different app* squatting that port. The checks were passing vacuously against pages with no matching inputs. The spec now asserts `visibleCount > 0` per page so it cannot pass without finding controls, and `/checkout` was removed from its page list (it short-circuits to an empty-cart state; its fields are covered by the AddressForm component test).
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Test asserting no input/textarea/select computes below 16px at a 390px viewport
+    file: tests/e2e/mobile-input-zoom.spec.ts
+    command: bunx playwright test tests/e2e/mobile-input-zoom.spec.ts
+    expected_result: FAIL — 14px found on checkout, login, create and footer newsletter fields
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the failure lists the 14px fields
+    command: bunx playwright test tests/e2e/mobile-input-zoom.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Apply text-base md:text-sm to the shared Input, Textarea and Select primitives so mobile gets 16px and desktop keeps 14px
+    file: packages/web/app/components/ui/input.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: All fields >= 16px on mobile; desktop rendering unchanged
+    command: bunx playwright test tests/e2e/mobile-input-zoom.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: "git add packages/web/app/components/ui/ tests/e2e/mobile-input-zoom.spec.ts && git commit -m \"fix(web): 16px inputs on mobile to stop iOS Safari auto-zoom\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T15:20:19.923Z"

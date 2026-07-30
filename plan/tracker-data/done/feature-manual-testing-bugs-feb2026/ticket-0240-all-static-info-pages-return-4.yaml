@@ -1,0 +1,58 @@
+ticket_number: 240
+title: All static/info pages return 404 (about, contact, faq, shipping, returns, privacy, terms, cookies)
+description: |-
+  ## Bug
+  All 8 informational pages linked from the navigation header, footer, login page, and register page return 404:
+  - /about - linked from header nav "About"
+  - /contact - linked from footer "Company > Contact"
+  - /faq - linked from footer "Company > FAQs"
+  - /shipping - linked from footer "Company > Shipping Info"
+  - /returns - linked from footer "Company > Returns & Refunds"
+  - /privacy - linked from footer legal links AND login/register pages
+  - /terms - linked from footer legal links AND login/register pages
+  - /cookies - linked from footer legal links
+
+  ## Steps to Reproduce
+  ```bash
+  for page in about contact faq shipping returns privacy terms cookies; do
+    curl -s -o /dev/null -w "$page: %{http_code}\n" http://localhost:3001/$page
+  done
+  ```
+  All return 404.
+
+  ## Impact
+  - Users clicking any footer Company link or legal link get a 404
+  - Login/Register "Terms of Service" and "Privacy Policy" links are broken
+  - Header "About" navigation link is broken
+  - Multiple dead links across the entire site
+
+  ## Expected
+  Each page should render with appropriate content (even placeholder)
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T20:51:22.688Z"
+last_updated: "2026-07-27T13:44:31.129Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - routing
+  - P1
+  - dead-links
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T13:44:31.138Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T13:44:33.685Z"
+    text: "✅ Closed as fixed by intervening work (2026-07-27). All 8 pages verified 200 on local dev: about, contact, faq, shipping, returns, privacy, terms, cookies. These were implemented in ticket #338 (\"8 footer info pages\", commit dde2a357, 2026-07-22) and are live on production."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T13:44:31.129Z"

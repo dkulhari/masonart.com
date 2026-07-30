@@ -1,0 +1,122 @@
+ticket_number: 351
+title: "BUG: Homepage Featured Collection is always empty — loader reads .products, API returns .items"
+description: |-
+  ## Problem
+
+  The homepage's primary merchandising block renders the 'Coming Soon — Our featured collection is being curated' empty state on every load, even though featured products exist and the API serves them correctly.
+
+  **Verified on production chobii.art, 2026-07-28.**
+  - `GET https://chobii.art/api/products/featured?limit=8` → **200**, returns `{"items":[{..."title":"Cosmic Harmony"...}]}`
+  - Homepage still shows the empty state
+
+  ## Root cause — response shape mismatch
+
+  The API returns `{ items: [...] }`:
+  ```ts
+  // packages/api/src/routes/products.ts:378
+  return c.json({ items: featuredProducts });
+  ```
+
+  The web loader reads `.products`:
+  ```ts
+  // packages/web/app/routes/index.tsx:49
+  const featuredResponse = await productsApi.featured({ limit: 8 })
+  return { featuredProducts: featuredResponse.products || [] }
+  ```
+
+  `productsApi.featured()` (`packages/web/app/lib/api.ts:246`) returns the raw parsed JSON, so `.products` is `undefined`, `|| []` yields an empty array, and the component falls through to its empty state. The surrounding `try/catch` returns `[]` on error too, so the failure is completely silent.
+
+  Not mobile-specific — this affects every viewport. Surfaced during the mobile sweep.
+
+  ## Fix
+
+  Read `.items` in the loader (or normalise the shape inside `productsApi.featured()` so callers get a consistent `{ products }`). Prefer typing the client method's return so this mismatch is a compile error rather than a silent empty array.
+
+  ## Acceptance criteria
+
+  - Homepage renders the featured product grid, not the 'Coming Soon' state
+  - The loader's return type is tied to the API response shape so drift fails typecheck
+feature: mobile-responsive-jul2026
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-28T12:26:33.745Z"
+last_updated: "2026-07-28T15:20:18.618Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - api-contract
+  - homepage
+  - merchandising
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-28T15:20:18.618Z"
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: "2026-07-28T15:20:59.920Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `6dd16d1c` — fix(web): featured products read the items envelope, not .products
+
+      **Files Changed**:
+      - `packages/web/app/lib/api.ts` — typed `featured()` as `FeaturedProductsResponse`; added `toFeaturedProducts()` as the single place the envelope key is named
+      - `packages/web/app/routes/index.tsx` — loader uses the mapper
+      - `packages/web/app/hooks/useProducts.ts` — see below
+      - `packages/web/tests/lib/featured-products.test.ts` — new regression test
+      - `packages/web/tests/hooks/useProducts.test.tsx` — corrected mocks
+
+      **Root Cause**: `GET /api/products/featured` returns `{ items: [...] }`; the loader read `featuredResponse.products`, which never exists. `|| []` yielded an empty array and the page fell through to its "Coming Soon" state on every load — silently, since the surrounding try/catch had nothing to catch.
+
+      **Second instance found**: typing the client surfaced the same defect in `useFeaturedProducts` (`useProducts.ts:254`), which cast the envelope directly to `ProductListItem[]`. Consumers would have received an object where they expected a list. Fixed with the same mapper.
+
+      **Why it survived**: the existing hook tests mocked `productsApi.featured` as a bare array, matching the old incorrect cast rather than the real endpoint. The mocks now return the real envelope.
+
+      **Verification**:
+      - Command: `bunx vitest run` (packages/web)
+      - Result: PASS — 1362 passed / 1362, 32 files
+      - Command: `bun run typecheck` → 26 errors, identical to the `main` baseline (diffed; all pre-existing, none in touched files)
+      - Live check at 390x844 on local dev: Featured Collection renders 7 real cards (Cosmic Harmony, Golden Flow, Mountain Majesty, Monstera Dreams) instead of "Coming Soon"
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Test asserting the homepage loader maps a {items:[...]} API response to a non-empty featuredProducts array
+    file: packages/web/tests/routes/index.test.ts
+    command: bun run test packages/web/tests/routes/index.test.ts
+    expected_result: FAIL — featuredProducts is [] because the loader reads .products
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the empty-array result
+    command: bun run test packages/web/tests/routes/index.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Read featuredResponse.items in the loader and add a typed return to productsApi.featured() so the shape is enforced
+    file: packages/web/app/routes/index.tsx
+    status: pending
+    code: |-
+      const featuredResponse = await productsApi.featured({ limit: 8 })
+      return { featuredProducts: featuredResponse.items || [] }
+  - id: 4
+    action: verify-pass
+    description: Loader returns products; homepage renders the grid
+    command: bun run test packages/web/tests/routes/index.test.ts && bun run typecheck
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the fix
+    command: "git add packages/web/app/routes/index.tsx packages/web/app/lib/api.ts packages/web/tests/routes/index.test.ts && git commit -m \"fix(web): homepage featured collection reads items not products\""
+    status: pending
+current_step: 1
+completed: "2026-07-28T15:20:18.618Z"

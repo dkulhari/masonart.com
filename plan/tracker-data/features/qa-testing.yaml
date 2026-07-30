@@ -40,6 +40,9 @@ tickets:
     "181": Consolidate test runner scripts into single unified script
     "182": Add stop, clean, and --no-seed commands to unified test runner
     "183": Execute and validate full test suite against running application
-total_tickets: 19
+    "332": "BUG: database unit tests DROP and recreate real dev-DB tables with stale schemas"
+    "343": Escape user-controlled values in order/approval email templates (pre-existing pattern)
+    "347": Add Content-Security-Policy header for SSR pages
+total_tickets: 22
 completion_percentage: 100
 is_completed: true

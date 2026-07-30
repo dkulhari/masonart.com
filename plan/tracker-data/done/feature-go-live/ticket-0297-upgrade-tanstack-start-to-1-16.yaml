@@ -1,0 +1,129 @@
+ticket_number: 297
+title: Upgrade TanStack Start to 1.168+ and remove custom serve.ts static-serving wrapper
+description: |-
+  ## Context
+
+  The web container originally failed in production because @tanstack/react-start 1.149 (masonart's lockfile pin) does not serve client assets from its SSR bundle. A custom 39-line `packages/web/serve.ts` wrapper was written mid-deploy (commit d79cb4f6) to serve `dist/client` with immutable cache headers and delegate everything else to SSR.
+
+  customs-copilot — the proven deployment reference — pins @tanstack/react-start 1.168.27 / react-router 1.170.17, where the server bundle serves client assets natively and the container runs `bun run packages/web/dist/server/server.js` directly. Both repos declare the same `^1.93.0` semver range; the difference is purely lockfile resolution, so the upgrade is a `bun update`, no package.json change.
+
+  Latest published: react-start 1.168.32, react-router 1.170.18.
+
+  ## Goal
+
+  Converge masonart with customs-copilot: upgrade the lockfile pins, delete serve.ts, and run the built server bundle directly in the Docker web stage.
+
+  ## Implementation Steps
+
+  - [ ] **Step 1 [verify-pass]**: Baseline — confirm existing build + web tests pass before touching anything
+    - Run: `bun run build && bun run test --filter web` (or `cd packages/web && bun run test`)
+    - Expected: PASS (existing behavior baseline)
+
+  - [ ] **Step 2 [implement]**: Upgrade TanStack packages within the existing semver range
+    - Run: `bun update @tanstack/react-start @tanstack/react-router`
+    - Verify bun.lock now pins react-start ~1.168.32 and react-router ~1.170.18
+    - Regenerate route tree if needed; fix any type/build fallout (expect possible churn from restructured start-plugin-core / new peer deps)
+
+  - [ ] **Step 3 [verify-pass]**: Production build passes and server bundle serves client assets natively
+    - Run: `cd packages/web && bun run build`, then `bun run dist/server/server.js` and curl `/` (SSR HTML 200) and a `/assets/*.js` file (200 with content)
+    - Expected: PASS — assets served without serve.ts
+
+  - [ ] **Step 4 [implement]**: Remove the wrapper
+    - Delete `packages/web/serve.ts`
+    - `packages/web/package.json`: `"start": "bun run dist/server/server.js"` (match customs-copilot)
+    - `Dockerfile` web stage: drop the `COPY ... serve.ts` line; `CMD ["bun", "run", "packages/web/dist/server/server.js"]`
+
+  - [ ] **Step 5 [verify-pass]**: Docker image works end-to-end
+    - Run: `docker build --target web -t masonart-web:tanstack-upgrade .` then run the container and verify: `/` returns SSR HTML 200, `/assets/*.js` returns 200, cache-control headers on /assets/ are long-lived/immutable, healthcheck passes
+    - Expected: PASS. If 1.168 does not emit immutable cache headers on /assets/, note it — Cloudflare edge caching may compensate, but record the delta before accepting it
+
+  - [ ] **Step 6 [verify-pass]**: Full repo checks — `bun run typecheck && bun run test`
+    - Expected: PASS (no regression from router 1.170 type changes)
+
+  - [ ] **Step 7 [commit]**: Commit
+    - Run: `git add -A && git commit -m "refactor(web): upgrade TanStack Start to 1.168, drop serve.ts wrapper (#<ticket>)"`
+
+  ## Verification gates
+
+  - Production build passes
+  - Docker web image serves static assets (with acceptable cache headers) and SSR
+  - routeTree.gen.ts valid, typecheck + tests green
+  - Deploy to staging afterward via `make -C deploy build-push-deploy` (sha-tag rollback available) — deliberately AFTER this ticket, before/independent of the #294 gate walkthrough
+feature: go-live
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-20T10:14:53.992Z"
+last_updated: "2026-07-20T10:49:36.465Z"
+time_spent_minutes: 34
+labels:
+  - web
+  - docker
+  - deployment
+  - dependencies
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-20T10:15:25.348Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-20T10:49:36.468Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-20T10:50:05.584Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `dddbfc5f` - refactor(web): upgrade TanStack Start to 1.168, replace serve.ts with bundled server entry
+
+      **Files Changed**:
+      - `bun.lock` - @tanstack/react-start 1.149.4→1.168.32, react-router 1.149.3→1.170.18 (package.json range ^1.93.0 unchanged)
+      - `packages/web/app/server.tsx` (new) - custom server entry via @tanstack/react-start/server-entry; serves dist/client with immutable cache headers, delegates to SSR; bundled into dist/server/server.js (customs-copilot pattern)
+      - `packages/web/serve.ts` (deleted) - external wrapper no longer needed
+      - `packages/web/package.json` - start script → `bun run dist/server/server.js`
+      - `Dockerfile` - web stage: dropped serve.ts COPY, CMD → `packages/web/dist/server/server.js`
+      - `app/routes/approve/$token.tsx`, `admin/approvals/$id.tsx`, `admin/approvals/index.tsx` - removed `as any` route-id casts (the 1.168 transformer requires plain string literals; the casts silently broke route-tree crawling → "Crawling result not available")
+      - `packages/web/app/routeTree.gen.ts` - regenerated by 1.168 generator
+      - `packages/web/tests/build.test.ts` - refreshed 4 stale expectations (pre-existing failures: .output-era start script, srcDirectory quoting, account routes now under _authed/, typecheck subprocess timeout)
+
+      **Key finding**: the claude-mem note "1.168 serves client assets from the SSR bundle natively" was inaccurate — customs-copilot does it via an app-authored `app/server.tsx` bundled at build time. Adopted the same pattern, so the capability is now in the bundle rather than an external wrapper.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run` → PASS, 1342/1342 tests (29 files)
+      - Command: `bun run build` (web) → PASS
+      - Command: `docker build --target web` + container run → `/` 200 SSR HTML; `/assets/*.js` 200 with `Cache-Control: public, max-age=31536000, immutable`; `/posters` 200; path traversal 404; healthcheck `healthy`
+      - Typecheck: 0 new errors vs pre-upgrade baseline worktree (26 pre-existing errors remain, out of scope); 1 baseline error actually fixed (addresses.tsx route-path cast)
+      - API test failures (39) reproduced identically on pre-upgrade baseline — environmental (missing API keys / DB state), unrelated
+
+      **Follow-ups worth ticketing separately**: (1) 26 pre-existing web typecheck errors; (2) redeploy staging via `make -C deploy build-push-deploy` to ship this — deliberately left for the owner alongside the #294 gate walkthrough.
+work_sessions:
+  - start: "2026-07-20T10:15:26.843Z"
+    agent: claude-code
+    summary: "Upgraded TanStack Start 1.149→1.168.32 / router 1.170.18 (lockfile only), added bundled app/server.tsx static-serving entry (customs-copilot pattern), deleted serve.ts wrapper, reverted Dockerfile CMD to dist/server/server.js, fixed 3 route files using `as any` casts that broke the new route-tree crawler, refreshed 4 stale build.test.ts expectations. Verified: web 1342/1342 tests, Docker image SSR+assets+healthcheck, 0 new typecheck errors vs baseline. Commit dddbfc5f."
+    prompts: []
+    end: "2026-07-20T10:49:24.836Z"
+    duration: "00:33:57"
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: "2026-07-20T10:15:25.348Z"
+work_session_summary:
+  total_sessions: 1
+  total_duration: "00:34:00"
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: "00:34:00"
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run
+  test_output: "Web: 29 files, 1342/1342 tests passed (build.test.ts 122/122 after refreshing stale expectations). API package untouched; its 39 failures reproduced identically on pre-upgrade baseline worktree (environmental: missing API keys/DB state)."
+  build_passed: true
+  build_command: bun run build (web) + docker build --target web
+  verified_at: "2026-07-20T10:49:11.292Z"
+completed: "2026-07-20T10:49:36.465Z"

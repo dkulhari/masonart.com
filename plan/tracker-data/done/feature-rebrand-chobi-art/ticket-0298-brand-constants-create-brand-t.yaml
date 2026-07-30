@@ -1,0 +1,116 @@
+ticket_number: 298
+title: Brand Constants - Create brand.ts with chobi.art identity in shared package
+description: |-
+  ## Task
+  Create the single source of truth for the chobi.art brand: packages/shared/src/constants/brand.ts exporting BRAND_NAME, BRAND_DOMAIN, BRAND_URL, STAGING_HOSTNAME/URL, SUPPORT_EMAIL, NOTIFICATIONS_EMAIL, EMAIL_FROM, BRAND_TAGLINE. Re-export from constants/index.ts.
+
+  ## Context
+  Part of feature: rebrand-chobi-art
+  Phase: 1 - Brand Constants
+  All later tickets import these constants instead of hardcoding the brand. Pattern: named exports like packages/shared/src/constants/sizes.ts, re-exported via constants/index.ts.
+feature: rebrand-chobi-art
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-22T08:06:45.579Z"
+last_updated: "2026-07-22T08:20:11.865Z"
+time_spent_minutes: 0
+labels:
+  - shared
+  - constants
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-22T08:14:18.741Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-07-22T08:20:11.876Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-22T08:20:29.558Z"
+    text: "✅ Implemented via TDD. brand.ts created with chobi.art identity constants, re-exported from constants barrel. Tests: 3 passed (packages/shared/tests/constants/brand.test.ts). Commit: 732c28ef on feature/rebrand-chobi-art."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test for brand constants
+    file: packages/shared/tests/brand.test.ts
+    command: bunx vitest run packages/shared/tests/brand.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, expect, it } from "vitest";
+      import {
+        BRAND_NAME,
+        BRAND_DOMAIN,
+        BRAND_URL,
+        STAGING_HOSTNAME,
+        SUPPORT_EMAIL,
+        EMAIL_FROM,
+        BRAND_TAGLINE,
+      } from "../src/constants/brand";
+
+      describe("brand constants", () => {
+        it("exposes the chobi.art identity", () => {
+          expect(BRAND_NAME).toBe("chobi.art");
+          expect(BRAND_DOMAIN).toBe("chobi.art");
+          expect(BRAND_URL).toBe("https://chobi.art");
+          expect(STAGING_HOSTNAME).toBe("chobi.xtoms.xyz");
+          expect(SUPPORT_EMAIL).toBe("support@chobi.art");
+          expect(EMAIL_FROM).toBe("chobi.art <notifications@chobi.art>");
+          expect(BRAND_TAGLINE).toBe("Premium Posters & Frames");
+        });
+
+        it("is re-exported from the constants barrel", async () => {
+          const constants = await import("../src/constants");
+          expect(constants.BRAND_NAME).toBe("chobi.art");
+        });
+      });
+  - id: 2
+    action: verify-fail
+    description: Confirm test fails (module does not exist)
+    command: bunx vitest run packages/shared/tests/brand.test.ts
+    expected_result: FAIL - Cannot find module ../src/constants/brand
+    status: pending
+  - id: 3
+    action: implement
+    description: Create brand.ts and re-export from constants barrel
+    file: packages/shared/src/constants/brand.ts
+    status: pending
+    code: |-
+      /**
+       * Brand Constants — single source of truth for the chobi.art identity.
+       * A future rebrand should only need to touch this file.
+       */
+      export const BRAND_NAME = "chobi.art";
+      export const BRAND_DOMAIN = "chobi.art";
+      export const BRAND_URL = "https://chobi.art";
+      export const STAGING_HOSTNAME = "chobi.xtoms.xyz";
+      export const STAGING_URL = "https://chobi.xtoms.xyz";
+      export const SUPPORT_EMAIL = "support@chobi.art";
+      export const NOTIFICATIONS_EMAIL = "notifications@chobi.art";
+      export const EMAIL_FROM = `${BRAND_NAME} <${NOTIFICATIONS_EMAIL}>`;
+      export const BRAND_TAGLINE = "Premium Posters & Frames";
+
+      // Also add to packages/shared/src/constants/index.ts:
+      // export * from "./brand";
+  - id: 4
+    action: verify-pass
+    description: Confirm brand tests pass
+    command: bunx vitest run packages/shared/tests/brand.test.ts
+    expected_result: PASS - 2 tests
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit brand constants
+    command: "git add packages/shared && git commit -m \"feat(shared): add chobi.art brand constants (#TICKET)\""
+    status: pending
+current_step: 1
+started: "2026-07-22T08:14:18.739Z"
+completed: "2026-07-22T08:20:11.865Z"

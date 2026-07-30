@@ -1,229 +1,166 @@
 status: todo
-last_updated: '2026-02-18T08:30:00.000Z'
-total_tickets: 49
+last_updated: '2026-07-29T06:23:17.366Z'
+total_tickets: 13
 summary:
-  critical: 6
-  high: 14
-  medium: 16
-  low: 13
+  critical: 1
+  high: 3
+  medium: 6
+  low: 3
 priorities:
   high:
-    - feature: manual-testing-bugs-feb2026
+    - feature: go-live
       tickets:
-        - ticket_number: 240
-          title: All static/info pages return 404 (about, contact, faq, shipping, returns, privacy, terms, cookies)
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 241
-          title: Sitemap.xml returns 404 HTML page instead of XML sitemap
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 242
-          title: Forgot password page (/auth/forgot-password) returns 404
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 243
-          title: 'Missing static assets: favicon.ico, apple-touch-icon.png, site.webmanifest all return 404'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 244
-          title: No JSON-LD structured data on any pages
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 255
-          title: Account Settings page returns 404
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 261
-          title: Auth sign-up endpoint returns 500 for all validation errors
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 264
-          title: Web server (SSR) missing ALL security headers
-          assignee: unassigned
-          blocked_by: []
-    - feature: go-to-production
-      tickets:
-        - ticket_number: 269
-          title: Create production Dockerfile with multi-stage build for API and Web
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 270
-          title: Add health check endpoint at /api/health with component status
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 271
-          title: Configure CORS for production domain and environment-based origin
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 272
-          title: Add security headers to Web server (CSP, HSTS, X-Frame-Options)
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 273
-          title: Wire up rate limiting on authentication endpoints
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 274
-          title: Choose deployment target and add deployment configuration
+        - ticket_number: 293
+          title: 'Ops: owner console setup + mini bootstrap execution'
           assignee: unassigned
           blocked_by:
-            - 269
+            - ticket_number: 287
+              title: ProductCard - Add uniformAspectRatio prop
+            - ticket_number: 288
+              title: ProductGrid - Pass uniformAspectRatio to ProductCard
+            - ticket_number: 289
+              title: Hero Page - Replace inline ProductCard with shared component
+            - ticket_number: 290
+              title: Hero Page - Add category images for Shop by Style section
+            - ticket_number: 291
+              title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+            - ticket_number: 292
+              title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+        - ticket_number: 333
+          title: 'Ops: point UptimeRobot monitors at https://chobii.art'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 334
+          title: 'Ops: Cloudflare redirect rule www.chobii.art -> chobii.art (301)'
+          assignee: unassigned
+          blocked_by: []
   medium:
-    - feature: manual-testing-bugs-feb2026
-      tickets:
-        - ticket_number: 245
-          title: 'Health check response deviates from spec: "healthy" instead of "ok", missing service/version fields'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 246
-          title: No skip-to-content accessibility link on any page
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 247
-          title: 'Products API routing inconsistency: trailing slash returns 401, no slash hangs'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 253
-          title: No og:image meta tag on any page - social sharing has no preview image
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 256
-          title: og:image meta tag missing on most pages except /posters
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 258
-          title: Home page missing H1 heading - accessibility violation
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 259
-          title: Canonical URLs missing on home, create, and gallery pages
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 260
-          title: API returns 500 for malformed JSON body instead of 400
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 262
-          title: DELETE /api/cart returns 404 instead of 401 when unauthenticated
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 265
-          title: No rate limiting on authentication endpoints
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 266
-          title: No rate limiting on authentication endpoints
-          assignee: unassigned
-          blocked_by: []
     - feature: go-to-production
       tickets:
-        - ticket_number: 275
-          title: Integrate Sentry for error tracking in API and Web
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 276
-          title: Replace console.log with structured logging using pino
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 277
-          title: Set up error alerting via Slack webhook or email
-          assignee: unassigned
-          blocked_by:
-            - 275
         - ticket_number: 278
           title: Set up external uptime monitoring for production
           assignee: unassigned
           blocked_by:
-            - 270
-        - ticket_number: 279
-          title: Create deployment documentation and operational runbook
-          assignee: unassigned
-          blocked_by:
-            - 274
-  low:
-    - feature: manual-testing-bugs-feb2026
+            - title: 'Ticket #undefined'
+    - feature: go-live
       tickets:
-        - ticket_number: 248
-          title: Cart icon aria-label doesn't include item count for screen readers
+        - ticket_number: 335
+          title: 'Ops: post-cutover Phase 5 — Search Console + old-URL registration cleanup'
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 249
-          title: API docs endpoint (/docs) returns 404 despite being referenced in API root response
+    - feature: mobile-responsive-jul2026
+      tickets:
+        - ticket_number: 359
+          title: 'TEST-INFRA: guest cart cannot be seeded in E2E — blocks all checkout browser tests'
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 257
-          title: AI style presets missing description, category, isPremium fields in API response
+        - ticket_number: 361
+          title: 'DECISION: order numbers still use the masonart MA- prefix after the rebrand'
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 263
-          title: GET /api/auth/session returns 404 (only /get-session works)
+    - feature: content-manager-role
+      tickets:
+        - ticket_number: 362
+          title: Role-aware two-way navigation between the store and the staff area
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 267
-          title: 'Inconsistent query parameter naming: style vs styles on category links'
+    - feature: admin-panel
+      tickets:
+        - ticket_number: 363
+          title: 'Admin customers: per-field filtering incl. joined date range, server-side'
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 268
-          title: Web server returns 500 instead of 406 for non-HTML Accept headers
-          assignee: unassigned
-          blocked_by: []
+  low:
     - feature: go-to-production
       tickets:
-        - ticket_number: 280
-          title: Add bundle analysis and optimize code splitting
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 281
-          title: Add gzip/brotli compression middleware to API responses
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 282
-          title: Configure database connection pooling for production
-          assignee: unassigned
-          blocked_by: []
         - ticket_number: 283
           title: Document and configure database backup procedures
           assignee: unassigned
           blocked_by:
-            - 274
-        - ticket_number: 284
-          title: Add retry logic with exponential backoff for email and SMS services
+            - title: 'Ticket #undefined'
+    - feature: chobi-external-services
+      tickets:
+        - ticket_number: 316
+          title: Production Cutover Gate - chobi.art domain external registrations
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 285
-          title: Verify and enforce payment webhook idempotency
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 286
-          title: Implement image optimization pipeline with WebP conversion
+    - feature: mobile-responsive-jul2026
+      tickets:
+        - ticket_number: 360
+          title: 'Product grid card sizing: residual height variance + home/listing ratio mismatch'
           assignee: unassigned
           blocked_by: []
   critical:
-    - feature: manual-testing-bugs-feb2026
+    - feature: go-live
       tickets:
-        - ticket_number: 238
-          title: Products API (/api/products) hangs indefinitely - empty reply from server
+        - ticket_number: 294
+          title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
           assignee: unassigned
-          blocked_by: []
-        - ticket_number: 239
-          title: Cart API (/api/cart) hangs indefinitely - empty reply from server
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 250
-          title: Gallery API (/api/ai/gallery) and Featured Products API (/api/products/featured) both hang/timeout
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 251
-          title: Gallery API and Featured Products API both hang and timeout
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 252
-          title: Gallery and Featured Products APIs both timeout
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 254
-          title: Auth sign-in with credentials times out like other DB endpoints
-          assignee: unassigned
-          blocked_by: []
-blocked_tickets: []
+          blocked_by:
+            - ticket_number: 287
+              title: ProductCard - Add uniformAspectRatio prop
+            - ticket_number: 288
+              title: ProductGrid - Pass uniformAspectRatio to ProductCard
+            - ticket_number: 289
+              title: Hero Page - Replace inline ProductCard with shared component
+            - ticket_number: 290
+              title: Hero Page - Add category images for Shop by Style section
+            - ticket_number: 291
+              title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+            - ticket_number: 292
+              title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+            - ticket_number: 293
+              title: 'Ops: owner console setup + mini bootstrap execution'
+            - ticket_number: 278
+              title: Set up external uptime monitoring for production
+            - ticket_number: 283
+              title: Document and configure database backup procedures
+blocked_tickets:
+  - ticket_number: 293
+    title: 'Ops: owner console setup + mini bootstrap execution'
+    blocked_by:
+      - ticket_number: 287
+        title: ProductCard - Add uniformAspectRatio prop
+      - ticket_number: 288
+        title: ProductGrid - Pass uniformAspectRatio to ProductCard
+      - ticket_number: 289
+        title: Hero Page - Replace inline ProductCard with shared component
+      - ticket_number: 290
+        title: Hero Page - Add category images for Shop by Style section
+      - ticket_number: 291
+        title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+      - ticket_number: 292
+        title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+    description: 'Infra: same-origin web bundle + single-hostname config, Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls, Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate, BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start, SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel, Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+  - ticket_number: 278
+    title: Set up external uptime monitoring for production
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 283
+    title: Document and configure database backup procedures
+    blocked_by:
+      - title: 'Ticket #undefined'
+    description: ''
+  - ticket_number: 294
+    title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
+    blocked_by:
+      - ticket_number: 287
+        title: ProductCard - Add uniformAspectRatio prop
+      - ticket_number: 288
+        title: ProductGrid - Pass uniformAspectRatio to ProductCard
+      - ticket_number: 289
+        title: Hero Page - Replace inline ProductCard with shared component
+      - ticket_number: 290
+        title: Hero Page - Add category images for Shop by Style section
+      - ticket_number: 291
+        title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+      - ticket_number: 292
+        title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+      - ticket_number: 293
+        title: 'Ops: owner console setup + mini bootstrap execution'
+      - ticket_number: 278
+        title: Set up external uptime monitoring for production
+      - ticket_number: 283
+        title: Document and configure database backup procedures
+    description: 'Infra: same-origin web bundle + single-hostname config, Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls, Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate, BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start, SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel, Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget, Ops: owner console setup + mini bootstrap execution, Set up external uptime monitoring for production, Document and configure database backup procedures'

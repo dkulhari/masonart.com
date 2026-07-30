@@ -1,0 +1,40 @@
+ticket_number: 292
+title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+description: |-
+  Phase: Hardening. Unset env vars must fail at compose-render time, not degrade silently in production.
+
+  Work items:
+  - Add ${VAR:?message} guards (message names the consequence) on: POSTGRES_PASSWORD, BETTER_AUTH_SECRET, RAZORPAY_KEY_ID/KEY_SECRET/WEBHOOK_SECRET, RESEND_API_KEY, EMAIL_FROM, TWO_FACTOR_API_KEY, R2_ENDPOINT/ACCESS_KEY/SECRET_KEY/BUCKET, CDN_URL, REPLICATE_API_TOKEN (and/or GOOGLE_AI_STUDIO_KEY), CLOUDFLARE_TUNNEL_TOKEN. Sentry/Slack stay optional with :- defaults.
+  - cloudflared: TUNNEL_TRANSPORT_PROTOCOL: http2 (QUIC degrades through the home-router NAT).
+  - Confirm no host ports published; restart: unless-stopped everywhere; verify combined mem_limits (~1.28g) against the shared 6GB Colima VM beside customs-copilot (~3.25g). Flag sharp/WebP image pipeline as the likeliest OOM spike.
+  - Negative test: strip one guarded var from deploy/.env → make gen-compose must fail naming it.
+
+  Acceptance: compose config fails fast per guarded var; renders clean with full .env; cloudflared logs show http2 transport.
+  Lessons: cc #94, #131, #99, #92.
+feature: go-live
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-07-16T14:22:10.860Z'
+last_updated: '2026-07-17T15:15:32.946Z'
+time_spent_minutes: 0
+labels:
+  - go-live
+  - phase-hardening
+  - infra
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-07-17T15:06:39.435Z'
+    text: 'AMENDED 2026-07-17 (platform edge stack): DROP the CLOUDFLARE_TUNNEL_TOKEN guard and the cloudflared TUNNEL_TRANSPORT_PROTOCOL item — MasonArt runs no cloudflared; http2 is pinned in the shared platform stack. ADD: external `platform` network; api+web join [default, platform] with traefik labels (traefik.enable, traefik.docker.network=platform, masonart-api router Host+PathPrefix(/api) port 3000, masonart-web router Host catch-all port 3001); postgres/redis stay on default network only; ports: !override [] everywhere. Mem budget: MasonArt total ~1.15g (no cloudflared 128m).'
+  - author: system
+    timestamp: '2026-07-17T15:15:32.946Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-17T15:15:32.946Z'

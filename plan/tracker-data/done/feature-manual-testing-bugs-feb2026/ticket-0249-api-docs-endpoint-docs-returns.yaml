@@ -1,0 +1,32 @@
+ticket_number: 249
+title: API docs endpoint (/docs) returns 404 despite being referenced in API root response
+description: |-
+  ## Bug
+  The API root (`GET http://localhost:3000/`) returns `{"name":"MasonArt API","version":"0.0.1","documentation":"/docs"}` but `/docs` returns 404.
+
+  ## Impact
+  Developers cannot access API documentation. The reference is misleading.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: low
+status: done
+assignee: unassigned
+reporter: cli
+created: '2026-02-17T20:54:14.522Z'
+last_updated: '2026-07-27T16:46:50.957Z'
+time_spent_minutes: 0
+labels:
+  - api
+  - docs
+  - P3
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-07-27T16:46:50.958Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-07-27T16:46:50.957Z'

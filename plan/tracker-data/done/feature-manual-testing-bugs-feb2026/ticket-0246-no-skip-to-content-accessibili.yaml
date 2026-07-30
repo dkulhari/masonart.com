@@ -1,0 +1,38 @@
+ticket_number: 246
+title: No skip-to-content accessibility link on any page
+description: |-
+  ## Bug
+  No skip-to-main-content link exists on any page. This is an important accessibility feature for keyboard/screen-reader users to bypass the navigation.
+
+  ## Impact
+  WCAG 2.1 Level A violation (Success Criterion 2.4.1 - Bypass Blocks). Keyboard users must tab through all navigation links before reaching page content.
+
+  ## Expected
+  A visually-hidden link that becomes visible on focus, jumping to `<main>` content.
+feature: manual-testing-bugs-feb2026
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-02-17T20:53:21.426Z"
+last_updated: "2026-07-27T15:09:09.384Z"
+time_spent_minutes: 0
+labels:
+  - accessibility
+  - frontend
+  - P2
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-27T15:09:09.400Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-27T15:09:19.153Z"
+    text: "✅ Completed in commit 203e0688: skip-to-content link in __root.tsx (sr-only until focused, first tab stop, targets main#main-content with tabIndex -1). Verified in SSR output + new E2E test in layout.spec.ts asserting it's the first focusable element (passing on chromium). Closing #258 and #248 alongside as already-fixed: home page has an H1 (\"Transform Your Space…\", verified in SSR), and Header.tsx:81 already renders `Shopping cart, N items` aria-label when the count is non-zero (the Feb report predates that code)."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: "2026-07-27T15:09:09.384Z"

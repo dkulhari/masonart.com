@@ -1,0 +1,50 @@
+ticket_number: 338
+title: "Bug - 8 footer/info links 404: about, contact, faq, shipping, returns, privacy, terms, cookies"
+description: |-
+  ## Bug
+  Footer links to /about, /contact, /faq, /shipping, /returns, /privacy, /terms, /cookies — none of these routes exist; all 404. Bad UX and privacy/terms are expected for a store taking payments.
+
+  ## Fix
+  Create the 8 static content pages under packages/web/app/routes/ with clean, consistent layout and reasonable v1 copy aligned with actual business rules (free-shipping threshold, 30-day returns per homepage/Requirement.md); privacy/terms/cookies get standard-structure placeholder legal copy flagged for review. Each page: SSR title `X | chobii.art`, breadcrumb back home.
+feature: frontend-ui
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: cli
+created: "2026-07-25T11:32:34.317Z"
+last_updated: "2026-07-25T11:38:51.780Z"
+time_spent_minutes: 0
+labels:
+  - frontend
+  - content
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: "2026-07-25T11:38:51.780Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-25T11:38:56.246Z"
+    text: "✅ **Completed** — commit dde2a357. Shared InfoPage/InfoSection layout + 8 routes: /about /contact /faq /shipping /returns /privacy /terms /cookies. Copy grounded in actual business rules (free shipping over ₹999, 30-day returns, /track deep-links, Razorpay/Resend/2Factor/Cloudflare named honestly in privacy/cookies). Legal pages carry \"Last updated: July 2026\" and standard structure — flagged for owner review before any formal compliance claim. Browser-verified: all 8 render 200 with correct titles (were 404). Production deploy in flight."
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Create 8 static routes with consistent InfoPage layout and v1 copy
+    file: packages/web/app/routes/
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: "Browser probe: all 8 URLs render 200 with titles; zero 404s from footer"
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit info pages
+    status: pending
+current_step: 1
+completed: "2026-07-25T11:38:51.780Z"
