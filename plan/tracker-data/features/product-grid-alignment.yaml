@@ -1,7 +1,7 @@
 name: product-grid-alignment
 title: Product Grid Alignment
 priority: medium
-created: '2026-07-31T03:32:11.517Z'
+created: "2026-07-31T03:32:11.517Z"
 assignee: unassigned
 tags: []
 description: |-
@@ -102,39 +102,39 @@ objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo:
-    '364': Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
-    '365': 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
-    '366': 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
-    '367': API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
-    '368': Admin upload - Per-file type selector, drag reorder, low-resolution warning
-    '369': Admin upload - Square crop and zoom control for photographic media
-    '370': Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
-    '371': Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
-    '372': Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
-    '373': Styling - Adopt the measured mesonart token set
-    '374': Seed - Reseed the 40 dev products into the new ProductImage shape
-    '375': E2E - Row alignment regression spec across breakpoints
+    "368": Admin upload - Per-file type selector, drag reorder, low-resolution warning
+    "369": Admin upload - Square crop and zoom control for photographic media
+    "374": Seed - Reseed the 40 dev products into the new ProductImage shape
+    "375": E2E - Row alignment regression spec across breakpoints
   in_progress: {}
-  done: {}
+  done:
+    "364": Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+    "365": "API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas"
+    "366": "API pipeline - cropToSquare(): apply a human-chosen crop window to photographs"
+    "367": API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+    "370": Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+    "371": Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+    "372": Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+    "373": Styling - Adopt the measured mesonart token set
 total_tickets: 12
-completion_percentage: 0
+completion_percentage: 67
 is_completed: false
 design:
   approach: Pipeline-guaranteed square asset contract plus CSS Grid stretch. Every stored product image is processed to 1500x1500 at upload, so aspect ratio stops being a frontend decision. Within a card, exactly one image sits in normal flow carrying aspect-square — it IS the media box's height — while all hover slides are position:absolute inset-0 and cannot contribute height. Rows then align purely because CSS Grid sizes each row to its tallest item and stretches the rest; no min-height or line-clamp is needed. This lets ASPECT_RATIO_MAP, the uniformAspectRatio prop and the non-stretching bordered card wrapper all be deleted rather than extended. Artwork is matted (contain at 88% inset, never cropped); photographic media fills the square via a crop window the uploader chooses. Styling targets measured parity with mesonart.com.
   decisions:
     - Target ratio 1:1
-    - 'chosen for orientation neutrality rather than minimum mat: at the 88% inset it is the only candidate with a 0-point portrait/landscape spread (both 48.4% mat area) and the only one where square art is not letterboxed (22.6%). A 4:5 box frames portrait art better (35.5%) but penalises landscape by 23 points and panoramic by 9; 26 of 40 products are square'
+    - "chosen for orientation neutrality rather than minimum mat: at the 88% inset it is the only candidate with a 0-point portrait/landscape spread (both 48.4% mat area) and the only one where square art is not letterboxed (22.6%). A 4:5 box frames portrait art better (35.5%) but penalises landscape by 23 points and panoramic by 9; 26 of 40 products are square"
     - landscape or panoramic.
     - Aspect ratio is declared on the in-flow <img>
     - not on a wrapper. No padding-top percentage hack and no aspect-ratio on the wrapper — verified on mesonart
     - whose a.media computes aspect-ratio:auto and padding-top:0 while still being exactly square.
     - Rows align by CSS Grid stretch
-    - 'not by height-locking the text block. Measured on mesonart across 104 cards: within every row all card heights are identical'
+    - "not by height-locking the text block. Measured on mesonart across 104 cards: within every row all card heights are identical"
     - between rows they differ (359.88 / 376.88 / 379.88px). Therefore no min-height and no line-clamp are required for alignment.
     - Artwork (type:'main') is matted with fit:'contain' at 88% inset and is never cropped. The 88% inset — rather than plain contain — guarantees a visible mat on every product
     - so square art does not bleed to the edge while portrait art floats.
@@ -151,26 +151,26 @@ design:
     - Three divergent ProductImage shapes (shared type
     - DB jsonb
     - web component) collapse into one. The shared type wins; 'type' replaces 'isPrimary'; width/height become required; crop and originalKey are added.
-    - 'Unprocessed originals are retained under an originals/ prefix. This is load-bearing rather than insurance: re-cropping and re-matting both require the untouched source.'
+    - "Unprocessed originals are retained under an originals/ prefix. This is load-bearing rather than insurance: re-cropping and re-matting both require the untouched source."
     - processImage() is left untouched and a thin orchestrator sits beside it on the product path only
     - because processImage also serves avatars and AI generations where squaring would be wrong.
-    - 'Image processing runs inline with no BullMQ queue: one image per request at roughly 400ms.'
+    - "Image processing runs inline with no BullMQ queue: one image per request at roughly 400ms."
     - Dark mode is dropped. Nothing in the codebase sets the .dark class — no theme provider
     - no toggle
-    - 'no classList.add(''dark'') — so the .dark block and 125 dark: utilities across 6 files are already unreachable dead code.'
-    - 'Styling targets measured parity with mesonart.com: Poppins/Urbanist (both free Google Fonts)'
+    - "no classList.add('dark') — so the .dark block and 125 dark: utilities across 6 files are already unreachable dead code."
+    - "Styling targets measured parity with mesonart.com: Poppins/Urbanist (both free Google Fonts)"
     - neutral-900 on white
-    - '#fafafa mat'
+    - "#fafafa mat"
     - fluid clamp(10px
     - 1.053vw
     - 20px) radius
     - gap 20px/13.5px
     - .5s cubic-bezier(.3
-    - '1'
-    - '.3'
-    - '1) primary easing. Accepted consequences: the mat is only ~2% contrast on a white page'
+    - "1"
+    - ".3"
+    - "1) primary easing. Accepted consequences: the mat is only ~2% contrast on a white page"
     - and the amber brand colour leaves the card in favour of neutral-900 CTAs.
-    - 'Deliberate divergences from mesonart: set sizes on every image (their omission causes a measured 6.7x over-fetch)'
+    - "Deliberate divergences from mesonart: set sizes on every image (their omission causes a measured 6.7x over-fetch)"
     - unmount hover slides below md rather than display:none them
     - preserve keyboard reachability
     - and gate transitions behind motion-safe.
@@ -179,7 +179,7 @@ design:
     - No data migration. The product is pre-launch
     - so the 40 dev products are reseeded into the new shape rather than migrated; no compatibility shim and no rollback path.
   approved: true
-  approved_at: '2026-07-31T03:32:36.592Z'
+  approved_at: "2026-07-31T03:32:36.592Z"
 plan:
   phases:
     - name: Shared contract
@@ -222,4 +222,4 @@ plan:
       tickets:
         - 375
       note: Row-height uniformity and square media across 1440/1024/375. The test that actually protects what this feature buys.
-  generated_at: '2026-07-31T03:43:41.010Z'
+  generated_at: "2026-07-31T03:43:41.010Z"

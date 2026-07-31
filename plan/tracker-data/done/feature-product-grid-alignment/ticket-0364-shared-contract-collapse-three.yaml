@@ -25,18 +25,45 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-07-31T03:38:09.425Z'
-last_updated: '2026-07-31T03:38:09.425Z'
+created: "2026-07-31T03:38:09.425Z"
+last_updated: "2026-07-31T07:57:33.607Z"
 time_spent_minutes: 0
 labels:
   - shared
   - types
   - schema
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-07-31T07:57:34.069Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-31T07:57:57.630Z"
+    text: |-
+      Done — commit `3aeccd1e`.
+
+      **Scope was larger than the ticket described.** It said three `ProductImage` shapes; there were **seven**, plus three inline object literals. All collapsed to the single definition in `@chobii/shared`. Verified: `grep -rn "^export interface ProductImage"` returns only the shared one, and zero `isPrimary` references remain anywhere in source.
+
+      **Two things the ticket did not anticipate:**
+
+      1. **`packages/api` did not depend on `@chobii/shared` at all.** It maintained a parallel `ProductImage` in `src/database/schema/products.ts`. Added as a workspace dependency (`bun install` links it; turbo's `dependsOn: ["^build"]` already sequences shared before api, so the build graph needed no change).
+
+      2. **40 type errors surfaced in `seed.ts`** the moment the contract tightened — every seed image literal used `alt`/`isPrimary` and optional dimensions. Leaving them would have blocked every later ticket, so they were migrated mechanically to `altText`/`type`/`MAT_CANVAS`/`originalKey`. The URLs are still remote Unsplash placeholders; **#374 replaces them with genuinely matted, self-hosted assets.** A comment in `seed.ts` records this.
+
+      **Added beyond the plan:** `sortedImages()` and `mainImage()` helpers. The `images.find(i => i.isPrimary) || images[0]` idiom appeared at seven call-sites with subtly different fallbacks — `ProductJsonLd` in particular would have silently degraded to `images[0]` (not necessarily the main image) once `isPrimary` disappeared, since its extras were all optional and it would have kept compiling. `mainImage()` gives one correct implementation: prefer `type: 'main'`, then lowest `sortOrder`.
+
+      **Verification**
+      | | |
+      |---|---|
+      | shared | 845 pass (11 new for the contract, mat constants, sort/main helpers) |
+      | web | 1380 pass |
+      | api | 11 failures — **all pre-existing**. The two touching products/AI were re-run at `f415e918` in a scratch worktree and fail identically there. |
+      | typecheck | 23 errors = exactly the branch baseline (main carries 26) |
+
+      **Note for #368/#369:** `ProductForm` was migrated rather than deferred — it now writes `type: 'main' | 'detail'` and enforces exactly one main. Its "Set Primary" button is retained and works against `type`. Those tickets build the type selector and crop control on top of this, rather than having to undo `isPrimary` first.
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -173,6 +200,7 @@ implementation_steps:
   - id: 7
     action: commit
     description: Commit the shared contract
-    command: 'git add packages/shared packages/web/app/components/product && git commit -m "feat(shared): single ProductImage contract with square invariant and mat constants"'
+    command: "git add packages/shared packages/web/app/components/product && git commit -m \"feat(shared): single ProductImage contract with square invariant and mat constants\""
     status: pending
 current_step: 1
+completed: "2026-07-31T07:57:33.607Z"

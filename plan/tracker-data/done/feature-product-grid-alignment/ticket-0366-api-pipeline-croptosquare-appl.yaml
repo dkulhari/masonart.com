@@ -1,5 +1,5 @@
 ticket_number: 366
-title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+title: "API pipeline - cropToSquare(): apply a human-chosen crop window to photographs"
 description: |-
   ## Task
 
@@ -21,18 +21,37 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-07-31T03:38:16.388Z'
-last_updated: '2026-07-31T03:38:16.388Z'
+created: "2026-07-31T03:38:16.388Z"
+last_updated: "2026-07-31T08:05:11.831Z"
 time_spent_minutes: 0
 labels:
   - backend
   - api
   - images
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-07-31T08:05:11.876Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-31T08:05:24.674Z"
+    text: |-
+      Done — commit `73e6d023`. 13 tests, all passing. Phase 2's two squaring functions are now complete (33 tests together).
+
+      **Test fixture choice worth noting:** the source is a red|blue split image rather than a solid colour, so the assertions prove *which region survived*, not merely that something was cropped. A solid-colour fixture would pass even if the function ignored the rect entirely and always took the centre. Left third yields red, right third yields blue.
+
+      One test asserts no `MAT_COLOR` appears anywhere in the output — that pins the no-mat requirement, which is the whole reason this function exists separately from `matToSquare`.
+
+      **Defensive clamping** covers everything a client can realistically send: out-of-range, negative, `NaN`, zero-area, and rects overflowing the source. All clamp rather than throw. The clamp *order* is load-bearing and commented in the source — size is bounded against the offset first, then the offset is pulled back. Doing it the other way round collapses a window starting near the far edge to 1px instead of yielding a usable region.
+
+      **Visual verification:** rendered a four-band 16:9 source through centred / left-edge / right-edge / zoomed windows. Each lands exactly where asked and fills edge-to-edge with no mat. The default (no rect supplied) correctly produces the largest centred square, showing the two middle bands with slivers of the outer two.
+
+      **For #369:** the contract this exposes is `crop?: ImageCrop` normalised 0..1 against the original. `react-easy-crop`'s `onCropComplete` percentage area maps to it by dividing by 100 — the admin control needs no other transformation. Passing no rect at all is a valid call and yields the centred square, so the UI can safely defer sending one until the user actually interacts.
+
+      api typecheck 0 errors; `matToSquare`'s 20 tests unaffected.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -193,6 +212,7 @@ implementation_steps:
   - id: 5
     action: commit
     description: Commit cropToSquare
-    command: 'git add packages/api/src/lib/image-processing.ts packages/api/tests/lib/image-processing-crop.test.ts && git commit -m "feat(api): crop photographs to square using a human-chosen window"'
+    command: "git add packages/api/src/lib/image-processing.ts packages/api/tests/lib/image-processing-crop.test.ts && git commit -m \"feat(api): crop photographs to square using a human-chosen window\""
     status: pending
 current_step: 1
+completed: "2026-07-31T08:05:11.831Z"

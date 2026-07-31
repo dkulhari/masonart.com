@@ -43,17 +43,45 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-07-31T03:41:16.702Z'
-last_updated: '2026-07-31T03:41:16.702Z'
+created: "2026-07-31T03:41:16.702Z"
+last_updated: "2026-07-31T09:24:16.284Z"
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-07-31T09:24:16.284Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-31T09:24:31.571Z"
+    text: |-
+      Done — committed with #371 as `f40ff761`. The two shipped together because they cannot compile separately: `ProductCard` is now an `<li>`, so the hand-rolled `<div className="grid">` wrappers had to become `ProductGrid` in the same change.
+
+      **D1 was worse than the ticket recorded — three call-sites, not two.**
+
+      | call-site | was | now |
+      |---|---|---|
+      | `routes/index.tsx` (home featured) | own 2/lg:4 div grid + `aspect-[3/4]` | `<ProductGrid />` |
+      | `routes/posters/index.tsx` (listing) | `columns` + `gap` + `aspect-[2/3]` | `<ProductGrid />` |
+      | `routes/posters/$slug.tsx` (**related products**) | own 2/3/4/lg:5 div grid + `aspect-[2/3]` | `<ProductGrid />` |
+
+      The third was not in the ticket. It had both a different ratio *and* a different column count (5 at `lg`), so "You May Also Like" was a third distinct layout. All three now share one grid. Verified `grep -rn uniformAspectRatio` returns only comments and test assertions — zero live code.
+
+      **`grid-flow-row-dense` deliberately not carried over.** Mesonart needs it to back-fill holes left by their multi-cell `.product-card--promo` app blocks; we have no such blocks, so it would only decouple DOM order from visual order and hurt keyboard/screen-reader traversal.
+
+      **Two test-authoring bugs found during the red phase**, both mine and both worth recording:
+
+      1. The source-text assertions ("ASPECT_RATIO_MAP is gone") failed against my own **doc comment**, which explains what was deleted by naming it. Rather than strip the explanation — it is the most useful comment in the file — the test now strips comments before asserting. A test that forbids *mentioning* a deleted symbol would punish documenting the deletion.
+      2. `getByRole('link', { name: title })` matched **two** elements: the media box carries `aria-label={title}` and so does the title link. Replaced with an explicit query for the link whose *text* is the title, plus a second test asserting the media link stays at `tabIndex={-1}` — so the card has one tab stop, not two.
+
+      **Verification:** 75 product component tests, full web suite 1455 pass (up from 1380), typecheck 23 = branch baseline.
+
+      **Still inert until #373:** `bg-mat` and `--card-radius` are referenced but not yet defined, so the media box currently has no mat colour and square corners. #373 adds the token set.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -141,6 +169,7 @@ implementation_steps:
   - id: 8
     action: commit
     description: Commit the grid simplification
-    command: 'git add packages/web/app/components/product/ProductGrid.tsx packages/web/app/routes/posters/index.tsx packages/web/app/routes/index.tsx packages/web/tests/components/product/ProductGrid.test.tsx && git commit -m "fix(web): one canonical product grid, resolving the home/listing ratio conflict"'
+    command: "git add packages/web/app/components/product/ProductGrid.tsx packages/web/app/routes/posters/index.tsx packages/web/app/routes/index.tsx packages/web/tests/components/product/ProductGrid.test.tsx && git commit -m \"fix(web): one canonical product grid, resolving the home/listing ratio conflict\""
     status: pending
 current_step: 1
+completed: "2026-07-31T09:24:16.284Z"

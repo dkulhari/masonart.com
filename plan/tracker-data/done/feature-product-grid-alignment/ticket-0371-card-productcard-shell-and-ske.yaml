@@ -39,17 +39,20 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
 created: '2026-07-31T03:41:13.742Z'
-last_updated: '2026-07-31T03:41:13.742Z'
+last_updated: '2026-07-31T09:24:09.198Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-07-31T09:24:09.223Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -133,3 +136,4 @@ implementation_steps:
     command: 'git add packages/web/app/components/product packages/web/tests/components/product && git commit -m "refactor(web): delete ratio machinery, extract skeleton, drop card chrome"'
     status: pending
 current_step: 1
+completed: '2026-07-31T09:24:09.198Z'

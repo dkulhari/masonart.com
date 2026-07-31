@@ -50,17 +50,20 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
 created: '2026-07-31T03:41:11.328Z'
-last_updated: '2026-07-31T03:41:11.328Z'
+last_updated: '2026-07-31T09:18:34.947Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-07-31T09:18:34.983Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -243,3 +246,4 @@ implementation_steps:
     command: 'git add packages/web/app/components/product/productCardTokens.ts packages/web/app/components/product/ProductCardMedia.tsx packages/web/tests/components/product && git commit -m "feat(web): square media box with cursor-X hover scrub"'
     status: pending
 current_step: 1
+completed: '2026-07-31T09:18:34.947Z'

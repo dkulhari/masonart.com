@@ -39,27 +39,51 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-07-31T03:38:18.395Z'
-last_updated: '2026-07-31T03:38:18.395Z'
+created: "2026-07-31T03:38:18.395Z"
+last_updated: "2026-07-31T08:10:07.217Z"
 time_spent_minutes: 0
 labels:
   - backend
   - api
   - images
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-07-31T08:10:07.227Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-31T08:10:23.346Z"
+    text: |-
+      Done — commit `2d78b221`. 11 tests. **Phase 2 complete** (44 tests across #365/#366/#367).
+
+      **Two corrections to the ticket's pseudo-code, found on contact with the real code:**
+
+      1. `uploadFile(buffer, key, options)` takes a **key**, not `filename + { prefix }` as the ticket assumed. `generateFileKey` is module-private in `storage.ts`, so `originalKeyFor()` mirrors its format (`timestamp-random-sanitisedName`) locally. Worth exporting `generateFileKey` at some point rather than duplicating the convention, but that touches storage's public surface and did not belong in this ticket.
+      2. `uploadOptimizedImage` returns variants as `{name,width,url,key}`; `ProductImage.variants` wants `{name,width,url}`. Mapped rather than widened the contract — the storage key is an implementation detail the frontend has no use for.
+
+      **A leftover the ticket did not mention, fixed here:** `productImageSchema` in the same file — used by the create/update product endpoints — still validated the **old** shape (`alt`, `isPrimary`, optional dimensions). Left alone, the API would have accepted and stored old-shape images even after #364 consolidated the type, which is exactly the kind of gap that shows up months later as one product rendering wrong. It now mirrors the contract and carries a `.refine()` rejecting non-square records, so the square invariant is enforced at the API boundary rather than trusted.
+
+      **Test design:** storage is mocked, so these assert *orchestration*, not S3 (`tests/lib/storage.test.ts` already covers that). The two assertions worth calling out:
+      - the buffer handed to the variant pipeline is decoded and checked to be genuinely 1500x1500 — not just "a buffer was passed"
+      - the buffer stored as the original is `.equals()`-compared against the source, proving we retain the **untouched** upload rather than the squared one. Getting this backwards would silently make crops unrevisable, and no type would catch it.
+
+      **On the admin suite failures:** running `tests/routes/admin/` in parallel shows 7 file-level failures, but that is this repo's known parallel-suite interference — `--no-file-parallelism` gives **9 files / 493 tests all passing**, and `products.test.ts` alone passes all 117. Not a regression from this ticket.
+
+      **For #368/#369:** the route contract is now `multipart { file, type, altText, sortOrder, crop? }` returning `{ success, image }` where `image` is the complete `ProductImage`. The old response shape (`{url, key, webpUrl, variants}`) is gone, so `ProductForm.handleFilesSelected` must be updated to read `data.image` — that is part of #368.
+
+      api typecheck 0 errors.
 work_sessions: []
 related_tickets: []
 blocked_by:
   - ticket: 365
     feature: product-grid-alignment
-    description: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+    description: "API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas"
   - ticket: 366
     feature: product-grid-alignment
-    description: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+    description: "API pipeline - cropToSquare(): apply a human-chosen crop window to photographs"
 blocks: []
 attachments: []
 implementation_steps:
@@ -132,7 +156,7 @@ implementation_steps:
     status: pending
   - id: 3
     action: implement
-    description: 'Create the orchestrator: branch on type, run the existing variant ladder, retain the original'
+    description: "Create the orchestrator: branch on type, run the existing variant ladder, retain the original"
     file: packages/api/src/lib/product-media.ts
     status: pending
     code: |
@@ -250,6 +274,7 @@ implementation_steps:
   - id: 6
     action: commit
     description: Commit the orchestrator and route
-    command: 'git add packages/api/src/lib/product-media.ts packages/api/src/routes/admin/products.ts packages/api/tests/routes/admin/products-upload-image.test.ts && git commit -m "feat(api): square every product upload and retain originals"'
+    command: "git add packages/api/src/lib/product-media.ts packages/api/src/routes/admin/products.ts packages/api/tests/routes/admin/products-upload-image.test.ts && git commit -m \"feat(api): square every product upload and retain originals\""
     status: pending
 current_step: 1
+completed: "2026-07-31T08:10:07.217Z"

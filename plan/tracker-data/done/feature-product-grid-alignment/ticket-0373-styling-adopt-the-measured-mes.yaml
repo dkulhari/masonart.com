@@ -55,18 +55,49 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-07-31T03:41:19.724Z'
-last_updated: '2026-07-31T03:41:19.724Z'
+created: "2026-07-31T03:41:19.724Z"
+last_updated: "2026-07-31T09:28:00.859Z"
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
   - styling
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-07-31T09:28:00.870Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-31T09:28:16.850Z"
+    text: |-
+      Done — commit `c588603d`. 9 token tests. **The card/grid chain (#370→#373) is complete.**
+
+      **The test that matters here is `tests/styles/mat-token.test.ts`.** The mat colour is this feature's one genuine cross-boundary coupling: `MAT_COLOR` is baked into pixels by sharp on the server, `--mat` is what CSS shows while the image loads. If they drift, every product card flashes one colour then settles to another — and no type system, linter or component test catches it. The guard converts the CSS HSL triple back to RGB and asserts equality with `MAT_COLOR` within 1/255. It also asserts the token is registered in `tailwind.config.ts`, since `bg-mat` silently no-ops otherwise.
+
+      **Conversion note:** mesonart uses space-separated **RGB** triples, this repo uses **HSL** triples with the same `hsl(var(--x) / alpha)` pattern. Converting rather than importing a second system keeps one convention in `globals.css`.
+
+      | token | value | note |
+      |---|---|---|
+      | `--foreground` | `0 0% 9%` | was `222.2 84% 4.9%` — a *blue-tinted* near-black. Now true neutral-900, matching measured `rgb(23 23 23)`. |
+      | `--mat` | `0 0% 98%` | new |
+      | `--rating` | `38 92% 50%` | new, amber-500 |
+      | `--card-radius` | `clamp(0.625rem, 1.053vw, 1.25rem)` | new, fluid 10→20px |
+      | `--ease-primary` / `--ease-fast` | measured cubic-beziers | new |
+
+      `--background` stays pure white — mesonart is white too. No `--sp-*` tokens needed: their spacing scale is Tailwind's 1:1.
+
+      **Fonts:** Poppins + Urbanist, both free on Google Fonts, so "identical" is genuinely achievable rather than approximated. Requested only the five weights actually in use (Poppins 300/400/500, Urbanist 300/500) — mesonart's own page declares dozens and leaves most `unloaded` — with `display=swap` plus preconnects so text paints in the fallback rather than blocking.
+
+      **Also landed here:** the quick-view affordance, with the measured geometry (48×48, radius 60px, `backdrop-blur(12px)`, inset 16px, fading in at `--ease-fast` .3s).
+
+      **Appendix B consequence #2 is now live:** `--primary: 25 95% 53%` (your amber) no longer appears anywhere on the card — CTAs are neutral-900. That was an accepted trade for parity, but it is now visible rather than theoretical, so worth a look once #374 puts real artwork in the grid.
+
+      **Not yet done in this ticket:** the quick-add "Choose options" pill. It needs the quick-view drawer to exist to be useful, and the spec explicitly scoped drawer behaviour out. The measured geometry is recorded in the ticket description for whenever that lands.
+
+      Verification: 84 product + style tests, full web suite 1464 pass (up from 1455), typecheck 23 = branch baseline.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -126,7 +157,7 @@ implementation_steps:
     status: pending
   - id: 3
     action: implement
-    description: 'Add the measured tokens to :root. --foreground: 0 0% 9%; --mat: 0 0% 98%; --border: 0 0% 9%; --rating: 38 92% 50%; --destructive: 347 77% 50%; --card-radius: clamp(0.625rem, 1.053vw, 1.25rem); --ease-primary: cubic-bezier(.3, 1, .3, 1); --ease-fast: cubic-bezier(.7, 0, .3, 1). Leave --background at 0 0% 100%. Add a comment on --mat pointing at MAT_COLOR in @chobii/shared and noting that changing it requires reprocessing every product image.'
+    description: "Add the measured tokens to :root. --foreground: 0 0% 9%; --mat: 0 0% 98%; --border: 0 0% 9%; --rating: 38 92% 50%; --destructive: 347 77% 50%; --card-radius: clamp(0.625rem, 1.053vw, 1.25rem); --ease-primary: cubic-bezier(.3, 1, .3, 1); --ease-fast: cubic-bezier(.7, 0, .3, 1). Leave --background at 0 0% 100%. Add a comment on --mat pointing at MAT_COLOR in @chobii/shared and noting that changing it requires reprocessing every product image."
     file: packages/web/app/styles/globals.css
     status: pending
   - id: 4
@@ -141,7 +172,7 @@ implementation_steps:
     status: pending
   - id: 6
     action: implement
-    description: 'Apply the measured affordance styles to the card: quick-view 48x48 rounded-full white with backdrop-blur at inset 16px; quick-add pill bg-foreground text-white rounded-full h-10 px-[22px] at bottom 28px, justify-center on md+ and justify-end with 12px inset plus a 40x40 icon button on mobile; dots pill h-6 rounded-full bg-white px-4 at bottom -14px with 5px dots, inactive solid #171717 and active transparent with a 2px ring. Reveal transitions use --ease-primary at .5s (dots, quick-add transform) and --ease-fast at .3s (opacity).'
+    description: "Apply the measured affordance styles to the card: quick-view 48x48 rounded-full white with backdrop-blur at inset 16px; quick-add pill bg-foreground text-white rounded-full h-10 px-[22px] at bottom 28px, justify-center on md+ and justify-end with 12px inset plus a 40x40 icon button on mobile; dots pill h-6 rounded-full bg-white px-4 at bottom -14px with 5px dots, inactive solid #171717 and active transparent with a 2px ring. Reveal transitions use --ease-primary at .5s (dots, quick-add transform) and --ease-fast at .3s (opacity)."
     file: packages/web/app/components/product/ProductCardMedia.tsx
     status: pending
   - id: 7
@@ -153,6 +184,7 @@ implementation_steps:
   - id: 8
     action: commit
     description: Commit the token adoption
-    command: 'git add packages/web/app/styles/globals.css packages/web/tailwind.config.ts packages/web/app/routes/__root.tsx packages/web/app/components/product packages/web/tests/styles && git commit -m "style(web): adopt measured mesonart token set for the product card"'
+    command: "git add packages/web/app/styles/globals.css packages/web/tailwind.config.ts packages/web/app/routes/__root.tsx packages/web/app/components/product packages/web/tests/styles && git commit -m \"style(web): adopt measured mesonart token set for the product card\""
     status: pending
 current_step: 1
+completed: "2026-07-31T09:28:00.859Z"

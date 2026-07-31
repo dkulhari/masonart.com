@@ -1,5 +1,5 @@
 ticket_number: 365
-title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+title: "API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas"
 description: |-
   ## Task
 
@@ -23,18 +23,42 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-07-31T03:38:13.867Z'
-last_updated: '2026-07-31T03:38:13.867Z'
+created: "2026-07-31T03:38:13.867Z"
+last_updated: "2026-07-31T08:02:54.330Z"
 time_spent_minutes: 0
 labels:
   - backend
   - api
   - images
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: "2026-07-31T08:02:54.368Z"
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: "2026-07-31T08:03:10.145Z"
+    text: |-
+      Done — commit `11d09fac`. 20 tests, all passing.
+
+      **Runtime output matches the design's computed geometry table exactly**, which is a useful independent check that the spec's maths and the implementation agree:
+
+      | orientation | predicted mat | measured mat | art box |
+      |---|---|---|---|
+      | square 1:1 | 22.6% | **22.6%** | 1320x1320 |
+      | portrait 2:3 | 48.4% | **48.4%** | 880x1320 |
+      | landscape 3:2 | 48.4% | **48.4%** | 1320x880 |
+      | panoramic 16:9 | 56.4% | **56.3%** | 1320x745 |
+
+      Also rendered a contact sheet and inspected it. Four identical squares, art centred, uniform 6% margin on the square case. It incidentally made Appendix B's first accepted consequence concrete: against a white page the `#fafafa` mat is *just barely* perceptible as a tile edge. That is the ~2% contrast we knowingly signed up for by matching mesonart — worth re-examining once real artwork is in the grid (#374), since flat-colour swatches are the least flattering test case.
+
+      **One test-authoring bug found and fixed during the red phase.** The initial fixtures used a 1200px square source, but the inner box is 1320px and `withoutEnlargement` is on — so the art correctly stayed at 1200 and the inset assertion failed by exactly 120px. The implementation was right; the fixture was too small to exercise the inset. Fixtures now all exceed 1320 on the longest side, and the no-upscale rule has its own dedicated test at 600px. Worth noting because a less careful fix would have been to drop `withoutEnlargement`, which would have silently introduced interpolated upscaling.
+
+      **Coverage:** output size, inset geometry, centring symmetry, source-ratio preservation (proving no crop), visible mat for square art, no-upscale, opacity (no alpha channel), and size-stability when re-run on its own output.
+
+      Verification: api typecheck 0 errors. `tests/lib/` shows one failure — `redis.test.ts`, which needs a live Redis and was already failing in the pre-change baseline run.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -170,6 +194,7 @@ implementation_steps:
   - id: 6
     action: commit
     description: Commit matToSquare
-    command: 'git add packages/api/src/lib/image-processing.ts packages/api/tests/lib/image-processing-mat.test.ts && git commit -m "feat(api): mat any-ratio artwork onto a square canvas"'
+    command: "git add packages/api/src/lib/image-processing.ts packages/api/tests/lib/image-processing-mat.test.ts && git commit -m \"feat(api): mat any-ratio artwork onto a square canvas\""
     status: pending
 current_step: 1
+completed: "2026-07-31T08:02:54.330Z"
