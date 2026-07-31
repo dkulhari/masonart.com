@@ -1,0 +1,141 @@
+ticket_number: 368
+title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
+description: |-
+  ## Task
+
+  The admin already loops a multi-file picker into the upload endpoint. Add the metadata controls the new contract needs.
+
+  Per media row:
+  - a `type` dropdown (`main` / `room-mockup` / `detail` / `texture` / `frame-preview`)
+  - drag-to-reorder, writing `sortOrder`
+  - alt text field (now required by the contract - `altText`, not `alt`)
+  - a warning when the source's long edge is under 1200px
+
+  The low-resolution warning matters because T2 sets `withoutEnlargement: true` - a small source is not upscaled, it just sits smaller on the mat. The uploader should know that before saving rather than discover it in the grid.
+
+  Exactly one image should be `type: 'main'`. Enforce in the UI: selecting `main` on a second row demotes the previous one.
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 3 - Admin upload
+  Depends on: T4
+
+  Existing code: `packages/web/app/components/admin/ProductForm.tsx`
+  - `handleFilesSelected` at line ~393 loops files into `POST /api/admin/products/upload-image`
+  - `addImagePlaceholder` at line ~381 is the manual-URL fallback row
+  - Local `ProductImage` interface at line ~32 must be replaced by the `@chobii/shared` type (T1)
+
+  The request becomes `multipart { file, type, altText, sortOrder, crop? }`. This ticket sends everything except `crop`, which T6 adds.
+
+  ## Acceptance criteria
+  - Each media row has a working type selector, alt text input and drag handle
+  - Reordering rows renumbers `sortOrder` contiguously from 0
+  - Exactly one row can be `main`
+  - A sub-1200px source shows a visible warning before save
+  - Saving a product persists the new `ProductImage` shape including `originalKey`
+feature: product-grid-alignment
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:38:20.449Z'
+last_updated: '2026-07-31T03:38:20.449Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 367
+    feature: product-grid-alignment
+    description: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing component tests for the type selector, single-main rule and sortOrder renumbering
+    file: packages/web/tests/components/admin/ProductMediaRows.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/admin/ProductMediaRows.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect, vi } from 'vitest'
+      import { render, screen, fireEvent } from '@testing-library/react'
+      import type { ProductImage } from '@chobii/shared'
+      import { ProductMediaRows } from '~/components/admin/ProductMediaRows'
+
+      const img = (over: Partial<ProductImage>): ProductImage => ({
+        id: 'i', url: 'u', altText: 'a', type: 'detail', sortOrder: 0,
+        width: 1500, height: 1500, originalKey: 'o', ...over,
+      })
+
+      describe('ProductMediaRows', () => {
+        it('renders a type selector per row', () => {
+          render(<ProductMediaRows images={[img({ id: '1' }), img({ id: '2' })]} onChange={vi.fn()} />)
+          expect(screen.getAllByLabelText(/media type/i)).toHaveLength(2)
+        })
+
+        it('demotes the previous main when another row is set to main', () => {
+          const onChange = vi.fn()
+          render(<ProductMediaRows images={[img({ id: '1', type: 'main' }), img({ id: '2' })]} onChange={onChange} />)
+          fireEvent.change(screen.getAllByLabelText(/media type/i)[1], { target: { value: 'main' } })
+          const next = onChange.mock.calls.at(-1)![0] as ProductImage[]
+          expect(next.filter((i) => i.type === 'main')).toHaveLength(1)
+          expect(next.find((i) => i.type === 'main')!.id).toBe('2')
+        })
+
+        it('renumbers sortOrder contiguously from 0 after reorder', () => {
+          const onChange = vi.fn()
+          render(<ProductMediaRows images={[img({ id: '1', sortOrder: 0 }), img({ id: '2', sortOrder: 1 }), img({ id: '3', sortOrder: 2 })]} onChange={onChange} />)
+          fireEvent.click(screen.getAllByLabelText(/move up/i)[2])
+          const next = onChange.mock.calls.at(-1)![0] as ProductImage[]
+          expect(next.map((i) => i.sortOrder)).toEqual([0, 1, 2])
+          expect(next.map((i) => i.id)).toEqual(['1', '3', '2'])
+        })
+
+        it('warns when a source is below 1200px on its long edge', () => {
+          render(<ProductMediaRows images={[img({ id: '1' })]} onChange={vi.fn()} sourceDimensions={{ '1': { width: 900, height: 600 } }} />)
+          expect(screen.getByText(/low resolution/i)).toBeInTheDocument()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bunx vitest run tests/components/admin/ProductMediaRows.test.tsx
+    expected_result: FAIL - ProductMediaRows does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: 'Extract media rows into their own component. Props: images: ProductImage[], onChange(next), sourceDimensions?. Renders one row per image with: a labelled <select> for type (aria-label ''Media type''), an alt text input bound to altText, move-up/move-down buttons (aria-label ''Move up''/''Move down'') plus a drag handle, and a thumbnail. Setting a row to ''main'' maps over the others demoting any existing main to ''detail''. Every mutation renumbers sortOrder from 0 by array index. When sourceDimensions[id] has max(width,height) < 1200, render a ''Low resolution'' warning explaining the art will sit smaller on the mat because sources are never upscaled. Keep this component presentational - all state lives in ProductForm.'
+    file: packages/web/app/components/admin/ProductMediaRows.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the component tests pass
+    command: cd packages/web && bunx vitest run tests/components/admin/ProductMediaRows.test.tsx
+    expected_result: PASS - 4 tests
+    status: pending
+  - id: 5
+    action: implement
+    description: 'Wire into ProductForm: replace the local ProductImage interface (line ~32) with the @chobii/shared import; render <ProductMediaRows> in place of the current image list; extend handleFilesSelected (line ~393) to send type, altText and sortOrder in the FormData and to read the new { image } response shape; capture natural dimensions client-side via createImageBitmap for the resolution warning.'
+    file: packages/web/app/components/admin/ProductForm.tsx
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Web suite green and no new type errors
+    command: cd packages/web && bunx vitest run && cd .. && cd .. && bun run typecheck 2>&1 | grep -cE 'error TS[0-9]+'
+    expected_result: Tests PASS; typecheck count <= 23
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the admin media rows
+    command: 'git add packages/web/app/components/admin packages/web/tests/components/admin && git commit -m "feat(admin): per-file media type, ordering and resolution warnings"'
+    status: pending
+current_step: 1

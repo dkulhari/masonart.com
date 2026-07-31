@@ -1,0 +1,158 @@
+ticket_number: 373
+title: Styling - Adopt the measured mesonart token set
+description: |-
+  ## Task
+
+  Bring the card to measured visual parity with mesonart. All values captured 2026-07-30 at 1440x900, DPR 1; the full table is in the spec's Appendix A.
+
+  **Palette.** Their tokens are space-separated RGB triples, ours are HSL triples - same `hsl(var(--x) / alpha)` convention, so these map into the existing `globals.css` rather than importing a second system.
+
+  | mesonart | value | chobii token | HSL |
+  |---|---|---|---|
+  | `--color-foreground` | `23 23 23` | `--foreground` | `0 0% 9%` |
+  | `--color-placeholder` | `250 250 250` | `--mat` **(new)** | `0 0% 98%` |
+  | `--color-border` | `23 23 23 / .1` | `--border` | `0 0% 9% / .1` |
+  | `--color-rating` | `245 158 11` | `--rating` **(new)** | `38 92% 50%` |
+  | `--color-sale-tag` | `225 29 72` | `--destructive` | `347 77% 50%` |
+  | `--card-radius` | `clamp(.625rem, 1.053vw, 1.25rem)` | `--card-radius` **(new)** | 10->20px |
+  | `--animation-primary` | `.5s cubic-bezier(.3,1,.3,1)` | `--ease-primary` **(new)** | |
+  | `--animation-fast` | `.3s cubic-bezier(.7,0,.3,1)` | `--ease-fast` **(new)** | |
+
+  `--background` stays `0 0% 100%` - mesonart is pure white too.
+
+  **Type.** Poppins + Urbanist, both free Google Fonts (loaded weights confirmed: Poppins 300/400/500, Urbanist 300/500).
+  ```
+  body        Poppins 300, 16px       card title  Poppins 500, 16px/20px, #171717, centred
+  headings    Urbanist 300            card price  Poppins 300, 16px/16px
+  buttons     Poppins 400, capitalize   "From"    Poppins 400, 12.8px inline <small>
+  ```
+
+  **Affordances**, measured:
+  ```
+  quick-view  48x48, radius 60px, bg #fff, backdrop-blur(12px), inset 16px
+  quick-add   171.6x40, radius 60px, bg #171717, fg #fff, padding 12.1px 22px, bottom 28px
+              justify-center md+ / justify-end + 12px inset mobile (40x40 icon)
+  dots pill   104x24, radius full, bg #fff, padding-inline 16px, bottom -14px
+  dot         5x5 ::before - inactive #171717 solid; active transparent + 2px ring
+  ```
+
+  `--sp-*` is Tailwind's spacing scale 1:1, so no spacing tokens needed.
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 5 - Styling
+  Depends on: T9
+
+  `MAT_COLOR` in `@chobii/shared` and the `--mat` token **must** resolve to the same RGB - that is the one cross-boundary coupling in this feature (see feature description). Add a unit test asserting it.
+
+  Dark mode is out of scope: nothing sets the `.dark` class, so the block is unreachable. Removing the 125 dead `dark:` utilities is tracked separately.
+
+  **Accepted consequences**, recorded in the spec's Appendix B:
+  1. `#fafafa` on pure white is ~2% contrast - the mat is subtle by design
+  2. `--primary: 25 95% 53%` (amber) leaves the card; CTAs become neutral-900
+  3. Poppins 300 is a light body weight
+feature: product-grid-alignment
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:41:19.724Z'
+last_updated: '2026-07-31T03:41:19.724Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - styling
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 372
+    feature: product-grid-alignment
+    description: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the failing guard for the mat colour coupling - the feature's main rot risk
+    file: packages/web/tests/styles/mat-token.test.ts
+    command: cd packages/web && bunx vitest run tests/styles/mat-token.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+      import { MAT_COLOR } from '@chobii/shared'
+
+      const css = readFileSync(join(process.cwd(), 'app/styles/globals.css'), 'utf8')
+
+      /** hsl(h s% l%) -> {r,g,b} 0..255 */
+      function hslToRgb(h: number, s: number, l: number) {
+        s /= 100; l /= 100
+        const k = (n: number) => (n + h / 30) % 12
+        const a = s * Math.min(l, 1 - l)
+        const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))
+        return { r: Math.round(255 * f(0)), g: Math.round(255 * f(8)), b: Math.round(255 * f(4)) }
+      }
+
+      describe('--mat token', () => {
+        it('is defined in globals.css', () => {
+          expect(css).toMatch(/--mat:\s*[\d.]+\s+[\d.]+%\s+[\d.]+%/)
+        })
+
+        it('resolves to the same RGB as the baked MAT_COLOR (the cross-boundary coupling)', () => {
+          const m = css.match(/--mat:\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/)!
+          const rgb = hslToRgb(Number(m[1]), Number(m[2]), Number(m[3]))
+          expect(Math.abs(rgb.r - MAT_COLOR.r)).toBeLessThanOrEqual(1)
+          expect(Math.abs(rgb.g - MAT_COLOR.g)).toBeLessThanOrEqual(1)
+          expect(Math.abs(rgb.b - MAT_COLOR.b)).toBeLessThanOrEqual(1)
+        })
+
+        it('defines the measured card radius and easing tokens', () => {
+          expect(css).toContain('--card-radius')
+          expect(css).toContain('cubic-bezier(.3, 1, .3, 1)')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bunx vitest run tests/styles/mat-token.test.ts
+    expected_result: FAIL - --mat is not defined
+    status: pending
+  - id: 3
+    action: implement
+    description: 'Add the measured tokens to :root. --foreground: 0 0% 9%; --mat: 0 0% 98%; --border: 0 0% 9%; --rating: 38 92% 50%; --destructive: 347 77% 50%; --card-radius: clamp(0.625rem, 1.053vw, 1.25rem); --ease-primary: cubic-bezier(.3, 1, .3, 1); --ease-fast: cubic-bezier(.7, 0, .3, 1). Leave --background at 0 0% 100%. Add a comment on --mat pointing at MAT_COLOR in @chobii/shared and noting that changing it requires reprocessing every product image.'
+    file: packages/web/app/styles/globals.css
+    status: pending
+  - id: 4
+    action: implement
+    description: Expose mat and rating as Tailwind colours so bg-mat / text-rating work, and register the Poppins and Urbanist font families in theme.extend.fontFamily (sans -> Poppins, display -> Urbanist).
+    file: packages/web/tailwind.config.ts
+    status: pending
+  - id: 5
+    action: implement
+    description: Load Poppins 300/400/500 and Urbanist 300/500 from Google Fonts, self-hosted or via a preconnect + stylesheet link in the root document. Prefer self-hosting to avoid a third-party request on every page load.
+    file: packages/web/app/routes/__root.tsx
+    status: pending
+  - id: 6
+    action: implement
+    description: 'Apply the measured affordance styles to the card: quick-view 48x48 rounded-full white with backdrop-blur at inset 16px; quick-add pill bg-foreground text-white rounded-full h-10 px-[22px] at bottom 28px, justify-center on md+ and justify-end with 12px inset plus a 40x40 icon button on mobile; dots pill h-6 rounded-full bg-white px-4 at bottom -14px with 5px dots, inactive solid #171717 and active transparent with a 2px ring. Reveal transitions use --ease-primary at .5s (dots, quick-add transform) and --ease-fast at .3s (opacity).'
+    file: packages/web/app/components/product/ProductCardMedia.tsx
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: Confirm the token guard and full web suite pass
+    command: cd packages/web && bunx vitest run
+    expected_result: PASS - including the mat-token coupling guard
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the token adoption
+    command: 'git add packages/web/app/styles/globals.css packages/web/tailwind.config.ts packages/web/app/routes/__root.tsx packages/web/app/components/product packages/web/tests/styles && git commit -m "style(web): adopt measured mesonart token set for the product card"'
+    status: pending
+current_step: 1

@@ -1,0 +1,146 @@
+ticket_number: 372
+title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+description: |-
+  ## Task
+
+  Reduce `ProductGrid` to mesonart's measured layout and resolve **defect D1** - the two production call-sites currently pass different ratios.
+
+  | Call-site | Currently passes |
+  |---|---|
+  | `routes/posters/index.tsx:523` | `uniformAspectRatio="aspect-[2/3]"` |
+  | `routes/index.tsx:251` | `uniformAspectRatio="aspect-[3/4]"` |
+
+  Both drop the prop; the ratio is now an invariant, not a decision.
+
+  **Measured mesonart layout:**
+  ```tsx
+  <ul className="grid list-none
+                 grid-cols-2 md:grid-cols-3 xl:grid-cols-4
+                 gap-x-[13.5px] gap-y-5">
+  ```
+
+  Column counts verified at 1536/1440/1280 -> 4, 1024/768 -> 3, 640/375 -> 2. Gap measured at `20px 13.5px`.
+
+  **Not** carrying over mesonart's `grid-flow-row-dense`: it exists solely to back-fill holes left by their multi-cell promo app blocks, which we do not have. Omitting it keeps DOM order equal to visual order, which matters for keyboard and screen-reader traversal.
+
+  Also simplify away the `columns` and `gap` props and their lookup maps - a single canonical grid means per-call-site configuration is dead weight.
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 4 - Card and grid
+  Depends on: T8
+
+  Current `ProductGrid.tsx` has `GRID_COLUMN_CLASSES`, `GAP_CLASSES`, and `columns`/`gap`/`cardSize`/`uniformAspectRatio` props - all removable.
+
+  Also satisfies **ticket #360**, which this feature absorbs: its acceptance criteria were (a) skeleton and resolved card occupy the same box, and (b) a recorded, consistently applied decision on card uniformity.
+
+  ## Acceptance criteria
+  - Both routes render the grid with no ratio prop
+  - `grep -rn 'uniformAspectRatio' packages/web` returns nothing
+  - Rows visually align at 1440, 1024 and 375
+  - The home page shows no layout shift as featured products resolve
+feature: product-grid-alignment
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:41:16.702Z'
+last_updated: '2026-07-31T03:41:16.702Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 371
+    feature: product-grid-alignment
+    description: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the grid classes and prop removal
+    file: packages/web/tests/components/product/ProductGrid.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductGrid.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { render } from '@testing-library/react'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+      import { ProductGrid } from '~/components/product/ProductGrid'
+
+      const src = readFileSync(join(process.cwd(), 'app/components/product/ProductGrid.tsx'), 'utf8')
+
+      describe('ProductGrid', () => {
+        it('uses the measured mesonart column counts', () => {
+          const { container } = render(<ProductGrid products={[]} />)
+          const grid = container.querySelector('ul')!
+          expect(grid.className).toContain('grid-cols-2')
+          expect(grid.className).toContain('md:grid-cols-3')
+          expect(grid.className).toContain('xl:grid-cols-4')
+        })
+
+        it('uses the measured 20px / 13.5px gaps', () => {
+          const { container } = render(<ProductGrid products={[]} />)
+          const grid = container.querySelector('ul')!
+          expect(grid.className).toContain('gap-x-[13.5px]')
+          expect(grid.className).toContain('gap-y-5')
+        })
+
+        it('omits grid-flow-row-dense so DOM order equals visual order', () => {
+          expect(src).not.toContain('grid-flow-row-dense')
+        })
+
+        it('no longer exposes ratio, column or gap configuration', () => {
+          for (const dead of ['uniformAspectRatio', 'GRID_COLUMN_CLASSES', 'GAP_CLASSES']) {
+            expect(src).not.toContain(dead)
+          }
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bunx vitest run tests/components/product/ProductGrid.test.tsx
+    expected_result: FAIL - old class maps and props still present
+    status: pending
+  - id: 3
+    action: implement
+    description: Rewrite ProductGrid. Render a <ul> with the measured classes; keep only products, isLoading, skeletonCount, emptyState and className props. Delete GRID_COLUMN_CLASSES, GAP_CLASSES and the columns/gap/cardSize/uniformAspectRatio props. Keep ProductGridEmptyState as-is. Each product renders <ProductCard> (which is now an <li>), and the loading branch renders ProductCardSkeleton the same number of times.
+    file: packages/web/app/components/product/ProductGrid.tsx
+    status: pending
+  - id: 4
+    action: implement
+    description: Drop uniformAspectRatio and any columns/gap props from the listing call-site
+    file: packages/web/app/routes/posters/index.tsx
+    status: pending
+  - id: 5
+    action: implement
+    description: Drop uniformAspectRatio from the home page featured grid; if it renders bare ProductCards, wrap them in ProductGrid so both surfaces share one layout
+    file: packages/web/app/routes/index.tsx
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Confirm the prop is gone repo-wide
+    command: cd /Users/dhruv/work/masonart.com && grep -rn 'uniformAspectRatio' packages/web || echo 'CLEAN - no references remain'
+    expected_result: CLEAN - no references remain
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: Full web suite plus typecheck against the branch baseline
+    command: cd packages/web && bunx vitest run && cd ../.. && bun run typecheck 2>&1 | grep -cE 'error TS[0-9]+'
+    expected_result: Tests PASS; typecheck count <= 23
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the grid simplification
+    command: 'git add packages/web/app/components/product/ProductGrid.tsx packages/web/app/routes/posters/index.tsx packages/web/app/routes/index.tsx packages/web/tests/components/product/ProductGrid.test.tsx && git commit -m "fix(web): one canonical product grid, resolving the home/listing ratio conflict"'
+    status: pending
+current_step: 1

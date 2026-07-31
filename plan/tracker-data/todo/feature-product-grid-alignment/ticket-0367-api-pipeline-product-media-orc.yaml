@@ -1,0 +1,255 @@
+ticket_number: 367
+title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+description: |-
+  ## Task
+
+  Wire T2 and T3 into the product upload path, and start retaining originals.
+
+  Add a `buildProductMedia()` orchestrator **beside** `processImage()`, not inside it - `processImage` also serves avatars and AI generations, where squaring would be wrong.
+
+  Flow:
+
+  ```
+  POST /api/admin/products/upload-image
+    multipart { file, type, crop? }
+          |
+          +- type === 'main' ? matToSquare(buf) : cropToSquare(buf, crop)
+          +- processImage()          -> existing IMAGE_SIZES ladder (150/400/800/1200 WebP)
+          +- uploadOptimizedImage()  -> existing S3/Minio + StoragePaths
+          +- uploadFile(original)    -> StoragePaths.PRODUCTS + 'originals/' -> originalKey
+          |
+    { url, key, originalKey, width, height, variants, type, crop? }
+  ```
+
+  Runs **inline, no queue** - one image per request at roughly 400ms.
+
+  Retaining originals is load-bearing, not insurance: re-cropping (a future UI) and re-matting (if MAT_COLOR ever changes) both require the untouched source.
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 2 - API image pipeline
+  Depends on: T2, T3
+
+  Existing route is at `packages/api/src/routes/admin/products.ts:188`. It currently accepts only `file` and calls `uploadOptimizedImage` directly, returning `{ url, key, webpUrl, variants }`.
+
+  Existing validation to preserve: `PRODUCT_IMAGE_TYPES` allowlist (JPEG/PNG/WebP) and `MAX_PRODUCT_IMAGE_MB`.
+
+  Add a Zod schema for the multipart text fields - `type` must be a valid `ProductImageType`, `crop` an optional JSON-encoded `ImageCrop`.
+feature: product-grid-alignment
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:38:18.395Z'
+last_updated: '2026-07-31T03:38:18.395Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - images
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 365
+    feature: product-grid-alignment
+    description: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+  - ticket: 366
+    feature: product-grid-alignment
+    description: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing route tests for type branching, crop parsing, originalKey and validation
+    file: packages/api/tests/routes/admin/products-upload-image.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/products-upload-image.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import sharp from 'sharp'
+      import { MAT_CANVAS } from '@chobii/shared'
+      import '../../setup'
+
+      vi.mock('../../../src/lib/storage', async (orig) => {
+        const actual = await orig<typeof import('../../../src/lib/storage')>()
+        return {
+          ...actual,
+          uploadOptimizedImage: vi.fn(async () => ({
+            url: 'https://cdn/test.webp', key: 'products/test.webp',
+            webpUrl: 'https://cdn/test.webp', variants: [],
+          })),
+          uploadFile: vi.fn(async () => ({ url: 'https://cdn/orig.jpg', key: 'products/originals/orig.jpg' })),
+        }
+      })
+
+      import { buildProductMedia } from '../../../src/lib/product-media'
+
+      const png = (w: number, h: number) =>
+        sharp({ create: { width: w, height: h, channels: 3, background: { r: 9, g: 9, b: 9 } } }).png().toBuffer()
+
+      describe('buildProductMedia', () => {
+        beforeEach(() => vi.clearAllMocks())
+
+        it("mats a 'main' image and leaves crop undefined", async () => {
+          const r = await buildProductMedia(await png(1000, 1500), 'art.png', 'image/png', { type: 'main', altText: 'a' })
+          expect(r.type).toBe('main')
+          expect(r.crop).toBeUndefined()
+          expect(r.width).toBe(MAT_CANVAS)
+          expect(r.height).toBe(MAT_CANVAS)
+        })
+
+        it('crops a room-mockup with the supplied window and records it', async () => {
+          const crop = { x: 0.1, y: 0.1, w: 0.5, h: 0.5 }
+          const r = await buildProductMedia(await png(1600, 900), 'room.png', 'image/png', { type: 'room-mockup', altText: 'r', crop })
+          expect(r.type).toBe('room-mockup')
+          expect(r.crop).toEqual(crop)
+          expect(r.width).toBe(r.height)
+        })
+
+        it('always returns an originalKey so the crop stays revisable', async () => {
+          const r = await buildProductMedia(await png(800, 800), 'x.png', 'image/png', { type: 'detail', altText: 'd' })
+          expect(r.originalKey).toMatch(/originals\//)
+        })
+
+        it('satisfies the square contract for every type', async () => {
+          for (const type of ['main', 'room-mockup', 'detail', 'texture'] as const) {
+            const r = await buildProductMedia(await png(1600, 900), 'x.png', 'image/png', { type, altText: 't' })
+            expect(r.width).toBe(r.height)
+          }
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/routes/admin/products-upload-image.test.ts
+    expected_result: FAIL - src/lib/product-media does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: 'Create the orchestrator: branch on type, run the existing variant ladder, retain the original'
+    file: packages/api/src/lib/product-media.ts
+    status: pending
+    code: |
+      import { randomUUID } from 'node:crypto'
+      import {
+        MAT_CANVAS,
+        type ImageCrop,
+        type ProductImage,
+        type ProductImageType,
+      } from '@chobii/shared'
+      import { matToSquare, cropToSquare } from './image-processing'
+      import { uploadOptimizedImage, uploadFile, StoragePaths } from './storage'
+
+      export interface BuildProductMediaInput {
+        type: ProductImageType
+        altText: string
+        /** Ignored for type:'main', which is matted and never cropped. */
+        crop?: ImageCrop
+        sortOrder?: number
+      }
+
+      /**
+       * Turn one uploaded file into one ProductImage satisfying the square contract.
+       *
+       * Deliberately NOT folded into processImage(): that function also serves avatars
+       * and AI generations, where forcing a square would be wrong.
+       */
+      export async function buildProductMedia(
+        input: Buffer,
+        filename: string,
+        contentType: string,
+        opts: BuildProductMediaInput,
+      ): Promise<ProductImage> {
+        // 1. square it - matted for artwork, human-cropped for photographs
+        const squared =
+          opts.type === 'main'
+            ? await matToSquare(input)
+            : await cropToSquare(input, opts.crop)
+
+        // 2. existing variant ladder + upload (unchanged)
+        const uploaded = await uploadOptimizedImage(squared, `${filename}.webp`, 'image/webp', {
+          prefix: StoragePaths.PRODUCTS,
+        })
+
+        // 3. retain the untouched source so the crop stays revisable
+        const original = await uploadFile(input, filename, contentType, {
+          prefix: `${StoragePaths.PRODUCTS}originals/`,
+        })
+
+        return {
+          id: randomUUID(),
+          url: uploaded.url,
+          altText: opts.altText,
+          type: opts.type,
+          sortOrder: opts.sortOrder ?? 0,
+          width: MAT_CANVAS,
+          height: MAT_CANVAS,
+          variants: uploaded.variants,
+          ...(opts.type === 'main' ? {} : opts.crop ? { crop: opts.crop } : {}),
+          originalKey: original.key,
+        }
+      }
+  - id: 4
+    action: implement
+    description: Point the upload route at the orchestrator; accept and validate type + crop; keep the existing file-type and size guards
+    file: packages/api/src/routes/admin/products.ts
+    status: pending
+    code: |
+      // near the other imports
+      import { z } from 'zod'
+      import { buildProductMedia } from '../../lib/product-media'
+
+      const uploadImageFieldsSchema = z.object({
+        type: z.enum(['main', 'detail', 'texture', 'room-mockup', 'frame-preview', '360-view']).default('main'),
+        altText: z.string().max(300).default(''),
+        sortOrder: z.coerce.number().int().min(0).default(0),
+        crop: z
+          .string()
+          .optional()
+          .transform((s, ctx) => {
+            if (!s) return undefined
+            try {
+              const p = JSON.parse(s)
+              return z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).parse(p)
+            } catch {
+              ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'crop must be JSON {x,y,w,h}' })
+              return z.NEVER
+            }
+          }),
+      })
+
+      // inside the POST /upload-image handler, replacing the uploadOptimizedImage call.
+      // KEEP the existing PRODUCT_IMAGE_TYPES and MAX_PRODUCT_IMAGE_MB guards above this.
+      const form = await c.req.formData()
+      const parsed = uploadImageFieldsSchema.safeParse({
+        type: form.get('type') ?? undefined,
+        altText: form.get('altText') ?? undefined,
+        sortOrder: form.get('sortOrder') ?? undefined,
+        crop: form.get('crop') ?? undefined,
+      })
+      if (!parsed.success) {
+        return c.json({ error: 'Invalid upload fields', details: parsed.error.flatten() }, 400)
+      }
+
+      const buffer = Buffer.from(await file.arrayBuffer())
+      const image = await buildProductMedia(buffer, file.name, file.type, parsed.data)
+
+      return c.json({ success: true, image }, 201)
+  - id: 5
+    action: verify-pass
+    description: Confirm the new tests pass and the existing admin product tests still do
+    command: cd packages/api && bunx vitest run tests/routes/admin/
+    expected_result: PASS - new upload tests green, existing admin/products tests unchanged
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the orchestrator and route
+    command: 'git add packages/api/src/lib/product-media.ts packages/api/src/routes/admin/products.ts packages/api/tests/routes/admin/products-upload-image.test.ts && git commit -m "feat(api): square every product upload and retain originals"'
+    status: pending
+current_step: 1

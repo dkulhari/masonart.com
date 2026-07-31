@@ -1,0 +1,175 @@
+ticket_number: 365
+title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+description: |-
+  ## Task
+
+  Add `matToSquare()` to the existing image-processing lib. It takes artwork of **any** aspect ratio and returns a `MAT_CANVAS` x `MAT_CANVAS` opaque WebP with the art contained at `MAT_ART_INSET` (88%) of the longest side, centred on `MAT_COLOR`.
+
+  This is the function that makes the grid's square invariant true. Artwork is **never cropped** - that distinguishes it from `cropToSquare` (T3), which handles photographs.
+
+  The 88% inset (rather than plain `fit: 'contain'`) is deliberate: it guarantees a visible mat on every product, so square art does not bleed to the card edge while portrait art floats.
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 2 - API image pipeline
+  Depends on: T1 (imports MAT_* from @chobii/shared)
+
+  Extends `packages/api/src/lib/image-processing.ts`, which already exports `processImage()`, `IMAGE_SIZES`, `convertToWebP()` and `getImageMetadata()`. `sharp@^0.34.5` is already a dependency.
+
+  **Do not modify `processImage()`** - it also serves avatars and AI generations, where squaring would be wrong.
+
+  No database needed; these are pure functions.
+feature: product-grid-alignment
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:38:13.867Z'
+last_updated: '2026-07-31T03:38:13.867Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - images
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 364
+    feature: product-grid-alignment
+    description: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests covering all four orientations, the inset geometry, and the no-upscale rule
+    file: packages/api/tests/lib/image-processing-mat.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/image-processing-mat.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import sharp from 'sharp'
+      import { MAT_CANVAS, MAT_ART_INSET } from '@chobii/shared'
+      import { matToSquare } from '../../src/lib/image-processing'
+
+      /** Solid-colour source so trim() can find the art against the mat. */
+      const src = (w: number, h: number) =>
+        sharp({ create: { width: w, height: h, channels: 3, background: { r: 10, g: 20, b: 30 } } })
+          .png().toBuffer()
+
+      const RATIOS: Array<[string, number, number]> = [
+        ['square 1:1', 1200, 1200],
+        ['portrait 2:3', 1000, 1500],
+        ['landscape 3:2', 1500, 1000],
+        ['panoramic 16:9', 1600, 900],
+      ]
+
+      describe('matToSquare', () => {
+        it.each(RATIOS)('%s -> 1500x1500', async (_label, w, h) => {
+          const out = await matToSquare(await src(w, h))
+          const m = await sharp(out).metadata()
+          expect(m.width).toBe(MAT_CANVAS)
+          expect(m.height).toBe(MAT_CANVAS)
+          expect(m.format).toBe('webp')
+        })
+
+        it.each(RATIOS)('%s insets art to 88% of the longest side', async (_label, w, h) => {
+          const out = await matToSquare(await src(w, h))
+          // trim the flat mat away; what remains is the art box
+          const { info } = await sharp(out).trim().toBuffer({ resolveWithObject: true })
+          const longest = Math.max(info.width, info.height)
+          expect(longest).toBeCloseTo(MAT_CANVAS * MAT_ART_INSET, -1) // 1320 +/- ~2px
+        })
+
+        it.each(RATIOS)('%s centres the art', async (_label, w, h) => {
+          const out = await matToSquare(await src(w, h))
+          const { info } = await sharp(out).trim().toBuffer({ resolveWithObject: true })
+          const leftGap = (MAT_CANVAS - info.width) / 2
+          const topGap = (MAT_CANVAS - info.height) / 2
+          expect(leftGap).toBeGreaterThanOrEqual(0)
+          expect(topGap).toBeGreaterThanOrEqual(0)
+          // centred: gaps on both axes are symmetric by construction
+          expect(MAT_CANVAS - info.width - leftGap).toBeCloseTo(leftGap, 0)
+          expect(MAT_CANVAS - info.height - topGap).toBeCloseTo(topGap, 0)
+        })
+
+        it('never upscales a small source', async () => {
+          const out = await matToSquare(await src(600, 600))
+          const { info } = await sharp(out).trim().toBuffer({ resolveWithObject: true })
+          expect(Math.max(info.width, info.height)).toBeLessThanOrEqual(602)
+        })
+
+        it('is idempotent in output size for an already-square 1500 source', async () => {
+          const out = await matToSquare(await src(1500, 1500))
+          const m = await sharp(out).metadata()
+          expect(m.width).toBe(MAT_CANVAS)
+          expect(m.height).toBe(MAT_CANVAS)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/lib/image-processing-mat.test.ts
+    expected_result: FAIL - matToSquare is not exported from src/lib/image-processing
+    status: pending
+  - id: 3
+    action: implement
+    description: Add matToSquare() alongside the existing exports
+    file: packages/api/src/lib/image-processing.ts
+    status: pending
+    code: |
+      import { MAT_COLOR, MAT_CANVAS, MAT_ART_INSET } from '@chobii/shared'
+
+      /**
+       * Composite artwork of ANY aspect ratio onto an opaque square mat.
+       *
+       * Output is always MAT_CANVAS x MAT_CANVAS - this is the invariant the product
+       * grid rests on. Art is contained (never cropped) at MAT_ART_INSET of the
+       * longest side, so every product shows a visible mat and square art does not
+       * bleed to the card edge.
+       *
+       * Small sources are NOT upscaled: they sit smaller on the mat rather than being
+       * interpolated. Fake resolution is worse than a wider mat.
+       */
+      export async function matToSquare(input: Buffer): Promise<Buffer> {
+        const inner = Math.round(MAT_CANVAS * MAT_ART_INSET)
+
+        const art = await sharp(input)
+          .resize(inner, inner, { fit: 'inside', withoutEnlargement: true })
+          .toBuffer()
+
+        return sharp({
+          create: {
+            width: MAT_CANVAS,
+            height: MAT_CANVAS,
+            channels: 3,
+            background: MAT_COLOR,
+          },
+        })
+          .composite([{ input: art, gravity: 'centre' }])
+          .webp({ quality: 88 })
+          .toBuffer()
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm all mat tests pass
+    command: cd packages/api && bunx vitest run tests/lib/image-processing-mat.test.ts
+    expected_result: PASS - 14 tests (4 ratios x 3 assertions + 2 edge cases)
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the existing image-processing and storage tests still pass (processImage untouched)
+    command: cd packages/api && bunx vitest run tests/lib/
+    expected_result: PASS - no regressions in razorpay/redis/storage/session-cookie tests
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit matToSquare
+    command: 'git add packages/api/src/lib/image-processing.ts packages/api/tests/lib/image-processing-mat.test.ts && git commit -m "feat(api): mat any-ratio artwork onto a square canvas"'
+    status: pending
+current_step: 1

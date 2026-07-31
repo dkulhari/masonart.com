@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-07-29T06:23:17.366Z'
-total_tickets: 13
+last_updated: '2026-07-31T03:42:29.410Z'
+total_tickets: 22
 summary:
   critical: 1
-  high: 3
-  medium: 6
-  low: 3
+  high: 6
+  medium: 10
+  low: 5
 priorities:
   high:
     - feature: go-live
@@ -30,8 +30,22 @@ priorities:
           title: 'Ops: point UptimeRobot monitors at https://chobii.art'
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 334
-          title: 'Ops: Cloudflare redirect rule www.chobii.art -> chobii.art (301)'
+    - feature: product-grid-alignment
+      tickets:
+        - ticket_number: 364
+          title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 365
+          title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 366
+          title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 367
+          title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
           assignee: unassigned
           blocked_by: []
   medium:
@@ -58,16 +72,30 @@ priorities:
           title: 'DECISION: order numbers still use the masonart MA- prefix after the rebrand'
           assignee: unassigned
           blocked_by: []
-    - feature: content-manager-role
+    - feature: product-grid-alignment
       tickets:
-        - ticket_number: 362
-          title: Role-aware two-way navigation between the store and the staff area
+        - ticket_number: 368
+          title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
           assignee: unassigned
           blocked_by: []
-    - feature: admin-panel
-      tickets:
-        - ticket_number: 363
-          title: 'Admin customers: per-field filtering incl. joined date range, server-side'
+        - ticket_number: 369
+          title: Admin upload - Square crop and zoom control for photographic media
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 370
+          title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 371
+          title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 372
+          title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 373
+          title: Styling - Adopt the measured mesonart token set
           assignee: unassigned
           blocked_by: []
   low:
@@ -88,6 +116,16 @@ priorities:
       tickets:
         - ticket_number: 360
           title: 'Product grid card sizing: residual height variance + home/listing ratio mismatch'
+          assignee: unassigned
+          blocked_by: []
+    - feature: product-grid-alignment
+      tickets:
+        - ticket_number: 374
+          title: Seed - Reseed the 40 dev products into the new ProductImage shape
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 375
+          title: E2E - Row alignment regression spec across breakpoints
           assignee: unassigned
           blocked_by: []
   critical:

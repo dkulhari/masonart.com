@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-07-29T06:23:17.561Z'
-total_tickets: 316
+last_updated: '2026-07-31T03:42:30.234Z'
+total_tickets: 319
 summary:
   critical: 21
-  high: 113
-  medium: 135
+  high: 114
+  medium: 137
   low: 47
 priorities:
   high:
@@ -492,6 +492,10 @@ priorities:
           title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 334
+          title: 'Ops: Cloudflare redirect rule www.chobii.art -> chobii.art (301)'
+          assignee: unassigned
+          blocked_by: []
     - feature: rebrand-chobi-art
       tickets:
         - ticket_number: 298
@@ -567,6 +571,10 @@ priorities:
           blocked_by: []
         - ticket_number: 190
           title: 'Bug: Admin orders date filter test fails due to hydration timing'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 363
+          title: 'Admin customers: per-field filtering incl. joined date range, server-side'
           assignee: unassigned
           blocked_by: []
     - feature: seo
@@ -1186,6 +1194,10 @@ priorities:
               title: Backend API - Admin customers list + role-assignment endpoints
             - ticket_number: 326
               title: Frontend - Role-aware admin layout with content-manager section guards
+        - ticket_number: 362
+          title: Role-aware two-way navigation between the store and the staff area
+          assignee: unassigned
+          blocked_by: []
     - feature: frontend-ui
       tickets:
         - ticket_number: 338

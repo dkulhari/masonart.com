@@ -1,0 +1,135 @@
+ticket_number: 371
+title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+description: |-
+  ## Task
+
+  Rebuild the card shell around the new media component, and **delete the ratio machinery** rather than adapt it. This is where defects D2 and D3 are resolved.
+
+  **D2 - ragged card bottoms.** The `<a>` is the grid item and stretches, but the inner `div.card-hover` carrying `border border-border bg-card` is content-height, so cards whose products have style tags render taller. Mesonart's `.product-card--standard` is `background: transparent` with `border: 0` - the matted image **is** the card. Adopting that deletes the bordered wrapper entirely, so there is nothing left to be ragged. D2 dissolves rather than being patched.
+
+  **D3 - skeleton shift.** `ProductCard.tsx:222` hardcodes `aspect-[2/3]` regardless of the prop, so the home page shifts on load. Extract the skeleton and have it import `MEDIA_RATIO`, making a future mismatch impossible.
+
+  **Deletions:**
+  - `ASPECT_RATIO_MAP` (`ProductCard.tsx:59-65`)
+  - the `uniformAspectRatio` prop and its type union
+  - the `size` variant map ('sm'/'md'/'lg') - one ratio means it has no job
+  - `div.card-hover border border-border bg-card rounded-lg`
+
+  `product.orientation` stays on the product as merchandising metadata (it drives filters and the detail page) but stops touching layout.
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 4 - Card and grid
+  Depends on: T7
+
+  Current file is 241 lines; the split keeps each piece focused:
+  ```
+  ProductCard.tsx          shell: media + title + price + badges   ~120
+  ProductCardSkeleton.tsx  extracted, imports MEDIA_RATIO           ~30
+  ```
+
+  Content block keeps `grow` so it absorbs the slack when grid stretches the card - that is what makes rows align without any min-height or line-clamp.
+
+  ## Acceptance criteria
+  - No `aspect-[` literal remains anywhere in the product components except via MEDIA_RATIO
+  - Skeleton and resolved card occupy an identical box
+  - No bordered wrapper; the mat is the card surface
+  - Badges (featured / AI) still render
+feature: product-grid-alignment
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:41:13.742Z'
+last_updated: '2026-07-31T03:41:13.742Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 370
+    feature: product-grid-alignment
+    description: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests pinning the skeleton/card ratio agreement and the deletions
+    file: packages/web/tests/components/product/ProductCard.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCard.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { render } from '@testing-library/react'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+      import { MEDIA_RATIO } from '~/components/product/productCardTokens'
+      import { ProductCardSkeleton } from '~/components/product/ProductCardSkeleton'
+
+      const read = (f: string) => readFileSync(join(process.cwd(), 'app/components/product', f), 'utf8')
+
+      describe('ratio machinery is gone', () => {
+        it('ProductCard no longer defines ASPECT_RATIO_MAP', () => {
+          expect(read('ProductCard.tsx')).not.toContain('ASPECT_RATIO_MAP')
+        })
+        it('ProductCard no longer accepts uniformAspectRatio', () => {
+          expect(read('ProductCard.tsx')).not.toContain('uniformAspectRatio')
+        })
+        it('no hardcoded aspect- literal outside the tokens file', () => {
+          for (const f of ['ProductCard.tsx', 'ProductCardSkeleton.tsx', 'ProductCardMedia.tsx']) {
+            expect(read(f)).not.toMatch(/aspect-\[/)
+          }
+        })
+        it('the bordered card wrapper is gone', () => {
+          expect(read('ProductCard.tsx')).not.toContain('border-border')
+        })
+      })
+
+      describe('ProductCardSkeleton', () => {
+        it('reserves the same box as the real card (D3)', () => {
+          const { container } = render(<ProductCardSkeleton />)
+          expect(container.querySelector(`.${MEDIA_RATIO}`)).toBeTruthy()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCard.test.tsx
+    expected_result: FAIL - ProductCardSkeleton module missing and ASPECT_RATIO_MAP still present
+    status: pending
+  - id: 3
+    action: implement
+    description: 'Extract the skeleton into its own file importing MEDIA_RATIO, so it can never disagree with the card again. Structure: outer animate-pulse div, a MEDIA_RATIO + bg-muted block for the media, then title/price bars matching the card''s content spacing. No border, no card-hover wrapper.'
+    file: packages/web/app/components/product/ProductCardSkeleton.tsx
+    status: pending
+  - id: 4
+    action: implement
+    description: 'Rewrite ProductCard as a thin shell. Delete ASPECT_RATIO_MAP, the uniformAspectRatio prop and the sizeStyles map. Root is <li className=''group/card relative flex flex-col leading-none''> (grid item, stretches). Render <ProductCardMedia images slug title /> then a content div ''flex w-full grow flex-col justify-start text-left'' - grow is what absorbs grid stretch slack. Inside: title link (Poppins 500, 16px/20px, centred per the mesonart spec) and price. Keep the featured/AI badges, absolutely positioned over the media. Import ProductImage from @chobii/shared; read altText not alt, and select the main image via type===''main'' rather than isPrimary, falling back to sortOrder 0.'
+    file: packages/web/app/components/product/ProductCard.tsx
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the card tests pass
+    command: cd packages/web && bunx vitest run tests/components/product/
+    expected_result: PASS - all product component tests
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Typecheck surfaces every remaining call-site of the deleted props
+    command: cd /Users/dhruv/work/masonart.com && bun run typecheck 2>&1 | grep -E 'uniformAspectRatio|isPrimary|ProductCardSkeleton' | head -20
+    expected_result: Lists routes/posters/index.tsx and routes/index.tsx - both fixed in T9
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the card shell and skeleton
+    command: 'git add packages/web/app/components/product packages/web/tests/components/product && git commit -m "refactor(web): delete ratio machinery, extract skeleton, drop card chrome"'
+    status: pending
+current_step: 1

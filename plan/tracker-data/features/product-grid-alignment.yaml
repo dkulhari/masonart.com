@@ -1,0 +1,225 @@
+name: product-grid-alignment
+title: Product Grid Alignment
+priority: medium
+created: '2026-07-31T03:32:11.517Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+
+  Make the storefront product grid hold perfect rows despite mixed source aspect ratios, add a multi-image hover reveal, and bring the card's visual styling to measured parity with mesonart.com.
+
+  The mechanism is a change of ownership: aspect ratio moves from a per-call-site prop to a **pipeline-guaranteed invariant**. Every stored product image becomes 1500x1500. The frontend then needs no ratio logic at all, and the machinery that existed to manage the variation is deleted rather than extended.
+
+  Full design spec (approved, committed as d5be8533):
+  `docs/superpowers/specs/2026-07-30-product-grid-alignment-design.md`
+  Research basis (measured reverse-engineering of mesonart.com):
+  `docs/research/mesonart-grid/README.md`
+
+  ## Goals
+
+  - Rows align in every grid, at every breakpoint, regardless of source artwork orientation
+  - Hover reveals additional product media, positioned by cursor X, with zero card reflow
+  - Card styling matches mesonart.com's measured token set
+  - Delete the ratio-management code (`ASPECT_RATIO_MAP`, `uniformAspectRatio`) rather than adding another branch to it
+
+  ## Problem being fixed
+
+  Three recorded defects, all traceable to ratio being decided at three separate call sites:
+
+  - **D1** Conflicting ratios in production: `routes/posters/index.tsx:523` passes `aspect-[2/3]`; `routes/index.tsx:251` passes `aspect-[3/4]`
+  - **D2** Card chrome does not stretch: the `<a>` is the grid item and stretches, but the inner `div.card-hover` carrying `border border-border bg-card` is content-height, so cards with style tags render taller — ragged bottom edges within a row
+  - **D3** Skeleton ratio hardcoded to `aspect-[2/3]` (`ProductCard.tsx:222`), causing a guaranteed layout shift on the home page
+
+  Missing capability: no multi-image hover.
+
+  ## Scope
+
+  **In scope**
+  - Collapse three divergent `ProductImage` shapes into one shared type; `type` replaces `isPrimary`; add `crop` and `originalKey`
+  - `matToSquare()` and `cropToSquare()` in `packages/api/src/lib/image-processing.ts`
+  - Product upload orchestrator branching on image type; reuses existing `processImage()` / `uploadOptimizedImage()` unchanged
+  - Retain unprocessed originals under an `originals/` prefix (load-bearing: crops must stay revisable)
+  - Admin multi-image upload: per-file `type` selector, square crop/zoom control for photographic types, drag reorder, low-resolution warning
+  - Rewrite `ProductCard` into 5 focused files; add cursor-X hover scrub, N-1 dots, quick-add/quick-view reveal
+  - Delete `ASPECT_RATIO_MAP`, the `uniformAspectRatio` prop, the `size` variant map, and the bordered card wrapper
+  - Adopt mesonart's measured tokens (Poppins/Urbanist, neutral-900 on white, #fafafa mat, fluid 10-20px radius, .5s cubic-bezier(.3,1,.3,1))
+  - Reseed the 40 dev products into the new shape
+  - Unit, component and an e2e row-alignment regression test
+
+  **Out of scope**
+  - Removing the 125 unreachable `dark:` utilities and the `.dark` block (unrelated cleanup)
+  - Auto-generated or AI-generated room mockups
+  - Focal-point editing for `type: 'main'` (never cropped, so nothing to focus)
+  - Editable crop after upload (`originalKey` makes it possible later; no UI now)
+  - Quick-view drawer behaviour (button appearance and reveal only)
+  - Product detail page ratio (keeps natural ratio)
+  - Video media slides (contract permits, no implementation)
+
+  ## Design
+
+  **Approach**: pipeline-guaranteed square asset contract + CSS Grid stretch.
+
+  Two mechanisms, both measured from mesonart:
+  1. Ratio lives on the **in-flow `<img>`**, not the wrapper. One image per card sits in normal flow with `aspect-square` and *is* the media box's height. All hover slides are `position:absolute; inset:0` and cannot contribute height.
+  2. Rows align by **grid stretch**, not by height-locking text. Mesonart's own card heights differ (measured 359.88 / 376.88 / 379.88px); rows still align because grid sizes each row to its tallest item. Verified across 104 cards: within every row all heights identical, between rows they differ.
+
+  Consequence: no `min-height`, no `line-clamp`, no ratio branching needed for alignment.
+
+  **Key decisions**
+
+  - **1:1 square target**, chosen for orientation neutrality rather than minimum mat. At the 88% inset it is the only ratio with a 0-point portrait/landscape spread (both 48.4% mat) and the only one where square art is not letterboxed (22.6%). A 4:5 box frames portrait better (35.5%) but penalises landscape by 23 points; 26 of 40 products are square, landscape or panoramic.
+  - **Artwork is matted, never cropped**: `fit:'contain'` at 88% inset on a flat mat. The 88% inset guarantees a visible mat on every product so square art does not bleed while portrait art floats.
+  - **Photographs fill the square via a human-chosen crop**: the rule is "never crop *blindly*", not "never crop". The uploader picks zoom and position; the rect is stored normalised 0..1 against the original.
+  - **All media are square, including room mockups** — so no hover slide can ever differ from the box.
+  - **Hover images are human-uploaded**, not auto-composited.
+  - **Dark mode dropped**: nothing in the codebase sets the `.dark` class — no provider, no toggle, no `classList.add('dark')`. Already unreachable.
+  - **Styling identical to mesonart**, full measured token set in the spec's Appendix A.
+  - **No data migration** — product is pre-launch; reseed rather than migrate.
+
+  ## Technical considerations
+
+  - **One cross-boundary coupling, the main rot risk**: the mat colour exists both as `MAT_COLOR` baked into pixels by sharp, and as the `bg-mat` CSS token shown during load. If they drift, every card flashes one colour then settles to another. Mitigated by a single exported constant in `@chobii/shared` consumed by both, with a unit test asserting they resolve to the same RGB.
+  - Pipeline is an **extension, not greenfield**: `sharp@^0.34.5`, `processImage()`, `IMAGE_SIZES`, `uploadOptimizedImage()` and `StoragePaths` all already exist and are reused unchanged.
+  - `processImage()` is deliberately left untouched — it also serves avatars and AI generations, where squaring would be wrong. A thin orchestrator sits beside it on the product path only.
+  - Processing runs **inline, no queue**: one image per request at ~400ms.
+  - `sizes` must be set on every image. Mesonart omits it, causing a measured 6.7x over-fetch (1080w into a 160.75px card).
+  - Stack is **TanStack Router/Start**, not React Router v7 (root CLAUDE.md is stale on this point).
+  - New web dependency: `react-easy-crop` (~15KB) for the admin crop control.
+  - `product.orientation` stays as merchandising metadata (drives filters and the detail page) but stops touching layout.
+
+  ## Relationship to other features
+
+  - **Supersedes `hero-grid-alignment`**: that feature introduced the `uniformAspectRatio` prop (tickets #287-289) which this design deletes in favour of the pipeline invariant.
+  - **Absorbs ticket #360** ("Product grid card sizing: residual height variance + home/listing ratio mismatch"). #360 independently identified D1 and D3 and reached the same conclusion about grid stretch. Its two acceptance criteria become verification checks here rather than separate work.
+  - **Extends `image-cdn-storage`**: reuses that feature's storage and WebP/srcset pipeline; adds the squaring step.
+  - **Distinct from `room-visualization`**: that is a customer-facing feature where the shopper uploads their own room. Here, room mockups are admin-curated product media.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    '364': Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+    '365': 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+    '366': 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+    '367': API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+    '368': Admin upload - Per-file type selector, drag reorder, low-resolution warning
+    '369': Admin upload - Square crop and zoom control for photographic media
+    '370': Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+    '371': Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+    '372': Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+    '373': Styling - Adopt the measured mesonart token set
+    '374': Seed - Reseed the 40 dev products into the new ProductImage shape
+    '375': E2E - Row alignment regression spec across breakpoints
+  in_progress: {}
+  done: {}
+total_tickets: 12
+completion_percentage: 0
+is_completed: false
+design:
+  approach: Pipeline-guaranteed square asset contract plus CSS Grid stretch. Every stored product image is processed to 1500x1500 at upload, so aspect ratio stops being a frontend decision. Within a card, exactly one image sits in normal flow carrying aspect-square — it IS the media box's height — while all hover slides are position:absolute inset-0 and cannot contribute height. Rows then align purely because CSS Grid sizes each row to its tallest item and stretches the rest; no min-height or line-clamp is needed. This lets ASPECT_RATIO_MAP, the uniformAspectRatio prop and the non-stretching bordered card wrapper all be deleted rather than extended. Artwork is matted (contain at 88% inset, never cropped); photographic media fills the square via a crop window the uploader chooses. Styling targets measured parity with mesonart.com.
+  decisions:
+    - Target ratio 1:1
+    - 'chosen for orientation neutrality rather than minimum mat: at the 88% inset it is the only candidate with a 0-point portrait/landscape spread (both 48.4% mat area) and the only one where square art is not letterboxed (22.6%). A 4:5 box frames portrait art better (35.5%) but penalises landscape by 23 points and panoramic by 9; 26 of 40 products are square'
+    - landscape or panoramic.
+    - Aspect ratio is declared on the in-flow <img>
+    - not on a wrapper. No padding-top percentage hack and no aspect-ratio on the wrapper — verified on mesonart
+    - whose a.media computes aspect-ratio:auto and padding-top:0 while still being exactly square.
+    - Rows align by CSS Grid stretch
+    - 'not by height-locking the text block. Measured on mesonart across 104 cards: within every row all card heights are identical'
+    - between rows they differ (359.88 / 376.88 / 379.88px). Therefore no min-height and no line-clamp are required for alignment.
+    - Artwork (type:'main') is matted with fit:'contain' at 88% inset and is never cropped. The 88% inset — rather than plain contain — guarantees a visible mat on every product
+    - so square art does not bleed to the edge while portrait art floats.
+    - Photographic media (room-mockup
+    - detail
+    - texture
+    - frame-preview) fills the square edge-to-edge with no mat
+    - using a crop window the uploader selects. The rule is 'never crop blindly'
+    - not 'never crop'. The rect is stored normalised 0..1 against the original so it survives re-encoding.
+    - Every stored image is square including room mockups
+    - so no hover slide can differ from the box. This is the invariant the whole frontend rests on; a dev-only assertion logs loudly on any ProductImage where width !== height rather than silently cropping or double-matting.
+    - Hover images are human-uploaded. Auto-compositing artwork into flat-on room templates was designed and rejected — sharp has no perspective transform
+    - and manual curation was preferred.
+    - Three divergent ProductImage shapes (shared type
+    - DB jsonb
+    - web component) collapse into one. The shared type wins; 'type' replaces 'isPrimary'; width/height become required; crop and originalKey are added.
+    - 'Unprocessed originals are retained under an originals/ prefix. This is load-bearing rather than insurance: re-cropping and re-matting both require the untouched source.'
+    - processImage() is left untouched and a thin orchestrator sits beside it on the product path only
+    - because processImage also serves avatars and AI generations where squaring would be wrong.
+    - 'Image processing runs inline with no BullMQ queue: one image per request at roughly 400ms.'
+    - Dark mode is dropped. Nothing in the codebase sets the .dark class — no theme provider
+    - no toggle
+    - 'no classList.add(''dark'') — so the .dark block and 125 dark: utilities across 6 files are already unreachable dead code.'
+    - 'Styling targets measured parity with mesonart.com: Poppins/Urbanist (both free Google Fonts)'
+    - neutral-900 on white
+    - '#fafafa mat'
+    - fluid clamp(10px
+    - 1.053vw
+    - 20px) radius
+    - gap 20px/13.5px
+    - .5s cubic-bezier(.3
+    - '1'
+    - '.3'
+    - '1) primary easing. Accepted consequences: the mat is only ~2% contrast on a white page'
+    - and the amber brand colour leaves the card in favour of neutral-900 CTAs.
+    - 'Deliberate divergences from mesonart: set sizes on every image (their omission causes a measured 6.7x over-fetch)'
+    - unmount hover slides below md rather than display:none them
+    - preserve keyboard reachability
+    - and gate transitions behind motion-safe.
+    - Roll the hover crossfade by hand rather than adopt a carousel library. Mesonart uses Flickity with draggable:false
+    - so there is no gesture and no continuous motion to preserve — about 20 lines of opacity crossfade replaces roughly 25KB.
+    - No data migration. The product is pre-launch
+    - so the 40 dev products are reseeded into the new shape rather than migrated; no compatibility shim and no rollback path.
+  approved: true
+  approved_at: '2026-07-31T03:32:36.592Z'
+plan:
+  phases:
+    - name: Shared contract
+      location: packages/shared/src/types
+      tickets:
+        - 364
+      note: Blocks every other ticket. Collapses three ProductImage shapes into one and adds MAT_COLOR/MAT_CANVAS/MAT_ART_INSET.
+    - name: API image pipeline
+      location: packages/api/src/lib
+      tickets:
+        - 365
+        - 366
+        - 367
+      note: matToSquare (artwork, matted, never cropped) and cropToSquare (photographs, human-chosen window), wired into the product upload path by an orchestrator that leaves processImage untouched.
+    - name: Admin upload
+      location: packages/web/app/components/admin
+      tickets:
+        - 368
+        - 369
+      note: Per-file type selector, ordering, resolution warning; plus the square crop/zoom control that makes 'never crop blindly' true. Adds react-easy-crop.
+    - name: Card and grid
+      location: packages/web/app/components/product
+      tickets:
+        - 370
+        - 371
+        - 372
+      note: Square media box with cursor-X hover scrub; card shell with the ratio machinery deleted; one canonical grid. Resolves defects D1, D2 and D3.
+    - name: Styling
+      location: packages/web/app/styles
+      tickets:
+        - 373
+      note: Measured mesonart token set. Includes the guard asserting MAT_COLOR and --mat resolve to the same RGB.
+    - name: Seed
+      location: packages/api/src/database
+      tickets:
+        - 374
+      note: Reseed, not migrate - product is pre-launch. Adds one 4-image fixture so the hover path is exercisable.
+    - name: E2E
+      location: tests/e2e
+      tickets:
+        - 375
+      note: Row-height uniformity and square media across 1440/1024/375. The test that actually protects what this feature buys.
+  generated_at: '2026-07-31T03:43:41.010Z'

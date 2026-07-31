@@ -1,0 +1,245 @@
+ticket_number: 370
+title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+description: |-
+  ## Task
+
+  Build the square media box and the hover interaction. This is the only stateful part of the card, which is why it gets its own file.
+
+  **Structure that makes rows align** - one in-flow image sets the height, every hover slide is absolute and cannot:
+
+  ```
+  <Link>                              relative, overflow-hidden, bg-mat, rounded
+    <img>            images[0]        IN FLOW: w-full aspect-square -> defines box height
+    <img> x N        images[1..]      absolute inset-0, opacity 0/1 crossfade
+    <dots>                            N-1 dots, absolute
+  ```
+
+  **Hover scrub**, generalised past mesonart's hardcoded `mediaCount === 2|3|4`:
+
+  ```ts
+  function zoneFor(clientX, el, n) {
+    const { left, width } = el.getBoundingClientRect()
+    const zones = n - 1          // slide 0 is the rest state, unreachable while hovering
+    return Math.min(zones, Math.max(1, Math.ceil(((clientX - left) / width) * zones)))
+  }
+  ```
+
+  Measured on mesonart, entering fresh at 8 cursor fractions: `0.02/0.10/0.20 -> 1`, `0.35/0.50/0.65 -> 2`, `0.80/0.98 -> 3`. Not time-based - holding still for 5.6s kept the index frozen.
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 4 - Card and grid
+  Depends on: T1
+
+  Routing is **TanStack Router** (`@tanstack/react-router`), not React Router - the root CLAUDE.md is stale on this.
+
+  Deliberate divergences from mesonart, all justified in the spec:
+  - set `sizes` on every image (their omission causes a measured 6.7x over-fetch)
+  - unmount hover slides below `md` rather than `display:none` them (they download 4 unused images per card on mobile)
+  - keep keyboard reachability; dots are `aria-hidden` decorative, since every image is reachable on the product page
+  - gate transitions behind `motion-safe:`
+  - `object-contain`, not `object-cover`: the pipeline guarantees square, so this never fires - but if a bad asset slips through, `cover` would silently crop it. Pair with a dev-only assertion that logs on `width !== height`.
+
+  ## Acceptance criteria
+  - One image renders a plain card with no hover affordances
+  - Two or more images crossfade on hover, index driven by cursor X
+  - Pointer-leave returns to slide 0
+  - Touch pointers are ignored (`pointerType !== 'mouse'`), so a tap navigates rather than swapping
+  - Card footprint is pixel-identical at rest and during hover
+feature: product-grid-alignment
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:41:11.328Z'
+last_updated: '2026-07-31T03:41:11.328Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 364
+    feature: product-grid-alignment
+    description: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Create the shared token constants
+    file: packages/web/app/components/product/productCardTokens.ts
+    status: pending
+    code: |
+      /** Single source of truth for card media geometry and motion. */
+
+      /** The square invariant, in Tailwind form. Skeleton and card MUST share this. */
+      export const MEDIA_RATIO = 'aspect-square'
+
+      /**
+       * Mesonart omits sizes entirely, causing a measured 6.7x over-fetch
+       * (1080w into a 160.75px card at 375px). Column counts: 2 / md:3 / xl:4.
+       */
+      export const SIZES_ATTR = '(min-width:1280px) 25vw, (min-width:768px) 33vw, 50vw'
+
+      /** --animation-primary: .5s cubic-bezier(.3, 1, .3, 1) */
+      export const EASE_PRIMARY = 'ease-[cubic-bezier(.3,1,.3,1)]'
+
+      /** --animation-fast: .3s cubic-bezier(.7, 0, .3, 1) */
+      export const EASE_FAST = 'ease-[cubic-bezier(.7,0,.3,1)]'
+
+      /** Divide the media box into n-1 zones; slide 0 is the not-hovered state. */
+      export function zoneFor(clientX: number, el: HTMLElement, n: number): number {
+        if (n < 2) return 0
+        const { left, width } = el.getBoundingClientRect()
+        if (width <= 0) return 1
+        const zones = n - 1
+        const raw = Math.ceil(((clientX - left) / width) * zones)
+        return Math.min(zones, Math.max(1, raw || 1))
+      }
+  - id: 2
+    action: write-test
+    description: Write failing tests for the zone math against mesonart's measured thresholds
+    file: packages/web/tests/components/product/zoneFor.test.ts
+    command: cd packages/web && bunx vitest run tests/components/product/zoneFor.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { zoneFor } from '~/components/product/productCardTokens'
+
+      const el = (left = 0, width = 100) =>
+        ({ getBoundingClientRect: () => ({ left, width }) }) as unknown as HTMLElement
+
+      describe('zoneFor', () => {
+        // measured on mesonart with 4 media, entering fresh at each fraction
+        it.each([
+          [0.02, 1], [0.10, 1], [0.20, 1],
+          [0.35, 2], [0.50, 2], [0.65, 2],
+          [0.80, 3], [0.98, 3],
+        ])('4 media, x=%s -> slide %i', (frac, expected) => {
+          expect(zoneFor(frac * 100, el(), 4)).toBe(expected)
+        })
+
+        it.each([[0.2, 1], [0.49, 1], [0.51, 2], [0.9, 2]])('3 media, x=%s -> slide %i', (frac, expected) => {
+          expect(zoneFor(frac * 100, el(), 3)).toBe(expected)
+        })
+
+        it('2 media always selects slide 1', () => {
+          for (const f of [0.01, 0.5, 0.99]) expect(zoneFor(f * 100, el(), 2)).toBe(1)
+        })
+
+        it('generalises past mesonart, which hardcodes 2|3|4 and no-ops for 5+', () => {
+          expect(zoneFor(0.1 * 100, el(), 6)).toBe(1)
+          expect(zoneFor(0.99 * 100, el(), 6)).toBe(5)
+        })
+
+        it('returns 0 for a single image (no hover)', () => {
+          expect(zoneFor(50, el(), 1)).toBe(0)
+        })
+
+        it('respects a non-zero element offset', () => {
+          expect(zoneFor(500 + 10, el(500, 100), 4)).toBe(1)
+          expect(zoneFor(500 + 90, el(500, 100), 4)).toBe(3)
+        })
+
+        it('clamps a cursor outside the box', () => {
+          expect(zoneFor(-50, el(), 4)).toBe(1)
+          expect(zoneFor(9999, el(), 4)).toBe(3)
+        })
+      })
+  - id: 3
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bunx vitest run tests/components/product/zoneFor.test.ts
+    expected_result: FAIL if tokens file absent; otherwise PASS once step 1 landed - in that case write the component test first
+    status: pending
+  - id: 4
+    action: write-test
+    description: Write failing component tests for slide stacking, hover behaviour and touch exemption
+    file: packages/web/tests/components/product/ProductCardMedia.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCardMedia.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { render, screen, fireEvent } from '@testing-library/react'
+      import type { ProductImage } from '@chobii/shared'
+      import { ProductCardMedia } from '~/components/product/ProductCardMedia'
+
+      const img = (i: number): ProductImage => ({
+        id: `i${i}`, url: `/img${i}.webp`, altText: `alt ${i}`,
+        type: i === 0 ? 'main' : 'room-mockup', sortOrder: i,
+        width: 1500, height: 1500, originalKey: `o${i}`,
+      })
+      const many = (n: number) => Array.from({ length: n }, (_, i) => img(i))
+
+      describe('ProductCardMedia', () => {
+        it('renders exactly one in-flow image that carries the ratio', () => {
+          const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+          const inFlow = container.querySelectorAll('img:not(.absolute)')
+          expect(inFlow).toHaveLength(1)
+          expect(inFlow[0].className).toContain('aspect-square')
+        })
+
+        it('renders hover slides absolutely so they cannot affect height', () => {
+          const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+          const abs = container.querySelectorAll('img.absolute')
+          expect(abs).toHaveLength(3)
+          abs.forEach((el) => expect(el.className).toContain('inset-0'))
+        })
+
+        it('renders no hover affordances for a single image', () => {
+          const { container } = render(<ProductCardMedia images={many(1)} slug="s" title="t" />)
+          expect(container.querySelectorAll('img.absolute')).toHaveLength(0)
+          expect(container.querySelector('[data-testid="card-dots"]')).toBeNull()
+        })
+
+        it('renders n-1 dots, matching mesonart hiding the first', () => {
+          render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+          expect(screen.getByTestId('card-dots').children).toHaveLength(3)
+        })
+
+        it('activates a slide on mouse pointermove and resets on leave', () => {
+          const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+          const box = container.querySelector('[data-testid="media-box"]')!
+          fireEvent.pointerMove(box, { pointerType: 'mouse', clientX: 90 })
+          expect(container.querySelectorAll('img.absolute.opacity-100')).toHaveLength(1)
+          fireEvent.pointerLeave(box)
+          expect(container.querySelectorAll('img.absolute.opacity-100')).toHaveLength(0)
+        })
+
+        it('ignores touch pointers so a tap navigates instead of swapping', () => {
+          const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+          const box = container.querySelector('[data-testid="media-box"]')!
+          fireEvent.pointerMove(box, { pointerType: 'touch', clientX: 90 })
+          expect(container.querySelectorAll('img.absolute.opacity-100')).toHaveLength(0)
+        })
+
+        it('sets sizes on every image', () => {
+          const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+          container.querySelectorAll('img').forEach((el) => expect(el.getAttribute('sizes')).toBeTruthy())
+        })
+      })
+  - id: 5
+    action: implement
+    description: 'Build ProductCardMedia. Props { images, slug, title }. One useState<number>(0) for the active slide. Root is a TanStack <Link to=''/posters/$slug'' params={{slug}}> with data-testid=''media-box'', aria-label={title}, tabIndex={-1}, className ''relative block overflow-hidden rounded-[var(--card-radius)] bg-mat'', onPointerMove (guarded on pointerType===''mouse'') calling setActive(zoneFor(...)), onPointerLeave resetting to 0. First child: images[0] as a normal in-flow <img> with ''block w-full '' + MEDIA_RATIO + '' object-contain'', width/height from the record, loading=''lazy'', decoding=''async'', sizes={SIZES_ATTR}. Then images.slice(1) each as <img className=''absolute inset-0 hidden h-full w-full object-contain md:block motion-safe:transition-opacity motion-safe:duration-500 '' + EASE_PRIMARY + (active===i+1 ? '' opacity-100'' : '' opacity-0'')} alt='''' aria-hidden. Finally, when images.length > 1, a dots pill with data-testid=''card-dots'' holding images.length-1 spans. In dev only, useEffect asserting every image satisfies isSquare() and console.error-ing the offenders by id - enforce the invariant loudly rather than letting object-contain hide it.'
+    file: packages/web/app/components/product/ProductCardMedia.tsx
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Confirm both test files pass
+    command: cd packages/web && bunx vitest run tests/components/product/
+    expected_result: PASS - zoneFor 20 assertions, ProductCardMedia 7 tests
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit tokens and media component
+    command: 'git add packages/web/app/components/product/productCardTokens.ts packages/web/app/components/product/ProductCardMedia.tsx packages/web/tests/components/product && git commit -m "feat(web): square media box with cursor-X hover scrub"'
+    status: pending
+current_step: 1

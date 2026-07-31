@@ -1,0 +1,198 @@
+ticket_number: 366
+title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+description: |-
+  ## Task
+
+  Add `cropToSquare()`. Photographs (room mockups, detail and texture shots) fill the square **edge-to-edge with no mat** - matting a photograph makes it look letterboxed. The framing is chosen by a human at upload (T6), passed here as a normalised 0..1 rect against the original.
+
+  The governing rule for the whole feature is "never crop **blindly**", not "never crop". Artwork is matted by T2; photographs are cropped, but only to a window a person selected.
+
+  Must clamp defensively: a rect from the client can be out of range, zero-area, or extend past the source edge.
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 2 - API image pipeline
+  Depends on: T1 (imports ImageCrop, MAT_CANVAS from @chobii/shared)
+
+  Same file as T2. `sharp.extract()` takes pixel coordinates, so the normalised rect is multiplied by the source metadata dimensions and rounded.
+
+  Default when no crop is supplied: the largest centred square. That keeps a careless upload sane and matches the admin UI's default framing.
+feature: product-grid-alignment
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:38:16.388Z'
+last_updated: '2026-07-31T03:38:16.388Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - images
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 364
+    feature: product-grid-alignment
+    description: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for rect honouring, clamping and the centred-square default
+    file: packages/api/tests/lib/image-processing-crop.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/image-processing-crop.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import sharp from 'sharp'
+      import { MAT_CANVAS } from '@chobii/shared'
+      import { cropToSquare, centredSquareCrop } from '../../src/lib/image-processing'
+
+      /** Left half red, right half blue - lets us prove WHICH region was kept. */
+      async function halves(w: number, h: number) {
+        const left = { create: { width: w / 2, height: h, channels: 3, background: { r: 255, g: 0, b: 0 } } }
+        const right = { create: { width: w / 2, height: h, channels: 3, background: { r: 0, g: 0, b: 255 } } }
+        return sharp({ create: { width: w, height: h, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+          .composite([
+            { input: await sharp(left).png().toBuffer(), left: 0, top: 0 },
+            { input: await sharp(right).png().toBuffer(), left: w / 2, top: 0 },
+          ]).png().toBuffer()
+      }
+
+      const centrePixel = async (buf: Buffer) => {
+        const { data } = await sharp(buf).resize(1, 1, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true })
+        return { r: data[0], g: data[1], b: data[2] }
+      }
+
+      describe('cropToSquare', () => {
+        it('outputs MAT_CANVAS x MAT_CANVAS webp', async () => {
+          const out = await cropToSquare(await halves(1600, 900), { x: 0, y: 0, w: 0.5, h: 1 })
+          const m = await sharp(out).metadata()
+          expect(m.width).toBe(MAT_CANVAS)
+          expect(m.height).toBe(MAT_CANVAS)
+          expect(m.format).toBe('webp')
+        })
+
+        it('honours the chosen window - left half yields red', async () => {
+          const out = await cropToSquare(await halves(1600, 900), { x: 0, y: 0, w: 0.4, h: 1 })
+          const px = await centrePixel(out)
+          expect(px.r).toBeGreaterThan(200)
+          expect(px.b).toBeLessThan(60)
+        })
+
+        it('honours the chosen window - right half yields blue', async () => {
+          const out = await cropToSquare(await halves(1600, 900), { x: 0.6, y: 0, w: 0.4, h: 1 })
+          const px = await centrePixel(out)
+          expect(px.b).toBeGreaterThan(200)
+          expect(px.r).toBeLessThan(60)
+        })
+
+        it('clamps a rect that overflows the source', async () => {
+          const out = await cropToSquare(await halves(1600, 900), { x: 0.9, y: 0.9, w: 0.5, h: 0.5 })
+          const m = await sharp(out).metadata()
+          expect(m.width).toBe(MAT_CANVAS)
+        })
+
+        it('clamps a zero-area rect instead of throwing', async () => {
+          const out = await cropToSquare(await halves(1600, 900), { x: 0.5, y: 0.5, w: 0, h: 0 })
+          const m = await sharp(out).metadata()
+          expect(m.width).toBe(MAT_CANVAS)
+        })
+
+        it('defaults to the largest centred square when no crop is given', async () => {
+          const out = await cropToSquare(await halves(1600, 900))
+          const m = await sharp(out).metadata()
+          expect(m.width).toBe(MAT_CANVAS)
+          expect(m.height).toBe(MAT_CANVAS)
+        })
+      })
+
+      describe('centredSquareCrop', () => {
+        it('takes full height and a centred slice of a landscape source', () => {
+          expect(centredSquareCrop(1600, 900)).toEqual({ x: (1600 - 900) / 2 / 1600, y: 0, w: 900 / 1600, h: 1 })
+        })
+        it('takes full width and a centred slice of a portrait source', () => {
+          expect(centredSquareCrop(900, 1600)).toEqual({ x: 0, y: (1600 - 900) / 2 / 1600, w: 1, h: 900 / 1600 })
+        })
+        it('is the whole frame for a square source', () => {
+          expect(centredSquareCrop(1000, 1000)).toEqual({ x: 0, y: 0, w: 1, h: 1 })
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/lib/image-processing-crop.test.ts
+    expected_result: FAIL - cropToSquare / centredSquareCrop are not exported
+    status: pending
+  - id: 3
+    action: implement
+    description: Add centredSquareCrop() and cropToSquare() with defensive clamping
+    file: packages/api/src/lib/image-processing.ts
+    status: pending
+    code: |
+      import type { ImageCrop } from '@chobii/shared'
+
+      /** The largest centred square of a source, as a normalised rect. */
+      export function centredSquareCrop(width: number, height: number): ImageCrop {
+        const side = Math.min(width, height)
+        return {
+          x: (width - side) / 2 / width,
+          y: (height - side) / 2 / height,
+          w: side / width,
+          h: side / height,
+        }
+      }
+
+      const clamp01 = (n: number) => Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0))
+
+      /**
+       * Crop a photograph to a square using a HUMAN-CHOSEN window, then resize to the
+       * canonical canvas. No mat: photographs fill the frame edge-to-edge.
+       *
+       * The rect is normalised 0..1 against the original so it survives re-encoding.
+       * Defends against out-of-range, zero-area and overflowing rects from the client;
+       * falls back to the largest centred square.
+       */
+      export async function cropToSquare(input: Buffer, crop?: ImageCrop): Promise<Buffer> {
+        const meta = await sharp(input).metadata()
+        const sw = meta.width ?? MAT_CANVAS
+        const sh = meta.height ?? MAT_CANVAS
+
+        const rect = crop ?? centredSquareCrop(sw, sh)
+
+        let left = Math.round(clamp01(rect.x) * sw)
+        let top = Math.round(clamp01(rect.y) * sh)
+        let width = Math.round(clamp01(rect.w) * sw)
+        let height = Math.round(clamp01(rect.h) * sh)
+
+        // keep the window inside the source and non-degenerate
+        width = Math.max(1, Math.min(width, sw - left))
+        height = Math.max(1, Math.min(height, sh - top))
+        left = Math.min(left, sw - width)
+        top = Math.min(top, sh - height)
+
+        return sharp(input)
+          .extract({ left, top, width, height })
+          .resize(MAT_CANVAS, MAT_CANVAS, { fit: 'fill' })
+          .webp({ quality: 88 })
+          .toBuffer()
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm all crop tests pass
+    command: cd packages/api && bunx vitest run tests/lib/image-processing-crop.test.ts
+    expected_result: PASS - 9 tests
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit cropToSquare
+    command: 'git add packages/api/src/lib/image-processing.ts packages/api/tests/lib/image-processing-crop.test.ts && git commit -m "feat(api): crop photographs to square using a human-chosen window"'
+    status: pending
+current_step: 1

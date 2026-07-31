@@ -1,0 +1,178 @@
+ticket_number: 364
+title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+description: |-
+  ## Task
+
+  Three incompatible `ProductImage` shapes exist today. Collapse them into one shared definition, because the whole feature depends on distinguishing `type: 'main'` from `type: 'room-mockup'`.
+
+  | Location | Current shape |
+  |---|---|
+  | `packages/shared/src/types/product.ts:328` | `{ id, url, thumbnailUrl?, altText, type, sortOrder, width?, height? }` |
+  | dev DB `products.images` jsonb | `{ id, url, alt, isPrimary, sortOrder, width, height }` |
+  | `packages/web/app/components/product/ProductCard.tsx:18` | `{ id, url, alt?, isPrimary?, webpUrl?, width?, height?, variants? }` |
+
+  The shared type wins. `isPrimary` is dropped (superseded by `type: 'main'` + `sortOrder`), `width`/`height` become required, `crop` and `originalKey` are added.
+
+  Also add the mat constants here rather than in the API, because they are the one value that must agree across the server/CSS boundary (see feature description, "one cross-boundary coupling").
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 1 - Shared contract (blocks every other ticket)
+
+  No migration needed - product is pre-launch, data is reseeded in T11.
+  After this lands, `packages/web` and `packages/api` must both import from `@chobii/shared`; no local redefinitions.
+feature: product-grid-alignment
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:38:09.425Z'
+last_updated: '2026-07-31T03:38:09.425Z'
+time_spent_minutes: 0
+labels:
+  - shared
+  - types
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test asserting the shared contract shape and mat constants
+    file: packages/shared/tests/types/product-image.test.ts
+    command: cd packages/shared && bunx vitest run tests/types/product-image.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { MAT_COLOR, MAT_CANVAS, MAT_ART_INSET, isSquare } from '../../src/types/product'
+      import type { ProductImage } from '../../src/types/product'
+
+      describe('mat constants', () => {
+        it('matches the measured mesonart placeholder rgb(250 250 250)', () => {
+          expect(MAT_COLOR).toEqual({ r: 250, g: 250, b: 250 })
+        })
+        it('uses a 1500px master canvas', () => {
+          expect(MAT_CANVAS).toBe(1500)
+        })
+        it('insets art to 88% of the longest side', () => {
+          expect(MAT_ART_INSET).toBe(0.88)
+        })
+      })
+
+      describe('isSquare', () => {
+        const base: ProductImage = {
+          id: 'i1', url: 'https://cdn/x.webp', altText: 'a', type: 'main',
+          sortOrder: 0, width: 1500, height: 1500, originalKey: 'originals/x.jpg',
+        }
+        it('accepts an equal-sided image', () => {
+          expect(isSquare(base)).toBe(true)
+        })
+        it('rejects a non-square image', () => {
+          expect(isSquare({ ...base, height: 2000 })).toBe(false)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/shared && bunx vitest run tests/types/product-image.test.ts
+    expected_result: FAIL - MAT_COLOR / MAT_CANVAS / MAT_ART_INSET / isSquare are not exported from src/types/product
+    status: pending
+  - id: 3
+    action: implement
+    description: Rewrite the ProductImage interface and add mat constants + isSquare guard
+    file: packages/shared/src/types/product.ts
+    status: pending
+    code: |
+      /**
+       * Mat colour baked into product artwork by sharp at upload time.
+       * MUST stay in sync with the --mat CSS token: the baked pixels and the
+       * CSS placeholder are both visible (CSS during load, pixels after), and a
+       * mismatch makes every card flash one colour then settle to another.
+       * Changing this requires reprocessing ALL product images.
+       */
+      export const MAT_COLOR = { r: 250, g: 250, b: 250 } as const
+
+      /** Square master size for every stored product image. */
+      export const MAT_CANVAS = 1500
+
+      /** Artwork occupies this fraction of the longest side, leaving a visible mat. */
+      export const MAT_ART_INSET = 0.88
+
+      export type ProductImageType =
+        | 'main'
+        | 'detail'
+        | 'texture'
+        | 'room-mockup'
+        | 'frame-preview'
+        | '360-view'
+
+      /** Normalised 0..1 crop window against the ORIGINAL upload. */
+      export interface ImageCrop {
+        x: number
+        y: number
+        w: number
+        h: number
+      }
+
+      export interface ImageVariant {
+        name: string
+        width: number
+        url: string
+      }
+
+      /**
+       * A single product image.
+       *
+       * CONTRACT: width === height, always. The grid's row alignment depends on it.
+       * Enforced by the upload pipeline; asserted in dev by the card component.
+       */
+      export interface ProductImage {
+        id: string
+        url: string
+        altText: string
+        type: ProductImageType
+        sortOrder: number
+        width: number
+        height: number
+        variants?: ImageVariant[]
+        /** Human-chosen crop window. Absent for type:'main', which is matted, never cropped. */
+        crop?: ImageCrop
+        /** Storage key of the unprocessed upload. Load-bearing: required to revise a crop. */
+        originalKey: string
+      }
+
+      export const isSquare = (img: Pick<ProductImage, 'width' | 'height'>): boolean =>
+        img.width === img.height
+  - id: 4
+    action: verify-pass
+    description: Confirm the test passes
+    command: cd packages/shared && bunx vitest run tests/types/product-image.test.ts
+    expected_result: PASS - 5 tests
+    status: pending
+  - id: 5
+    action: refactor
+    description: Remove the now-duplicate local ProductImage from the web card and point it at @chobii/shared. Delete the ImageVariant re-export from OptimizedImage if it now conflicts. Typecheck will list every call-site still using isPrimary or alt.
+    file: packages/web/app/components/product/ProductCard.tsx
+    command: bun run typecheck 2>&1 | grep -E 'isPrimary|altText|ProductImage' | head -30
+    expected_result: A finite list of call-sites to update; no new error categories
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Full typecheck introduces no NEW errors versus the 26-error main baseline
+    command: bun run typecheck 2>&1 | grep -cE 'error TS[0-9]+'
+    expected_result: <= 23 (the current branch baseline). Anything higher means this ticket regressed something.
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the shared contract
+    command: 'git add packages/shared packages/web/app/components/product && git commit -m "feat(shared): single ProductImage contract with square invariant and mat constants"'
+    status: pending
+current_step: 1

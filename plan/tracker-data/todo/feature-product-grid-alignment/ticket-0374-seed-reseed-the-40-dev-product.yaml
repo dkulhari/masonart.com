@@ -1,0 +1,138 @@
+ticket_number: 374
+title: Seed - Reseed the 40 dev products into the new ProductImage shape
+description: |-
+  ## Task
+
+  The 40 dev products currently hold a single image each, in the **old** jsonb shape, pointing at **external** `images.unsplash.com` URLs:
+
+  ```json
+  { "id": "img-1", "alt": "...", "url": "https://images.unsplash.com/photo-...?w=800",
+    "width": 800, "height": 800, "isPrimary": true, "sortOrder": 0 }
+  ```
+
+  Sources are genuinely off-ratio (`800x800`, `800x600`), so they exercise the matting path properly.
+
+  This is a **reseed, not a migration** - the product is pre-launch, so there is no compatibility shim, no dual-read and no rollback path. Downloading the Unsplash source once, matting it, uploading to our own storage, and writing the new shape is the whole job.
+
+  Generates **no** room mockups: hover media is human-uploaded (T5/T6). Seeded products therefore have `images.length === 1` and correctly render as static cards - which is itself worth verifying, since the single-image path must not show hover affordances.
+
+  Add **one fixture product with 4 images** so the hover interaction is exercisable locally and by the E2E spec (T12).
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 6 - Seed
+  Depends on: T2 (matToSquare)
+
+  Existing seed entrypoint: `packages/api/src/database/seed.ts`, run via `bun run seed` (which passes `--env-file=../../.env`).
+
+  **Important**: `.env` points `DATABASE_URL` at port **5433**, but that is a different application's database. The real chobii dev DB is on port **5440** (`poster-app-postgres`). Override when running.
+
+  Because the sources are remote, the seed needs network access. Cache downloads under a gitignored temp dir so repeated runs are fast and offline-friendly.
+
+  ## Acceptance criteria
+  - All 40 products have images in the new shape with `type`, `altText`, `width === height === 1500`, `originalKey`
+  - No `isPrimary` or `alt` keys survive anywhere in `products.images`
+  - Exactly one fixture product has 4 images for hover testing
+  - `/posters` renders all 40 with aligned rows
+feature: product-grid-alignment
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:42:23.412Z'
+last_updated: '2026-07-31T03:42:23.412Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - database
+  - seed
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 367
+    feature: product-grid-alignment
+    description: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing test for the seed's image-building helper
+    file: packages/api/tests/database/seed-product-images.test.ts
+    command: cd packages/api && bunx vitest run tests/database/seed-product-images.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import sharp from 'sharp'
+      import { MAT_CANVAS } from '@chobii/shared'
+      import { buildSeedImage } from '../../src/database/seed-images'
+
+      const png = (w: number, h: number) =>
+        sharp({ create: { width: w, height: h, channels: 3, background: { r: 7, g: 7, b: 7 } } }).png().toBuffer()
+
+      describe('buildSeedImage', () => {
+        it('produces the new contract shape', async () => {
+          const img = await buildSeedImage(await png(800, 600), 'p.jpg', 'Alt text', 0)
+          expect(img).toMatchObject({
+            altText: 'Alt text', type: 'main', sortOrder: 0,
+            width: MAT_CANVAS, height: MAT_CANVAS,
+          })
+          expect(img.originalKey).toBeTruthy()
+        })
+
+        it('carries no legacy keys', async () => {
+          const img = await buildSeedImage(await png(800, 800), 'p.jpg', 'a', 0)
+          expect(img).not.toHaveProperty('isPrimary')
+          expect(img).not.toHaveProperty('alt')
+        })
+
+        it('satisfies the square contract for an off-ratio source', async () => {
+          const img = await buildSeedImage(await png(800, 600), 'p.jpg', 'a', 0)
+          expect(img.width).toBe(img.height)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/database/seed-product-images.test.ts
+    expected_result: FAIL - src/database/seed-images does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Create a seed image helper that reuses buildProductMedia from T4 (do not reimplement matting). Signature buildSeedImage(buffer, filename, altText, sortOrder, type = 'main'). Add a cached fetch helper that downloads a remote URL to a gitignored .cache/seed-images/ dir keyed by URL hash, so reruns are offline-friendly.
+    file: packages/api/src/database/seed-images.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the helper tests pass
+    command: cd packages/api && bunx vitest run tests/database/seed-product-images.test.ts
+    expected_result: PASS - 3 tests
+    status: pending
+  - id: 5
+    action: implement
+    description: 'Update seed.ts: for each product, download its Unsplash source once, run buildSeedImage, and write the resulting ProductImage into products.images. Remove every isPrimary/alt literal from the seed data. Add one fixture product carrying 4 images (1 main + 3 room-mockup) so the hover path is exercisable; the 3 extras can reuse any local sample imagery since they only need to differ visibly.'
+    file: packages/api/src/database/seed.ts
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Run the seed against the REAL dev database on port 5440, not the 5433 in .env
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:<password>@localhost:5440/poster_app_dev' bun run src/database/seed.ts
+    expected_result: Seed completes; 40 products written
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: Verify the stored shape directly - no legacy keys, all square, one fixture with 4
+    command: docker exec -e PGPASSWORD=<password> poster-app-postgres psql -U poster_app -d poster_app_dev -c "select count(*) filter (where images::text like '%isPrimary%') as legacy_keys, count(*) filter (where (images->0->>'width')::int <> (images->0->>'height')::int) as non_square, max(jsonb_array_length(images)) as max_images from products;"
+    expected_result: legacy_keys 0 | non_square 0 | max_images 4
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the reseed
+    command: 'git add packages/api/src/database packages/api/tests/database && git commit -m "feat(api): reseed products into the square ProductImage contract"'
+    status: pending
+current_step: 1

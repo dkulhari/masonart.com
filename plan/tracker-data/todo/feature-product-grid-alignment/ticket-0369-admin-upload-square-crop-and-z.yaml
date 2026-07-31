@@ -1,0 +1,135 @@
+ticket_number: 369
+title: Admin upload - Square crop and zoom control for photographic media
+description: |-
+  ## Task
+
+  Give the uploader a square viewport to choose exactly what part of a room photo survives. This is the control that makes "never crop **blindly**" true - the backend crop (T3) is dumb and just applies whatever rect it is handed.
+
+  - Square viewport, drag to pan, scroll or slider to zoom
+  - Default framing is the largest centred square, so a careless upload still yields something sane
+  - Shown only for photographic types; `type: 'main'` is matted and never cropped, so it gets a matted preview instead
+  - Emits a normalised 0..1 rect, sent as the `crop` field in the upload multipart
+
+  ## Context
+
+  Part of feature: product-grid-alignment
+  Phase: 3 - Admin upload
+  Depends on: T4 (route accepts `crop`), T5 (media rows exist to host the control)
+
+  **New dependency**: `react-easy-crop` (~15KB) in `packages/web`. Chosen over hand-rolling because it emits exactly the normalised rect the contract stores, and touch pan/pinch/zoom is fiddlier than it looks. Its `onCropComplete` gives both a pixel rect and a percentage rect - use the percentage one, divided by 100.
+
+  Out of scope: editing the crop after upload. `originalKey` (T4) makes that possible later; no UI now.
+
+  ## Acceptance criteria
+  - Selecting a photographic type reveals a square crop viewport
+  - Pan and zoom both work; the framing shown is exactly what gets stored
+  - `type: 'main'` shows a matted preview and no crop control
+  - The emitted rect is normalised 0..1 and round-trips through the backend unchanged
+  - A product saved with a deliberately off-centre crop renders that framing in the storefront grid
+feature: product-grid-alignment
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: cli
+created: '2026-07-31T03:41:08.080Z'
+last_updated: '2026-07-31T03:41:08.080Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 367
+    feature: product-grid-alignment
+    description: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+  - ticket: 368
+    feature: product-grid-alignment
+    description: Admin upload - Per-file type selector, drag reorder, low-resolution warning
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Add the dependency
+    file: packages/web/package.json
+    command: cd packages/web && bun add react-easy-crop
+    status: pending
+  - id: 2
+    action: write-test
+    description: Write failing tests for crop emission, normalisation and the main-type exemption
+    file: packages/web/tests/components/admin/MediaCropControl.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/admin/MediaCropControl.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect, vi } from 'vitest'
+      import { render, screen } from '@testing-library/react'
+      import { MediaCropControl, toNormalisedCrop } from '~/components/admin/MediaCropControl'
+
+      describe('toNormalisedCrop', () => {
+        it('converts react-easy-crop percentage areas to 0..1', () => {
+          expect(toNormalisedCrop({ x: 10, y: 20, width: 50, height: 50 }))
+            .toEqual({ x: 0.1, y: 0.2, w: 0.5, h: 0.5 })
+        })
+        it('clamps values outside 0..1', () => {
+          expect(toNormalisedCrop({ x: -5, y: 0, width: 150, height: 50 }))
+            .toEqual({ x: 0, y: 0, w: 1, h: 0.5 })
+        })
+      })
+
+      describe('MediaCropControl', () => {
+        it('renders a crop viewport for photographic types', () => {
+          render(<MediaCropControl type="room-mockup" src="blob:x" onCropChange={vi.fn()} />)
+          expect(screen.getByTestId('crop-viewport')).toBeInTheDocument()
+        })
+
+        it("shows a matted preview and NO crop viewport for type 'main'", () => {
+          render(<MediaCropControl type="main" src="blob:x" onCropChange={vi.fn()} />)
+          expect(screen.queryByTestId('crop-viewport')).not.toBeInTheDocument()
+          expect(screen.getByTestId('mat-preview')).toBeInTheDocument()
+        })
+
+        it('exposes a zoom control for photographic types', () => {
+          render(<MediaCropControl type="detail" src="blob:x" onCropChange={vi.fn()} />)
+          expect(screen.getByLabelText(/zoom/i)).toBeInTheDocument()
+        })
+      })
+  - id: 3
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bunx vitest run tests/components/admin/MediaCropControl.test.tsx
+    expected_result: FAIL - MediaCropControl does not exist
+    status: pending
+  - id: 4
+    action: implement
+    description: Build the control. Export toNormalisedCrop(area) mapping react-easy-crop's percentage area {x,y,width,height} to {x,y,w,h} divided by 100 and clamped to 0..1. The component takes { type, src, onCropChange }. For type==='main' render a matted preview (object-contain at 88% on the mat colour, data-testid='mat-preview') and no cropper. Otherwise render <Cropper aspect={1} objectFit='contain' crop zoom onCropChange onZoomChange onCropComplete={(_, pct) => onCropChange(toNormalisedCrop(pct))} /> inside a square wrapper with data-testid='crop-viewport', plus a range input labelled 'Zoom' (1..3, step .01). Keep zoom and crop position in local state; the parent only receives the normalised rect.
+    file: packages/web/app/components/admin/MediaCropControl.tsx
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the component tests pass
+    command: cd packages/web && bunx vitest run tests/components/admin/MediaCropControl.test.tsx
+    expected_result: PASS - 5 tests
+    status: pending
+  - id: 6
+    action: implement
+    description: Host the control inside each ProductMediaRows row and send the rect. In ProductForm.handleFilesSelected, append crop as JSON.stringify(rect) to the FormData when the row's type is not 'main'. Uploads should be deferred until the user has framed the crop rather than firing on file-select, so hold picked files in local state with an object-URL preview and upload on an explicit action.
+    file: packages/web/app/components/admin/ProductForm.tsx
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: Full web suite plus typecheck
+    command: cd packages/web && bunx vitest run && cd ../.. && bun run typecheck 2>&1 | grep -cE 'error TS[0-9]+'
+    expected_result: Tests PASS; typecheck count <= 23
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the crop control
+    command: 'git add packages/web/app/components/admin packages/web/tests/components/admin packages/web/package.json && git commit -m "feat(admin): square crop and zoom control for photographic product media"'
+    status: pending
+current_step: 1

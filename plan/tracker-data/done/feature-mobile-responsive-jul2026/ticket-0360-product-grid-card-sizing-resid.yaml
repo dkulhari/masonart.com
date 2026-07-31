@@ -34,11 +34,11 @@ description: |-
 feature: mobile-responsive-jul2026
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
 created: '2026-07-28T15:37:51.348Z'
-last_updated: '2026-07-28T15:37:51.348Z'
+last_updated: '2026-07-31T03:44:01.619Z'
 time_spent_minutes: 0
 labels:
   - frontend
@@ -46,7 +46,30 @@ labels:
   - visual
   - design-decision
 acceptance_criteria: []
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-07-31T03:43:57.178Z'
+    text: |-
+      Absorbed into feature `product-grid-alignment` (tickets #364-#375). Closing as superseded rather than duplicating the work.
+
+      This ticket independently identified the same two problems the new feature was designed around, and reached the same conclusion about grid stretch handling row alignment. Both of its acceptance criteria are covered:
+
+      **1. "Home page skeleton and resolved card occupy the same box - no visible shift"**
+      Covered by #371, which extracts `ProductCardSkeleton` into its own file importing the shared `MEDIA_RATIO` constant, making a future mismatch structurally impossible rather than merely fixed. Verified by #375, which asserts cumulative layout shift < 0.05 on the home page as featured products resolve.
+
+      **2. "A conscious decision recorded on whether card heights should be perfectly uniform, applied consistently across both grids"**
+      Decision recorded: **card heights are deliberately NOT uniform; rows align by CSS Grid stretch alone.**
+
+      The reasoning, from measuring mesonart.com directly (`docs/research/mesonart-grid/README.md`): their card heights genuinely differ - 359.88 / 376.88 / 379.88px - because titles wrap to 3 or 4 lines. Rows still align perfectly, because grid sizes each row to its tallest item and stretches the rest. Measured across all 104 cards: within every row all heights identical, between rows they differ.
+
+      So this ticket's option of clamping the metadata to a fixed line count is explicitly rejected. As it noted itself, reserving a blank line for single-style products trades one kind of unevenness for whitespace - and it turns out to be unnecessary, since grid stretch already delivers the alignment.
+
+      This also resolves the residual variance the ticket recorded (`[368, 348]`) from a different angle: mesonart's `.product-card--standard` is `background: transparent` with `border: 0`, so the matted image *is* the card. #371 adopts that and deletes the `div.card-hover border border-border bg-card` wrapper entirely - with no bordered box, there is nothing left to be ragged.
+
+      **On the ratio question**, this ticket offered two options (align home to `aspect-[2/3]`, or keep `aspect-[3/4]` with a skeleton prop). The feature takes a third: neither. Both call-sites drop the prop and every image is matted to 1:1 by the upload pipeline, so aspect ratio stops being a per-call-site decision at all. #372 removes the prop repo-wide; #375 asserts every media box is square at 1440/1024/375.
+  - author: system
+    timestamp: '2026-07-31T03:44:01.621Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -72,3 +95,4 @@ implementation_steps:
     command: 'git add packages/web/app/ && git commit -m "fix(web): align product card skeleton and card aspect ratios"'
     status: pending
 current_step: 1
+completed: '2026-07-31T03:44:01.619Z'
