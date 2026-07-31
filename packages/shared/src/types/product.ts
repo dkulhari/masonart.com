@@ -312,7 +312,35 @@ export interface Artist {
 // ============================================================================
 
 /**
- * Image type for product images
+ * Mat colour baked into product artwork by sharp at upload time.
+ *
+ * IMPORTANT: this MUST stay in sync with the `--mat` CSS token. Both are
+ * visible — the CSS token while the image loads, the baked pixels afterwards —
+ * so a mismatch makes every card flash one colour then settle to another.
+ * Changing this value requires reprocessing every product image.
+ *
+ * Value measured from mesonart.com's `--color-placeholder`.
+ */
+export const MAT_COLOR = { r: 250, g: 250, b: 250 } as const;
+
+/** Square master size for every stored product image. */
+export const MAT_CANVAS = 1500;
+
+/**
+ * Artwork occupies this fraction of the longest side, leaving a visible mat.
+ *
+ * Plain `fit: 'contain'` would give square art a 0% mat, so square products
+ * would bleed to the card edge while portrait products floated — inconsistent
+ * across a row. The inset guarantees a minimum 6% margin on every product.
+ */
+export const MAT_ART_INSET = 0.88;
+
+/**
+ * Image type for product images.
+ *
+ * Determines how the upload pipeline squares the image:
+ * - `main` is matted (contained at MAT_ART_INSET, never cropped)
+ * - every other type is cropped to a human-chosen window and fills the frame
  */
 export type ProductImageType =
   | 'main'
@@ -323,12 +351,39 @@ export type ProductImageType =
   | '360-view';
 
 /**
- * Product image definition
+ * A crop window, normalised 0..1 against the ORIGINAL upload.
+ *
+ * Normalised rather than pixel coordinates so it survives any future re-encode
+ * or resize of the source.
+ */
+export interface ImageCrop {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * A responsive variant of a product image.
+ */
+export interface ImageVariant {
+  name: string;
+  width: number;
+  url: string;
+}
+
+/**
+ * Product image definition.
+ *
+ * CONTRACT: `width === height`, always. The product grid's row alignment
+ * depends on it — the in-flow card image declares `aspect-square`, and any
+ * non-square asset would either be silently cropped or double-matted. The
+ * upload pipeline enforces this; the card asserts it in development.
  */
 export interface ProductImage {
   /** Unique identifier */
   id: string;
-  /** Image URL */
+  /** Processed square WebP URL */
   url: string;
   /** Thumbnail URL */
   thumbnailUrl?: string;
@@ -336,12 +391,56 @@ export interface ProductImage {
   altText: string;
   /** Image type */
   type: ProductImageType;
-  /** Sort order */
+  /** Sort order; `images[0]` after sorting is the `main` image */
   sortOrder: number;
-  /** Width in pixels */
-  width?: number;
-  /** Height in pixels */
-  height?: number;
+  /** Width in pixels. Always equal to `height`. */
+  width: number;
+  /** Height in pixels. Always equal to `width`. */
+  height: number;
+  /** Responsive variants, all sharing the same square ratio */
+  variants?: ImageVariant[];
+  /** Human-chosen crop window. Absent for `main`, which is matted, never cropped. */
+  crop?: ImageCrop;
+  /** Storage key of the unprocessed upload. Load-bearing: required to revise a crop. */
+  originalKey: string;
+}
+
+/**
+ * Guard for the square contract. Used by the card in development to surface a
+ * bad asset loudly rather than letting `object-contain` quietly double-mat it.
+ */
+export const isSquare = (
+  img: Pick<ProductImage, 'width' | 'height'>
+): boolean => img.width === img.height;
+
+/**
+ * Images in display order: `main` first, then the rest by `sortOrder`.
+ *
+ * Callers should not sort by hand — the card relies on `images[0]` being the
+ * in-flow image that sets the media box height.
+ */
+export function sortedImages<T extends Pick<ProductImage, 'type' | 'sortOrder'>>(
+  images: readonly T[]
+): T[] {
+  return [...images].sort((a, b) => {
+    if (a.type === 'main' && b.type !== 'main') return -1;
+    if (b.type === 'main' && a.type !== 'main') return 1;
+    return a.sortOrder - b.sortOrder;
+  });
+}
+
+/**
+ * The primary image for a product.
+ *
+ * Replaces the old `images.find(i => i.isPrimary) || images[0]` idiom, which
+ * was repeated across seven call-sites with subtly different fallbacks.
+ * Prefers `type: 'main'`, then the lowest `sortOrder`, then the first entry.
+ */
+export function mainImage<T extends Pick<ProductImage, 'type' | 'sortOrder'>>(
+  images: readonly T[] | null | undefined
+): T | undefined {
+  if (!images?.length) return undefined;
+  return sortedImages(images)[0];
 }
 
 // ============================================================================

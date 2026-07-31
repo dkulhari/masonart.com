@@ -29,15 +29,8 @@ import { cn, getApiUrl } from '~/lib/utils'
 // Types
 // ============================================================================
 
-export interface ProductImage {
-  id: string
-  url: string
-  alt?: string
-  width?: number
-  height?: number
-  isPrimary?: boolean
-  sortOrder?: number
-}
+import { MAT_CANVAS, type ProductImage } from '@chobii/shared'
+export type { ProductImage }
 
 export interface ProductVariant {
   id?: string
@@ -382,9 +375,12 @@ export function ProductForm({
     const newImage: ProductImage = {
       id: `temp-${Date.now()}`,
       url: '',
-      alt: '',
-      isPrimary: formData.images.length === 0,
+      altText: '',
+      type: formData.images.length === 0 ? 'main' : 'detail',
       sortOrder: formData.images.length,
+      width: MAT_CANVAS,
+      height: MAT_CANVAS,
+      originalKey: '',
     }
     updateField('images', [...formData.images, newImage])
   }
@@ -413,9 +409,12 @@ export function ProductForm({
         const newImage: ProductImage = {
           id: `upload-${Date.now()}-${file.name}`,
           url: data.url,
-          alt: '',
-          isPrimary: false,
+          altText: '',
+          type: 'detail',
           sortOrder: 0,
+          width: MAT_CANVAS,
+          height: MAT_CANVAS,
+          originalKey: data.originalKey ?? '',
         }
         setFormData((prev) => ({
           ...prev,
@@ -423,7 +422,7 @@ export function ProductForm({
             ...prev.images,
             {
               ...newImage,
-              isPrimary: prev.images.length === 0,
+              type: prev.images.length === 0 ? ('main' as const) : ('detail' as const),
               sortOrder: prev.images.length,
             },
           ],
@@ -444,21 +443,22 @@ export function ProductForm({
   }
 
   const removeImage = (id: string) => {
-    const newImages = formData.images.filter((img) => img.id !== id)
-    // If we removed the primary image, set the first one as primary
-    if (newImages.length > 0 && !newImages.some((img) => img.isPrimary)) {
-      const firstImage = newImages[0]
-      if (firstImage) {
-        firstImage.isPrimary = true
-      }
-    }
+    const remaining = formData.images.filter((img) => img.id !== id)
+    // If we removed the main image, promote the first remaining one.
+    const needsMain = remaining.length > 0 && !remaining.some((img) => img.type === 'main')
+    const newImages = needsMain
+      ? remaining.map((img, i) => (i === 0 ? { ...img, type: 'main' as const } : img))
+      : remaining
     updateField('images', newImages)
   }
 
   const setPrimaryImage = (id: string) => {
     updateField(
       'images',
-      formData.images.map((img) => ({ ...img, isPrimary: img.id === id }))
+      formData.images.map((img) => ({
+        ...img,
+        type: img.id === id ? ('main' as const) : img.type === 'main' ? ('detail' as const) : img.type,
+      }))
     )
   }
 
@@ -753,7 +753,7 @@ export function ProductForm({
                   key={image.id}
                   className={cn(
                     'relative rounded-lg border-2 bg-muted/50 p-2',
-                    image.isPrimary ? 'border-brand-500' : 'border-border'
+                    image.type === 'main' ? 'border-brand-500' : 'border-border'
                   )}
                 >
                   {/* Image preview or URL input */}
@@ -761,7 +761,7 @@ export function ProductForm({
                     <div className="relative aspect-[3/4] overflow-hidden rounded-md">
                       <img
                         src={image.url}
-                        alt={image.alt || 'Product image'}
+                        alt={image.altText || 'Product image'}
                         className="h-full w-full object-cover"
                       />
                     </div>
@@ -787,12 +787,12 @@ export function ProductForm({
                       onClick={() => setPrimaryImage(image.id)}
                       className={cn(
                         'rounded px-2 py-1 text-xs font-medium',
-                        image.isPrimary
+                        image.type === 'main'
                           ? 'bg-brand-500 text-white'
                           : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       )}
                     >
-                      {image.isPrimary ? 'Primary' : 'Set Primary'}
+                      {image.type === 'main' ? 'Primary' : 'Set Primary'}
                     </button>
                     <button
                       type="button"
@@ -807,8 +807,8 @@ export function ProductForm({
                   <input
                     type="text"
                     placeholder="Alt text"
-                    value={image.alt || ''}
-                    onChange={(e) => updateImage(image.id, { alt: e.target.value })}
+                    value={image.altText || ''}
+                    onChange={(e) => updateImage(image.id, { altText: e.target.value })}
                     className="mt-2 w-full rounded border border-border bg-background px-2 py-1 text-xs"
                   />
                 </div>

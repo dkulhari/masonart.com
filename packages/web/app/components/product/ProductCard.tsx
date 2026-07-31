@@ -9,22 +9,16 @@
 
 import { Palette, Sparkles } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
-import { OptimizedImage, type ImageVariant } from '~/components/ui/OptimizedImage'
+import { OptimizedImage } from '~/components/ui/OptimizedImage'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export interface ProductImage {
-  id: string
-  url: string
-  alt?: string
-  isPrimary?: boolean
-  webpUrl?: string
-  width?: number
-  height?: number
-  variants?: ImageVariant[]
-}
+// ProductImage now lives in @chobii/shared — one shape across api, web and db.
+// Re-exported for the call-sites that imported it from here.
+import { mainImage, type ProductImage } from '@chobii/shared'
+export type { ProductImage }
 
 export interface ProductCardData {
   id: string
@@ -86,8 +80,7 @@ export function ProductCard({
   size = 'md',
   uniformAspectRatio,
 }: ProductCardProps) {
-  const primaryImage =
-    product.images?.find((img) => img.isPrimary) || product.images?.[0]
+  const primaryImage = mainImage(product.images)
   const price = parseFloat(product.basePrice)
   const aspectRatioClass =
     uniformAspectRatio || ASPECT_RATIO_MAP[product.orientation] || ASPECT_RATIO_MAP.portrait
@@ -132,8 +125,7 @@ export function ProductCard({
           {primaryImage?.url ? (
             <OptimizedImage
               src={primaryImage.url}
-              webpSrc={primaryImage.webpUrl}
-              alt={primaryImage.alt || product.title}
+              alt={primaryImage.altText || product.title}
               variants={primaryImage.variants}
               width={primaryImage.width}
               height={primaryImage.height}

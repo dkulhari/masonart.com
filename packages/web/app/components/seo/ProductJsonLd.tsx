@@ -11,7 +11,13 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { BRAND_NAME, BRAND_URL, SUPPORT_EMAIL } from '@chobii/shared'
+import {
+  BRAND_NAME,
+  BRAND_URL,
+  SUPPORT_EMAIL,
+  mainImage,
+  type ProductImage,
+} from '@chobii/shared'
 
 // ============================================================================
 // Types
@@ -20,12 +26,10 @@ import { BRAND_NAME, BRAND_URL, SUPPORT_EMAIL } from '@chobii/shared'
 /**
  * Product image data for JSON-LD
  */
-export interface ProductJsonLdImage {
-  id: string
-  url: string
-  alt?: string
-  isPrimary?: boolean
-}
+export type ProductJsonLdImage = Pick<
+  ProductImage,
+  'id' | 'url' | 'altText' | 'type' | 'sortOrder'
+>
 
 /**
  * Product variant data for JSON-LD pricing
@@ -155,8 +159,7 @@ function hasAvailableVariants(variants: ProductJsonLdVariant[]): boolean {
  * Get primary image URL from images array
  */
 function getPrimaryImageUrl(images: ProductJsonLdImage[]): string | undefined {
-  const primary = images.find((img) => img.isPrimary)
-  return primary?.url || images[0]?.url
+  return mainImage(images)?.url
 }
 
 /**

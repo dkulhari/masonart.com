@@ -10,6 +10,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
+import type { ProductImage } from '@chobii/shared'
 import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
@@ -58,15 +59,7 @@ interface ProductWithVariants {
   rooms: string[]
   tags: string[]
   orientation: 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
-  images: Array<{
-    id: string
-    url: string
-    alt?: string
-    width?: number
-    height?: number
-    isPrimary?: boolean
-    sortOrder?: number
-  }>
+  images: ProductImage[]
   seoTitle: string | null
   seoDescription: string | null
   status: 'draft' | 'active' | 'archived'

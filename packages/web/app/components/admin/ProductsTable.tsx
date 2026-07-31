@@ -52,12 +52,8 @@ import { cn, formatPrice } from '~/lib/utils'
 // Types
 // ============================================================================
 
-export interface ProductImage {
-  id: string
-  url: string
-  alt?: string
-  isPrimary?: boolean
-}
+import { mainImage, type ProductImage } from '@chobii/shared'
+export type { ProductImage }
 
 export interface AdminProduct {
   id: string
@@ -330,7 +326,7 @@ export function ProductsTable({
         ),
         cell: ({ row }: CellContext<AdminProduct, unknown>) => {
           const product = row.original
-          const primaryImage = product.images?.find((img: ProductImage) => img.isPrimary) || product.images?.[0]
+          const primaryImage = mainImage(product.images)
 
           return (
             <div className="flex items-center gap-3">
@@ -339,7 +335,7 @@ export function ProductsTable({
                 {primaryImage?.url ? (
                   <img
                     src={primaryImage.url}
-                    alt={primaryImage.alt || product.title}
+                    alt={primaryImage.altText || product.title}
                     className="h-full w-full object-cover"
                   />
                 ) : (

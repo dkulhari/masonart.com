@@ -20,17 +20,16 @@ import { relations } from "drizzle-orm";
 // ============================================================================
 
 /**
- * Product image structure stored as JSONB
+ * Product image structure stored as JSONB.
+ *
+ * Single source of truth lives in @chobii/shared — re-exported here so the
+ * Drizzle `$type<ProductImage[]>()` annotation stays readable at the call-site.
+ * The old local shape (`alt`, `isPrimary`, optional dimensions) is gone:
+ * `isPrimary` is superseded by `type: 'main'` + `sortOrder`, and width/height
+ * are now required because the pipeline guarantees them.
  */
-export interface ProductImage {
-  id: string;
-  url: string;
-  alt?: string;
-  width?: number;
-  height?: number;
-  isPrimary?: boolean;
-  sortOrder?: number;
-}
+export type { ProductImage } from "@chobii/shared";
+import type { ProductImage } from "@chobii/shared";
 
 // ============================================================================
 // Enums

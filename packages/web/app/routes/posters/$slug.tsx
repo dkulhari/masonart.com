@@ -7,12 +7,12 @@
 
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { productsApi, toFeaturedProducts } from '~/lib/api'
+import { mainImage, type ProductImage } from '@chobii/shared'
 import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
 import {
   ProductDetail,
   ProductDetailSkeleton,
   type ProductDetailData,
-  type ProductImage,
 } from '~/components/product/ProductDetail'
 import { ProductReviews, ProductReviewsSkeleton } from '~/components/product/ProductReviews'
 import type { SizeVariant } from '~/components/product/SizeSelector'
@@ -29,13 +29,7 @@ interface ProductApiResponse {
   slug: string
   description: string
   shortDescription?: string
-  images: Array<{
-    id: string
-    url: string
-    alt?: string
-    type?: string
-    isPrimary?: boolean
-  }>
+  images: ProductImage[]
   variants: Array<{
     id: string
     sizeId?: string
@@ -103,13 +97,7 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
       slug: response.slug,
       description: response.description,
       shortDescription: response.shortDescription,
-      images: response.images.map((img): ProductImage => ({
-        id: img.id,
-        url: img.url,
-        alt: img.alt,
-        type: img.type as ProductImage['type'],
-        isPrimary: img.isPrimary,
-      })),
+      images: response.images,
       variants: response.variants.map((v): SizeVariant => ({
         id: v.id,
         sizeId: v.sizeId || v.id,
@@ -197,7 +185,7 @@ export const Route = createFileRoute('/posters/$slug')({
     }
 
     const { product } = loaderData
-    const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0]
+    const primaryImage = mainImage(product.images)
 
     // Calculate price range for display
     const prices = product.variants.map((v) =>
@@ -215,7 +203,7 @@ export const Route = createFileRoute('/posters/$slug')({
       `Shop ${product.title} at chobii.art. ${priceText}. Premium quality poster available in multiple sizes and frames.`
     const productUrl = `https://chobii.art/posters/${product.slug}`
     const imageUrl = primaryImage?.url || 'https://chobii.art/og-default.jpg'
-    const imageAlt = primaryImage?.alt || product.title
+    const imageAlt = primaryImage?.altText || product.title
 
     // Build keywords from product attributes
     const keywords = [
@@ -393,7 +381,7 @@ function Breadcrumb({ product }: { product: ProductDetailData }) {
  * generated from trusted API data, not user input.
  */
 function ProductJsonLd({ product }: { product: ProductDetailData }) {
-  const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0]
+  const primaryImage = mainImage(product.images)
 
   // Calculate price range
   const prices = product.variants.map((v) =>

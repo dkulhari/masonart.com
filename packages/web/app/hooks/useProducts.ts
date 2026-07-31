@@ -78,14 +78,8 @@ export interface ProductListItem {
 /**
  * Product image type
  */
-export interface ProductImage {
-  id: string;
-  url: string;
-  thumbnailUrl?: string;
-  altText?: string;
-  type: string;
-  sortOrder: number;
-}
+import type { ProductImage } from '@chobii/shared';
+export type { ProductImage };
 
 /**
  * Product variant type

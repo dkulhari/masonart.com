@@ -30,13 +30,8 @@ import { FrameSelector, calculateFramePrice, type FrameOptionData } from './Fram
 // Types
 // ============================================================================
 
-export interface ProductImage {
-  id: string
-  url: string
-  alt?: string
-  type?: 'main' | 'detail' | 'texture' | 'room-mockup' | 'frame-preview'
-  isPrimary?: boolean
-}
+import { mainImage, type ProductImage } from '@chobii/shared'
+export type { ProductImage }
 
 export interface ProductDetailData {
   /** Product ID */
@@ -153,7 +148,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
       )
     }
 
-    const primaryImage = product.images.find((img) => img.isPrimary) || product.images[0]
+    const primaryImage = mainImage(product.images)
 
     addItem({
       productId: product.id,
@@ -201,7 +196,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
               {currentImage?.url ? (
                 <img
                   src={currentImage.url}
-                  alt={currentImage.alt || product.title}
+                  alt={currentImage.altText || product.title}
                   className="h-full w-full object-contain"
                 />
               ) : (
@@ -265,7 +260,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                   >
                     <img
                       src={image.url}
-                      alt={image.alt || `Product image ${index + 1}`}
+                      alt={image.altText || `Product image ${index + 1}`}
                       className="h-full w-full object-cover"
                     />
                   </button>
