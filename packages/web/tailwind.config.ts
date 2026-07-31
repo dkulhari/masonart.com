@@ -17,6 +17,13 @@ const config: Config = {
     },
     extend: {
       colors: {
+        /**
+         * Product card mat. Mirrors MAT_COLOR in @chobii/shared, which sharp
+         * bakes into image pixels — see globals.css for why they must agree.
+         */
+        mat: 'hsl(var(--mat))',
+        /** Review stars — measured amber-500 on mesonart. */
+        rating: 'hsl(var(--rating))',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

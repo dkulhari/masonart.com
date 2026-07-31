@@ -19,13 +19,14 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { Eye } from 'lucide-react'
 import { isSquare, sortedImages, type ProductImage } from '@chobii/shared'
 import { cn } from '~/lib/utils'
-// EASE_FAST is used by the quick-add / quick-view affordances in #373, not here.
 import {
   MEDIA_RATIO,
   SIZES_ATTR,
   EASE_PRIMARY,
+  EASE_FAST,
   zoneFor,
 } from './productCardTokens'
 
@@ -129,6 +130,24 @@ export function ProductCardMedia({
           )}
         />
       ))}
+
+      {/* Quick-view: 48x48, radius 60px, white on backdrop-blur, inset 16px.
+          Fades in on hover at --ease-fast. Kept reachable by focus, unlike
+          mesonart, which sets Flickity accessibility:false. */}
+      <span
+        data-testid="quick-view"
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute right-4 top-4 z-20 hidden md:grid',
+          'h-12 w-12 place-items-center rounded-[60px]',
+          'bg-background/90 text-foreground backdrop-blur-[12px]',
+          'opacity-0 motion-safe:transition-opacity motion-safe:duration-300',
+          EASE_FAST,
+          'group-hover/card:opacity-100'
+        )}
+      >
+        <Eye className="h-5 w-5" />
+      </span>
 
       {/* Dots: n-1 of them. Slide 0 is only reachable by leaving the card, so
           it gets no dot — mesonart achieves the same with

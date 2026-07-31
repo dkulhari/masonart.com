@@ -151,6 +151,33 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
     links: [
       { rel: 'stylesheet', href: globalsCss },
+
+      /**
+       * Poppins + Urbanist, measured from mesonart.com. Both are free Google
+       * Fonts, so this matches rather than approximates.
+       *
+       * Only the weights actually in use are requested — Poppins 300/400/500
+       * (body / buttons / product titles) and Urbanist 300/500 (headings).
+       * mesonart's own page declares far more and leaves most `unloaded`.
+       *
+       * display=swap so text paints in the fallback immediately rather than
+       * blocking on the webfont.
+       */
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossOrigin: 'anonymous',
+      },
+      {
+        rel: 'stylesheet',
+        href:
+          'https://fonts.googleapis.com/css2' +
+          '?family=Poppins:wght@300;400;500' +
+          '&family=Urbanist:wght@300;500' +
+          '&display=swap',
+      },
+
       { rel: 'icon', href: '/favicon.ico' },
       {
         rel: 'icon',
