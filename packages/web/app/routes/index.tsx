@@ -23,7 +23,8 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { productsApi, toFeaturedProducts } from '~/lib/api'
-import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
+import type { ProductCardData } from '~/components/product/ProductCard'
+import { ProductGrid } from '~/components/product/ProductGrid'
 import { OrganizationJsonLd } from '~/components/seo/ProductJsonLd'
 
 // ============================================================================
@@ -241,17 +242,10 @@ function FeaturedProductsSection({ products }: FeaturedProductsSectionProps) {
           </a>
         </div>
 
-        {/* Products Grid */}
+        {/* Products Grid — shares the one canonical grid with /posters, so the
+            home page and the listing can no longer disagree about layout. */}
         {products.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                uniformAspectRatio="aspect-[3/4]"
-              />
-            ))}
-          </div>
+          <ProductGrid products={products} />
         ) : (
           <ProductsPlaceholder />
         )}

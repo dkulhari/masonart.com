@@ -8,7 +8,8 @@
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { productsApi, toFeaturedProducts } from '~/lib/api'
 import { mainImage, type ProductImage } from '@chobii/shared'
-import { ProductCard, type ProductCardData } from '~/components/product/ProductCard'
+import type { ProductCardData } from '~/components/product/ProductCard'
+import { ProductGrid } from '~/components/product/ProductGrid'
 import {
   ProductDetail,
   ProductDetailSkeleton,
@@ -464,15 +465,7 @@ function RelatedProductsSection({ products }: { products: ProductCardData[] }) {
     <section className="border-t border-border bg-muted/30">
       <div className="container-wide py-12">
         <h2 className="mb-6 text-xl font-bold text-foreground">You May Also Like</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              uniformAspectRatio="aspect-[2/3]"
-            />
-          ))}
-        </div>
+        <ProductGrid products={products} />
       </div>
     </section>
   )

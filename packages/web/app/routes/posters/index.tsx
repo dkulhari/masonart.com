@@ -516,12 +516,7 @@ function PostersPage() {
                 <ItemListJsonLd
                   items={products.map((p) => ({ name: p.title, slug: p.slug }))}
                 />
-                <ProductGrid
-                  products={products}
-                  columns={{ default: 2, sm: 2, md: 3, lg: 4 }}
-                  gap="md"
-                  uniformAspectRatio="aspect-[2/3]"
-                />
+                <ProductGrid products={products} />
 
                 {/* Pagination */}
                 {pagination.totalPages > 1 && (
