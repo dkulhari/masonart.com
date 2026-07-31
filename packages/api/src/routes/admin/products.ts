@@ -34,7 +34,7 @@ import {
   type AuthVariables,
 } from "../../middleware/auth";
 import { deleteCached, CacheKeys } from "../../lib/redis";
-import { uploadOptimizedImage, StoragePaths } from "../../lib/storage";
+import { buildProductMedia } from "../../lib/product-media";
 
 // ============================================================================
 // Constants
@@ -48,17 +48,52 @@ const MAX_PAGE_SIZE = 100;
 // ============================================================================
 
 /**
- * Product image schema for validation
+ * Product image schema for validation.
+ *
+ * Mirrors the ProductImage contract in @chobii/shared. Notably `width` and
+ * `height` are required and must be equal — the storefront grid's row alignment
+ * depends on every stored image being square, so a non-square record is
+ * rejected at the boundary rather than discovered as a visual bug later.
  */
-const productImageSchema = z.object({
-  id: z.string(),
-  url: z.string().url(),
-  alt: z.string().optional(),
-  width: z.number().positive().optional(),
-  height: z.number().positive().optional(),
-  isPrimary: z.boolean().optional(),
-  sortOrder: z.number().int().nonnegative().optional(),
-});
+const productImageSchema = z
+  .object({
+    id: z.string(),
+    url: z.string().url(),
+    altText: z.string(),
+    type: z.enum([
+      "main",
+      "detail",
+      "texture",
+      "room-mockup",
+      "frame-preview",
+      "360-view",
+    ]),
+    sortOrder: z.number().int().nonnegative(),
+    width: z.number().positive(),
+    height: z.number().positive(),
+    variants: z
+      .array(
+        z.object({
+          name: z.string(),
+          width: z.number().positive(),
+          url: z.string().url(),
+        })
+      )
+      .optional(),
+    crop: z
+      .object({
+        x: z.number().min(0).max(1),
+        y: z.number().min(0).max(1),
+        w: z.number().min(0).max(1),
+        h: z.number().min(0).max(1),
+      })
+      .optional(),
+    originalKey: z.string(),
+  })
+  .refine((img) => img.width === img.height, {
+    message: "Product images must be square (width must equal height)",
+    path: ["width"],
+  });
 
 /**
  * Query parameters for admin product listing
@@ -163,6 +198,44 @@ adminProductsApp.use("*", requireContentManager);
 const PRODUCT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_PRODUCT_IMAGE_MB = 10;
 
+/**
+ * Text fields accompanying the uploaded file.
+ *
+ * `crop` arrives as a JSON string because it rides in multipart form data; it
+ * is parsed and validated here rather than trusted downstream. cropToSquare
+ * clamps defensively too, but a malformed rect should be a 400, not a silent
+ * fallback to the centred square.
+ */
+const uploadImageFieldsSchema = z.object({
+  type: z
+    .enum(["main", "detail", "texture", "room-mockup", "frame-preview", "360-view"])
+    .default("main"),
+  altText: z.string().max(300).default(""),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+  crop: z
+    .string()
+    .optional()
+    .transform((s, ctx) => {
+      if (!s) return undefined;
+      try {
+        return z
+          .object({
+            x: z.number().min(0).max(1),
+            y: z.number().min(0).max(1),
+            w: z.number().min(0).max(1),
+            h: z.number().min(0).max(1),
+          })
+          .parse(JSON.parse(s));
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "crop must be JSON {x,y,w,h} with values in 0..1",
+        });
+        return z.NEVER;
+      }
+    }),
+});
+
 adminProductsApp.post("/upload-image", async (c) => {
   const formData = await c.req.formData();
   const file = formData.get("file") as File | null;
@@ -183,22 +256,28 @@ adminProductsApp.post("/upload-image", async (c) => {
     );
   }
 
+  // Text fields alongside the file. `type` decides how the image is squared:
+  // 'main' is matted and never cropped; everything else is cropped to the
+  // window the admin chose.
+  const fields = uploadImageFieldsSchema.safeParse({
+    type: formData.get("type") ?? undefined,
+    altText: formData.get("altText") ?? undefined,
+    sortOrder: formData.get("sortOrder") ?? undefined,
+    crop: formData.get("crop") ?? undefined,
+  });
+
+  if (!fields.success) {
+    return c.json(
+      { error: "Invalid upload fields", details: fields.error.flatten() },
+      400
+    );
+  }
+
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await uploadOptimizedImage(buffer, file.name, file.type, {
-      prefix: StoragePaths.PRODUCTS,
-    });
+    const image = await buildProductMedia(buffer, file.name, file.type, fields.data);
 
-    return c.json(
-      {
-        success: true,
-        url: result.url,
-        key: result.key,
-        webpUrl: result.webpUrl,
-        variants: result.variants,
-      },
-      201
-    );
+    return c.json({ success: true, image }, 201);
   } catch (error) {
     console.error("[AdminProducts] Image upload failed:", error);
     return c.json({ error: "Failed to upload image" }, 500);
