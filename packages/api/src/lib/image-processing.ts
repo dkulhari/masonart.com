@@ -5,11 +5,13 @@
  * - WebP conversion for smaller file sizes
  * - Responsive size generation (thumbnail, card, detail, full)
  * - Quality optimization
+ * - Squaring product media (matToSquare / cropToSquare)
  *
  * Uses Sharp for high-performance image processing.
  */
 
 import sharp from "sharp";
+import { MAT_COLOR, MAT_CANVAS, MAT_ART_INSET } from "@chobii/shared";
 import { logger } from "./logger";
 
 // ============================================================================
@@ -140,4 +142,52 @@ export async function getImageMetadata(input: Buffer) {
     format: metadata.format || "unknown",
     size: metadata.size || input.length,
   };
+}
+
+// ============================================================================
+// Squaring Product Media
+// ============================================================================
+//
+// Every stored product image is MAT_CANVAS x MAT_CANVAS. That invariant is what
+// lets the storefront grid drop all ratio logic: the in-flow card image declares
+// `aspect-square` and simply fits.
+//
+// Two ways to get there, differing in WHO chooses the framing:
+//   matToSquare   — artwork. Contained at MAT_ART_INSET on a flat mat. Never cropped.
+//   cropToSquare  — photographs. Filled edge-to-edge using a human-chosen window.
+//
+// The rule is "never crop BLINDLY", not "never crop".
+//
+// NOTE: processImage() above is deliberately NOT involved. It also serves
+// avatars and AI generations, where forcing a square would be wrong.
+
+/**
+ * Composite artwork of ANY aspect ratio onto an opaque square mat.
+ *
+ * The art is contained — never cropped — at MAT_ART_INSET of the longest side.
+ * The inset (rather than plain `fit: 'contain'`) guarantees a visible mat on
+ * every product, so square art does not bleed to the card edge while portrait
+ * art floats — which would read as inconsistent across a grid row.
+ *
+ * Small sources are NOT upscaled: they sit smaller on the mat rather than being
+ * interpolated. Fake resolution is worse than a wider mat.
+ */
+export async function matToSquare(input: Buffer): Promise<Buffer> {
+  const inner = Math.round(MAT_CANVAS * MAT_ART_INSET);
+
+  const art = await sharp(input)
+    .resize(inner, inner, { fit: "inside", withoutEnlargement: true })
+    .toBuffer();
+
+  return sharp({
+    create: {
+      width: MAT_CANVAS,
+      height: MAT_CANVAS,
+      channels: 3,
+      background: MAT_COLOR,
+    },
+  })
+    .composite([{ input: art, gravity: "centre" }])
+    .webp({ quality: 88 })
+    .toBuffer();
 }
