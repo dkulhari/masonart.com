@@ -11,7 +11,12 @@
  */
 
 import sharp from "sharp";
-import { MAT_COLOR, MAT_CANVAS, MAT_ART_INSET } from "@chobii/shared";
+import {
+  MAT_COLOR,
+  MAT_CANVAS,
+  MAT_ART_INSET,
+  type ImageCrop,
+} from "@chobii/shared";
 import { logger } from "./logger";
 
 // ============================================================================
@@ -188,6 +193,60 @@ export async function matToSquare(input: Buffer): Promise<Buffer> {
     },
   })
     .composite([{ input: art, gravity: "centre" }])
+    .webp({ quality: 88 })
+    .toBuffer();
+}
+
+/** The largest centred square of a source, as a normalised rect. */
+export function centredSquareCrop(width: number, height: number): ImageCrop {
+  const side = Math.min(width, height);
+  return {
+    x: (width - side) / 2 / width,
+    y: (height - side) / 2 / height,
+    w: side / width,
+    h: side / height,
+  };
+}
+
+const clamp01 = (n: number): number =>
+  Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0;
+
+/**
+ * Crop a photograph to a square using a HUMAN-CHOSEN window, then resize to the
+ * canonical canvas. No mat: photographs fill the frame edge-to-edge, because a
+ * matted photograph reads as letterboxed rather than composed.
+ *
+ * The rect is normalised 0..1 against the original so it survives any future
+ * re-encode. This function is deliberately dumb — it applies what the admin UI
+ * chose — but it defends against rects that are out of range, zero-area, NaN or
+ * overflowing the source, falling back to the largest centred square.
+ */
+export async function cropToSquare(
+  input: Buffer,
+  crop?: ImageCrop
+): Promise<Buffer> {
+  const meta = await sharp(input).metadata();
+  const sw = meta.width || MAT_CANVAS;
+  const sh = meta.height || MAT_CANVAS;
+
+  const rect = crop ?? centredSquareCrop(sw, sh);
+
+  let left = Math.round(clamp01(rect.x) * sw);
+  let top = Math.round(clamp01(rect.y) * sh);
+  let width = Math.round(clamp01(rect.w) * sw);
+  let height = Math.round(clamp01(rect.h) * sh);
+
+  // Keep the window inside the source and non-degenerate. Order matters:
+  // size is clamped against the offset first, then the offset is pulled back
+  // so a rect starting near the far edge still yields a usable window.
+  width = Math.max(1, Math.min(width, sw - left));
+  height = Math.max(1, Math.min(height, sh - top));
+  left = Math.max(0, Math.min(left, sw - width));
+  top = Math.max(0, Math.min(top, sh - height));
+
+  return sharp(input)
+    .extract({ left, top, width, height })
+    .resize(MAT_CANVAS, MAT_CANVAS, { fit: "fill" })
     .webp({ quality: 88 })
     .toBuffer();
 }
