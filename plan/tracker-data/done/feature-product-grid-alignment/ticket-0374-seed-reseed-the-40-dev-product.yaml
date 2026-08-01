@@ -38,18 +38,21 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
 created: '2026-07-31T03:42:23.412Z'
-last_updated: '2026-07-31T03:42:23.412Z'
+last_updated: '2026-08-01T06:55:22.046Z'
 time_spent_minutes: 0
 labels:
   - backend
   - database
   - seed
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-01T06:55:22.095Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -136,3 +139,4 @@ implementation_steps:
     command: 'git add packages/api/src/database packages/api/tests/database && git commit -m "feat(api): reseed products into the square ProductImage contract"'
     status: pending
 current_step: 1
+completed: '2026-08-01T06:55:22.046Z'

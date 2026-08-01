@@ -40,17 +40,20 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
 created: '2026-07-31T03:42:27.098Z'
-last_updated: '2026-07-31T03:42:27.098Z'
+last_updated: '2026-08-01T07:07:44.847Z'
 time_spent_minutes: 0
 labels:
   - testing
   - e2e
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-01T07:07:44.899Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -192,3 +195,4 @@ implementation_steps:
     command: 'git add tests/e2e/product-grid-alignment.spec.ts packages/web/app/components/product/ProductCard.tsx && git commit -m "test(e2e): assert row-height uniformity and square media across breakpoints"'
     status: pending
 current_step: 1
+completed: '2026-08-01T07:07:44.847Z'
