@@ -1,7 +1,8 @@
 // Database seed script for the Poster & Frame E-Commerce Platform
 // Populates the database with sample products, variants, and frames for development
 
-import { MAT_CANVAS } from "@chobii/shared";
+import { MAT_CANVAS, type ProductImage } from "@chobii/shared";
+import { buildSeedImageFromUrl } from "./seed-images";
 import { db, closeDatabase } from "./index";
 import {
   products,
@@ -10,12 +11,12 @@ import {
   type NewProduct,
   type NewProductVariant,
   type NewFrame,
-  type ProductImage,
 } from "./schema";
 
-// NOTE: image records below carry MAT_CANVAS dimensions and placeholder
-// originalKeys so they satisfy the square contract at compile time. Ticket #374
-// replaces the remote Unsplash URLs with genuinely matted, self-hosted assets.
+// The `images` entries below declare a SOURCE url and placeholder dimensions.
+// They are not what gets stored: processProductImages() downloads each source,
+// mats or crops it to MAT_CANVAS, uploads to our own storage and replaces the
+// record before insert. Only `url`, `altText`, `type` and `sortOrder` are read.
 
 // ============================================================================
 // Sample Data
@@ -25,6 +26,77 @@ import {
  * Sample poster products covering various styles and subjects
  */
 const sampleProducts: NewProduct[] = [
+  /**
+   * HOVER FIXTURE — the only product with multiple media.
+   *
+   * The rest of the catalogue has one image each, which correctly renders a
+   * static card. This one exercises the hover path: cursor-X scrub across three
+   * room-mockup slides, plus the n-1 dot indicator. #375's e2e spec locates the
+   * card by the presence of dots, so this product is what makes that assertion
+   * possible. Do not reduce it below four media.
+   */
+  {
+    sku: "FIX-001",
+    title: "Wabi-Sabi Study",
+    slug: "wabi-sabi-study",
+    description:
+      "A textured wabi-sabi composition in muted earth tones. Seeded with multiple room mockups so the grid hover interaction can be exercised locally and in e2e.",
+    basePrice: "2499.00",
+    styles: ["wabi-sabi", "minimalist"],
+    subjects: ["abstract", "texture"],
+    colors: ["beige", "grey", "cream"],
+    rooms: ["living-room", "bedroom"],
+    tags: ["fixture", "wabi-sabi"],
+    orientation: "portrait",
+    images: [
+      {
+        id: "fix-main",
+        url: "https://images.unsplash.com/photo-1554907984-15263bfd63bd?w=2000",
+        altText: "Wabi-Sabi Study textured artwork",
+        type: "main",
+        sortOrder: 0,
+        width: MAT_CANVAS,
+        height: MAT_CANVAS,
+        originalKey: "",
+      },
+      {
+        id: "fix-room-1",
+        url: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=2000",
+        altText: "Wabi-Sabi Study in a living room",
+        type: "room-mockup",
+        sortOrder: 1,
+        width: MAT_CANVAS,
+        height: MAT_CANVAS,
+        originalKey: "",
+      },
+      {
+        id: "fix-room-2",
+        url: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=2000",
+        altText: "Wabi-Sabi Study in a bedroom",
+        type: "room-mockup",
+        sortOrder: 2,
+        width: MAT_CANVAS,
+        height: MAT_CANVAS,
+        originalKey: "",
+      },
+      {
+        id: "fix-room-3",
+        url: "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?w=2000",
+        altText: "Wabi-Sabi Study in a hallway",
+        type: "room-mockup",
+        sortOrder: 3,
+        width: MAT_CANVAS,
+        height: MAT_CANVAS,
+        originalKey: "",
+      },
+    ] as ProductImage[],
+    seoTitle: "Wabi-Sabi Study | Textured Wall Art",
+    seoDescription:
+      "A textured wabi-sabi composition in muted earth tones.",
+    status: "active",
+    isFeatured: true,
+    featuredOrder: 0,
+  },
   // Abstract Collection
   {
     sku: "ABS-001",
@@ -42,7 +114,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-1",
-        url: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800",
+        url: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=2000",
         altText: "Cosmic Harmony Abstract Art",
         type: "main",
         sortOrder: 0,
@@ -74,7 +146,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-2",
-        url: "https://images.unsplash.com/photo-1549490349-8643362247b5?w=800",
+        url: "https://images.unsplash.com/photo-1549490349-8643362247b5?w=2000",
         altText: "Golden Flow Abstract Art",
         type: "main",
         sortOrder: 0,
@@ -106,7 +178,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-3",
-        url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+        url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=2000",
         altText: "Serene Waves Abstract Art",
         type: "main",
         sortOrder: 0,
@@ -139,7 +211,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-4",
-        url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200",
+        url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=2000",
         altText: "Mountain Majesty Landscape",
         type: "main",
         sortOrder: 0,
@@ -171,7 +243,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-5",
-        url: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=800",
+        url: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=2000",
         altText: "Forest Whispers Nature Print",
         type: "main",
         sortOrder: 0,
@@ -202,7 +274,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-6",
-        url: "https://images.unsplash.com/photo-1509587584298-0f3b3a3a1797?w=800",
+        url: "https://images.unsplash.com/photo-1509587584298-0f3b3a3a1797?w=2000",
         altText: "Desert Bloom Nature Print",
         type: "main",
         sortOrder: 0,
@@ -235,7 +307,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-7",
-        url: "https://images.unsplash.com/photo-1459411552884-841db9b3cc2a?w=800",
+        url: "https://images.unsplash.com/photo-1459411552884-841db9b3cc2a?w=2000",
         altText: "Monstera Dreams Botanical Art",
         type: "main",
         sortOrder: 0,
@@ -267,7 +339,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-8",
-        url: "https://images.unsplash.com/photo-1603436326446-74e2d69da7cd?w=800",
+        url: "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=2000",
         altText: "Eucalyptus Study Botanical Art",
         type: "main",
         sortOrder: 0,
@@ -300,7 +372,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-9",
-        url: "https://images.unsplash.com/photo-1515825838458-f2a94b20105a?w=800",
+        url: "https://images.unsplash.com/photo-1515825838458-f2a94b20105a?w=2000",
         altText: "Circle of Zen Minimalist Art",
         type: "main",
         sortOrder: 0,
@@ -331,7 +403,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-10",
-        url: "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=800",
+        url: "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=2000",
         altText: "Linear Horizons Minimalist Art",
         type: "main",
         sortOrder: 0,
@@ -364,7 +436,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-11",
-        url: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=800",
+        url: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=2000",
         altText: "Stay Curious Typography Art",
         type: "main",
         sortOrder: 0,
@@ -395,7 +467,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-12",
-        url: "https://images.unsplash.com/photo-1499678329028-101435549a4e?w=800",
+        url: "https://images.unsplash.com/photo-1499678329028-101435549a4e?w=2000",
         altText: "Dream Big Typography Art",
         type: "main",
         sortOrder: 0,
@@ -432,7 +504,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-wbs-1",
-        url: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=800",
+        url: "https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=2000",
         altText: "Imperfect Vessel Wabi-Sabi Art",
         type: "main",
         sortOrder: 0,
@@ -462,7 +534,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-wbs-2",
-        url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+        url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=2000",
         altText: "Weathered Stone Texture Art",
         type: "main",
         sortOrder: 0,
@@ -494,7 +566,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-pop-1",
-        url: "https://images.unsplash.com/photo-1550684376-efcbd6e3f031?w=800",
+        url: "https://images.unsplash.com/photo-1550684376-efcbd6e3f031?w=2000",
         altText: "Neon Dreams Pop Art",
         type: "main",
         sortOrder: 0,
@@ -525,7 +597,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-pop-2",
-        url: "https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=800",
+        url: "https://images.unsplash.com/photo-1561214115-f2f134cc4912?w=2000",
         altText: "Comic Burst Pop Art",
         type: "main",
         sortOrder: 0,
@@ -557,7 +629,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-vin-1",
-        url: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800",
+        url: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=2000",
         altText: "Paris 1920 Vintage Art",
         type: "main",
         sortOrder: 0,
@@ -587,7 +659,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-vin-2",
-        url: "https://images.unsplash.com/photo-1459411552884-841db9b3cc2a?w=800",
+        url: "https://images.unsplash.com/photo-1459411552884-841db9b3cc2a?w=2000",
         altText: "Botanical Atlas Vintage Print",
         type: "main",
         sortOrder: 0,
@@ -619,7 +691,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-sur-1",
-        url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800",
+        url: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=2000",
         altText: "Floating Islands Surrealist Art",
         type: "main",
         sortOrder: 0,
@@ -649,7 +721,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-sur-2",
-        url: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800",
+        url: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=2000",
         altText: "Melting Time Surrealist Art",
         type: "main",
         sortOrder: 0,
@@ -681,7 +753,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-boh-1",
-        url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+        url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=2000",
         altText: "Desert Tapestry Bohemian Art",
         type: "main",
         sortOrder: 0,
@@ -711,7 +783,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-boh-2",
-        url: "https://images.unsplash.com/photo-1509587584298-0f3b3a3a1797?w=800",
+        url: "https://images.unsplash.com/photo-1509587584298-0f3b3a3a1797?w=2000",
         altText: "Mandala Garden Bohemian Art",
         type: "main",
         sortOrder: 0,
@@ -743,7 +815,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-mod-1",
-        url: "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=800",
+        url: "https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=2000",
         altText: "Urban Geometry Modern Art",
         type: "main",
         sortOrder: 0,
@@ -773,7 +845,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-mod-2",
-        url: "https://images.unsplash.com/photo-1550684376-efcbd6e3f031?w=800",
+        url: "https://images.unsplash.com/photo-1550684376-efcbd6e3f031?w=2000",
         altText: "Color Block Modern Art",
         type: "main",
         sortOrder: 0,
@@ -805,7 +877,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-pho-1",
-        url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200",
+        url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=2000",
         altText: "Ocean Horizon Photography",
         type: "main",
         sortOrder: 0,
@@ -836,7 +908,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-pho-2",
-        url: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1200",
+        url: "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=2000",
         altText: "City Lights Photography",
         type: "main",
         sortOrder: 0,
@@ -866,7 +938,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-pho-3",
-        url: "https://images.unsplash.com/photo-1474511320723-9a56873571b7?w=800",
+        url: "https://images.unsplash.com/photo-1425913397330-cf8af2ff40a1?w=2000",
         altText: "Wild Spirit Wildlife Photography",
         type: "main",
         sortOrder: 0,
@@ -898,7 +970,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-tex-1",
-        url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+        url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=2000",
         altText: "Concrete Poetry Texture Art",
         type: "main",
         sortOrder: 0,
@@ -928,7 +1000,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-tex-2",
-        url: "https://images.unsplash.com/photo-1515825838458-f2a94b20105a?w=800",
+        url: "https://images.unsplash.com/photo-1515825838458-f2a94b20105a?w=2000",
         altText: "Paper Layers Texture Art",
         type: "main",
         sortOrder: 0,
@@ -960,7 +1032,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-quo-1",
-        url: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=800",
+        url: "https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=2000",
         altText: "Be Present Quote Art",
         type: "main",
         sortOrder: 0,
@@ -990,7 +1062,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-quo-2",
-        url: "https://images.unsplash.com/photo-1499678329028-101435549a4e?w=800",
+        url: "https://images.unsplash.com/photo-1499678329028-101435549a4e?w=2000",
         altText: "Create Every Day Quote Art",
         type: "main",
         sortOrder: 0,
@@ -1022,7 +1094,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-ret-1",
-        url: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=800",
+        url: "https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=2000",
         altText: "Sunset Boulevard Retro Art",
         type: "main",
         sortOrder: 0,
@@ -1052,7 +1124,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-ret-2",
-        url: "https://images.unsplash.com/photo-1461360228754-6e81c478b882?w=800",
+        url: "https://images.unsplash.com/photo-1461360228754-6e81c478b882?w=2000",
         altText: "Vinyl Vibes Retro Art",
         type: "main",
         sortOrder: 0,
@@ -1084,7 +1156,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-pan-1",
-        url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200",
+        url: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=2000",
         altText: "Alpine Majesty Panoramic",
         type: "main",
         sortOrder: 0,
@@ -1116,7 +1188,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-por-1",
-        url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800",
+        url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=2000",
         altText: "Urban Soul Portrait",
         type: "main",
         sortOrder: 0,
@@ -1148,7 +1220,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-col-1",
-        url: "https://images.unsplash.com/photo-1549490349-8643362247b5?w=800",
+        url: "https://images.unsplash.com/photo-1549490349-8643362247b5?w=2000",
         altText: "Emerald Dreams Abstract",
         type: "main",
         sortOrder: 0,
@@ -1178,7 +1250,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-col-2",
-        url: "https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=800",
+        url: "https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=2000",
         altText: "Blush Hour Abstract",
         type: "main",
         sortOrder: 0,
@@ -1210,7 +1282,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-ai-1",
-        url: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=800",
+        url: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=2000",
         altText: "Neural Dreams AI Generated Art",
         type: "main",
         sortOrder: 0,
@@ -1242,7 +1314,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-ai-2",
-        url: "https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?w=800",
+        url: "https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?w=2000",
         altText: "Digital Cosmos AI Generated Art",
         type: "main",
         sortOrder: 0,
@@ -1275,7 +1347,7 @@ const sampleProducts: NewProduct[] = [
     images: [
       {
         id: "img-ai-3",
-        url: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=800",
+        url: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=2000",
         altText: "Synthetic Nature AI Generated Art",
         type: "main",
         sortOrder: 0,
@@ -1608,16 +1680,68 @@ async function clearData(): Promise<void> {
 }
 
 /**
+ * Turn a product's declared source URLs into genuinely matted, self-hosted
+ * images satisfying the square contract.
+ *
+ * The literals in sampleProducts carry remote URLs and *asserted* MAT_CANVAS
+ * dimensions. This replaces them with real records: the source is downloaded
+ * (cached), matted or cropped by the same code path the admin upload uses, and
+ * pushed to storage.
+ *
+ * Failures are non-fatal — a dead source URL should leave that one product
+ * without imagery rather than abort the whole seed.
+ */
+async function processProductImages(
+  productData: NewProduct
+): Promise<ProductImage[]> {
+  const declared = (productData.images ?? []) as ProductImage[];
+  const built: ProductImage[] = [];
+
+  for (const [i, img] of declared.entries()) {
+    try {
+      built.push(
+        await buildSeedImageFromUrl(
+          img.url,
+          `${productData.slug}-${i}.jpg`,
+          img.altText,
+          img.sortOrder ?? i,
+          img.type
+        )
+      );
+    } catch (error) {
+      console.warn(
+        `    ! image ${i} failed for ${productData.slug}: ${(error as Error).message}`
+      );
+    }
+  }
+
+  if (declared.length > 0 && built.length === 0) {
+    // Warn loudly: a product with no imagery renders a placeholder card and
+    // silently degrades the dev catalogue. Usually means a rotted source URL.
+    console.error(
+      `    !! ${productData.slug} has NO images — every source failed. ` +
+        "Check the URLs in sampleProducts."
+    );
+  }
+
+  return built;
+}
+
+/**
  * Seed products and their variants
  */
 async function seedProducts(): Promise<void> {
   console.log("Seeding products...");
 
   for (const productData of sampleProducts) {
+    // Download, mat and upload this product's imagery before inserting, so the
+    // stored records point at our own matted assets rather than remote sources.
+    const images = await processProductImages(productData);
+
     // Insert product
     const [insertedProduct] = await db
       .insert(products)
-      .values(productData)
+      .values({ ...productData, images })
       .returning({ id: products.id, orientation: products.orientation });
 
     if (!insertedProduct) {
