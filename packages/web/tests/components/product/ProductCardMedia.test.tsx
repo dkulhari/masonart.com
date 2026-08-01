@@ -118,6 +118,40 @@ describe('ProductCardMedia — dots', () => {
   })
 })
 
+describe('ProductCardMedia — dots must escape the rounded clip', () => {
+  /**
+   * Regression: the dots sit at bottom-[-14px], deliberately outside the image
+   * box (measured on mesonart). The rounded corners need overflow-hidden, so if
+   * that clip is on an ancestor of the dots they are silently cut off — which
+   * is exactly what happened, and jsdom cannot catch it by layout.
+   *
+   * Asserted structurally instead: no overflow-hidden element may contain the
+   * dots.
+   */
+  it('dots are not inside any overflow-hidden ancestor', () => {
+    const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+    const dots = container.querySelector('[data-testid="card-dots"]')!
+    const clipped = [...container.querySelectorAll('.overflow-hidden')].filter((el) =>
+      el.contains(dots)
+    )
+    expect(clipped).toHaveLength(0)
+  })
+
+  it('the images ARE inside the rounded clip, so corners still round', () => {
+    const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+    const clip = container.querySelector('.overflow-hidden')!
+    expect(clip.className).toContain('rounded-')
+    expect(clip.querySelectorAll('img').length).toBe(4)
+  })
+
+  it('the in-flow image still sets the height after the restructure', () => {
+    const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)
+    const inFlow = container.querySelectorAll('img:not(.absolute)')
+    expect(inFlow).toHaveLength(1)
+    expect(inFlow[0]!.className).toContain('aspect-square')
+  })
+})
+
 describe('ProductCardMedia — hover', () => {
   it('activates a slide on mouse pointermove', () => {
     const { container } = render(<ProductCardMedia images={many(4)} slug="s" title="t" />)

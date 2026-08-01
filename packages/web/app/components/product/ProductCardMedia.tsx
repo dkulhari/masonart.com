@@ -89,47 +89,53 @@ export function ProductCardMedia({
       aria-label={title}
       tabIndex={-1}
       data-testid="media-box"
-      className={cn(
-        'relative block overflow-hidden rounded-[var(--card-radius)] bg-mat',
-        className
-      )}
+      className={cn('relative block', className)}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
     >
-      {/* IN FLOW — this element defines the media box height. Never absolute. */}
-      <img
-        src={primary.url}
-        alt={primary.altText}
-        width={primary.width}
-        height={primary.height}
-        loading="lazy"
-        decoding="async"
-        sizes={SIZES_ATTR}
-        className={cn('block w-full object-contain', MEDIA_RATIO)}
-      />
-
-      {/* ABSOLUTE — hover slides. Cannot contribute height. Desktop only:
-          mesonart ships these under display:none on mobile and still downloads
-          four unused images per card, which we avoid by not rendering them. */}
-      {hoverSlides.map((m, i) => (
+      {/*
+        The rounded clip lives HERE, not on the Link.
+        The dots sit at bottom-[-14px] — deliberately outside the image box, as
+        measured on mesonart — so an overflow-hidden Link would clip them. This
+        wrapper is in normal flow, so it still takes its height from the in-flow
+        image below and the alignment mechanism is unchanged.
+      */}
+      <div className="relative overflow-hidden rounded-[var(--card-radius)] bg-mat">
+        {/* IN FLOW — this element defines the media box height. Never absolute. */}
         <img
-          key={m.id}
-          src={m.url}
-          alt=""
-          aria-hidden
-          width={m.width}
-          height={m.height}
+          src={primary.url}
+          alt={primary.altText}
+          width={primary.width}
+          height={primary.height}
           loading="lazy"
           decoding="async"
           sizes={SIZES_ATTR}
-          className={cn(
-            'absolute inset-0 hidden h-full w-full object-contain md:block',
-            'motion-safe:transition-opacity motion-safe:duration-500',
-            EASE_PRIMARY,
-            active === i + 1 ? 'opacity-100' : 'opacity-0'
-          )}
+          className={cn('block w-full object-contain', MEDIA_RATIO)}
         />
-      ))}
+
+        {/* ABSOLUTE — hover slides. Cannot contribute height. Desktop only:
+            mesonart ships these under display:none on mobile and still downloads
+            four unused images per card, which we avoid by not rendering them. */}
+        {hoverSlides.map((m, i) => (
+          <img
+            key={m.id}
+            src={m.url}
+            alt=""
+            aria-hidden
+            width={m.width}
+            height={m.height}
+            loading="lazy"
+            decoding="async"
+            sizes={SIZES_ATTR}
+            className={cn(
+              'absolute inset-0 hidden h-full w-full object-contain md:block',
+              'motion-safe:transition-opacity motion-safe:duration-500',
+              EASE_PRIMARY,
+              active === i + 1 ? 'opacity-100' : 'opacity-0'
+            )}
+          />
+        ))}
+      </div>
 
       {/* Quick-view: 48x48, radius 60px, white on backdrop-blur, inset 16px.
           Fades in on hover at --ease-fast. Kept reachable by focus, unlike
