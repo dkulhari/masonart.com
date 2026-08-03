@@ -213,7 +213,7 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
     <a
       href={`/account/orders/${order.orderNumber}`}
       className={cn(
-        'block rounded-xl border border-border bg-card transition-all hover:border-brand-300 hover:shadow-md',
+        'block rounded-xl border border-border bg-card transition-all hover:border-foreground/30 hover:shadow-md',
         compact ? 'p-4' : 'p-4 sm:p-6'
       )}
     >
@@ -309,7 +309,7 @@ function OrderCard({ order, compact = false }: OrderCardProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-1 text-sm font-medium text-brand-600">
+        <div className="flex items-center gap-1 text-sm font-medium text-foreground">
           View Details
           <ChevronRight className="h-4 w-4" />
         </div>
@@ -394,7 +394,7 @@ function EmptyOrdersState({ className }: EmptyOrdersStateProps) {
       </p>
       <a
         href="/posters"
-        className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+        className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
       >
         Browse Posters
         <ArrowRight className="h-4 w-4" />

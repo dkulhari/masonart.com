@@ -79,7 +79,7 @@ function CartContent() {
       <div className="container-wide py-8 lg:py-12">
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-2xl tracking-tight text-foreground sm:text-3xl">
             Shopping Cart
           </h1>
           {!isEmpty && (
@@ -123,7 +123,7 @@ function CartContent() {
               <div className="mt-6">
                 <a
                   href="/posters"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 transition-colors hover:text-brand-700"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-foreground transition-colors hover:text-foreground/60"
                 >
                   Continue Shopping
                   <ChevronRight className="h-4 w-4" />
@@ -165,14 +165,14 @@ function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
 
       {/* Free Shipping Progress */}
       {hasShippingFee && (
-        <div className="mt-4 rounded-lg bg-brand-50 p-3">
-          <p className="text-sm text-brand-700">
+        <div className="mt-4 rounded-lg bg-accent p-3">
+          <p className="text-sm text-foreground">
             Add <span className="font-semibold">{formatPrice(amountUntilFreeShipping)}</span> more
             for free shipping!
           </p>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-brand-200">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-accent">
             <div
-              className="h-full rounded-full bg-brand-500 transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${Math.min(100, (subtotal / shippingThreshold) * 100)}%` }}
             />
           </div>
@@ -207,14 +207,14 @@ function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
       <div className="mt-4 border-t border-border pt-4">
         <div className="flex items-center justify-between">
           <span className="text-base font-semibold text-foreground">Estimated Total</span>
-          <span className="text-xl font-bold text-foreground">{formatPrice(total)}</span>
+          <span className="text-xl font-medium text-foreground">{formatPrice(total)}</span>
         </div>
       </div>
 
       {/* Checkout Button */}
       <a
         href="/checkout"
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
       >
         Proceed to Checkout
         <ArrowRight className="h-4 w-4" />
@@ -223,15 +223,15 @@ function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
       {/* Trust Badges */}
       <div className="mt-6 space-y-3">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <Truck className="h-5 w-5 text-brand-500" />
+          <Truck className="h-5 w-5 text-foreground" />
           <span>Free shipping on orders over ₹999</span>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <Shield className="h-5 w-5 text-brand-500" />
+          <Shield className="h-5 w-5 text-foreground" />
           <span>Secure checkout with encrypted payment</span>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <RotateCcw className="h-5 w-5 text-brand-500" />
+          <RotateCcw className="h-5 w-5 text-foreground" />
           <span>30-day hassle-free returns</span>
         </div>
       </div>
@@ -275,7 +275,7 @@ function EmptyCartState() {
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
         <a
           href="/posters"
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
         >
           Browse Posters
           <ArrowRight className="h-4 w-4" />
@@ -298,7 +298,7 @@ function EmptyCartState() {
         </p>
         <a
           href="/posters?featured=true"
-          className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700"
+          className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-foreground hover:text-foreground/60"
         >
           View Featured Collection
           <ChevronRight className="h-4 w-4" />

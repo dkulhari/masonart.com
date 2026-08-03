@@ -132,7 +132,7 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
               Your Cart
             </h2>
             {itemCount > 0 && (
-              <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+              <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-foreground">
                 {itemCount} {itemCount === 1 ? 'item' : 'items'}
               </span>
             )}
@@ -186,7 +186,7 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
               <div className="space-y-2">
                 <a
                   href="/checkout"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
                   onClick={onClose}
                 >
                   Checkout
@@ -226,7 +226,7 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
       </p>
       <a
         href="/posters"
-        className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+        className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
         onClick={onClose}
       >
         Browse Posters
@@ -266,7 +266,7 @@ export function CartTrigger({ onClick, className }: CartTriggerProps) {
     >
       <ShoppingCart className="h-5 w-5" />
       {itemCount > 0 && (
-        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs font-medium text-white">
+        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-white">
           {itemCount > 99 ? '99+' : itemCount}
         </span>
       )}

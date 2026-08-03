@@ -181,8 +181,8 @@ export function ReturnRequestForm({
               className={cn(
                 'flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
                 reason === option.value
-                  ? 'border-brand-500 bg-brand-50'
-                  : 'border-border hover:border-brand-300 hover:bg-muted/50'
+                  ? 'border-primary bg-accent'
+                  : 'border-border hover:border-foreground/30 hover:bg-muted/50'
               )}
             >
               <input
@@ -191,13 +191,13 @@ export function ReturnRequestForm({
                 value={option.value}
                 checked={reason === option.value}
                 onChange={(e) => setReason(e.target.value as ReturnReason)}
-                className="mt-0.5 h-4 w-4 border-border text-brand-500 focus:ring-brand-500"
+                className="mt-0.5 h-4 w-4 border-border text-foreground focus:ring-ring"
               />
               <div className="flex-1">
                 <p
                   className={cn(
                     'text-sm font-medium',
-                    reason === option.value ? 'text-brand-700' : 'text-foreground'
+                    reason === option.value ? 'text-foreground' : 'text-foreground'
                   )}
                 >
                   {option.label}
@@ -222,7 +222,7 @@ export function ReturnRequestForm({
           rows={4}
           maxLength={MAX_DETAILS_LENGTH}
           className={cn(
-            'w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20',
+            'w-full rounded-lg border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20',
             !isDetailsValid && detailsLength > 0 ? 'border-red-300' : 'border-border'
           )}
         />
@@ -259,8 +259,8 @@ export function ReturnRequestForm({
           className={cn(
             'inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2 text-sm font-medium text-white transition-colors',
             canSubmit
-              ? 'bg-brand-500 hover:bg-brand-600'
-              : 'cursor-not-allowed bg-brand-300'
+              ? 'bg-primary hover:bg-primary/85'
+              : 'cursor-not-allowed bg-accent'
           )}
         >
           {isSubmitting ? (

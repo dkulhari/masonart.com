@@ -2,10 +2,10 @@
  * SectionBand — a full-bleed page band with the standard vertical rhythm.
  *
  * mesonart's pages are a stack of alternating bands: white, then beige, then
- * white again. Ours reached for `bg-muted/30`, a cool blue-gray, and for
- * `bg-gradient-to-br from-brand-*` on the marketing sections. This component
- * exists so the alternation is a `tone` prop rather than a class each section
- * invents for itself.
+ * white again. Ours reached for a cool blue-gray muted tint, and for brand
+ * gradients on the marketing sections. This component exists so the
+ * alternation is a `tone` prop rather than a class each section invents for
+ * itself.
  *
  * The band colours are measured — see --band / --band-strong / --highlight in
  * globals.css.

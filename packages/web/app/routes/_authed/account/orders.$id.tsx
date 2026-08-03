@@ -309,7 +309,7 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-        <Camera className="h-5 w-5 text-brand-500" />
+        <Camera className="h-5 w-5 text-foreground" />
         Production Approval
       </h2>
 
@@ -357,7 +357,7 @@ function ApprovalStatusSection({ approvals }: { approvals: OrderApproval[] }) {
         {pendingApproval && (
           <a
             href={`/approve/${pendingApproval.approvalToken}`}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/85"
           >
             <ExternalLink className="h-4 w-4" />
             Review & Approve Photos
@@ -492,7 +492,7 @@ function OrderDetailPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-brand-500 mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -570,7 +570,7 @@ function OrderDetailPage() {
         <div className="mb-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+              <h1 className="text-2xl text-foreground sm:text-3xl">
                 Order {order.orderNumber}
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -606,7 +606,7 @@ function OrderDetailPage() {
             <div className="rounded-xl border border-border bg-card">
               <div className="border-b border-border p-4">
                 <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                  <Package className="h-5 w-5 text-brand-500" />
+                  <Package className="h-5 w-5 text-foreground" />
                   Items ({order.items.length})
                 </h2>
               </div>
@@ -631,7 +631,7 @@ function OrderDetailPage() {
                     <div className="flex-1">
                       <a
                         href={`/posters/${item.productSlug || item.productId}`}
-                        className="font-medium text-foreground hover:text-brand-600 hover:underline"
+                        className="font-medium text-foreground hover:text-foreground/60 hover:underline"
                       >
                         {item.productTitle}
                       </a>
@@ -701,7 +701,7 @@ function OrderDetailPage() {
             {/* Order Summary */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <FileText className="h-5 w-5 text-brand-500" />
+                <FileText className="h-5 w-5 text-foreground" />
                 Order Summary
               </h2>
               <div className="mt-4 space-y-2 text-sm">
@@ -755,7 +755,7 @@ function OrderDetailPage() {
             {/* Shipping Address */}
             <div className="rounded-xl border border-border bg-card p-4">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <MapPin className="h-5 w-5 text-brand-500" />
+                <MapPin className="h-5 w-5 text-foreground" />
                 Shipping Address
               </h2>
               <div className="mt-4 text-sm text-muted-foreground">
@@ -791,7 +791,7 @@ function OrderDetailPage() {
               </p>
               <a
                 href="/contact"
-                className="mt-3 inline-flex items-center text-sm font-medium text-brand-600 hover:text-brand-700"
+                className="mt-3 inline-flex items-center text-sm font-medium text-foreground hover:text-foreground/60"
               >
                 Contact Support
               </a>

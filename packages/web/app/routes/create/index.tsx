@@ -394,7 +394,7 @@ function CreatePage() {
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              <h1 className="text-2xl tracking-tight text-foreground sm:text-3xl">
                 Create AI Poster
               </h1>
               <p className="text-sm text-muted-foreground">

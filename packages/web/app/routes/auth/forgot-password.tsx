@@ -65,8 +65,8 @@ function ForgotPasswordPage() {
           {/* Logo/Brand */}
           <div className="mb-8 text-center">
             <a href="/" className="inline-block">
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                chobii<span className="text-brand-500">.art</span>
+              <h1 className="text-3xl tracking-tight text-foreground">
+                chobii.art
               </h1>
             </a>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -90,7 +90,7 @@ function ForgotPasswordPage() {
                 </p>
                 <a
                   href="/auth/login"
-                  className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-brand-500 hover:text-brand-600"
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground/60"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Back to sign in
@@ -129,7 +129,7 @@ function ForgotPasswordPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="h-12 w-full rounded-lg border border-border bg-background pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    className="h-12 w-full rounded-lg border border-border bg-background pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
@@ -137,8 +137,8 @@ function ForgotPasswordPage() {
                   type="submit"
                   disabled={isLoading}
                   className={cn(
-                    'flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-medium text-white transition-colors',
-                    'hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                    'flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-white transition-colors',
+                    'hover:bg-primary/85 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                     'disabled:cursor-not-allowed disabled:opacity-50'
                   )}
                 >
@@ -156,7 +156,7 @@ function ForgotPasswordPage() {
                   Remembered it?{' '}
                   <a
                     href="/auth/login"
-                    className="font-medium text-brand-500 hover:text-brand-600"
+                    className="font-medium text-foreground hover:text-foreground/60"
                   >
                     Back to sign in
                   </a>

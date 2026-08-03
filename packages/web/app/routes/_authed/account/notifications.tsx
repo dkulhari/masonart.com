@@ -197,7 +197,7 @@ function NotificationPreferencesPage() {
         <div className="container-wide py-8 lg:py-12">
           <div className="mx-auto max-w-2xl">
             <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-12 w-12 animate-spin text-brand-500" />
+              <Loader2 className="h-12 w-12 animate-spin text-foreground" />
               <p className="mt-4 text-muted-foreground">Loading preferences...</p>
             </div>
           </div>
@@ -249,11 +249,11 @@ function NotificationPreferencesPage() {
           {/* Page Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-100">
-                <Bell className="h-6 w-6 text-brand-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent">
+                <Bell className="h-6 w-6 text-foreground" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">
+                <h1 className="text-2xl text-foreground">
                   Notification Preferences
                 </h1>
                 <p className="text-sm text-muted-foreground">
@@ -283,7 +283,7 @@ function NotificationPreferencesPage() {
             {/* Email Notifications */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-4">
-                <Mail className="h-5 w-5 text-brand-500" />
+                <Mail className="h-5 w-5 text-foreground" />
                 <div>
                   <h2 className="font-semibold text-foreground">Email Notifications</h2>
                   <p className="text-xs text-muted-foreground">Sent to your account email</p>
@@ -307,7 +307,7 @@ function NotificationPreferencesPage() {
             {/* SMS Notifications */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-4">
-                <Smartphone className="h-5 w-5 text-brand-500" />
+                <Smartphone className="h-5 w-5 text-foreground" />
                 <div>
                   <h2 className="font-semibold text-foreground">SMS Notifications</h2>
                   <p className="text-xs text-muted-foreground">Sent to your phone number</p>
@@ -372,8 +372,8 @@ function NotificationToggle({
         disabled={isLoading}
         onClick={() => onChange(!enabled)}
         className={cn(
-          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-          enabled ? 'bg-brand-500' : 'bg-muted'
+          'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          enabled ? 'bg-primary' : 'bg-muted'
         )}
       >
         <span
@@ -384,7 +384,7 @@ function NotificationToggle({
         >
           {isLoading && (
             <span className="flex h-full w-full items-center justify-center">
-              <Loader2 className="h-3 w-3 animate-spin text-brand-500" />
+              <Loader2 className="h-3 w-3 animate-spin text-foreground" />
             </span>
           )}
         </span>

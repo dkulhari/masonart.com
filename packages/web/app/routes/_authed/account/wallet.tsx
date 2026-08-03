@@ -253,7 +253,7 @@ function WalletPage() {
             <ChevronLeft className="h-4 w-4" />
             Back to Account
           </a>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+          <h1 className="text-2xl text-foreground sm:text-3xl">
             My Wallet
           </h1>
           <p className="mt-2 text-muted-foreground">
@@ -281,7 +281,7 @@ function WalletPage() {
                   <p className="text-sm font-medium text-muted-foreground">
                     Available Balance
                   </p>
-                  <p className="mt-1 text-4xl font-bold text-foreground">
+                  <p className="mt-1 text-4xl font-medium text-foreground">
                     {walletData?.balance.formatted || '₹0.00'}
                   </p>
                 </div>

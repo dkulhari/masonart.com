@@ -188,11 +188,11 @@ function GalleryPage() {
       <div className="container-wide py-8 lg:py-12">
         {/* Page Header */}
         <div className="mb-8 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-brand-100 px-4 py-2 text-sm font-medium text-brand-700">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-foreground">
             <Sparkles className="h-4 w-4" />
             Community Creations
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          <h1 className="text-3xl tracking-tight text-foreground sm:text-4xl">
             AI Art Gallery
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
@@ -201,7 +201,7 @@ function GalleryPage() {
           </p>
           <Link
             to="/create"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
           >
             <Sparkles className="h-4 w-4" />
             Create Your Own
@@ -215,7 +215,7 @@ function GalleryPage() {
             <select
               value={currentStylePreset}
               onChange={(e) => updateSearch({ stylePreset: e.target.value || undefined })}
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
             >
               {STYLE_PRESETS.map((preset) => (
                 <option key={preset.value} value={preset.value}>
@@ -230,7 +230,7 @@ function GalleryPage() {
               onChange={(e) =>
                 updateSearch({ sortBy: e.target.value as 'createdAt' | 'likes' })
               }
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="createdAt">Newest</option>
               <option value="likes">Most Liked</option>
@@ -395,7 +395,7 @@ function EmptyGalleryState() {
 
       <Link
         to="/create"
-        className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+        className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
       >
         <Sparkles className="h-4 w-4" />
         Create with AI

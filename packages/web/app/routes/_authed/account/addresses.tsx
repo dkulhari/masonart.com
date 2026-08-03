@@ -186,7 +186,7 @@ function AddressesPage() {
         <div className="container-wide py-8 lg:py-12">
           <div className="mx-auto max-w-2xl">
             <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-12 w-12 animate-spin text-brand-500" />
+              <Loader2 className="h-12 w-12 animate-spin text-foreground" />
               <p className="mt-4 text-muted-foreground">Loading addresses...</p>
             </div>
           </div>
@@ -215,7 +215,7 @@ function AddressesPage() {
                 <MapPin className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Saved Addresses</h1>
+                <h1 className="text-2xl text-foreground">Saved Addresses</h1>
                 <p className="text-sm text-muted-foreground">
                   Manage your delivery addresses
                 </p>
@@ -225,7 +225,7 @@ function AddressesPage() {
               <button
                 type="button"
                 onClick={handleAdd}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/85 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               >
                 <Plus className="h-4 w-4" />
                 Add Address
@@ -297,9 +297,9 @@ function AddressesPage() {
                     onClick={handleSubmit}
                     disabled={!formValid || isSubmitting}
                     className={cn(
-                      'inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                      'inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                       formValid && !isSubmitting
-                        ? 'bg-brand-500 text-white hover:bg-brand-600'
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/85'
                         : 'cursor-not-allowed bg-muted text-muted-foreground'
                     )}
                   >
@@ -322,7 +322,7 @@ function AddressesPage() {
               <button
                 type="button"
                 onClick={handleAdd}
-                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/85"
               >
                 <Plus className="h-4 w-4" />
                 Add Your First Address
@@ -335,7 +335,7 @@ function AddressesPage() {
                   key={address.id}
                   className={cn(
                     'rounded-xl border bg-card p-6 transition-colors',
-                    address.isDefault ? 'border-brand-300 bg-brand-50/30' : 'border-border'
+                    address.isDefault ? 'border-foreground/30 bg-accent/30' : 'border-border'
                   )}
                 >
                   <div className="flex items-start justify-between">
@@ -343,7 +343,7 @@ function AddressesPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-foreground">{address.fullName}</span>
                         {address.isDefault && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-foreground">
                             <Star className="h-3 w-3" />
                             Default
                           </span>
@@ -371,7 +371,7 @@ function AddressesPage() {
                           type="button"
                           onClick={() => handleSetDefault(address.id)}
                           title="Set as default"
-                          className="rounded-lg p-2 text-muted-foreground hover:bg-brand-50 hover:text-brand-600 transition-colors"
+                          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground/60 transition-colors"
                         >
                           <Star className="h-4 w-4" />
                         </button>

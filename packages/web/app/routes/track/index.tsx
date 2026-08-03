@@ -204,10 +204,10 @@ function TrackOrderPage() {
       <div className="container-wide py-8 lg:py-12">
         {/* Page Header */}
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-100">
-            <Package className="h-8 w-8 text-brand-600" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent">
+            <Package className="h-8 w-8 text-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+          <h1 className="text-2xl text-foreground sm:text-3xl">
             Track Your Order
           </h1>
           <p className="mt-2 text-muted-foreground">
@@ -312,7 +312,7 @@ function GuestOrderLookupForm({
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
                 contactMethod === 'email'
-                  ? 'bg-brand-500 text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               )}
               disabled={isLoading}
@@ -326,7 +326,7 @@ function GuestOrderLookupForm({
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors',
                 contactMethod === 'phone'
-                  ? 'bg-brand-500 text-white'
+                  ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               )}
               disabled={isLoading}
@@ -402,7 +402,7 @@ function GuestOrderLookupForm({
         <button
           type="submit"
           disabled={isLoading}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 text-base font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-6 text-base font-semibold text-white transition-colors hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isLoading ? (
             <>
@@ -423,7 +423,7 @@ function GuestOrderLookupForm({
         <p className="text-sm text-muted-foreground">
           <span className="font-medium text-foreground">Need help?</span>{' '}
           If you&apos;re having trouble tracking your order, please{' '}
-          <a href="/contact" className="font-medium text-brand-600 hover:text-brand-700">
+          <a href="/contact" className="font-medium text-foreground hover:text-foreground/60">
             contact support
           </a>{' '}
           with your order details.
@@ -522,7 +522,7 @@ function OrderTrackingResult({ order, onTrackAnother }: OrderTrackingResultProps
                   href={order.tracking.trackingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/85"
                 >
                   Track on {getCarrierDisplayName(order.tracking.carrier)}
                   <ExternalLink className="h-4 w-4" />
@@ -554,7 +554,7 @@ function OrderTrackingResult({ order, onTrackAnother }: OrderTrackingResultProps
       <div className="text-center">
         <button
           onClick={onTrackAnother}
-          className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+          className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground/60"
         >
           <Search className="h-4 w-4" />
           Track Another Order
@@ -569,7 +569,7 @@ function OrderTrackingResult({ order, onTrackAnother }: OrderTrackingResultProps
         </p>
         <a
           href="/contact"
-          className="mt-3 inline-flex items-center text-sm font-medium text-brand-600 hover:text-brand-700"
+          className="mt-3 inline-flex items-center text-sm font-medium text-foreground hover:text-foreground/60"
         >
           Contact Support
         </a>

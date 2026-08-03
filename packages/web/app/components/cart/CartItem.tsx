@@ -93,7 +93,7 @@ export function CartItem({
         <a
           href={`/posters/${item.productSlug}`}
           className={cn(
-            'font-medium text-foreground hover:text-brand-600 transition-colors line-clamp-1',
+            'font-medium text-foreground hover:text-foreground/60 transition-colors line-clamp-1',
             compact ? 'text-sm' : 'text-sm sm:text-base'
           )}
         >

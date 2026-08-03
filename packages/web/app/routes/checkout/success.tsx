@@ -148,7 +148,7 @@ function OrderSuccessPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-brand-500 mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">Loading your order details...</p>
         </div>
       </div>
@@ -169,11 +169,11 @@ function OrderSuccessPage() {
             <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
               <AlertCircle className="h-10 w-10 text-red-500" />
             </div>
-            <h1 className="mb-2 text-2xl font-bold text-foreground">Unable to Load Order</h1>
+            <h1 className="mb-2 text-2xl text-foreground">Unable to Load Order</h1>
             <p className="mb-8 text-muted-foreground">{error}</p>
             <a
               href="/account/orders"
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
             >
               View All Orders
               <ArrowRight className="h-4 w-4" />
@@ -243,7 +243,7 @@ function OrderSuccessPage() {
               </a>
               <a
                 href="/account/orders"
-                className="flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+                className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
               >
                 <User className="h-4 w-4" />
                 View All Orders
@@ -276,7 +276,7 @@ function SuccessHeader({ orderNumber, userEmail, onCopy, copied }: SuccessHeader
       </div>
 
       {/* Title */}
-      <h1 className="mb-2 text-2xl font-bold text-foreground sm:text-3xl animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+      <h1 className="mb-2 text-2xl text-foreground sm:text-3xl animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
         Order Confirmed!
       </h1>
 
@@ -286,7 +286,7 @@ function SuccessHeader({ orderNumber, userEmail, onCopy, copied }: SuccessHeader
 
       {/* Order Number */}
       <div className="inline-flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-3 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-300">
-        <Receipt className="h-5 w-5 text-brand-500" />
+        <Receipt className="h-5 w-5 text-foreground" />
         <div className="text-left">
           <p className="text-xs text-muted-foreground">Order Number</p>
           <p className="text-lg font-semibold text-foreground">{orderNumber}</p>
@@ -341,7 +341,7 @@ function OrderItemsSection({ items }: OrderItemsSectionProps) {
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="border-b border-border bg-muted/30 px-6 py-4">
         <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-          <Package className="h-5 w-5 text-brand-500" />
+          <Package className="h-5 w-5 text-foreground" />
           Order Items ({items.length})
         </h2>
       </div>
@@ -416,7 +416,7 @@ function ShippingSection({ address, method, estimatedDelivery }: ShippingSection
     <div className="rounded-xl border border-border bg-card">
       <div className="border-b border-border bg-muted/30 px-6 py-4">
         <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-          <MapPin className="h-5 w-5 text-brand-500" />
+          <MapPin className="h-5 w-5 text-foreground" />
           Shipping Details
         </h2>
       </div>
@@ -438,7 +438,7 @@ function ShippingSection({ address, method, estimatedDelivery }: ShippingSection
         {/* Delivery Method */}
         {method && (
           <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-4 py-3">
-            <Truck className="h-4 w-4 text-brand-500" />
+            <Truck className="h-4 w-4 text-foreground" />
             <div>
               <p className="text-sm font-medium text-foreground capitalize">{method} Delivery</p>
               {estimatedDelivery && (
@@ -475,7 +475,7 @@ function OrderSummarySection({
     <div className="rounded-xl border border-border bg-card">
       <div className="border-b border-border bg-muted/30 px-6 py-4">
         <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-          <CreditCard className="h-5 w-5 text-brand-500" />
+          <CreditCard className="h-5 w-5 text-foreground" />
           Payment Summary
         </h2>
       </div>
@@ -506,7 +506,7 @@ function OrderSummarySection({
         {/* Total */}
         <div className="flex justify-between border-t border-border pt-3">
           <span className="text-base font-semibold text-foreground">Total Paid</span>
-          <span className="text-lg font-bold text-foreground">{formatPrice(total)}</span>
+          <span className="text-lg font-medium text-foreground">{formatPrice(total)}</span>
         </div>
 
         {/* Payment Status Badge */}
@@ -564,12 +564,12 @@ function WhatNextSection() {
               key={step.title}
               className="flex items-start gap-3 rounded-lg bg-muted/30 p-4"
             >
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-foreground">
                 <step.icon className="h-5 w-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs font-medium text-white">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-white">
                     {index + 1}
                   </span>
                   <h3 className="text-sm font-medium text-foreground">{step.title}</h3>
@@ -599,7 +599,7 @@ function GenericSuccessState() {
           </div>
 
           {/* Title */}
-          <h1 className="mb-2 text-2xl font-bold text-foreground sm:text-3xl">
+          <h1 className="mb-2 text-2xl text-foreground sm:text-3xl">
             Order Confirmed!
           </h1>
 
@@ -619,7 +619,7 @@ function GenericSuccessState() {
             </a>
             <a
               href="/account/orders"
-              className="flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+              className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
             >
               <User className="h-4 w-4" />
               View Orders
@@ -629,7 +629,7 @@ function GenericSuccessState() {
           {/* Help Text */}
           <p className="mt-8 text-sm text-muted-foreground">
             Need help?{' '}
-            <a href="/contact" className="text-brand-600 hover:text-brand-700 font-medium">
+            <a href="/contact" className="text-foreground hover:text-foreground/60 font-medium">
               Contact us
             </a>
           </p>

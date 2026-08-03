@@ -283,7 +283,7 @@ function AICreationsHistoryPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-brand-500 mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -305,7 +305,7 @@ function AICreationsHistoryPage() {
         {/* Page Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground sm:text-3xl">
+            <h1 className="flex items-center gap-2 text-2xl text-foreground sm:text-3xl">
               <Sparkles className="h-7 w-7 text-purple-500" />
               AI Creations
             </h1>
@@ -335,7 +335,7 @@ function AICreationsHistoryPage() {
               <Filter className="h-4 w-4" />
               Filter
               {activeFilterCount > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs text-white">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-white">
                   {activeFilterCount}
                 </span>
               )}

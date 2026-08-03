@@ -102,7 +102,7 @@ export function TrackingTimeline({
                   className={cn(
                     'absolute left-4 top-8 w-0.5',
                     compact ? 'h-8' : 'h-12',
-                    isCompleted ? 'bg-brand-500' : 'bg-border'
+                    isCompleted ? 'bg-primary' : 'bg-border'
                   )}
                   style={{ transform: 'translateX(-50%)' }}
                 />
@@ -113,9 +113,9 @@ export function TrackingTimeline({
                 className={cn(
                   'relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2',
                   isCompleted
-                    ? 'border-brand-500 bg-brand-500 text-white'
+                    ? 'border-primary bg-primary text-primary-foreground'
                     : isCurrent
-                      ? 'border-brand-500 bg-background text-brand-500'
+                      ? 'border-primary bg-background text-foreground'
                       : 'border-border bg-background text-muted-foreground'
                 )}
               >
@@ -131,7 +131,7 @@ export function TrackingTimeline({
                     isCompleted
                       ? 'text-foreground'
                       : isCurrent
-                        ? 'text-brand-600'
+                        ? 'text-foreground'
                         : 'text-muted-foreground'
                   )}
                 >
@@ -143,7 +143,7 @@ export function TrackingTimeline({
                   </p>
                 )}
                 {!compact && isCurrent && !isCompleted && estimatedDelivery && (
-                  <p className="mt-1 text-xs text-brand-600">
+                  <p className="mt-1 text-xs text-foreground">
                     Est. {formatDate(estimatedDelivery)}
                   </p>
                 )}

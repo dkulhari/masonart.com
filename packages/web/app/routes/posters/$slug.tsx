@@ -320,13 +320,13 @@ function ProductPageLoading() {
 function ProductNotFound() {
   return (
     <div className="container-wide flex flex-col items-center justify-center py-20 text-center">
-      <h1 className="text-2xl font-bold text-foreground">Product Not Found</h1>
+      <h1 className="text-2xl text-foreground">Product Not Found</h1>
       <p className="mt-2 text-muted-foreground">
         The product you are looking for could not be found or may have been removed.
       </p>
       <a
         href="/posters"
-        className="mt-6 rounded-lg bg-brand-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-brand-600"
+        className="mt-6 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary/85"
       >
         Browse All Products
       </a>
@@ -464,7 +464,7 @@ function RelatedProductsSection({ products }: { products: ProductCardData[] }) {
   return (
     <section className="border-t border-border bg-muted/30">
       <div className="container-wide py-12">
-        <h2 className="mb-6 text-xl font-bold text-foreground">You May Also Like</h2>
+        <h2 className="mb-6 text-xl text-foreground">You May Also Like</h2>
         <ProductGrid products={products} />
       </div>
     </section>

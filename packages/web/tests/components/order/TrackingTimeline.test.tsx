@@ -100,8 +100,9 @@ describe('TrackingTimeline Component', () => {
         />
       )
 
-      // Completed step icons should have brand-500 background (rounded-full class distinguishes icons from connectors)
-      const completedIcons = container.querySelectorAll('.rounded-full.bg-brand-500')
+      // Completed step icons carry the primary fill (rounded-full distinguishes
+      // icons from connectors). Was bg-brand-500 before the monochrome sweep.
+      const completedIcons = container.querySelectorAll('.rounded-full.bg-primary')
       expect(completedIcons.length).toBe(3) // First 3 steps are completed
     })
 
@@ -116,7 +117,7 @@ describe('TrackingTimeline Component', () => {
 
       // Current step text should have brand color
       const inTransitText = screen.getByText('In Transit')
-      expect(inTransitText).toHaveClass('text-brand-600')
+      expect(inTransitText).toHaveClass('text-foreground')
     })
   })
 
@@ -206,7 +207,7 @@ describe('TrackingTimeline Component', () => {
       )
 
       // Some connectors should be colored (completed), some should be gray
-      const coloredConnectors = container.querySelectorAll('[class*="bg-brand-500"]')
+      const coloredConnectors = container.querySelectorAll('[class*="bg-primary"]')
       expect(coloredConnectors.length).toBeGreaterThan(0)
     })
   })

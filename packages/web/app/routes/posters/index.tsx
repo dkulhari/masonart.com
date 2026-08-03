@@ -564,7 +564,7 @@ function PageHeader({ totalProducts, activeFilterCount }: PageHeaderProps) {
   return (
     <section className="border-b border-border bg-muted/30 py-8 sm:py-12">
       <div className="container-wide">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+        <h1 className="text-3xl tracking-tight text-foreground sm:text-4xl">
           Shop Posters
         </h1>
         <p className="mt-2 text-muted-foreground">

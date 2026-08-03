@@ -295,7 +295,7 @@ function AICreationCard({
   return (
     <div
       className={cn(
-        'group relative overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-brand-300 hover:shadow-md',
+        'group relative overflow-hidden rounded-xl border border-border bg-card transition-all hover:border-foreground/30 hover:shadow-md',
         compact ? 'flex gap-3 p-3' : 'flex flex-col'
       )}
     >
@@ -318,7 +318,7 @@ function AICreationCard({
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {creation.status === 'queued' || creation.status === 'processing' ? (
-              <Loader2 className={cn('h-8 w-8 text-brand-500', isAnimated && 'animate-spin')} />
+              <Loader2 className={cn('h-8 w-8 text-foreground', isAnimated && 'animate-spin')} />
             ) : (
               <Image className="h-8 w-8 text-muted-foreground/50" />
             )}
@@ -401,7 +401,7 @@ function AICreationCard({
         <a
           href={`/account/ai-creations/${creation.id}`}
           className={cn(
-            'font-medium text-foreground hover:text-brand-600',
+            'font-medium text-foreground hover:text-foreground/60',
             compact ? 'text-sm line-clamp-2' : 'line-clamp-2'
           )}
         >
@@ -473,7 +473,7 @@ function AICreationCard({
                 className={cn(
                   'flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   isApproved
-                    ? 'bg-brand-500 text-white hover:bg-brand-600'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/85'
                     : 'cursor-not-allowed bg-gray-100 text-gray-400'
                 )}
                 title={!isApproved ? 'Awaiting moderation approval' : undefined}
@@ -515,7 +515,7 @@ function AICreationCard({
         {compact && (
           <a
             href={`/account/ai-creations/${creation.id}`}
-            className="mt-1 flex items-center gap-0.5 text-xs font-medium text-brand-600 hover:text-brand-700"
+            className="mt-1 flex items-center gap-0.5 text-xs font-medium text-foreground hover:text-foreground/60"
           >
             View Details
             <ChevronRight className="h-3.5 w-3.5" />

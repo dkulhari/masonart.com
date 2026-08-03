@@ -163,7 +163,7 @@ export function OrderTrackingCard({
     return (
       <div className={cn('rounded-xl border border-border bg-card p-6', className)}>
         <div className="flex items-center justify-center gap-2">
-          <Loader2 className="h-5 w-5 animate-spin text-brand-500" />
+          <Loader2 className="h-5 w-5 animate-spin text-foreground" />
           <span className="text-muted-foreground">Loading tracking information...</span>
         </div>
       </div>
@@ -220,7 +220,7 @@ export function OrderTrackingCard({
         <button
           onClick={() => fetchShipments(true)}
           disabled={isRefreshing}
-          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-50 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
         >
           <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
           Refresh
@@ -244,8 +244,8 @@ export function OrderTrackingCard({
               className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-muted/50"
             >
               <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50">
-                  <Package className="h-5 w-5 text-brand-600" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
+                  <Package className="h-5 w-5 text-foreground" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
@@ -298,7 +298,7 @@ export function OrderTrackingCard({
                   />
                 ) : (
                   <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-brand-500" />
+                    <Loader2 className="h-5 w-5 animate-spin text-foreground" />
                   </div>
                 )}
 
@@ -309,7 +309,7 @@ export function OrderTrackingCard({
                       href={shipment.trackingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/85"
                     >
                       Track on {getCarrierDisplayName(shipment.carrier)}
                       <ExternalLink className="h-4 w-4" />

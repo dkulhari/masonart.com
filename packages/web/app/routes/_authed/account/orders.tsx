@@ -200,7 +200,7 @@ function OrderHistoryPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-brand-500 mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -222,8 +222,8 @@ function OrderHistoryPage() {
         {/* Page Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground sm:text-3xl">
-              <Package className="h-7 w-7 text-brand-500" />
+            <h1 className="flex items-center gap-2 text-2xl text-foreground sm:text-3xl">
+              <Package className="h-7 w-7 text-foreground" />
               Order History
             </h1>
             <p className="mt-2 text-muted-foreground">
@@ -242,7 +242,7 @@ function OrderHistoryPage() {
             <Filter className="h-4 w-4" />
             Filter
             {currentStatus && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-xs text-white">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-white">
                 1
               </span>
             )}
@@ -263,7 +263,7 @@ function OrderHistoryPage() {
                     className={cn(
                       'w-full rounded-lg px-3 py-2 text-left text-sm transition-colors',
                       currentStatus === option.value
-                        ? 'bg-brand-100 font-medium text-brand-700'
+                        ? 'bg-accent font-medium text-foreground'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
@@ -296,7 +296,7 @@ function OrderHistoryPage() {
                     className={cn(
                       'rounded-full px-4 py-2 text-sm transition-colors',
                       currentStatus === option.value
-                        ? 'bg-brand-500 font-medium text-white'
+                        ? 'bg-primary font-medium text-white'
                         : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
                     )}
                   >
@@ -316,7 +316,7 @@ function OrderHistoryPage() {
                 <button
                   type="button"
                   onClick={handleClearFilter}
-                  className="flex items-center gap-1 rounded-full bg-brand-100 px-3 py-1 text-sm font-medium text-brand-700 hover:bg-brand-200"
+                  className="flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-sm font-medium text-foreground hover:bg-accent"
                 >
                   {STATUS_FILTERS.find((f) => f.value === currentStatus)?.label}
                   <X className="h-3.5 w-3.5" />
@@ -421,7 +421,7 @@ function Pagination({
               className={cn(
                 'flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-medium transition-colors',
                 page === currentPage
-                  ? 'border-brand-500 bg-brand-500 text-white'
+                  ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-border bg-background text-foreground hover:bg-muted'
               )}
             >

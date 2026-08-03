@@ -266,7 +266,7 @@ export function ReturnStatusCard({
                           className={cn(
                             'absolute left-[11px] top-6 h-full w-0.5',
                             isCompleted && stepOrder < currentStatusOrder
-                              ? 'bg-brand-500'
+                              ? 'bg-primary'
                               : 'bg-border'
                           )}
                         />
@@ -277,9 +277,9 @@ export function ReturnStatusCard({
                         className={cn(
                           'relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2',
                           isCompleted
-                            ? 'border-brand-500 bg-brand-500 text-white'
+                            ? 'border-primary bg-primary text-primary-foreground'
                             : isCurrent
-                              ? 'border-brand-500 bg-white text-brand-500'
+                              ? 'border-primary bg-white text-foreground'
                               : 'border-border bg-background text-muted-foreground'
                         )}
                       >

@@ -161,7 +161,7 @@ function ReturnRequestPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-brand-500 mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -238,8 +238,8 @@ function ReturnRequestPage() {
 
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground sm:text-3xl">
-            <RotateCcw className="h-7 w-7 text-brand-500" />
+          <h1 className="flex items-center gap-2 text-2xl text-foreground sm:text-3xl">
+            <RotateCcw className="h-7 w-7 text-foreground" />
             Request Return
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -324,7 +324,7 @@ function ReturnRequestPage() {
               </p>
               <a
                 href="/contact"
-                className="mt-3 inline-flex items-center text-sm font-medium text-brand-600 hover:text-brand-700"
+                className="mt-3 inline-flex items-center text-sm font-medium text-foreground hover:text-foreground/60"
               >
                 Contact Support
               </a>

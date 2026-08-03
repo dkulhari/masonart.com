@@ -71,7 +71,7 @@ export function ReturnPolicyDisplay({
   if (isLoading) {
     return (
       <div className={cn('flex items-center justify-center p-4', className)}>
-        <Loader2 className="h-5 w-5 animate-spin text-brand-500" />
+        <Loader2 className="h-5 w-5 animate-spin text-foreground" />
       </div>
     )
   }
@@ -119,7 +119,7 @@ export function ReturnPolicyDisplay({
         </div>
         <a
           href="/return-policy"
-          className="ml-auto text-brand-600 hover:text-brand-700 hover:underline"
+          className="ml-auto text-foreground hover:text-foreground/60 hover:underline"
         >
           View full policy
         </a>
@@ -137,7 +137,7 @@ export function ReturnPolicyDisplay({
     >
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-border p-4">
-        <FileText className="h-5 w-5 text-brand-500" />
+        <FileText className="h-5 w-5 text-foreground" />
         <h3 className="font-semibold text-foreground">{policy.name}</h3>
       </div>
 
@@ -194,7 +194,7 @@ export function ReturnPolicyDisplay({
         <div className="mt-4 border-t border-border pt-4">
           <a
             href="/return-policy"
-            className="text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline"
+            className="text-sm font-medium text-foreground hover:text-foreground/60 hover:underline"
           >
             View full return policy →
           </a>

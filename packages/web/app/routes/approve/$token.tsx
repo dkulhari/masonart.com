@@ -476,7 +476,7 @@ function ApprovalPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="mx-auto h-12 w-12 animate-spin text-brand-500" />
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-foreground" />
           <p className="mt-4 text-muted-foreground">Loading approval...</p>
         </div>
       </div>
@@ -489,11 +489,11 @@ function ApprovalPage() {
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="w-full max-w-md text-center">
           <AlertCircle className="mx-auto h-16 w-16 text-red-500" />
-          <h1 className="mt-4 text-2xl font-bold text-foreground">Unable to Load</h1>
+          <h1 className="mt-4 text-2xl text-foreground">Unable to Load</h1>
           <p className="mt-2 text-muted-foreground">{error}</p>
           <button
             onClick={loadApproval}
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand-500 px-6 py-3 font-medium text-white transition-colors hover:bg-brand-600"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-medium text-white transition-colors hover:bg-primary/85"
           >
             Try Again
           </button>
@@ -519,8 +519,8 @@ function ApprovalPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <Camera className="h-6 w-6 text-brand-500" />
-                <h1 className="text-xl font-bold text-foreground sm:text-2xl">
+                <Camera className="h-6 w-6 text-foreground" />
+                <h1 className="text-xl text-foreground sm:text-2xl">
                   Production Photo Review
                 </h1>
               </div>
@@ -666,7 +666,7 @@ function ApprovalPage() {
                   onChange={(e) => setChangeComment(e.target.value)}
                   placeholder="Please describe the changes you'd like..."
                   rows={4}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/20"
                 />
                 <div className="mt-4 flex gap-3">
                   <button

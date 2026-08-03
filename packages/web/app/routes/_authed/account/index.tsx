@@ -164,7 +164,7 @@ function AccountDashboardPage() {
       <div className="container-wide py-8 lg:py-12">
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground sm:text-3xl">My Account</h1>
+          <h1 className="text-2xl text-foreground sm:text-3xl">My Account</h1>
           <p className="mt-2 text-muted-foreground">
             Manage your orders, profile, and preferences
           </p>
@@ -180,12 +180,12 @@ function AccountDashboardPage() {
             <div className="rounded-xl border border-border bg-card">
               <div className="flex items-center justify-between border-b border-border px-6 py-4">
                 <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                  <Package className="h-5 w-5 text-brand-500" />
+                  <Package className="h-5 w-5 text-foreground" />
                   Recent Orders
                 </h2>
                 <a
                   href="/account/orders"
-                  className="flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700"
+                  className="flex items-center gap-1 text-sm font-medium text-foreground hover:text-foreground/60"
                 >
                   View All
                   <ChevronRight className="h-4 w-4" />
@@ -223,7 +223,7 @@ function AccountDashboardPage() {
               </p>
               <a
                 href="/contact"
-                className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+                className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground/60"
               >
                 Contact Support
                 <ArrowRight className="h-4 w-4" />
@@ -260,7 +260,7 @@ function ProfileCard({ user, onSignOut }: ProfileCardProps) {
               className="h-16 w-16 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-xl font-bold text-brand-600">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-xl font-medium text-foreground">
               {initials}
             </div>
           )}
@@ -314,7 +314,7 @@ function QuickActionCard({ action }: QuickActionCardProps) {
   return (
     <a
       href={action.href}
-      className="flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-all hover:border-brand-300 hover:shadow-sm"
+      className="flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-all hover:border-foreground/30 hover:shadow-sm"
     >
       <div
         className={cn('flex h-10 w-10 items-center justify-center rounded-lg', action.bgColor)}

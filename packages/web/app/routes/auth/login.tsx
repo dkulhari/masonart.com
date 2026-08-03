@@ -383,8 +383,8 @@ function LoginPage() {
           {/* Logo/Brand */}
           <div className="mb-8 text-center">
             <a href="/" className="inline-block">
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                chobii<span className="text-brand-500">.art</span>
+              <h1 className="text-3xl tracking-tight text-foreground">
+                chobii.art
               </h1>
             </a>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -409,7 +409,7 @@ function LoginPage() {
               disabled={isGoogleLoading || isLoading}
               className={cn(
                 'flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium text-foreground transition-colors',
-                'hover:bg-muted focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                'hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                 'disabled:cursor-not-allowed disabled:opacity-50'
               )}
             >
@@ -510,11 +510,11 @@ function LoginPage() {
                       disabled={isLoading}
                       className={cn(
                         'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                         'disabled:cursor-not-allowed disabled:opacity-50',
                         getFieldError('email')
                           ? 'border-red-500 focus:ring-red-500'
-                          : 'border-input hover:border-brand-300'
+                          : 'border-input hover:border-foreground/30'
                       )}
                     />
                   </div>
@@ -531,7 +531,7 @@ function LoginPage() {
                     </label>
                     <a
                       href="/auth/forgot-password"
-                      className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                      className="text-xs font-medium text-foreground hover:text-foreground/60"
                     >
                       Forgot password?
                     </a>
@@ -549,11 +549,11 @@ function LoginPage() {
                       disabled={isLoading}
                       className={cn(
                         'w-full rounded-lg border bg-background py-2.5 pl-10 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                         'disabled:cursor-not-allowed disabled:opacity-50',
                         getFieldError('password')
                           ? 'border-red-500 focus:ring-red-500'
-                          : 'border-input hover:border-brand-300'
+                          : 'border-input hover:border-foreground/30'
                       )}
                     />
                     <button
@@ -580,9 +580,9 @@ function LoginPage() {
                   disabled={isLoading || !isEmailFormValid}
                   className={cn(
                     'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
-                    'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                    'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                     isEmailFormValid && !isLoading
-                      ? 'bg-brand-500 text-white hover:bg-brand-600'
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/85'
                       : 'cursor-not-allowed bg-muted text-muted-foreground'
                   )}
                 >
@@ -623,11 +623,11 @@ function LoginPage() {
                       disabled={isLoading}
                       className={cn(
                         'w-full rounded-lg border bg-background py-2.5 pl-14 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                         'disabled:cursor-not-allowed disabled:opacity-50',
                         errors.phone
                           ? 'border-red-500 focus:ring-red-500'
-                          : 'border-input hover:border-brand-300'
+                          : 'border-input hover:border-foreground/30'
                       )}
                     />
                   </div>
@@ -642,9 +642,9 @@ function LoginPage() {
                   disabled={isLoading || !isPhoneValid}
                   className={cn(
                     'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
-                    'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                    'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                     isPhoneValid && !isLoading
-                      ? 'bg-brand-500 text-white hover:bg-brand-600'
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/85'
                       : 'cursor-not-allowed bg-muted text-muted-foreground'
                   )}
                 >
@@ -691,9 +691,9 @@ function LoginPage() {
                       disabled={isLoading}
                       className={cn(
                         'w-full rounded-lg border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                         'disabled:cursor-not-allowed disabled:opacity-50',
-                        'border-input hover:border-brand-300'
+                        'border-input hover:border-foreground/30'
                       )}
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -720,11 +720,11 @@ function LoginPage() {
                       disabled={isLoading}
                       className={cn(
                         'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors tracking-widest',
-                        'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                         'disabled:cursor-not-allowed disabled:opacity-50',
                         errors.otp
                           ? 'border-red-500 focus:ring-red-500'
-                          : 'border-input hover:border-brand-300'
+                          : 'border-input hover:border-foreground/30'
                       )}
                     />
                   </div>
@@ -750,7 +750,7 @@ function LoginPage() {
                       'font-medium',
                       resendTimer > 0 || isLoading
                         ? 'cursor-not-allowed text-muted-foreground'
-                        : 'text-brand-600 hover:text-brand-700'
+                        : 'text-foreground hover:text-foreground/60'
                     )}
                   >
                     {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
@@ -763,9 +763,9 @@ function LoginPage() {
                   disabled={isLoading || phoneFormData.otp.length !== 6}
                   className={cn(
                     'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
-                    'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                    'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                     phoneFormData.otp.length === 6 && !isLoading
-                      ? 'bg-brand-500 text-white hover:bg-brand-600'
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/85'
                       : 'cursor-not-allowed bg-muted text-muted-foreground'
                   )}
                 >
@@ -790,7 +790,7 @@ function LoginPage() {
             Don&apos;t have an account?{' '}
             <a
               href={`/auth/register${redirectUrl !== '/' ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`}
-              className="font-medium text-brand-600 hover:text-brand-700"
+              className="font-medium text-foreground hover:text-foreground/60"
             >
               Create account
             </a>

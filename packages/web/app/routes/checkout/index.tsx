@@ -266,7 +266,7 @@ function CheckoutPage() {
             <ArrowLeft className="h-4 w-4" />
             Back to Cart
           </a>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-2xl tracking-tight text-foreground sm:text-3xl">
             Checkout
           </h1>
         </div>
@@ -315,7 +315,7 @@ function CheckoutPage() {
                     maxLength={500}
                     className={cn(
                       'w-full resize-none rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                      'hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2'
+                      'hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
                     )}
                   />
                   <p className="mt-1 text-xs text-muted-foreground text-right">
@@ -331,9 +331,9 @@ function CheckoutPage() {
                     disabled={!canProceedFromCurrentStep()}
                     className={cn(
                       'flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                      'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                       canProceedFromCurrentStep()
-                        ? 'bg-brand-500 text-white hover:bg-brand-600'
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/85'
                         : 'cursor-not-allowed bg-muted text-muted-foreground'
                     )}
                   >
@@ -350,7 +350,7 @@ function CheckoutPage() {
                 {/* Delivery Options */}
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h2 className="mb-4 flex items-center gap-3 text-lg font-semibold text-foreground">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-foreground">
                       <Truck className="h-5 w-5" />
                     </div>
                     Delivery Options
@@ -372,7 +372,7 @@ function CheckoutPage() {
                       <button
                         type="button"
                         onClick={() => setCurrentStep('shipping')}
-                        className="text-sm font-medium text-brand-600 hover:text-brand-700"
+                        className="text-sm font-medium text-foreground hover:text-foreground/60"
                       >
                         Edit
                       </button>
@@ -405,9 +405,9 @@ function CheckoutPage() {
                     disabled={!canProceedFromCurrentStep()}
                     className={cn(
                       'flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-colors',
-                      'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                      'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                       canProceedFromCurrentStep()
-                        ? 'bg-brand-500 text-white hover:bg-brand-600'
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/85'
                         : 'cursor-not-allowed bg-muted text-muted-foreground'
                     )}
                   >
@@ -424,7 +424,7 @@ function CheckoutPage() {
                 {/* Payment Section - Placeholder for Razorpay */}
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h2 className="mb-4 flex items-center gap-3 text-lg font-semibold text-foreground">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-foreground">
                       <CreditCard className="h-5 w-5" />
                     </div>
                     Payment
@@ -462,7 +462,7 @@ function CheckoutPage() {
                     {/* Total */}
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-foreground">Total Amount</span>
-                      <span className="text-lg font-bold text-foreground">{formatPrice(total)}</span>
+                      <span className="text-lg font-medium text-foreground">{formatPrice(total)}</span>
                     </div>
                   </div>
 
@@ -526,7 +526,7 @@ function CheckoutPage() {
               {/* Security Notice */}
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="mt-0.5 h-5 w-5 text-brand-500" />
+                  <AlertCircle className="mt-0.5 h-5 w-5 text-foreground" />
                   <div className="text-xs text-muted-foreground">
                     <p className="font-medium text-foreground">Secure Checkout</p>
                     <p className="mt-1">
@@ -580,7 +580,7 @@ function CheckoutSteps({ currentStep, onStepClick }: CheckoutStepsProps) {
                   className={cn(
                     'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
                     isCompleted && 'bg-green-500 text-white',
-                    isCurrent && 'bg-brand-500 text-white',
+                    isCurrent && 'bg-primary text-primary-foreground',
                     !isCompleted && !isCurrent && 'bg-muted text-muted-foreground'
                   )}
                 >
@@ -634,14 +634,14 @@ function EmptyCartState() {
             <ShoppingCart className="h-10 w-10 text-muted-foreground" />
           </div>
 
-          <h1 className="mb-2 text-2xl font-bold text-foreground">Your cart is empty</h1>
+          <h1 className="mb-2 text-2xl text-foreground">Your cart is empty</h1>
           <p className="mb-8 text-muted-foreground">
             Add some items to your cart before proceeding to checkout.
           </p>
 
           <a
             href="/posters"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
           >
             Browse Posters
             <ChevronRight className="h-4 w-4" />

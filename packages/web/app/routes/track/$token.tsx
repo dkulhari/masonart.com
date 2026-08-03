@@ -178,7 +178,7 @@ function TokenTrackingPage() {
         <div className="container-wide py-8 lg:py-12">
           <div className="mx-auto max-w-2xl">
             <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-12 w-12 animate-spin text-brand-500" />
+              <Loader2 className="h-12 w-12 animate-spin text-foreground" />
               <p className="mt-4 text-muted-foreground">Loading your order...</p>
             </div>
           </div>
@@ -313,7 +313,7 @@ function TokenTrackingPage() {
                       href={orderData.tracking.trackingUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-600"
+                      className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/85"
                     >
                       Track on {getCarrierDisplayName(orderData.tracking.carrier)}
                       <ExternalLink className="h-4 w-4" />
@@ -345,7 +345,7 @@ function TokenTrackingPage() {
           <div className="mt-6 text-center">
             <button
               onClick={() => fetchOrder()}
-              className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+              className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground/60"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh Status
@@ -360,7 +360,7 @@ function TokenTrackingPage() {
             </p>
             <a
               href="/contact"
-              className="mt-3 inline-flex items-center text-sm font-medium text-brand-600 hover:text-brand-700"
+              className="mt-3 inline-flex items-center text-sm font-medium text-foreground hover:text-foreground/60"
             >
               Contact Support
             </a>
