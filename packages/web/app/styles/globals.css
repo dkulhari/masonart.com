@@ -181,6 +181,20 @@
      */
     --font-sans: 'Poppins', system-ui, sans-serif;
     --font-heading: 'Urbanist', system-ui, sans-serif;
+
+    /**
+     * Fluid type — measured mesonart clamps, Appendix A of the parity
+     * analysis. Their whole scale is fluid; ours was fixed px, which is the
+     * "no clamp" row in the token table.
+     *
+     * Registered as Tailwind fontSize utilities (text-nav, text-button,
+     * text-product, text-display) so components consume them by name.
+     */
+    --font-nav-size: clamp(0.875rem, 0.748rem + 0.3174vw, 1.125rem);
+    --font-button-size: clamp(0.875rem, 0.8115rem + 0.1587vw, 1rem);
+    --font-product-size: clamp(1rem, 0.873rem + 0.3175vw, 1.25rem);
+    /* H1 lands at ~44px at the 1600px page width, matching their display H1. */
+    --font-display-size: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);
   }
 
   .dark {
@@ -272,6 +286,50 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* Measured: Poppins 300, line-height 1.2. We were rendering 400/1.5. */
+    font-weight: 300;
+    line-height: 1.2;
+  }
+
+  /**
+   * Headings, at the base layer on purpose.
+   *
+   * `--font-heading` existed for months and was consumed by nothing, while
+   * every heading carried `font-bold`. Weight 700 is not among the loaded
+   * Poppins weights (see the font link in __root.tsx), so those headings were
+   * synthesised faux-bold -- heavier, muddier and wider than either face
+   * actually draws.
+   *
+   * Setting it here rather than per-component means the sweep that follows can
+   * simply delete `font-bold` instead of replacing it everywhere, and any
+   * heading added later is correct by default.
+   */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    font-weight: 300;
+    line-height: 1;
+  }
+
+  h1 {
+    font-size: var(--font-display-size);
+  }
+
+  /**
+   * Word-by-word reveal for display headings (see ui/DisplayHeading.tsx).
+   * Motion is decorative here -- the text is already in the DOM -- so it is
+   * dropped entirely rather than shortened when the user asks for less.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-word-reveal {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
   }
 
   /* Ensure images don't overflow */

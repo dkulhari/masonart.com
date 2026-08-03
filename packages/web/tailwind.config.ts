@@ -126,6 +126,17 @@ const config: Config = {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         heading: ['var(--font-heading)', 'system-ui', 'sans-serif'],
       },
+      /**
+       * Measured mesonart fluid scales. These are the only sizes that should
+       * appear on nav links, buttons and product titles — the fixed px sizes
+       * they replaced are the "no clamp" row in the parity token table.
+       */
+      fontSize: {
+        nav: 'var(--font-nav-size)',
+        button: 'var(--font-button-size)',
+        product: 'var(--font-product-size)',
+        display: 'var(--font-display-size)',
+      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },
