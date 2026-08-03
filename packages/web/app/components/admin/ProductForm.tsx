@@ -18,19 +18,45 @@ import {
   Trash2,
   ImageIcon,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   Upload as UploadIcon,
   ChevronDown,
   ChevronUp,
+  GripVertical,
 } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
+import {
+  PRODUCT_IMAGE_TYPE_OPTIONS,
+  isLowResSource,
+  reorderImages,
+  renumberImages,
+  applyImageType,
+  readImageDimensions,
+} from '~/lib/product-images'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-import { MAT_CANVAS, type ProductImage } from '@chobii/shared'
+import { MAT_CANVAS, type ProductImage, type ProductImageType } from '@chobii/shared'
 export type { ProductImage }
+
+/**
+ * A picked file staged for upload. Metadata (type, alt text, crop) is chosen
+ * here because the backend squares the image at upload time — after that, only
+ * a re-upload from `originalKey` could change the framing.
+ */
+export interface PendingUpload {
+  localId: string
+  file: File
+  previewUrl: string
+  /** Intrinsic pixel size of the source, for the low-resolution warning. */
+  width: number
+  height: number
+  type: ProductImageType
+  altText: string
+}
 
 export interface ProductVariant {
   id?: string
@@ -298,7 +324,9 @@ export function ProductForm({
   const [autoSlug, setAutoSlug] = useState(!isEditing)
   const [isUploadingImages, setIsUploadingImages] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragIndexRef = useRef<number | null>(null)
 
   // Update slug when title changes (only if autoSlug is enabled)
   useEffect(() => {
@@ -385,18 +413,95 @@ export function ProductForm({
     updateField('images', [...formData.images, newImage])
   }
 
-  // Upload picked files to R2 via the admin endpoint, then append the CDN urls
+  // Stage picked files locally. Metadata (type, alt text) must be chosen
+  // before upload because the backend squares the image at upload time.
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? [])
     e.target.value = '' // allow re-picking the same file
     if (files.length === 0) return
 
+    setUploadError(null)
+    try {
+      const staged: PendingUpload[] = []
+      let hasMain =
+        formData.images.some((img) => img.type === 'main') ||
+        pendingUploads.some((p) => p.type === 'main')
+      for (const file of files) {
+        const { width, height } = await readImageDimensions(file)
+        staged.push({
+          localId: `pending-${Date.now()}-${file.name}`,
+          file,
+          previewUrl: URL.createObjectURL(file),
+          width,
+          height,
+          type: hasMain ? 'detail' : 'main',
+          altText: '',
+        })
+        hasMain = true
+      }
+      setPendingUploads((prev) => [...prev, ...staged])
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Could not read image')
+    }
+  }
+
+  const updatePending = (localId: string, updates: Partial<PendingUpload>) => {
+    setPendingUploads((prev) =>
+      prev.map((p) => (p.localId === localId ? { ...p, ...updates } : p))
+    )
+  }
+
+  const removePending = (localId: string) => {
+    setPendingUploads((prev) => {
+      const target = prev.find((p) => p.localId === localId)
+      if (target) URL.revokeObjectURL(target.previewUrl)
+      return prev.filter((p) => p.localId !== localId)
+    })
+  }
+
+  // Exactly one `main` across uploaded AND staged rows.
+  const setUploadedType = (id: string, type: ProductImageType) => {
+    updateField('images', applyImageType(formData.images, id, type))
+    if (type === 'main') {
+      setPendingUploads((prev) =>
+        prev.map((p) => (p.type === 'main' ? { ...p, type: 'detail' } : p))
+      )
+    }
+  }
+
+  const setPendingType = (localId: string, type: ProductImageType) => {
+    setPendingUploads((prev) =>
+      prev.map((p) => {
+        if (p.localId === localId) return { ...p, type }
+        if (type === 'main' && p.type === 'main') return { ...p, type: 'detail' }
+        return p
+      })
+    )
+    if (type === 'main') {
+      updateField(
+        'images',
+        formData.images.map((img) =>
+          img.type === 'main' ? { ...img, type: 'detail' as const } : img
+        )
+      )
+    }
+  }
+
+  // POST each staged file with its metadata; the server returns the processed
+  // square ProductImage (including originalKey), which we append verbatim.
+  const uploadPending = async () => {
+    if (pendingUploads.length === 0) return
     setIsUploadingImages(true)
     setUploadError(null)
     try {
-      for (const file of files) {
+      let images = formData.images
+      const uploaded: string[] = []
+      for (const pending of pendingUploads) {
         const body = new FormData()
-        body.append('file', file)
+        body.append('file', pending.file)
+        body.append('type', pending.type)
+        body.append('altText', pending.altText)
+        body.append('sortOrder', String(images.length))
         const response = await fetch(`${getApiUrl()}/api/admin/products/upload-image`, {
           method: 'POST',
           credentials: 'include',
@@ -404,30 +509,14 @@ export function ProductForm({
         })
         const data = await response.json()
         if (!response.ok) {
-          throw new Error(data.error || `Upload failed for ${file.name}`)
+          throw new Error(data.error || `Upload failed for ${pending.file.name}`)
         }
-        const newImage: ProductImage = {
-          id: `upload-${Date.now()}-${file.name}`,
-          url: data.url,
-          altText: '',
-          type: 'detail',
-          sortOrder: 0,
-          width: MAT_CANVAS,
-          height: MAT_CANVAS,
-          originalKey: data.originalKey ?? '',
-        }
-        setFormData((prev) => ({
-          ...prev,
-          images: [
-            ...prev.images,
-            {
-              ...newImage,
-              type: prev.images.length === 0 ? ('main' as const) : ('detail' as const),
-              sortOrder: prev.images.length,
-            },
-          ],
-        }))
+        images = renumberImages([...images, data.image as ProductImage])
+        uploaded.push(pending.localId)
+        URL.revokeObjectURL(pending.previewUrl)
       }
+      updateField('images', images)
+      setPendingUploads((prev) => prev.filter((p) => !uploaded.includes(p.localId)))
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Image upload failed')
     } finally {
@@ -443,7 +532,7 @@ export function ProductForm({
   }
 
   const removeImage = (id: string) => {
-    const remaining = formData.images.filter((img) => img.id !== id)
+    const remaining = renumberImages(formData.images.filter((img) => img.id !== id))
     // If we removed the main image, promote the first remaining one.
     const needsMain = remaining.length > 0 && !remaining.some((img) => img.type === 'main')
     const newImages = needsMain
@@ -452,14 +541,15 @@ export function ProductForm({
     updateField('images', newImages)
   }
 
-  const setPrimaryImage = (id: string) => {
-    updateField(
-      'images',
-      formData.images.map((img) => ({
-        ...img,
-        type: img.id === id ? ('main' as const) : img.type === 'main' ? ('detail' as const) : img.type,
-      }))
-    )
+  const handleRowDragStart = (index: number) => {
+    dragIndexRef.current = index
+  }
+
+  const handleRowDrop = (index: number) => {
+    const from = dragIndexRef.current
+    dragIndexRef.current = null
+    if (from === null || from === index) return
+    updateField('images', reorderImages(formData.images, from, index))
   }
 
   // Add variant
@@ -745,12 +835,19 @@ export function ProductForm({
         collapsible
       >
         <div className="space-y-4">
-          {/* Image list */}
+          {/* Uploaded image list */}
           {formData.images.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {formData.images.map((image) => (
+              {formData.images.map((image, index) => (
                 <div
                   key={image.id}
+                  data-testid="media-row"
+                  data-image-id={image.id}
+                  data-sort-order={image.sortOrder}
+                  draggable
+                  onDragStart={() => handleRowDragStart(index)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleRowDrop(index)}
                   className={cn(
                     'relative rounded-lg border-2 bg-muted/50 p-2',
                     image.type === 'main' ? 'border-brand-500' : 'border-border'
@@ -758,7 +855,7 @@ export function ProductForm({
                 >
                   {/* Image preview or URL input */}
                   {image.url ? (
-                    <div className="relative aspect-[3/4] overflow-hidden rounded-md">
+                    <div className="relative aspect-square overflow-hidden rounded-md">
                       <img
                         src={image.url}
                         alt={image.altText || 'Product image'}
@@ -767,7 +864,7 @@ export function ProductForm({
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <div className="flex aspect-[3/4] items-center justify-center rounded-md bg-muted">
+                      <div className="flex aspect-square items-center justify-center rounded-md bg-muted">
                         <ImageIcon className="h-12 w-12 text-muted-foreground" />
                       </div>
                       <input
@@ -780,20 +877,29 @@ export function ProductForm({
                     </div>
                   )}
 
-                  {/* Image controls */}
-                  <div className="mt-2 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setPrimaryImage(image.id)}
-                      className={cn(
-                        'rounded px-2 py-1 text-xs font-medium',
-                        image.type === 'main'
-                          ? 'bg-brand-500 text-white'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      )}
+                  {/* Row controls: drag handle, type selector, remove */}
+                  <div className="mt-2 flex items-center gap-2">
+                    <span
+                      aria-label="Drag to reorder"
+                      title="Drag to reorder"
+                      className="cursor-grab rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing"
                     >
-                      {image.type === 'main' ? 'Primary' : 'Set Primary'}
-                    </button>
+                      <GripVertical className="h-4 w-4" />
+                    </span>
+                    <select
+                      aria-label="Image type"
+                      value={image.type}
+                      onChange={(e) =>
+                        setUploadedType(image.id, e.target.value as ProductImageType)
+                      }
+                      className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+                    >
+                      {PRODUCT_IMAGE_TYPE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => removeImage(image.id)}
@@ -803,9 +909,10 @@ export function ProductForm({
                     </button>
                   </div>
 
-                  {/* Alt text */}
+                  {/* Alt text (required by the ProductImage contract) */}
                   <input
                     type="text"
+                    required
                     placeholder="Alt text"
                     value={image.altText || ''}
                     onChange={(e) => updateImage(image.id, { altText: e.target.value })}
@@ -813,6 +920,91 @@ export function ProductForm({
                   />
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Staged uploads: metadata is chosen before the file is processed */}
+          {pendingUploads.length > 0 && (
+            <div className="space-y-3 rounded-lg border border-dashed border-brand-300 p-3">
+              <p className="text-sm font-medium text-foreground">
+                Staged uploads ({pendingUploads.length})
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {pendingUploads.map((pending) => (
+                  <div
+                    key={pending.localId}
+                    data-testid="pending-row"
+                    className="rounded-lg border-2 border-border bg-muted/50 p-2"
+                  >
+                    <div className="relative aspect-square overflow-hidden rounded-md">
+                      <img
+                        src={pending.previewUrl}
+                        alt={pending.file.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    {isLowResSource(pending.width, pending.height) && (
+                      <p
+                        role="alert"
+                        className="mt-2 flex items-start gap-1 rounded bg-amber-50 p-1.5 text-xs text-amber-700"
+                      >
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                        Low resolution: long edge is {Math.max(pending.width, pending.height)}
+                        px (under 1200px). It will not be upscaled and will sit smaller on
+                        the mat.
+                      </p>
+                    )}
+                    <div className="mt-2 flex items-center gap-2">
+                      <select
+                        aria-label="Image type"
+                        value={pending.type}
+                        onChange={(e) =>
+                          setPendingType(pending.localId, e.target.value as ProductImageType)
+                        }
+                        className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+                      >
+                        {PRODUCT_IMAGE_TYPE_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removePending(pending.localId)}
+                        className="rounded p-1 text-red-500 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Alt text"
+                      value={pending.altText}
+                      onChange={(e) =>
+                        updatePending(pending.localId, { altText: e.target.value })
+                      }
+                      className="mt-2 w-full rounded border border-border bg-background px-2 py-1 text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={uploadPending}
+                disabled={isUploadingImages}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
+              >
+                {isUploadingImages ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <UploadIcon className="h-4 w-4" />
+                )}
+                {isUploadingImages
+                  ? 'Uploading…'
+                  : `Upload ${pendingUploads.length} image${pendingUploads.length > 1 ? 's' : ''}`}
+              </button>
             </div>
           )}
 
@@ -840,7 +1032,7 @@ export function ProductForm({
               ) : (
                 <UploadIcon className="h-5 w-5" />
               )}
-              {isUploadingImages ? 'Uploading…' : 'Upload Images'}
+              {isUploadingImages ? 'Uploading…' : 'Choose Images'}
             </button>
             <button
               type="button"
