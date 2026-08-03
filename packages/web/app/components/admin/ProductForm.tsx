@@ -33,13 +33,20 @@ import {
   renumberImages,
   applyImageType,
   readImageDimensions,
+  buildUploadFormData,
 } from '~/lib/product-images'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-import { MAT_CANVAS, type ProductImage, type ProductImageType } from '@chobii/shared'
+import {
+  MAT_CANVAS,
+  type ImageCrop,
+  type ProductImage,
+  type ProductImageType,
+} from '@chobii/shared'
+import { ImageCropControl } from '~/components/admin/ImageCropControl'
 export type { ProductImage }
 
 /**
@@ -56,6 +63,12 @@ export interface PendingUpload {
   height: number
   type: ProductImageType
   altText: string
+  /**
+   * Human-chosen square window, normalised 0..1 against the source. Absent for
+   * `main` (matted, never cropped) or before the admin touches the viewport —
+   * the backend then defaults to the largest centred square.
+   */
+  crop?: ImageCrop
 }
 
 export interface ProductVariant {
@@ -497,11 +510,7 @@ export function ProductForm({
       let images = formData.images
       const uploaded: string[] = []
       for (const pending of pendingUploads) {
-        const body = new FormData()
-        body.append('file', pending.file)
-        body.append('type', pending.type)
-        body.append('altText', pending.altText)
-        body.append('sortOrder', String(images.length))
+        const body = buildUploadFormData(pending, images.length)
         const response = await fetch(`${getApiUrl()}/api/admin/products/upload-image`, {
           method: 'POST',
           credentials: 'include',
@@ -936,13 +945,12 @@ export function ProductForm({
                     data-testid="pending-row"
                     className="rounded-lg border-2 border-border bg-muted/50 p-2"
                   >
-                    <div className="relative aspect-square overflow-hidden rounded-md">
-                      <img
-                        src={pending.previewUrl}
-                        alt={pending.file.name}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
+                    <ImageCropControl
+                      type={pending.type}
+                      imageUrl={pending.previewUrl}
+                      crop={pending.crop}
+                      onCropChange={(crop) => updatePending(pending.localId, { crop })}
+                    />
                     {isLowResSource(pending.width, pending.height) && (
                       <p
                         role="alert"

@@ -6,7 +6,7 @@
  * sortOrder, and the low-resolution source warning.
  */
 
-import type { ProductImageType } from '@chobii/shared'
+import type { ImageCrop, ProductImageType } from '@chobii/shared'
 
 /**
  * Sources whose long edge is under this are not upscaled by the pipeline
@@ -68,6 +68,51 @@ export function applyImageType<T extends { id: string; type: ProductImageType }>
     }
     return image
   })
+}
+
+const clamp01 = (n: number): number => Math.min(1, Math.max(0, n))
+
+/**
+ * Convert react-easy-crop's `onCropComplete` percentage area to the contract's
+ * normalised 0..1 rect, clamped against float drift at the edges.
+ */
+export function percentAreaToCropRect(area: {
+  x: number
+  y: number
+  width: number
+  height: number
+}): ImageCrop {
+  return {
+    x: clamp01(area.x / 100),
+    y: clamp01(area.y / 100),
+    w: clamp01(area.width / 100),
+    h: clamp01(area.height / 100),
+  }
+}
+
+/**
+ * The upload-image multipart body for one staged file. `crop` rides along only
+ * for photographic types — `main` is matted, never cropped, and an unset crop
+ * lets the backend default to the largest centred square.
+ */
+export function buildUploadFormData(
+  pending: {
+    file: File
+    type: ProductImageType
+    altText: string
+    crop?: ImageCrop
+  },
+  sortOrder: number
+): FormData {
+  const body = new FormData()
+  body.append('file', pending.file)
+  body.append('type', pending.type)
+  body.append('altText', pending.altText)
+  body.append('sortOrder', String(sortOrder))
+  if (pending.type !== 'main' && pending.crop) {
+    body.append('crop', JSON.stringify(pending.crop))
+  }
+  return body
 }
 
 /**
