@@ -7,6 +7,7 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
+import { DisplayHeading } from '~/components/ui/DisplayHeading'
 
 interface InfoPageProps {
   title: string
@@ -27,7 +28,9 @@ export function InfoPage({ title, subtitle, updated, children }: InfoPageProps) 
           Back to Home
         </Link>
 
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
+        {/* One edit, seven pages: about, faq, shipping, returns, terms,
+            privacy, cookies all render through here. */}
+        <DisplayHeading className="text-foreground">{title}</DisplayHeading>
         {subtitle && <p className="mt-2 text-muted-foreground">{subtitle}</p>}
         {updated && (
           <p className="mt-1 text-xs text-muted-foreground">Last updated: {updated}</p>

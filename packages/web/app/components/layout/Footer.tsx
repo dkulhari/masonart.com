@@ -16,8 +16,9 @@ export function Footer() {
           {/* Brand & Description */}
           <div className="space-y-4">
             <Link to="/" className="inline-block">
-              <span className="text-xl font-bold tracking-tight text-foreground">
-                chobii<span className="text-primary">.art</span>
+              {/* Matches the header wordmark — see the note there. */}
+              <span className="font-heading text-xl font-medium tracking-tight text-foreground">
+                chobii.art
               </span>
             </Link>
             <p className="text-sm text-muted-foreground">

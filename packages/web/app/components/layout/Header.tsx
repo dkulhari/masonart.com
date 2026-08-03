@@ -70,8 +70,11 @@ export function Header() {
             className="flex items-center space-x-2"
             onClick={closeMobileMenu}
           >
-            <span className="text-xl font-bold tracking-tight text-foreground">
-              chobii<span className="text-primary">.art</span>
+            {/* One word, one weight. The `.art` used to be tinted with the
+                brand orange; --primary is now the same near-black as the rest
+                of the wordmark, so the split span earned nothing. */}
+            <span className="font-heading text-xl font-medium tracking-tight text-foreground">
+              chobii.art
             </span>
           </Link>
 
@@ -98,7 +101,7 @@ export function Header() {
               <Link
                 to={staffHref}
                 search={staffSearch}
-                className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="flex items-center gap-1.5 rounded-pill border border-border px-3 py-1.5 text-nav font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <LayoutDashboard className="h-4 w-4" />
                 {staffLabel}
@@ -243,7 +246,7 @@ function NavLink({
     <Link
       to={to}
       onClick={onClick}
-      className="flex items-center text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      className="flex items-center text-nav font-medium text-muted-foreground transition-colors hover:text-foreground"
       activeProps={{
         className: 'text-foreground',
       }}
