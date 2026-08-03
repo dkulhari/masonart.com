@@ -181,6 +181,11 @@ const config: Config = {
           from: { transform: 'rotate(0deg)' },
           to: { transform: 'rotate(360deg)' },
         },
+        /** Per-word reveal for ui/DisplayHeading.tsx. */
+        'word-reveal': {
+          from: { opacity: '0', transform: 'translateY(0.4em)' },
+          to: { opacity: '1', transform: 'none' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -194,6 +199,13 @@ const config: Config = {
         shimmer: 'shimmer 2s infinite',
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         spin: 'spin 1s linear infinite',
+        /**
+         * `both` so the word holds its from-state through its stagger delay —
+         * without it every word paints immediately and then animates, which
+         * reads as a flicker rather than a reveal. Curve is --animation-primary
+         * as measured.
+         */
+        'word-reveal': 'word-reveal 0.5s cubic-bezier(.3, 1, .3, 1) both',
       },
       spacing: {
         '18': '4.5rem',
