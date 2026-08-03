@@ -26,6 +26,10 @@ import { productsApi, toFeaturedProducts } from '~/lib/api'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ProductGrid } from '~/components/product/ProductGrid'
 import { OrganizationJsonLd } from '~/components/seo/ProductJsonLd'
+import { cn } from '~/lib/utils'
+import { Button, buttonVariants } from '~/components/ui/Button'
+import { SectionBand } from '~/components/ui/SectionBand'
+import { DisplayHeading } from '~/components/ui/DisplayHeading'
 
 // ============================================================================
 // Types
@@ -135,79 +139,74 @@ function HomePage() {
 // Hero Section
 // ============================================================================
 
+/**
+ * The hero was the last of the orange marketing identity: a brand gradient
+ * wash, two blur blobs, an amber pill badge and a gradient-filled H1. mesonart
+ * puts photography here and lets one outline pill carry the whole call to
+ * action, so all of that comes out.
+ *
+ * The photography itself is Phase D — a contained slideshow needs room
+ * mockups we do not have yet. Until then this is the same content on the
+ * monochrome system rather than a placeholder.
+ */
 function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-brand-50 via-background to-brand-100/30 py-16 sm:py-24 lg:py-32">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-brand-200/30 blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 h-80 w-80 rounded-full bg-brand-300/20 blur-3xl" />
-      </div>
+    <SectionBand className="py-16 sm:py-24 lg:py-32">
+      <div className="mx-auto max-w-3xl text-center">
+        {/* Badge */}
+        <div className="mb-6 inline-flex items-center gap-2 rounded-pill border border-foreground/15 bg-highlight px-4 py-1.5 text-sm font-medium text-foreground">
+          <Sparkles className="h-4 w-4" />
+          <span>New: AI Poster Generator</span>
+        </div>
 
-      <div className="container-wide relative">
-        <div className="mx-auto max-w-3xl text-center">
-          {/* Badge */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-brand-100 px-4 py-1.5 text-sm font-medium text-brand-700">
+        {/* Headline */}
+        <DisplayHeading className="text-balance text-foreground sm:text-5xl lg:text-6xl">
+          Transform Your Space with Premium Art
+        </DisplayHeading>
+
+        {/* Subheadline */}
+        <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
+          Discover our curated collection of stunning posters and custom frames.
+          Create unique AI-generated art or choose from hundreds of designs
+          crafted by talented artists.
+        </p>
+
+        {/* CTA Buttons */}
+        <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+          <a href="/posters" className={buttonVariants({ size: 'lg' })}>
+            Shop Posters
+            <ArrowRight className="h-4 w-4" />
+          </a>
+          <a
+            href="/create"
+            className={buttonVariants({ variant: 'outline', size: 'lg' })}
+          >
             <Sparkles className="h-4 w-4" />
-            <span>New: AI Poster Generator</span>
+            Create with AI
+          </a>
+        </div>
+
+        {/* Trust indicators */}
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-1">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className="h-4 w-4 fill-rating text-rating" />
+              ))}
+            </div>
+            <span>4.9/5 from 2,000+ reviews</span>
           </div>
-
-          {/* Headline */}
-          <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-            Transform Your Space with{' '}
-            <span className="gradient-text">Premium Art</span>
-          </h1>
-
-          {/* Subheadline */}
-          <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
-            Discover our curated collection of stunning posters and custom frames.
-            Create unique AI-generated art or choose from hundreds of designs
-            crafted by talented artists.
-          </p>
-
-          {/* CTA Buttons */}
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <a
-              href="/posters"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-primary px-8 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/30"
-            >
-              Shop Posters
-              <ArrowRight className="h-4 w-4" />
-            </a>
-            <a
-              href="/create"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border-2 border-brand-300 bg-background px-8 text-base font-semibold text-brand-600 transition-all hover:border-brand-400 hover:bg-brand-50"
-            >
-              <Sparkles className="h-4 w-4" />
-              Create with AI
-            </a>
+          <div className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            <span>Free shipping over ₹999</span>
           </div>
-
-          {/* Trust indicators */}
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className="h-4 w-4 fill-yellow-400 text-yellow-400"
-                  />
-                ))}
-              </div>
-              <span>4.9/5 from 2,000+ reviews</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Truck className="h-4 w-4" />
-              <span>Free shipping over ₹999</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              <span>30-day returns</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            <span>30-day returns</span>
           </div>
         </div>
       </div>
-    </section>
+    </SectionBand>
   )
 }
 
@@ -221,47 +220,45 @@ interface FeaturedProductsSectionProps {
 
 function FeaturedProductsSection({ products }: FeaturedProductsSectionProps) {
   return (
-    <section className="py-16 sm:py-24">
-      <div className="container-wide">
-        {/* Section Header */}
-        <div className="mb-12 flex items-end justify-between">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Featured Collection
-            </h2>
-            <p className="mt-2 text-lg text-muted-foreground">
-              Handpicked favorites loved by our customers
-            </p>
-          </div>
-          <a
-            href="/posters"
-            className="hidden items-center gap-1 text-sm font-medium text-brand-600 transition-colors hover:text-brand-700 sm:flex"
-          >
-            View all
-            <ChevronRight className="h-4 w-4" />
-          </a>
+    <SectionBand>
+      {/* Section Header */}
+      <div className="mb-12 flex items-end justify-between">
+        <div>
+          <DisplayHeading as="h2" className="text-3xl sm:text-4xl">
+            Featured Collection
+          </DisplayHeading>
+          <p className="mt-2 text-lg text-muted-foreground">
+            Handpicked favorites loved by our customers
+          </p>
         </div>
-
-        {/* Products Grid — shares the one canonical grid with /posters, so the
-            home page and the listing can no longer disagree about layout. */}
-        {products.length > 0 ? (
-          <ProductGrid products={products} />
-        ) : (
-          <ProductsPlaceholder />
-        )}
-
-        {/* Mobile View All Link */}
-        <div className="mt-8 text-center sm:hidden">
-          <a
-            href="/posters"
-            className="inline-flex items-center gap-1 text-sm font-medium text-brand-600"
-          >
-            View all products
-            <ChevronRight className="h-4 w-4" />
-          </a>
-        </div>
+        <a
+          href="/posters"
+          className="hidden items-center gap-1 text-sm font-medium text-foreground transition-colors hover:text-foreground/60 sm:flex"
+        >
+          View all
+          <ChevronRight className="h-4 w-4" />
+        </a>
       </div>
-    </section>
+
+      {/* Products Grid — shares the one canonical grid with /posters, so the
+          home page and the listing can no longer disagree about layout. */}
+      {products.length > 0 ? (
+        <ProductGrid products={products} />
+      ) : (
+        <ProductsPlaceholder />
+      )}
+
+      {/* Mobile View All Link */}
+      <div className="mt-8 text-center sm:hidden">
+        <a
+          href="/posters"
+          className="inline-flex items-center gap-1 text-sm font-medium text-foreground"
+        >
+          View all products
+          <ChevronRight className="h-4 w-4" />
+        </a>
+      </div>
+    </SectionBand>
   )
 }
 
@@ -281,7 +278,7 @@ function ProductsPlaceholder() {
       </p>
       <a
         href="/create"
-        className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+        className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-foreground/60"
       >
         <Sparkles className="h-4 w-4" />
         Create your own with AI in the meantime
@@ -330,20 +327,21 @@ const categories = [
 
 function CategoriesSection() {
   return (
-    <section className="bg-muted/30 py-16 sm:py-24">
-      <div className="container-wide">
-        {/* Section Header */}
-        <div className="mb-12 text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Shop by Style
-          </h2>
-          <p className="mt-2 text-lg text-muted-foreground">
-            Find the perfect piece for your aesthetic
-          </p>
-        </div>
+    // Beige rather than the old `bg-muted/30`: that was a cool blue-gray, and
+    // it is the one band tone mesonart never uses.
+    <SectionBand tone="beige">
+      {/* Section Header */}
+      <div className="mb-12 text-center">
+        <DisplayHeading as="h2" className="text-3xl sm:text-4xl">
+          Shop by Style
+        </DisplayHeading>
+        <p className="mt-2 text-lg text-muted-foreground">
+          Find the perfect piece for your aesthetic
+        </p>
+      </div>
 
-        {/* Categories Grid */}
-        <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
+      {/* Categories Grid */}
+      <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
           {categories.map((category) => (
             <a
               key={category.slug}
@@ -383,7 +381,7 @@ function CategoriesSection() {
 
               {/* Text content */}
               <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center text-white">
-                <h3 className="text-lg font-bold sm:text-xl [text-shadow:0_1px_3px_rgb(0_0_0_/_45%)]">
+                <h3 className="text-lg font-medium sm:text-xl [text-shadow:0_1px_3px_rgb(0_0_0_/_45%)]">
                   {category.name}
                 </h3>
                 <p className="mt-1 text-sm text-white/90 [text-shadow:0_1px_3px_rgb(0_0_0_/_45%)]">
@@ -396,9 +394,8 @@ function CategoriesSection() {
               </div>
             </a>
           ))}
-        </div>
       </div>
-    </section>
+    </SectionBand>
   )
 }
 
@@ -406,60 +403,58 @@ function CategoriesSection() {
 // AI Generator Section
 // ============================================================================
 
+/**
+ * The AI generator is our differentiator and stays, but it cannot stay as a
+ * brand-orange gradient with two blur blobs. `tone="ink"` gives it the one
+ * remaining way to say "this section is different" without a hue: it inverts.
+ */
 function AIGeneratorSection() {
   return (
-    <section className="relative overflow-hidden py-16 sm:py-24">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-brand-600 to-brand-800" />
-
-      {/* Decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -left-20 top-0 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
-        <div className="absolute -right-20 bottom-0 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
-      </div>
-
-      <div className="container-wide relative">
-        <div className="mx-auto max-w-3xl text-center">
-          {/* Icon */}
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur">
-            <Sparkles className="h-8 w-8 text-white" />
-          </div>
-
-          {/* Content */}
-          <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Create Your Own Masterpiece
-          </h2>
-          <p className="mt-4 text-lg text-white/80">
-            Use our AI-powered poster generator to create unique, one-of-a-kind
-            artwork. Simply describe your vision, choose a style, and watch your
-            idea come to life.
-          </p>
-
-          {/* Features */}
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {[
-              { title: 'Easy to use', desc: 'No design skills needed' },
-              { title: 'Multiple styles', desc: 'From abstract to realistic' },
-              { title: 'Print ready', desc: 'High-quality output' },
-            ].map((feature) => (
-              <div key={feature.title} className="rounded-lg bg-white/10 p-4 backdrop-blur">
-                <p className="font-semibold text-white">{feature.title}</p>
-                <p className="text-sm text-white/70">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* CTA */}
-          <a
-            href="/create"
-            className="mt-10 inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-white px-8 text-base font-semibold text-brand-700 shadow-xl transition-all hover:bg-white/90 hover:shadow-2xl"
-          >
-            <Sparkles className="h-5 w-5" />
-            Start Creating
-          </a>
+    <SectionBand tone="ink">
+      <div className="mx-auto max-w-3xl text-center">
+        {/* Icon */}
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-background/10">
+          <Sparkles className="h-8 w-8" />
         </div>
+
+        {/* Content */}
+        <DisplayHeading as="h2" className="text-3xl sm:text-4xl">
+          Create Your Own Masterpiece
+        </DisplayHeading>
+        <p className="mt-4 text-lg text-background/80">
+          Use our AI-powered poster generator to create unique, one-of-a-kind
+          artwork. Simply describe your vision, choose a style, and watch your
+          idea come to life.
+        </p>
+
+        {/* Features */}
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {[
+            { title: 'Easy to use', desc: 'No design skills needed' },
+            { title: 'Multiple styles', desc: 'From abstract to realistic' },
+            { title: 'Print ready', desc: 'High-quality output' },
+          ].map((feature) => (
+            <div key={feature.title} className="rounded-lg bg-background/10 p-4">
+              <p className="font-medium">{feature.title}</p>
+              <p className="text-sm text-background/70">{feature.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA — inverted outline pill, so it reads as the same control as the
+            hero CTA rather than a different kind of button. */}
+        <a
+          href="/create"
+          className={cn(
+            buttonVariants({ variant: 'outline', size: 'lg' }),
+            'mt-10 border-background text-background hover:bg-background hover:text-foreground'
+          )}
+        >
+          <Sparkles className="h-5 w-5" />
+          Start Creating
+        </a>
       </div>
-    </section>
+    </SectionBand>
   )
 }
 
@@ -496,39 +491,35 @@ const valueProps = [
 
 function ValuePropsSection() {
   return (
-    <section className="py-16 sm:py-24">
-      <div className="container-wide">
-        {/* Section Header */}
-        <div className="mb-12 text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            Why Choose chobii.art?
-          </h2>
-          <p className="mt-2 text-lg text-muted-foreground">
-            We&apos;re committed to bringing art into every home
-          </p>
-        </div>
-
-        {/* Value Props Grid */}
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {valueProps.map((prop) => (
-            <div
-              key={prop.title}
-              className="group rounded-xl border border-border bg-card p-6 text-center transition-all hover:border-brand-200 hover:shadow-lg"
-            >
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-100 text-brand-600 transition-colors group-hover:bg-brand-500 group-hover:text-white">
-                <prop.icon className="h-6 w-6" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground">
-                {prop.title}
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {prop.description}
-              </p>
-            </div>
-          ))}
-        </div>
+    <SectionBand>
+      {/* Section Header */}
+      <div className="mb-12 text-center">
+        <DisplayHeading as="h2" className="text-3xl sm:text-4xl">
+          Why Choose chobii.art?
+        </DisplayHeading>
+        <p className="mt-2 text-lg text-muted-foreground">
+          We&apos;re committed to bringing art into every home
+        </p>
       </div>
-    </section>
+
+      {/* Value Props Grid */}
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        {valueProps.map((prop) => (
+          <div
+            key={prop.title}
+            className="group rounded-xl border border-border bg-card p-6 text-center transition-all hover:border-foreground/20 hover:shadow-lg"
+          >
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-highlight text-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+              <prop.icon className="h-6 w-6" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground">{prop.title}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {prop.description}
+            </p>
+          </div>
+        ))}
+      </div>
+    </SectionBand>
   )
 }
 
@@ -538,44 +529,42 @@ function ValuePropsSection() {
 
 function NewsletterSection() {
   return (
-    <section className="border-t border-border bg-muted/30 py-16 sm:py-24">
-      <div className="container-wide">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Stay Inspired
-          </h2>
-          <p className="mt-2 text-muted-foreground">
-            Subscribe to receive updates on new collections, exclusive offers, and
-            design inspiration.
-          </p>
+    <SectionBand tone="beige">
+      <div className="mx-auto max-w-2xl text-center">
+        <DisplayHeading as="h2" className="text-2xl sm:text-3xl">
+          Stay Inspired
+        </DisplayHeading>
+        <p className="mt-2 text-muted-foreground">
+          Subscribe to receive updates on new collections, exclusive offers, and
+          design inspiration.
+        </p>
 
-          {/* Newsletter Form */}
-          <form
-            className="mt-8 flex flex-col gap-3 sm:flex-row sm:gap-0"
-            onSubmit={(e) => {
-              e.preventDefault()
-              // Newsletter signup will be implemented later
-            }}
-          >
-            <input
-              type="email"
-              placeholder="Enter your email"
-              required
-              className="h-12 flex-1 rounded-lg border border-input bg-background px-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:rounded-r-none"
-            />
-            <button
-              type="submit"
-              className="h-12 rounded-lg bg-primary px-6 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 sm:rounded-l-none"
-            >
-              Subscribe
-            </button>
-          </form>
+        {/* Newsletter Form
+         *
+         * The field and the button are separate pills rather than a fused
+         * rectangle: at a 3.75rem radius the old flush `sm:rounded-r-none` /
+         * `sm:rounded-l-none` seam has nothing to sit flush against.
+         */}
+        <form
+          className="mt-8 flex flex-col gap-3 sm:flex-row"
+          onSubmit={(e) => {
+            e.preventDefault()
+            // Newsletter signup will be implemented later
+          }}
+        >
+          <input
+            type="email"
+            placeholder="Enter your email"
+            required
+            className="h-11 flex-1 rounded-pill border border-input bg-background px-5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <Button type="submit">Subscribe</Button>
+        </form>
 
-          <p className="mt-4 text-xs text-muted-foreground">
-            By subscribing, you agree to our Privacy Policy. Unsubscribe anytime.
-          </p>
-        </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          By subscribing, you agree to our Privacy Policy. Unsubscribe anytime.
+        </p>
       </div>
-    </section>
+    </SectionBand>
   )
 }
