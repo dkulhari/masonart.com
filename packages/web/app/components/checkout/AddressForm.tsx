@@ -202,7 +202,7 @@ export function AddressForm({
     <div className={cn('rounded-xl border border-border bg-card p-6', className)}>
       {/* Section Title */}
       <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-foreground">
           <MapPin className="h-5 w-5" />
         </div>
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
@@ -227,10 +227,10 @@ export function AddressForm({
               placeholder="Enter your full name"
               className={cn(
                 'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                 getFieldError('fullName')
                   ? 'border-red-500 focus:ring-red-500'
-                  : 'border-input hover:border-brand-300'
+                  : 'border-input hover:border-foreground/30'
               )}
             />
           </div>
@@ -256,10 +256,10 @@ export function AddressForm({
               placeholder="your@email.com"
               className={cn(
                 'w-full rounded-lg border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                 getFieldError('email')
                   ? 'border-red-500 focus:ring-red-500'
-                  : 'border-input hover:border-brand-300'
+                  : 'border-input hover:border-foreground/30'
               )}
             />
             {getFieldError('email') && (
@@ -285,10 +285,10 @@ export function AddressForm({
                 placeholder="10-digit mobile number"
                 className={cn(
                   'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                  'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                  'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                   getFieldError('phone')
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-input hover:border-brand-300'
+                    : 'border-input hover:border-foreground/30'
                 )}
               />
             </div>
@@ -315,10 +315,10 @@ export function AddressForm({
               rows={2}
               className={cn(
                 'w-full resize-none rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                 getFieldError('addressLine1')
                   ? 'border-red-500 focus:ring-red-500'
-                  : 'border-input hover:border-brand-300'
+                  : 'border-input hover:border-foreground/30'
               )}
             />
           </div>
@@ -343,7 +343,7 @@ export function AddressForm({
               placeholder="Area, Sector, Locality"
               className={cn(
                 'w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                'hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2'
+                'hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
               )}
             />
           </div>
@@ -361,7 +361,7 @@ export function AddressForm({
               placeholder="Near famous place or shop"
               className={cn(
                 'w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                'hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2'
+                'hover:border-foreground/30 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
               )}
             />
           </div>
@@ -386,10 +386,10 @@ export function AddressForm({
                 placeholder="City"
                 className={cn(
                   'w-full rounded-lg border bg-background py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                  'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                  'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                   getFieldError('city')
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-input hover:border-brand-300'
+                    : 'border-input hover:border-foreground/30'
                 )}
               />
             </div>
@@ -412,11 +412,11 @@ export function AddressForm({
                 onBlur={() => handleBlur('state')}
                 className={cn(
                   'w-full appearance-none rounded-lg border bg-background py-2.5 pl-4 pr-10 text-sm text-foreground transition-colors',
-                  'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                  'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                   !formData.state && 'text-muted-foreground',
                   getFieldError('state')
                     ? 'border-red-500 focus:ring-red-500'
-                    : 'border-input hover:border-brand-300'
+                    : 'border-input hover:border-foreground/30'
                 )}
               >
                 <option value="">Select State</option>
@@ -451,10 +451,10 @@ export function AddressForm({
               maxLength={6}
               className={cn(
                 'w-full rounded-lg border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                 getFieldError('postalCode')
                   ? 'border-red-500 focus:ring-red-500'
-                  : 'border-input hover:border-brand-300'
+                  : 'border-input hover:border-foreground/30'
               )}
             />
             {getFieldError('postalCode') && (
@@ -481,8 +481,8 @@ export function AddressForm({
                 className={cn(
                   'flex h-5 w-5 items-center justify-center rounded border transition-colors',
                   formData.saveAddress
-                    ? 'border-brand-500 bg-brand-500 text-white'
-                    : 'border-input bg-background hover:border-brand-300'
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-input bg-background hover:border-foreground/30'
                 )}
               >
                 {formData.saveAddress && <Check className="h-3.5 w-3.5" />}
@@ -544,8 +544,8 @@ export function SavedAddressSelector({
             className={cn(
               'w-full rounded-lg border p-4 text-left transition-colors',
               selectedId === address.id
-                ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-                : 'border-border bg-background hover:border-brand-300'
+                ? 'border-primary bg-accent ring-1 ring-primary'
+                : 'border-border bg-background hover:border-foreground/30'
             )}
           >
             <div className="flex items-start justify-between">
@@ -553,7 +553,7 @@ export function SavedAddressSelector({
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-foreground">{address.fullName}</span>
                   {address.isDefault && (
-                    <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+                    <span className="rounded-full bg-highlight px-2 py-0.5 text-xs font-medium text-foreground">
                       Default
                     </span>
                   )}
@@ -572,7 +572,7 @@ export function SavedAddressSelector({
                 className={cn(
                   'flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors',
                   selectedId === address.id
-                    ? 'border-brand-500 bg-brand-500'
+                    ? 'border-primary bg-primary'
                     : 'border-muted-foreground/30 bg-transparent'
                 )}
               >
@@ -586,7 +586,7 @@ export function SavedAddressSelector({
       <button
         type="button"
         onClick={onAddNew}
-        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-brand-300 py-3 text-sm font-medium text-brand-600 transition-colors hover:border-brand-500 hover:bg-brand-50"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-foreground/30 py-3 text-sm font-medium text-foreground transition-colors hover:border-primary hover:bg-accent"
       >
         <MapPin className="h-4 w-4" />
         Add New Address

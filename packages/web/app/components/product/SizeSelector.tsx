@@ -117,8 +117,8 @@ export function SizeSelector({
               className={cn(
                 'relative flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-all',
                 isSelected
-                  ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500 dark:bg-brand-950/20'
-                  : 'border-border bg-card hover:border-brand-300 hover:bg-muted/50',
+                  ? 'border-primary bg-accent ring-1 ring-primary'
+                  : 'border-border bg-card hover:border-foreground/30 hover:bg-muted/50',
                 isOutOfStock && 'cursor-not-allowed opacity-50'
               )}
               aria-label={`Select size ${formatDimension(variant.widthInches, variant.heightInches, displayUnit)}`}
@@ -128,7 +128,7 @@ export function SizeSelector({
               <div className="flex flex-col">
                 <span className={cn(
                   'text-sm font-medium',
-                  isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-foreground'
+                  isSelected ? 'text-foreground' : 'text-foreground'
                 )}>
                   {formatDimension(variant.widthInches, variant.heightInches, displayUnit)}
                 </span>
@@ -146,12 +146,12 @@ export function SizeSelector({
               <div className="flex items-center gap-2">
                 <span className={cn(
                   'text-sm font-semibold',
-                  isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-foreground'
+                  isSelected ? 'text-foreground' : 'text-foreground'
                 )}>
                   {formatPrice(price)}
                 </span>
                 {isSelected && (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                     <Check className="h-3 w-3" />
                   </div>
                 )}
@@ -191,8 +191,8 @@ export function SizeSelectorCompact({
               className={cn(
                 'rounded-md border px-3 py-1.5 text-sm transition-all',
                 isSelected
-                  ? 'border-brand-500 bg-brand-500 text-white'
-                  : 'border-border bg-background hover:border-brand-300'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background hover:border-foreground/30'
               )}
             >
               {formatDimension(variant.widthInches, variant.heightInches, displayUnit)}

@@ -84,7 +84,7 @@ export function ReviewSummary({
         <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
           {/* Average Rating */}
           <div className="flex flex-col items-center sm:items-start">
-            <div className="text-5xl font-bold text-foreground">
+            <div className="font-heading text-5xl font-light text-foreground">
               {stats.averageRating.toFixed(1)}
             </div>
             <StarRating

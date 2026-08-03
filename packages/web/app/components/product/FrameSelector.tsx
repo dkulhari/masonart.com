@@ -181,8 +181,8 @@ function FrameOptionCard({
       className={cn(
         'relative flex gap-3 rounded-lg border p-3 text-left transition-all',
         isSelected
-          ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500 dark:bg-brand-950/20'
-          : 'border-border bg-card hover:border-brand-300 hover:bg-muted/50'
+          ? 'border-primary bg-accent ring-1 ring-primary'
+          : 'border-border bg-card hover:border-foreground/30 hover:bg-muted/50'
       )}
       aria-label={`Select ${frame.name}`}
       aria-pressed={isSelected}
@@ -212,7 +212,7 @@ function FrameOptionCard({
           <div className="min-w-0">
             <span className={cn(
               'block text-sm font-medium leading-tight',
-              isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-foreground'
+              isSelected ? 'text-foreground' : 'text-foreground'
             )}>
               {frame.name}
             </span>
@@ -223,7 +223,7 @@ function FrameOptionCard({
 
           {/* Selection Indicator */}
           {isSelected && (
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white">
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <Check className="h-3 w-3" />
             </div>
           )}
@@ -233,7 +233,7 @@ function FrameOptionCard({
         <div className="mt-1 flex items-center gap-2">
           <span className={cn(
             'text-xs font-semibold',
-            isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-foreground'
+            isSelected ? 'text-foreground' : 'text-foreground'
           )}>
             {priceDisplay}
           </span>
@@ -300,8 +300,8 @@ export function FrameSelectorCompact({
               className={cn(
                 'rounded-md border px-3 py-1.5 text-sm transition-all',
                 isSelected
-                  ? 'border-brand-500 bg-brand-500 text-white'
-                  : 'border-border bg-background hover:border-brand-300'
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-background hover:border-foreground/30'
               )}
             >
               {frame.name}

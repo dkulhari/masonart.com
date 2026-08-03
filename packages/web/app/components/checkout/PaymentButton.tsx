@@ -280,12 +280,12 @@ export function PaymentButton({
         disabled={isDisabled}
         className={cn(
           'flex w-full items-center justify-center gap-3 rounded-lg px-6 py-4 text-base font-semibold transition-all',
-          'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
           status === 'success'
             ? 'bg-green-500 text-white'
             : isDisabled
               ? 'cursor-not-allowed bg-muted text-muted-foreground'
-              : 'bg-brand-500 text-white hover:bg-brand-600 active:scale-[0.98]'
+              : 'bg-primary text-primary-foreground hover:bg-primary/85 active:scale-[0.98]'
         )}
       >
         {isLoading ? (

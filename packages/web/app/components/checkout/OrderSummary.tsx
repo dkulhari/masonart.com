@@ -114,7 +114,7 @@ export function OrderSummary({
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Order Summary</h2>
-          <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-sm font-medium text-brand-700">
+          <span className="rounded-full bg-highlight px-2.5 py-0.5 text-sm font-medium text-foreground">
             {itemCount} {itemCount === 1 ? 'item' : 'items'}
           </span>
         </div>
@@ -212,8 +212,8 @@ export function OrderSummary({
                 placeholder="Coupon code"
                 className={cn(
                   'w-full rounded-lg border bg-background px-3 py-2 text-sm uppercase placeholder:normal-case placeholder:text-muted-foreground transition-colors',
-                  'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
-                  couponError ? 'border-red-500' : 'border-input hover:border-brand-300'
+                  'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                  couponError ? 'border-red-500' : 'border-input hover:border-foreground/30'
                 )}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -227,11 +227,11 @@ export function OrderSummary({
               onClick={handleApplyCoupon}
               disabled={!couponCode.trim() || isApplyingCoupon}
               className={cn(
-                'rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium transition-colors',
-                'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+                'rounded-pill border border-primary px-4 py-2 text-sm font-medium transition-colors',
+                'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
                 !couponCode.trim() || isApplyingCoupon
                   ? 'cursor-not-allowed border-muted bg-muted text-muted-foreground'
-                  : 'bg-brand-50 text-brand-600 hover:bg-brand-100'
+                  : 'bg-transparent text-primary hover:bg-primary hover:text-primary-foreground'
               )}
             >
               {isApplyingCoupon ? (
@@ -266,7 +266,7 @@ export function OrderSummary({
       <div className="border-t border-border p-4">
         <div className="flex items-center justify-between">
           <span className="text-base font-semibold text-foreground">Total</span>
-          <span className="text-xl font-bold text-foreground">{formatPrice(total)}</span>
+          <span className="text-xl font-medium text-foreground">{formatPrice(total)}</span>
         </div>
       </div>
 
@@ -278,11 +278,11 @@ export function OrderSummary({
             onClick={onCheckout}
             disabled={!canProceed || isCheckingOut}
             className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2',
+              'flex w-full items-center justify-center gap-2 rounded-pill py-3 text-sm font-medium transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
               !canProceed || isCheckingOut
                 ? 'cursor-not-allowed bg-muted text-muted-foreground'
-                : 'bg-brand-500 text-white hover:bg-brand-600'
+                : 'bg-primary text-primary-foreground hover:bg-primary/85'
             )}
           >
             {isCheckingOut ? (
@@ -301,15 +301,15 @@ export function OrderSummary({
       <div className="border-t border-border p-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Shield className="h-4 w-4 text-brand-500" />
+            <Shield className="h-4 w-4 text-foreground" />
             <span>Secure checkout with encrypted payment</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Truck className="h-4 w-4 text-brand-500" />
+            <Truck className="h-4 w-4 text-foreground" />
             <span>Free shipping on orders over ₹999</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <RotateCcw className="h-4 w-4 text-brand-500" />
+            <RotateCcw className="h-4 w-4 text-foreground" />
             <span>30-day hassle-free returns</span>
           </div>
         </div>

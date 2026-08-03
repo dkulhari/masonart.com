@@ -85,15 +85,21 @@ export function ProductCard({
           </div>
         )}
 
-        {/* Badges sit over the media, so they cannot affect the box. */}
+        {/* Badges sit over the media, so they cannot affect the box.
+         *
+         * Both were saturated fills — orange Featured, purple AI — sitting a
+         * few pixels from the artwork, which is the worst place on the page
+         * for a colour that is not the artwork's. Featured inverts to the page
+         * ink; AI keeps its icon but becomes a light chip, so it reads as a
+         * marker of provenance rather than a second brand. */}
         <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-col gap-1">
           {showFeaturedBadge && product.isFeatured && (
-            <span className="rounded-full bg-brand-500 px-2 py-0.5 text-xs font-medium text-white">
+            <span className="rounded-full bg-foreground px-2 py-0.5 text-xs font-medium text-background">
               Featured
             </span>
           )}
           {showAiBadge && product.isAiGenerated && (
-            <span className="flex items-center gap-1 rounded-full bg-purple-500 px-2 py-0.5 text-xs font-medium text-white">
+            <span className="flex items-center gap-1 rounded-full border border-foreground/15 bg-background/90 px-2 py-0.5 text-xs font-medium text-foreground">
               <Sparkles className="h-3 w-3" />
               AI
             </span>
@@ -111,14 +117,14 @@ export function ProductCard({
           <Link
             to="/posters/$slug"
             params={{ slug: product.slug }}
-            className="text-base font-medium leading-tight text-foreground transition-colors hover:text-brand-600"
+            className="text-product font-medium leading-tight text-foreground transition-colors hover:text-foreground/60"
           >
             {product.title}
           </Link>
         </p>
 
         <div className="flex flex-col gap-2">
-          <span className="whitespace-nowrap text-base font-light lg:text-right">
+          <span className="whitespace-nowrap text-product font-light lg:text-right">
             <small className="text-[0.8em]">From</small> {formatPrice(price)}
           </span>
         </div>

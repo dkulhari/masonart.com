@@ -230,12 +230,12 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
               {/* Badges */}
               <div className="absolute left-3 top-3 flex flex-col gap-2">
                 {product.isFeatured && (
-                  <span className="rounded-full bg-brand-500 px-2.5 py-1 text-xs font-medium text-white">
+                  <span className="rounded-full bg-foreground px-2.5 py-1 text-xs font-medium text-background">
                     Featured
                   </span>
                 )}
                 {product.isAiGenerated && (
-                  <span className="flex items-center gap-1 rounded-full bg-purple-500 px-2.5 py-1 text-xs font-medium text-white">
+                  <span className="flex items-center gap-1 rounded-full border border-foreground/15 bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground">
                     <Sparkles className="h-3 w-3" />
                     AI Generated
                   </span>
@@ -254,8 +254,8 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                     className={cn(
                       'relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-all',
                       index === currentImageIndex
-                        ? 'border-brand-500'
-                        : 'border-transparent hover:border-brand-300'
+                        ? 'border-foreground'
+                        : 'border-transparent hover:border-foreground/30'
                     )}
                   >
                     <img
@@ -287,7 +287,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                 </div>
               )}
 
-              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              <h1 className="text-2xl tracking-tight text-foreground sm:text-3xl">
                 {product.title}
               </h1>
 
@@ -302,7 +302,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
               {product.rating && product.rating.reviewCount > 0 && (
                 <div className="mt-2 flex items-center gap-2">
                   <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    <Star className="h-4 w-4 fill-rating text-rating" />
                     <span className="text-sm font-medium">
                       {product.rating.averageRating.toFixed(1)}
                     </span>
@@ -320,7 +320,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
             {/* Price Display */}
             <div className="rounded-lg border border-border bg-muted/30 p-4">
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-foreground">
+                <span className="text-3xl font-medium text-foreground">
                   {formatPrice(totalPrice)}
                 </span>
                 {selectedFrame && (
@@ -393,7 +393,7 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                   className={cn(
                     'flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-all',
                     selectedVariant
-                      ? 'bg-brand-500 text-white hover:bg-brand-600'
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/85'
                       : 'cursor-not-allowed bg-muted text-muted-foreground'
                   )}
                 >
@@ -420,17 +420,17 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
             {/* Trust Badges */}
             <div className="grid grid-cols-3 gap-4 border-t border-border pt-6">
               <div className="flex flex-col items-center text-center">
-                <Truck className="mb-2 h-6 w-6 text-brand-500" />
+                <Truck className="mb-2 h-6 w-6 text-foreground" />
                 <span className="text-xs font-medium text-foreground">Free Shipping</span>
                 <span className="text-xs text-muted-foreground">Orders over ₹999</span>
               </div>
               <div className="flex flex-col items-center text-center">
-                <Shield className="mb-2 h-6 w-6 text-brand-500" />
+                <Shield className="mb-2 h-6 w-6 text-foreground" />
                 <span className="text-xs font-medium text-foreground">Secure Payment</span>
                 <span className="text-xs text-muted-foreground">100% Protected</span>
               </div>
               <div className="flex flex-col items-center text-center">
-                <RotateCcw className="mb-2 h-6 w-6 text-brand-500" />
+                <RotateCcw className="mb-2 h-6 w-6 text-foreground" />
                 <span className="text-xs font-medium text-foreground">Easy Returns</span>
                 <span className="text-xs text-muted-foreground">30-day policy</span>
               </div>

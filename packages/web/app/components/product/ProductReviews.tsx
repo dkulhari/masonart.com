@@ -81,7 +81,7 @@ export function ProductReviews({
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <MessageSquare className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold text-foreground">
+            <h2 className="text-2xl text-foreground">
               Customer Reviews
             </h2>
           </div>

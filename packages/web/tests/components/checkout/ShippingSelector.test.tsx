@@ -170,7 +170,9 @@ describe('ShippingSelector Component', () => {
 
       await waitFor(() => {
         const expressButton = screen.getByText('Express Delivery').closest('button');
-        expect(expressButton).toHaveClass('border-brand-500');
+        // Was border-brand-500. The mesonart parity work moved every
+        // selection state onto the monochrome primary.
+        expect(expressButton).toHaveClass('border-primary');
       });
     });
 

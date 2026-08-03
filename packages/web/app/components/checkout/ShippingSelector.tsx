@@ -88,8 +88,8 @@ function ShippingOptionCard({
       className={cn(
         'w-full rounded-lg border p-4 text-left transition-all duration-200',
         isSelected
-          ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-          : 'border-border bg-background hover:border-brand-300 hover:shadow-sm'
+          ? 'border-primary bg-accent ring-1 ring-primary'
+          : 'border-border bg-background hover:border-foreground/30 hover:shadow-sm'
       )}
       aria-pressed={isSelected}
     >
@@ -98,7 +98,7 @@ function ShippingOptionCard({
         <div
           className={cn(
             'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg',
-            isSelected ? 'bg-brand-100 text-brand-600' : 'bg-muted text-muted-foreground'
+            isSelected ? 'bg-accent text-foreground' : 'bg-muted text-muted-foreground'
           )}
         >
           <CarrierIcon className="h-5 w-5" />
@@ -147,7 +147,7 @@ function ShippingOptionCard({
           <div
             className={cn(
               'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-              isSelected ? 'border-brand-500 bg-brand-500' : 'border-muted-foreground/30 bg-transparent'
+              isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/30 bg-transparent'
             )}
           >
             {isSelected && <div className="h-2 w-2 rounded-full bg-white" />}
@@ -282,7 +282,7 @@ export function ShippingSelector({
   if (isLoading) {
     return (
       <div className={cn('flex items-center justify-center py-8', className)}>
-        <Loader2 className="h-6 w-6 animate-spin text-brand-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-foreground" />
         <span className="ml-2 text-sm text-muted-foreground">Loading shipping options...</span>
       </div>
     )
@@ -360,7 +360,7 @@ export function ShippingSelector({
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-brand-500 transition-all duration-300"
+              className="h-full rounded-full bg-primary transition-all duration-300"
               style={{ width: `${Math.min((cartTotal / freeShippingThreshold) * 100, 100)}%` }}
             />
           </div>
