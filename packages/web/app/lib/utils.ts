@@ -6,7 +6,31 @@
  */
 
 import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/**
+ * tailwind-merge only knows Tailwind's stock scales. Ours adds two that it
+ * would otherwise misfile, both from the mesonart parity work:
+ *
+ *   - `text-nav|button|product|display` are FONT SIZES. Unrecognised `text-*`
+ *     is assumed to be a text colour, so `text-button` was being cancelled by
+ *     any `text-<colour>` alongside it — silently, since the class simply
+ *     disappeared from the output.
+ *   - `rounded-pill` is a BORDER RADIUS. Unrecognised, it did not conflict
+ *     with `rounded-none`, so both survived and the winner was decided by
+ *     stylesheet order rather than by the caller.
+ *
+ * Anything registered under `theme.extend.fontSize` or `borderRadius` in
+ * tailwind.config.ts needs a line here too.
+ */
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [{ text: ["nav", "button", "product", "display"] }],
+      rounded: [{ rounded: ["pill"] }],
+    },
+  },
+});
 
 /**
  * Merge Tailwind CSS classes with proper precedence handling.
