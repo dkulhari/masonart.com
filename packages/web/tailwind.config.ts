@@ -8,11 +8,16 @@ const config: Config = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
+    /**
+     * Kept in step with `--page-width` / `--page-padding` in globals.css.
+     * `.container-wide` is what the storefront actually uses; this exists so
+     * the handful of `container` call sites do not disagree with it.
+     */
     container: {
       center: true,
-      padding: '2rem',
+      padding: '20px',
       screens: {
-        '2xl': '1400px',
+        '2xl': '1600px',
       },
     },
     extend: {

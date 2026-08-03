@@ -130,9 +130,12 @@ describe('page width', () => {
     expect(m![0]).toContain('var(--page-width)')
   })
 
-  it('uses 20px page padding, not 2rem', () => {
+  it('uses the measured 20px page gutter, not the old 2rem ramp', () => {
+    expect(css).toMatch(/--page-padding:\s*20px/)
     const m = css.match(/\.container-wide\s*\{[^}]*\}/)
-    expect(m![0]).toMatch(/px-5|padding-inline:\s*20px/)
+    expect(m![0]).toContain('var(--page-padding)')
+    // The old responsive ramp had nothing to ramp between at a flat gutter.
+    expect(m![0]).not.toContain('sm:px-6')
   })
 
   it('the tailwind container agrees with the page width', () => {

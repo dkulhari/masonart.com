@@ -145,8 +145,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
           'Discover premium posters and custom frames. Create unique AI-generated art for your space.',
       },
       {
+        // Colours the mobile browser chrome. Follows --primary; leaving it
+        // orange put a strip of the retired palette above every page.
         name: 'theme-color',
-        content: '#f97316',
+        content: '#171717',
       },
     ],
     links: [

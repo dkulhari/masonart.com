@@ -123,12 +123,15 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
       expect(tailwindConfig).toContain('center: true');
     });
 
-    it('should have container padding', () => {
-      expect(tailwindConfig).toContain("padding: '2rem'");
+    // Was 2rem / 1400px. Moved to the measured mesonart page box; the
+    // authoritative values are --page-padding / --page-width in globals.css,
+    // and design-tokens.test.ts asserts the two stay in step.
+    it('should have the measured 20px container padding', () => {
+      expect(tailwindConfig).toContain("padding: '20px'");
     });
 
     it('should have 2xl screen breakpoint for container', () => {
-      expect(tailwindConfig).toContain("'2xl': '1400px'");
+      expect(tailwindConfig).toContain("'2xl': '1600px'");
     });
   });
 
