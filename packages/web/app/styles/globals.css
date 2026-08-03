@@ -18,9 +18,19 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Primary - chobii.art brand color (warm amber/terracotta) */
-    --primary: 25 95% 53%;
-    --primary-foreground: 60 9.1% 97.8%;
+    /**
+     * Primary — measured mesonart button, rgb(23 23 23) on white.
+     *
+     * This used to be the warm amber `25 95% 53%`. It is deliberately the same
+     * value as --foreground: mesonart's entire button system is one near-black
+     * pill plus its outline variant, and the accent role that orange used to
+     * play is now filled by --sale (and only on sale prices).
+     *
+     * The --brand-* scale below is intentionally left intact — /admin and the
+     * AI generator still consume it. Do not delete it to "finish the job".
+     */
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 100%;
 
     /* Secondary */
     --secondary: 210 40% 96.1%;
@@ -49,10 +59,46 @@
     /* Border, Input, Ring */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 25 95% 53%;
+    --ring: 0 0% 9%;
 
     /* Border Radius */
     --radius: 0.5rem;
+
+    /**
+     * Button geometry — measured mesonart.
+     *
+     * --rounded-button: 3.75rem, --buttons-border-width: 2px. The radius is
+     * large enough that any button under ~7.5rem tall is a full pill; it is a
+     * radius rather than 9999px because their wider blocks keep the same
+     * corner.
+     *
+     * Consumed by app/components/ui/Button.tsx, which is the only thing that
+     * should be spelling these out.
+     */
+    --radius-pill: 3.75rem;
+    --border-button: 2px;
+
+    /**
+     * Sale accent — rgb(225 29 72), rose-600.
+     *
+     * The ONLY warm colour left in the storefront, and reserved for sale
+     * prices and sale tags. It reads as "discount" precisely because nothing
+     * else on the page is red; spending it on a generic CTA would undo that.
+     */
+    --sale: 347 77% 50%;
+
+    /**
+     * Section bands.
+     *
+     * mesonart alternates white and beige full-bleed bands rather than the
+     * gray-tinted `bg-muted/30` we used. --band is the standard beige
+     * (rgb 229 226 213); --band-strong is the warmer sand their collection
+     * pages sit on (rgb 219 216 194). --highlight is the peach they use for
+     * emphasis chips (rgb 255 221 191).
+     */
+    --band: 49 24% 87%;
+    --band-strong: 53 26% 81%;
+    --highlight: 28 100% 87.5%;
 
     /* ------------------------------------------------------------------ */
     /* Product card tokens — measured from mesonart.com, 2026-07-30        */
@@ -108,7 +154,7 @@
     /* Sidebar */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary: 0 0% 9%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
@@ -139,9 +185,16 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    /* Primary - slightly lighter for dark mode */
-    --primary: 25 95% 58%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /**
+     * Primary — inverted, so the pill stays a pill.
+     *
+     * mesonart has no dark mode; ours predates the parity work and is already
+     * tested, so it survives rather than being deleted. A near-black pill on a
+     * near-black page would vanish, so the roles swap: near-white fill,
+     * near-black label.
+     */
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
 
     /* Secondary */
     --secondary: 217.2 32.6% 17.5%;
@@ -170,7 +223,7 @@
     /* Border, Input, Ring */
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 25 95% 58%;
+    --ring: 0 0% 98%;
 
     /* Brand - adjusted for dark mode */
     --brand: 25 95% 58%;
@@ -186,7 +239,7 @@
     /* Sidebar - Dark Mode */
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 25 95% 58%;
+    --sidebar-primary: 0 0% 98%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;

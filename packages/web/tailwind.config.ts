@@ -24,6 +24,17 @@ const config: Config = {
         mat: 'hsl(var(--mat))',
         /** Review stars — measured amber-500 on mesonart. */
         rating: 'hsl(var(--rating))',
+        /**
+         * Sale accent. Reserved for sale prices and sale tags — see the token
+         * comment in globals.css for why it is not a general-purpose red.
+         */
+        sale: 'hsl(var(--sale))',
+        /** Full-bleed section bands. `sand` is the warmer collections tone. */
+        band: {
+          DEFAULT: 'hsl(var(--band))',
+          strong: 'hsl(var(--band-strong))',
+        },
+        highlight: 'hsl(var(--highlight))',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -103,6 +114,8 @@ const config: Config = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        /** Measured mesonart button radius. Consumed by ui/Button.tsx. */
+        pill: 'var(--radius-pill)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],

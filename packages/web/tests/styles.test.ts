@@ -1044,9 +1044,17 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
       expect(tailwindConfig).toContain('// chobii.art brand colors');
     });
 
-    it('should have brand primary color as warm amber/terracotta', () => {
-      // Primary color should be around hue 25 (warm amber/terracotta)
-      expect(globalsCss).toContain('--primary: 25 95% 53%');
+    it('should have primary as the measured mesonart near-black, not amber', () => {
+      // Was `--primary: 25 95% 53%` (warm amber/terracotta). The mesonart
+      // parity work moved the storefront onto a single near-black pill and
+      // reserved the accent role for --sale. The amber scale survives as
+      // --brand-* below, which /admin and the AI generator still consume.
+      expect(globalsCss).toContain('--primary: 0 0% 9%');
+      expect(globalsCss).not.toContain('--primary: 25 95% 53%');
+    });
+
+    it('should keep the warm amber scale for /admin and the AI surface', () => {
+      expect(globalsCss).toContain('--brand: 25 95% 53%');
     });
 
     it('should have complete brand color scale', () => {
