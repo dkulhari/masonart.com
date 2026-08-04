@@ -173,6 +173,7 @@ export const productSizeSchema = z.object({
   category: sizeCategorySchema,
   displayLabel: z.string().min(1),
   displayLabelMetric: z.string().min(1),
+  displayLabelDual: z.string().min(1),
 });
 
 // ============================================================================

@@ -182,6 +182,14 @@ export interface ProductSize {
   displayLabel: string;
   /** Display label in metric (e.g., "30 × 30 cm") */
   displayLabelMetric: string;
+  /**
+   * Both units inline (e.g. `36" × 48" / 91 × 122 cm`).
+   *
+   * mesonart prints every size this way rather than offering a unit toggle,
+   * so the list is scannable in either system at once. This is what gets
+   * written to `product_variants.size_label`.
+   */
+  displayLabelDual: string;
 }
 
 // ============================================================================

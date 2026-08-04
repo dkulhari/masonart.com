@@ -434,6 +434,7 @@ describe('Product Size Schema', () => {
     category: 'portrait-landscape' as const,
     displayLabel: '12x16 inches',
     displayLabelMetric: '30x41 cm',
+    displayLabelDual: '12" x 16" / 30 x 41 cm',
   };
 
   it('should validate a complete valid size', () => {
@@ -838,6 +839,7 @@ describe('Product Variant Schema', () => {
       category: 'portrait-landscape' as const,
       displayLabel: '12x16 inches',
       displayLabelMetric: '30x41 cm',
+      displayLabelDual: '12" x 16" / 30 x 41 cm',
     },
     basePrice: 149900,
     compareAtPrice: 179900,
@@ -953,6 +955,7 @@ describe('Product Schema', () => {
           category: 'portrait-landscape' as const,
           displayLabel: '12x16 inches',
           displayLabelMetric: '30x41 cm',
+          displayLabelDual: '12" x 16" / 30 x 41 cm',
         },
         basePrice: 149900,
         stockQuantity: 50,
@@ -1460,6 +1463,7 @@ describe('Create Product Input Schema', () => {
           category: 'portrait-landscape' as const,
           displayLabel: '12x16 inches',
           displayLabelMetric: '30x41 cm',
+          displayLabelDual: '12" x 16" / 30 x 41 cm',
         },
         basePrice: 149900,
         stockQuantity: 50,

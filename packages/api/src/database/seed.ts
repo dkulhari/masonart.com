@@ -3,6 +3,18 @@
 
 import { MAT_CANVAS, type ProductImage } from "@chobii/shared";
 import { buildSeedImageFromUrl } from "./seed-images";
+import { buildVariantsForOrientation } from "./seed-variants";
+
+/**
+ * Orientations the shared ladder covers. `round` has no ladder yet — it falls
+ * back to portrait rather than seeding a product with zero variants.
+ */
+const LADDERED_ORIENTATIONS = new Set([
+  "square",
+  "portrait",
+  "landscape",
+  "panoramic",
+]);
 import { db, closeDatabase } from "./index";
 import {
   products,
@@ -1365,182 +1377,6 @@ const sampleProducts: NewProduct[] = [
   },
 ];
 
-/**
- * Variant sizes for products based on orientation
- */
-const variantsByOrientation: Record<
-  string,
-  Omit<NewProductVariant, "productId">[]
-> = {
-  square: [
-    {
-      sizeLabel: '12" x 12"',
-      widthInches: 12,
-      heightInches: 12,
-      widthCm: 30,
-      heightCm: 30,
-      price: "0.00", // Will be calculated as base price
-      stockQuantity: 50,
-      sortOrder: 1,
-    },
-    {
-      sizeLabel: '18" x 18"',
-      widthInches: 18,
-      heightInches: 18,
-      widthCm: 46,
-      heightCm: 46,
-      price: "200.00", // Price addition
-      stockQuantity: 40,
-      sortOrder: 2,
-    },
-    {
-      sizeLabel: '24" x 24"',
-      widthInches: 24,
-      heightInches: 24,
-      widthCm: 61,
-      heightCm: 61,
-      price: "400.00",
-      stockQuantity: 30,
-      sortOrder: 3,
-    },
-    {
-      sizeLabel: '36" x 36"',
-      widthInches: 36,
-      heightInches: 36,
-      widthCm: 91,
-      heightCm: 91,
-      price: "800.00",
-      stockQuantity: 20,
-      sortOrder: 4,
-    },
-  ],
-  portrait: [
-    {
-      sizeLabel: '12" x 16"',
-      widthInches: 12,
-      heightInches: 16,
-      widthCm: 30,
-      heightCm: 41,
-      price: "0.00",
-      stockQuantity: 50,
-      sortOrder: 1,
-    },
-    {
-      sizeLabel: '18" x 24"',
-      widthInches: 18,
-      heightInches: 24,
-      widthCm: 46,
-      heightCm: 61,
-      price: "200.00",
-      stockQuantity: 40,
-      sortOrder: 2,
-    },
-    {
-      sizeLabel: '24" x 36"',
-      widthInches: 24,
-      heightInches: 36,
-      widthCm: 61,
-      heightCm: 91,
-      price: "500.00",
-      stockQuantity: 30,
-      sortOrder: 3,
-    },
-    {
-      sizeLabel: '30" x 40"',
-      widthInches: 30,
-      heightInches: 40,
-      widthCm: 76,
-      heightCm: 102,
-      price: "800.00",
-      stockQuantity: 20,
-      sortOrder: 4,
-    },
-  ],
-  landscape: [
-    {
-      sizeLabel: '16" x 12"',
-      widthInches: 16,
-      heightInches: 12,
-      widthCm: 41,
-      heightCm: 30,
-      price: "0.00",
-      stockQuantity: 50,
-      sortOrder: 1,
-    },
-    {
-      sizeLabel: '24" x 18"',
-      widthInches: 24,
-      heightInches: 18,
-      widthCm: 61,
-      heightCm: 46,
-      price: "200.00",
-      stockQuantity: 40,
-      sortOrder: 2,
-    },
-    {
-      sizeLabel: '36" x 24"',
-      widthInches: 36,
-      heightInches: 24,
-      widthCm: 91,
-      heightCm: 61,
-      price: "500.00",
-      stockQuantity: 30,
-      sortOrder: 3,
-    },
-    {
-      sizeLabel: '48" x 32"',
-      widthInches: 48,
-      heightInches: 32,
-      widthCm: 122,
-      heightCm: 81,
-      price: "900.00",
-      stockQuantity: 15,
-      sortOrder: 4,
-    },
-  ],
-  panoramic: [
-    {
-      sizeLabel: '36" x 12"',
-      widthInches: 36,
-      heightInches: 12,
-      widthCm: 91,
-      heightCm: 30,
-      price: "0.00",
-      stockQuantity: 40,
-      sortOrder: 1,
-    },
-    {
-      sizeLabel: '48" x 16"',
-      widthInches: 48,
-      heightInches: 16,
-      widthCm: 122,
-      heightCm: 41,
-      price: "300.00",
-      stockQuantity: 30,
-      sortOrder: 2,
-    },
-    {
-      sizeLabel: '60" x 20"',
-      widthInches: 60,
-      heightInches: 20,
-      widthCm: 152,
-      heightCm: 51,
-      price: "600.00",
-      stockQuantity: 20,
-      sortOrder: 3,
-    },
-    {
-      sizeLabel: '72" x 24"',
-      widthInches: 72,
-      heightInches: 24,
-      widthCm: 183,
-      heightCm: 61,
-      price: "1000.00",
-      stockQuantity: 10,
-      sortOrder: 4,
-    },
-  ],
-};
 
 /**
  * Sample frame options
@@ -1751,27 +1587,33 @@ async function seedProducts(): Promise<void> {
 
     console.log(`  Created product: ${productData.title}`);
 
-    // Get variants for this orientation
-    const variantTemplates =
-      variantsByOrientation[insertedProduct.orientation] ||
-      variantsByOrientation.portrait;
+    // Variants come from the shared size ladder, not from a table in this
+    // file. See seed-variants.ts for why that mattered.
+    const ladderOrientation = LADDERED_ORIENTATIONS.has(
+      insertedProduct.orientation
+    )
+      ? (insertedProduct.orientation as Parameters<
+          typeof buildVariantsForOrientation
+        >[0])
+      : "portrait";
 
-    if (!variantTemplates) {
-      console.error(`  No variant templates found for orientation: ${insertedProduct.orientation}`);
+    const templates = buildVariantsForOrientation(
+      ladderOrientation,
+      parseFloat(productData.basePrice)
+    );
+
+    if (templates.length === 0) {
+      console.error(
+        `  No ladder for orientation: ${insertedProduct.orientation}`
+      );
       continue;
     }
 
-    // Calculate actual prices and insert variants
-    const basePrice = parseFloat(productData.basePrice);
-    const variantsToInsert: NewProductVariant[] = variantTemplates.map(
-      (template) => ({
-        ...template,
-        productId: insertedProduct.id,
-        // Calculate final price: base price + size addition
-        price: (basePrice + parseFloat(template.price)).toFixed(2),
-        variantSku: `${productData.sku}-${template.widthInches}x${template.heightInches}`,
-      })
-    );
+    const variantsToInsert: NewProductVariant[] = templates.map((template) => ({
+      ...template,
+      productId: insertedProduct.id,
+      variantSku: `${productData.sku}-${template.widthInches}x${template.heightInches}`,
+    }));
 
     await db.insert(productVariants).values(variantsToInsert);
     console.log(`    Added ${variantsToInsert.length} variants`);

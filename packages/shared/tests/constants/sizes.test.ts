@@ -40,8 +40,11 @@ import {
 // ============================================================================
 
 describe('SQUARE_SIZES constant', () => {
-  it('should have 8 square sizes defined', () => {
-    expect(SQUARE_SIZES.length).toBe(8);
+  // Was 8, capped at 48". Extended to mesonart's measured square-10 ladder
+  // (24-72") on top of our own 12-20" poster steps. See sizes.ladders.test.ts
+  // for the depth and ceiling assertions.
+  it('should have 13 square sizes defined', () => {
+    expect(SQUARE_SIZES.length).toBe(13);
   });
 
   it('should have all sizes with equal width and height', () => {
@@ -108,8 +111,10 @@ describe('SQUARE_SIZES constant', () => {
 // ============================================================================
 
 describe('PORTRAIT_LANDSCAPE_SIZES constant', () => {
-  it('should have 8 portrait/landscape sizes defined', () => {
-    expect(PORTRAIT_LANDSCAPE_SIZES.length).toBe(8);
+  // Was 8. Extended with mesonart's measured rect-14, transposed short-side
+  // first and merged with our small steps.
+  it('should have 17 portrait/landscape sizes defined', () => {
+    expect(PORTRAIT_LANDSCAPE_SIZES.length).toBe(17);
   });
 
   it('should have all sizes with width less than height (portrait)', () => {
@@ -159,8 +164,10 @@ describe('PORTRAIT_LANDSCAPE_SIZES constant', () => {
 // ============================================================================
 
 describe('PANORAMIC_SIZES constant', () => {
-  it('should have 4 panoramic sizes defined', () => {
-    expect(PANORAMIC_SIZES.length).toBe(4);
+  // Was 4, all of them 3:1. Extended with mesonart's pano-11, which mixes
+  // 2:1, 3:1 and 8:3.
+  it('should have 13 panoramic sizes defined', () => {
+    expect(PANORAMIC_SIZES.length).toBe(13);
   });
 
   it('should have very wide aspect ratios (width << height)', () => {
@@ -188,9 +195,12 @@ describe('PANORAMIC_SIZES constant', () => {
     });
   });
 
-  it('should have valid price tiers (2-4)', () => {
+  // Tiers are now derived from ladder quartile rather than hand-assigned, so
+  // a deep panoramic ladder has tier-1 steps like every other ladder. The
+  // schema constraint is 1-4; that is what is worth asserting.
+  it('should have valid price tiers (1-4)', () => {
     PANORAMIC_SIZES.forEach((size) => {
-      expect(size.priceTier).toBeGreaterThanOrEqual(2);
+      expect(size.priceTier).toBeGreaterThanOrEqual(1);
       expect(size.priceTier).toBeLessThanOrEqual(4);
     });
   });
@@ -216,8 +226,11 @@ describe('ALL_SIZES constant', () => {
     expect(ALL_SIZES.length).toBe(expectedLength);
   });
 
-  it('should have 20 total sizes', () => {
-    expect(ALL_SIZES.length).toBe(20);
+  it('should have 43 total sizes', () => {
+    expect(ALL_SIZES.length).toBe(
+      SQUARE_SIZES.length + PORTRAIT_LANDSCAPE_SIZES.length + PANORAMIC_SIZES.length
+    );
+    expect(ALL_SIZES.length).toBe(43);
   });
 
   it('should have unique IDs across all sizes', () => {
@@ -630,9 +643,10 @@ describe('LARGEST_SIZE constant', () => {
     expect(LARGEST_SIZE).toBe(PANORAMIC_SIZES[PANORAMIC_SIZES.length - 1]);
   });
 
-  it('should be the 24x72 size', () => {
-    expect(LARGEST_SIZE.widthInches).toBe(24);
-    expect(LARGEST_SIZE.heightInches).toBe(72);
+  // Was 24x72. The panoramic ladder now tops out at mesonart's 50x100.
+  it('should be the 50x100 size', () => {
+    expect(LARGEST_SIZE.widthInches).toBe(50);
+    expect(LARGEST_SIZE.heightInches).toBe(100);
   });
 
   it('should be in price tier 4', () => {
@@ -687,11 +701,17 @@ describe('Price tier distribution', () => {
     expect(avgTier1Area).toBeLessThan(avgTier4Area);
   });
 
-  it('should have tier 1 sizes with smallest dimensions', () => {
-    const tier1Sizes = getSizesByTier(1);
-    tier1Sizes.forEach((size) => {
-      expect(size.widthInches).toBeLessThanOrEqual(20);
-    });
+  // Tier is a quartile of its own ladder, so "tier 1" means the smallest
+  // quarter of that ladder, not an absolute dimension across all three. A
+  // panoramic tier-1 step is 24" wide and still the bottom of its ladder.
+  it('should have tier 1 sizes in the smallest quartile of their ladder', () => {
+    for (const ladder of [SQUARE_SIZES, PORTRAIT_LANDSCAPE_SIZES, PANORAMIC_SIZES]) {
+      const tier1 = ladder.filter((s) => s.priceTier === 1);
+      const cutoff = Math.ceil(ladder.length / 4);
+      tier1.forEach((size) => {
+        expect(ladder.indexOf(size)).toBeLessThan(cutoff);
+      });
+    }
   });
 
   it('should have tier 4 sizes with largest dimensions', () => {
