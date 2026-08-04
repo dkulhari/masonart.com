@@ -1,5 +1,33 @@
 import { Link } from '@tanstack/react-router'
-import { Facebook, Instagram, Twitter, Mail } from 'lucide-react'
+import {
+  Facebook,
+  Instagram,
+  Twitter,
+  Mail,
+  Brush,
+  Truck,
+  ShieldCheck,
+  RotateCcw,
+  MapPin,
+  MessageCircle,
+} from 'lucide-react'
+import { SUPPORT_EMAIL } from '@chobii/shared'
+
+/**
+ * The USP strip mesonart runs above its footer columns.
+ *
+ * Two of theirs are not repeated. "Free Shipping" flat implies unconditional;
+ * ours is free over ₹999 and the label says so. Their environmental claim has
+ * nothing behind it on our side, and a sustainability claim we cannot
+ * substantiate is not one worth copying — replaced with one that is simply
+ * true of the product.
+ */
+const USP_ITEMS = [
+  { Icon: Brush, label: 'Archival Inks', detail: 'Museum-grade pigment' },
+  { Icon: Truck, label: 'Free Over ₹999', detail: 'Across India' },
+  { Icon: RotateCcw, label: '30-Day Returns', detail: 'No questions asked' },
+  { Icon: ShieldCheck, label: 'Safe Payments', detail: 'Razorpay secured' },
+]
 
 /**
  * Footer component for the chobii.art e-commerce platform.
@@ -10,9 +38,24 @@ export function Footer() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className="border-t border-border bg-background">
+    <footer className="border-t border-border bg-band">
+      {/* USP strip — above the columns, as on theirs. */}
+      <div className="border-b border-foreground/10">
+        <div className="container-wide grid grid-cols-2 gap-6 py-8 md:grid-cols-4">
+          {USP_ITEMS.map(({ Icon, label, detail }) => (
+            <div key={label} className="flex items-center gap-3">
+              <Icon className="h-5 w-5 shrink-0 text-foreground" />
+              <div>
+                <p className="text-sm font-medium text-foreground">{label}</p>
+                <p className="text-xs text-muted-foreground">{detail}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="container-wide py-12 md:py-16">
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-5">
           {/* Brand & Description */}
           <div className="space-y-4">
             <Link to="/" className="inline-block">
@@ -40,7 +83,7 @@ export function Footer() {
 
           {/* Shop Links */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">Shop</h3>
+            <h3 className="text-sm text-foreground">Shop</h3>
             <ul className="space-y-3">
               <li>
                 <FooterLink to="/posters">All Posters</FooterLink>
@@ -62,7 +105,7 @@ export function Footer() {
 
           {/* Company Links */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">Company</h3>
+            <h3 className="text-sm text-foreground">Company</h3>
             <ul className="space-y-3">
               <li>
                 <FooterLink to="/about">About Us</FooterLink>
@@ -84,7 +127,30 @@ export function Footer() {
 
           {/* Newsletter */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">Stay Updated</h3>
+            <h3 className="text-sm text-foreground">Contact</h3>
+            <ul className="space-y-3 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Bengaluru, Karnataka, India</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0" />
+                {/* From the brand constants — the same address the API sends
+                    support mail from. Retyping it here is how the two drift. */}
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-foreground">
+                  {SUPPORT_EMAIL}
+                </a>
+              </li>
+              <li className="flex items-start gap-2">
+                <MessageCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Mon–Sat, 10am–7pm IST</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Newsletter */}
+          <div className="space-y-4">
+            <h3 className="text-sm text-foreground">Stay Updated</h3>
             <p className="text-sm text-muted-foreground">
               Subscribe to get special offers, new arrivals, and inspiration.
             </p>
