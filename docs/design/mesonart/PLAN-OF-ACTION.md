@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **All five planned features delivered** (2026-08-04, #387–#403). Phase A (#376–#385), the Phase E size slice (#386), Phase B and Phase C now complete. Phase D (home rebuild), the Phase E PDP restructure and Phase F (new pages) remain. |
+| Status | **Six features delivered** (2026-08-04, #387–#414). Phase A (#376–#385), the Phase E size slice (#386), Phase B and Phase C complete — Phase C genuinely so as of #404–#414, which closed the three §3.3 items the first pass had left open. Phase D (home rebuild), the Phase E PDP restructure and Phase F (new pages) remain. |
 | Date | 2026-08-04 |
 | Input | [mesonart-parity-analysis.md](mesonart-parity-analysis.md) — measured, re-verified 2026-08-04 |
 | Scope | Structural and stylistic parity only. Not their logo, copy, artwork, artist names or photography — see the analysis' scope note |
@@ -15,7 +15,11 @@ Turns the analysis' §6 phase plan into a concrete sequence of tt-skill invocati
 
 **Phase E — size slice only. Done.** #386 wired `getSizesForOrientation()` in as the source of truth for seeded variants, extended the three ladders to the measured step counts, replaced hand-entered per-variant prices with area pricing at the measured ~31% volume taper, and moved labels to dual-unit inline. The rest of Phase E — PDP restructure — is untouched.
 
-**Phases B and C — done**, as features 2–5 below. **Phase D, the Phase E PDP restructure and Phase F remain**; see *What remains*.
+**Phases B and C — done**, as features 2–6 below. **Phase D, the Phase E PDP restructure and Phase F remain**; see *What remains*.
+
+**Phase C was declared done early.** Features 2 and 3 shipped the collection page and this document said Phase C was complete, while three §3.3 items were still open: the Discover chip carousel (§1.3.2) was never built, promo tiles (§1.3.6) had no component anywhere, and sort stood at 6 options against mesonart's 9. Feature 6 (#404–#414) closed them.
+
+Two of those three were not blocked on anything. **Featured** was reachable through the API the whole time — it merely sorted nulls first, and `featuredOrder` is null on most of the catalogue, so the option would have led with the products nobody featured. The Discover chips were recorded here as blocked on per-collection photography; they are not, because a chip can borrow the main image of a representative product in that style. Only **Best selling** genuinely lacked a signal, and `order_items` had carried one all along.
 
 ## Build order, and why it departs from §6
 
@@ -39,6 +43,7 @@ Two of these already exist in ticketrack as empty todo features — use them, do
 | 3 | `product-metadata-facets` | ✅ **done** — #395–#399 | §6 Phase C data half + §4: facet vocabularies to shared constants, new `vibe`/`aesthetic`/`medium`/`uniqueness`/`availability`, Room 7→12, Subject 9→17, Orientation +Circle/+Set-of-2-3, filter API params, reseed | 2–3 d |
 | 4 | `global-chrome-parity` | ✅ **done** — #400–#402 | §6 Phase B minus the sale strip: centered wordmark, right cluster, two-row nav, announcement bar, footer USP row + contact column + beige restyle | 2 d |
 | 5 | `advanced-search` | ✅ **done** — #403 | Search drawer over the existing `GET /api/products/search`, wired into the new header | 1 d |
+| 6 | `collection-page-parity-remainder` | ✅ **done** — #404–#414 | The three §3.3 items feature 2 left open: Discover chip carousel, promo tiles, sort 6→8. Plus the real popularity signal behind Best selling — live sales aggregate, curator pin, admin visibility — and the seeded orders/reviews both signals needed | 1.5 d |
 
 ### What was delivered
 
@@ -52,6 +57,12 @@ Two of these already exist in ticketrack as empty todo features — use them, do
 
 **Feature 5 — advanced-search (#403).** A drawer over the search endpoint that had existed for months with no way to reach it.
 
+**Feature 6 — collection-page-parity-remainder (#404–#414).** `GET /api/products/collections` returns a display-ready row per style — count plus the main image of a representative product — so the Discover rail needed no curated assets. `PromoTile` occupies one grid cell and renders the catalogue's approved-review aggregate *or nothing*: below ten approved reviews it returns null rather than round a thin sample into a marketing number. Sort went 6→8; "Most relevant" stays out because on a collection page with no query there is nothing for relevance to mean.
+
+Best selling is a correlated scalar subquery over `order_items` joined to settled orders — **not** a join, because the list query already joins `reviews` and groups by product, so a second join fans the rows out and silently multiplies both `sum(quantity)` and `count(reviews.id)`. `products.isPopular`/`popularOrder` let a curator lift a product above that ordering; the admin list shows the real units-sold figure beside the pin so the two can be seen to disagree.
+
+#414 seeded twelve settled orders and fourteen reviews, which is what turned both signals from structurally-correct-but-empty into visible: the catalogue now reads 4.5 from 12 approved reviews and Best selling ranks 5/4/3/3/3/2 units. Two orders are voided and `paper-layers` appears only in those, so a regression that starts counting cancelled orders shows up as that product gaining sales from nothing.
+
 
 ### Corrections to the analysis, found while building
 
@@ -59,6 +70,9 @@ Two of these already exist in ticketrack as empty todo features — use them, do
 - **The product API returned no review data at all**, despite populated reviews tables. That, not the card, was why stars were missing.
 - **Facet vocabularies are hardcoded literals** in `ProductFilters.tsx` while the API validates them as unconstrained comma-separated strings. No single source of truth — the same disease the size ladders had. Feature 3 is the fix.
 - **The `sql.raw` ARRAY construction in the products filter escapes quotes by hand.** Safe only because the vocabularies are fixed; feature 3 should close it properly.
+- **`sortBy` is declared in three places** — the API zod enum, `ProductFilters.SortOption`, and `lib/api.ts`. Adding a sort value means touching all three and only the typecheck catches the one you forget. Same disease as the facet vocabularies feature 3 fixed; sort was not part of that sweep.
+- **`hooks/useReviews.ts` fetches against a relative `API_BASE = '/api'` and there is no Vite proxy for it**, so those requests never leave the dev server. Found because the promo tile rendered in jsdom and never in the browser while the endpoint answered curl perfectly. The catalogue-stats fetcher moved to `lib/api.ts`, which uses `getApiUrl()`; every other fetch in that hook still has the original shape.
+- **`tests/routes/products.test.ts` has a stale assertion**: `should filter by styles` requests `?styles=minimalist,abstract`, ids outside the vocabulary feature 3 introduced, so the 400 it gets is correct and the test is wrong.
 
 ### What remains
 
@@ -69,6 +83,8 @@ Unchanged from the analysis, and all still blocked on the same things:
 - **Phase F — new pages.** Artists, Reviews, Trade, Commission, Gift Card, Blog, and the wishlist *page* (feature 1 shipped the affordance and the badge, not the destination).
 - **The sale strip and its countdown.** Still blocked on a promotion entity; a countdown to a sale that does not exist stays out.
 - **Two loose ends from §5.6**, recorded when they were found: the admin variant endpoints still accept arbitrary sizes and prices rather than reading the ladder, and `SizeSelector`'s "Show in cm" toggle is now both redundant against dual-unit labels *and* dead (its `onClick` body is empty).
+- **"Most relevant" sort**, the ninth option. Not blocked on a signal — blocked on a definition. It only means something alongside a search query, and the collection page has none.
+- **Best selling reflects seeded orders, not trade.** #414's twelve orders are dev fixture data. The query is real; the numbers become meaningful when real orders arrive.
 
 ## Per-feature execution loop
 
@@ -85,10 +101,11 @@ For each feature in the order above:
 
 Every feature must leave these green before the next one starts:
 
-- `cd packages/web && bunx vitest run` — **1715 passing, 0 failing** as of #403. No new failures.
+- `cd packages/web && bunx vitest run` — **1753 passing, 0 failing** as of #414 (1715 as of #403). No new failures.
 - `cd packages/shared && bunx vitest run` — **880 passing**, 0 failing. No new failures.
-- `cd packages/api && bunx vitest run` — **~34–36 failing is the baseline** (38 on `feat/product-grid-alignment`). Pre-existing AI/redis/queue/auth/health suites, and the failing *file set* varies between identical runs under parallelism — confirm any suspected regression by running the single file alone before believing it.
-- `bun run typecheck` — **23 errors is the baseline.** Never higher.
+- `cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bunx vitest run` — **~22–36 failing is the baseline**. Pre-existing AI/redis/queue/auth/health suites, and the failing *file set* varies between identical runs under parallelism — confirm any suspected regression by running the single file alone before believing it.
+  **Set `DATABASE_URL` explicitly.** `packages/api/vitest.config.ts` falls back to port **5433**, which is a different project's postgres and now rejects `poster_app` outright (`password authentication failed`). Without the override every database-backed api test fails — 19 in `tests/routes/products.test.ts` alone — with nothing wrong in the code.
+- `bun run typecheck` — **23 errors is the baseline.** Never higher. Turbo stops at the first failing package, so a partial count means an earlier package failed, not that errors vanished.
 - `bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps` — **18 passing.** Use `--no-deps`: the four `auth.setup.ts` projects fail to log in the test users for pre-existing reasons, and the grid spec needs no auth.
 - `bunx vitest run tests/styles/storefront-token-compliance.test.ts` — the Phase A guard. Any new component that reaches for `font-bold`, `fill-yellow-400`, the `brand-*` scale, `blur-3xl` or a brand gradient fails here.
 
@@ -103,7 +120,8 @@ Every feature must leave these green before the next one starts:
 
 ## Blocked on non-engineering input
 
-- **Photography.** The analysis calls mesonart ~80% photography. The Discover chip carousel (§1.3.2) needs circular imagery per collection; Phase D's hero, Shop-by-Room and UGC sections need lifestyle assets; Phase F needs artist portraits. None exist. Budget separately.
+- **Photography.** The analysis calls mesonart ~80% photography. Phase D's hero, Shop-by-Room and UGC sections need lifestyle assets; Phase F needs artist portraits. None exist. Budget separately.
+  ~~The Discover chip carousel needs circular imagery per collection.~~ **It did not.** Each chip borrows the main image of a representative product in its style — highest `featuredOrder`, else newest — so the rail restyles itself as the catalogue changes. This entry blocked #410 for no reason; check whether existing data can supply an asset before booking a photo shoot.
 - **Promotion entity.** No schema for sales/promotions. Gates the sale strip, the countdown, the Sale page and the `text-sale` token having anything to colour.
 - **Facet vocabularies are a business decision.** Feature 3 proposes adopting the analysis' §1.3 lists verbatim; if chobii's catalogue wants different Vibe/Aesthetic values, decide before the reseed, not after.
 
