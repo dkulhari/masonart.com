@@ -8,6 +8,20 @@ import {
   staffAreaHref,
   staffAreaLabel,
 } from '~/lib/admin-nav'
+import { STYLE_OPTIONS } from '@chobii/shared'
+
+/**
+ * The header's own height, and the offset everything sticky below it uses.
+ *
+ * CollectionToolbar is `sticky top-16` — 4rem, this value. They are two
+ * numbers that must agree, and nothing but this comment and a test connects
+ * them: grow the header without moving the toolbar and the toolbar hides
+ * behind it.
+ *
+ * The styles row is deliberately NOT counted here. It scrolls away with the
+ * page rather than sticking, so the sticky box stays one row tall.
+ */
+export const HEADER_HEIGHT_CLASS = 'h-16'
 
 /**
  * Header component for the chobii.art e-commerce platform.
@@ -73,11 +87,16 @@ export function Header() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container-wide">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
+        <div className="relative flex h-16 items-center justify-between">
+          {/* Wordmark.
+           *
+           * Absolutely centred on desktop so it stays centred regardless of
+           * how wide the nav and action clusters happen to be. Left-aligned on
+           * mobile — centring on a narrow viewport squeezes the actions, and
+           * mesonart's own mobile header is left-aligned too. */}
           <Link
             to="/"
-            className="flex items-center space-x-2"
+            className="flex items-center space-x-2 md:absolute md:left-1/2 md:-translate-x-1/2"
             onClick={closeMobileMenu}
           >
             {/* One word, one weight. The `.art` used to be tinted with the
@@ -183,7 +202,50 @@ export function Header() {
           </div>
           </div>
         </div>
+
       </header>
+
+      {/* Nav row 2 — styles.
+       *
+       * Generated from STYLE_OPTIONS in @chobii/shared, the same list the
+       * schema, the API validation, the seed and the filter sidebar read.
+       * Twelve hardcoded links here would restart the drift #395 ended.
+       *
+       * Scrolls rather than wraps: twelve links overflow a laptop, and three
+       * wrapped lines of nav pushes the page content below the fold.
+       *
+       * OUTSIDE <header> on purpose. The header is `sticky top-0` and the
+       * collection toolbar is `sticky top-16` — if this row were inside the
+       * sticky box the header would stand 101px tall and swallow the
+       * toolbar. Here it scrolls away and the sticky box stays one row. */}
+      <nav
+        aria-label="Shop by style"
+        className="hidden border-b border-border bg-background md:block"
+      >
+        <div className="container-wide">
+          <ul className="scrollbar-hide flex items-center gap-6 overflow-x-auto py-2">
+            <li>
+              <Link
+                to="/posters"
+                className="whitespace-nowrap text-nav text-muted-foreground transition-colors hover:text-foreground"
+              >
+                All Art
+              </Link>
+            </li>
+            {STYLE_OPTIONS.map((style) => (
+              <li key={style.id}>
+                <Link
+                  to="/posters"
+                  search={{ styles: style.id }}
+                  className="whitespace-nowrap text-nav text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {style.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </nav>
 
       {/* Mobile Navigation
        *
