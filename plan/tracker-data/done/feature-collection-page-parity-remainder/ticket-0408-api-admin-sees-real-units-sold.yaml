@@ -1,0 +1,147 @@
+ticket_number: 408
+title: API - admin sees real units sold and can pin a product as popular
+description: |-
+  ## Task
+
+  Admin side of the popularity signal, in packages/api/src/routes/admin/products.ts:
+
+  1. The product **list** (:353) gains `unitsSold` - the same paid/fulfilled aggregate the storefront sort uses. This is what makes curation informed rather than blind.
+  2. `createProductSchema` (:122) and therefore `updateProductSchema` (:158) accept `isPopular` and `popularOrder`, alongside the existing `isFeatured` / `featuredOrder` at :149-150.
+  3. The update handler writes them, matching the pattern at :582-585.
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 2 - API
+  Depends on the columns from the schema ticket and the aggregate shape from the sort ticket.
+
+  The pin reorders, it never rewrites the number. An admin looking at a pinned product still sees its true `unitsSold` - that separation is the whole point of showing both.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:15:48.088Z'
+last_updated: '2026-08-04T11:51:38.278Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T11:38:42.150Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T11:51:33.950Z'
+    text: |-
+      Done — commit c0e7dcae.
+
+      **Verification**
+      - `bunx vitest run tests/routes/admin/product-popularity.test.ts` — RED at 4 failing, GREEN at 7 passing.
+      - `bunx vitest run tests/routes/admin/products.test.ts` — passing.
+      - Ran the admin list query with the units-sold subquery against the **real** dev database: 20 rows in 121ms.
+
+      **On `products-role-access.test.ts`:** it shows 1–3 timeout failures, and the set shuffles between identical runs — I measured 1 and 3 failures with my change *stashed*, and 2 and 2 with it applied. Overlapping ranges, all `Test timed out in 5000ms`, none touching the columns this ticket added. This is the varying-failing-file-set baseline PLAN-OF-ACTION.md records for `packages/api` under parallelism, not a regression.
+
+      **Environment note worth carrying:** `packages/api/vitest.config.ts` falls back to `DATABASE_URL` port **5433** when the variable is unset, which is a different project's postgres. Suites that use the real `db` (this one does — it mocks only Better Auth) fail differently depending on whether the caller exported 5440. Every run above was pinned to 5440 explicitly.
+
+      Reuses `unitsSoldSql()` from `packages/api/src/lib/product-sales.ts`, so the storefront sort and the admin column can never drift on what counts as a sale.
+  - author: system
+    timestamp: '2026-08-04T11:51:38.278Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 404
+    feature: collection-page-parity-remainder
+    description: Schema - curator pin columns and sales index
+  - ticket: 405
+    feature: collection-page-parity-remainder
+    description: API - Best selling sort over real orders, plus NULLS LAST on Featured
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for unitsSold on the list and the two new writable fields
+    file: packages/api/tests/routes/admin/product-popularity.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/product-popularity.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+
+      describe('admin product popularity', () => {
+        it('reports real units sold on the list', async () => {
+          const res = await adminRequest('/api/admin/products')
+          const body = await res.json()
+          expect(body.items[0]).toHaveProperty('unitsSold')
+          expect(typeof body.items[0].unitsSold).toBe('number')
+        })
+
+        it('accepts isPopular and popularOrder on update', async () => {
+          const res = await adminRequest(`/api/admin/products/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ isPopular: true, popularOrder: 1 }),
+          })
+          expect(res.status).toBe(200)
+        })
+
+        it('rejects a non-integer popularOrder', async () => {
+          const res = await adminRequest(`/api/admin/products/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ popularOrder: 'first' }),
+          })
+          expect(res.status).toBe(400)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm failure - unitsSold missing, fields stripped by the schema
+    command: cd packages/api && bunx vitest run tests/routes/admin/product-popularity.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the fields to the create schema (update inherits via .partial())
+    file: packages/api/src/routes/admin/products.ts
+    status: pending
+    code: |2-
+        isPopular: z.boolean().optional().default(false),
+        popularOrder: z.number().int().optional().nullable(),
+  - id: 4
+    action: implement
+    description: Write the fields in the update handler, beside the isFeatured pair
+    file: packages/api/src/routes/admin/products.ts
+    status: pending
+    code: |2-
+            if (input.isPopular !== undefined) updateData.isPopular = input.isPopular;
+            if (input.popularOrder !== undefined)
+              updateData.popularOrder = input.popularOrder;
+  - id: 5
+    action: implement
+    description: Join the pre-aggregated sales subquery into the admin list select and expose unitsSold
+    file: packages/api/src/routes/admin/products.ts
+    status: pending
+    code: |-
+      // Same pre-aggregation as the storefront sort - aggregate first, join one
+      // row per product. A raw join against order_items would fan out.
+                isPopular: products.isPopular,
+                popularOrder: products.popularOrder,
+                unitsSold: sql<number>`coalesce(${salesAgg.units}, 0)::int`,
+  - id: 6
+    action: verify-pass
+    description: Confirm the tests pass and role-access tests still pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/product-popularity.test.ts tests/routes/admin/products-role-access.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the admin API
+    command: 'git add packages/api/src/routes/admin/products.ts packages/api/tests/routes/admin && git commit -m "feat(api): admin units-sold column and popularity pin"'
+    status: pending
+current_step: 1
+started: '2026-08-04T11:38:42.150Z'
+completed: '2026-08-04T11:51:38.278Z'

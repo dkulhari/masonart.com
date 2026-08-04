@@ -1,0 +1,86 @@
+ticket_number: 394
+title: Collection - lazy-load paging replacing the numbered component
+description: |-
+  ## Task
+
+  mesonart lazy-loads on scroll with no numbered pagination (analysis §1.3.7). Ours renders a `Pagination` component.
+
+  Replace it with append-on-scroll, using an `IntersectionObserver` sentinel below the grid.
+
+  ## Context
+
+  Feature: collection-page-parity
+  Last ticket of the feature — it changes how the grid is populated, so it lands after the card work.
+
+  **Files**: `packages/web/app/routes/posters/index.tsx` (grid + `Pagination` at :521)
+
+  **Constraints — the ones that make this non-trivial**
+  - **The URL must stay shareable.** `?page=` is in the URL today and someone's bookmark depends on it. Appending pages must keep the deepest loaded page in the URL, not drop the param. `router.tsx` overrides search serialisation so params arrive as strings — page must keep being coerced to a number in `validateSearch` or the route error-boundaries to a blank page.
+  - **Keep a keyboard/no-JS path.** Pure infinite scroll is unreachable by keyboard and invisible to crawlers. Render a real "Load more" button and let the observer click it; that keeps the SEO and a11y story intact.
+  - **SSR renders page 1 only.** The loader must keep returning the first page server-side so the page is crawlable and first paint is not empty.
+  - `ItemListJsonLd` currently describes the visible page; decide whether it describes page 1 or the accumulated set, and be consistent.
+  - Re-run the grid E2E: it asserts row heights and column counts against the rendered grid, and appending changes how many cards are present.
+feature: collection-page-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T07:48:15.480Z'
+last_updated: '2026-08-04T08:10:32.834Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T08:05:28.604Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T08:10:32.834Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: load-more button exists, appends rather than replaces, URL keeps the page param, SSR renders page 1'
+    file: packages/web/tests/routes/posters-paging.test.ts
+    command: cd packages/web && bunx vitest run tests/routes/posters-paging.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/web && bunx vitest run tests/routes/posters-paging.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Replace Pagination with an observer-driven Load more that appends
+    file: packages/web/app/routes/posters/index.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the web suite passes
+    command: cd packages/web && bunx vitest run
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the grid E2E still holds with appended pages
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: 18 passed
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the paging change
+    command: 'git add packages/web/app packages/web/tests && git commit -m "feat(web): lazy-load paging on the collection grid"'
+    status: pending
+current_step: 1
+started: '2026-08-04T08:05:28.604Z'
+completed: '2026-08-04T08:10:32.834Z'

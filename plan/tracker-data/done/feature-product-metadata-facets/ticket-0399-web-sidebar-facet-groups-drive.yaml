@@ -1,0 +1,84 @@
+ticket_number: 399
+title: Web - sidebar facet groups driven by the shared vocabularies
+description: |-
+  ## Task
+
+  Replace the hardcoded option literals in `packages/web/app/components/product/ProductFilters.tsx:75-140` with the shared vocabularies, and add the new groups: Vibe, Aesthetic, Medium, Uniqueness, Availability.
+
+  With nine facet groups the rail gets long — the existing `FilterSection` collapse already handles that; pick sensible default-expanded sections rather than opening all nine.
+
+  ## Context
+
+  Feature: product-metadata-facets
+  Blocked by the shared vocabulary and API tickets.
+
+  **Constraints**
+  - **No local literals.** A guard test must assert the component imports the vocabularies rather than redeclaring them — that drift is the whole reason for this feature.
+  - Orientation renders mesonart's labels (Vertical / Horizontal / Circle / Set of 2-3) over our stored ids (portrait / landscape / round / set-of-2-3).
+  - Counts from #392 apply to the new groups too; zero-count options stay disabled rather than hidden.
+  - Filter state currently has fixed keys (`styles`, `subjects`, `colors`, `rooms`, …). Adding five more means touching `FilterState`, the URL search params, `validateSearch` (params arrive as strings — coercion must hold), and the clear-all handler. Missing one leaves a filter that cannot be cleared.
+  - The storefront token guard applies: no `font-bold`, no brand utilities.
+feature: product-metadata-facets
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T08:24:53.717Z'
+last_updated: '2026-08-04T08:46:30.845Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T08:40:47.579Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T08:46:30.845Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: sidebar sources options from @chobii/shared, renders all nine groups, orientation shows mesonart labels, clear-all clears the new facets'
+    file: packages/web/tests/components/product/ProductFilters.facets.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductFilters.facets.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/web && bunx vitest run tests/components/product/ProductFilters.facets.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Source options from shared, add the five new groups, extend FilterState and the URL params
+    file: packages/web/app/components/product/ProductFilters.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the web suite and guards pass
+    command: cd packages/web && bunx vitest run
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the collection page renders all nine groups with live counts and the grid still aligns
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: 18 passed
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the sidebar
+    command: 'git add packages/web/app packages/web/tests && git commit -m "feat(web): sidebar facet groups from the shared vocabularies"'
+    status: pending
+current_step: 1
+started: '2026-08-04T08:40:47.579Z'
+completed: '2026-08-04T08:46:30.845Z'

@@ -1,0 +1,91 @@
+ticket_number: 401
+title: Chrome - centered wordmark, right action cluster, two-row nav
+description: |-
+  ## Task
+
+  Restructure `Header.tsx` to mesonart's shape (analysis §1.1):
+
+  - **Centered wordmark** on desktop, with the action cluster (Search, Account, Wishlist, Cart) right. Ours is left-logo / centre-nav / right-actions.
+  - **Nav row 1** — pages: Posters, Create, Gallery, About, plus the staff entry when present.
+  - **Nav row 2** — styles, generated from `STYLE_OPTIONS` in `@chobii/shared`, each linking to `/posters?styles=<id>`.
+
+  ## Context
+
+  Feature: global-chrome-parity
+  Blocked by nothing; the vocabulary landed in #395.
+
+  **Constraints — all four are pinned by `tests/components/layout/chrome-tokens.test.ts` and must survive:**
+  - Mobile drawer scroll-lock and Escape (#348), including the scrim being a SIBLING of `<header>` rather than a child — the header sets `backdrop-blur`, which establishes a containing block and collapses a nested fixed scrim to zero height.
+  - Cart aria-label carries the item count (#248).
+  - Role-aware staff entry via `staffAreaLabel` / `staffAreaHref` (#362).
+  - Wishlist badge hydration gate (#389 / #498).
+
+  **Also**
+  - Search is a placeholder button here; the drawer is feature 5. It must not look interactive-but-broken — either wire it to `/posters` or ship it in the same change as the drawer.
+  - Mobile keeps ONE row plus the drawer. Two nav rows and an announcement bar is most of a phone screen.
+  - Twelve style links will overflow on a laptop — the row scrolls horizontally rather than wrapping to three lines.
+  - Header height feeds the collection toolbar's `sticky top-16`. If the header grows, that offset must move with it or the toolbar hides behind it.
+feature: global-chrome-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T08:47:35.585Z'
+last_updated: '2026-08-04T08:54:10.905Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T08:49:04.502Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T08:54:10.905Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: wordmark centered on desktop, action cluster order, styles row from shared vocabulary, preserved behaviours'
+    file: packages/web/tests/components/layout/Header.structure.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/web && bunx vitest run tests/components/layout/Header.structure.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Restructure the header into three rows
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the new suite and the chrome guard both pass
+    command: cd packages/web && bunx vitest run tests/components/layout/ tests/styles/
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the sticky toolbar still clears the taller header
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: 18 passed
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the header restructure
+    command: 'git add packages/web/app packages/web/tests && git commit -m "feat(web): centered wordmark and two-row nav"'
+    status: pending
+current_step: 1
+started: '2026-08-04T08:49:04.502Z'
+completed: '2026-08-04T08:54:10.905Z'

@@ -1,0 +1,80 @@
+ticket_number: 384
+title: Sweep - remaining storefront routes off font-bold, brand orange and rounded-lg CTAs
+description: |-
+  ## Task
+  The long tail: every remaining non-admin route file that still reaches for `font-bold`, `bg-brand-*`/`text-brand-*`, `fill-yellow-400`, or a hand-rolled `rounded-lg bg-primary` CTA.
+
+  Enumerate with:
+  ```
+  grep -rlE 'font-bold|font-extrabold|font-black|\b(bg|text|border|from|to)-brand-|fill-yellow-400' packages/web/app --include=*.tsx | grep -v '/admin'
+  ```
+
+  Covers: `routes/posters/{index,$slug}.tsx`, `routes/cart/index.tsx`, `routes/checkout/{index,success}.tsx`, `routes/create/index.tsx`, `routes/gallery/index.tsx`, `routes/track/index.tsx`, `routes/approve/$token.tsx`, `routes/auth/*` (4 files), `routes/_authed/account/*` (9 files).
+
+  Rules, applied uniformly:
+  - `font-bold` / `font-extrabold` / `font-black` on a heading → delete (the base layer supplies Urbanist 300); on non-heading emphasis → `font-medium`.
+  - `bg-brand-*` on a CTA → the `Button` primitive or `buttonVariants()`.
+  - `text-brand-*` on a link → `text-foreground` with `hover:text-foreground/60`.
+  - `fill-yellow-400` → `fill-rating`.
+  - A price shown as discounted → `text-sale`.
+
+  `/admin/**` is deliberately skipped — internal tool, out of scope, and excluding it keeps the blast radius on the storefront.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 3 — Storefront sweep
+  Depends on: the Button primitive.
+  The AI-generator components under `app/components/ai-generator/` may keep `--brand-*` — they are the differentiator surface and are not part of the mesonart-facing storefront chrome. Do not sweep them; the guard ticket must exempt that directory explicitly.
+feature: mesonart-design-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:19:36.053Z'
+last_updated: '2026-08-03T20:49:35.889Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.889Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Enumerate the remaining offenders so the sweep has a checklist
+    command: cd /Users/dhruv/work/masonart.com && grep -rcE 'font-bold|font-extrabold|font-black|\b(bg|text|border|from|to)-brand-|fill-yellow-400' packages/web/app --include=*.tsx | grep -v '/admin' | grep -v ':0$' | sort
+    expected_result: A file:count list — the sweep worklist
+    status: pending
+  - id: 2
+    action: implement
+    description: Apply the sweep rules file by file across the enumerated routes
+    file: packages/web/app/routes
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Confirm the storefront is clean apart from the exempt AI-generator directory
+    command: cd /Users/dhruv/work/masonart.com && grep -rlE 'font-bold|font-extrabold|font-black|fill-yellow-400' packages/web/app --include=*.tsx | grep -v '/admin' | grep -v '/ai-generator/'
+    expected_result: no output
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the full web unit suite and typecheck still pass
+    command: cd packages/web && bunx vitest run && bunx tsc --noEmit 2>&1 | tail -5
+    expected_result: PASS, with the TS error count no worse than the main baseline
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the long-tail sweep
+    command: 'git add packages/web/app && git commit -m "feat(web): sweep remaining storefront routes onto the monochrome system"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.889Z'

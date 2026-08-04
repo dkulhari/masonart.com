@@ -1,0 +1,66 @@
+name: collection-page-parity
+title: Collection Page Parity
+priority: high
+created: "2026-08-04T07:47:04.651Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Phase C (UI half) of docs/design/mesonart/PLAN-OF-ACTION.md — feature 2.
+
+  The analysis calls `/posters` "the closest page already": post product-grid-alignment we match the square media contract, the 4/3/2-column aligned grid and the hover mockup carousel. What is missing is the page *furniture* around the grid.
+
+  ## Corrections to the analysis, found while scoping
+
+  - **"No active-filter chips" is out of date.** `ActiveFilterTags` exists in `routes/posters/index.tsx` and renders on both mobile and desktop. Nothing to build.
+  - **`Pagination` exists** and works; the gap is that mesonart lazy-loads instead.
+  - **Facet options are hardcoded literals in `ProductFilters.tsx:75-140`** (Style 10, Subject 9, Color 13, Room 7, Orientation 4, Sort 6 — exactly the analysis' numbers) while the API validates them as free-text comma lists with no enum. There is no single source of truth for facet vocabularies — the same disease the size ladders had. Fixing that is feature 3; this feature must not entrench the literals further.
+
+  ## Scope
+
+  **In scope**
+  1. **Beige header band** — `SectionBand tone="beige"` + `DisplayHeading` (both built in Phase A, currently used only on the home page), breadcrumbs, and an SEO description. Replaces the flat `bg-muted/30` band in `PageHeader`.
+  2. **Sticky toolbar** — hide-filters toggle, inline result count, sort as a pill dropdown. Sort currently lives as a radio list *inside* the sidebar, which is where mesonart does not put it.
+  3. **Facet counts** — every option carries how many products match. Needs an API facet-count endpoint or an aggregate on the list response.
+  4. **Card rating + review count** — the reviews tables exist and are populated, but `GET /api/products` returns no aggregate at all. Needs the API to surface it before the card can show it.
+  5. **Lazy-load paging** replacing the numbered component.
+
+  **Out of scope**
+  - **Discover chip carousel** — needs circular per-collection imagery that does not exist. Blocked on photography, tracked in PLAN-OF-ACTION.
+  - **Promo tiles** — content, not engineering.
+  - **Facet vocabulary expansion** (vibe/aesthetic/medium, Room 7→12, Subject 9→17) — that is feature 3, and it is a schema + reseed job.
+  - **Quick-view and "Choose options"** — mesonart has them; they are a second interaction model on the card and deserve their own decision. Not parity-critical.
+  - The wishlist heart already landed with feature 1.
+
+  ## Design
+
+  **Approach:** additive page furniture around an untouched grid.
+
+  **Key decisions**
+  1. **Do not touch `ProductGrid` or `ProductCard` layout.** The #360–#375 contract (square media, `grow` row alignment, no min-height/line-clamp) is covered by E2E and by `ProductCard.tokens.test.ts`. The rating row is additive inside the existing content block.
+  2. **Sort moves out of the sidebar** into the toolbar as a pill dropdown, matching mesonart. The sidebar keeps facets only.
+  3. **Counts come from the API, not the client.** Counting client-side only counts the current page.
+  4. **Lazy-load must keep the URL shareable.** Numbered pagination puts `?page=` in the URL today; infinite scroll that loses that is a regression. Keep the page param, append rather than replace.
+  5. **Rating is real or absent.** No placeholder stars. If a product has no reviews, the row renders nothing rather than five empty stars — the analysis' real-data-only constraint.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "390": Collection - beige header band with display H1, breadcrumbs and description
+    "391": Collection - sticky toolbar with hide-filters toggle, result count and sort pill
+    "392": API - facet counts and a review aggregate on the product list
+    "393": Collection - facet counts in the sidebar and a star row on the card
+    "394": Collection - lazy-load paging replacing the numbered component
+total_tickets: 5
+completion_percentage: 100
+is_completed: true

@@ -1,0 +1,144 @@
+ticket_number: 409
+title: Web - sort options 6 to 8 (Featured, Best selling)
+description: |-
+  ## Task
+
+  `SORT_OPTIONS` in packages/web/app/components/product/CollectionToolbar.tsx:22 holds 6. Add two:
+
+  - `featuredOrder-asc` -> "Featured"
+  - `salesCount-desc` -> "Best selling"
+
+  The id scheme stays `${sortBy}-${sortOrder}` - the route splits on the hyphen at posters/index.tsx:419. These are new sortBy values, not a new scheme.
+
+  Also update the comment block at :18-21, which currently states all three missing options need a signal we lack. After this ticket only "Most relevant" is out, and it is out because it has no honest definition without a search query - not because of a missing signal.
+
+  `SortOption` in packages/web/app/routes/posters/index.tsx (:85) must gain `salesCount`, or the typecheck baseline moves.
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 3 - Web
+
+  The existing test asserts `SORT_OPTIONS` has length 6 (tests/components/product/CollectionToolbar.test.tsx:37) - that assertion is the failing test for this ticket.
+
+  Router search params are strings: router.tsx overrides TanStack serialization, so anything read back out of `validateSearch` needs coercion. `sortBy`/`sortOrder` are already plain strings, so this ticket adds no coercion work - but do not assume that for any new param.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:17:41.200Z'
+last_updated: '2026-08-04T12:04:05.696Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T11:59:09.333Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T12:04:05.331Z'
+    text: |-
+      Done — commits 8589913e and bad215e2.
+
+      **Verification**
+      - `bunx vitest run tests/components/product/CollectionToolbar.test.tsx` — RED at 4 failing, GREEN at 15 passing.
+      - `bunx vitest run tests/components/product/` — 144 passing across 9 files, no regression.
+      - `bun run typecheck` — **23 errors, baseline restored** (see below).
+
+      **Caught a real regression on the gate.** The first commit took typecheck to 24. Three separate errors surfaced once turbo got past its cache:
+
+      1. `app/lib/api.ts` — the web API client carries its **own** `sortBy` union, independent of `ProductFilters`'s `SortOption`. Widening one and not the other meant the route could not pass the value the toolbar now offers.
+      2. `routes/products.ts` — my nulls-last helper typed its parameter as `typeof products.featuredOrder`, which is a *column-specific* type in drizzle, so passing `popularOrder` failed. Widened to `AnyColumn`.
+      3. `seed-orders-reviews.ts` — `noUncheckedIndexedAccess` makes an array lookup `string | undefined`, against a NOT NULL author column.
+
+      Worth carrying: **`sortBy` is declared in three places** — the API zod enum, `ProductFilters.SortOption`, and `lib/api.ts`. Adding a sort value means touching all three, and only the typecheck catches the one you forget. That is the same one-source-of-truth problem features #395-#399 fixed for facet vocabularies; sort was not part of that sweep.
+
+      Also corrected the comment block above `SORT_OPTIONS`, which claimed all three missing options needed a signal we lacked. Only Best selling did.
+  - author: system
+    timestamp: '2026-08-04T12:04:05.697Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 405
+    feature: collection-page-parity-remainder
+    description: API - Best selling sort over real orders, plus NULLS LAST on Featured
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Update the toolbar test to expect 8 options and assert both new ids and labels
+    file: packages/web/tests/components/product/CollectionToolbar.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/CollectionToolbar.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      expect(SORT_OPTIONS).toHaveLength(8)
+
+      it('offers Featured and Best selling', () => {
+        const ids = SORT_OPTIONS.map((o) => o.id)
+        expect(ids).toContain('featuredOrder-asc')
+        expect(ids).toContain('salesCount-desc')
+      })
+
+      it('keeps the sortBy-sortOrder id contract', () => {
+        for (const option of SORT_OPTIONS) {
+          expect(option.id.split('-')).toHaveLength(2)
+        }
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the length assertion fails at 6
+    command: cd packages/web && bunx vitest run tests/components/product/CollectionToolbar.test.tsx
+    expected_result: FAIL - expected 8, received 6
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the two options and correct the stale comment
+    file: packages/web/app/components/product/CollectionToolbar.tsx
+    status: pending
+    code: |-
+      /**
+       * Eight options. mesonart has nine. The one we do not carry is "Most
+       * relevant", and not for want of a signal: on a collection page with no
+       * search query there is nothing for relevance to mean. A composite
+       * editorial score would be our heuristic dressed as a measurement.
+       *
+       * "Best selling" is real units sold from paid orders, with a curator pin
+       * layered above it - see GET /api/products?sortBy=salesCount.
+       */
+      export const SORT_OPTIONS = [
+        { id: 'featuredOrder-asc', label: 'Featured' },
+        { id: 'salesCount-desc', label: 'Best selling' },
+        { id: 'createdAt-desc', label: 'Newest First' },
+        { id: 'createdAt-asc', label: 'Oldest First' },
+        { id: 'basePrice-asc', label: 'Price: Low to High' },
+        { id: 'basePrice-desc', label: 'Price: High to Low' },
+        { id: 'title-asc', label: 'Name: A to Z' },
+        { id: 'title-desc', label: 'Name: Z to A' },
+      ] as const
+  - id: 4
+    action: implement
+    description: Widen the SortOption type on the collection route
+    file: packages/web/app/routes/posters/index.tsx
+    status: pending
+    code: // SortOption gains 'salesCount' alongside createdAt | updatedAt | title | basePrice | featuredOrder
+  - id: 5
+    action: verify-pass
+    description: Toolbar tests pass and the typecheck baseline holds at 23
+    command: cd packages/web && bunx vitest run tests/components/product/CollectionToolbar.test.tsx && cd ../.. && bun run typecheck
+    expected_result: PASS - 23 typecheck errors, unchanged
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the sort options
+    command: 'git add packages/web/app/components/product/CollectionToolbar.tsx packages/web/app/routes/posters/index.tsx packages/web/tests/components/product/CollectionToolbar.test.tsx && git commit -m "feat(web): featured and best-selling sort options"'
+    status: pending
+current_step: 1
+started: '2026-08-04T11:59:09.333Z'
+completed: '2026-08-04T12:04:05.696Z'

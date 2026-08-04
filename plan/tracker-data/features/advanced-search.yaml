@@ -1,43 +1,53 @@
 name: advanced-search
 title: Advanced Search
-priority: medium
-created: '2026-01-28T07:45:55.398Z'
+priority: high
+created: "2026-01-28T07:45:55.398Z"
 assignee: unassigned
 tags: []
 description: |-
-  ## Overview
-  ## Overview
-  Implement Algolia or Elasticsearch-powered search with autocomplete, typo tolerance, faceted search, and search analytics to understand user intent.
+  Feature 5 of docs/design/mesonart/PLAN-OF-ACTION.md. Scoped down 2026-08-04 to the mesonart-parity slice.
 
-  ## Objectives
-  - Search bar with autocomplete
-  - Results appear as user types
-  - Typo tolerance and fuzzy matching
-  - Search by product name, artist, style
-  - Faceted search with filter counts
-  - Recent searches for logged-in users
-  - No results page with suggestions
-  - Search analytics dashboard in admin
+  ## What already exists
 
-  ## Implementation Status
-  Basic search implemented - may need enhancement with dedicated search service
+  - `GET /api/products/search` — `packages/api/src/routes/products.ts`, ILIKE over title/description with pagination.
+  - `productsApi.search()` — `packages/web/app/lib/api.ts:278`.
 
-  ## Source
-  Roadmap Feature 20 (Phase 2)
+  What is missing is the **entry point**. There is no `/search` route and no search affordance in the header, so a working endpoint has been unreachable from the UI.
 
-  ## Objectives
-  - TBD
+  ## Scope
+
+  **In scope**
+  - A search drawer opened from the header (analysis §1.1 lists "Search drawer with recommendations" among their global chrome).
+  - Debounced query against the existing endpoint, results as product rows.
+  - Keyboard: `/` or `Cmd/Ctrl-K` opens, Escape closes, arrow keys move through results, Enter opens the highlighted one.
+  - An empty state that suggests styles from the shared vocabulary rather than showing nothing.
+
+  **Out of scope**
+  - A `/search` results page. The drawer covers the parity gap; a full page is only worth building if the drawer proves too small.
+  - Personalised recommendations. Theirs shows "recommendations" in the empty drawer; we have no signal to base them on, and inventing one is the fabricated-personalisation version of the same dark pattern the analysis rules out elsewhere. The empty state offers real style shortcuts instead.
+  - Search across facets. The endpoint matches title and description only; widening it is a separate change.
+
+  ## Design
+
+  **Approach:** a drawer over the existing endpoint, no new API.
+
+  **Key decisions**
+  1. **Debounce, and cancel in flight.** Typing "abstract" is eight keystrokes; without cancellation the last response is not necessarily the last request, and results flicker between queries.
+  2. **The empty state suggests from `STYLE_OPTIONS`** — real, filterable links, not invented recommendations.
+  3. **Escape and scroll-lock mirror the mobile nav drawer** (#348), including keeping the panel a sibling of the header rather than a child: the header sets `backdrop-blur`, which establishes a containing block and collapses a nested fixed overlay.
+  4. **The header's search control becomes real in this change.** #401 deliberately left it out rather than shipping a button that looks interactive and does nothing.
 objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo: {}
   in_progress: {}
-  done: {}
-total_tickets: 0
-completion_percentage: 0
-is_completed: false
+  done:
+    "403": Search - drawer over the existing endpoint, opened from the header
+total_tickets: 1
+completion_percentage: 100
+is_completed: true

@@ -1,0 +1,87 @@
+ticket_number: 393
+title: Collection - facet counts in the sidebar and a star row on the card
+description: |-
+  ## Task
+
+  Consume what the API ticket added.
+
+  **Sidebar**: render each facet option's count beside its label, matching mesonart's "Wabi-Sabi Art (788)". An option with a count of 0 under the current filters should be visibly disabled rather than hidden — hiding it makes the list jump as the shopper filters.
+
+  **Card**: a star row plus review count, below the image. Per analysis §1.3.6 mesonart puts it left with the wishlist heart right; the heart is already on the card from feature 1, so this completes that row.
+
+  ## Context
+
+  Feature: collection-page-parity
+  Blocked by the API ticket.
+
+  **Files**: `packages/web/app/components/product/ProductFilters.tsx`, `packages/web/app/components/product/ProductCard.tsx`
+
+  **Constraints**
+  - **Real data only.** A product with no reviews renders NO star row — not five empty stars, not "0.0". The analysis is explicit that fabricated social proof is a dark pattern.
+  - Stars use the `rating` token (`fill-rating text-rating`). `fill-yellow-400` fails the storefront token guard.
+  - **The grid-alignment contract.** The star row goes inside the existing content block. No `min-h-`, no `line-clamp-` — `ProductCard.tokens.test.ts` asserts their absence and the E2E asserts equal row heights.
+  - Re-run `product-grid-alignment.spec.ts` after touching the card. Note: run it with `--no-deps`; the `auth.setup.ts` projects fail for unrelated pre-existing reasons.
+feature: collection-page-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T07:48:15.445Z'
+last_updated: '2026-08-04T08:05:16.371Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T08:00:16.661Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T08:05:16.371Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: counts render, zero-count options disabled not hidden, star row only when reviews exist, rating token used'
+    file: packages/web/tests/components/product/ProductRating.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductRating.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/web && bunx vitest run tests/components/product/ProductRating.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add counts to ProductFilters and the star row to ProductCard
+    file: packages/web/app/components/product/ProductCard.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm component and guard suites pass
+    command: cd packages/web && bunx vitest run tests/components/ tests/styles/
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the grid contract still holds
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: 18 passed
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the sidebar counts and card rating
+    command: 'git add packages/web/app packages/web/tests && git commit -m "feat(web): facet counts in the sidebar, star row on the card"'
+    status: pending
+current_step: 1
+started: '2026-08-04T08:00:16.661Z'
+completed: '2026-08-04T08:05:16.371Z'

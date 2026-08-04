@@ -1,0 +1,84 @@
+ticket_number: 398
+title: Seed - assign the new metadata across the catalogue
+description: |-
+  ## Task
+
+  The new facets are useless while every product has null for them — the sidebar would render twelve Aesthetic options all reading 0.
+
+  Assign `vibe`, `aesthetic`, `medium`, `uniqueness` and `availability` across the 41 seeded products, and widen `rooms` and `subjects` to the fuller §1.3 vocabularies where the existing values already imply them.
+
+  ## Context
+
+  Feature: product-metadata-facets
+  Blocked by the schema and shared-vocabulary tickets.
+
+  **Constraints**
+  - **Deterministic, not random.** A reseed must produce the same catalogue, or facet counts change between runs and nothing is reproducible. Derive from a stable property (sku or slug), never `Math.random()`.
+  - Values must come from `@chobii/shared` facet constants, not be retyped as literals in the seed — that is the drift this feature exists to end.
+  - **Seed from the repo root**: `bun run packages/api/src/database/seed.ts`. Running it from `packages/api` loses the root `.env` and silently produces an imageless catalogue (see PLAN-OF-ACTION local traps).
+  - Verify afterwards that images survived: `SELECT count(*) FILTER (WHERE jsonb_array_length(coalesce(images,'[]'))=0) FROM products;` must be 0.
+  - Every vocabulary value should be reachable — a facet option no product carries is a dead row in the sidebar.
+feature: product-metadata-facets
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T08:24:53.684Z'
+last_updated: '2026-08-04T08:40:46.614Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - data
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T08:36:23.937Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T08:40:46.614Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: assignment is deterministic, values come from the shared vocabularies, coverage spans every option'
+    file: packages/api/tests/database/seed-facets.test.ts
+    command: cd packages/api && bunx vitest run tests/database/seed-facets.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/api && bunx vitest run tests/database/seed-facets.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add deterministic facet assignment to the seed
+    file: packages/api/src/database/seed-facets.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the suite passes
+    command: cd packages/api && bunx vitest run tests/database/
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Reseed from the repo root and confirm both facet coverage and image survival
+    command: cd /Users/dhruv/work/masonart.com && bun run packages/api/src/database/seed.ts >/dev/null 2>&1; docker exec poster-app-postgres psql -U poster_app -d poster_app_dev -t -c "SELECT count(*) FILTER (WHERE jsonb_array_length(coalesce(images,'[]'))=0) AS imageless, count(*) FILTER (WHERE vibe IS NULL) AS no_vibe FROM products;"
+    expected_result: imageless 0, no_vibe 0
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the seed metadata
+    command: 'git add packages/api/src/database packages/api/tests && git commit -m "feat(api): seed the expanded facet metadata deterministically"'
+    status: pending
+current_step: 1
+started: '2026-08-04T08:36:23.937Z'
+completed: '2026-08-04T08:40:46.614Z'

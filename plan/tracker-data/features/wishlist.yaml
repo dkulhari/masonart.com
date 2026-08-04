@@ -1,43 +1,73 @@
 name: wishlist
 title: Wishlist
-priority: medium
-created: '2026-01-28T07:45:54.375Z'
+priority: high
+created: "2026-01-28T07:45:54.375Z"
 assignee: unassigned
 tags: []
 description: |-
   ## Overview
-  ## Overview
-  Save products to wishlist for later purchase. Include wishlist page, quick add from product cards, move to cart functionality, and back-in-stock notifications.
 
-  ## Objectives
-  - Heart icon to add to wishlist
-  - Wishlist page in user dashboard
-  - Move to cart button
-  - Remove from wishlist
-  - Share wishlist via link
-  - Back-in-stock email notification
-  - Price drop notification option
-  - Guest wishlist stored in localStorage
+  Save products for later. Scoped down 2026-08-04 to the slice the mesonart parity work needs — see docs/design/mesonart/PLAN-OF-ACTION.md, feature 1.
 
-  ## Implementation Status
-  Partial - DB field exists (wishlistProductIds in users table), but API endpoints missing
+  Pulled ahead of Phase B and Phase C because both need it: the global chrome wants a header count badge, the collection card wants a heart. `users.wishlistProductIds` already exists as a column (schema/users.ts:170) and there are no API routes over it. ProductDetail.tsx:406 already renders a button with `aria-label="Add to wishlist"` that does nothing. Building this once beats half-building it twice.
 
-  ## Source
-  Roadmap Feature 19 (Phase 2)
+  ## Scope
 
-  ## Objectives
-  - TBD
+  **In scope**
+  - REST routes over the existing column: list, add, remove, and a lightweight count. Auth-required, following the `notification-preferences.ts` pattern (Hono sub-app, `requireAuth` on `*`, zValidator, mounted in `index.ts`).
+  - `wishlistApi` in `packages/web/app/lib/api.ts` alongside the existing clients.
+  - A `useWishlist` hook + Zustand store, hydration-safe — the cart badge precedent (#498) is that showing a count before hydration causes an SSR mismatch.
+  - Heart affordance on `ProductCard` (analysis §1.3.6: below the image, right of the star row) and on `ProductDetail` — wiring the dead button that already exists there.
+  - Header count badge, matching the existing cart badge treatment.
+
+  **Out of scope — deliberately deferred, not cancelled**
+  - Wishlist *page* in the account dashboard. The parity work needs the affordance and the count, not the destination. Ship the page with Phase F, which is where the analysis puts `/apps/wishlist`.
+  - Back-in-stock and price-drop notifications. Real feature, unrelated to parity, and it needs the notification pipeline.
+  - Share-by-link.
+  - Guest wishlist in localStorage. Adds an anonymous-to-authenticated merge path; the heart can prompt sign-in until someone asks for it.
+
+  ## Design
+
+  **Approach:** thin REST over the existing array column, no new table.
+
+  **Key decisions**
+  1. **No new table.** `wishlistProductIds text[]` already exists and carries whatever data is there. A join table would be the better model at scale (it gives per-row timestamps, and "49 saves" social proof on the PDP needs a count per product, which an array column answers with a slow scan). Not worth a migration for an affordance and a badge — revisit when Phase E wants real saves counters.
+  2. **Toggle, not add/remove, at the UI edge.** The heart is one control with two states; two endpoints behind one optimistic toggle.
+  3. **Optimistic UI with rollback.** A heart that waits on a round-trip feels broken. Roll back on failure.
+  4. **Hydration-safe count**, mirroring `useCartHydration` — render 0 until hydrated or the header mismatches on SSR (#498).
+  5. **Monochrome from the start.** Filled heart is `text-foreground`, not red — the storefront token guard forbids reaching outside the palette, and `--sale` is reserved for sale prices.
+
+  ## Technical considerations
+  - The column defaults to `[]` but is nullable in the type; treat `null` as empty everywhere.
+  - Product IDs are uuids stored as `text[]`; validate as uuid before writing so a bad id cannot poison the array.
+  - Removing a product from the catalogue leaves a dangling id in every wishlist. The list endpoint joins to `products` and drops misses rather than 404ing.
+  - `ProductCard` is under the #360–#375 grid-alignment contract: the heart goes in the existing content block, and must not introduce `min-h-`, `line-clamp-`, or anything that fights `grow`.
 objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo: {}
   in_progress: {}
-  done: {}
-total_tickets: 0
-completion_percentage: 0
-is_completed: false
+  done:
+    "387": API - wishlist routes over the existing users column
+    "388": Web - wishlistApi client and a hydration-safe useWishlist store
+    "389": Web - heart on ProductCard and ProductDetail, count badge in the header
+total_tickets: 3
+completion_percentage: 100
+is_completed: true
+design:
+  approach: Thin REST over the existing users.wishlistProductIds array column — no new table. Auth-required Hono sub-app following the notification-preferences pattern, a hydration-safe Zustand store, and an optimistic heart on ProductCard/ProductDetail plus a header count badge. Scoped to what mesonart parity needs; the wishlist page itself defers to Phase F.
+  decisions:
+    - No new table — wishlistProductIds text[] already exists. A join table is the better model at scale (per-row timestamps, cheap per-product save counts for PDP social proof) but is not worth a migration for an affordance and a badge; revisit when Phase E wants real saves counters.
+    - Toggle at the UI edge, two endpoints behind it — the heart is one control with two states.
+    - Optimistic UI with rollback; a heart that waits on a round-trip feels broken.
+    - "Hydration-safe count mirroring useCartHydration — rendering a count before hydration is what caused the cart badge SSR mismatch in #498."
+    - Filled heart is text-foreground, not red — the storefront token guard forbids reaching outside the palette and --sale is reserved for sale prices.
+    - Dangling ids from deleted products are dropped by the list endpoint rather than 404ing the whole request.
+    - Wishlist page deferred to Phase F, where the analysis puts /apps/wishlist. Parity needs the affordance and the count, not the destination.
+  approved: true
+  approved_at: "2026-08-04T07:08:52.329Z"

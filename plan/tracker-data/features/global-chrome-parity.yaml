@@ -1,0 +1,54 @@
+name: global-chrome-parity
+title: Global Chrome Parity
+priority: high
+created: "2026-08-04T08:46:54.935Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Phase B of the parity analysis — feature 4 of docs/design/mesonart/PLAN-OF-ACTION.md.
+
+  ## Scope
+
+  **In scope**
+  1. **Header restructure** — centered wordmark with the action cluster right (Search, Account, Wishlist, Cart), matching analysis §1.1. Ours is left-logo / nav-centre / actions-right.
+  2. **Two-row nav** — pages row, then a styles row fed from the facet vocabulary now that `STYLE_OPTIONS` exists in `@chobii/shared` (#395). Ours is a single four-link row.
+  3. **Announcement bar** — the beige strip above the header carrying a rotating message and social links.
+  4. **Footer** — USP strip (Handcrafted · Free Shipping · Eco Friendly · Safe Payments) and a contact column; beige restyle.
+
+  **Out of scope, and why**
+  - **The sale strip and its countdown.** There is no promotion entity anywhere in `packages/api/src/database/schema/`. A countdown to a sale that does not exist is exactly the fabricated-urgency dark pattern the analysis' *Dependencies and risks* section forbids. It waits for a real promotion concept.
+  - **Currency/region selector.** We are INR-only; a selector with one option is furniture.
+  - **Floating offer tab and chat bubble.** The analysis marks them optional.
+  - **Search drawer** — feature 5 (`advanced-search`), which already exists as a ticketrack feature.
+
+  ## Design
+
+  **Approach:** restructure the existing chrome; no new routing, no new data.
+
+  **Key decisions**
+  1. **The styles nav row reads `STYLE_OPTIONS` from `@chobii/shared`.** Hardcoding twelve links here would start exactly the drift #395 just ended. Each links to `/posters?styles=<id>`, which the validated filter API already accepts.
+  2. **The announcement bar rotates real messages only** — free shipping over ₹999 and 30-day returns are true of us. No invented offers.
+  3. **Mobile keeps a single row.** Two nav rows plus an announcement bar is most of a phone screen; the styles row collapses into the existing drawer.
+  4. **Behaviour that must survive**: the mobile drawer's scroll-lock and Escape (#348), the cart aria-label item count (#248), the role-aware staff entry (#362), and the wishlist badge's hydration gate (#389 / #498). All are pinned by `tests/components/layout/chrome-tokens.test.ts`.
+  5. **A centered wordmark on desktop, left on mobile.** Centring on a narrow viewport squeezes the action cluster; mesonart's own mobile header is left-aligned.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "400": Chrome - announcement bar above the header
+    "401": Chrome - centered wordmark, right action cluster, two-row nav
+    "402": Chrome - footer USP strip, contact column and beige restyle
+total_tickets: 3
+completion_percentage: 100
+is_completed: true

@@ -1,0 +1,121 @@
+ticket_number: 382
+title: Sweep - Header, Footer and InfoPage chrome onto the monochrome system
+description: |-
+  ## Task
+  Global chrome, restyled only — the Phase B restructure (centered wordmark, two-row nav, announcement bar) is explicitly out of scope.
+
+  - **Header.tsx** — wordmark drops `font-bold` for `font-heading font-light`; `text-primary` on `.art` stays (it is now near-black, so drop it to plain `text-foreground` and let the wordmark read as one word); nav links move to `text-nav`; the cart count badge keeps `bg-primary text-primary-foreground` and now renders near-black rather than orange, which needs no code change but must be verified.
+  - **Footer.tsx** — drop `font-bold` headings for the base heading style; any `text-brand-*` link colour becomes `text-foreground`/`text-muted-foreground`.
+  - **InfoPage.tsx** — same treatment; this is the shared shell for about / faq / shipping / returns / terms / privacy / cookies, so it is seven pages for one edit.
+  - **__root.tsx** — the skip-link uses `focus:bg-brand-500`; move to `focus:bg-primary focus:text-primary-foreground`. The 404 and error boundaries use `rounded-md bg-primary` — move to `buttonVariants()`.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 3 — Storefront sweep
+  Files: `packages/web/app/components/layout/{Header,Footer,InfoPage}.tsx`, `packages/web/app/routes/__root.tsx`
+  Test: `packages/web/tests/components/layout/chrome-tokens.test.ts`
+  Header has a mobile drawer with scroll-lock and Escape handling (#348) — do not touch that logic, only classes.
+feature: mesonart-design-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:19:36.041Z'
+last_updated: '2026-08-03T20:49:35.869Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.869Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing guard over the chrome files
+    file: packages/web/tests/components/layout/chrome-tokens.test.ts
+    command: cd packages/web && bunx vitest run tests/components/layout/chrome-tokens.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+
+      const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
+
+      const FILES = {
+        Header: 'app/components/layout/Header.tsx',
+        Footer: 'app/components/layout/Footer.tsx',
+        InfoPage: 'app/components/layout/InfoPage.tsx',
+        root: 'app/routes/__root.tsx',
+      }
+
+      describe('global chrome — monochrome system', () => {
+        for (const [name, path] of Object.entries(FILES)) {
+          it(`${name} uses no orange brand utilities`, () => {
+            expect(read(path)).not.toMatch(/\b(bg|text|border|from|to)-brand-/)
+          })
+
+          it(`${name} has no font-bold`, () => {
+            expect(read(path)).not.toContain('font-bold')
+          })
+        }
+
+        it('the wordmark uses the heading face', () => {
+          expect(read(FILES.Header)).toContain('font-heading')
+        })
+
+        it('nav links use the fluid nav scale', () => {
+          expect(read(FILES.Header)).toContain('text-nav')
+        })
+
+        it('the skip link is a primary pill, not orange', () => {
+          const src = read(FILES.root)
+          expect(src).toContain('focus:bg-primary')
+          expect(src).not.toContain('focus:bg-brand-500')
+        })
+
+        it('the 404 and error CTAs go through buttonVariants', () => {
+          expect(read(FILES.root)).toContain('buttonVariants')
+        })
+
+        it('the mobile drawer scroll-lock and Escape wiring survive the restyle', () => {
+          const src = read(FILES.Header)
+          expect(src).toContain("document.body.style.overflow = 'hidden'")
+          expect(src).toContain("event.key === 'Escape'")
+          expect(src).toContain('data-testid="mobile-nav-scrim"')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the chrome guard fails
+    command: cd packages/web && bunx vitest run tests/components/layout/chrome-tokens.test.ts
+    expected_result: FAIL - font-bold in Header/Footer/InfoPage/__root; focus:bg-brand-500 in __root
+    status: pending
+  - id: 3
+    action: implement
+    description: Restyle the chrome files; do not restructure them
+    file: packages/web/app/components/layout/Header.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the guard passes and header behaviour tests still pass
+    command: cd packages/web && bunx vitest run tests/components/layout/ tests/components/
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the chrome sweep
+    command: 'git add packages/web/app/components/layout packages/web/app/routes/__root.tsx packages/web/tests/components/layout && git commit -m "feat(web): restyle global chrome onto the monochrome system"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.869Z'

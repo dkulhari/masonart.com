@@ -1,0 +1,106 @@
+ticket_number: 389
+title: Web - heart on ProductCard and ProductDetail, count badge in the header
+description: |-
+  ## Task
+
+  Wire the affordances.
+
+  **`ProductCard`** — a heart in the existing content block. Per analysis §1.3.6 mesonart puts it right of the star row, below the image. We have no star row yet (that lands with `collection-page-parity`), so the heart goes right-aligned in the content row for now, sharing the line with the title/price block.
+
+  **`ProductDetail`** — `ProductDetail.tsx:406` already renders a button with `aria-label="Add to wishlist"` and no handler. Wire it; make the label reflect state (`Add to`/`Remove from`).
+
+  **`Header`** — count badge on a new wishlist link, matching the cart badge treatment already there.
+
+  ## Context
+
+  Feature: wishlist (mesonart parity, PLAN-OF-ACTION feature 1)
+  Blocked by the store ticket.
+
+  **Hard constraints**
+  - **Monochrome.** Filled heart is `text-foreground` / `fill-foreground`, outline is `text-muted-foreground`. NOT red — `tests/styles/storefront-token-compliance.test.ts` fails the build on anything outside the palette, and `--sale` is reserved for sale prices.
+  - **The grid-alignment contract (#360–#375).** `ProductCard`'s row alignment is CSS-grid stretch plus `grow` on the content block, with deliberately no `min-height` and no `line-clamp`. The heart must not add either. `tests/components/product/ProductCard.tokens.test.ts` asserts this.
+  - **Header badge must be hydration-gated**, same as the cart count (#498).
+  - **Signed-out users**: the heart prompts sign-in rather than silently failing. No guest wishlist — that is out of scope.
+  - Accessible name must change with state, and the control needs `aria-pressed`.
+feature: wishlist
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T07:09:43.914Z'
+last_updated: '2026-08-04T07:45:34.844Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T07:18:13.494Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T07:45:24.879Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-04T07:45:34.844Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `bd3e1291` — feat(web): wishlist heart on card and PDP, header count badge
+
+      **Verification**: 9 WishlistButton tests; web suite 1621/1621; typecheck 23 (baseline); `product-grid-alignment` E2E **18/18 chromium**, including every row-alignment and hover assertion — the card change does not disturb the #360–#375 contract.
+
+      **Three environment problems found and fixed while verifying this** (none were code defects in this ticket, but all three blocked verification and two would have bitten the next person):
+
+      1. **The `#386` reseed had silently wiped every product image.** I ran `bun run src/database/seed.ts` from `packages/api`, so bun never loaded the root `.env` and the S3 credentials were missing. `processProductImages` treats download failures as non-fatal by design, so it produced a catalogue of 41 imageless products and reported success. The E2E "no cards render" failures traced to this, not to the card change. Reseeding from the repo root gives 41 products / 0 imageless / 44 images.
+
+      2. **`.env` pointed `DATABASE_URL` at port 5433 — a different project's postgres** (`surveytrack-postgres`). chobii's is `poster-app-postgres` on 5440. This survived because vitest reaches the right DB via an inline override, but `packages/api/package.json` runs `bun run --env-file=../../.env`, and `--env-file` *overrides* inherited environment variables — so the override was silently clobbered for anything started through `bun run dev`, i.e. every Playwright run. Fixed in `.env` (gitignored, untracked; backup at `.env.bak-1785829333`).
+
+      3. **Seed summary was lying.** It reported `sampleProducts.length * 4` variants, wrong since the ladder landed in #386. Now counts actual rows.
+
+      **Still failing, pre-existing**: the four `auth.setup.ts` projects fail to log in the test users. Reproduced identically with my changes stashed, so it is not from this work. The grid spec needs no auth and passes fully with `--no-deps`.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing component tests: heart renders, toggles, aria-pressed and label track state, monochrome classes, header badge hydration-gated'
+    file: packages/web/tests/components/product/WishlistButton.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/WishlistButton.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/web && bunx vitest run tests/components/product/WishlistButton.test.tsx
+    expected_result: FAIL - WishlistButton does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Create WishlistButton, place it on ProductCard, wire the dead ProductDetail button, add the header link and badge
+    file: packages/web/app/components/product/WishlistButton.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the new tests pass and the grid-alignment and token guards still hold
+    command: cd packages/web && bunx vitest run tests/components/ tests/styles/
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the grid E2E is unaffected by the card change
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --reporter=line
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the affordances
+    command: 'git add packages/web/app packages/web/tests && git commit -m "feat(web): wishlist heart on card and PDP, header count badge"'
+    status: pending
+current_step: 1
+started: '2026-08-04T07:18:13.494Z'
+completed: '2026-08-04T07:45:24.879Z'

@@ -29,19 +29,57 @@ description: |-
 feature: product-grid-alignment
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: cli
-created: '2026-07-31T03:41:08.080Z'
-last_updated: '2026-07-31T03:41:08.080Z'
-time_spent_minutes: 0
+created: "2026-07-31T03:41:08.080Z"
+last_updated: "2026-08-03T18:13:42.779Z"
+time_spent_minutes: 3
 labels:
   - frontend
   - ui
   - admin
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: "2026-08-03T18:10:22.850Z"
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: "2026-08-03T18:13:42.780Z"
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: "2026-08-03T18:13:49.227Z"
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `37df900b` - feat(web): square crop and zoom control for photographic media (#369)
+
+      **Files Changed**:
+      - `packages/web/app/components/admin/ImageCropControl.tsx` (new) - react-easy-crop viewport (aspect 1, pan by drag, zoom by scroll + slider) for photographic types; matted preview at MAT_ART_INSET for `main`; restores framing via initialCroppedAreaPercentages when a row's type toggles
+      - `packages/web/app/lib/product-images.ts` - `percentAreaToCropRect` (percentages / 100, clamped 0..1) and `buildUploadFormData` (multipart {file, type, altText, sortOrder, crop?}; crop omitted for `main` and when unset — backend then defaults to largest centred square)
+      - `packages/web/app/components/admin/ProductForm.tsx` - PendingUpload gains `crop`; staged rows render ImageCropControl; uploadPending uses buildUploadFormData
+      - `packages/web/package.json` + `bun.lock` - react-easy-crop@6.2.3
+      - Tests: `product-images.crop.test.ts` (5), `PendingUploadCrop.test.tsx` (3)
+
+      **Not covered by unit tests** (needs browser/E2E): actual pan/pinch interaction and the storefront round-trip of an off-centre crop — jsdom has no layout so react-easy-crop's media events never fire. Rect round-trip through the backend is covered by the existing #367 route tests plus the serialization tests here.
+
+      **Verification**:
+      - Command: `bunx vitest run` (packages/web)
+      - Result: PASS (44 files, 1493 tests, 0 failing; 8 new)
+      - `bunx tsc --noEmit`: 23 errors, all pre-existing baseline, none in changed files
+work_sessions:
+  - start: "2026-08-03T18:10:25.000Z"
+    agent: claude-code
+    summary: "ImageCropControl (react-easy-crop): square pan/zoom viewport for photographic staged rows, matted preview for main, normalised 0..1 crop rect sent in upload multipart. 8 new tests. Commit 37df900b."
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: "2026-08-03T18:13:36.111Z"
+    duration: "00:03:11"
 related_tickets: []
 blocked_by:
   - ticket: 367
@@ -130,6 +168,24 @@ implementation_steps:
   - id: 8
     action: commit
     description: Commit the crop control
-    command: 'git add packages/web/app/components/admin packages/web/tests/components/admin packages/web/package.json && git commit -m "feat(admin): square crop and zoom control for photographic product media"'
+    command: "git add packages/web/app/components/admin packages/web/tests/components/admin packages/web/package.json && git commit -m \"feat(admin): square crop and zoom control for photographic product media\""
     status: pending
 current_step: 1
+started: "2026-08-03T18:10:22.846Z"
+work_session_summary:
+  total_sessions: 1
+  total_duration: "00:03:00"
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: "00:03:00"
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run (packages/web)
+  test_output: "44 files, 1493 tests passed (includes 8 new #369 tests). tsc --noEmit: 23 pre-existing baseline errors, 0 in changed files."
+  build_passed: true
+  build_command: bunx tsc --noEmit
+  verified_at: "2026-08-03T18:13:38.287Z"
+completed: "2026-08-03T18:13:42.779Z"

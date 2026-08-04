@@ -1,0 +1,194 @@
+ticket_number: 410
+title: Web - Discover chip carousel on the collection page
+description: |-
+  ## Task
+
+  Build `DiscoverChips` (analysis §1.3.2) and render it under the beige header band on /posters. Today the only "discover" on that page is a word in the SEO paragraph.
+
+  - Horizontally scrollable row of circular image chips, one per collection from `GET /api/products/collections`, with prev/next arrows
+  - Chip = circular image + label + count
+  - Click toggles `?styles=<id>`; the active chip is visually marked and its second click clears
+  - No image on a collection -> a monochrome initial-letter fallback, never a broken img
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 3 - Web
+  Files: packages/web/app/components/product/DiscoverChips.tsx (new), packages/web/app/routes/posters/index.tsx
+
+  **Routing trap:** router.tsx overrides TanStack search serialization, so `styles` travels as a comma-joined string and `validateSearch` splits it back. A chip must go through the existing `handleFiltersChange` (posters/index.tsx:418-473), never a raw navigate - a hand-built search object error-boundaries the route to a blank page.
+
+  **Token guard:** consumes Button/primary/accent/band tokens. `font-bold`, `fill-yellow-400`, `brand-*`, `blur-3xl` and brand gradients all fail packages/web/tests/styles/storefront-token-compliance.test.ts.
+
+  Scroll container needs keyboard reachability - arrows are buttons, the rail is focusable and arrow-key scrollable, not a mouse-only affordance.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:17:41.231Z'
+last_updated: '2026-08-04T14:57:14.783Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T12:04:12.816Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T12:07:09.938Z'
+    text: |-
+      Done — commit c1606c8a.
+
+      **Verification**
+      - `bunx vitest run tests/components/product/DiscoverChips.test.tsx` — RED (module missing), GREEN at 11 passing.
+      - `bunx vitest run tests/components/product/ tests/styles/` — 197 passing across 14 files. Token compliance guard green.
+      - `bun run typecheck` — 23 errors, baseline held.
+
+      **One test was wrong, not the component.** Two assertions queried the chip image by `role="img"` and failed. The image carries `alt=""` deliberately: the chip's own label already names the collection, so alt text makes a screen reader announce it twice. `alt=""` removes the element from the accessibility tree entirely, which is correct — the tests were changed to query by tag.
+
+      **Where it renders:** between the beige header band and the sticky toolbar, matching mesonart's placement. Fetched client-side in a `useEffect`, following the facet-counts precedent immediately above it in the file — collections describe the catalogue rather than the page, so they neither vary with filters nor belong in the SSR critical path. A failed fetch leaves the rail absent rather than breaking the page.
+
+      **Toggle, not link.** Clicking the active chip clears the filter, so it carries `aria-pressed`; `aria-current` would claim it is the page you are on. Selection goes through `handleFiltersChange`, never a raw navigate.
+  - author: system
+    timestamp: '2026-08-04T12:07:10.163Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-04T14:57:14.783Z'
+    text: |-
+      Follow-up — commit 44d37976. Visual fix after review: the chips were showing a shrunken picture floating on white.
+
+      **Cause.** `main` product images are **matted** — sharp contains the artwork at `MAT_ART_INSET` (0.88) of the longest side on a #fafafa square at upload time ([product.ts:344](packages/shared/src/types/product.ts#L344)). Dropping that square into an 80px chip at 1:1 puts the *entire matted picture* inside the circle. That is a thumbnail, not a collection chip.
+
+      **Fix.** The image is enlarged and centre-cropped so the circle is a window inside the picture; it is never downscaled to fit.
+
+      **Crop depth has to vary, and this is the part worth recording.** The inset applies to the *longest* side, so how much mat sits along the short edge is entirely a function of aspect: a square clears at ~1.14, a 3:4 portrait at ~1.5, a 3:1 panoramic at ~3.3. A single constant cannot serve all three — I shipped 1.5 first and it left white arcs on exactly the two panoramic representatives (`wabi-sabi-art`, `plaster-and-texture-art`) while already cropping squares hard. `GET /api/products/collections` now also returns the representative product's `orientation`, picked by the same `array_agg` ordering as its image so the two can never describe different rows.
+
+      **Known imperfection, deliberately left.** A few chips still show slivers, because `orientation` describes what sizes a product *sells in*, not the aspect of the image installed by `REFERENCE_MEDIA` — that fixture set was paired by subject. `minimalist-art`'s representative is declared `square` while its placeholder artwork is a wide strip. The mechanism is correct for real artwork, where orientation and image agree; the residue is a placeholder-data artefact and disappears with real imagery. Decided against raising a floor scale, which would have cropped every square chip harder to paper over fixture data.
+
+      **Verification**
+      - `bunx vitest run tests/components/product/DiscoverChips.test.tsx` — 17 passing (was 11; added crop-depth coverage per orientation, including the fallback for null/unknown).
+      - `bunx vitest run tests/routes/product-collections.test.ts` (api) — 10 passing.
+      - `bunx playwright test tests/e2e/collection-page-remainder.spec.ts --project=chromium --no-deps` — 16 passed.
+      - `bun run typecheck` — 23, baseline held.
+      - **Measured in a real browser at 1440×900**, not just jsdom: computed `transform: matrix(3.61, …)` on a panoramic chip, a 289px image clipped by an 80px `border-radius: 9999px` frame with `overflow: hidden`, no mat inside the circle.
+
+      The Playwright MCP browser was claimed by another session, so this used a throwaway `chromium.launch()` script at the repo root (module resolution fails from a scratchpad path); the script was deleted afterwards.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 406
+    feature: collection-page-parity-remainder
+    description: API - GET /api/products/collections for the Discover chips
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing component test: renders a chip per collection, marks the active one, falls back without an image'
+    file: packages/web/tests/components/product/DiscoverChips.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/DiscoverChips.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { render, screen, fireEvent } from '@testing-library/react'
+      import { describe, it, expect, vi } from 'vitest'
+      import { DiscoverChips } from '~/components/product/DiscoverChips'
+
+      const collections = [
+        { id: 'abstract', label: 'Abstract', count: 12, image: 'https://x/a.jpg' },
+        { id: 'minimalist', label: 'Minimalist', count: 3, image: null },
+      ]
+
+      describe('DiscoverChips', () => {
+        it('renders one chip per collection with its count', () => {
+          render(<DiscoverChips collections={collections} activeStyle={undefined} onSelect={vi.fn()} />)
+          expect(screen.getByRole('link', { name: /Abstract/ })).toBeInTheDocument()
+          expect(screen.getByText('12')).toBeInTheDocument()
+        })
+
+        it('falls back to an initial when a collection has no image', () => {
+          render(<DiscoverChips collections={collections} activeStyle={undefined} onSelect={vi.fn()} />)
+          expect(screen.queryByRole('img', { name: /Minimalist/ })).toBeNull()
+        })
+
+        it('marks the active collection and clears it on a second click', () => {
+          const onSelect = vi.fn()
+          render(<DiscoverChips collections={collections} activeStyle="abstract" onSelect={onSelect} />)
+          const chip = screen.getByRole('link', { name: /Abstract/ })
+          expect(chip).toHaveAttribute('aria-current', 'true')
+          fireEvent.click(chip)
+          expect(onSelect).toHaveBeenCalledWith(undefined)
+        })
+
+        it('renders nothing when there are no collections', () => {
+          const { container } = render(<DiscoverChips collections={[]} activeStyle={undefined} onSelect={vi.fn()} />)
+          expect(container).toBeEmptyDOMElement()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails - component does not exist
+    command: cd packages/web && bunx vitest run tests/components/product/DiscoverChips.test.tsx
+    expected_result: FAIL - cannot resolve DiscoverChips
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the component - circular chips, arrows, fallback initial, active state
+    file: packages/web/app/components/product/DiscoverChips.tsx
+    status: pending
+    code: |-
+      // Presentational only: it receives collections and reports selection upward.
+      // Fetching lives in the route so the chip row cannot fire its own request on
+      // every filter change.
+      export interface DiscoverCollection {
+        id: string
+        label: string
+        count: number
+        image: string | null
+      }
+
+      export interface DiscoverChipsProps {
+        collections: DiscoverCollection[]
+        activeStyle: string | undefined
+        onSelect: (styleId: string | undefined) => void
+        className?: string
+      }
+      // - <ul> rail, overflow-x-auto, scroll-smooth, snap-x
+      // - each chip: rounded-full 80px media, object-cover; no image -> initial on --mat
+      // - active chip carries aria-current="true" and a ring in the primary token
+      // - arrows: Button variant="outline" size="icon", scrollBy(rail.clientWidth * 0.8)
+      // - arrows hidden when the rail does not overflow
+  - id: 4
+    action: implement
+    description: Fetch collections in the route loader and render the rail under the beige band
+    file: packages/web/app/routes/posters/index.tsx
+    status: pending
+    code: |-
+      // Selection goes through handleFiltersChange, NOT a raw navigate - the
+      // comma-joined styles param is built by router.tsx's serializer and a
+      // hand-rolled search object error-boundaries the route.
+      <DiscoverChips
+        collections={collections}
+        activeStyle={filters.styles?.[0]}
+        onSelect={(styleId) =>
+          handleFiltersChange({ ...filters, styles: styleId ? [styleId] : [] })
+        }
+      />
+  - id: 5
+    action: verify-pass
+    description: Component tests pass and the token compliance guard stays green
+    command: cd packages/web && bunx vitest run tests/components/product/DiscoverChips.test.tsx tests/styles/storefront-token-compliance.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the chips
+    command: 'git add packages/web/app/components/product/DiscoverChips.tsx packages/web/app/routes/posters/index.tsx packages/web/tests/components/product/DiscoverChips.test.tsx && git commit -m "feat(web): discover chip carousel on the collection page"'
+    status: pending
+current_step: 1
+started: '2026-08-04T12:04:12.816Z'
+completed: '2026-08-04T12:07:10.163Z'

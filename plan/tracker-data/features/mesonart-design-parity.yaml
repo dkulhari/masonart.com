@@ -1,0 +1,118 @@
+name: mesonart-design-parity
+title: Mesonart Design Parity
+priority: high
+created: '2026-08-03T20:14:49.558Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Phase A of the mesonart.com parity plan (docs/design/mesonart/mesonart-parity-analysis.md §5): make the storefront actually CONSUME the design tokens it already declares.
+
+  ## Overview
+  The token file already adopted mesonart's measured values (--font-heading Urbanist, --mat, --card-radius, --rating, --ease-*), but components do not consume them. `--font-heading` appears exactly once — its own declaration at globals.css:126. `__root.tsx` loads Poppins 300/400/500 and Urbanist 300/500; weight 700 is never loaded, yet 47 files use `font-bold`, so every heading renders faux-bold Poppins. Primary is orange (`25 95% 53%`) with `rounded-lg`, against mesonart's near-black `#171717` pill (radius 3.75rem, 2px border). Token parity is not render parity.
+
+  ## Goals
+  - Headings render Urbanist 300 at display sizes; body renders Poppins 300.
+  - Primary CTA is a near-black pill, not an orange rounded rectangle. Red `225 29 72` reserved for sale price/tag only.
+  - Beige section bands (#E5E2D5) and peach highlight exist as tokens and are applied to alternating home sections.
+  - Container 1600px, page padding 20px.
+  - Nav / button / product-title sizes are fluid `clamp()`.
+  - No marketing gradients or blur blobs on the storefront.
+  - `fill-yellow-400` replaced by the `--rating` token everywhere.
+  - Split-word display-heading component with reveal animation, used on home and collection H1s.
+
+  ## Scope
+  **In scope** — `packages/web` storefront: globals.css, tailwind.config.ts, __root.tsx, layout/{Header,Footer,InfoPage}, routes/index.tsx, routes/posters/*, routes/products/*, product/*, reviews/*, cart/checkout/account/auth/track/gallery/create route chrome. Three new shared primitives: `ui/Button.tsx` (CVA, pill variants), `ui/SectionBand.tsx` (beige/plain band), `ui/DisplayHeading.tsx` (split-word reveal).
+
+  **Out of scope (YAGNI / later phases)**
+  - `/admin` — an internal tool, not customer-facing; keeps its current look. Explicitly excluded so a token retarget cannot regress the admin surface.
+  - Phase B global chrome (centered logo, two-row nav, announcement bar), Phase C collection toolbar/facets, Phase D home rebuild, Phase E PDP restructure, Phase F new pages. Those need lifestyle photography and product-metadata backfill that do not exist yet.
+  - Removing dark mode.
+
+  ## Design
+  **Approach: token retarget + three primitives + mechanical sweep.** Change the token values in one place, introduce the three components that the sweep needs, then sweep storefront call sites off hardcoded `bg-brand-*` / `font-bold` / `fill-yellow-400` / `rounded-lg` onto semantic utilities. No page is restructured — this is Phase A's whole point: ~50% of perceived similarity with zero new layout.
+
+  **Key decisions**
+  1. **Retarget `--primary` to `0 0% 9%` rather than deleting the brand scale.** `--brand-*` stays defined so `/admin` and the AI-generator surface keep working unchanged; only the storefront stops reaching for it. A one-shot rename would have touched 54 files across admin too.
+  2. **Introduce a real `Button` primitive.** There is none today — every button is bespoke inline Tailwind, which is exactly why the orange never got centralised. Without it, "kill orange" is a 54-file sweep that regresses on the next new button.
+  3. **Keep dark mode.** mesonart has none, but ours is already built and tested; deleting it is scope creep and a regression risk. Dark mode's `--primary` inverts to near-white so the pill stays a pill.
+  4. **`font-bold` → `font-medium` + `font-heading`, not a new 700 webfont.** Loading Poppins 700 would fix the faux-bold but move us away from mesonart, not toward it.
+  5. **Guard the tokens with tests**, mirroring the existing `tests/styles/mat-token.test.ts` pattern: token values asserted against measured RGB, and a grep-style guard that storefront source contains no `font-bold` / `fill-yellow-400` / `bg-brand-` outside admin. Cheap, and the only thing that stops this from rotting back.
+
+  ## Technical Considerations
+  - `container-wide` is `max-w-7xl` (1280px) — the real page width, not the Tailwind `container` 2xl:1400px. Both must move to 1600px or the change is invisible.
+  - `--mat` is baked into image pixels by sharp on the server; it must not be touched. Guarded by tests/styles/mat-token.test.ts.
+  - `theme-color` meta in __root.tsx is `#f97316` (orange) — needs to move with the palette.
+  - ProductCard hover uses `hover:text-brand-600`; the Featured badge is `bg-brand-500` and the AI badge `bg-purple-500`. Both clash with a monochrome system (analysis §3.3).
+  - Existing E2E row-alignment tests (#375) assert grid geometry; a container width change must not break them.
+  - ~86 pre-existing API test failures and ~26 TS errors on main — diff against that baseline, do not attribute them to this work.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:11:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:11:00'
+      tokens: 0
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    '376': Tokens - retarget primary to the monochrome pill palette and add band/highlight/sale tokens
+    '377': Tokens - widen the page to 1600px and drop page padding to 20px
+    '378': 'Tokens - base typography: Urbanist 300 headings, Poppins 300 body, fluid clamp scales'
+    '379': Primitives - Button component with the mesonart pill variants
+    '380': Primitives - SectionBand and DisplayHeading with split-word reveal
+    '381': 'Sweep - home page: strip gradients and blur blobs, adopt bands, pills and DisplayHeading'
+    '382': Sweep - Header, Footer and InfoPage chrome onto the monochrome system
+    '383': 'Sweep - product and review surfaces: monochrome badges, rating token, product type scale'
+    '384': Sweep - remaining storefront routes off font-bold, brand orange and rounded-lg CTAs
+    '385': Guard - storefront token-compliance test and full verification against the main baseline
+    '386': Sizes - make the shared ladders the single source of truth, extend them, and price by area
+total_tickets: 11
+completion_percentage: 100
+is_completed: true
+design:
+  approach: Token retarget + three shared primitives (Button, SectionBand, DisplayHeading) + a mechanical sweep of storefront call sites. No page is restructured. Phase A of docs/design/mesonart/mesonart-parity-analysis.md.
+  decisions:
+    - Retarget --primary to 0 0% 9% (near-black) rather than deleting the --brand-* scale, so /admin and the AI-generator surface keep working unchanged
+    - Introduce a real ui/Button CVA primitive — none exists today, which is why orange never got centralised; without it 'kill orange' regresses on the next new button
+    - Keep dark mode; mesonart has none but ours is built and tested. Dark --primary inverts to near-white so the pill stays a pill
+    - font-bold becomes font-medium + font-heading rather than loading Poppins 700 — loading 700 would move us away from mesonart
+    - 'Guard tokens with tests mirroring tests/styles/mat-token.test.ts: measured-RGB assertions plus a source guard forbidding font-bold / fill-yellow-400 / bg-brand- in storefront files'
+    - Exclude /admin from the sweep — internal tool, not customer-facing; keeps the blast radius on the storefront
+    - container-wide (max-w-7xl) is the real page width, not the Tailwind container config; both must move to 1600px or the change is invisible
+    - '--mat must not be touched: sharp bakes it into image pixels server-side'
+  approved: true
+  approved_at: '2026-08-03T20:14:57.354Z'
+plan:
+  phases:
+    - name: Phase 1 - Tokens
+      location: packages/web/app/styles/globals.css, packages/web/tailwind.config.ts, packages/web/app/routes/__root.tsx
+      tickets:
+        - 376
+        - 377
+        - 378
+    - name: Phase 2 - Primitives
+      location: packages/web/app/components/ui
+      tickets:
+        - 379
+        - 380
+    - name: Phase 3 - Storefront sweep
+      location: packages/web/app/routes, packages/web/app/components/{layout,product,reviews,checkout}
+      tickets:
+        - 381
+        - 382
+        - 383
+        - 384
+    - name: Phase 4 - Guard and verification
+      location: packages/web/tests/styles
+      tickets:
+        - 385
+  generated_at: '2026-08-03T20:19:46.627Z'

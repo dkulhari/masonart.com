@@ -1,0 +1,125 @@
+ticket_number: 381
+title: 'Sweep - home page: strip gradients and blur blobs, adopt bands, pills and DisplayHeading'
+description: |-
+  ## Task
+  `app/routes/index.tsx` is the loudest surviving piece of the old orange marketing identity. Per analysis §5 A.4, strip it back to the monochrome system.
+
+  Per section:
+  - **HeroSection** — delete `bg-gradient-to-br from-brand-50 via-background to-brand-100/30` and both `blur-3xl` blob divs; delete the orange `bg-brand-100 text-brand-700` badge; H1 becomes `DisplayHeading` with `gradient-text` removed; the two CTAs become `buttonVariants({variant:'solid'|'outline', size:'lg'})` anchors; trust-row stars move from `fill-yellow-400 text-yellow-400` to `fill-rating text-rating`.
+  - **FeaturedProductsSection / ValuePropsSection / NewsletterSection** — wrap in `SectionBand`; `h2` drops `font-bold` (base layer now supplies Urbanist 300); "View all" links drop `text-brand-600` for `text-foreground`.
+  - **CategoriesSection** — becomes `SectionBand tone="beige"`. The four per-category `from-*/to-*` gradient washes stay: they are a text-legibility scrim over category photography (see the #357 comment at index.tsx:370), not brand colour. Only the `bg-muted/30` section background changes.
+  - **AIGeneratorSection** — keep it (our differentiator, explicitly retained per the design), but restyle: `bg-gradient-to-br from-brand-600 to-brand-800` becomes `SectionBand tone="ink"`, both `blur-3xl` blobs deleted, the white CTA becomes an outline pill on ink.
+  - **ProductsPlaceholder** — `text-brand-600` becomes `text-foreground`.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 3 — Storefront sweep
+  File: `packages/web/app/routes/index.tsx`
+  Test: `packages/web/tests/routes/home-tokens.test.ts` (source-level; the route module cannot be rendered standalone because it calls `createFileRoute` and a server function)
+  Depends on: Button, SectionBand, DisplayHeading primitives.
+feature: mesonart-design-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:19:36.032Z'
+last_updated: '2026-08-03T20:49:35.855Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.855Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing source-level guard for the home route
+    file: packages/web/tests/routes/home-tokens.test.ts
+    command: cd packages/web && bunx vitest run tests/routes/home-tokens.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+
+      /**
+       * Source-level guard. The home route calls createFileRoute and a server
+       * function at module scope, so it cannot be rendered in isolation — and the
+       * thing under test here is which classes the file reaches for, which source
+       * answers directly.
+       */
+      const src = readFileSync(join(process.cwd(), 'app/routes/index.tsx'), 'utf8')
+
+      describe('home page — monochrome system', () => {
+        it('has no gradient background on any section', () => {
+          expect(src).not.toContain('bg-gradient-to-br from-brand')
+          expect(src).not.toContain('gradient-text')
+        })
+
+        it('has no blur blobs', () => {
+          expect(src).not.toContain('blur-3xl')
+        })
+
+        it('reaches for no orange brand utilities', () => {
+          expect(src).not.toMatch(/\b(bg|text|border|from|to)-brand-/)
+        })
+
+        it('uses the rating token rather than a hardcoded yellow', () => {
+          expect(src).not.toContain('fill-yellow-400')
+          expect(src).toContain('fill-rating')
+        })
+
+        it('uses the shared primitives', () => {
+          expect(src).toContain("from '~/components/ui/SectionBand'")
+          expect(src).toContain("from '~/components/ui/DisplayHeading'")
+          expect(src).toContain('buttonVariants')
+        })
+
+        it('has no font-bold (weight 700 is never loaded)', () => {
+          expect(src).not.toContain('font-bold')
+        })
+
+        it('keeps the category legibility scrims, which are not brand colour', () => {
+          expect(src).toContain('bg-black/25')
+          expect(src).toContain('from-slate-700/80')
+        })
+
+        it('keeps the AI generator section — our differentiator, restyled not deleted', () => {
+          expect(src).toContain('AIGeneratorSection')
+          expect(src).toContain("tone=\"ink\"")
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the home guard fails
+    command: cd packages/web && bunx vitest run tests/routes/home-tokens.test.ts
+    expected_result: FAIL - gradient-text, blur-3xl, bg-brand-100, fill-yellow-400 and font-bold all present
+    status: pending
+  - id: 3
+    action: implement
+    description: Rewrite the home sections onto SectionBand / DisplayHeading / buttonVariants and strip the gradients and blobs
+    file: packages/web/app/routes/index.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the guard passes and typecheck is clean
+    command: cd packages/web && bunx vitest run tests/routes/home-tokens.test.ts && bunx tsc --noEmit -p tsconfig.json 2>&1 | tail -5
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the home sweep
+    command: 'git add packages/web/app/routes/index.tsx packages/web/tests/routes/home-tokens.test.ts && git commit -m "feat(web): restyle the home page into the monochrome band system"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.855Z'

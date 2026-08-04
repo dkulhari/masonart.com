@@ -1,0 +1,85 @@
+ticket_number: 397
+title: API - validated filter params for the new facets, and facet counts for them
+description: |-
+  ## Task
+
+  Teach `GET /api/products` and `GET /api/products/facets` about the new metadata.
+
+  1. **Filter params** — `vibe`, `aesthetic`, `medium`, `uniqueness`, `availability`, alongside the existing comma-separated array filters.
+  2. **Validate against the shared vocabularies.** Today the array params are `z.string().optional()` and every value is interpolated into a postgres literal by `sql.raw` with hand-rolled quote escaping (~`products.ts:167`). Validating against a closed vocabulary makes that structurally safe and turns a typo into a 400 rather than a silently empty result set.
+  3. **Facet counts** — extend `/api/products/facets` to cover the new facets.
+
+  ## Context
+
+  Feature: product-metadata-facets
+  Blocked by the schema ticket.
+
+  **Constraints**
+  - Existing callers pass `styles=a,b`. Validation must accept that shape, not require an array.
+  - An unknown value is a 400 with a useful message. Silently ignoring it is worse: the shopper sees an unfiltered grid and believes it was filtered.
+  - The facets endpoint is cached (`CacheKeys.PRODUCT + "facets"`). Adding facets changes the payload shape — the cache key must change with it, or a stale entry serves the old shape after deploy.
+  - **Route tests mock `db`**, so they cannot catch a bad column. Add schema assertions and verify against the real database (the #387 lesson).
+feature: product-metadata-facets
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T08:24:53.670Z'
+last_updated: '2026-08-04T08:36:23.281Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T08:30:43.885Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T08:36:23.281Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: new params accepted, unknown values rejected with 400, facets endpoint returns the new groups'
+    file: packages/api/tests/routes/product-facet-filters.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/product-facet-filters.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/api && bunx vitest run tests/routes/product-facet-filters.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add validated params and extend the facets endpoint
+    file: packages/api/src/routes/products.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the new and existing product suites pass
+    command: cd packages/api && bunx vitest run tests/routes/product-facet-filters.test.ts tests/routes/product-facets.test.ts tests/routes/products.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Exercise the real endpoints against the dev database
+    command: curl -s 'http://localhost:3000/api/products/facets' | head -c 300; curl -s -o /dev/null -w '%{http_code}' 'http://localhost:3000/api/products?vibe=not-a-real-vibe'
+    expected_result: Facets include the new groups; the bad value returns 400
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the API work
+    command: 'git add packages/api/src packages/api/tests && git commit -m "feat(api): validated filters and counts for the expanded facet set"'
+    status: pending
+current_step: 1
+started: '2026-08-04T08:30:43.885Z'
+completed: '2026-08-04T08:36:23.281Z'

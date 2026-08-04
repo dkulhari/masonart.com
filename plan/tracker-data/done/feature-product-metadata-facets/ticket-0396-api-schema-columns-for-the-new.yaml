@@ -1,0 +1,88 @@
+ticket_number: 396
+title: API - schema columns for the new facets and a migration
+description: |-
+  ## Task
+
+  Add the metadata the new facets need to `packages/api/src/database/schema/products.ts`.
+
+  - `vibe`, `aesthetic`, `medium` — `text[]`, matching how `styles`/`subjects`/`colors`/`rooms` are already stored.
+  - `uniqueness`, `availability` — single-valued `text`. A product has one edition type and one availability; an array invites contradictory rows.
+  - Extend `orientationEnum` with `set-of-2-3`. `round` already covers mesonart's "Circle".
+
+  Generate the migration with `drizzle-kit generate` (output lands in `src/database/migrations`, per `drizzle.config.ts:8`).
+
+  ## Context
+
+  Feature: product-metadata-facets
+  Blocked by the shared vocabularies ticket.
+
+  **Constraints**
+  - Postgres will not drop an enum value later — adding `set-of-2-3` is effectively permanent. It is added because mesonart genuinely treats it as an orientation facet (§5.2), even though it describes panel count rather than proportion.
+  - `getSizesForOrientation` in `@chobii/shared` has no ladder for `set-of-2-3` and returns an empty array. `buildVariantsForOrientation` already handles that, and `seed.ts` falls back to portrait for unladdered orientations — verify that path still behaves rather than assuming.
+  - Do NOT hand-write the migration; generate it, then read what was generated before applying.
+  - Apply against the dev database on **5440** and confirm the columns exist.
+feature: product-metadata-facets
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T08:24:53.657Z'
+last_updated: '2026-08-04T08:30:43.129Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T08:27:41.127Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T08:30:43.129Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing schema tests for the new columns and the extended enum
+    file: packages/api/tests/database/product-facet-columns.test.ts
+    command: cd packages/api && bunx vitest run tests/database/product-facet-columns.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/api && bunx vitest run tests/database/product-facet-columns.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the columns and enum value, generate the migration
+    file: packages/api/src/database/schema/products.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the schema tests pass
+    command: cd packages/api && bunx vitest run tests/database/product-facet-columns.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Apply the migration and confirm the columns landed in the real database
+    command: docker exec poster-app-postgres psql -U poster_app -d poster_app_dev -c "\\d products" | grep -E 'vibe|aesthetic|medium|uniqueness|availability'
+    expected_result: All five columns present
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the schema change
+    command: 'git add packages/api/src/database packages/api/tests && git commit -m "feat(api): schema columns for the expanded facet set"'
+    status: pending
+current_step: 1
+started: '2026-08-04T08:27:41.127Z'
+completed: '2026-08-04T08:30:43.129Z'

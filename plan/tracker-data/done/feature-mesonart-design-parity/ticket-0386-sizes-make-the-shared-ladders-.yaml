@@ -1,0 +1,344 @@
+ticket_number: 386
+title: Sizes - make the shared ladders the single source of truth, extend them, and price by area
+description: |-
+  ## Task
+
+  From docs/design/mesonart/mesonart-parity-analysis.md §5.6, implications 2, 3, 5 and 6.
+
+  **There are two size systems in this repo and they disagree.**
+
+  1. `packages/shared/src/constants/sizes.ts` declares three ladders (`SQUARE_SIZES`, `PORTRAIT_LANDSCAPE_SIZES`, `PANORAMIC_SIZES`) plus `getSizesForOrientation()`. Grepped across the monorepo: **every one of these is referenced only by its own test file**, `packages/shared/tests/constants/sizes.test.ts`. It is dead code that has been fully unit-tested for months.
+
+  2. `packages/api/src/database/seed.ts` hand-writes `variantsByOrientation` — 4 steps per orientation with *different numbers*. Square is 12/18/24/36 there against 12/16/20/24/30/36/40/48 in the shared ladder. Nothing reconciles them; the shared ladder loses because nothing reads it.
+
+  So every product ships 4 variants topping out at 48", which the analysis reads as "posters, not gallery art" against their 10–14 steps up to 100".
+
+  **Four changes:**
+
+  1. **Extend the ladders** to the measured step counts in Appendix A — `square-10` (24…72"), `rect-14`, `pano-11` — and raise the ceiling. Keep the existing small steps: our catalogue genuinely sells 12–20" posters and their ladder starts at 24" because they sell hand-painted canvases. This is a superset, not a replacement.
+
+  2. **Price by area with a volume taper** (§5.5). Today `price = basePrice + hand-entered addition` per step. Their $/in² falls 0.454 → 0.311 across the ladder, ~31%. Adopt the *shape*, not the dollar figures — anchor the smallest step at the product's own `basePrice` so `From ₹X` on every card and listing stays correct, then scale by area with the taper applied on top.
+
+  3. **Dual-unit inline labels** (§5.6.6) — `48" × 36" / 122 × 91 cm`, so the list is scannable in either system at once.
+
+  4. **Wire `getSizesForOrientation()` in** as the source of truth for seeding, and delete `variantsByOrientation`. This is the actual point of the ticket; 1–3 are what make it worth doing.
+
+  ## Context
+
+  Feature: mesonart-design-parity (Phase E slice — the analysis puts the size work under Phase E, but it is data-layer work with no dependency on the PDP restructure, so it can land alone).
+
+  **Files**
+  - `packages/shared/src/constants/sizes.ts` — the ladders and helpers
+  - `packages/shared/tests/constants/sizes.test.ts` — currently the only consumer; asserts exact step counts, `DEFAULT_SIZE_ID === 'portrait-landscape-16x20'`, `SMALLEST_SIZE`, `LARGEST_SIZE`, `POPULAR_SIZES`. Extending the ladders will break several of these on purpose.
+  - `packages/api/src/database/seed.ts` — `variantsByOrientation` around line 1371, insert around line 1766
+  - `packages/api/src/database/schema/products.ts` — `productVariants` table
+
+  **Constraints**
+  - `priceTier` is 1–4 in `productSizeSchema` (zod) and must stay in range. With 10–14 steps it can no longer be hand-assigned per size; derive it from ladder position so the schema stays satisfied while area pricing does the real work.
+  - `DEFAULT_SIZE_ID`, `SMALLEST_SIZE`, `LARGEST_SIZE` and `POPULAR_SIZES` all name specific size ids. Extending the ladders invalidates some; they must be re-pointed, not deleted.
+  - The square master image contract (#360–#375) is untouched. §5.6.1 is explicit that variable ratios and a square master are not in conflict — the ratio only materialises at manufacture.
+  - Seeding is destructive (`clearData()` truncates products and variants). This ticket changes what a reseed produces; it does not migrate existing rows.
+
+  **Out of scope**
+  - The `Show in cm` toggle in `SizeSelector.tsx` and any PDP restructure — Phase E UI.
+  - Circle and Set of 2/3 orientation families — those need the facet decision from Phase C.
+  - Turning finish into a variant-matrix axis. §5.6.4 explicitly rejects copying their 98-row matrix; our frames stay an add-on list.
+feature: mesonart-design-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T06:27:00.989Z'
+last_updated: '2026-08-04T06:38:26.314Z'
+time_spent_minutes: 11
+labels:
+  - backend
+  - shared
+  - data
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T06:27:12.554Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T06:38:19.946Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `83d1aadf` — feat(shared): wire the size ladders in as the source of truth for variants
+
+      **Files Changed**:
+      - `packages/shared/src/constants/sizes.ts` — ladders extended to the measured step counts via a new `buildLadder()`; added `priceForSize()` and `displayLabelDual`; `priceTier` now derived from ladder quartile
+      - `packages/shared/src/types/product.ts` — `ProductSize.displayLabelDual`
+      - `packages/shared/src/schemas/product.ts` — `productSizeSchema` requires the dual label
+      - `packages/shared/tests/constants/sizes.ladders.test.ts` — new: depth, ceiling, ratio spread, dual label, area pricing and taper
+      - `packages/shared/tests/constants/sizes.test.ts` — 7 assertions that pinned the old 8/8/4 shape updated with reasons
+      - `packages/shared/tests/schemas/product.test.ts` — 4 fixtures given the new required field
+      - `packages/api/src/database/seed-variants.ts` — new: `buildVariantsForOrientation()`
+      - `packages/api/src/database/seed.ts` — `variantsByOrientation` deleted, seeding driven by the shared ladder
+      - `packages/api/tests/database/seed-variants.test.ts` — new, including a guard that the hand-written table does not come back
+
+      **Summary**:
+      Two size systems existed and disagreed. The shared ladders and `getSizesForOrientation()` were referenced only by their own test file — fully unit-tested dead code — while `seed.ts` hand-wrote a 4-step table per orientation with different numbers (seed square 12/18/24/36" against the ladder's 12/16/20/24/30/36/40/48"). The seed won by default because it is what reaches the database.
+
+      There is now one source of truth. Ladders: square 8→13 (ceiling 48→72"), rectangular 8→17 (→80×60"), panoramic 4→13 (→50×100", and no longer uniformly 3:1). Pricing moved from a hand-entered per-variant addition to `priceForSize()` — area-driven with the measured ~31% volume taper, interpolated in log-area space across the step's own ladder so the decline does not become a function of ladder depth. The smallest step prices at exactly `basePrice`, which is load-bearing for the `From <basePrice>` shown on every card. Labels are dual-unit inline.
+
+      **Verification**:
+      - Command: `bunx vitest run` in shared / api / web, `bun run typecheck`, local reseed
+      - shared: PASS (859/859)
+      - api: 36 failures against **38 on the parent branch** — two fewer, none size- or variant-related; all pre-existing AI/redis/queue/auth/health suites
+      - web: PASS (1601/1601)
+      - typecheck: 23 errors, exactly the pre-existing baseline
+      - reseed: 41 products now carry 13–17 variants each rather than 4. Square entry step `599.00` == basePrice; unit rate falls 4.16 → 2.87 ₹/in² across the ladder — a 31% taper, matching the measured figure.
+
+      **Deferred (stated out of scope in the ticket)**: the `Show in cm` toggle in `SizeSelector.tsx` is now redundant against dual-unit labels, but removing it is Phase E PDP work. Circle and Set of 2/3 families await the Phase C facet decision. The finish axis stays an add-on list — §5.6.4 explicitly rejects copying their 98-row matrix.
+  - author: system
+    timestamp: '2026-08-04T06:38:20.166Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-04T06:27:13.591Z'
+    agent: claude-code
+    summary: Extended the three size ladders to the measured mesonart step counts, added area-based pricing with the measured volume taper and dual-unit labels, and made getSizesForOrientation the source of truth for seeded variants. Committed 83d1aadf.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-04T06:38:26.280Z'
+    duration: '00:11:12'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the extended ladders, the dual-unit label and area pricing
+    file: packages/shared/tests/constants/sizes.ladders.test.ts
+    command: cd packages/shared && bunx vitest run tests/constants/sizes.ladders.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import {
+        SQUARE_SIZES, PORTRAIT_LANDSCAPE_SIZES, PANORAMIC_SIZES,
+        getSizesForOrientation, priceForSize, ALL_SIZES,
+      } from '../../src/constants/sizes'
+
+      describe('ladder depth and ceiling', () => {
+        it('square reaches the measured 72in ceiling', () => {
+          expect(SQUARE_SIZES.length).toBeGreaterThanOrEqual(10)
+          expect(SQUARE_SIZES.at(-1)!.widthInches).toBe(72)
+        })
+
+        it('rectangular reaches 80x60', () => {
+          expect(PORTRAIT_LANDSCAPE_SIZES.length).toBeGreaterThanOrEqual(14)
+          const last = PORTRAIT_LANDSCAPE_SIZES.at(-1)!
+          expect([last.widthInches, last.heightInches].sort((a,b)=>a-b)).toEqual([60, 80])
+        })
+
+        it('panoramic carries more than one ratio', () => {
+          const ratios = new Set(PANORAMIC_SIZES.map(s => {
+            const [lo, hi] = [s.widthInches, s.heightInches].sort((a,b)=>a-b)
+            return (hi / lo).toFixed(2)
+          }))
+          // Ours was uniformly 3:1; theirs mixes 2:1, 3:1 and 8:3.
+          expect(ratios.size).toBeGreaterThan(1)
+        })
+
+        it('every ladder step is strictly larger by area than the one before', () => {
+          for (const ladder of [SQUARE_SIZES, PORTRAIT_LANDSCAPE_SIZES, PANORAMIC_SIZES]) {
+            const areas = ladder.map(s => s.widthInches * s.heightInches)
+            expect(areas).toEqual([...areas].sort((a, b) => a - b))
+            expect(new Set(areas).size).toBe(areas.length)
+          }
+        })
+
+        it('keeps priceTier inside the 1-4 the zod schema allows', () => {
+          for (const s of ALL_SIZES) {
+            expect(s.priceTier).toBeGreaterThanOrEqual(1)
+            expect(s.priceTier).toBeLessThanOrEqual(4)
+          }
+        })
+
+        it('ids stay unique across the combined ladders', () => {
+          expect(new Set(ALL_SIZES.map(s => s.id)).size).toBe(ALL_SIZES.length)
+        })
+      })
+
+      describe('dual-unit labels', () => {
+        it('prints inches and cm in one scannable string', () => {
+          const size = PORTRAIT_LANDSCAPE_SIZES.find(s => s.widthInches === 36 && s.heightInches === 48)!
+          expect(size.displayLabelDual).toBe('36" x 48" / 91 x 122 cm')
+        })
+
+        it('every size has one', () => {
+          for (const s of ALL_SIZES) expect(s.displayLabelDual).toMatch(/" \/ .* cm$/)
+        })
+      })
+
+      describe('priceForSize - area with a volume taper', () => {
+        const BASE = 1000
+        const square = getSizesForOrientation('square')
+
+        it('anchors the smallest step at the product base price', () => {
+          // Every card and listing renders `From <basePrice>`; the entry step must
+          // keep matching it or the whole catalogue starts lying.
+          expect(priceForSize(BASE, square[0])).toBe(BASE)
+        })
+
+        it('rises monotonically with area', () => {
+          const prices = square.map(s => priceForSize(BASE, s))
+          expect(prices).toEqual([...prices].sort((a, b) => a - b))
+        })
+
+        it('tapers - the unit rate falls as the piece gets bigger', () => {
+          const rate = (s: typeof square[number]) =>
+            priceForSize(BASE, s) / (s.widthInches * s.heightInches)
+          expect(rate(square.at(-1)!)).toBeLessThan(rate(square[0]))
+        })
+
+        it('tapers by roughly the measured 30 percent across the ladder', () => {
+          const rate = (s: typeof square[number]) =>
+            priceForSize(BASE, s) / (s.widthInches * s.heightInches)
+          const decline = 1 - rate(square.at(-1)!) / rate(square[0])
+          expect(decline).toBeGreaterThan(0.2)
+          expect(decline).toBeLessThan(0.45)
+        })
+
+        it('returns whole rupees', () => {
+          for (const s of square) expect(Number.isInteger(priceForSize(BASE, s))).toBe(true)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the new suite fails
+    command: cd packages/shared && bunx vitest run tests/constants/sizes.ladders.test.ts
+    expected_result: FAIL - priceForSize and displayLabelDual do not exist; ladders are 8/8/4 steps topping out at 48-72in
+    status: done
+  - id: 3
+    action: implement
+    description: Extend the three ladders to the measured steps, add displayLabelDual, derive priceTier from ladder position, and add priceForSize
+    file: packages/shared/src/constants/sizes.ts
+    status: done
+  - id: 4
+    action: verify-pass
+    description: Confirm the new suite passes and reconcile the pre-existing sizes test, which pins step counts and named constants on purpose
+    command: cd packages/shared && bunx vitest run tests/constants/
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: write-test
+    description: Write a failing test that the seed derives its variants from the shared ladder rather than a hand-written table
+    file: packages/api/tests/database/seed-variants.test.ts
+    command: cd packages/api && bunx vitest run tests/database/seed-variants.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+      import { getSizesForOrientation, priceForSize } from '@chobii/shared'
+      import { buildVariantsForOrientation } from '../../src/database/seed-variants'
+
+      describe('seed variants derive from the shared ladder', () => {
+        it('emits one variant per ladder step', () => {
+          for (const o of ['square', 'portrait', 'landscape', 'panoramic'] as const) {
+            expect(buildVariantsForOrientation(o, 1000)).toHaveLength(
+              getSizesForOrientation(o).length
+            )
+          }
+        })
+
+        it('prices each step through priceForSize', () => {
+          const ladder = getSizesForOrientation('square')
+          const variants = buildVariantsForOrientation('square', 1000)
+          variants.forEach((v, i) => {
+            expect(v.price).toBe(priceForSize(1000, ladder[i]).toFixed(2))
+          })
+        })
+
+        it('labels each variant dual-unit', () => {
+          for (const v of buildVariantsForOrientation('square', 1000)) {
+            expect(v.sizeLabel).toMatch(/" \/ .* cm$/)
+          }
+        })
+
+        it('numbers sortOrder from 1 in ladder order', () => {
+          const variants = buildVariantsForOrientation('portrait', 1000)
+          expect(variants.map((v) => v.sortOrder)).toEqual(
+            variants.map((_, i) => i + 1)
+          )
+        })
+
+        it('carries cm alongside inches on every row', () => {
+          for (const v of buildVariantsForOrientation('panoramic', 1000)) {
+            expect(v.widthCm).toBeGreaterThan(0)
+            expect(v.heightCm).toBeGreaterThan(0)
+          }
+        })
+
+        it('leaves no hand-written variant table behind in the seed', () => {
+          const seed = readFileSync(
+            join(process.cwd(), 'src/database/seed.ts'), 'utf8'
+          )
+          expect(seed).not.toContain('variantsByOrientation')
+          expect(seed).toContain('buildVariantsForOrientation')
+        })
+      })
+  - id: 6
+    action: verify-fail
+    description: Confirm the seed test fails
+    command: cd packages/api && bunx vitest run tests/database/seed-variants.test.ts
+    expected_result: FAIL - src/database/seed-variants.ts does not exist
+    status: done
+  - id: 7
+    action: implement
+    description: Extract buildVariantsForOrientation into its own module driven by getSizesForOrientation, and delete variantsByOrientation from seed.ts
+    file: packages/api/src/database/seed-variants.ts
+    status: done
+  - id: 8
+    action: verify-pass
+    description: Confirm both suites pass and nothing else in api or shared regressed
+    command: cd packages/shared && bunx vitest run && cd ../api && bunx vitest run tests/database/
+    expected_result: PASS
+    status: done
+  - id: 9
+    action: verify-pass
+    description: Reseed against the local database and confirm the variant count per product went from 4 to the full ladder
+    command: cd packages/api && DATABASE_URL='postgresql://poster_app:dev_password@localhost:5440/poster_app_dev' bun run src/database/seed.ts
+    expected_result: Each product reports 10-14 variants rather than 4
+    status: done
+  - id: 10
+    action: verify-pass
+    description: Confirm the monorepo typecheck is no worse than the pre-existing baseline of 23 errors
+    command: bun run typecheck 2>&1 | grep -c 'error TS'
+    expected_result: '23'
+    status: done
+  - id: 11
+    action: commit
+    description: Commit the ladder work
+    command: 'git add packages/shared packages/api && git commit -m "feat(shared): wire the size ladders in as the source of truth for variants"'
+    status: done
+current_step: 11
+started: '2026-08-04T06:27:12.554Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:11:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:11:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run (shared, api, web) + bun run typecheck + local reseed
+  test_output: shared 859/859 pass; api 36 failures vs 38 on parent baseline (none size/variant related); web 1601/1601 pass; typecheck 23 errors == baseline; reseed produced 13-17 variants per product across 41 products (was 4)
+  build_passed: true
+  build_command: bun run typecheck
+  verified_at: '2026-08-04T06:38:02.246Z'
+completed: '2026-08-04T06:38:20.166Z'

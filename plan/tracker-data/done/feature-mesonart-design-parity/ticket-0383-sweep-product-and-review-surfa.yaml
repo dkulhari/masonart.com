@@ -1,0 +1,135 @@
+ticket_number: 383
+title: 'Sweep - product and review surfaces: monochrome badges, rating token, product type scale'
+description: |-
+  ## Task
+  The product surfaces carry the last brand-coloured chrome that sits directly next to artwork, where it clashes hardest (analysis §3.3).
+
+  - **ProductCard.tsx** — the `Featured` badge is `bg-brand-500` and the `AI` badge is `bg-purple-500`. Both go monochrome: Featured becomes `bg-foreground text-background`, AI keeps its `Sparkles` icon but becomes `bg-background/90 text-foreground border border-foreground/15` so it reads as a marker rather than a brand colour. Title hover `hover:text-brand-600` becomes `hover:text-foreground/60`. Title size `text-base` becomes `text-product` (the measured fluid clamp) — this is the `⚠️ no clamp` row in the analysis token table.
+  - **ProductDetail.tsx** — headings drop `font-bold`; the add-to-cart CTA becomes a full-width `Button` pill. Do NOT restructure the buy panel or the frame selector — Phase E.
+  - **ProductReviews.tsx**, **reviews/ReviewSummary.tsx** — every `fill-yellow-400 text-yellow-400` becomes `fill-rating text-rating`; drop `font-bold`.
+  - **checkout/OrderSummary.tsx** — drop `font-bold`.
+
+  `--mat`, `MEDIA_RATIO`, the square-media contract and the grid geometry are untouchable: they are the #360–#375 product-grid-alignment contract and are covered by E2E tests.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 3 — Storefront sweep
+  Files: `packages/web/app/components/product/{ProductCard,ProductDetail,ProductReviews}.tsx`, `packages/web/app/components/reviews/ReviewSummary.tsx`, `packages/web/app/components/checkout/OrderSummary.tsx`
+  Test: `packages/web/tests/components/product/ProductCard.tokens.test.tsx` plus a source guard for the rest.
+feature: mesonart-design-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:19:36.047Z'
+last_updated: '2026-08-03T20:49:35.880Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.880Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing ProductCard render tests and a rating-token source guard
+    file: packages/web/tests/components/product/ProductCard.tokens.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCard.tokens.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+
+      const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
+      const card = read('app/components/product/ProductCard.tsx')
+
+      describe('ProductCard — monochrome badges', () => {
+        it('the Featured badge is no longer brand orange', () => {
+          expect(card).not.toContain('bg-brand-500')
+          expect(card).toContain('bg-foreground')
+        })
+
+        it('the AI badge is no longer purple', () => {
+          expect(card).not.toContain('bg-purple-500')
+        })
+
+        it('title hover is monochrome', () => {
+          expect(card).not.toContain('hover:text-brand-600')
+        })
+
+        it('the product title uses the measured fluid clamp', () => {
+          expect(card).toContain('text-product')
+        })
+
+        it('the square-media contract is untouched', () => {
+          expect(card).toContain('MEDIA_RATIO')
+          expect(card).toContain('bg-mat')
+          expect(card).toContain('rounded-[var(--card-radius)]')
+          expect(card).toContain('grow')
+        })
+      })
+
+      describe('rating token adoption', () => {
+        const FILES = [
+          'app/components/product/ProductReviews.tsx',
+          'app/components/reviews/ReviewSummary.tsx',
+          'app/components/product/ProductDetail.tsx',
+        ]
+
+        for (const path of FILES) {
+          it(`${path} uses the rating token, not a hardcoded yellow`, () => {
+            const src = read(path)
+            expect(src).not.toContain('fill-yellow-400')
+            expect(src).not.toContain('text-yellow-400')
+          })
+
+          it(`${path} has no font-bold`, () => {
+            expect(read(path)).not.toContain('font-bold')
+          })
+        }
+
+        it('OrderSummary has no font-bold', () => {
+          expect(read('app/components/checkout/OrderSummary.tsx')).not.toContain('font-bold')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the product guard fails
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCard.tokens.test.tsx
+    expected_result: FAIL - bg-brand-500 and bg-purple-500 badges; fill-yellow-400 in review components
+    status: pending
+  - id: 3
+    action: implement
+    description: Restyle the badges, hover, title scale and rating stars
+    file: packages/web/app/components/product/ProductCard.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the guard passes and the existing product component suites still pass
+    command: cd packages/web && bunx vitest run tests/components/product/ tests/components/reviews/ tests/components/checkout/
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm grid alignment E2E is unaffected by the card changes
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --reporter=line
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the product surface sweep
+    command: 'git add packages/web/app/components/product packages/web/app/components/reviews packages/web/app/components/checkout packages/web/tests/components && git commit -m "feat(web): monochrome product badges and rating-token stars"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.880Z'

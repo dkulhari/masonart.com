@@ -1,0 +1,244 @@
+ticket_number: 380
+title: Primitives - SectionBand and DisplayHeading with split-word reveal
+description: |-
+  ## Task
+  Two small primitives the sweep depends on.
+
+  **`SectionBand`** — mesonart alternates white and beige full-bleed bands. Props: `tone` (`plain` | `beige` | `sand` | `ink`), plus `className` and children. Renders a `<section>` with the band background and the standard vertical rhythm, with a `container-wide` inside. Replaces the ad-hoc `bg-muted/30` and gradient sections.
+
+  **`DisplayHeading`** — mesonart wraps each word of a display heading in its own span and reveals them in sequence. Props: `as` (`h1` | `h2`, default `h1`), `children` (a string), `className`. Splits on whitespace, emits `<span class="inline-block">` per word with a staggered `animation-delay`, using the existing `--ease-primary` curve.
+
+  Accessibility: the split must not break the accessible name — assert that `getByRole('heading', { name: 'Full Sentence Here' })` still resolves, and that words keep their separating whitespace so screen readers and copy-paste do not run words together.
+
+  Respect `prefers-reduced-motion`: no transform, no delay.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 2 — Primitives
+  Files: `packages/web/app/components/ui/SectionBand.tsx`, `packages/web/app/components/ui/DisplayHeading.tsx`
+  Tests: `packages/web/tests/components/ui/SectionBand.test.tsx`, `packages/web/tests/components/ui/DisplayHeading.test.tsx`
+  Depends on the `band`/`highlight` colours and `--ease-primary` from the token tickets.
+feature: mesonart-design-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:17:49.140Z'
+last_updated: '2026-08-03T20:49:35.846Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - component
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.846Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing SectionBand and DisplayHeading tests
+    file: packages/web/tests/components/ui/DisplayHeading.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/ui/DisplayHeading.test.tsx tests/components/ui/SectionBand.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // tests/components/ui/DisplayHeading.test.tsx
+      import { describe, it, expect } from 'vitest'
+      import { render, screen } from '@testing-library/react'
+      import { DisplayHeading } from '~/components/ui/DisplayHeading'
+
+      describe('DisplayHeading', () => {
+        it('renders an h1 by default', () => {
+          render(<DisplayHeading>Shop All Art</DisplayHeading>)
+          expect(screen.getByRole('heading', { level: 1 })).toBeTruthy()
+        })
+
+        it('keeps the whole sentence as the accessible name despite the split', () => {
+          render(<DisplayHeading>Transform Your Space</DisplayHeading>)
+          expect(
+            screen.getByRole('heading', { name: 'Transform Your Space' })
+          ).toBeTruthy()
+        })
+
+        it('wraps each word in its own span', () => {
+          render(<DisplayHeading>Transform Your Space</DisplayHeading>)
+          const spans = screen
+            .getByRole('heading')
+            .querySelectorAll('span[data-word]')
+          expect(spans.length).toBe(3)
+          expect(spans[0].textContent).toBe('Transform')
+        })
+
+        it('staggers the reveal per word', () => {
+          render(<DisplayHeading>One Two Three</DisplayHeading>)
+          const spans = Array.from(
+            screen.getByRole('heading').querySelectorAll<HTMLElement>('span[data-word]')
+          )
+          const delays = spans.map((s) => s.style.animationDelay)
+          expect(new Set(delays).size).toBe(3)
+        })
+
+        it('renders an h2 when asked', () => {
+          render(<DisplayHeading as="h2">Best Seller</DisplayHeading>)
+          expect(screen.getByRole('heading', { level: 2 })).toBeTruthy()
+        })
+
+        it('never uses font-bold', () => {
+          render(<DisplayHeading>Shop</DisplayHeading>)
+          expect(screen.getByRole('heading').className).not.toContain('font-bold')
+        })
+      })
+
+      // tests/components/ui/SectionBand.test.tsx
+      // (separate file, same command)
+      // import { SectionBand } from '~/components/ui/SectionBand'
+      //
+      // it('renders a section with a container-wide inside')
+      // it('tone="beige" applies bg-band')
+      // it('tone="sand" applies bg-band-strong')
+      // it('tone="plain" applies no band background')
+      // it('merges className')
+  - id: 2
+    action: write-test
+    description: Write the SectionBand test file
+    file: packages/web/tests/components/ui/SectionBand.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/ui/SectionBand.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { render } from '@testing-library/react'
+      import { SectionBand } from '~/components/ui/SectionBand'
+
+      describe('SectionBand', () => {
+        it('renders a section wrapping its children in container-wide', () => {
+          const { container } = render(<SectionBand>content</SectionBand>)
+          const section = container.querySelector('section')
+          expect(section).not.toBeNull()
+          expect(section!.querySelector('.container-wide')).not.toBeNull()
+          expect(section!.textContent).toContain('content')
+        })
+
+        it('tone="beige" paints the measured band colour', () => {
+          const { container } = render(<SectionBand tone="beige">x</SectionBand>)
+          expect(container.querySelector('section')!.className).toContain('bg-band')
+        })
+
+        it('tone="sand" uses the stronger collections band', () => {
+          const { container } = render(<SectionBand tone="sand">x</SectionBand>)
+          expect(container.querySelector('section')!.className).toContain('bg-band-strong')
+        })
+
+        it('defaults to plain with no band background and no gradient', () => {
+          const { container } = render(<SectionBand>x</SectionBand>)
+          const cls = container.querySelector('section')!.className
+          expect(cls).not.toContain('bg-band')
+          expect(cls).not.toContain('gradient')
+        })
+
+        it('merges caller className', () => {
+          const { container } = render(<SectionBand className="pt-0">x</SectionBand>)
+          expect(container.querySelector('section')!.className).toContain('pt-0')
+        })
+      })
+  - id: 3
+    action: verify-fail
+    description: Confirm both suites fail on the missing modules
+    command: cd packages/web && bunx vitest run tests/components/ui/DisplayHeading.test.tsx tests/components/ui/SectionBand.test.tsx
+    expected_result: FAIL - Cannot find module '~/components/ui/DisplayHeading' / '~/components/ui/SectionBand'
+    status: pending
+  - id: 4
+    action: implement
+    description: Create SectionBand and DisplayHeading, plus the word-reveal keyframe
+    file: packages/web/app/components/ui/DisplayHeading.tsx
+    status: pending
+    code: |-
+      // app/components/ui/SectionBand.tsx
+      import { cn } from '~/lib/utils'
+
+      const TONES = {
+        plain: '',
+        beige: 'bg-band',
+        sand: 'bg-band-strong',
+        ink: 'bg-foreground text-background',
+      } as const
+
+      export interface SectionBandProps
+        extends React.HTMLAttributes<HTMLElement> {
+        tone?: keyof typeof TONES
+      }
+
+      /** Full-bleed band with the standard rhythm. mesonart alternates white/beige. */
+      export function SectionBand({ tone = 'plain', className, children, ...props }: SectionBandProps) {
+        return (
+          <section className={cn('py-16 sm:py-24', TONES[tone], className)} {...props}>
+            <div className="container-wide">{children}</div>
+          </section>
+        )
+      }
+
+      // app/components/ui/DisplayHeading.tsx
+      import { cn } from '~/lib/utils'
+
+      export interface DisplayHeadingProps
+        extends React.HTMLAttributes<HTMLHeadingElement> {
+        as?: 'h1' | 'h2'
+        children: string
+      }
+
+      /**
+       * mesonart splits display headings into per-word spans and reveals them in
+       * sequence. The whitespace between words is preserved so the accessible name
+       * and copy-paste stay intact.
+       */
+      export function DisplayHeading({ as: Tag = 'h1', className, children, ...props }: DisplayHeadingProps) {
+        const words = children.split(/(\s+)/)
+        return (
+          <Tag className={cn('font-heading font-light tracking-tight', className)} {...props}>
+            {words.map((word, i) =>
+              /^\s+$/.test(word) ? (
+                word
+              ) : (
+                <span
+                  key={i}
+                  data-word
+                  className="inline-block animate-word-reveal"
+                  style={{ animationDelay: `${(i / 2) * 60}ms` }}
+                >
+                  {word}
+                </span>
+              )
+            )}
+          </Tag>
+        )
+      }
+
+      /* tailwind.config.ts -> keyframes + animation */
+      // 'word-reveal': { from: { opacity: '0', transform: 'translateY(0.4em)' }, to: { opacity: '1', transform: 'none' } }
+      // 'word-reveal': 'word-reveal .5s cubic-bezier(.3,1,.3,1) both'
+
+      /* globals.css — honour reduced motion */
+      // @media (prefers-reduced-motion: reduce) {
+      //   .animate-word-reveal { animation: none; opacity: 1; transform: none; }
+      // }
+  - id: 5
+    action: verify-pass
+    description: Confirm both primitive suites pass
+    command: cd packages/web && bunx vitest run tests/components/ui/
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the band and display-heading primitives
+    command: 'git add packages/web/app/components/ui/SectionBand.tsx packages/web/app/components/ui/DisplayHeading.tsx packages/web/tailwind.config.ts packages/web/app/styles/globals.css packages/web/tests/components/ui/ && git commit -m "feat(web): add SectionBand and split-word DisplayHeading primitives"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.846Z'

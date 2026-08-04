@@ -1,0 +1,197 @@
+ticket_number: 379
+title: Primitives - Button component with the mesonart pill variants
+description: |-
+  ## Task
+  There is no Button component anywhere in `packages/web` — `app/components/ui/` contains only `OptimizedImage.tsx`, and every button in the app is bespoke inline Tailwind. That absence is precisely why orange never got centralised.
+
+  Build `app/components/ui/Button.tsx` with `class-variance-authority` (already a dependency, ^0.7.1) and `cn` from `~/lib/utils`.
+
+  Variants, measured from mesonart:
+  - `solid` (default) — `bg-primary text-primary-foreground`, `rounded-pill`, `border-[length:var(--border-button)] border-primary`, `text-button`.
+  - `outline` — transparent fill, `border-primary text-primary`, same pill and border width. This is their `SHOP All ART` hero CTA.
+  - `ghost` — no border, hover tint only.
+  - `link` — underline on hover, no pill.
+
+  Sizes: `sm` (h-9 px-5), `md` (h-11 px-7, default), `lg` (h-12 px-8), `icon` (h-10 w-10, `rounded-full`).
+
+  Must support `asChild`-style composition without pulling in Radix: export `buttonVariants` so `<Link className={buttonVariants({...})}>` works. That is how the storefront's anchor CTAs migrate.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 2 — Primitives
+  File: `packages/web/app/components/ui/Button.tsx`, test at `packages/web/tests/components/ui/Button.test.tsx`
+  Deps present: class-variance-authority ^0.7.1, clsx, tailwind-merge, @testing-library/react ^16.3.1
+  Pattern: named export, `cn` from `~/lib/utils` (see ProductCard.tsx).
+feature: mesonart-design-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:17:49.134Z'
+last_updated: '2026-08-03T20:49:35.833Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - component
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.833Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing Button component tests
+    file: packages/web/tests/components/ui/Button.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/ui/Button.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { render, screen } from '@testing-library/react'
+      import { Button, buttonVariants } from '~/components/ui/Button'
+
+      describe('Button', () => {
+        it('renders a button with its children', () => {
+          render(<Button>Add to cart</Button>)
+          expect(screen.getByRole('button', { name: 'Add to cart' })).toBeTruthy()
+        })
+
+        it('is a near-black pill by default, never orange and never rounded-lg', () => {
+          render(<Button>Shop</Button>)
+          const cls = screen.getByRole('button').className
+          expect(cls).toContain('bg-primary')
+          expect(cls).toContain('rounded-pill')
+          expect(cls).not.toContain('bg-brand')
+          expect(cls).not.toContain('rounded-lg')
+        })
+
+        it('carries the measured 2px button border', () => {
+          render(<Button>Shop</Button>)
+          expect(screen.getByRole('button').className).toContain('var(--border-button)')
+        })
+
+        it('uses the fluid button type scale', () => {
+          render(<Button>Shop</Button>)
+          expect(screen.getByRole('button').className).toContain('text-button')
+        })
+
+        it('outline variant is a transparent pill with a primary border', () => {
+          render(<Button variant="outline">Shop All Art</Button>)
+          const cls = screen.getByRole('button').className
+          expect(cls).toContain('border-primary')
+          expect(cls).toContain('text-primary')
+          expect(cls).not.toContain('bg-primary ')
+        })
+
+        it('never renders font-bold (weight 700 is not loaded)', () => {
+          for (const v of ['solid', 'outline', 'ghost', 'link'] as const) {
+            expect(buttonVariants({ variant: v })).not.toContain('font-bold')
+          }
+        })
+
+        it('exposes buttonVariants so anchors and Links can share the styling', () => {
+          expect(typeof buttonVariants).toBe('function')
+          expect(buttonVariants({ variant: 'outline', size: 'lg' })).toContain('rounded-pill')
+        })
+
+        it('merges caller className without dropping variant classes', () => {
+          render(<Button className="w-full">Shop</Button>)
+          const cls = screen.getByRole('button').className
+          expect(cls).toContain('w-full')
+          expect(cls).toContain('rounded-pill')
+        })
+
+        it('forwards disabled and type', () => {
+          render(<Button disabled type="submit">Go</Button>)
+          const el = screen.getByRole('button') as HTMLButtonElement
+          expect(el.disabled).toBe(true)
+          expect(el.type).toBe('submit')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the Button tests fail
+    command: cd packages/web && bunx vitest run tests/components/ui/Button.test.tsx
+    expected_result: FAIL - Cannot find module '~/components/ui/Button'
+    status: pending
+  - id: 3
+    action: implement
+    description: Create the Button primitive with CVA pill variants
+    file: packages/web/app/components/ui/Button.tsx
+    status: pending
+    code: |-
+      import { cva, type VariantProps } from 'class-variance-authority'
+      import { forwardRef } from 'react'
+      import { cn } from '~/lib/utils'
+
+      /**
+       * The storefront button, measured from mesonart.com.
+       *
+       * Near-black pill, 2px border, fluid type. There was no Button component
+       * before this one, which is why orange spread across ~54 files by hand.
+       * New buttons go through here.
+       */
+      export const buttonVariants = cva(
+        'inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium text-button transition-colors duration-300 ' +
+          'disabled:pointer-events-none disabled:opacity-50 ' +
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        {
+          variants: {
+            variant: {
+              solid:
+                'rounded-pill border-[length:var(--border-button)] border-primary bg-primary text-primary-foreground hover:bg-primary/85 hover:border-primary/85',
+              outline:
+                'rounded-pill border-[length:var(--border-button)] border-primary bg-transparent text-primary hover:bg-primary hover:text-primary-foreground',
+              ghost:
+                'rounded-pill border-[length:var(--border-button)] border-transparent text-foreground hover:bg-accent',
+              link: 'text-foreground underline-offset-4 hover:underline',
+            },
+            size: {
+              sm: 'h-9 px-5',
+              md: 'h-11 px-7',
+              lg: 'h-12 px-8',
+              icon: 'h-10 w-10 rounded-full p-0',
+            },
+          },
+          defaultVariants: { variant: 'solid', size: 'md' },
+        }
+      )
+
+      export interface ButtonProps
+        extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+          VariantProps<typeof buttonVariants> {}
+
+      export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+        ({ className, variant, size, type = 'button', ...props }, ref) => (
+          <button
+            ref={ref}
+            type={type}
+            className={cn(buttonVariants({ variant, size }), className)}
+            {...props}
+          />
+        )
+      )
+      Button.displayName = 'Button'
+
+      export default Button
+  - id: 4
+    action: verify-pass
+    description: Confirm the Button tests pass
+    command: cd packages/web && bunx vitest run tests/components/ui/Button.test.tsx
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the Button primitive
+    command: 'git add packages/web/app/components/ui/Button.tsx packages/web/tests/components/ui/Button.test.tsx && git commit -m "feat(web): add the Button primitive with mesonart pill variants"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.833Z'

@@ -1,0 +1,146 @@
+ticket_number: 415
+title: Web - filter rail typography and chrome parity (strip the box)
+description: |-
+  ## Task
+
+  Our `/posters` filter rail reads as a bordered widget bolted onto the page; mesonart's is a bare column of type. Measured live on 2026-08-04 at 1440px, both sides, computed styles (not eyeballed).
+
+  **Measured deltas — mesonart | chobii today**
+
+  | Thing | mesonart | ours |
+  |---|---|---|
+  | Rail container | no box, no border, no radius, no background | `rounded-lg border border-border` (8px radius, 0.556px `rgb(226,232,240)` slate) |
+  | Scroll | rail is `position: sticky; top: 0`, page scrolls | `sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto` — a second scrollbar inside the rail |
+  | Width | 300px | 256px (`w-64`) |
+  | Rail header | none | `Filters (n)` + `Clear all` row, `p-4`, `border-b` |
+  | Group divider | `border-bottom: 0.667px solid rgba(23,23,23,0.06)` — warm, hairline | `border-b border-border` = `rgb(226,232,240)`, a cool slate |
+  | Group padding | summary has no horizontal padding, `padding-bottom: 21.9px` | head button `px-4 py-3` |
+  | Group title | 400 weight, 16px | `font-medium` = Poppins 500, 16px |
+  | Group count badge | none | filled `bg-primary` pill with the active count |
+  | Option list | `display: grid; gap: 12px`, 22px rows | `space-y-1`, 32px rows |
+  | Option label | 14px, no row padding, no hover fill | `rounded-md px-2 py-1.5 hover:bg-accent`, 14px/20px |
+  | Option count | inline right after the label, `(788)`, 14px / lh 22.4px, `rgba(23,23,23,0.6)`, `gap: 4px` | separate right-aligned span at the far edge of the row |
+  | Checkbox | 20x20, `border: 0.667px solid rgba(23,23,23,0.4)`, `radius 5px`, `appearance: none` | 20x20 (`h-5 w-5`), `rounded` 6px, `border-muted-foreground/30` |
+  | Chevron | 20px icon, `transform` transition `0.5s cubic-bezier(.3,1,.3,1)` | lucide chevron, no measured easing |
+
+  **Decisions taken (2026-08-04, with the user)**
+
+  1. **Font: keep Poppins.** mesonart's rail renders in `AtacamaTrial VAR` — a serif, 400 weight, and the only place on their site that is neither Poppins nor Urbanist. It is a *trial*-licensed face, so copying it is a licensing problem and a fourth webfont. Match their metrics (sizes, weights, colours, rhythm), not their face.
+  2. **Strip the chrome to match.** Drop the box, radius and inner scroll; drop the rail header row and the per-group count badges; warm hairline dividers; count inline in parentheses. `Clear all` is not lost — `ActiveFilterTags` already renders active filters as removable chips above the grid.
+
+  ## Context
+
+  - Rail wrapper: `packages/web/app/routes/posters/index.tsx:642` — the `sticky top-20 max-h-[...] overflow-y-auto rounded-lg border border-border` div. The `aside` above it at :635 carries `w-64`.
+  - Rail internals: `packages/web/app/components/product/ProductFilters.tsx` — header row at :194, group wrapper/head at :333-354, checkbox visual at :400-403, option label at :416.
+  - Mobile drawer shares this component (`ProductFilters` is rendered twice — desktop at :643, mobile at :1056). The drawer keeps its own header; only the desktop rail loses one. Scope the change so the mobile sheet does not lose `Clear all`.
+  - The token guard (`tests/styles/storefront-token-compliance.test.ts`) is law: no `font-bold`, no `brand-*`. New hairline colour should come from a token, not a literal.
+  - Tests: `tests/components/product/ProductFilters.facets.test.tsx`. E2E selectors scope by `div.hidden.lg\:block` — see the mobile/desktop duplicate-test-id gotcha in CLAUDE.md.
+  - Analysis: `docs/design/mesonart/mesonart-parity-analysis.md` section 3.3 and section 1.3.4.
+feature: collection-page-parity-remainder
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T13:58:51.219Z'
+last_updated: '2026-08-04T14:49:14.327Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - design-parity
+  - collection-page
+current_step: 7
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Assert the measured rail spec: group title at weight 400 (not font-medium 500), option count inline in parentheses next to the label rather than a right-aligned span, no rail header row and no per-group count badge in the desktop variant, checkbox at 5px radius.'
+    file: packages/web/tests/components/product/ProductFilters.facets.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductFilters.facets.test.tsx
+    expected_result: FAIL - rail still renders font-medium titles, a separate count span and the Filters/Clear all header
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm the new assertions fail against the current rail
+    command: cd packages/web && bunx vitest run tests/components/product/ProductFilters.facets.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Rail internals - drop the header row (desktop variant only; the mobile sheet keeps its Clear all), drop the per-group count badge, group head to weight 400 with no horizontal padding and 21.9px bottom padding, warm hairline divider token in place of border-border, option list to a 12px grid gap with no row padding and no hover fill, count inline at 14px / 60% opacity with a 4px gap, checkbox to 0.667px border at 5px radius.
+    file: packages/web/app/components/product/ProductFilters.tsx
+    status: done
+  - id: 4
+    action: implement
+    description: Rail container - remove `rounded-lg border border-border`, remove the `max-h-[calc(100vh-6rem)] overflow-y-auto` inner scroll so the rail sticks with the page, widen the aside from w-64 to 300px.
+    file: packages/web/app/routes/posters/index.tsx
+    code: |-
+      // :635 aside - w-64 -> w-[300px]
+      // :642 wrapper - `sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border border-border`
+      //               -> `sticky top-20`
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Rail tests pass
+    command: cd packages/web && bunx vitest run tests/components/product/ProductFilters.facets.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: verify-pass
+    description: No regression - full web suite at the 1715-passing baseline, the token guard green, and the grid E2E untouched by the width change.
+    command: cd packages/web && bunx vitest run && bunx vitest run tests/styles/storefront-token-compliance.test.ts && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps
+    expected_result: PASS - 1715 web tests, token guard green, 18 E2E passing
+    status: done
+  - id: 7
+    action: commit
+    description: Commit the rail parity work
+    command: 'git add packages/web/app/components/product/ProductFilters.tsx packages/web/app/routes/posters/index.tsx packages/web/tests/components/product/ProductFilters.facets.test.tsx && git commit -m "feat(web): strip the filter rail to the measured mesonart chrome (#415)"'
+    status: done
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T14:38:40.237Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T14:49:14.037Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `2c26d78a` — feat(web): strip the filter rail to the measured mesonart chrome (#415)
+
+      **Files Changed**:
+      - `packages/web/app/components/product/ProductFilters.tsx` — header row now mobile-only; group count badges removed; divider to `border-foreground/[0.06]`; title at body weight; head padding `px-4 py-3` → `py-4`; one rotating chevron on `--ease-primary` in place of two that swapped; option rows `space-y-3` with no padding and no hover fill; count inline as `(n)` at `text-foreground/60`; checkbox `rounded-[5px]` with `border-foreground/40`
+      - `packages/web/app/routes/posters/index.tsx` — rail `w-64` → `w-[300px]`; wrapper reduced to `sticky top-20`, dropping `rounded-lg border border-border` and the `max-h-[calc(100vh-6rem)] overflow-y-auto` inner scroll
+      - `packages/web/tests/components/product/ProductFilters.facets.test.tsx` — 8 new assertions for the measured spec
+
+      **Summary**:
+      Horizontal padding moved from `FilterSection` to the mobile scroll container, so the desktop rail sits flush in the page gutter while the drawer keeps its inset. The `activeCount` prop is gone from `FilterSection` rather than left unused. `ChevronDown` import dropped.
+
+      Kept Poppins deliberately: their rail renders in `AtacamaTrial VAR`, a trial-licensed serif and the only text on their site that is neither Poppins nor Urbanist. Metrics matched, face not copied.
+
+      Visual check at 1440px against their live page: rail is a bare column, counts read `Wabi-Sabi Art (9)`, dividers warm, no second scrollbar.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run`
+      - Result: PASS (68 files, **1767 passing, 0 failing**)
+      - Command: `bunx vitest run tests/styles/storefront-token-compliance.test.ts` → PASS (9/9)
+      - Command: `bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps` → PASS (18/18)
+      - Command: `bun run typecheck` → 23 errors, exactly the baseline
+
+      **Note**: `packages/scripts/dist/move-ticket.js` and `log-work-session.js` both crash on this machine (Node v25.9.0, no error text beyond `}` + version banner). Status and steps were driven through the ticketrack MCP tools instead.
+  - author: system
+    timestamp: '2026-08-04T14:49:14.327Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-04T14:38:40.237Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run
+  test_output: 68 files, 1767 passed, 0 failed. Token guard 9/9. Grid E2E 18 passed. Typecheck 23 errors = baseline.
+  build_passed: true
+  build_command: bun run typecheck
+  verified_at: '2026-08-04T14:48:58.785Z'
+completed: '2026-08-04T14:49:14.327Z'

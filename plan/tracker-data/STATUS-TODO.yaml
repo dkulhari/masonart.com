@@ -1,12 +1,37 @@
 status: todo
-last_updated: '2026-07-31T03:42:29.410Z'
-total_tickets: 22
+last_updated: '2026-08-04T15:06:10.276Z'
+total_tickets: 9
 summary:
   critical: 1
-  high: 6
-  medium: 10
-  low: 5
+  high: 2
+  medium: 4
+  low: 2
 priorities:
+  critical:
+    - feature: go-live
+      tickets:
+        - ticket_number: 294
+          title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 287
+              title: ProductCard - Add uniformAspectRatio prop
+            - ticket_number: 288
+              title: ProductGrid - Pass uniformAspectRatio to ProductCard
+            - ticket_number: 289
+              title: Hero Page - Replace inline ProductCard with shared component
+            - ticket_number: 290
+              title: Hero Page - Add category images for Shop by Style section
+            - ticket_number: 291
+              title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+            - ticket_number: 292
+              title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+            - ticket_number: 293
+              title: 'Ops: owner console setup + mini bootstrap execution'
+            - ticket_number: 278
+              title: Set up external uptime monitoring for production
+            - ticket_number: 283
+              title: Document and configure database backup procedures
   high:
     - feature: go-live
       tickets:
@@ -28,24 +53,6 @@ priorities:
               title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
         - ticket_number: 333
           title: 'Ops: point UptimeRobot monitors at https://chobii.art'
-          assignee: unassigned
-          blocked_by: []
-    - feature: product-grid-alignment
-      tickets:
-        - ticket_number: 364
-          title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 365
-          title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 366
-          title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 367
-          title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
           assignee: unassigned
           blocked_by: []
   medium:
@@ -72,32 +79,6 @@ priorities:
           title: 'DECISION: order numbers still use the masonart MA- prefix after the rebrand'
           assignee: unassigned
           blocked_by: []
-    - feature: product-grid-alignment
-      tickets:
-        - ticket_number: 368
-          title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 369
-          title: Admin upload - Square crop and zoom control for photographic media
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 370
-          title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 371
-          title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 372
-          title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 373
-          title: Styling - Adopt the measured mesonart token set
-          assignee: unassigned
-          blocked_by: []
   low:
     - feature: go-to-production
       tickets:
@@ -112,48 +93,29 @@ priorities:
           title: Production Cutover Gate - chobi.art domain external registrations
           assignee: unassigned
           blocked_by: []
-    - feature: mobile-responsive-jul2026
-      tickets:
-        - ticket_number: 360
-          title: 'Product grid card sizing: residual height variance + home/listing ratio mismatch'
-          assignee: unassigned
-          blocked_by: []
-    - feature: product-grid-alignment
-      tickets:
-        - ticket_number: 374
-          title: Seed - Reseed the 40 dev products into the new ProductImage shape
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 375
-          title: E2E - Row alignment regression spec across breakpoints
-          assignee: unassigned
-          blocked_by: []
-  critical:
-    - feature: go-live
-      tickets:
-        - ticket_number: 294
-          title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 287
-              title: ProductCard - Add uniformAspectRatio prop
-            - ticket_number: 288
-              title: ProductGrid - Pass uniformAspectRatio to ProductCard
-            - ticket_number: 289
-              title: Hero Page - Replace inline ProductCard with shared component
-            - ticket_number: 290
-              title: Hero Page - Add category images for Shop by Style section
-            - ticket_number: 291
-              title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
-            - ticket_number: 292
-              title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
-            - ticket_number: 293
-              title: 'Ops: owner console setup + mini bootstrap execution'
-            - ticket_number: 278
-              title: Set up external uptime monitoring for production
-            - ticket_number: 283
-              title: Document and configure database backup procedures
 blocked_tickets:
+  - ticket_number: 294
+    title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
+    blocked_by:
+      - ticket_number: 287
+        title: ProductCard - Add uniformAspectRatio prop
+      - ticket_number: 288
+        title: ProductGrid - Pass uniformAspectRatio to ProductCard
+      - ticket_number: 289
+        title: Hero Page - Replace inline ProductCard with shared component
+      - ticket_number: 290
+        title: Hero Page - Add category images for Shop by Style section
+      - ticket_number: 291
+        title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
+      - ticket_number: 292
+        title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+      - ticket_number: 293
+        title: 'Ops: owner console setup + mini bootstrap execution'
+      - ticket_number: 278
+        title: Set up external uptime monitoring for production
+      - ticket_number: 283
+        title: Document and configure database backup procedures
+    description: 'Infra: same-origin web bundle + single-hostname config, Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls, Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate, BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start, SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel, Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget, Ops: owner console setup + mini bootstrap execution, Set up external uptime monitoring for production, Document and configure database backup procedures'
   - ticket_number: 293
     title: 'Ops: owner console setup + mini bootstrap execution'
     blocked_by:
@@ -180,25 +142,3 @@ blocked_tickets:
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
-  - ticket_number: 294
-    title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
-    blocked_by:
-      - ticket_number: 287
-        title: ProductCard - Add uniformAspectRatio prop
-      - ticket_number: 288
-        title: ProductGrid - Pass uniformAspectRatio to ProductCard
-      - ticket_number: 289
-        title: Hero Page - Replace inline ProductCard with shared component
-      - ticket_number: 290
-        title: Hero Page - Add category images for Shop by Style section
-      - ticket_number: 291
-        title: 'SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel'
-      - ticket_number: 292
-        title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
-      - ticket_number: 293
-        title: 'Ops: owner console setup + mini bootstrap execution'
-      - ticket_number: 278
-        title: Set up external uptime monitoring for production
-      - ticket_number: 283
-        title: Document and configure database backup procedures
-    description: 'Infra: same-origin web bundle + single-hostname config, Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls, Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate, BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start, SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel, Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget, Ops: owner console setup + mini bootstrap execution, Set up external uptime monitoring for production, Document and configure database backup procedures'

@@ -1,0 +1,158 @@
+ticket_number: 404
+title: Schema - curator pin columns and sales index
+description: |-
+  ## Task
+
+  Add the two curator-pin columns the Best-selling sort needs, plus the index that makes the live sales aggregate cheap.
+
+  - `products.isPopular` boolean, default false, not null
+  - `products.popularOrder` integer, nullable
+  - index `products_popular_idx` on (isPopular, popularOrder)
+  - index `order_items_product_id_idx` on order_items(product_id)
+
+  Mirrors the existing `isFeatured` / `featuredOrder` / `products_featured_idx` triple at packages/api/src/database/schema/products.ts:140-158, so the query shape and admin UI follow a path already in the codebase.
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 1 - Schema
+
+  Local trap #3 from docs/design/mesonart/PLAN-OF-ACTION.md: API route tests mock `db`, so they cannot catch a reference to a column that does not exist. A route filtering on a non-existent column once passed 17 green tests. Hence a schema-assumption test that hits the real database (host port 5440, not the 5433 in .env).
+
+  The seed leaves `isPopular` false everywhere - the pin is a curator action, not seed data.
+feature: collection-page-parity-remainder
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:15:47.725Z'
+last_updated: '2026-08-04T11:23:59.377Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T11:19:12.167Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T11:23:56.852Z'
+    text: |-
+      Done — commit 848ff026.
+
+      **Verification**
+      - `bunx vitest run tests/database/product-popularity-columns.test.ts` — RED at 5 failing, GREEN at 7 passing.
+      - Migration `0003_smiling_forge.sql` generated and applied to the dev database (host port 5440). Live check via `information_schema.columns` returns `["is_popular", "popular_order"]` where it returned `[]` before.
+      - `bun run typecheck` — 23 errors, baseline unchanged.
+
+      **Correction to the plan:** step 4 skipped. `order_items_product_id_idx` already existed at orders.ts:278, so the sales aggregate needed no index work. The migration is the two columns and `products_popular_idx` only.
+
+      **Deviation from the ticket's step 1:** the committed test asserts on the drizzle schema object rather than querying `information_schema`. `packages/api` has no live-database test path — `vitest.config.ts` gates real-DB suites behind `TEST_DATABASE_URL` pointing at a `*_test` database (#332), and no test imports `database/client`. A committed test needing a live DB would fail everywhere that guard is unset. The real-database assertion was run manually instead and its output is above.
+  - author: system
+    timestamp: '2026-08-04T11:23:59.377Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing schema-assumption test for the new columns and indexes against the real database
+    file: packages/api/tests/database/product-popularity-columns.test.ts
+    command: cd packages/api && bunx vitest run tests/database/product-popularity-columns.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      // Follows tests/database/product-facet-columns.test.ts - a REAL db connection,
+      // not the mocked `db` the route tests use. This is the only layer that can
+      // catch a column that does not exist.
+      import { describe, it, expect } from 'vitest'
+      import { sql } from 'drizzle-orm'
+      import { db } from '../../src/database/client'
+
+      describe('products popularity columns', () => {
+        it('has is_popular and popular_order', async () => {
+          const rows = await db.execute(sql`
+            select column_name, data_type, is_nullable
+            from information_schema.columns
+            where table_name = 'products'
+              and column_name in ('is_popular', 'popular_order')
+            order by column_name
+          `)
+          expect(rows.rows.map((r: any) => r.column_name)).toEqual([
+            'is_popular',
+            'popular_order',
+          ])
+        })
+
+        it('indexes the popularity pin and the sales join column', async () => {
+          const rows = await db.execute(sql`
+            select indexname from pg_indexes
+            where indexname in ('products_popular_idx', 'order_items_product_id_idx')
+            order by indexname
+          `)
+          expect(rows.rows.map((r: any) => r.indexname)).toEqual([
+            'order_items_product_id_idx',
+            'products_popular_idx',
+          ])
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails because the columns do not exist yet
+    command: cd packages/api && bunx vitest run tests/database/product-popularity-columns.test.ts
+    expected_result: FAIL - returns an empty column list
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the columns and index to the products schema
+    file: packages/api/src/database/schema/products.ts
+    status: pending
+    code: |-
+      // beside featuredOrder / isFeatured (~line 140)
+          popularOrder: integer("popular_order"),
+          isPopular: boolean("is_popular").default(false).notNull(),
+
+      // in the index block beside featuredIdx (~line 155)
+          popularIdx: index("products_popular_idx").on(
+            table.isPopular,
+            table.popularOrder
+          ),
+  - id: 4
+    action: implement
+    description: Add the product_id index to order_items so the sales aggregate does not seq-scan
+    file: packages/api/src/database/schema/orders.ts
+    status: skipped
+    code: |-
+      // in the orderItems index block
+          productIdIdx: index("order_items_product_id_idx").on(table.productId),
+  - id: 5
+    action: implement
+    description: Generate and apply the migration
+    command: cd packages/api && bun run db:generate && bun run db:migrate
+    expected_result: New SQL file in packages/api/drizzle/, applied cleanly
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Confirm the schema-assumption test passes
+    command: cd packages/api && bunx vitest run tests/database/product-popularity-columns.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: Typecheck stays at the 23-error baseline, never higher
+    command: bun run typecheck
+    expected_result: PASS - 23 errors, unchanged
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit schema and migration
+    command: 'git add packages/api/src/database/schema packages/api/drizzle packages/api/tests/database && git commit -m "feat(api): curator popularity pin columns and sales index"'
+    status: pending
+current_step: 1
+started: '2026-08-04T11:19:12.166Z'
+completed: '2026-08-04T11:23:59.377Z'

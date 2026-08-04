@@ -1,0 +1,205 @@
+ticket_number: 405
+title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+description: |-
+  ## Task
+
+  Two sort fixes on `GET /api/products`:
+
+  1. **`sortBy=salesCount`** - units sold aggregated live from `order_items` joined to `orders` filtered to paid/fulfilled status. Final order: pinned first by `popularOrder`, then real units sold desc, then `featuredOrder`, then `createdAt`.
+  2. **`sortBy=featuredOrder` needs NULLS LAST** in both directions. The column is nullable and most products have no value, so today Featured would sort ~30 nulls to the top.
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 2 - API
+  File: packages/api/src/routes/products.ts (sort enum at :112, order-by map at :291, select at :313)
+
+  **Critical, found during planning:** sales CANNOT be a second `leftJoin`. The list query already `leftJoin`s `reviews` and `groupBy(products.id)`; a second join fans the rows out, so `sum(quantity)` multiplies by the review count AND `count(reviews.id)` multiplies by the order-item count. Both numbers silently corrupt. It must be a **pre-aggregated subquery** joined on productId.
+
+  Real data only: with no orders seeded the aggregate returns zero for every product and the sort falls through to the pin / featuredOrder / createdAt tie-break. That is the honest result, not a bug.
+feature: collection-page-parity-remainder
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:15:47.861Z'
+last_updated: '2026-08-04T11:27:41.053Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T11:24:04.139Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T11:27:40.563Z'
+    text: |-
+      Done — commit 1ee4f99c.
+
+      **Verification**
+      - `bunx vitest run tests/routes/product-sort.test.ts` — RED at 9 failing / 3 passing, GREEN at 12 passing.
+      - `bunx vitest run tests/routes/products.test.ts tests/routes/product-facet-filters.test.ts tests/routes/product-facets.test.ts` — 105 passing, no regression from the ORDER BY change.
+      - Ran the full Best-selling query against the **real** dev database (route tests mock `db` and cannot catch a query that will not execute). Returns rows, all `units_sold = 0` with no orders seeded, falling through to the `featured_order` tie-break 0,1,2,3,4. Featured sort returns `[0,1,2,3,4]` where without NULLS LAST it would have led with nulls.
+
+      **Deviation from the ticket's step 4:** the plan called for a pre-aggregated derived table joined into the list query. Shipped as a correlated scalar subquery in `packages/api/src/lib/product-sales.ts` instead. Both avoid the fan-out, but the subquery form adds no chain methods to the query builder, so the existing mocked-`db` test harness keeps working — a derived-table join would have needed `.innerJoin()`/`.as()` support added to every product route suite's mock. The upgrade path if list latency ever demands it is a materialised view, documented in the module header.
+
+      **Sale definition:** `payment_status = 'paid'` AND `status NOT IN ('cancelled','refunded','failed')`. A denylist, so a status added to the enum later counts by default rather than being silently dropped from every seller's total.
+  - author: system
+    timestamp: '2026-08-04T11:27:41.055Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 404
+    feature: collection-page-parity-remainder
+    description: Schema - curator pin columns and sales index
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: salesCount accepted by the query schema, ordering respects pin then units, featuredOrder sorts NULLS LAST'
+    file: packages/api/tests/routes/product-sort.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/product-sort.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      // Mirrors the mocked-db style of tests/routes/products.test.ts.
+      // Assert on the query the route builds and on the accepted param set;
+      // the real-data ordering is covered by the schema-assumption test below.
+      import { describe, it, expect } from 'vitest'
+
+      describe('GET /api/products sort', () => {
+        it('accepts sortBy=salesCount', async () => {
+          const res = await app.request('/api/products?sortBy=salesCount&sortOrder=desc')
+          expect(res.status).toBe(200)
+        })
+
+        it('rejects an unknown sortBy', async () => {
+          const res = await app.request('/api/products?sortBy=vibes')
+          expect(res.status).toBe(400)
+        })
+
+        it('does not float null featuredOrder to the top', async () => {
+          const res = await app.request('/api/products?sortBy=featuredOrder&sortOrder=asc')
+          const body = await res.json()
+          const firstNullIndex = body.items.findIndex((p: any) => p.featuredOrder === null)
+          const lastNumberIndex = body.items.map((p: any) => p.featuredOrder)
+            .lastIndexOf(body.items.map((p: any) => p.featuredOrder).filter((v: any) => v !== null).pop())
+          if (firstNullIndex !== -1) expect(firstNullIndex).toBeGreaterThan(lastNumberIndex - 1)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail - salesCount is not in the enum
+    command: cd packages/api && bunx vitest run tests/routes/product-sort.test.ts
+    expected_result: FAIL - 400 on sortBy=salesCount
+    status: pending
+  - id: 3
+    action: implement
+    description: Add salesCount to the sort enum
+    file: packages/api/src/routes/products.ts
+    status: pending
+    code: '  sortBy: z.enum(["createdAt", "updatedAt", "title", "basePrice", "featuredOrder", "salesCount"]).optional().default("createdAt"),'
+  - id: 4
+    action: implement
+    description: Build the pre-aggregated sales subquery and join it - NOT a second leftJoin on order_items
+    file: packages/api/src/routes/products.ts
+    status: pending
+    code: |-
+      /**
+       * Units sold, pre-aggregated.
+       *
+       * A second leftJoin against order_items would fan out across the existing
+       * reviews join: sum(quantity) would multiply by review count and
+       * count(reviews.id) would multiply by order-item count. Both numbers
+       * corrupt silently. Aggregate first, then join one row per product.
+       *
+       * Only paid/fulfilled orders count - a pending or cancelled order is not
+       * a sale.
+       */
+      const salesAgg = db
+        .select({
+          productId: orderItems.productId,
+          units: sql<number>`sum(${orderItems.quantity})::int`.as("units"),
+        })
+        .from(orderItems)
+        .innerJoin(orders, eq(orders.id, orderItems.orderId))
+        .where(
+          and(
+            eq(orders.paymentStatus, "paid"),
+            inArray(orders.status, ["processing", "shipped", "delivered", "completed"])
+          )
+        )
+        .groupBy(orderItems.productId)
+        .as("sales_agg")
+  - id: 5
+    action: implement
+    description: 'Wire the ORDER BY: pin first, then real units, then featuredOrder, then createdAt; NULLS LAST everywhere nullable'
+    file: packages/api/src/routes/products.ts
+    status: pending
+    code: |-
+      // replaces the single orderByDirection(orderByColumn) call
+      const orderByClause =
+        sortBy === "salesCount"
+          ? [
+              desc(products.isPopular),
+              sql`${products.popularOrder} asc nulls last`,
+              sql`coalesce(${salesAgg.units}, 0) desc`,
+              sql`${products.featuredOrder} asc nulls last`,
+              desc(products.createdAt),
+            ]
+          : sortBy === "featuredOrder"
+            ? [
+                sql`${products.featuredOrder} ${sql.raw(sortOrder)} nulls last`,
+                desc(products.createdAt),
+              ]
+            : [orderByDirection(orderByColumn)];
+      // NOTE: sortOrder is a zod enum of exactly 'asc'|'desc', so sql.raw here is
+      // constrained to two literals - not a free-text path.
+  - id: 6
+    action: write-test
+    description: Add the real-database schema-assumption test for the sales join (route tests mock db and cannot catch it)
+    file: packages/api/tests/database/product-sales-aggregate.test.ts
+    command: cd packages/api && bunx vitest run tests/database/product-sales-aggregate.test.ts
+    expected_result: PASS - query executes against the real schema, returns rows (all zero units is fine)
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { sql } from 'drizzle-orm'
+      import { db } from '../../src/database/client'
+
+      describe('sales aggregate', () => {
+        it('runs against the real schema', async () => {
+          const rows = await db.execute(sql`
+            select p.id, coalesce(s.units, 0) as units
+            from products p
+            left join (
+              select oi.product_id, sum(oi.quantity)::int as units
+              from order_items oi
+              join orders o on o.id = oi.order_id
+              where o.payment_status = 'paid'
+              group by oi.product_id
+            ) s on s.product_id = p.id
+            limit 5
+          `)
+          expect(rows.rows.length).toBeGreaterThan(0)
+        })
+      })
+  - id: 7
+    action: verify-pass
+    description: Both suites pass; api failure count stays at the 34-36 baseline
+    command: cd packages/api && bunx vitest run tests/routes/product-sort.test.ts tests/database/product-sales-aggregate.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the sort work
+    command: 'git add packages/api/src/routes/products.ts packages/api/tests && git commit -m "feat(api): best-selling sort over real orders, featured sort nulls last"'
+    status: pending
+current_step: 1
+started: '2026-08-04T11:24:04.139Z'
+completed: '2026-08-04T11:27:41.053Z'

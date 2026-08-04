@@ -1,0 +1,122 @@
+name: collection-page-parity-remainder
+title: Collection Page Parity Remainder
+priority: high
+created: "2026-08-04T11:11:16.965Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Closes the three items mesonart-parity-analysis.md §3.3 lists that Phase C (collection-page-parity, #390-#394) shipped without: the Discover chip carousel (§1.3.2), promo tiles in the grid (§1.3.6), and sort at 6 options instead of 9 (§1.3.5).
+
+  ## Overview
+
+  Phase C was marked done while three §3.3 gaps remained open. Two were never built at all; the third was capped at 6 sort options because Featured, Most relevant and Best selling were all assumed to need signals we lack. Only Best selling actually did, and order_items already carries it.
+
+  ## Goals
+
+  - Discover chip carousel over sibling collections, with real per-style imagery
+  - Promo tiles occupying grid cells, carrying real social proof or nothing
+  - Sort 6 -> 8: Featured and Best selling. Most relevant dropped
+  - A popularity signal built on real orders, plus a curator pin, plus admin visibility of the real number
+
+  ## Scope
+
+  **In scope**
+
+  1. `GET /api/products/collections` - per style: id, label, active product count, representative image (highest featuredOrder, else newest active product carrying that style). `DiscoverChips` circular carousel with prev/next arrows, rendered under the beige header band on /posters. Clicking a chip toggles `?styles=<id>`. Zero-count styles omitted.
+  2. `PromoTile` injected into `ProductGrid` at a fixed cell slot. Content is the real catalogue-wide approved-review aggregate from a new `GET /api/reviews/stats`. Below a minimum review threshold it renders nothing.
+  3. Sort 6 -> 8: `featuredOrder-asc` (Featured) and `salesCount-desc` (Best selling), added to SORT_OPTIONS in CollectionToolbar.tsx and to the API sort enum. `featuredOrder` is nullable, so both directions need NULLS LAST.
+  4. Popularity: units sold aggregated live from `order_items` joined to `orders` filtered to paid/fulfilled, with an index on `order_items(product_id)`. New `products.isPopular` (bool, default false) and `products.popularOrder` (int, nullable), mirroring the existing isFeatured/featuredOrder pattern. Best-selling order = pinned first by popularOrder, then real units sold desc, then featuredOrder, then createdAt.
+  5. Admin: real units-sold column on the admin product list, plus the Popular toggle and order field, so curation is informed by the actual number rather than replacing it.
+
+  **Out of scope**
+
+  - "Most relevant" sort - has no honest definition on a collection page with no search query
+  - Home "Most Popular" rail - Phase D; it reuses the endpoint this feature builds
+  - Denormalized salesCount counter or materialized view - the live aggregate is driftless and the catalogue is small; upgrade path noted, not taken
+  - Sale strip, countdown, promotion entity - still blocked, still a dark pattern without a real promotion
+  - Curated per-collection photography - chips derive imagery from products
+
+  ## Design
+
+  **Approach: real signals, live aggregate.** Sales computed at query time from `order_items` rather than a counter column, so nothing in the checkout/payment webhook path changes and the number cannot drift on refunds or cancellations.
+
+  **Key decisions**
+
+  - Real data only, taken literally. The promo tile hides itself below the review threshold rather than showing a rounded-up rating. Best selling returns honest zeros in an unsold catalogue rather than an invented ranking. The curator pin moves a product up the list; it never inflates the number the admin sees.
+  - Chips read STYLE_OPTIONS from `@chobii/shared` - no fourth parallel vocabulary. Features 3 (#395-#399) removed exactly this disease; do not reintroduce it.
+  - The toolbar contract stays `${sortBy}-${sortOrder}`. New options are new sortBy values, not a new id scheme.
+  - Live aggregate over a denormalized counter: no backfill, no checkout-path change, no drift. Materialized view is the documented upgrade path if list latency ever shows it.
+
+  ## Technical Considerations
+
+  - Router search params are strings (router.tsx overrides TanStack serialization). Chips must route through `handleFiltersChange`, not raw navigate, or the comma-joined `styles` array breaks the route into its blank-page error boundary.
+  - The promo tile occupies a grid cell under the same grow/aspect rules as a card. The #360-#375 square-media contract and its E2E must stay green.
+  - API route tests mock `db`, so they cannot catch a column that does not exist. The new order_items join needs a schema-assumption test run against the real database (local trap #3 in PLAN-OF-ACTION.md).
+  - Migration adds two columns and one index. Seed leaves isPopular false; with no orders seeded, Best selling in dev falls through to the featuredOrder tie-break. Expected, not a regression.
+  - Token guard applies: new UI consumes Button/SectionBand/DisplayHeading and the primary/accent/band/highlight/rating tokens. No font-bold, fill-yellow-400, brand-*, blur-3xl.
+
+  ## Gates
+
+  Unchanged from PLAN-OF-ACTION.md: web vitest 1715 passing, shared vitest 880 passing, api ~34-36 failing baseline, typecheck 23 errors baseline, product-grid-alignment E2E 18 passing with --no-deps, storefront-token-compliance green.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "404": Schema - curator pin columns and sales index
+    "405": API - Best selling sort over real orders, plus NULLS LAST on Featured
+    "406": API - GET /api/products/collections for the Discover chips
+    "407": API - catalogue-wide review aggregate for the promo tile
+    "408": API - admin sees real units sold and can pin a product as popular
+    "409": Web - sort options 6 to 8 (Featured, Best selling)
+    "410": Web - Discover chip carousel on the collection page
+    "411": Web - promo tile occupying a grid cell
+    "412": Web - admin popularity pin and units-sold column
+    "413": E2E - discover chips, both new sorts, promo tile
+    "414": Seed - settled orders and approved reviews so the real signals have data
+    "415": Web - filter rail typography and chrome parity (strip the box)
+    "416": "Web - toolbar pill parity: 56px pills, fill-wipe hover, in-place black sort panel"
+total_tickets: 13
+completion_percentage: 100
+is_completed: true
+design:
+  approach: |-
+    Real signals, live aggregate. Sales computed at query time from order_items joined to paid/fulfilled orders, indexed on order_items(product_id), rather than a denormalized counter maintained by the payment webhook. Discover chips derive per-style imagery from a representative product; promo tiles carry the real catalogue review aggregate or render nothing. Sort goes 6 -> 8 (Featured, Best selling); Most relevant is dropped as undefinable without a search query.</approach>
+    <parameter name="decisions">["Real data only, taken literally: promo tile self-hides below the review threshold, Best selling returns honest zeros in an unsold catalogue, and the curator pin reorders without inflating the number the admin sees.", "Live aggregate over a denormalized salesCount column - no backfill, no checkout-path change, no drift on refunds. Materialized view is the documented upgrade path if list latency ever demands it.", "Curator pin mirrors the existing isFeatured/featuredOrder pattern as isPopular/popularOrder, so admin UI and query shape follow a path already in the codebase.", "Discover chips read STYLE_OPTIONS from @chobii/shared - no fourth parallel facet vocabulary, the exact disease #395-#399 removed.", "Toolbar sort contract stays ${sortBy}-${sortOrder}; the two new options are new sortBy enum values, not a new id scheme.", "featuredOrder is nullable, so Featured sort needs NULLS LAST in both directions or ~30 null-ordered products sort first.", "Most relevant is dropped rather than faked: on a collection page with no query there is no honest relevance signal, and a composite editorial score would be our heuristic dressed as a measurement."]
+  approved: true
+  approved_at: "2026-08-04T11:11:29.223Z"
+plan:
+  phases:
+    - name: Phase 1 - Schema
+      location: packages/api/src/database/schema
+      tickets:
+        - 404
+    - name: Phase 2 - API
+      location: packages/api/src/routes
+      tickets:
+        - 405
+        - 406
+        - 407
+        - 408
+    - name: Phase 3 - Web
+      location: packages/web/app
+      tickets:
+        - 409
+        - 410
+        - 411
+        - 412
+    - name: Phase 4 - E2E
+      location: packages/web/tests/e2e
+      tickets:
+        - 413
+  generated_at: "2026-08-04T11:18:08.774Z"

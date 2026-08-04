@@ -1,0 +1,181 @@
+ticket_number: 406
+title: API - GET /api/products/collections for the Discover chips
+description: |-
+  ## Task
+
+  New endpoint feeding the Discover chip carousel (analysis §1.3.2). Per style, returns:
+
+  - `id` and `label` from STYLE_OPTIONS in `@chobii/shared` (packages/shared/src/constants/facets.ts:44) - the single source of truth, no fourth parallel vocabulary
+  - `count` of active products carrying that style
+  - `image`: the square media of one representative active product - highest `featuredOrder`, else newest
+
+  Styles with zero active products are omitted: a chip that leads to an empty grid is worse than no chip.
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 2 - API
+  File: packages/api/src/routes/products.ts
+
+  Register BEFORE the `/:slug` route, or "collections" is read as a product slug - the same trap the `/facets` route documents at :533.
+
+  Follow the `/facets` caching pattern: versioned cache key (`CacheKeys.PRODUCT}collections:v1`), `getCached` / `setCached`, TTL alongside the other product TTLs. `styles` is a `text[]` column, so it needs `unnest` to group - see the `arrayFacet` helper in the facets route.
+feature: collection-page-parity-remainder
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:15:47.944Z'
+last_updated: '2026-08-04T11:30:14.758Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T11:27:47.990Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T11:30:14.681Z'
+    text: |-
+      Done — commit 32a74022.
+
+      **Verification**
+      - `bunx vitest run tests/routes/product-collections.test.ts` — RED at 8 failing, GREEN at 8 passing.
+      - Ran the grouped query against the **real** dev database: 12 style rows returned, every one with a representative image resolved. Top rows: ukiyo-e-art (12), wabi-sabi-art (9), graffiti-art (9), hyperrealism-art (7).
+
+      **Deviation from the ticket's step 3:** the plan used `db.execute` with a `distinct on` second query for the representative image. Shipped as a single grouped query instead — `array_agg(image order by featured_order asc nulls last, created_at desc))[1]` picks the winner per group in the same scan, and it stays on `db.select`, which is what the route suites' mocked `db` exposes. `db.execute` is not on that mock.
+
+      **Image resolution** prefers the element explicitly typed `main` and falls back to `images -> 0`, which the `ProductImage` contract documents as the main image after sorting.
+
+      **Free-text guard:** the response is built by iterating `STYLE_OPTIONS`, not the query result. That supplies the labels, fixes the order, and silently drops any value in the column outside the vocabulary — such a value has no label and filtering on it would 400.
+  - author: system
+    timestamp: '2026-08-04T11:30:14.758Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test for the collections endpoint shape
+    file: packages/api/tests/routes/product-collections.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/product-collections.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+
+      describe('GET /api/products/collections', () => {
+        it('returns id, label, count and image per style', async () => {
+          const res = await app.request('/api/products/collections')
+          expect(res.status).toBe(200)
+          const body = await res.json()
+          expect(Array.isArray(body.collections)).toBe(true)
+          for (const c of body.collections) {
+            expect(c).toHaveProperty('id')
+            expect(c).toHaveProperty('label')
+            expect(typeof c.count).toBe('number')
+            expect(c.count).toBeGreaterThan(0)
+          }
+        })
+
+        it('omits styles with no active products', async () => {
+          const res = await app.request('/api/products/collections')
+          const body = await res.json()
+          expect(body.collections.every((c: any) => c.count > 0)).toBe(true)
+        })
+
+        it('is not shadowed by the :slug route', async () => {
+          const res = await app.request('/api/products/collections')
+          expect(res.status).not.toBe(404)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails - route does not exist, :slug swallows it
+    command: cd packages/api && bunx vitest run tests/routes/product-collections.test.ts
+    expected_result: FAIL - 404 product not found
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the collections route above /:slug
+    file: packages/api/src/routes/products.ts
+    status: pending
+    code: |-
+      /**
+       * GET /api/products/collections - Discover chips (analysis §1.3.2)
+       *
+       * Labels come from STYLE_OPTIONS in @chobii/shared, never from a literal
+       * here: features #395-#399 removed the last parallel vocabulary and this
+       * would reintroduce it.
+       *
+       * Registered BEFORE `/:slug`, same as `/facets`.
+       */
+      productsApp.get("/collections", async (c) => {
+        const cacheKey = `${CacheKeys.PRODUCT}collections:v1`;
+        const cached = await getCached<Record<string, unknown>>(cacheKey);
+        if (cached) return c.json({ ...cached, fromCache: true });
+
+        try {
+          // Counts per style. `styles` is text[], so unnest before grouping.
+          const counts = await db
+            .select({
+              value: sql<string>`unnest(${products.styles})`,
+              count: sql<number>`count(*)::int`,
+            })
+            .from(products)
+            .where(eq(products.status, "active"))
+            .groupBy(sql`1`);
+
+          // One representative product per style: highest featuredOrder, else newest.
+          const representatives = await db.execute(sql`
+            select distinct on (style) style, images
+            from (
+              select unnest(styles) as style, images, featured_order, created_at
+              from products where status = 'active'
+            ) t
+            order by style, featured_order asc nulls last, created_at desc
+          `);
+
+          const imageByStyle = new Map<string, string | null>();
+          for (const row of representatives.rows as any[]) {
+            const first = Array.isArray(row.images) ? row.images[0] : null;
+            imageByStyle.set(row.style, first?.url ?? null);
+          }
+
+          const countByStyle = new Map(counts.map((r) => [r.value, r.count]));
+
+          const collections = STYLE_OPTIONS.map((option) => ({
+            id: option.id,
+            label: option.label,
+            count: countByStyle.get(option.id) ?? 0,
+            image: imageByStyle.get(option.id) ?? null,
+          })).filter((collection) => collection.count > 0);
+
+          const result = { collections };
+          await setCached(cacheKey, result, CACHE_TTL_FACETS);
+          return c.json(result);
+        } catch (error) {
+          console.error("Error fetching collections:", error);
+          return c.json({ error: "Failed to fetch collections" }, 500);
+        }
+      });
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/product-collections.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the endpoint
+    command: 'git add packages/api/src/routes/products.ts packages/api/tests/routes/product-collections.test.ts && git commit -m "feat(api): collections endpoint for the discover chips"'
+    status: pending
+current_step: 1
+started: '2026-08-04T11:27:47.990Z'
+completed: '2026-08-04T11:30:14.758Z'

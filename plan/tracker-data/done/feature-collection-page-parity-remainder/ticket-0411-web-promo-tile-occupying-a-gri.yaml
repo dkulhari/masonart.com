@@ -1,0 +1,198 @@
+ticket_number: 411
+title: Web - promo tile occupying a grid cell
+description: |-
+  ## Task
+
+  mesonart drops an occasional promo tile into a grid cell (analysis §1.3.6). We have no such component anywhere.
+
+  - `PromoTile` - a beige `SectionBand`-toned cell carrying the real catalogue review aggregate from `GET /api/reviews/stats`: "Rated 4.8/5 by 312 reviews" plus a pill link to reviews
+  - Renders **nothing** when the aggregate is null or under the minimum review threshold. No rounded-up figure, no seeded number, no placeholder copy
+  - `ProductGrid` gains an optional slot: a tile and the cell index it occupies. One tile per page-load slot, not one per row
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 3 - Web
+  Files: packages/web/app/components/product/PromoTile.tsx (new), ProductGrid.tsx, routes/posters/index.tsx
+
+  **The square media contract is untouchable.** ProductGrid.tsx documents why `grid-flow-row-dense` was deliberately NOT carried over: it exists only to back-fill holes left by mesonart's multi-cell promo blocks. Ours occupies exactly one cell, so DOM order still equals visual order and dense flow stays off. The #360-#375 alignment E2E must stay green - the tile stretches with its row like a card does.
+
+  The grid is a `<ul>` of cards; the tile is an `<li>` too, or the list semantics break.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:17:41.248Z'
+last_updated: '2026-08-04T12:12:08.986Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T12:07:16.157Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T12:12:08.888Z'
+    text: |-
+      Done — commit b21ecca5.
+
+      **Verification**
+      - `bunx vitest run tests/components/product/PromoTile.test.tsx tests/components/product/ProductGrid.test.tsx` — RED at 1 failing / component missing, GREEN at 28 passing.
+      - `bunx vitest run tests/components/product/ tests/styles/` — 212 passing across 15 files, token guard green.
+      - `bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps` — **18 passed**. The #360-#375 square-media and row-alignment contract survives a promo cell in the grid.
+      - `bun run typecheck` — 23 errors, baseline held.
+
+      **Now renders with real data.** After #414 the catalogue aggregate is 4.5 from 12 approved reviews, which clears the ten-review threshold — the tile is visible rather than the permanently-dark component this ticket was originally going to ship.
+
+      **One test was wrong.** The "does not round up" assertion used `/\b5\/5\b/`, which matches inside `Rated 4.5/5` — the string it was written to reject appears as a substring of the correct output. Replaced with assertions on the actual rendered text.
+
+      **E2E path correction:** the specs live at the **repo root** `tests/e2e/`, not `packages/web/tests/e2e/`. Running playwright from `packages/web` fails with `Project(s) "chromium" not found. Available projects: ""` — there is no config there. Tickets #413 and the gates in PLAN-OF-ACTION.md both imply the package path.
+
+      **Slot semantics:** `promo.node` may be null and an out-of-range index is ignored rather than appended — a promo dangling past the last product reads as a broken card. Both are covered.
+  - author: system
+    timestamp: '2026-08-04T12:12:08.986Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 407
+    feature: collection-page-parity-remainder
+    description: API - catalogue-wide review aggregate for the promo tile
+  - ticket: 414
+    feature: collection-page-parity-remainder
+    description: Seed - settled orders and approved reviews so the real signals have data
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: tile renders real numbers, renders nothing below threshold, grid places it at the given index'
+    file: packages/web/tests/components/product/PromoTile.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/PromoTile.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { render, screen } from '@testing-library/react'
+      import { describe, it, expect } from 'vitest'
+      import { PromoTile } from '~/components/product/PromoTile'
+
+      describe('PromoTile', () => {
+        it('shows the real aggregate', () => {
+          render(<PromoTile averageRating={4.8} reviewCount={312} />)
+          expect(screen.getByText(/4\.8/)).toBeInTheDocument()
+          expect(screen.getByText(/312/)).toBeInTheDocument()
+        })
+
+        it('renders nothing when nothing is approved', () => {
+          const { container } = render(<PromoTile averageRating={null} reviewCount={0} />)
+          expect(container).toBeEmptyDOMElement()
+        })
+
+        it('renders nothing below the minimum review threshold', () => {
+          const { container } = render(<PromoTile averageRating={5} reviewCount={2} />)
+          expect(container).toBeEmptyDOMElement()
+        })
+      })
+  - id: 2
+    action: write-test
+    description: 'Extend the grid test: the tile occupies one cell at the requested index without disturbing card order'
+    file: packages/web/tests/components/product/ProductGrid.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductGrid.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      it('places a promo tile at the requested cell index', () => {
+        render(<ProductGrid products={eightProducts} promo={{ node: <li data-testid="promo" />, index: 4 }} />)
+        const cells = screen.getAllByRole('listitem')
+        expect(cells).toHaveLength(9)
+        expect(cells[4]).toHaveAttribute('data-testid', 'promo')
+      })
+
+      it('renders the plain grid when no promo is passed', () => {
+        render(<ProductGrid products={eightProducts} />)
+        expect(screen.getAllByRole('listitem')).toHaveLength(8)
+      })
+
+      it('ignores a promo index beyond the product count', () => {
+        render(<ProductGrid products={eightProducts} promo={{ node: <li data-testid="promo" />, index: 99 }} />)
+        expect(screen.queryByTestId('promo')).toBeNull()
+      })
+  - id: 3
+    action: verify-fail
+    description: Confirm both suites fail
+    command: cd packages/web && bunx vitest run tests/components/product/PromoTile.test.tsx tests/components/product/ProductGrid.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 4
+    action: implement
+    description: Build PromoTile - beige tone, real numbers or nothing
+    file: packages/web/app/components/product/PromoTile.tsx
+    status: pending
+    code: |-
+      /**
+       * A grid cell carrying real social proof (analysis §1.3.6).
+       *
+       * mesonart's reads "Rated 4.9/5 by 9,000+ Users". Ours says what is true or
+       * says nothing: below MIN_REVIEWS the component returns null rather than
+       * round a thin sample up into a marketing number.
+       */
+      const MIN_REVIEWS = 10
+
+      export function PromoTile({
+        averageRating,
+        reviewCount,
+      }: {
+        averageRating: number | null
+        reviewCount: number
+      }) {
+        if (averageRating === null || reviewCount < MIN_REVIEWS) return null
+        // <li> - the grid is a <ul> and a bare <div> breaks list semantics.
+        // Beige band tone, rating token for the stars, Button pill to /reviews.
+      }
+  - id: 5
+    action: implement
+    description: Add the optional promo slot to ProductGrid
+    file: packages/web/app/components/product/ProductGrid.tsx
+    status: pending
+    code: |-
+      export interface ProductGridProps {
+        products: ProductCardData[]
+        /**
+         * One promo cell, spliced in at `index`. Exactly ONE cell wide - which is
+         * why grid-flow-row-dense stays off (see the file header): dense flow only
+         * exists to backfill holes left by multi-cell blocks, and it would break
+         * DOM-order == visual-order for keyboard and screen-reader traversal.
+         */
+        promo?: { node: React.ReactNode; index: number }
+        // ...existing props
+      }
+  - id: 6
+    action: implement
+    description: Fetch the aggregate on the collection route and pass the tile in
+    file: packages/web/app/routes/posters/index.tsx
+    status: pending
+    code: |-
+      <ProductGrid
+        products={visibleProducts}
+        promo={{ node: <PromoTile {...reviewStats} />, index: PROMO_CELL_INDEX }}
+      />
+      // PROMO_CELL_INDEX = 8 - after the second full 4-column row, before the fold
+      // on most viewports.
+  - id: 7
+    action: verify-pass
+    description: Unit tests, the token guard, and the grid-alignment E2E all pass
+    command: cd packages/web && bunx vitest run tests/components/product tests/styles/storefront-token-compliance.test.ts && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps
+    expected_result: PASS - E2E 18 passing
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the promo tile
+    command: 'git add packages/web/app/components/product packages/web/app/routes/posters/index.tsx packages/web/tests/components/product && git commit -m "feat(web): promo tile in the collection grid"'
+    status: pending
+current_step: 1
+started: '2026-08-04T12:07:16.156Z'
+completed: '2026-08-04T12:12:08.986Z'

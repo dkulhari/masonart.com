@@ -1,0 +1,118 @@
+ticket_number: 412
+title: Web - admin popularity pin and units-sold column
+description: |-
+  ## Task
+
+  Admin surface for the popularity signal, under packages/web/app/routes/admin/products/:
+
+  - Product list gains a **Units sold** column reading `unitsSold` from the admin API - the real figure, sortable
+  - Product form gains a **Popular** toggle and an order field, following whatever pattern the existing Featured toggle and featured-order field already use
+  - The two are shown side by side deliberately: the pin reorders, the number stays true, and a curator should be able to see when they disagree
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 3 - Web
+  Depends on the admin API ticket.
+
+  Zero units sold everywhere is the expected state until real orders exist - the column reads 0, it does not hide itself. Admin UI is internal, so `--brand-*` is allowed here; the storefront token guard does not cover these routes.
+feature: collection-page-parity-remainder
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:17:41.282Z'
+last_updated: '2026-08-04T12:15:28.491Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T12:12:14.157Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T12:15:27.647Z'
+    text: |-
+      Done — commit 87d0dfd7.
+
+      **Verification**
+      - `bunx vitest run tests/components/admin/product-popularity.test.tsx` — RED at 7 failing, GREEN at 8 passing.
+      - `bunx vitest run` (full web suite) — **1753 passing, 0 failing**, across 68 files. PLAN-OF-ACTION.md records 1715 as the #403 baseline; the 38 added are this feature's.
+      - `bun run typecheck` — 23 errors, baseline held.
+
+      **Test shape:** source-text assertions rather than rendered-DOM ones. `ProductForm` is ~900 lines with a `FormSection` layout and file-upload wiring, and mounting it to assert two checkboxes exist would test the harness more than the change. The assertions pin the field names, the column headers and the two defaults that carry meaning (`isPopular: false`, `popularOrder: null`).
+
+      **Wired end to end:** row type in `ProductsTable`, form data and defaults in `ProductForm`, and the detail route at three points — its own product type, the update payload, and the form's initial values.
+
+      **`popularOrder` defaults to null rather than 0** in both the form and the API, because unpinned is not the same as ranked first. The rank input maps an empty string back to null for the same reason.
+
+      **Token guard does not apply here.** `routes/admin` and `components/admin` are exempt in `storefront-token-compliance.test.ts`, which is why the Pinned badge uses `bg-brand-100` — it matches the Featured badge immediately above it.
+  - author: system
+    timestamp: '2026-08-04T12:15:28.491Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 408
+    feature: collection-page-parity-remainder
+    description: API - admin sees real units sold and can pin a product as popular
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test for the units-sold column and the popular toggle
+    file: packages/web/tests/routes/admin/product-popularity.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/admin/product-popularity.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |
+      it('shows a units sold column', () => {
+        render(<AdminProductList products={[{ ...product, unitsSold: 0 }]} />)
+        expect(screen.getByText('Units sold')).toBeInTheDocument()
+        expect(screen.getByText('0')).toBeInTheDocument()
+      })
+
+      it('renders 0 rather than hiding the column when nothing has sold', () => {
+        render(<AdminProductList products={[{ ...product, unitsSold: 0 }]} />)
+        expect(screen.queryByText('Units sold')).toBeInTheDocument()
+      })
+
+      it('submits isPopular and popularOrder', async () => {
+        render(<AdminProductForm product={product} onSubmit={onSubmit} />)
+        await userEvent.click(screen.getByLabelText('Popular'))
+        await userEvent.click(screen.getByRole('button', { name: /save/i }))
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ isPopular: true }))
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && bunx vitest run tests/routes/admin/product-popularity.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the column and the toggle, mirroring the existing Featured controls
+    file: packages/web/app/routes/admin/products/
+    status: pending
+    code: |-
+      // Units sold column beside the existing status/featured columns.
+      // Popular toggle + order field beside the Featured pair in the form.
+      // Field names must match the admin API: isPopular, popularOrder.
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/routes/admin/product-popularity.test.tsx
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the admin UI
+    command: 'git add packages/web/app/routes/admin packages/web/tests/routes/admin && git commit -m "feat(web): admin popularity pin and units-sold column"'
+    status: pending
+current_step: 1
+started: '2026-08-04T12:12:14.157Z'
+completed: '2026-08-04T12:15:28.491Z'

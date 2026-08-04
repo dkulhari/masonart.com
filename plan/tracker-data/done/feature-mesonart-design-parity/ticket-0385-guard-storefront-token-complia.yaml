@@ -1,0 +1,134 @@
+ticket_number: 385
+title: Guard - storefront token-compliance test and full verification against the main baseline
+description: |-
+  ## Task
+  A sweep with no guard rots back within a few features. Add one test that walks the storefront source tree and fails on the specific regressions this feature exists to prevent — the same shape as the existing `tests/styles/mat-token.test.ts` coupling guard.
+
+  The guard asserts, over `packages/web/app/**/*.tsx` excluding `app/components/admin/**`, `app/routes/admin/**` and `app/components/ai-generator/**`:
+  1. No `font-bold` / `font-extrabold` / `font-black` — weight 700 is not loaded, so these render faux-bold.
+  2. No `fill-yellow-400` / `text-yellow-400` — the `--rating` token exists for this.
+  3. No `bg-brand-` / `from-brand-` / `to-brand-` — the brand scale is admin-and-AI-only now.
+  4. No `blur-3xl` — the marketing blob idiom.
+
+  The exemption list lives in the test with a comment explaining each, so the next person adding a directory has to make the case in writing.
+
+  Then run the full verification: web unit suite, typecheck, and the grid E2E — diffed against the main baseline, which already carries ~86 API failures and ~26 TS errors that are not ours.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 4 — Guard and verification
+  File: `packages/web/tests/styles/storefront-token-compliance.test.ts`
+  This is the last ticket — it must be written after the sweep, or it fails for reasons unrelated to its own correctness.
+feature: mesonart-design-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:19:36.059Z'
+last_updated: '2026-08-03T20:49:35.898Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - testing
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.898Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the storefront token-compliance guard
+    file: packages/web/tests/styles/storefront-token-compliance.test.ts
+    command: cd packages/web && bunx vitest run tests/styles/storefront-token-compliance.test.ts
+    expected_result: PASS after the sweep; would FAIL on any reintroduction
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync, readdirSync, statSync } from 'node:fs'
+      import { join, relative } from 'node:path'
+
+      /**
+       * Storefront design-token compliance.
+       *
+       * The mesonart palette lives in tokens; the whole point of the parity work was
+       * that components stopped ignoring them. Nothing in the type system notices a
+       * new `font-bold`, so it is noticed here.
+       *
+       * Each exemption below needs a reason in writing.
+       */
+      const APP = join(process.cwd(), 'app')
+
+      const EXEMPT = [
+        // Internal tool, not customer-facing. Deliberately keeps its own look.
+        'components/admin/',
+        'routes/admin',
+        // Our differentiator surface, explicitly retained on the brand scale.
+        'components/ai-generator/',
+      ]
+
+      const FORBIDDEN: Array<[RegExp, string]> = [
+        [/\bfont-(bold|extrabold|black)\b/, 'weight 700+ is never loaded — renders faux-bold. Use font-medium or the base heading style.'],
+        [/\b(fill|text)-yellow-400\b/, 'use the --rating token: fill-rating / text-rating.'],
+        [/\b(bg|from|to)-brand-/, 'the brand scale is admin/AI-only. Use primary.'],
+        [/\bblur-3xl\b/, 'marketing blob idiom — stripped for the monochrome system.'],
+      ]
+
+      function walk(dir: string, out: string[] = []) {
+        for (const entry of readdirSync(dir)) {
+          const full = join(dir, entry)
+          if (statSync(full).isDirectory()) walk(full, out)
+          else if (full.endsWith('.tsx')) out.push(full)
+        }
+        return out
+      }
+
+      const files = walk(APP)
+        .map((f) => relative(APP, f))
+        .filter((f) => !EXEMPT.some((e) => f.includes(e)))
+
+      describe('storefront token compliance', () => {
+        it('finds storefront files to check', () => {
+          expect(files.length).toBeGreaterThan(20)
+        })
+
+        for (const [pattern, why] of FORBIDDEN) {
+          it(`no ${pattern.source} — ${why}`, () => {
+            const offenders = files.filter((f) =>
+              pattern.test(readFileSync(join(APP, f), 'utf8'))
+            )
+            expect(offenders, `${why}\nOffending files:\n  ${offenders.join('\n  ')}`).toEqual([])
+          })
+        }
+      })
+  - id: 2
+    action: verify-pass
+    description: Run the whole web unit suite
+    command: cd packages/web && bunx vitest run 2>&1 | tail -20
+    expected_result: PASS
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Typecheck and compare against the main baseline (~26 pre-existing errors)
+    command: cd /Users/dhruv/work/masonart.com && bun run typecheck 2>&1 | grep -c 'error TS'
+    expected_result: no worse than the main baseline
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Run the grid alignment E2E to confirm the 1600px container did not move the geometry
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --reporter=line
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the guard
+    command: 'git add packages/web/tests/styles/storefront-token-compliance.test.ts && git commit -m "test(web): guard storefront design-token compliance"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.898Z'

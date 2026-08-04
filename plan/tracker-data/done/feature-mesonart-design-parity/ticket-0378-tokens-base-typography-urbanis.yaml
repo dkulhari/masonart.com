@@ -1,0 +1,160 @@
+ticket_number: 378
+title: 'Tokens - base typography: Urbanist 300 headings, Poppins 300 body, fluid clamp scales'
+description: |-
+  ## Task
+  `--font-heading: 'Urbanist'` is declared at globals.css:126 and consumed nowhere. `__root.tsx` loads Poppins 300/400/500 and Urbanist 300/500 — weight 700 is never loaded, yet 47 files use `font-bold`, so every heading renders faux-bold Poppins.
+
+  Fix at the base layer so headings are right by default rather than per-component:
+  - `body` gets `font-weight: 300` and `line-height: 1.2` (measured).
+  - `h1..h6` get `font-family: var(--font-heading)`, `font-weight: 300`, `line-height: 1`.
+  - H1 renders at the measured display size (~44px) via clamp.
+  - Add the three measured fluid scales as tokens and Tailwind `fontSize` entries: `--font-nav-size`, `--font-button-size`, `--font-product-size`.
+
+  This makes the later per-file `font-bold` removal a deletion rather than a rewrite.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 1 — Tokens
+  Files: `packages/web/app/styles/globals.css`, `packages/web/tailwind.config.ts`
+  Measured clamps: docs/design/mesonart/mesonart-parity-analysis.md Appendix A.
+  Note: `/admin` headings inherit this too. That is acceptable and desirable — it is a font change, not a colour change, and admin already uses the same body font.
+feature: mesonart-design-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:17:49.126Z'
+last_updated: '2026-08-03T20:49:35.811Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - tokens
+  - typography
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.811Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing typography tests
+    file: packages/web/tests/styles/typography.test.ts
+    command: cd packages/web && bunx vitest run tests/styles/typography.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+
+      const css = readFileSync(join(process.cwd(), 'app/styles/globals.css'), 'utf8')
+      const tailwind = readFileSync(join(process.cwd(), 'tailwind.config.ts'), 'utf8')
+      const root = readFileSync(join(process.cwd(), 'app/routes/__root.tsx'), 'utf8')
+
+      describe('base typography', () => {
+        it('body is Poppins 300 at line-height 1.2', () => {
+          const body = css.match(/\n  body\s*\{[\s\S]*?\n  \}/)
+          expect(body).not.toBeNull()
+          expect(body![0]).toMatch(/font-weight:\s*300/)
+          expect(body![0]).toMatch(/line-height:\s*1\.2/)
+        })
+
+        it('headings consume --font-heading at weight 300', () => {
+          const heads = css.match(/h1,\s*h2,\s*h3,\s*h4,\s*h5,\s*h6\s*\{[\s\S]*?\}/)
+          expect(heads, 'no h1..h6 base rule').not.toBeNull()
+          expect(heads![0]).toContain('var(--font-heading)')
+          expect(heads![0]).toMatch(/font-weight:\s*300/)
+          expect(heads![0]).toMatch(/line-height:\s*1/)
+        })
+
+        it('--font-heading is consumed somewhere other than its own declaration', () => {
+          const uses = css.match(/var\(--font-heading\)/g) ?? []
+          expect(uses.length).toBeGreaterThan(0)
+        })
+      })
+
+      describe('fluid type scales', () => {
+        it('declares the measured nav / button / product clamps', () => {
+          expect(css).toMatch(/--font-nav-size:\s*clamp\(/)
+          expect(css).toMatch(/--font-button-size:\s*clamp\(/)
+          expect(css).toMatch(/--font-product-size:\s*clamp\(/)
+          expect(css).toMatch(/--font-display-size:\s*clamp\(/)
+        })
+
+        it('exposes them to Tailwind as fontSize utilities', () => {
+          expect(tailwind).toContain('fontSize:')
+          for (const n of ['nav', 'button', 'product', 'display']) {
+            expect(tailwind).toContain(`--font-${n}-size`)
+          }
+        })
+      })
+
+      describe('webfont loading', () => {
+        it('still loads only the weights actually used, and never 700', () => {
+          expect(root).toContain('Poppins:wght@300;400;500')
+          expect(root).toContain('Urbanist:wght@300;500')
+          expect(root).not.toMatch(/wght@[\d;]*700/)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the typography tests fail
+    command: cd packages/web && bunx vitest run tests/styles/typography.test.ts
+    expected_result: FAIL - no h1..h6 base rule; body has no font-weight; clamp tokens undefined
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the fluid type tokens and the base body/heading rules; register the fontSize utilities in Tailwind
+    file: packages/web/app/styles/globals.css
+    status: pending
+    code: |-
+      /* :root — measured on mesonart, Appendix A */
+      --font-nav-size:     clamp(0.875rem, 0.748rem + 0.3174vw, 1.125rem);
+      --font-button-size:  clamp(0.875rem, 0.8115rem + 0.1587vw, 1rem);
+      --font-product-size: clamp(1rem, 0.873rem + 0.3175vw, 1.25rem);
+      --font-display-size: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);  /* H1 ~44px at 1600 */
+
+      /* @layer base */
+      body {
+        @apply bg-background text-foreground antialiased;
+        font-feature-settings: "rlig" 1, "calt" 1;
+        font-weight: 300;
+        line-height: 1.2;
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-heading);
+        font-weight: 300;
+        line-height: 1;
+      }
+
+      h1 { font-size: var(--font-display-size); }
+
+      /* tailwind.config.ts -> theme.extend */
+      fontSize: {
+        nav: 'var(--font-nav-size)',
+        button: 'var(--font-button-size)',
+        product: 'var(--font-product-size)',
+        display: 'var(--font-display-size)',
+      },
+  - id: 4
+    action: verify-pass
+    description: Confirm typography tests pass and nothing else regressed
+    command: cd packages/web && bunx vitest run tests/styles/ tests/styles.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the base typography
+    command: 'git add packages/web/app/styles/globals.css packages/web/tailwind.config.ts packages/web/tests/styles/typography.test.ts && git commit -m "feat(web): consume the Urbanist heading token and the measured fluid type scales"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.811Z'

@@ -1,0 +1,195 @@
+ticket_number: 376
+title: Tokens - retarget primary to the monochrome pill palette and add band/highlight/sale tokens
+description: |-
+  ## Task
+  Make `--primary` the measured mesonart near-black (`rgb(23 23 23)` == `hsl(0 0% 9%)`) instead of orange `25 95% 53%`, and add the tokens the sweep needs: `--sale` (rose-600, `225 29 72`), `--band` (beige `#E5E2D5`), `--band-strong` (warm sand `rgb(219 216 194)`), `--highlight` (peach `rgb(255 221 191)`), `--radius-pill` (`3.75rem`), `--border-button` (`2px`).
+
+  The `--brand-*` scale stays defined and stays registered in Tailwind — `/admin` and the AI-generator surface consume it and are out of scope. Only `--primary`, `--ring` and `--sidebar-primary` move.
+
+  `--mat` must NOT be touched: sharp bakes it into image pixels server-side (see the comment at globals.css:62 and tests/styles/mat-token.test.ts).
+
+  Dark mode keeps a pill by inverting: `--primary: 0 0% 98%` / `--primary-foreground: 0 0% 9%`.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 1 — Tokens
+  Files: `packages/web/app/styles/globals.css`, `packages/web/tailwind.config.ts`
+  Measured values: docs/design/mesonart/mesonart-parity-analysis.md Appendix A.
+  Existing `tests/styles.test.ts` only asserts token EXISTENCE, not values — it must keep passing, which is why `--brand-*` is preserved.
+feature: mesonart-design-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:17:49.090Z'
+last_updated: '2026-08-03T20:49:35.771Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - tokens
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.771Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing token tests asserting the measured mesonart palette values
+    file: packages/web/tests/styles/design-tokens.test.ts
+    command: cd packages/web && bunx vitest run tests/styles/design-tokens.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+
+      const css = readFileSync(join(process.cwd(), 'app/styles/globals.css'), 'utf8')
+      const tailwind = readFileSync(join(process.cwd(), 'tailwind.config.ts'), 'utf8')
+
+      function hslToRgb(h: number, s: number, l: number) {
+        const sn = s / 100, ln = l / 100
+        const k = (n: number) => (n + h / 30) % 12
+        const a = sn * Math.min(ln, 1 - ln)
+        const f = (n: number) => ln - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))
+        return { r: Math.round(255 * f(0)), g: Math.round(255 * f(8)), b: Math.round(255 * f(4)) }
+      }
+
+      function token(name: string, source = css) {
+        const m = source.match(new RegExp(`${name}:\\s*([\\d.]+)\\s+([\\d.]+)%\\s+([\\d.]+)%`))
+        expect(m, `${name} not found`).not.toBeNull()
+        return hslToRgb(Number(m![1]), Number(m![2]), Number(m![3]))
+      }
+
+      function near(got: {r:number;g:number;b:number}, r: number, g: number, b: number, tol = 2) {
+        expect(Math.abs(got.r - r)).toBeLessThanOrEqual(tol)
+        expect(Math.abs(got.g - g)).toBeLessThanOrEqual(tol)
+        expect(Math.abs(got.b - b)).toBeLessThanOrEqual(tol)
+      }
+
+      describe('mesonart button palette', () => {
+        it('primary is the measured near-black, not orange', () => {
+          near(token('--primary'), 23, 23, 23)
+        })
+
+        it('primary-foreground is white so the pill reads', () => {
+          const fg = token('--primary-foreground')
+          expect(fg.r).toBeGreaterThan(240)
+        })
+
+        it('focus ring follows primary rather than the old orange', () => {
+          near(token('--ring'), 23, 23, 23)
+        })
+
+        it('defines the sale accent (rose-600, reserved for sale price/tag)', () => {
+          near(token('--sale'), 225, 29, 72, 3)
+        })
+
+        it('defines the beige section band', () => {
+          near(token('--band'), 229, 226, 213, 3)
+        })
+
+        it('defines the warm-sand collections band', () => {
+          near(token('--band-strong'), 219, 216, 194, 3)
+        })
+
+        it('defines the peach highlight', () => {
+          near(token('--highlight'), 255, 221, 191, 3)
+        })
+
+        it('defines the pill radius and 2px button border', () => {
+          expect(css).toMatch(/--radius-pill:\s*3\.75rem/)
+          expect(css).toMatch(/--border-button:\s*2px/)
+        })
+      })
+
+      describe('token registration', () => {
+        it('exposes band / band-strong / highlight / sale to Tailwind', () => {
+          for (const name of ['band', 'highlight', 'sale']) {
+            expect(tailwind).toContain(`${name}:`)
+            expect(tailwind).toContain(`--${name}`)
+          }
+          expect(tailwind).toContain('--band-strong')
+        })
+
+        it('registers a pill border-radius', () => {
+          expect(tailwind).toContain('pill:')
+          expect(tailwind).toContain('--radius-pill')
+        })
+      })
+
+      describe('preserved tokens', () => {
+        it('keeps the brand scale for /admin and the AI surface', () => {
+          expect(css).toContain('--brand-500:')
+          expect(tailwind).toContain('brand:')
+        })
+
+        it('leaves --mat untouched (sharp bakes it into pixels)', () => {
+          expect(css).toMatch(/--mat:\s*0\s+0%\s+98%/)
+        })
+
+        it('inverts primary in dark mode so the pill survives', () => {
+          const dark = css.slice(css.indexOf('.dark'))
+          const m = dark.match(/--primary:\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/)
+          expect(m).not.toBeNull()
+          expect(Number(m![3])).toBeGreaterThan(90)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the token tests fail
+    command: cd packages/web && bunx vitest run tests/styles/design-tokens.test.ts
+    expected_result: FAIL - --primary resolves to orange rgb(249,115,22); --sale/--band/--highlight/--radius-pill undefined
+    status: pending
+  - id: 3
+    action: implement
+    description: Retarget --primary/--ring/--sidebar-primary and add the band, highlight, sale and pill tokens in globals.css; register band/band-strong/highlight/sale colours and the pill radius in tailwind.config.ts
+    file: packages/web/app/styles/globals.css
+    status: pending
+    code: |-
+      /* :root */
+      --primary: 0 0% 9%;            /* measured rgb(23 23 23) */
+      --primary-foreground: 0 0% 100%;
+      --ring: 0 0% 9%;
+      --sidebar-primary: 0 0% 9%;
+      --sale: 347 77% 50%;           /* rgb(225 29 72), sale price/tag ONLY */
+      --band: 48 20% 87%;            /* rgb(229 226 213) beige section band */
+      --band-strong: 53 21% 81%;     /* rgb(219 216 194) collections warm sand */
+      --highlight: 28 100% 87%;      /* rgb(255 221 191) peach */
+      --radius-pill: 3.75rem;
+      --border-button: 2px;
+
+      /* .dark — invert so the pill stays a pill */
+      --primary: 0 0% 98%;
+      --primary-foreground: 0 0% 9%;
+      --ring: 0 0% 98%;
+      --sidebar-primary: 0 0% 98%;
+
+      /* tailwind.config.ts -> theme.extend.colors */
+      band: { DEFAULT: 'hsl(var(--band))', strong: 'hsl(var(--band-strong))' },
+      highlight: 'hsl(var(--highlight))',
+      sale: 'hsl(var(--sale))',
+
+      /* tailwind.config.ts -> theme.extend.borderRadius */
+      pill: 'var(--radius-pill)',
+  - id: 4
+    action: verify-pass
+    description: Confirm token tests pass and the pre-existing style suites still pass
+    command: cd packages/web && bunx vitest run tests/styles/design-tokens.test.ts tests/styles/mat-token.test.ts tests/styles.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the token retarget
+    command: 'git add packages/web/app/styles/globals.css packages/web/tailwind.config.ts packages/web/tests/styles/design-tokens.test.ts && git commit -m "feat(web): retarget primary to the monochrome pill palette"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.771Z'

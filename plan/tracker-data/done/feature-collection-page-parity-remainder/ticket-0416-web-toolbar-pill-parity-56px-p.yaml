@@ -1,0 +1,152 @@
+ticket_number: 416
+title: 'Web - toolbar pill parity: 56px pills, fill-wipe hover, in-place black sort panel'
+description: |-
+  ## Task
+
+  Both toolbar controls are the right idea at the wrong scale, and the sort menu is a generic popover where mesonart's *is the pill*. Measured live on 2026-08-04, computed styles plus a driven open-state capture.
+
+  **Rest state — mesonart | chobii today**
+
+  | Thing | mesonart | ours |
+  |---|---|---|
+  | Pill size | 169x56 (Hide filters), 180x56 (sort) | 146x36 both (`buttonVariants size=sm`, h-9) |
+  | Padding | `18px 26px` | `0 20px` |
+  | Type | Poppins **400**, 16px / lh 16px | Poppins **500**, 14.95px |
+  | Outline | `::after`, `2px solid rgb(23,23,23)`, `radius 60px`, inset 0 | `border: 1.67px solid rgb(23,23,23)`, `radius 60px` |
+  | Sort affordance | a small dot marker after the label | `ChevronDown` icon |
+  | Toolbar layout | `Hide filters` then the count immediately after it (`gap: 16px`, count is `grow`), sort hard right | `justify-between`, so the count floats to the centre |
+  | Toolbar rule | no bottom border | `border-b border-border` + `bg-background/95 backdrop-blur` |
+  | Count type | Poppins 300, 18px / lh 28.8px, full-strength `rgb(23,23,23)` | `text-sm text-muted-foreground` |
+
+  **Hover** (both pills): a `.btn-fill` circle — `border-radius: 50%`, `background rgb(23,23,23)`, 480px wide, anchored off the pill's corner — wipes across on `background-color 0.5s cubic-bezier(.3,1,.3,1)`, while `.btn-text` goes to white on `color 0.5s cubic-bezier(.3,1,.3,1) 0.1s` (note the 0.1s delay, so the text flips after the fill lands). Ours: flat `background-color 0.3s`.
+
+  **Sort open** — the menu is not a popover. The *same element* animates:
+
+  - `180x56` to `320x469`, transition `width, height, box-shadow 0.5s cubic-bezier(.3,1,.3,1)`, `overflow: hidden`
+  - `border-radius` `60px` to `32px`, padding `20.9px 26px`, `box-shadow: none`
+  - surface goes black via the same fill circle; content is white
+  - header `SORT BY`, 14px, `letter-spacing: 1.4px`, uppercase, white
+  - 40px white `rounded-full` close button, top right
+  - 8 options, white Poppins 400 16px, 32px rows; the current option renders dimmed rather than ticked
+  - opens on **click** (hover only does the fill wipe)
+
+  Ours: click opens `absolute right-0 mt-2 w-56 rounded-lg border border-border bg-background py-1 shadow-lg` with a `Check` icon on the current option.
+
+  **Decision taken (2026-08-04, with the user): full copy** — fill wipe, in-place morph, black panel, caps label, close button, dimmed-current. Keep click-to-open plus keyboard: the existing outside-click and Escape handlers, `aria-haspopup="listbox"`, `aria-expanded`, `role="option"`/`aria-selected` all stay. Hover must not open the menu.
+
+  ## Context
+
+  - `packages/web/app/components/product/CollectionToolbar.tsx` — toolbar container at :100, Hide-filters button at :107, count `<p>` at :123, sort trigger at :127, popover at :139.
+  - Both pills go through `buttonVariants({ variant: 'outline', size: 'sm' })` from `~/components/ui/Button`. A 56px pill is not `size="sm"`; decide whether this is a new size on the `Button` primitive (it is the mesonart button scale, so it likely belongs there and will be reused by the PDP CTA in Phase E) or a local override. Changing the shared primitive means checking its other call sites.
+  - The fill-wipe wants a `.btn-fill`-equivalent span inside `Button`; `--ease-primary` / `--ease-fast` already hold the two measured curves, so use the tokens rather than re-typing the beziers.
+  - `SORT_OPTIONS` and the `${sortBy}-${sortOrder}` id contract stay untouched — `routes/posters/index.tsx` splits on the hyphen.
+  - Token guard applies: `primary` / `accent` / `band` tokens only, no `brand-*`, no `font-bold`.
+  - Tests: `tests/components/product/CollectionToolbar.test.tsx`. Ticket #413 (E2E for chips, both new sorts, promo tile) is still open in this feature and asserts against the sort control — land this before or alongside it so the spec is written once.
+  - Analysis: `docs/design/mesonart/mesonart-parity-analysis.md` section 1.3.3 and section 3.3.
+feature: collection-page-parity-remainder
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T13:58:51.249Z'
+last_updated: '2026-08-04T15:06:09.954Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - design-parity
+  - collection-page
+current_step: 8
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Assert the measured toolbar spec: both pills at the 56px scale with weight 400 and a dot marker rather than a chevron; the count sits beside the Hide filters pill rather than being pushed to the centre; the sort menu is the trigger element itself (no separate positioned popover, no shadow), opens only on click, carries a SORT BY caps label and a close button, and renders the current option dimmed rather than ticked.'
+    file: packages/web/tests/components/product/CollectionToolbar.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/CollectionToolbar.test.tsx
+    expected_result: FAIL - toolbar still renders size=sm pills, a ChevronDown and a separate shadowed popover
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm the new assertions fail against the current toolbar
+    command: cd packages/web && bunx vitest run tests/components/product/CollectionToolbar.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Button primitive - add the mesonart pill scale (56px tall, 18px/26px padding, Poppins 400 at 16px, 2px outline at 60px radius) and the fill-wipe hover, a circle span animating on --ease-primary with the text colour following on a 0.1s delay. Check the other call sites before changing shared variants.
+    file: packages/web/app/components/ui/Button.tsx
+    status: done
+  - id: 4
+    action: implement
+    description: Toolbar - both pills onto the new scale, dot marker in place of ChevronDown, count beside the Hide filters pill (drop justify-between), drop the toolbar bottom border.
+    file: packages/web/app/components/product/CollectionToolbar.tsx
+    status: done
+  - id: 5
+    action: implement
+    description: Sort menu morphs in place - the trigger expands to the panel (radius 60px to 32px, black surface, white content, SORT BY caps label at 1.4px tracking, 40px round close button, 32px option rows, current option dimmed) on --ease-primary. Keep click-to-open, outside-click, Escape, aria-haspopup/aria-expanded and role=option/aria-selected. Hover must fire the fill wipe only, never open the menu.
+    file: packages/web/app/components/product/CollectionToolbar.tsx
+    status: done
+  - id: 6
+    action: verify-pass
+    description: Toolbar tests pass
+    command: cd packages/web && bunx vitest run tests/components/product/CollectionToolbar.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 7
+    action: verify-pass
+    description: No regression - full web suite at the 1715-passing baseline and the token guard green. Button is shared, so the whole suite matters here.
+    command: cd packages/web && bunx vitest run && bunx vitest run tests/styles/storefront-token-compliance.test.ts
+    expected_result: PASS - 1715 web tests, token guard green
+    status: done
+  - id: 8
+    action: commit
+    description: Commit the toolbar parity work
+    command: 'git add packages/web/app/components/ui/Button.tsx packages/web/app/components/product/CollectionToolbar.tsx packages/web/tests/components/product/CollectionToolbar.test.tsx && git commit -m "feat(web): mesonart pill scale, fill-wipe hover and in-place sort panel (#416)"'
+    status: done
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T14:49:42.671Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T15:06:03.446Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `e69ac639` — feat(web): mesonart pill scale, fill-wipe hover and in-place sort panel (#416)
+
+      **Files Changed**:
+      - `packages/web/app/components/ui/Button.tsx` — new `size="pill"` (`h-14 px-[26px] font-normal`); `outline` variant's hover is now the circle wipe (`before:` pseudo, `scale-0` → `scale-100` on `--ease-primary`, label colour on a 0.1s delay) instead of `hover:bg-primary`
+      - `packages/web/app/components/product/CollectionToolbar.tsx` — both pills to `size="pill"`; dot marker replaces `ChevronDown`; count `grow` beside the toggle; bottom rule and `justify-between` dropped; sort popover replaced by an in-place morph
+      - `packages/web/tests/components/product/CollectionToolbar.test.tsx` — 12 new assertions
+
+      **Summary**:
+      The panel is anchored `right-0 top-0` over the trigger and animates `width`/`height`/`border-radius` from the pill's box. Its open size is computed from `SORT_OPTIONS.length` against named constants rather than hardcoded to their 320×469 — neither dimension transitions from `auto`, and our list is eight options where theirs is nine. A `requestAnimationFrame` flag gives the browser two states to interpolate.
+
+      Kept click-to-open against their `hover-element`: a hover-opened menu has no touch or keyboard story. Hover fires the wipe only, and there is a test asserting hover does not open it.
+
+      Verified in a real browser (headless chromium at 1440×900, driven directly): panel mounts at 246×87 mid-transition and settles at 320×336, page stays responsive, 8 options, console clean. The Chrome-extension tab freezes on interaction, but it did so before these changes too — not a product fault.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run`
+      - Result: PASS (68 files, **1779 passing, 0 failing**)
+      - Command: `bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps` → PASS (18/18)
+      - Command: `bunx playwright test tests/e2e/collection-page-remainder.spec.ts tests/e2e/product-listing.spec.ts --project=chromium --no-deps` → PASS (93/93) — this is the suite that would have caught the sort rewrite
+      - Command: `bun run typecheck` → 23 errors, exactly the baseline
+  - author: system
+    timestamp: '2026-08-04T15:06:09.954Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-04T14:49:42.670Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run
+  test_output: '68 files, 1779 passed, 0 failed. E2E: grid 18/18, collection-page-remainder + product-listing 93/93. Typecheck 23 errors = baseline.'
+  build_passed: true
+  build_command: bun run typecheck
+  verified_at: '2026-08-04T15:05:52.598Z'
+completed: '2026-08-04T15:06:09.954Z'

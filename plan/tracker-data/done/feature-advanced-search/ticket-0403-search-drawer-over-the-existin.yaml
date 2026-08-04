@@ -1,0 +1,91 @@
+ticket_number: 403
+title: Search - drawer over the existing endpoint, opened from the header
+description: |-
+  ## Task
+
+  Build `packages/web/app/components/layout/SearchDrawer.tsx` and wire the header's search control to it.
+
+  `GET /api/products/search` and `productsApi.search()` both already exist — what is missing is any way to reach them from the UI.
+
+  **Behaviour**
+  - Debounced query (~250ms), in-flight request cancelled when a newer one starts.
+  - Results render as rows: thumbnail, title, price; each links to the PDP.
+  - Empty query shows style shortcuts built from `STYLE_OPTIONS` in `@chobii/shared`, linking at `/posters?styles=<id>`.
+  - No results shows a plain statement, not a spinner that never resolves.
+  - Keyboard: `/` and `Cmd/Ctrl-K` open, Escape closes, Up/Down move the highlight, Enter opens it.
+
+  ## Context
+
+  Feature: advanced-search
+
+  **Constraints**
+  - **Cancel in flight.** Typing "abstract" is eight keystrokes; without cancellation the last response is not necessarily the last request and results flicker between queries. Use an AbortController or a request-sequence guard.
+  - **The panel must be a SIBLING of `<header>`, not a child.** The header sets `backdrop-blur`, which establishes a containing block and collapses a nested fixed overlay to zero height — the exact bug #348 fixed for the mobile nav drawer.
+  - Scroll-lock and Escape mirror that drawer.
+  - `/` must not hijack typing: ignore it when focus is already in an input, textarea or contenteditable.
+  - The header search button is currently absent — #401 left it out deliberately rather than shipping something that looks interactive and does nothing. It becomes real here.
+  - Token guard applies: no `font-bold`, no brand utilities.
+feature: advanced-search
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T08:57:13.337Z'
+last_updated: '2026-08-04T09:01:18.722Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T08:57:18.230Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-04T09:01:18.722Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write failing tests: opens/closes, debounces, cancels stale responses, keyboard shortcuts, empty state from the shared vocabulary, sibling-of-header placement'
+    file: packages/web/tests/components/layout/SearchDrawer.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/layout/SearchDrawer.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails
+    command: cd packages/web && bunx vitest run tests/components/layout/SearchDrawer.test.tsx
+    expected_result: FAIL - component does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Build SearchDrawer and add the header search control
+    file: packages/web/app/components/layout/SearchDrawer.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the web suite and guards pass
+    command: cd packages/web && bunx vitest run
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Verify the drawer opens, searches and navigates in a real browser
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: 18 passed, and the drawer verified by probe
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the drawer
+    command: 'git add packages/web/app packages/web/tests && git commit -m "feat(web): search drawer over the existing product search endpoint"'
+    status: pending
+current_step: 1
+started: '2026-08-04T08:57:18.230Z'
+completed: '2026-08-04T09:01:18.722Z'

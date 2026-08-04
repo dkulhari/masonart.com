@@ -1,0 +1,112 @@
+ticket_number: 377
+title: Tokens - widen the page to 1600px and drop page padding to 20px
+description: |-
+  ## Task
+  mesonart's `--page-width` is 1600px with 20px page padding. Ours renders at 1400px / 32px.
+
+  Two places must move together or the change is invisible:
+  - `tailwind.config.ts` `theme.container` — `screens['2xl']: '1400px'`, `padding: '2rem'`.
+  - `globals.css` `.container-wide` — `max-w-7xl` (1280px), which is what the storefront actually uses everywhere.
+
+  Also retire the orange `theme-color` meta in `__root.tsx` (`#f97316`) — it colours the mobile browser chrome and is the last orange left after ticket 1.
+
+  ## Context
+  Part of feature: mesonart-design-parity
+  Phase: 1 — Tokens
+  Files: `packages/web/tailwind.config.ts`, `packages/web/app/styles/globals.css`, `packages/web/app/routes/__root.tsx`
+  Risk: E2E row-alignment tests from #375 assert grid geometry at 1440px viewport. 1600px is above the viewport so the container stays viewport-bound there — verify, do not assume.
+feature: mesonart-design-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-03T20:17:49.115Z'
+last_updated: '2026-08-03T20:49:35.792Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - tokens
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-03T20:49:35.792Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Extend the token test with page-width assertions
+    file: packages/web/tests/styles/design-tokens.test.ts
+    command: cd packages/web && bunx vitest run tests/styles/design-tokens.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |
+      describe('page width', () => {
+        it('declares the measured 1600px page width', () => {
+          expect(css).toMatch(/--page-width:\s*1600px/)
+        })
+
+        it('container-wide is 1600px, not max-w-7xl', () => {
+          const m = css.match(/\.container-wide\s*\{[^}]*\}/)
+          expect(m).not.toBeNull()
+          expect(m![0]).not.toContain('max-w-7xl')
+          expect(m![0]).toContain('var(--page-width)')
+        })
+
+        it('uses 20px page padding, not 2rem', () => {
+          const m = css.match(/\.container-wide\s*\{[^}]*\}/)
+          expect(m![0]).toMatch(/px-5|padding-inline:\s*20px/)
+        })
+
+        it('the tailwind container agrees with the page width', () => {
+          expect(tailwind).toContain("'2xl': '1600px'")
+          expect(tailwind).toContain("padding: '20px'")
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the width tests fail
+    command: cd packages/web && bunx vitest run tests/styles/design-tokens.test.ts
+    expected_result: FAIL - container-wide still max-w-7xl; --page-width undefined; tailwind container still 1400px/2rem
+    status: pending
+  - id: 3
+    action: implement
+    description: Add --page-width, rewrite .container-wide against it, move the tailwind container to 1600px/20px, and drop the orange theme-color meta
+    file: packages/web/app/styles/globals.css
+    status: pending
+    code: |-
+      /* globals.css :root */
+      --page-width: 1600px;
+
+      /* globals.css @layer components */
+      .container-wide {
+        width: 100%;
+        max-width: var(--page-width);
+        margin-inline: auto;
+        padding-inline: 20px;
+      }
+
+      /* tailwind.config.ts */
+      container: { center: true, padding: '20px', screens: { '2xl': '1600px' } },
+
+      /* __root.tsx — theme-color follows the palette */
+      { name: 'theme-color', content: '#171717' },
+  - id: 4
+    action: verify-pass
+    description: Confirm width tests pass and the grid E2E geometry is unaffected
+    command: cd packages/web && bunx vitest run tests/styles/design-tokens.test.ts && cd ../.. && bunx playwright test tests/e2e/product-grid-alignment.spec.ts --reporter=line
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the page-width change
+    command: 'git add packages/web/app/styles/globals.css packages/web/tailwind.config.ts packages/web/app/routes/__root.tsx packages/web/tests/styles/design-tokens.test.ts && git commit -m "feat(web): widen the storefront page to the measured 1600px"'
+    status: pending
+current_step: 1
+completed: '2026-08-03T20:49:35.792Z'

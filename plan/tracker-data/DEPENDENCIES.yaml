@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-07-31T03:42:30.604Z'
+  last_updated: '2026-08-04T15:06:10.866Z'
   features:
     chobi-external-services:
       - ticket_number: 315
@@ -8,6 +8,65 @@ dependencies:
         blocked_by:
           - ticket_number: 312
             title: R2 - Provision chobi bucket, credentials and chobi-cdn CDN route
+    collection-page-parity-remainder:
+      - ticket_number: 405
+        title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+        blocks: []
+        blocked_by:
+          - ticket_number: 404
+            title: Schema - curator pin columns and sales index
+      - ticket_number: 408
+        title: API - admin sees real units sold and can pin a product as popular
+        blocks: []
+        blocked_by:
+          - ticket_number: 404
+            title: Schema - curator pin columns and sales index
+          - ticket_number: 405
+            title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+      - ticket_number: 409
+        title: Web - sort options 6 to 8 (Featured, Best selling)
+        blocks: []
+        blocked_by:
+          - ticket_number: 405
+            title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+      - ticket_number: 410
+        title: Web - Discover chip carousel on the collection page
+        blocks: []
+        blocked_by:
+          - ticket_number: 406
+            title: API - GET /api/products/collections for the Discover chips
+      - ticket_number: 411
+        title: Web - promo tile occupying a grid cell
+        blocks: []
+        blocked_by:
+          - ticket_number: 407
+            title: API - catalogue-wide review aggregate for the promo tile
+          - ticket_number: 414
+            title: Seed - settled orders and approved reviews so the real signals have data
+      - ticket_number: 412
+        title: Web - admin popularity pin and units-sold column
+        blocks: []
+        blocked_by:
+          - ticket_number: 408
+            title: API - admin sees real units sold and can pin a product as popular
+      - ticket_number: 413
+        title: E2E - discover chips, both new sorts, promo tile
+        blocks: []
+        blocked_by:
+          - ticket_number: 409
+            title: Web - sort options 6 to 8 (Featured, Best selling)
+          - ticket_number: 410
+            title: Web - Discover chip carousel on the collection page
+          - ticket_number: 411
+            title: Web - promo tile occupying a grid cell
+      - ticket_number: 414
+        title: Seed - settled orders and approved reviews so the real signals have data
+        blocks: []
+        blocked_by:
+          - ticket_number: 405
+            title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+          - ticket_number: 407
+            title: API - catalogue-wide review aggregate for the promo tile
     content-manager-role:
       - ticket_number: 323
         title: Backend API - requireContentManager middleware and isContentManager helper
@@ -116,6 +175,79 @@ dependencies:
         blocked_by:
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
+    product-grid-alignment:
+      - ticket_number: 365
+        title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+        blocks: []
+        blocked_by:
+          - ticket_number: 364
+            title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+      - ticket_number: 366
+        title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+        blocks: []
+        blocked_by:
+          - ticket_number: 364
+            title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+      - ticket_number: 367
+        title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+        blocks: []
+        blocked_by:
+          - ticket_number: 365
+            title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+          - ticket_number: 366
+            title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+      - ticket_number: 368
+        title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
+        blocks: []
+        blocked_by:
+          - ticket_number: 367
+            title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+      - ticket_number: 369
+        title: Admin upload - Square crop and zoom control for photographic media
+        blocks: []
+        blocked_by:
+          - ticket_number: 367
+            title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+          - ticket_number: 368
+            title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
+      - ticket_number: 370
+        title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+        blocks: []
+        blocked_by:
+          - ticket_number: 364
+            title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+      - ticket_number: 371
+        title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+        blocks: []
+        blocked_by:
+          - ticket_number: 370
+            title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+      - ticket_number: 372
+        title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+        blocks: []
+        blocked_by:
+          - ticket_number: 371
+            title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+      - ticket_number: 373
+        title: Styling - Adopt the measured mesonart token set
+        blocks: []
+        blocked_by:
+          - ticket_number: 372
+            title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+      - ticket_number: 374
+        title: Seed - Reseed the 40 dev products into the new ProductImage shape
+        blocks: []
+        blocked_by:
+          - ticket_number: 367
+            title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+      - ticket_number: 375
+        title: E2E - Row alignment regression spec across breakpoints
+        blocks: []
+        blocked_by:
+          - ticket_number: 372
+            title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+          - ticket_number: 374
+            title: Seed - Reseed the 40 dev products into the new ProductImage shape
     rebrand-chobi-art:
       - ticket_number: 299
         title: Web SEO - Root meta, OG tags, and JSON-LD use chobi.art brand constants

@@ -1,0 +1,74 @@
+name: product-metadata-facets
+title: Product Metadata Facets
+priority: high
+created: "2026-08-04T08:23:40.300Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  Phase C data half — feature 3 of docs/design/mesonart/PLAN-OF-ACTION.md, and §4 of the parity analysis.
+
+  Owner decision 2026-08-04: **adopt the analysis' §1.3 vocabularies verbatim.**
+
+  ## The real problem this fixes
+
+  There is no single source of truth for facet vocabularies. Options are hardcoded literals in `packages/web/app/components/product/ProductFilters.tsx` while `packages/api/src/routes/products.ts` validates them as unconstrained comma-separated strings — nothing reconciles the two. It is the same disease the size ladders had before #386, and it has the same fix: one list in `@chobii/shared`, consumed by both ends.
+
+  It also closes a latent injection vector. The array filters build a postgres literal with `sql.raw` and hand-rolled quote escaping (`products.ts` ~:167). That is safe only while the values are effectively fixed; validating against a closed vocabulary makes it structurally safe.
+
+  ## Scope
+
+  **In scope**
+  1. Nine vocabularies in `packages/shared/src/constants/facets.ts` as the single source of truth, with types and zod schemas.
+  2. Schema: new `vibe`, `aesthetic`, `medium` (`text[]`) and `uniqueness`, `availability` (single-valued) columns; orientation enum extended.
+  3. API: filter params for the new facets, validated against the vocabularies; `/api/products/facets` covers them.
+  4. Seed: assign the new metadata across the 41 products so the facets are not empty.
+  5. Sidebar: render the new groups, driven by the shared constants rather than local literals.
+
+  **Out of scope**
+  - Backfilling production. This changes what a reseed produces; there is no production data to migrate yet.
+  - Sort parity (Featured / Most relevant / Best selling) — needs a sales signal, not metadata.
+  - Size ladders for the new orientation families — Phase E.
+
+  ## Known problems in mesonart's taxonomy, adopted anyway
+
+  Recorded because they will look like our bugs later:
+
+  - **Color lists both "Gray" and "Grey"** — the same colour twice. We keep one canonical `gray` and note it; carrying both would let a shopper filter to an empty intersection.
+  - **"Colorful Art" appears as both a Style and a Subject.** Kept in both, matching them.
+  - **Subject has both "Sea" and "Sea & Beach"**, which overlap. Kept.
+  - **"Set of 2/3" is an orientation value on their storefront** (§5.2) even though it describes how many panels ship, not the proportion of one. Adopted as an orientation so filtering matches theirs, but it has no size ladder — `getSizesForOrientation` returns empty for it and the seed already guards that path.
+  - **"Vertical"/"Horizontal" are their labels for what our enum calls `portrait`/`landscape`.** The stored value stays `portrait`/`landscape`; only the display label changes. Renaming the enum would churn the size ladders, the E2E and the seed for a caption.
+
+  ## Design
+
+  **Approach:** one shared vocabulary module; schema, API validation, seed and UI all consume it.
+
+  **Key decisions**
+  1. **Vocabularies live in `@chobii/shared`, not in the web component and not in the API.** Both ends import the same list, so they cannot drift. A test asserts the sidebar does not reintroduce local literals.
+  2. **`uniqueness` and `availability` are single-valued columns, not arrays.** A product has one edition type and one availability; modelling them as `text[]` invites contradictory rows.
+  3. **Filter params validated against the vocabulary with zod enums.** An unknown value is a 400, not a silent empty result — and it removes the hand-escaped `sql.raw` risk.
+  4. **Orientation keeps its stored values.** Display labels map on top.
+  5. **The seed assigns metadata deterministically**, not randomly, so a reseed produces the same catalogue and facet counts are reproducible between runs.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "395": Shared - the nine facet vocabularies as the single source of truth
+    "396": API - schema columns for the new facets and a migration
+    "397": API - validated filter params for the new facets, and facet counts for them
+    "398": Seed - assign the new metadata across the catalogue
+    "399": Web - sidebar facet groups driven by the shared vocabularies
+total_tickets: 5
+completion_percentage: 100
+is_completed: true

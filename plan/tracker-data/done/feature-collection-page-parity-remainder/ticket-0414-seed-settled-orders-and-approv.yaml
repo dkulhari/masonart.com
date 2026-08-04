@@ -1,0 +1,88 @@
+ticket_number: 414
+title: Seed - settled orders and approved reviews so the real signals have data
+description: |-
+  ## Task
+
+  Both real signals this feature builds return empty in dev, and for the same root cause: nothing downstream of a purchase is ever seeded.
+
+  - `select count(*) from order_items` → **0**, so Best selling (#405) returns `units_sold = 0` for every product and falls through to its tie-break
+  - `select status, count(*) from reviews group by status` → **empty set**, so the catalogue aggregate (#407) is `{ averageRating: null, reviewCount: 0 }` and the promo tile (#411) renders nothing
+
+  Seed a small set of settled orders with order items, then approved reviews referencing real `order_item_id` values.
+
+  ## Context
+
+  Part of feature: collection-page-parity-remainder
+  Phase: 2 - Data
+  Blocks #411 (promo tile has nothing to show) and weakens #412 / #413.
+
+  Local trap #4 from docs/design/mesonart/PLAN-OF-ACTION.md records the history: reviews require a real `order_item_id`, no orders are seeded, and the three fixture reviews that once existed on `synthetic-nature` only worked because the FK was dropped and restored `NOT VALID`. A reseed has since removed them. **Do not repeat that** — seed the orders so the FK is satisfied honestly.
+
+  Trap #1 also applies: **seed from the repo root**, never from `packages/api`. Bun loads `.env` from cwd, so running in the package directory loses the R2/minio credentials and `processProductImages` treats upload failure as non-fatal — the seed reports success while writing products with zero images.
+
+  ## Constraints
+
+  - Deterministic, like the facet seeding in #395-#399: a reseed must reproduce the same catalogue, the same orders and the same ratings. Random ratings would make the promo tile's number move on every reseed.
+  - Spread across products and ratings so the aggregate is a real distribution rather than one value repeated.
+  - Orders must satisfy the sale definition in `packages/api/src/lib/product-sales.ts` — `payment_status = 'paid'` and a status outside `('cancelled','refunded','failed')` — or Best selling still reads zero.
+  - Include at least one cancelled or refunded order that must NOT be counted, so the denylist is exercised by real data rather than only by a mocked test.
+  - Reviews must be `approved` to reach the aggregate; seed a couple of pending ones so the status filter is exercised too.
+feature: collection-page-parity-remainder
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-04T11:36:55.772Z'
+last_updated: '2026-08-04T11:59:02.266Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-04T11:51:54.632Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-04T11:59:02.173Z'
+    text: |-
+      Done — commit a91b2b72.
+
+      **Verification** — reseeded from the repo root (`bun run --env-file=.env packages/api/src/database/seed.ts`), then checked against the real database:
+
+      | Check | Result |
+      |---|---|
+      | `bunx vitest run tests/database/seed-orders-reviews.test.ts` | 13 passing |
+      | Seed output | Orders: 12, items: 15, reviews: 14 |
+      | Trap #1 — products with zero images | **0** |
+      | Trap #5 — room mockups | **122** |
+      | Catalogue review aggregate | **4.5 from 12 approved** (2 pending, correctly excluded) |
+      | Best selling top 6 units | 5, 4, 3, 3, 3, 2 — a real ranking, not a tie |
+      | Voided canary `paper-layers` | **0** settled units against **8** across all orders |
+
+      That last row is the one that matters: 8 units exist in the database and the sort counts none of them, because both orders carrying them are voided. The denylist in `lib/product-sales.ts` is now exercised by real rows rather than only by a mocked assertion.
+
+      **Schema note that cost time:** the Better Auth tables are singular — `user`, `session`, `account`, `address` — while the drizzle exports are plural (`users`, `sessions`). Querying `users` directly against the database returns `relation "users" does not exist`.
+
+      **Two additions beyond the ticket:**
+      - `clearOrdersAndReviews()` runs at the top of `clearData()`. `order_items.product_id` is ON DELETE SET NULL, so clearing products alone leaves orphaned purchase history that the next seed would stack on top of.
+      - The seed no-ops with a warning if the five test customers are absent, rather than inventing users. A review needs a real author; a fabricated name on a public page is the thing this whole feature refuses.
+
+      **Destructive, as designed:** the seed already wiped products, variants and frames on every run; orders and reviews now join that list. Any hand-made dev order is removed by a reseed.
+  - author: system
+    timestamp: '2026-08-04T11:59:02.266Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 405
+    feature: collection-page-parity-remainder
+    description: API - Best selling sort over real orders, plus NULLS LAST on Featured
+  - ticket: 407
+    feature: collection-page-parity-remainder
+    description: API - catalogue-wide review aggregate for the promo tile
+blocks: []
+attachments: []
+started: '2026-08-04T11:51:54.632Z'
+completed: '2026-08-04T11:59:02.266Z'

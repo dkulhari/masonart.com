@@ -1,12 +1,113 @@
 status: done
-last_updated: '2026-07-31T03:42:30.234Z'
-total_tickets: 319
+last_updated: '2026-08-04T15:06:10.491Z'
+total_tickets: 373
 summary:
   critical: 21
-  high: 114
-  medium: 137
-  low: 47
+  high: 144
+  medium: 156
+  low: 52
 priorities:
+  critical:
+    - feature: qa-testing
+      tickets:
+        - ticket_number: 12
+          title: 'Phase 1: Setup & Configuration'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 16
+          title: 'Phase 5: Authentication Tests'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 21
+          title: 'Phase 10: Checkout & Payments Tests'
+          assignee: unassigned
+          blocked_by: []
+    - feature: user-reviews
+      tickets:
+        - ticket_number: 28
+          title: Database Schema - Reviews Table
+          assignee: claude
+          blocked_by: []
+    - feature: shipping-returns
+      tickets:
+        - ticket_number: 36
+          title: Database Schema - Shipping and Returns Tables
+          assignee: claude
+          blocked_by: []
+    - feature: manual-testing-bugs-feb2026
+      tickets:
+        - ticket_number: 238
+          title: Products API (/api/products) hangs indefinitely - empty reply from server
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 239
+          title: Cart API (/api/cart) hangs indefinitely - empty reply from server
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 250
+          title: Gallery API (/api/ai/gallery) and Featured Products API (/api/products/featured) both hang/timeout
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 251
+          title: Gallery API and Featured Products API both hang and timeout
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 252
+          title: Gallery and Featured Products APIs both timeout
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 254
+          title: Auth sign-in with credentials times out like other DB endpoints
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 342
+          title: 'BUG: verification emails never sent — sendVerificationEmail is a console.log stub (production signup dead-end)'
+          assignee: unassigned
+          blocked_by: []
+    - feature: go-live
+      tickets:
+        - ticket_number: 287
+          title: 'Infra: same-origin web bundle + single-hostname config'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 288
+          title: 'Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 290
+          title: 'BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 295
+          title: 'BUG: api tsc build broken on main — ~60 type errors block the production image build'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 296
+          title: 'BUG: wildcard requireAuth on /api-mounted sub-apps gated health/tracking/webhooks; onError collapsed HTTPExceptions to 500'
+          assignee: unassigned
+          blocked_by: []
+    - feature: rebrand-chobi-art
+      tickets:
+        - ticket_number: 317
+          title: Correction - Rebrand chobi.art to chobii.art (code, tests, docs)
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 318
+          title: 'Correction - chobii infra: R2 bucket/CDN, images, DB, staging cutover'
+          assignee: unassigned
+          blocked_by: []
+    - feature: full-ai-generator
+      tickets:
+        - ticket_number: 321
+          title: 'Bug - AI generation worker never calls real providers: stub pipeline stores JSON placeholders'
+          assignee: unassigned
+          blocked_by: []
+    - feature: mobile-responsive-jul2026
+      tickets:
+        - ticket_number: 348
+          title: 'BUG: Mobile nav drawer is transparent — page content bleeds through, menu illegible'
+          assignee: unassigned
+          blocked_by: []
   high:
     - feature: infrastructure-setup
       tickets:
@@ -552,6 +653,156 @@ priorities:
           blocked_by: []
         - ticket_number: 352
           title: 'BUG: PDP ''You May Also Like'' is a hardcoded permanent skeleton — never implemented'
+          assignee: unassigned
+          blocked_by: []
+    - feature: product-grid-alignment
+      tickets:
+        - ticket_number: 364
+          title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 365
+          title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 364
+              title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+        - ticket_number: 366
+          title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 364
+              title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+        - ticket_number: 367
+          title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 365
+              title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+            - ticket_number: 366
+              title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+    - feature: mesonart-design-parity
+      tickets:
+        - ticket_number: 376
+          title: Tokens - retarget primary to the monochrome pill palette and add band/highlight/sale tokens
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 377
+          title: Tokens - widen the page to 1600px and drop page padding to 20px
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 378
+          title: 'Tokens - base typography: Urbanist 300 headings, Poppins 300 body, fluid clamp scales'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 379
+          title: Primitives - Button component with the mesonart pill variants
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 380
+          title: Primitives - SectionBand and DisplayHeading with split-word reveal
+          assignee: unassigned
+          blocked_by: []
+    - feature: wishlist
+      tickets:
+        - ticket_number: 387
+          title: API - wishlist routes over the existing users column
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 388
+          title: Web - wishlistApi client and a hydration-safe useWishlist store
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 389
+          title: Web - heart on ProductCard and ProductDetail, count badge in the header
+          assignee: unassigned
+          blocked_by: []
+    - feature: collection-page-parity
+      tickets:
+        - ticket_number: 390
+          title: Collection - beige header band with display H1, breadcrumbs and description
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 391
+          title: Collection - sticky toolbar with hide-filters toggle, result count and sort pill
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 392
+          title: API - facet counts and a review aggregate on the product list
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 393
+          title: Collection - facet counts in the sidebar and a star row on the card
+          assignee: unassigned
+          blocked_by: []
+    - feature: product-metadata-facets
+      tickets:
+        - ticket_number: 395
+          title: Shared - the nine facet vocabularies as the single source of truth
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 396
+          title: API - schema columns for the new facets and a migration
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 397
+          title: API - validated filter params for the new facets, and facet counts for them
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 398
+          title: Seed - assign the new metadata across the catalogue
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 399
+          title: Web - sidebar facet groups driven by the shared vocabularies
+          assignee: unassigned
+          blocked_by: []
+    - feature: global-chrome-parity
+      tickets:
+        - ticket_number: 400
+          title: Chrome - announcement bar above the header
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 401
+          title: Chrome - centered wordmark, right action cluster, two-row nav
+          assignee: unassigned
+          blocked_by: []
+    - feature: advanced-search
+      tickets:
+        - ticket_number: 403
+          title: Search - drawer over the existing endpoint, opened from the header
+          assignee: unassigned
+          blocked_by: []
+    - feature: collection-page-parity-remainder
+      tickets:
+        - ticket_number: 404
+          title: Schema - curator pin columns and sales index
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 405
+          title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 404
+              title: Schema - curator pin columns and sales index
+        - ticket_number: 406
+          title: API - GET /api/products/collections for the Discover chips
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 414
+          title: Seed - settled orders and approved reviews so the real signals have data
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 405
+              title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+            - ticket_number: 407
+              title: API - catalogue-wide review aggregate for the promo tile
+        - ticket_number: 415
+          title: Web - filter rail typography and chrome parity (strip the box)
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 416
+          title: 'Web - toolbar pill parity: 56px pills, fill-wipe hover, in-place black sort panel'
           assignee: unassigned
           blocked_by: []
   medium:
@@ -1222,6 +1473,118 @@ priorities:
           title: 'UX: /create ''Generate Poster'' CTA sits 3.2 screens down on mobile'
           assignee: unassigned
           blocked_by: []
+    - feature: product-grid-alignment
+      tickets:
+        - ticket_number: 368
+          title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 367
+              title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+        - ticket_number: 369
+          title: Admin upload - Square crop and zoom control for photographic media
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 367
+              title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+            - ticket_number: 368
+              title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
+        - ticket_number: 370
+          title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 364
+              title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+        - ticket_number: 371
+          title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 370
+              title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+        - ticket_number: 372
+          title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 371
+              title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+        - ticket_number: 373
+          title: Styling - Adopt the measured mesonart token set
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 372
+              title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+    - feature: mesonart-design-parity
+      tickets:
+        - ticket_number: 381
+          title: 'Sweep - home page: strip gradients and blur blobs, adopt bands, pills and DisplayHeading'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 382
+          title: Sweep - Header, Footer and InfoPage chrome onto the monochrome system
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 383
+          title: 'Sweep - product and review surfaces: monochrome badges, rating token, product type scale'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 384
+          title: Sweep - remaining storefront routes off font-bold, brand orange and rounded-lg CTAs
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 385
+          title: Guard - storefront token-compliance test and full verification against the main baseline
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 386
+          title: Sizes - make the shared ladders the single source of truth, extend them, and price by area
+          assignee: unassigned
+          blocked_by: []
+    - feature: collection-page-parity
+      tickets:
+        - ticket_number: 394
+          title: Collection - lazy-load paging replacing the numbered component
+          assignee: unassigned
+          blocked_by: []
+    - feature: global-chrome-parity
+      tickets:
+        - ticket_number: 402
+          title: Chrome - footer USP strip, contact column and beige restyle
+          assignee: unassigned
+          blocked_by: []
+    - feature: collection-page-parity-remainder
+      tickets:
+        - ticket_number: 407
+          title: API - catalogue-wide review aggregate for the promo tile
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 408
+          title: API - admin sees real units sold and can pin a product as popular
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 404
+              title: Schema - curator pin columns and sales index
+            - ticket_number: 405
+              title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+        - ticket_number: 409
+          title: Web - sort options 6 to 8 (Featured, Best selling)
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 405
+              title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+        - ticket_number: 410
+          title: Web - Discover chip carousel on the collection page
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 406
+              title: API - GET /api/products/collections for the Discover chips
+        - ticket_number: 411
+          title: Web - promo tile occupying a grid cell
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 407
+              title: API - catalogue-wide review aggregate for the promo tile
+            - ticket_number: 414
+              title: Seed - settled orders and approved reviews so the real signals have data
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -1463,107 +1826,44 @@ priorities:
           title: 'BUG: Track page placeholder shows stale ''MA-2024-001234'' masonart order prefix'
           assignee: unassigned
           blocked_by: []
-  critical:
-    - feature: qa-testing
+        - ticket_number: 360
+          title: 'Product grid card sizing: residual height variance + home/listing ratio mismatch'
+          assignee: unassigned
+          blocked_by: []
+    - feature: product-grid-alignment
       tickets:
-        - ticket_number: 12
-          title: 'Phase 1: Setup & Configuration'
+        - ticket_number: 374
+          title: Seed - Reseed the 40 dev products into the new ProductImage shape
           assignee: unassigned
-          blocked_by: []
-        - ticket_number: 16
-          title: 'Phase 5: Authentication Tests'
+          blocked_by:
+            - ticket_number: 367
+              title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+        - ticket_number: 375
+          title: E2E - Row alignment regression spec across breakpoints
           assignee: unassigned
-          blocked_by: []
-        - ticket_number: 21
-          title: 'Phase 10: Checkout & Payments Tests'
-          assignee: unassigned
-          blocked_by: []
-    - feature: user-reviews
+          blocked_by:
+            - ticket_number: 372
+              title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+            - ticket_number: 374
+              title: Seed - Reseed the 40 dev products into the new ProductImage shape
+    - feature: collection-page-parity-remainder
       tickets:
-        - ticket_number: 28
-          title: Database Schema - Reviews Table
-          assignee: claude
-          blocked_by: []
-    - feature: shipping-returns
-      tickets:
-        - ticket_number: 36
-          title: Database Schema - Shipping and Returns Tables
-          assignee: claude
-          blocked_by: []
-    - feature: manual-testing-bugs-feb2026
-      tickets:
-        - ticket_number: 238
-          title: Products API (/api/products) hangs indefinitely - empty reply from server
+        - ticket_number: 412
+          title: Web - admin popularity pin and units-sold column
           assignee: unassigned
-          blocked_by: []
-        - ticket_number: 239
-          title: Cart API (/api/cart) hangs indefinitely - empty reply from server
+          blocked_by:
+            - ticket_number: 408
+              title: API - admin sees real units sold and can pin a product as popular
+        - ticket_number: 413
+          title: E2E - discover chips, both new sorts, promo tile
           assignee: unassigned
-          blocked_by: []
-        - ticket_number: 250
-          title: Gallery API (/api/ai/gallery) and Featured Products API (/api/products/featured) both hang/timeout
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 251
-          title: Gallery API and Featured Products API both hang and timeout
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 252
-          title: Gallery and Featured Products APIs both timeout
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 254
-          title: Auth sign-in with credentials times out like other DB endpoints
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 342
-          title: 'BUG: verification emails never sent — sendVerificationEmail is a console.log stub (production signup dead-end)'
-          assignee: unassigned
-          blocked_by: []
-    - feature: go-live
-      tickets:
-        - ticket_number: 287
-          title: 'Infra: same-origin web bundle + single-hostname config'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 288
-          title: 'Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 290
-          title: 'BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 295
-          title: 'BUG: api tsc build broken on main — ~60 type errors block the production image build'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 296
-          title: 'BUG: wildcard requireAuth on /api-mounted sub-apps gated health/tracking/webhooks; onError collapsed HTTPExceptions to 500'
-          assignee: unassigned
-          blocked_by: []
-    - feature: rebrand-chobi-art
-      tickets:
-        - ticket_number: 317
-          title: Correction - Rebrand chobi.art to chobii.art (code, tests, docs)
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 318
-          title: 'Correction - chobii infra: R2 bucket/CDN, images, DB, staging cutover'
-          assignee: unassigned
-          blocked_by: []
-    - feature: full-ai-generator
-      tickets:
-        - ticket_number: 321
-          title: 'Bug - AI generation worker never calls real providers: stub pipeline stores JSON placeholders'
-          assignee: unassigned
-          blocked_by: []
-    - feature: mobile-responsive-jul2026
-      tickets:
-        - ticket_number: 348
-          title: 'BUG: Mobile nav drawer is transparent — page content bleeds through, menu illegible'
-          assignee: unassigned
-          blocked_by: []
+          blocked_by:
+            - ticket_number: 409
+              title: Web - sort options 6 to 8 (Featured, Best selling)
+            - ticket_number: 410
+              title: Web - Discover chip carousel on the collection page
+            - ticket_number: 411
+              title: Web - promo tile occupying a grid cell
 blocked_tickets:
   - ticket_number: 29
     title: API Routes - Public Review Endpoints
@@ -1689,6 +1989,40 @@ blocked_tickets:
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
+  - ticket_number: 365
+    title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+    blocked_by:
+      - ticket_number: 364
+        title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+    description: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+  - ticket_number: 366
+    title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+    blocked_by:
+      - ticket_number: 364
+        title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+    description: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+  - ticket_number: 367
+    title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+    blocked_by:
+      - ticket_number: 365
+        title: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas'
+      - ticket_number: 366
+        title: 'API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+    description: 'API pipeline - matToSquare(): mat any-ratio artwork onto a square canvas, API pipeline - cropToSquare(): apply a human-chosen crop window to photographs'
+  - ticket_number: 405
+    title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+    blocked_by:
+      - ticket_number: 404
+        title: Schema - curator pin columns and sales index
+    description: Schema - curator pin columns and sales index
+  - ticket_number: 414
+    title: Seed - settled orders and approved reviews so the real signals have data
+    blocked_by:
+      - ticket_number: 405
+        title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+      - ticket_number: 407
+        title: API - catalogue-wide review aggregate for the promo tile
+    description: API - Best selling sort over real orders, plus NULLS LAST on Featured, API - catalogue-wide review aggregate for the promo tile
   - ticket_number: 229
     title: Add addressesApi to web API client
     blocked_by:
@@ -1854,6 +2188,72 @@ blocked_tickets:
       - ticket_number: 326
         title: Frontend - Role-aware admin layout with content-manager section guards
     description: Backend API - Admin customers list + role-assignment endpoints, Frontend - Role-aware admin layout with content-manager section guards
+  - ticket_number: 368
+    title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
+    blocked_by:
+      - ticket_number: 367
+        title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+    description: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+  - ticket_number: 369
+    title: Admin upload - Square crop and zoom control for photographic media
+    blocked_by:
+      - ticket_number: 367
+        title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+      - ticket_number: 368
+        title: Admin upload - Per-file type selector, drag reorder, low-resolution warning
+    description: API pipeline - Product media orchestrator and upload route (type, crop, originalKey), Admin upload - Per-file type selector, drag reorder, low-resolution warning
+  - ticket_number: 370
+    title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+    blocked_by:
+      - ticket_number: 364
+        title: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+    description: Shared contract - Collapse three ProductImage shapes into one, add MAT_* constants
+  - ticket_number: 371
+    title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+    blocked_by:
+      - ticket_number: 370
+        title: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+    description: Card - productCardTokens + ProductCardMedia with cursor-X hover scrub
+  - ticket_number: 372
+    title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+    blocked_by:
+      - ticket_number: 371
+        title: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+    description: Card - ProductCard shell and skeleton; delete ASPECT_RATIO_MAP and uniformAspectRatio
+  - ticket_number: 373
+    title: Styling - Adopt the measured mesonart token set
+    blocked_by:
+      - ticket_number: 372
+        title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+    description: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+  - ticket_number: 408
+    title: API - admin sees real units sold and can pin a product as popular
+    blocked_by:
+      - ticket_number: 404
+        title: Schema - curator pin columns and sales index
+      - ticket_number: 405
+        title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+    description: Schema - curator pin columns and sales index, API - Best selling sort over real orders, plus NULLS LAST on Featured
+  - ticket_number: 409
+    title: Web - sort options 6 to 8 (Featured, Best selling)
+    blocked_by:
+      - ticket_number: 405
+        title: API - Best selling sort over real orders, plus NULLS LAST on Featured
+    description: API - Best selling sort over real orders, plus NULLS LAST on Featured
+  - ticket_number: 410
+    title: Web - Discover chip carousel on the collection page
+    blocked_by:
+      - ticket_number: 406
+        title: API - GET /api/products/collections for the Discover chips
+    description: API - GET /api/products/collections for the Discover chips
+  - ticket_number: 411
+    title: Web - promo tile occupying a grid cell
+    blocked_by:
+      - ticket_number: 407
+        title: API - catalogue-wide review aggregate for the promo tile
+      - ticket_number: 414
+        title: Seed - settled orders and approved reviews so the real signals have data
+    description: API - catalogue-wide review aggregate for the promo tile, Seed - settled orders and approved reviews so the real signals have data
   - ticket_number: 232
     title: Implement save-address-on-checkout
     blocked_by:
@@ -1912,3 +2312,33 @@ blocked_tickets:
       - ticket_number: 330
         title: E2E - content-manager access matrix spec
     description: E2E - content-manager access matrix spec
+  - ticket_number: 374
+    title: Seed - Reseed the 40 dev products into the new ProductImage shape
+    blocked_by:
+      - ticket_number: 367
+        title: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+    description: API pipeline - Product media orchestrator and upload route (type, crop, originalKey)
+  - ticket_number: 375
+    title: E2E - Row alignment regression spec across breakpoints
+    blocked_by:
+      - ticket_number: 372
+        title: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1)
+      - ticket_number: 374
+        title: Seed - Reseed the 40 dev products into the new ProductImage shape
+    description: Grid - Simplify ProductGrid and fix both conflicting call-sites (D1), Seed - Reseed the 40 dev products into the new ProductImage shape
+  - ticket_number: 412
+    title: Web - admin popularity pin and units-sold column
+    blocked_by:
+      - ticket_number: 408
+        title: API - admin sees real units sold and can pin a product as popular
+    description: API - admin sees real units sold and can pin a product as popular
+  - ticket_number: 413
+    title: E2E - discover chips, both new sorts, promo tile
+    blocked_by:
+      - ticket_number: 409
+        title: Web - sort options 6 to 8 (Featured, Best selling)
+      - ticket_number: 410
+        title: Web - Discover chip carousel on the collection page
+      - ticket_number: 411
+        title: Web - promo tile occupying a grid cell
+    description: Web - sort options 6 to 8 (Featured, Best selling), Web - Discover chip carousel on the collection page, Web - promo tile occupying a grid cell
