@@ -15,7 +15,7 @@ Turns the analysis' §6 phase plan into a concrete sequence of tt-skill invocati
 
 **Phase E — size slice only. Done.** #386 wired `getSizesForOrientation()` in as the source of truth for seeded variants, extended the three ladders to the measured step counts, replaced hand-entered per-variant prices with area pricing at the measured ~31% volume taper, and moved labels to dual-unit inline. The rest of Phase E — PDP restructure — is untouched.
 
-**Everything else is outstanding.** B, C, D, F entirely; E minus the size slice.
+**Phases B and C — done**, as features 2–5 below. **Phase D, the Phase E PDP restructure and Phase F remain**; see *What remains*.
 
 ## Build order, and why it departs from §6
 
@@ -40,9 +40,11 @@ Two of these already exist in ticketrack as empty todo features — use them, do
 | 4 | `global-chrome-parity` | ✅ **done** — #400–#402 | §6 Phase B minus the sale strip: centered wordmark, right cluster, two-row nav, announcement bar, footer USP row + contact column + beige restyle | 2 d |
 | 5 | `advanced-search` | ✅ **done** — #403 | Search drawer over the existing `GET /api/products/search`, wired into the new header | 1 d |
 
-### Delivered so far
+### What was delivered
 
 **Feature 1 — wishlist (#387–#389).** Four auth-gated routes over the `users.wishlistProductIds` column that had existed with nothing reading it. Add/remove are atomic SQL (`array_append` guarded by containment, `array_remove`) rather than read-modify-write, so two tabs cannot clobber each other, and both are idempotent because the UI is an optimistic toggle. The heart is monochrome — `--sale` is reserved for sale prices. The PDP button that had carried `aria-label="Add to wishlist"` and no handler is now wired.
+
+**Feature 2 — collection-page-parity (#390–#394).** Beige header band with breadcrumbs + `BreadcrumbList` JSON-LD; sticky toolbar carrying the count and a sort pill (sort moved out of the filter sidebar, where mesonart does not put it); `GET /api/products/facets` plus a review aggregate on the list; sidebar counts with zero-count options *disabled rather than hidden*; a card star row that renders **nothing** when a product has no approved reviews; and lazy-load paging where `?page=N` means "everything up to N", fetched in one widened request.
 
 **Feature 3 — product-metadata-facets (#395–#399).** Nine facet vocabularies from §1.3, adopted verbatim, as the single source of truth in `@chobii/shared`. Found a **third** parallel vocabulary while doing it: `constants/styles.ts` held `STYLE_CONFIGS`/`SUBJECT_CONFIGS`/`COLOR_CONFIGS` referenced nowhere outside its own test — dead but fully tested, exactly the state the size ladders were in. Now deprecated with a pointer. Five new columns, validated filter params (which also closed a hand-escaped `sql.raw` path), and deterministic seeding so a reseed reproduces the same catalogue.
 
@@ -50,7 +52,6 @@ Two of these already exist in ticketrack as empty todo features — use them, do
 
 **Feature 5 — advanced-search (#403).** A drawer over the search endpoint that had existed for months with no way to reach it.
 
-**Feature 2 — collection-page-parity (#390–#394).** Beige header band with breadcrumbs + `BreadcrumbList` JSON-LD; sticky toolbar carrying the count and a sort pill (sort moved out of the filter sidebar, where mesonart does not put it); `GET /api/products/facets` plus a review aggregate on the list; sidebar counts with zero-count options *disabled rather than hidden*; a card star row that renders **nothing** when a product has no approved reviews; and lazy-load paging where `?page=N` means "everything up to N", fetched in one widened request.
 
 ### Corrections to the analysis, found while building
 
