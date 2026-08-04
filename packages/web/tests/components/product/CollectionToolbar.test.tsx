@@ -33,8 +33,42 @@ describe('result count', () => {
 })
 
 describe('sort', () => {
-  it('offers the six sort options', () => {
-    expect(SORT_OPTIONS).toHaveLength(6)
+  it('offers eight sort options', () => {
+    // mesonart has nine (§1.3.5). The one we do not carry is "Most
+    // relevant": on a collection page with no search query there is nothing
+    // for relevance to mean, and a composite editorial score would be our
+    // heuristic dressed as a measurement.
+    expect(SORT_OPTIONS).toHaveLength(8)
+  })
+
+  it('offers Featured and Best selling', () => {
+    const ids = SORT_OPTIONS.map((option) => option.id)
+    expect(ids).toContain('featuredOrder-asc')
+    expect(ids).toContain('salesCount-desc')
+  })
+
+  it('leads with Featured, the way a merchandised grid opens', () => {
+    expect(SORT_OPTIONS[0]?.id).toBe('featuredOrder-asc')
+  })
+
+  it('keeps the sortBy-sortOrder id contract the route splits on', () => {
+    // routes/posters/index.tsx does `sortId.split('-')`. An id with any
+    // other shape silently produces an undefined sortOrder.
+    for (const option of SORT_OPTIONS) {
+      const parts = option.id.split('-')
+      expect(parts).toHaveLength(2)
+      expect(['asc', 'desc']).toContain(parts[1])
+    }
+  })
+
+  it('reports Best selling by its sortBy value', () => {
+    const onSortChange = vi.fn()
+    render(<CollectionToolbar {...defaults} onSortChange={onSortChange} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Sort by/ }))
+    fireEvent.click(screen.getByRole('option', { name: 'Best selling' }))
+
+    expect(onSortChange).toHaveBeenCalledWith('salesCount-desc')
   })
 
   it('names the current sort on the trigger', () => {

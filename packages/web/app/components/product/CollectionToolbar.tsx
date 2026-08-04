@@ -16,10 +16,28 @@ import { cn } from '~/lib/utils'
 import { buttonVariants } from '~/components/ui/Button'
 
 /**
- * Six options. mesonart has nine — the three we lack (Featured, Most relevant,
- * Best selling) all need a sales or relevance signal that does not exist yet.
+ * Eight options. mesonart has nine (analysis §1.3.5).
+ *
+ * The comment that stood here said all three missing options needed a signal
+ * we lacked. That was only true of one of them:
+ *
+ *   - **Featured** was already reachable through the API — it just sorted
+ *     nulls first, and `featuredOrder` is null on most of the catalogue, so
+ *     the option would have led with the products nobody featured.
+ *   - **Best selling** genuinely had no signal until #405 aggregated units
+ *     from `order_items`. Real orders only; the curator pin reorders on top
+ *     of that number without changing it.
+ *   - **Most relevant** is the one we do not carry, and not for want of a
+ *     signal: on a collection page with no search query there is nothing for
+ *     relevance to mean. A composite editorial score would be our heuristic
+ *     dressed as a measurement.
+ *
+ * The `sortBy-sortOrder` id shape is a contract — routes/posters/index.tsx
+ * splits on the hyphen.
  */
 export const SORT_OPTIONS = [
+  { id: 'featuredOrder-asc', label: 'Featured' },
+  { id: 'salesCount-desc', label: 'Best selling' },
   { id: 'createdAt-desc', label: 'Newest First' },
   { id: 'createdAt-asc', label: 'Oldest First' },
   { id: 'basePrice-asc', label: 'Price: Low to High' },

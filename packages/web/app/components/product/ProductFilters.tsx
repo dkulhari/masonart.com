@@ -24,7 +24,15 @@ import { FACET_GROUPS, type FacetOption } from '@chobii/shared'
 // ============================================================================
 
 export type Orientation = 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
-export type SortOption = 'createdAt' | 'updatedAt' | 'title' | 'basePrice' | 'featuredOrder'
+/** Mirrors the `sortBy` enum on GET /api/products. */
+export type SortOption =
+  | 'createdAt'
+  | 'updatedAt'
+  | 'title'
+  | 'basePrice'
+  | 'featuredOrder'
+  /** Real units sold from settled orders, with the curator pin above it. */
+  | 'salesCount'
 export type SortOrder = 'asc' | 'desc'
 
 export interface FilterState {
