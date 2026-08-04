@@ -4,6 +4,7 @@
 import { MAT_CANVAS, type ProductImage } from "@chobii/shared";
 import { buildSeedImageFromUrl } from "./seed-images";
 import { buildVariantsForOrientation } from "./seed-variants";
+import { facetsForProduct } from "./seed-facets";
 
 /**
  * Orientations the shared ladder covers. `round` has no ladder yet — it falls
@@ -1578,7 +1579,13 @@ async function seedProducts(): Promise<void> {
     // Insert product
     const [insertedProduct] = await db
       .insert(products)
-      .values({ ...productData, images })
+      /**
+       * Facets are derived from the sku, not taken from the literals above.
+       * The hand-written values predate the vocabularies in @chobii/shared and
+       * used the old ad-hoc ids (`minimalist` where the vocabulary says
+       * `minimalist-art`), which the API now rejects outright.
+       */
+      .values({ ...productData, images, ...facetsForProduct(productData.sku) })
       .returning({ id: products.id, orientation: products.orientation });
 
     if (!insertedProduct) {

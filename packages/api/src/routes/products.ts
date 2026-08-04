@@ -16,7 +16,12 @@ import { z } from "zod";
 import { eq, and, or, ilike, desc, asc, sql, inArray } from "drizzle-orm";
 
 import { db } from "../database";
-import { products, productVariants, frames } from "../database/schema/products";
+import {
+  products,
+  productVariants,
+  frames,
+  orientationEnum,
+} from "../database/schema/products";
 import { reviews } from "../database/schema/reviews";
 import {
   styleSchema,
@@ -196,7 +201,19 @@ productsApp.get(
 
     // Filter by orientation
     if (orientation) {
-      conditions.push(eq(products.orientation, orientation));
+      /**
+       * `orientationSchema` widens to `string` (the shared vocabulary types
+       * ids as string), so it does not narrow to the pg enum union on its own.
+       * The cast is safe because validation has already restricted the value
+       * to the six vocabulary ids, and product-facet-columns.test.ts asserts
+       * the enum carries exactly those six.
+       */
+      conditions.push(
+        eq(
+          products.orientation,
+          orientation as (typeof orientationEnum.enumValues)[number]
+        )
+      );
     }
 
     // Filter by featured status
