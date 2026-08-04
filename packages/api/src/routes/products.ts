@@ -34,6 +34,7 @@ import {
   mediumSchema,
   uniquenessSchema,
   availabilitySchema,
+  STYLE_OPTIONS,
 } from "@chobii/shared";
 import { unitsSoldSql } from "../lib/product-sales";
 import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
@@ -549,6 +550,108 @@ productsApp.get(
     }
   }
 );
+
+// ============================================================================
+// GET /api/products/collections - Discover Chips
+// ============================================================================
+
+/**
+ * The Discover chip carousel's data (analysis §1.3.2).
+ *
+ * mesonart runs a scrollable rail of circular collection chips between the
+ * page header and the grid. We have no collection entity, so a "collection"
+ * here is a style from the vocabulary in @chobii/shared — the same list the
+ * filter sidebar renders and the list endpoint validates against. Labels come
+ * from that module and never from the database, which stores ids: a label
+ * read back out of a row is how two views of the same taxonomy drift apart.
+ *
+ * Imagery has no source of its own either. Each chip borrows the main image
+ * of a representative product in that style — highest `featuredOrder` first,
+ * newest as the fallback — so the rail restyles itself as the catalogue
+ * changes instead of waiting on twelve curated assets that do not exist.
+ *
+ * Styles with no active products are dropped: a chip leading to an empty
+ * grid is worse than no chip.
+ *
+ * Registered BEFORE `/:slug`, same as `/facets`.
+ */
+productsApp.get("/collections", async (c) => {
+  const cacheKey = `${CacheKeys.PRODUCT}collections:v1`;
+
+  const cached = await getCached<Record<string, unknown>>(cacheKey);
+  if (cached) return c.json({ ...cached, fromCache: true });
+
+  try {
+    /**
+     * One grouped pass. `styles` is text[], so it needs unnest before it can
+     * be grouped — the same shape as `arrayFacet` in the facets route below.
+     *
+     * The representative image is picked inside the aggregate rather than by
+     * a second query: array_agg with an ORDER BY takes the winner per group
+     * in the same scan. Prefer the image explicitly typed `main`; fall back
+     * to the first element, which the ProductImage contract documents as the
+     * main image after sorting.
+     */
+    const rows = await db
+      .select({
+        style: sql<string>`t.style`,
+        count: sql<number>`count(*)::int`,
+        image: sql<
+          string | null
+        >`(array_agg(t.image order by t.featured_order asc nulls last, t.created_at desc))[1]`,
+      })
+      .from(
+        sql`(
+          select
+            unnest(${products.styles}) as style,
+            coalesce(
+              (
+                select element ->> 'url'
+                from jsonb_array_elements(${products.images}) as element
+                where element ->> 'type' = 'main'
+                limit 1
+              ),
+              ${products.images} -> 0 ->> 'url'
+            ) as image,
+            ${products.featuredOrder} as featured_order,
+            ${products.createdAt} as created_at
+          from ${products}
+          where ${products.status} = 'active'
+        ) as t`
+      )
+      .groupBy(sql`t.style`);
+
+    const byStyle = new Map(rows.map((row) => [row.style, row]));
+
+    /**
+     * Driven by the vocabulary, not the query result: this both supplies the
+     * labels and fixes the order, and it silently drops any free-text value
+     * that reached the column — such a value has no label and filtering on
+     * it would 400.
+     */
+    const collections = STYLE_OPTIONS.flatMap((option) => {
+      const row = byStyle.get(option.id);
+      if (!row || row.count <= 0) return [];
+      return [
+        {
+          id: option.id,
+          label: option.label,
+          count: row.count,
+          image: row.image ?? null,
+        },
+      ];
+    });
+
+    const result = { collections };
+
+    await setCached(cacheKey, result, CACHE_TTL_PRODUCTS);
+
+    return c.json(result);
+  } catch (error) {
+    console.error("Error fetching collections:", error);
+    return c.json({ error: "Failed to fetch collections" }, 500);
+  }
+});
 
 // ============================================================================
 // GET /api/products/facets - Per-Option Counts
