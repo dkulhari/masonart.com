@@ -54,8 +54,8 @@ const sampleProducts: NewProduct[] = [
    * media, and do not demote it below featuredOrder 0.
    *
    * These URLs are the floor, not the ceiling: REFERENCE_MEDIA overrides them
-   * with local fixture imagery when that directory exists, and gives nine other
-   * products room mockups too. Either way this one has four.
+   * with local fixture imagery when that directory exists, which gives every
+   * other product room mockups too. Either way this one has four.
    */
   {
     sku: "FIX-001",
@@ -1554,17 +1554,17 @@ async function clearData(): Promise<void> {
  * falls back to its declared URL.
  */
 const REFERENCE_MEDIA: Record<string, string> = {
-  // The first ten also have room mockups; the rest are artwork only.
-  "wabi-sabi-study": "tx462", // misty mountain, heavy texture (+3 rooms)
-  "floating-islands": "tx463", // mountains dissolving into mist (+3 rooms)
-  "imperfect-vessel": "tx450", // lone tree against a broken white field (+2 rooms)
-  "weathered-stone": "tx466", // eroded cliff face (+3 rooms)
-  "paper-layers": "tx449", // two-panel set, layered (+3 rooms)
-  "desert-bloom": "tx070", // seed-head field (+3 rooms)
-  "mountain-majesty": "tx218", // peak above a river (+3 rooms)
-  "ocean-horizon": "tx556", // sea against a pale sky (+3 rooms)
-  "serene-waves": "tx557", // abstract water (+3 rooms)
-  "forest-whispers": "tx532", // trees over still water (+3 rooms)
+  // Every entry has a main artwork plus three room scenes, bar the two noted.
+  "wabi-sabi-study": "tx462", // misty mountain, heavy texture
+  "floating-islands": "tx463", // mountains dissolving into mist
+  "imperfect-vessel": "tx450", // lone tree against a broken white field (2 rooms)
+  "weathered-stone": "tx466", // eroded cliff face
+  "paper-layers": "tx449", // two-panel set, layered
+  "desert-bloom": "tx070", // seed-head field
+  "mountain-majesty": "tx218", // peak above a river
+  "ocean-horizon": "tx556", // sea against a pale sky
+  "serene-waves": "tx557", // abstract water
+  "forest-whispers": "tx532", // trees over still water
 
   "cosmic-harmony": "sa126", // celestial figure
   "golden-flow": "sg259", // gold tree, heavy impasto
