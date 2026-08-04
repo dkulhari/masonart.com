@@ -11,6 +11,7 @@ import { getRequest } from '@tanstack/react-start/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BRAND_NAME, BRAND_TAGLINE } from '@chobii/shared'
 import type * as React from 'react'
+import { AnnouncementBar } from '~/components/layout/AnnouncementBar'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
 import { buttonVariants } from '~/components/ui/Button'
@@ -249,6 +250,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           Skip to content
         </a>
         <div className="relative flex min-h-screen flex-col">
+          {!isAdminRoute && <AnnouncementBar />}
           {!isAdminRoute && <Header />}
           <main id="main-content" tabIndex={-1} className="flex-1">
             {children}
