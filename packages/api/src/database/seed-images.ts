@@ -10,16 +10,34 @@
  *
  * Downloads are cached under .cache/seed-images/ (gitignored) so repeated runs
  * are fast and work offline once warm.
+ *
+ * A second source exists alongside the remote one: a local directory of
+ * reference imagery. See SEED_MEDIA_DIR below.
  */
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ProductImage, ProductImageType } from "@chobii/shared";
 import { buildProductMedia } from "../lib/product-media";
 
 const CACHE_DIR = join(process.cwd(), ".cache", "seed-images");
+
+/**
+ * Local reference imagery, gitignored and machine-local.
+ *
+ * Holds an evaluation set pulled from a live storefront while working the
+ * design-parity features: real artwork plus real room mockups, which the
+ * stock-photo URLs in this seed cannot supply. It is test-only fixture data —
+ * the files are third-party and watermarked, they are not in the repository,
+ * and nothing here is publishable.
+ *
+ * Absence is the normal case, not an error. A clone without the directory
+ * seeds from the declared remote URLs exactly as it did before this existed.
+ */
+export const SEED_MEDIA_DIR =
+  process.env.SEED_MEDIA_DIR ?? join(process.cwd(), ".cache", "seed-media");
 
 /**
  * Fetch a remote image once, then serve it from disk.
@@ -75,4 +93,55 @@ export async function buildSeedImageFromUrl(
   type: ProductImageType = "main"
 ): Promise<ProductImage> {
   return buildSeedImage(await fetchCached(url), filename, altText, sortOrder, type);
+}
+
+/** One file from SEED_MEDIA_DIR, already classified by its name. */
+export interface LocalSeedMedia {
+  file: string;
+  type: ProductImageType;
+}
+
+/**
+ * Collect one product's reference files by naming convention:
+ * `<prefix>-main.webp` plus any `<prefix>-room-N.webp`.
+ *
+ * Returns [] whenever the directory or the main file is missing — the caller
+ * reads an empty set as "no local media, use the declared URLs", so a missing
+ * directory degrades to the previous behaviour instead of failing the seed.
+ * The main file is required: room mockups without the artwork they frame would
+ * make a gallery whose first slide is somebody else's living room.
+ */
+export function localSeedMediaSet(
+  prefix: string,
+  dir: string = SEED_MEDIA_DIR
+): LocalSeedMedia[] {
+  const main = `${prefix}-main.webp`;
+  if (!existsSync(join(dir, main))) return [];
+
+  const rooms = readdirSync(dir)
+    .filter((name) => name.startsWith(`${prefix}-room-`) && name.endsWith(".webp"))
+    .sort();
+
+  return [
+    { file: main, type: "main" },
+    ...rooms.map((file) => ({ file, type: "room-mockup" as ProductImageType })),
+  ];
+}
+
+/** Build a record from a file in SEED_MEDIA_DIR rather than a remote URL. */
+export async function buildSeedImageFromFile(
+  file: string,
+  filename: string,
+  altText: string,
+  sortOrder: number,
+  type: ProductImageType = "main",
+  dir: string = SEED_MEDIA_DIR
+): Promise<ProductImage> {
+  return buildSeedImage(
+    await readFile(join(dir, file)),
+    filename,
+    altText,
+    sortOrder,
+    type
+  );
 }

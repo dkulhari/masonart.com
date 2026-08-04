@@ -2,7 +2,11 @@
 // Populates the database with sample products, variants, and frames for development
 
 import { MAT_CANVAS, type ProductImage } from "@chobii/shared";
-import { buildSeedImageFromUrl } from "./seed-images";
+import {
+  buildSeedImageFromFile,
+  buildSeedImageFromUrl,
+  localSeedMediaSet,
+} from "./seed-images";
 import { buildVariantsForOrientation } from "./seed-variants";
 import { facetsForProduct } from "./seed-facets";
 
@@ -41,13 +45,17 @@ import {
  */
 const sampleProducts: NewProduct[] = [
   /**
-   * HOVER FIXTURE — the only product with multiple media.
+   * HOVER FIXTURE — guaranteed multiple media.
    *
-   * The rest of the catalogue has one image each, which correctly renders a
-   * static card. This one exercises the hover path: cursor-X scrub across three
-   * room-mockup slides, plus the n-1 dot indicator. #375's e2e spec locates the
-   * card by the presence of dots, so this product is what makes that assertion
-   * possible. Do not reduce it below four media.
+   * Exercises the hover path: cursor-X scrub across three room-mockup slides,
+   * plus the n-1 dot indicator. #375's e2e spec locates the card by the
+   * presence of dots, and this product leads the home grid at featuredOrder 0,
+   * so it is what the spec's .first() resolves to. Do not reduce it below four
+   * media, and do not demote it below featuredOrder 0.
+   *
+   * These URLs are the floor, not the ceiling: REFERENCE_MEDIA overrides them
+   * with local fixture imagery when that directory exists, and gives nine other
+   * products room mockups too. Either way this one has four.
    */
   {
     sku: "FIX-001",
@@ -1529,22 +1537,97 @@ async function clearData(): Promise<void> {
  * Failures are non-fatal — a dead source URL should leave that one product
  * without imagery rather than abort the whole seed.
  */
+/**
+ * Products that prefer local reference imagery over their declared URL.
+ *
+ * Maps a seed slug to a file prefix under SEED_MEDIA_DIR. The set is an
+ * evaluation fixture captured from a live storefront during the design-parity
+ * work: real textured artwork plus real room mockups, which stock-photo URLs
+ * cannot supply and which the PDP gallery and the card hover both need.
+ *
+ * It is test-only. The files are third-party and carry that storefront's
+ * watermark, they are gitignored and absent from the repository, and none of
+ * it is publishable — it exists so the local catalogue looks like a catalogue.
+ *
+ * Pairing is by subject, so a product's copy still describes its picture.
+ * When the directory is missing the whole map goes inert and every product
+ * falls back to its declared URL.
+ */
+const REFERENCE_MEDIA: Record<string, string> = {
+  "wabi-sabi-study": "tx462", // misty mountain, heavy texture
+  "floating-islands": "tx463", // mountains dissolving into mist
+  "imperfect-vessel": "tx450", // lone tree against a broken white field
+  "weathered-stone": "tx466", // eroded cliff face
+  "paper-layers": "tx449", // two-panel set, layered
+  "desert-bloom": "tx070", // seed-head field
+  "mountain-majesty": "tx218", // peak above a river
+  "ocean-horizon": "tx556", // sea against a pale sky
+  "serene-waves": "tx557", // abstract water
+  "forest-whispers": "tx532", // trees over still water
+};
+
+/** A resolved image source: a local fixture file, or a remote URL. */
+interface SeedImageSource {
+  local: boolean;
+  ref: string;
+  altText: string;
+  type: ProductImage["type"];
+}
+
+/**
+ * Choose where one product's imagery comes from.
+ *
+ * Local reference media wins when present, because it is the only source with
+ * matching room mockups. Otherwise the declared URLs are used unchanged.
+ */
+function sourcesFor(productData: NewProduct): SeedImageSource[] {
+  const prefix = REFERENCE_MEDIA[productData.slug ?? ""];
+  const local = prefix ? localSeedMediaSet(prefix) : [];
+
+  if (local.length > 0) {
+    return local.map((media) => ({
+      local: true,
+      ref: media.file,
+      type: media.type,
+      altText:
+        media.type === "main"
+          ? `${productData.title} artwork`
+          : `${productData.title} framed on a wall`,
+    }));
+  }
+
+  return ((productData.images ?? []) as ProductImage[]).map((img) => ({
+    local: false,
+    ref: img.url,
+    type: img.type,
+    altText: img.altText,
+  }));
+}
+
 async function processProductImages(
   productData: NewProduct
 ): Promise<ProductImage[]> {
-  const declared = (productData.images ?? []) as ProductImage[];
+  const declared = sourcesFor(productData);
   const built: ProductImage[] = [];
 
-  for (const [i, img] of declared.entries()) {
+  for (const [i, src] of declared.entries()) {
     try {
       built.push(
-        await buildSeedImageFromUrl(
-          img.url,
-          `${productData.slug}-${i}.jpg`,
-          img.altText,
-          img.sortOrder ?? i,
-          img.type
-        )
+        src.local
+          ? await buildSeedImageFromFile(
+              src.ref,
+              `${productData.slug}-${i}.webp`,
+              src.altText,
+              i,
+              src.type
+            )
+          : await buildSeedImageFromUrl(
+              src.ref,
+              `${productData.slug}-${i}.jpg`,
+              src.altText,
+              i,
+              src.type
+            )
       );
     } catch (error) {
       console.warn(
