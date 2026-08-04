@@ -9,6 +9,7 @@
 1. **Visual pass** — live browser capture at 1440×900, both sites side by side.
 2. **Source pass** — raw HTML/JSON pulled from mesonart production (`/`, `/collections/artworks`, `/products/<handle>`, `/products/<handle>.js`) plus their served CSS custom properties; our side read from source in `packages/web`.
 3. **Re-verification (2026-08-04)** — fresh screenshots via headless Chrome at 1440×900, used to settle every point where the two passes disagreed. See [Appendix C](#appendix-c--corrections-from-re-verification).
+4. **Re-run (2026-08-04, after #376–#403 and the seed imagery work)** — both sites measured again from *computed styles and DOM counts*, not from source or memory. Status columns below reflect that run. See [Appendix D](#appendix-d--re-run-after-376403).
 
 Screenshots in this folder (all 1440px wide, captured 2026-08-04):
 
@@ -139,30 +140,37 @@ Mega-menu URL inventory: `/collections/{artworks, new, style_wabi-sabi, plaste-a
 
 Left column: mesonart's served CSS custom properties, cross-checked against rendered pixels. Right: our [globals.css](../../../packages/web/app/styles/globals.css) / [tailwind.config.ts](../../../packages/web/tailwind.config.ts) and what actually renders.
 
-| Token | mesonart | chobii — declared | chobii — rendered | Status |
+Both columns re-measured 2026-08-04 from computed styles in a live browser.
+
+| Token | mesonart (measured) | chobii (measured) | Was | Now |
 |---|---|---|---|---|
-| Body font | Poppins **300**, line-height 1.2 | `--font-sans: Poppins` | Poppins **400** | ⚠️ weight |
-| Heading font | **Urbanist 300**, line-height 1, H1 ≈ 44px | `--font-heading: Urbanist` | **Poppins 700** — token consumed nowhere | ❌ |
-| Product title | Poppins 500, `clamp(1rem, …, 1.25rem)` | `text-base font-medium` | fixed 16px | ⚠️ no clamp |
-| Nav | Urbanist 500, `clamp(0.875rem, …, 1.125rem)` | shadcn default | Poppins 500 fixed | ❌ |
-| Text color | `rgb(23 23 23)` | `--foreground: 0 0% 9%` | same | ✅ |
-| Primary / CTA | **`#171717` pill, white text, radius 60px, 2px border**; outline-pill variant | `--primary: 25 95% 53%` | orange fills, `rounded-lg` | ❌ **largest single delta** |
-| Accent | red `rgb(225 29 72)` — sale price/tag only | `--brand-*` amber scale | orange everywhere + purple AI badges | ❌ |
-| Section band | beige `~#E5E2D5`; collections `rgb(219 216 194)` | none | white / light-gray only | ❌ |
-| Highlight | `rgb(255 221 191)` peach | none | — | ❌ |
-| Rating star | `rgb(245 158 11)` amber-500 | `--rating: 38 92% 50%` (identical) | hardcoded `fill-yellow-400` | ⚠️ token unused |
-| Card radius | `clamp(10px, 1.053vw, 20px)` | `--card-radius`, same clamp | same | ✅ |
-| Card border/shadow | border 0, shadow opacity 0.1, 0 offset | none | none | ⚠️ |
-| Page width | **1600px** | container `2xl: 1400px` | 1400px | ❌ |
-| Page padding | 20px | `2rem` | 32px | ⚠️ |
-| Motion | `.5s cubic-bezier(.3,1,.3,1)` / `.3s cubic-bezier(.7,0,.3,1)` | `--ease-primary` / `--ease-fast`, identical | same | ✅ |
-| Placeholder / mat | `rgb(250 250 250)` | `--mat: 0 0% 98%` | same | ✅ |
-| Display headings | split-word spans with reveal animation | — | bold sans, no animation | ❌ |
-| Dark mode | none | full dark palette | — | ours extra |
+| Body font | Poppins **300**, line-height 1.2 | Poppins **300**, line-height 19.2px (= 1.2) | ⚠️ 400 | ✅ |
+| Heading font | **Urbanist 300**, line-height 1 | Urbanist **300**, line-height = font-size | ❌ Poppins 700 | ✅ |
+| Product title | Poppins 500, `clamp(1rem, …, 1.25rem)` | `text-product`, same clamp | ⚠️ fixed 16px | ✅ |
+| Nav | Urbanist 500, `clamp(0.875rem, …, 1.125rem)` | `--font-nav-size`, same clamp | ❌ | ✅ |
+| Text color | `rgb(23 23 23)` | `rgb(23, 23, 23)` | ✅ | ✅ |
+| Primary / CTA | `#171717`, radius `3.75rem`, border `2px` | `--primary: 0 0% 9%`, `--radius-pill: 3.75rem`, `--border-button: 2px` | ❌ orange, `rounded-lg` | ✅ |
+| Accent | `rgb(225 29 72)` — sale price/tag only | `--sale: 347 77% 50%` (= `rgb(225 29 72)`) | ❌ | ✅ |
+| Section band | beige `~#E5E2D5` | `--band: 49 24% 87%` + `--band-strong` | ❌ none | ✅ |
+| Highlight | `rgb(255 221 191)` peach | `--highlight: 28 100% 87.5%` | ❌ none | ✅ |
+| Rating star | `rgb(245 158 11)` | `--rating: 38 92% 50%` (= same), consumed | ⚠️ unused | ✅ |
+| Card radius | `clamp(10px, 1.053vw, 20px)` | same clamp | ✅ | ✅ |
+| Page width | **1600px** | **1600px** | ❌ 1400px | ✅ |
+| Page padding | 20px | 20px | ⚠️ 32px | ✅ |
+| Motion | `.5s cubic-bezier(.3,1,.3,1)` / `.3s cubic-bezier(.7,0,.3,1)` | identical | ✅ | ✅ |
+| Placeholder / mat | `rgb(250 250 250)` | `--mat: 0 0% 98%` | ✅ | ✅ |
+| Display headings | split-word spans with reveal | `DisplayHeading`, same | ❌ | ✅ |
+| Card border/shadow | border 0, shadow opacity 0.1 | none | ⚠️ | ⚠️ open |
+| Dark mode | none | full dark palette | ours extra | ours extra |
 
 **Already at parity** (product-grid-alignment work, #360–#375): grid columns 2 / md:3 / xl:4, gaps 20px row / 13.5px column, square media contract, cursor-zone hover slides, card radius clamp, easing curves, mat colour, and the Poppins/Urbanist webfonts being loaded at all.
 
-**The core finding:** the token file already adopted mesonart's values, but **components do not consume them.** `--font-heading` appears exactly once — its own declaration at `globals.css:126` — and no component uses a `font-heading` utility. `__root.tsx` loads Poppins 300/400/500 and Urbanist 300/500; **weight 700 is never loaded**, yet every heading is `font-bold`, so headings render faux-bold Poppins. Fixing consumption is cheap and moves the needle more than any new component.
+**The core finding is closed.** It read: *the token file already adopted mesonart's values, but components do not consume them* — `--font-heading` declared once and used nowhere, every heading `font-bold` at a weight that was never loaded. Phase A (#376–#385) wired consumption at the base layer and added the `Button` / `SectionBand` / `DisplayHeading` primitives that did not exist. §2 now measures green on every row but card shadow.
+
+Two things that made it stick, both worth remembering because neither was in the original plan:
+
+- **There was no `Button` component anywhere in `packages/web`.** That absence is the mechanism by which orange reached ~54 files — with nothing to change centrally, every call site hardcoded.
+- **tailwind-merge silently deleted the new utilities.** `text-button` filed under the same group as text *colour*, so any adjacent `text-muted-foreground` removed it, and `rounded-none` could not override `rounded-pill`. Custom scales need `extendTailwindMerge` or the tokens are declared and then thrown away at runtime. See [utils.ts](../../../packages/web/app/lib/utils.ts).
 
 ---
 
@@ -170,29 +178,33 @@ Left column: mesonart's served CSS custom properties, cross-checked against rend
 
 ### 3.1 Global chrome
 
-| mesonart | chobii today | Gap |
+| mesonart | chobii today (measured 2026-08-04) | State |
 |---|---|---|
-| Sale strip + countdown | none | New component, admin-configurable |
-| Announcement bar (social / rotator / currency) | none | New component |
-| Centered logo; Search / Login / Wishlist / Cart right | Left logo, 4 links, cart + account | Restructure [Header.tsx](../../../packages/web/app/components/layout/Header.tsx); add Search and Wishlist |
-| Two-row nav (pages + styles) | Single row (Posters / Create / Gallery / About) | New nav data + a styles row fed from categories |
-| Floating offer tab + chat | none | Optional |
-| 4-col footer + USP row | 3-col footer ✅ structure, no USP row, no contact column | Add USP strip + contact column, restyle beige |
+| Sale strip + countdown | none | ❌ **blocked** — no promotion entity in the schema. A countdown to a sale that does not exist is the fabricated-urgency pattern this document rules out |
+| Announcement bar (social / rotator / currency) | present, social left / rotating message centre | ✅ #400 — no currency selector (single-currency store) |
+| Centered logo; Search / Login / Wishlist / Cart right | wordmark centred within 12px of header centre; all four actions present | ✅ #401 |
+| Two-row nav (pages + styles) | 2 nav rows, 19 style links generated from `STYLE_OPTIONS` | ✅ #401 |
+| Floating offer tab + chat | none | ❌ optional; theirs still runs a chat bubble |
+| 4-col footer + USP row | 4 columns incl. contact, USP strip above, beige | ✅ #402 |
 
 ### 3.2 Home
 
-| mesonart | chobii today | Gap |
+Home is the least-touched page: 6 sections against their 12, and the only Phase A change visible is typographic. Measured 2026-08-04.
+
+| mesonart | chobii today (measured) | State |
 |---|---|---|
-| Contained slideshow, room photography, one outline-pill CTA | Orange-gradient marketing hero, badge, 2 CTAs, trust row | **Full rebuild** — needs lifestyle photography |
-| Best Seller tabs + carousels | Static 8-card Featured grid | Tabs + carousel component |
-| Shop By Popular photo tiles (8 subjects) | "Shop by Style" gradient tiles (4, images 404 → gradient fallback) | Swap to photo tiles, real assets |
-| Shop by Room band with live counts | none | New section + room taxonomy on products + count endpoint |
-| New In carousel | none | Reuse carousel |
-| Orientation pills | exists only as a filter | Small section |
-| Featured Artists | none | New section — needs an artist entity |
-| Reviews strip + carousel | none on home | Reviews API exists; aggregate + carousel |
-| Brand story band + video | "Why Choose" cards + AI banner | Restyle; keep AI banner as our differentiator |
-| ~8 rails before brand copy | 1 product rail | Rail-density gap |
+| Contained slideshow, room photography, one outline-pill CTA | text hero, badge, 2 CTAs, trust row — no photography | ❌ **now buildable.** The blocker was imagery; the seed carries 41 artworks and 122 room scenes, three per product |
+| Best Seller tabs + carousels | static 8-card "Featured Collection" grid | ❌ tabs + carousel component |
+| Shop By Popular photo tiles (8 subjects) | "Shop by Style" — **4 gradient tiles**, still gradient fallbacks | ❌ **now buildable** — swap to room-scene tiles |
+| Shop by Room band with live counts | none | ❌ component only — the room taxonomy (#395–#399) and the count endpoint (#392) both exist |
+| New In carousel | none | ❌ reuse carousel |
+| Orientation pills | filter only | ❌ small section; `ORIENTATION_OPTIONS` is shared already |
+| Featured Artists | none | ❌ **blocked** — needs an artist entity |
+| Reviews strip + carousel | none on home | ❌ aggregate exists on the product list (#392); needs a home strip |
+| Brand story band + video | "Why Choose" cards + AI banner | ⚠️ restyle; keep the AI banner as our differentiator |
+| ~8 rails before brand copy | 1 product rail | ❌ rail-density gap |
+
+**The single biggest change since the last run.** *Dependencies and risks* named imagery as the real bottleneck, and Phase D's own line assumed "room mockups our seed pipeline already generates" when three existed in total. There are now 122. That converts Phase D from *cannot start* to *can build, cannot ship*: the imagery is third-party placeholder, so it is fine for developing hero, Shop-by-Room and UGC sections against, and not fine to launch on. Replacing it is a content task, not an engineering one, and it no longer blocks the code.
 
 ### 3.3 Collection page
 
@@ -218,17 +230,22 @@ Gaps:
 
 Structure already broadly matches — gallery left, buy panel right, size list, frame selector, trust icons, similar products. See `chobii-pdp-buybox.jpeg` vs `mesonart-pdp-buybox.jpeg`.
 
-Gaps:
+**The least-changed page.** Everything below was re-measured on `/posters/wabi-sabi-study` 2026-08-04; only two rows moved, both as side effects of work aimed elsewhere.
 
-- **Thumbnail rail**: ours horizontal below the gallery, theirs vertical at left. CSS restructure. No zoom modal on ours.
-- **Buy-panel order and content**: no social proof (saves / in-carts), no urgency line, no delivery ETA, no sale countdown, no star rating in the panel.
-- **CTA**: ours is a plain button; theirs is a full-width black pill with the price inside — "Add to cart — ₹1,699.00".
-- **Heading**: ours bold Poppins 30px; theirs Urbanist 300 at ~44px.
-- **Size selector**: theirs a dropdown with dual units; ours a row list with a "Show in cm" toggle — functionally equivalent, restyle only.
-- **Frame selector**: ours is richer (image, description, price delta, material); theirs is text radio pills. **Keep ours**, restyle to monochrome.
-- **Trust**: ours is a static 3-icon row; theirs is 4 accordions opening drawers.
-- **Missing sections**: Visually Similar, More to Love, artist block, UGC "in real life", "Why us", art advisory, tabbed detail block with a spec table, sticky add-to-cart bar, share row, view-on-wall/VR.
-- **Reviews**: we have the Loox-style layout skeleton; needs real data rendering.
+Closed:
+
+- **Heading** — Urbanist 300, not bold Poppins. Phase A, at the base layer, no PDP change needed.
+- **Size selector** — dual-unit labels inline (`24" x 32" / 61 × 81 cm`), from #386.
+- **Reviews have real data** now (12 approved across 9 products, seeded with the settled orders that authorise them, #414). The skeleton has something to render.
+
+Still open, all measured absent:
+
+- **Thumbnail rail** horizontal below the gallery, theirs vertical at left. No zoom modal.
+- **Buy panel**: no star rating in the panel, no delivery ETA, no social proof. Saves and in-carts are now *derivable* — wishlist rows exist (#387) and cart rows always did — so "real counter or nothing" can finally be satisfied with a counter.
+- **CTA** reads "Add to Cart" with no price in it; theirs carries the price.
+- **Trust**: static icon row, no accordions (0 `<details>` on the page).
+- **Missing sections**: Visually Similar, More to Love, artist block, UGC, "Why us", tabbed detail block, sticky add-to-cart, share row, view-on-wall.
+- **"Show in cm" toggle** is still rendered and is now both redundant against the dual-unit labels *and* dead — its `onClick` body is empty. It should be deleted, not restyled.
 
 ### 3.5 Pages we don't have
 
@@ -473,6 +490,37 @@ Points where the two source analyses disagreed, settled against the 2026-08-04 s
 | Our size units | We already have a "Show in cm" toggle — dual units are partly covered, contrary to one reading. |
 | Currency | Their storefront localises: INR in India, USD in the US. Both captures were valid. |
 | Phase-A payoff | ~50%, not ~80%. |
+
+## Appendix D — re-run after #376–#416
+
+Method: both sites loaded in headless Chrome at 1440×900 and measured from `getComputedStyle` and DOM counts. Nothing below is read from source or from the previous pass. Screenshots and raw JSON under `.cache/audit/` (gitignored).
+
+**Where parity now stands**
+
+| Area | State |
+|---|---|
+| §2 design tokens | **Closed.** Every row measures green but card shadow. The "tokens declared, never consumed" finding is resolved |
+| §3.1 global chrome | **Closed** but the sale strip — announcement bar, centred wordmark, two nav rows (19 style links), search, wishlist, 4-column footer with USP strip |
+| §3.3 collection page | **Closed** but four items: Discover chips, promo tile, facet counts and sort 6→8 all landed. Remaining: quick-view / "Choose options", "Most relevant" sort, mat-colour decision, catalogue depth |
+| §3.2 home | **Barely started.** 6 sections against their 12. Only Phase A typography is visible |
+| §3.4 product page | **Barely started.** Heading, dual-unit sizes and real review data only |
+| §5 sizes and variants | **Closed** (#386) |
+
+**Changes on their side since the first pass** — the storefront is not static, so re-measure before trusting any number here:
+
+- Sale strip copy rotated; the countdown mechanic is unchanged.
+- Catalogue 3,878 → 3,890 products.
+- Sort list unchanged at 9. Facet groups unchanged at 10, and ours now matches that list exactly.
+
+**Corrections to the previous pass, found by measuring**
+
+- **The imagery bottleneck is no longer an engineering blocker.** *Dependencies and risks* treats photography as gating Phase D. The seed now carries 41 artworks and 122 room scenes. They are third-party placeholders, so Phase D can be *built* and not *shipped* — which is a content dependency, not a code one. The Discover chips proved the same point earlier: #410 needed per-collection imagery and solved it by borrowing a representative product's artwork rather than waiting for photography.
+- **"No star rating on cards" cannot be measured by testid** — `ProductRating` carries none. Two runs with different selectors gave 2 and 0; both were selector artifacts. The component's actual contract is: render nothing without approved reviews. 9 of 41 products have them.
+- **A blank-looking grid in a screenshot is usually the screenshot.** A full-page capture showed empty media boxes; instrumenting the page found 108 images, 0 broken. Check `naturalWidth` before believing a picture.
+
+**Found while measuring, not previously recorded**
+
+- Signed-out visitors generate **repeated `401 /api/wishlist` requests** on the collection page — six in one load. Harmless but noisy, and it means the wishlist store fetches before it knows whether anyone is logged in.
 
 ## Appendix D — corrections from building it (2026-08-04, #404–#414)
 
