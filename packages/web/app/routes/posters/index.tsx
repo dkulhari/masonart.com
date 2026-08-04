@@ -72,6 +72,11 @@ export interface PostersSearchParams {
   subjects?: string
   colors?: string
   rooms?: string
+  vibe?: string
+  aesthetic?: string
+  medium?: string
+  uniqueness?: string
+  availability?: string
   orientation?: Orientation
   priceMin?: number
   priceMax?: number
@@ -114,6 +119,11 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
     if (params.subjects) apiParams.subjects = params.subjects
     if (params.colors) apiParams.colors = params.colors
     if (params.rooms) apiParams.rooms = params.rooms
+    if (params.vibe) apiParams.vibe = params.vibe
+    if (params.aesthetic) apiParams.aesthetic = params.aesthetic
+    if (params.medium) apiParams.medium = params.medium
+    if (params.uniqueness) apiParams.uniqueness = params.uniqueness
+    if (params.availability) apiParams.availability = params.availability
     if (params.orientation) apiParams.orientation = params.orientation
     if (params.priceMin) apiParams.priceMin = params.priceMin
     if (params.priceMax) apiParams.priceMax = params.priceMax
@@ -155,6 +165,11 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         subjects: params.subjects?.split(',').filter(Boolean) || [],
         colors: params.colors?.split(',').filter(Boolean) || [],
         rooms: params.rooms?.split(',').filter(Boolean) || [],
+        vibe: params.vibe?.split(',').filter(Boolean) || [],
+        aesthetic: params.aesthetic?.split(',').filter(Boolean) || [],
+        medium: params.medium?.split(',').filter(Boolean) || [],
+        uniqueness: params.uniqueness,
+        availability: params.availability,
         orientation: params.orientation,
         priceMin: params.priceMin,
         priceMax: params.priceMax,
@@ -181,6 +196,9 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         subjects: [],
         colors: [],
         rooms: [],
+        vibe: [],
+        aesthetic: [],
+        medium: [],
         sortBy: 'createdAt',
         sortOrder: 'desc',
       },
@@ -200,6 +218,11 @@ export const Route = createFileRoute('/posters/')({
       subjects: search.subjects as string | undefined,
       colors: search.colors as string | undefined,
       rooms: search.rooms as string | undefined,
+      vibe: search.vibe as string | undefined,
+      aesthetic: search.aesthetic as string | undefined,
+      medium: search.medium as string | undefined,
+      uniqueness: search.uniqueness as string | undefined,
+      availability: search.availability as string | undefined,
       orientation: search.orientation as Orientation | undefined,
       priceMin: search.priceMin ? Number(search.priceMin) : undefined,
       priceMax: search.priceMax ? Number(search.priceMax) : undefined,
@@ -581,6 +604,11 @@ function PostersPage() {
                       subjects: [],
                       colors: [],
                       rooms: [],
+                      vibe: [],
+                      aesthetic: [],
+                      medium: [],
+                      uniqueness: undefined,
+                      availability: undefined,
                       orientation: undefined,
                       priceMin: undefined,
                       priceMax: undefined,
@@ -619,6 +647,11 @@ function PostersPage() {
                       subjects: [],
                       colors: [],
                       rooms: [],
+                      vibe: [],
+                      aesthetic: [],
+                      medium: [],
+                      uniqueness: undefined,
+                      availability: undefined,
                       orientation: undefined,
                       priceMin: undefined,
                       priceMax: undefined,

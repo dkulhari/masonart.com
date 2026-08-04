@@ -17,6 +17,7 @@ import {
   Check,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
+import { FACET_GROUPS, type FacetOption } from '@chobii/shared'
 
 // ============================================================================
 // Types
@@ -31,6 +32,12 @@ export interface FilterState {
   subjects: string[]
   colors: string[]
   rooms: string[]
+  /** Expanded facets — see FACET_GROUPS in @chobii/shared. */
+  vibe: string[]
+  aesthetic: string[]
+  medium: string[]
+  uniqueness?: string
+  availability?: string
   orientation?: Orientation
   priceMin?: number
   priceMax?: number
@@ -65,13 +72,6 @@ export interface ProductFiltersProps {
    * rather than flashing zeros.
    */
   facetCounts?: Record<string, Map<string, number>> | null
-  styleOptions?: FilterOption[]
-  /** Available subject options */
-  subjectOptions?: FilterOption[]
-  /** Available color options */
-  colorOptions?: FilterOption[]
-  /** Available room options */
-  roomOptions?: FilterOption[]
   /** Whether to show in mobile mode */
   isMobile?: boolean
   /** Callback to close mobile filters */
@@ -84,63 +84,6 @@ export interface ProductFiltersProps {
 // Default Filter Options
 // ============================================================================
 
-const DEFAULT_STYLE_OPTIONS: FilterOption[] = [
-  { id: 'wabi-sabi', name: 'Wabi-Sabi' },
-  { id: 'minimalist', name: 'Minimalist' },
-  { id: 'abstract', name: 'Abstract' },
-  { id: 'modern-contemporary', name: 'Modern Contemporary' },
-  { id: 'vintage', name: 'Vintage' },
-  { id: 'retro', name: 'Retro' },
-  { id: 'pop-art', name: 'Pop Art' },
-  { id: 'bohemian', name: 'Bohemian' },
-  { id: 'photographic', name: 'Photographic' },
-  { id: 'typography', name: 'Typography' },
-]
-
-const DEFAULT_SUBJECT_OPTIONS: FilterOption[] = [
-  { id: 'nature-landscape', name: 'Nature & Landscape' },
-  { id: 'flowers-botanical', name: 'Flowers & Botanical' },
-  { id: 'animals', name: 'Animals' },
-  { id: 'abstract-geometric', name: 'Abstract & Geometric' },
-  { id: 'people-portraits', name: 'People & Portraits' },
-  { id: 'city-architecture', name: 'City & Architecture' },
-  { id: 'sea-ocean', name: 'Sea & Ocean' },
-  { id: 'mountains', name: 'Mountains' },
-  { id: 'motivational', name: 'Motivational' },
-]
-
-const DEFAULT_COLOR_OPTIONS: FilterOption[] = [
-  { id: 'black', name: 'Black', hex: '#000000' },
-  { id: 'white', name: 'White', hex: '#FFFFFF' },
-  { id: 'beige', name: 'Beige', hex: '#F5F5DC' },
-  { id: 'neutral', name: 'Neutral', hex: '#D3D3D3' },
-  { id: 'blue', name: 'Blue', hex: '#4169E1' },
-  { id: 'green', name: 'Green', hex: '#228B22' },
-  { id: 'gold', name: 'Gold', hex: '#FFD700' },
-  { id: 'pink', name: 'Pink', hex: '#FF69B4' },
-  { id: 'red', name: 'Red', hex: '#DC143C' },
-  { id: 'grey', name: 'Grey', hex: '#808080' },
-  { id: 'black-white', name: 'Black & White', hex: '#000000' },
-  { id: 'colorful', name: 'Colorful', hex: '#FF6B6B' },
-  { id: 'earth-tones', name: 'Earth Tones', hex: '#8B4513' },
-]
-
-const DEFAULT_ROOM_OPTIONS: FilterOption[] = [
-  { id: 'living-room', name: 'Living Room' },
-  { id: 'bedroom', name: 'Bedroom' },
-  { id: 'office', name: 'Office' },
-  { id: 'kitchen-dining', name: 'Kitchen & Dining' },
-  { id: 'kids-room', name: 'Kids Room' },
-  { id: 'bathroom', name: 'Bathroom' },
-  { id: 'entryway', name: 'Entryway' },
-]
-
-const ORIENTATION_OPTIONS: FilterOption[] = [
-  { id: 'square', name: 'Square' },
-  { id: 'portrait', name: 'Portrait' },
-  { id: 'landscape', name: 'Landscape' },
-  { id: 'panoramic', name: 'Panoramic' },
-]
 
 // ============================================================================
 // Component
@@ -153,17 +96,19 @@ export function ProductFilters({
   filters,
   onFiltersChange,
   facetCounts,
-  styleOptions = DEFAULT_STYLE_OPTIONS,
-  subjectOptions = DEFAULT_SUBJECT_OPTIONS,
-  colorOptions = DEFAULT_COLOR_OPTIONS,
-  roomOptions = DEFAULT_ROOM_OPTIONS,
   isMobile = false,
   onClose,
   className,
 }: ProductFiltersProps) {
   // Track which sections are expanded
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['styles', 'subjects', 'orientation', 'sort'])
+    /**
+     * Four of ten open by default. Opening all ten makes the rail thousands of
+     * pixels tall; opening none hides that filtering exists. 'sort' used to be
+     * in this list and is no longer a section — it moved to the toolbar in
+     * #391.
+     */
+    new Set(['orientation', 'styles', 'subjects', 'colors'])
   )
 
   const toggleSection = useCallback((section: string) => {
@@ -179,22 +124,6 @@ export function ProductFilters({
   }, [])
 
   // Toggle a multi-select filter value
-  /**
-   * Attach counts to whichever option lists we were given. Done here rather
-   * than at each call site so every facet section gets the same treatment.
-   */
-  const withCounts = useCallback(
-    (options: FilterOption[], facet: string): FilterOption[] => {
-      const counts = facetCounts?.[facet]
-      if (!counts) return options
-      return options.map((option) => ({
-        ...option,
-        count: counts.get(option.id) ?? 0,
-      }))
-    },
-    [facetCounts]
-  )
-
   const toggleMultiFilter = useCallback(
     (key: keyof FilterState, value: string) => {
       const currentValues = (filters[key] as string[]) || []
@@ -210,16 +139,6 @@ export function ProductFilters({
   )
 
   // Set a single-select filter value
-  const setSingleFilter = useCallback(
-    (key: keyof FilterState, value: string | undefined) => {
-      onFiltersChange({
-        ...filters,
-        [key]: value,
-      })
-    },
-    [filters, onFiltersChange]
-  )
-
   // Handle sort change
   // Clear all filters
   const clearAllFilters = useCallback(() => {
@@ -228,6 +147,11 @@ export function ProductFilters({
       subjects: [],
       colors: [],
       rooms: [],
+      vibe: [],
+      aesthetic: [],
+      medium: [],
+      uniqueness: undefined,
+      availability: undefined,
       orientation: undefined,
       priceMin: undefined,
       priceMax: undefined,
@@ -292,171 +216,71 @@ export function ProductFilters({
         </div>
       </div>
 
-      {/* Filter Sections */}
+      {/* Filter Sections
+       *
+       * Driven by FACET_GROUPS from @chobii/shared rather than a section
+       * hand-written per facet. That is the whole point: one vocabulary,
+       * consumed by the schema, the API, the seed and here. Nine groups
+       * written out by hand is also where the previous copy started drifting
+       * from the API's idea of the same values. */}
       <div className="flex-1 overflow-y-auto">
+        {FACET_GROUPS.map((group) => {
+          const counts = facetCounts?.[group.key]
+          const options: FilterOption[] = group.options.map(
+            (option: FacetOption) => ({
+              id: option.id,
+              name: option.label,
+              hex: option.hex,
+              count: counts?.get(option.id),
+            })
+          )
 
-        {/* Orientation Section */}
-        <FilterSection
-          title="Orientation"
-          sectionKey="orientation"
-          isExpanded={expandedSections.has('orientation')}
-          onToggle={toggleSection}
-        >
-          <div className="flex flex-wrap gap-2">
-            {ORIENTATION_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() =>
-                  setSingleFilter(
-                    'orientation',
-                    filters.orientation === option.id ? undefined : option.id
-                  )
-                }
-                className={cn(
-                  'rounded-full border px-3 py-1.5 text-sm transition-colors',
-                  filters.orientation === option.id
-                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                    : 'border-border hover:border-muted-foreground'
-                )}
-              >
-                {option.name}
-              </button>
-            ))}
-          </div>
-        </FilterSection>
+          const raw = filters[group.key as keyof FilterState]
+          const selected: string[] = group.multi
+            ? ((raw as string[]) ?? [])
+            : raw
+              ? [raw as string]
+              : []
 
-        {/* Styles Section */}
-        <FilterSection
-          title="Style"
-          sectionKey="styles"
-          isExpanded={expandedSections.has('styles')}
-          onToggle={toggleSection}
-          activeCount={filters.styles.length}
-        >
-          <div className="space-y-1">
-            {withCounts(styleOptions, 'styles').map((option) => (
-              <FilterCheckbox
-                key={option.id}
-                id={`style-${option.id}`}
-                label={option.name}
-                count={option.count}
-                checked={filters.styles.includes(option.id)}
-                onChange={() => toggleMultiFilter('styles', option.id)}
-              />
-            ))}
-          </div>
-        </FilterSection>
-
-        {/* Subjects Section */}
-        <FilterSection
-          title="Subject"
-          sectionKey="subjects"
-          isExpanded={expandedSections.has('subjects')}
-          onToggle={toggleSection}
-          activeCount={filters.subjects.length}
-        >
-          <div className="space-y-1">
-            {withCounts(subjectOptions, 'subjects').map((option) => (
-              <FilterCheckbox
-                key={option.id}
-                id={`subject-${option.id}`}
-                label={option.name}
-                count={option.count}
-                checked={filters.subjects.includes(option.id)}
-                onChange={() => toggleMultiFilter('subjects', option.id)}
-              />
-            ))}
-          </div>
-        </FilterSection>
-
-        {/* Colors Section */}
-        <FilterSection
-          title="Color"
-          sectionKey="colors"
-          isExpanded={expandedSections.has('colors')}
-          onToggle={toggleSection}
-          activeCount={filters.colors.length}
-        >
-          <div className="flex flex-wrap gap-2">
-            {withCounts(colorOptions, 'colors').map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => toggleMultiFilter('colors', option.id)}
-                className={cn(
-                  'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors',
-                  filters.colors.includes(option.id)
-                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                    : 'border-border hover:border-muted-foreground'
-                )}
-              >
-                {option.hex && (
-                  <span
-                    className="h-4 w-4 rounded-full border border-border"
-                    style={{ backgroundColor: option.hex }}
+          return (
+            <FilterSection
+              key={group.key}
+              title={group.label}
+              sectionKey={group.key}
+              isExpanded={expandedSections.has(group.key)}
+              onToggle={toggleSection}
+              activeCount={selected.length}
+            >
+              <div className="space-y-1">
+                {options.map((option) => (
+                  <FilterCheckbox
+                    key={option.id}
+                    id={`${group.key}-${option.id}`}
+                    label={option.name}
+                    count={option.count}
+                    checked={selected.includes(option.id)}
+                    onChange={() => {
+                      if (group.multi) {
+                        toggleMultiFilter(
+                          group.key as keyof FilterState,
+                          option.id
+                        )
+                        return
+                      }
+                      // Single-valued: ticking the current value clears it.
+                      onFiltersChange({
+                        ...filters,
+                        [group.key]: selected.includes(option.id)
+                          ? undefined
+                          : option.id,
+                      })
+                    }}
                   />
-                )}
-                {option.name}
-              </button>
-            ))}
-          </div>
-        </FilterSection>
-
-        {/* Rooms Section */}
-        <FilterSection
-          title="Room"
-          sectionKey="rooms"
-          isExpanded={expandedSections.has('rooms')}
-          onToggle={toggleSection}
-          activeCount={filters.rooms.length}
-        >
-          <div className="space-y-1">
-            {withCounts(roomOptions, 'rooms').map((option) => (
-              <FilterCheckbox
-                key={option.id}
-                id={`room-${option.id}`}
-                label={option.name}
-                count={option.count}
-                checked={filters.rooms.includes(option.id)}
-                onChange={() => toggleMultiFilter('rooms', option.id)}
-              />
-            ))}
-          </div>
-        </FilterSection>
-
-        {/* Special Filters */}
-        <FilterSection
-          title="Special"
-          sectionKey="special"
-          isExpanded={expandedSections.has('special')}
-          onToggle={toggleSection}
-        >
-          <div className="space-y-1">
-            <FilterCheckbox
-              id="ai-generated"
-              label="AI Generated"
-              checked={filters.isAiGenerated === true}
-              onChange={() =>
-                setSingleFilter(
-                  'isAiGenerated',
-                  filters.isAiGenerated === true ? undefined : 'true' as unknown as string
-                )
-              }
-            />
-            <FilterCheckbox
-              id="featured"
-              label="Featured"
-              checked={filters.isFeatured === true}
-              onChange={() =>
-                setSingleFilter(
-                  'isFeatured',
-                  filters.isFeatured === true ? undefined : 'true' as unknown as string
-                )
-              }
-            />
-          </div>
-        </FilterSection>
+                ))}
+              </div>
+            </FilterSection>
+          )
+        })}
       </div>
 
       {/* Mobile Apply Button */}

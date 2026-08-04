@@ -22,7 +22,19 @@ export interface ProductFilters {
   subjects?: string;
   colors?: string;
   rooms?: string;
-  orientation?: "square" | "portrait" | "landscape" | "panoramic" | "round";
+  /** Expanded facets — vocabularies live in @chobii/shared. */
+  vibe?: string;
+  aesthetic?: string;
+  medium?: string;
+  uniqueness?: string;
+  availability?: string;
+  orientation?:
+    | "square"
+    | "portrait"
+    | "landscape"
+    | "panoramic"
+    | "round"
+    | "set-of-2-3";
   priceMin?: number;
   priceMax?: number;
   isFeatured?: boolean;
