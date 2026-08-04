@@ -76,6 +76,54 @@ describe('ProductGrid — measured layout', () => {
   })
 })
 
+describe('ProductGrid — promo slot', () => {
+  const eight = [1, 2, 3, 4, 5, 6, 7, 8].map(product)
+  const promoNode = <li key="promo" data-testid="promo" />
+
+  it('renders the plain grid when no promo is passed', () => {
+    const { container } = render(<ProductGrid products={eight} />)
+    expect(container.querySelectorAll('ul > li')).toHaveLength(8)
+  })
+
+  it('places the promo at the requested cell index', () => {
+    const { container } = render(
+      <ProductGrid products={eight} promo={{ node: promoNode, index: 4 }} />
+    )
+    const cells = container.querySelectorAll('ul > li')
+    expect(cells).toHaveLength(9)
+    expect(cells[4]?.getAttribute('data-testid')).toBe('promo')
+  })
+
+  it('keeps every product, in order, around the promo', () => {
+    const { container } = render(
+      <ProductGrid products={eight} promo={{ node: promoNode, index: 4 }} />
+    )
+    expect(container.querySelectorAll('[data-testid="product-card"]')).toHaveLength(8)
+  })
+
+  it('ignores an index past the end rather than appending a stray cell', () => {
+    // A promo dangling after the last product reads as a broken card.
+    const { container } = render(
+      <ProductGrid products={eight} promo={{ node: promoNode, index: 99 }} />
+    )
+    expect(container.querySelectorAll('ul > li')).toHaveLength(8)
+  })
+
+  it('ignores a null promo node — the tile hides itself below threshold', () => {
+    const { container } = render(
+      <ProductGrid products={eight} promo={{ node: null, index: 4 }} />
+    )
+    expect(container.querySelectorAll('ul > li')).toHaveLength(8)
+  })
+
+  it('still omits grid-flow-row-dense — ours occupies exactly one cell', () => {
+    // mesonart needs dense flow to backfill holes left by multi-cell promo
+    // blocks. A single-cell tile leaves no hole, so DOM order stays equal to
+    // visual order for keyboard and screen-reader traversal.
+    expect(code).not.toContain('grid-flow-row-dense')
+  })
+})
+
 describe('ProductGrid — configuration removed (D1)', () => {
   it.each(['uniformAspectRatio', 'GRID_COLUMN_CLASSES', 'GAP_CLASSES', 'cardSize'])(
     'no longer references %s',

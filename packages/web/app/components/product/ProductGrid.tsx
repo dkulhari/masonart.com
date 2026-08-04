@@ -28,6 +28,20 @@ import { ProductCardSkeleton } from './ProductCardSkeleton'
 
 export interface ProductGridProps {
   products: ProductCardData[]
+  /**
+   * One promo cell spliced in at `index` (analysis §1.3.6).
+   *
+   * Exactly ONE cell wide, which is why `grid-flow-row-dense` above stays
+   * off: dense flow exists only to backfill the holes mesonart's multi-cell
+   * promo blocks leave behind, and turning it on would break DOM-order ==
+   * visual-order for keyboard and screen-reader traversal.
+   *
+   * `node` may be null — PromoTile hides itself when the catalogue has too
+   * few approved reviews to quote — and an out-of-range index is ignored
+   * rather than appended, since a promo dangling past the last product reads
+   * as a broken card.
+   */
+  promo?: { node: React.ReactNode; index: number }
   isLoading?: boolean
   skeletonCount?: number
   emptyState?: React.ReactNode
@@ -40,6 +54,7 @@ const GRID_CLASSES =
 
 export function ProductGrid({
   products,
+  promo,
   isLoading = false,
   skeletonCount = 8,
   emptyState,
@@ -59,13 +74,15 @@ export function ProductGrid({
     return emptyState || <ProductGridEmptyState />
   }
 
-  return (
-    <ul className={cn(GRID_CLASSES, className)}>
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
-      ))}
-    </ul>
-  )
+  const cells: React.ReactNode[] = products.map((product) => (
+    <ProductCard key={product.id} product={product} />
+  ))
+
+  if (promo?.node && promo.index >= 0 && promo.index < cells.length) {
+    cells.splice(promo.index, 0, promo.node)
+  }
+
+  return <ul className={cn(GRID_CLASSES, className)}>{cells}</ul>
 }
 
 export function ProductGridEmptyState({

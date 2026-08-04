@@ -36,6 +36,8 @@ import {
   DiscoverChips,
   type DiscoverCollection,
 } from '~/components/product/DiscoverChips'
+import { PromoTile } from '~/components/product/PromoTile'
+import { fetchCatalogueReviewStats } from '~/hooks/useReviews'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
 import { Button } from '~/components/ui/Button'
@@ -48,6 +50,15 @@ import {
 
 /** Cards per page. `?page=N` renders N × this many. */
 const PAGE_SIZE = 24
+
+/**
+ * Which grid cell the promo tile occupies (analysis §1.3.6).
+ *
+ * Eight: after the second full row at the 4-column desktop breakpoint, and
+ * after the fourth at the 2-column mobile one. Early enough to be seen,
+ * late enough that the first impression of the page is products.
+ */
+const PROMO_CELL_INDEX = 8
 
 /** localStorage key for the collapsed-filter-rail preference. */
 const FILTERS_HIDDEN_KEY = 'chobii:collection:filters-hidden'
@@ -415,6 +426,30 @@ function PostersPage() {
    */
   const [collections, setCollections] = useState<DiscoverCollection[]>([])
 
+  /**
+   * Catalogue review aggregate for the promo tile. Same reasoning again: it
+   * describes the catalogue, not the page.
+   */
+  const [reviewStats, setReviewStats] = useState<{
+    averageRating: number | null
+    reviewCount: number
+  }>({ averageRating: null, reviewCount: 0 })
+
+  useEffect(() => {
+    let cancelled = false
+    fetchCatalogueReviewStats()
+      .then((stats) => {
+        if (cancelled) return
+        setReviewStats(stats)
+      })
+      // Failing to load leaves the tile absent, which is the same thing it
+      // does when the catalogue has too few reviews to quote.
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     productsApi
@@ -727,7 +762,25 @@ function PostersPage() {
                     slug: p.slug,
                   }))}
                 />
-                <ProductGrid products={visibleProducts} />
+                <ProductGrid
+                  products={visibleProducts}
+                  /**
+                   * After the second full 4-column row (analysis §1.3.6).
+                   * The tile returns null when the catalogue has too few
+                   * approved reviews to quote, and ProductGrid then renders
+                   * the plain grid.
+                   */
+                  promo={{
+                    node: (
+                      <PromoTile
+                        key="promo-tile"
+                        averageRating={reviewStats.averageRating}
+                        reviewCount={reviewStats.reviewCount}
+                      />
+                    ),
+                    index: PROMO_CELL_INDEX,
+                  }}
+                />
 
                 {/* Load more.
                  *

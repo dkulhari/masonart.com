@@ -116,6 +116,31 @@ async function fetchReviewStats(productId: string): Promise<ReviewStatsResponse>
 }
 
 /**
+ * Catalogue-wide review aggregate, for the collection-grid promo tile.
+ *
+ * Distinct from fetchReviewStats above, which is per-product and returns the
+ * full star distribution. This is one average and one count across every
+ * approved review.
+ *
+ * `averageRating` is null when nothing is approved — never 0, which a tile
+ * would render as "rated badly" rather than "not yet rated".
+ */
+export async function fetchCatalogueReviewStats(): Promise<{
+  averageRating: number | null
+  reviewCount: number
+}> {
+  const response = await fetch(`${API_BASE}/reviews/stats`, {
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch catalogue review stats')
+  }
+
+  return response.json()
+}
+
+/**
  * Create a new review
  */
 async function createReview(
