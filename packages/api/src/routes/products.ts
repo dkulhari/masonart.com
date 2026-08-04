@@ -18,6 +18,18 @@ import { eq, and, or, ilike, desc, asc, sql, inArray } from "drizzle-orm";
 import { db } from "../database";
 import { products, productVariants, frames } from "../database/schema/products";
 import { reviews } from "../database/schema/reviews";
+import {
+  styleSchema,
+  subjectSchema,
+  colorSchema,
+  roomSchema,
+  orientationSchema,
+  vibeSchema,
+  aestheticSchema,
+  mediumSchema,
+  uniquenessSchema,
+  availabilitySchema,
+} from "@chobii/shared";
 import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
 import { getCached, setCached, CacheKeys } from "../lib/redis";
 
@@ -38,17 +50,54 @@ const CACHE_TTL_FEATURED = 900; // 15 minutes
 /**
  * Query parameters for product listing
  */
+/**
+ * A comma-separated facet parameter, every value checked against its
+ * vocabulary.
+ *
+ * Two things this buys:
+ *
+ * 1. **Safety.** The array filters below build a postgres ARRAY literal with
+ *    `sql.raw` and hand-rolled quote escaping. That is only ever safe while
+ *    the values are constrained; this constrains them.
+ * 2. **Honesty.** An unknown value is a 400. Ignoring it would hand the
+ *    shopper an unfiltered grid that they believe was filtered — the worst of
+ *    the available failure modes. A partly-valid list fails too, rather than
+ *    quietly filtering on the half we recognised.
+ */
+const facetList = (member: z.ZodTypeAny) =>
+  z
+    .string()
+    .optional()
+    .transform((value) =>
+      value === undefined
+        ? undefined
+        : value
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean)
+    )
+    .refine(
+      (values) =>
+        values === undefined || values.every((v) => member.safeParse(v).success),
+      { message: "Unknown filter value" }
+    );
+
 const listProductsQuerySchema = z.object({
   // Pagination
   page: z.coerce.number().int().positive().optional().default(1),
   pageSize: z.coerce.number().int().positive().max(MAX_PAGE_SIZE).optional().default(DEFAULT_PAGE_SIZE),
 
-  // Filters
-  styles: z.string().optional(), // comma-separated list
-  subjects: z.string().optional(), // comma-separated list
-  colors: z.string().optional(), // comma-separated list
-  rooms: z.string().optional(), // comma-separated list
-  orientation: z.enum(["square", "portrait", "landscape", "panoramic", "round"]).optional(),
+  // Filters — every value checked against the shared vocabulary.
+  styles: facetList(styleSchema),
+  subjects: facetList(subjectSchema),
+  colors: facetList(colorSchema),
+  rooms: facetList(roomSchema),
+  vibe: facetList(vibeSchema),
+  aesthetic: facetList(aestheticSchema),
+  medium: facetList(mediumSchema),
+  orientation: orientationSchema.optional(),
+  uniqueness: uniquenessSchema.optional(),
+  availability: availabilitySchema.optional(),
   priceMin: z.coerce.number().nonnegative().optional(),
   priceMax: z.coerce.number().nonnegative().optional(),
   isFeatured: z.coerce.boolean().optional(),
@@ -108,7 +157,12 @@ productsApp.get(
       subjects,
       colors,
       rooms,
+      vibe,
+      aesthetic,
+      medium,
       orientation,
+      uniqueness,
+      availability,
       priceMin,
       priceMax,
       isFeatured,
@@ -163,28 +217,57 @@ productsApp.get(
       conditions.push(sql`${products.basePrice}::numeric <= ${priceMax}`);
     }
 
-    // Filter by array fields (styles, subjects, colors, rooms)
-    // Using array overlap operator with proper PostgreSQL array casting
-    if (styles) {
-      const styleList = styles.split(",").map(s => s.trim());
-      // Create PostgreSQL array literal: ARRAY['style1', 'style2']::text[]
-      const pgArray = sql.raw(`ARRAY[${styleList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
-      conditions.push(sql`${products.styles} && ${pgArray}`);
+    /**
+     * Array-facet overlap.
+     *
+     * The values are already validated against the shared vocabularies by
+     * `facetList`, so they are drawn from a closed set — which is what makes
+     * building the literal safe. The previous version escaped quotes by hand
+     * on unvalidated input, which was one careless caller away from being an
+     * injection vector.
+     *
+     * Parameterised rather than `sql.raw` now, so the escaping question does
+     * not arise at all.
+     */
+    const overlapFilter = (
+      column:
+        | typeof products.styles
+        | typeof products.subjects
+        | typeof products.colors
+        | typeof products.rooms
+        | typeof products.vibe
+        | typeof products.aesthetic
+        | typeof products.medium,
+      values: string[] | undefined
+    ) => {
+      if (!values?.length) return;
+      /**
+       * Each element is bound as its own parameter. Passing the JS array as a
+       * single bind and casting it (`${values}::text[]`) does NOT work —
+       * postgres.js sends it as one scalar and the server answers
+       * "malformed array literal".
+       */
+      const elements = sql.join(
+        values.map((value) => sql`${value}`),
+        sql`, `
+      );
+      conditions.push(sql`${column} && ARRAY[${elements}]::text[]`);
+    };
+
+    overlapFilter(products.styles, styles);
+    overlapFilter(products.subjects, subjects);
+    overlapFilter(products.colors, colors);
+    overlapFilter(products.rooms, rooms);
+    overlapFilter(products.vibe, vibe);
+    overlapFilter(products.aesthetic, aesthetic);
+    overlapFilter(products.medium, medium);
+
+    // Single-valued facets.
+    if (uniqueness) {
+      conditions.push(eq(products.uniqueness, uniqueness));
     }
-    if (subjects) {
-      const subjectList = subjects.split(",").map(s => s.trim());
-      const pgArray = sql.raw(`ARRAY[${subjectList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
-      conditions.push(sql`${products.subjects} && ${pgArray}`);
-    }
-    if (colors) {
-      const colorList = colors.split(",").map(s => s.trim());
-      const pgArray = sql.raw(`ARRAY[${colorList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
-      conditions.push(sql`${products.colors} && ${pgArray}`);
-    }
-    if (rooms) {
-      const roomList = rooms.split(",").map(s => s.trim());
-      const pgArray = sql.raw(`ARRAY[${roomList.map(s => `'${s.replace(/'/g, "''")}'`).join(", ")}]::text[]`);
-      conditions.push(sql`${products.rooms} && ${pgArray}`);
+    if (availability) {
+      conditions.push(eq(products.availability, availability));
     }
 
     // Build sort order
@@ -433,7 +516,12 @@ productsApp.get(
  * Registered BEFORE `/:slug` — otherwise "facets" is read as a product slug.
  */
 productsApp.get("/facets", async (c) => {
-  const cacheKey = `${CacheKeys.PRODUCT}facets`;
+  /**
+   * Versioned key. The payload gained five groups; without bumping this a
+   * cached entry from before the deploy serves the old shape to a sidebar
+   * that expects the new one.
+   */
+  const cacheKey = `${CacheKeys.PRODUCT}facets:v2`;
 
   const cached = await getCached<Record<string, unknown>>(cacheKey);
   if (cached) return c.json({ ...cached, fromCache: true });
@@ -448,7 +536,10 @@ productsApp.get("/facets", async (c) => {
       | typeof products.styles
       | typeof products.subjects
       | typeof products.colors
-      | typeof products.rooms;
+      | typeof products.rooms
+      | typeof products.vibe
+      | typeof products.aesthetic
+      | typeof products.medium;
 
     const arrayFacet = async (column: ArrayFacetColumn) => {
       const rows = await db
@@ -463,23 +554,59 @@ productsApp.get("/facets", async (c) => {
       return rows;
     };
 
-    const [styles, subjects, colors, rooms, orientation] = await Promise.all([
-      arrayFacet(products.styles),
-      arrayFacet(products.subjects),
-      arrayFacet(products.colors),
-      arrayFacet(products.rooms),
+    /** A scalar column groups directly — no unnest needed. */
+    const scalarFacet = async (
+      column:
+        | typeof products.orientation
+        | typeof products.uniqueness
+        | typeof products.availability
+    ) =>
       db
         .select({
-          value: sql<string>`${products.orientation}`,
+          value: sql<string>`${column}`,
           count: sql<number>`count(*)::int`,
         })
         .from(products)
         .where(eq(products.status, "active"))
-        .groupBy(products.orientation)
-        .orderBy(sql`2 desc`),
+        .groupBy(column)
+        .orderBy(sql`2 desc`);
+
+    const [
+      styles,
+      subjects,
+      colors,
+      rooms,
+      vibe,
+      aesthetic,
+      medium,
+      orientation,
+      uniqueness,
+      availability,
+    ] = await Promise.all([
+      arrayFacet(products.styles),
+      arrayFacet(products.subjects),
+      arrayFacet(products.colors),
+      arrayFacet(products.rooms),
+      arrayFacet(products.vibe),
+      arrayFacet(products.aesthetic),
+      arrayFacet(products.medium),
+      scalarFacet(products.orientation),
+      scalarFacet(products.uniqueness),
+      scalarFacet(products.availability),
     ]);
 
-    const result = { styles, subjects, colors, rooms, orientation };
+    const result = {
+      styles,
+      subjects,
+      colors,
+      rooms,
+      vibe,
+      aesthetic,
+      medium,
+      orientation,
+      uniqueness,
+      availability,
+    };
     await setCached(cacheKey, result, CACHE_TTL_PRODUCTS);
     return c.json(result);
   } catch (error) {

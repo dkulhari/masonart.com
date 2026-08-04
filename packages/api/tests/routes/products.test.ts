@@ -238,8 +238,20 @@ describe('Products Query Parameter Validation', () => {
     it('should accept valid filter parameters', async () => {
       if (!app) return;
 
-      const res = await app.request('/api/products?styles=minimalist&orientation=landscape');
+      // `minimalist` was the old ad-hoc id. The vocabulary in @chobii/shared
+      // calls it `minimalist-art`, and unknown values are now a 400 rather
+      // than a silently unfiltered grid.
+      const res = await app.request(
+        '/api/products?styles=minimalist-art&orientation=landscape'
+      );
       expect([200, 500].includes(res.status)).toBe(true);
+    });
+
+    it('rejects a style outside the vocabulary', async () => {
+      if (!app) return;
+
+      const res = await app.request('/api/products?styles=minimalist');
+      expect(res.status).toBe(400);
     });
 
     it('should accept valid sort parameters', async () => {
