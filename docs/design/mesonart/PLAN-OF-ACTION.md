@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Phase A complete** (2026-08-04, #376–#385) · **Phase E size slice complete** (#386) · Phases B–D, F outstanding |
+| Status | **All five planned features delivered** (2026-08-04, #387–#403). Phase A (#376–#385), the Phase E size slice (#386), Phase B and Phase C now complete. Phase D (home rebuild), the Phase E PDP restructure and Phase F (new pages) remain. |
 | Date | 2026-08-04 |
 | Input | [mesonart-parity-analysis.md](mesonart-parity-analysis.md) — measured, re-verified 2026-08-04 |
 | Scope | Structural and stylistic parity only. Not their logo, copy, artwork, artist names or photography — see the analysis' scope note |
@@ -36,13 +36,19 @@ Two of these already exist in ticketrack as empty todo features — use them, do
 |---|---|---|---|---|
 | 1 | `wishlist` | ✅ **done** — #387–#389 | API routes over the existing column, `useWishlist` store, heart on card + PDP, header badge | 0.5–1 d |
 | 2 | `collection-page-parity` | ✅ **done** — #390–#394 | Beige header band + breadcrumbs, sticky toolbar (hide-filters, count, sort pill), facet-count API + sidebar counts, card star row, lazy-load paging | 2–3 d |
-| 3 | `product-metadata-facets` | next | §6 Phase C data half + §4: facet vocabularies to shared constants, new `vibe`/`aesthetic`/`medium`/`uniqueness`/`availability`, Room 7→12, Subject 9→17, Orientation +Circle/+Set-of-2-3, filter API params, reseed | 2–3 d |
-| 4 | `global-chrome-parity` | pending | §6 Phase B minus the sale strip: centered wordmark, right cluster, two-row nav, announcement bar, footer USP row + contact column + beige restyle | 2 d |
-| 5 | `advanced-search` | **exists, 0 tickets** | Search drawer over the existing `GET /api/products/search`, wired into the new header | 1 d |
+| 3 | `product-metadata-facets` | ✅ **done** — #395–#399 | §6 Phase C data half + §4: facet vocabularies to shared constants, new `vibe`/`aesthetic`/`medium`/`uniqueness`/`availability`, Room 7→12, Subject 9→17, Orientation +Circle/+Set-of-2-3, filter API params, reseed | 2–3 d |
+| 4 | `global-chrome-parity` | ✅ **done** — #400–#402 | §6 Phase B minus the sale strip: centered wordmark, right cluster, two-row nav, announcement bar, footer USP row + contact column + beige restyle | 2 d |
+| 5 | `advanced-search` | ✅ **done** — #403 | Search drawer over the existing `GET /api/products/search`, wired into the new header | 1 d |
 
 ### Delivered so far
 
 **Feature 1 — wishlist (#387–#389).** Four auth-gated routes over the `users.wishlistProductIds` column that had existed with nothing reading it. Add/remove are atomic SQL (`array_append` guarded by containment, `array_remove`) rather than read-modify-write, so two tabs cannot clobber each other, and both are idempotent because the UI is an optimistic toggle. The heart is monochrome — `--sale` is reserved for sale prices. The PDP button that had carried `aria-label="Add to wishlist"` and no handler is now wired.
+
+**Feature 3 — product-metadata-facets (#395–#399).** Nine facet vocabularies from §1.3, adopted verbatim, as the single source of truth in `@chobii/shared`. Found a **third** parallel vocabulary while doing it: `constants/styles.ts` held `STYLE_CONFIGS`/`SUBJECT_CONFIGS`/`COLOR_CONFIGS` referenced nowhere outside its own test — dead but fully tested, exactly the state the size ladders were in. Now deprecated with a pointer. Five new columns, validated filter params (which also closed a hand-escaped `sql.raw` path), and deterministic seeding so a reseed reproduces the same catalogue.
+
+**Feature 4 — global-chrome-parity (#400–#402).** Announcement bar, centred wordmark, a styles nav row generated from the shared vocabulary, footer USP strip and contact column.
+
+**Feature 5 — advanced-search (#403).** A drawer over the search endpoint that had existed for months with no way to reach it.
 
 **Feature 2 — collection-page-parity (#390–#394).** Beige header band with breadcrumbs + `BreadcrumbList` JSON-LD; sticky toolbar carrying the count and a sort pill (sort moved out of the filter sidebar, where mesonart does not put it); `GET /api/products/facets` plus a review aggregate on the list; sidebar counts with zero-count options *disabled rather than hidden*; a card star row that renders **nothing** when a product has no approved reviews; and lazy-load paging where `?page=N` means "everything up to N", fetched in one widened request.
 
@@ -53,7 +59,15 @@ Two of these already exist in ticketrack as empty todo features — use them, do
 - **Facet vocabularies are hardcoded literals** in `ProductFilters.tsx` while the API validates them as unconstrained comma-separated strings. No single source of truth — the same disease the size ladders had. Feature 3 is the fix.
 - **The `sql.raw` ARRAY construction in the products filter escapes quotes by hand.** Safe only because the vocabularies are fixed; feature 3 should close it properly.
 
-Deferred to a later pass, unchanged from the analysis: Phase D (home rebuild), Phase E remainder (PDP restructure), Phase F (new pages), and the sale strip.
+### What remains
+
+Unchanged from the analysis, and all still blocked on the same things:
+
+- **Phase D — home rebuild.** Hero slideshow, Best Seller tabs, Popular photo tiles, Shop-by-Room band. Needs lifestyle photography that does not exist.
+- **Phase E — PDP restructure.** Vertical thumb rail, zoom modal, buy-panel reorder, price-in-CTA pill, trust accordions, Visually Similar / More to Love. The size slice (#386) is the only part done.
+- **Phase F — new pages.** Artists, Reviews, Trade, Commission, Gift Card, Blog, and the wishlist *page* (feature 1 shipped the affordance and the badge, not the destination).
+- **The sale strip and its countdown.** Still blocked on a promotion entity; a countdown to a sale that does not exist stays out.
+- **Two loose ends from §5.6**, recorded when they were found: the admin variant endpoints still accept arbitrary sizes and prices rather than reading the ladder, and `SizeSelector`'s "Show in cm" toggle is now both redundant against dual-unit labels *and* dead (its `onClick` body is empty).
 
 ## Per-feature execution loop
 
@@ -70,8 +84,8 @@ For each feature in the order above:
 
 Every feature must leave these green before the next one starts:
 
-- `cd packages/web && bunx vitest run` — **1653 passing, 0 failing** as of #394. No new failures.
-- `cd packages/shared && bunx vitest run` — 859 passing, 0 failing. No new failures.
+- `cd packages/web && bunx vitest run` — **1715 passing, 0 failing** as of #403. No new failures.
+- `cd packages/shared && bunx vitest run` — **880 passing**, 0 failing. No new failures.
 - `cd packages/api && bunx vitest run` — **~34–36 failing is the baseline** (38 on `feat/product-grid-alignment`). Pre-existing AI/redis/queue/auth/health suites, and the failing *file set* varies between identical runs under parallelism — confirm any suspected regression by running the single file alone before believing it.
 - `bun run typecheck` — **23 errors is the baseline.** Never higher.
 - `bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps` — **18 passing.** Use `--no-deps`: the four `auth.setup.ts` projects fail to log in the test users for pre-existing reasons, and the grid spec needs no auth.
