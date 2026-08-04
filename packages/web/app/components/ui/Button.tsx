@@ -37,9 +37,25 @@ export const buttonVariants = cva(
         /** Their primary CTA: filled near-black pill, white label. */
         solid:
           'rounded-pill border-[length:var(--border-button)] border-primary bg-primary text-primary-foreground hover:bg-primary/85 hover:border-primary/85',
-        /** Their hero CTA ("SHOP All ART"): outline pill that fills on hover. */
+        /**
+         * Their hero CTA ("SHOP All ART") and both collection-toolbar pills:
+         * an outline pill that fills on hover.
+         *
+         * The fill is not a background colour change. Theirs is a circle —
+         * `border-radius: 50%`, near-black, anchored off the pill's top-left
+         * corner and far wider than the pill — that scales in on
+         * `--ease-primary`, so the fill arrives as a wipe across the button
+         * rather than a flat flash. The label follows 0.1s later, which is why
+         * the text reads as being overtaken rather than changing with it.
+         *
+         * `isolate` plus `before:-z-10` keeps the circle behind bare text
+         * children without wrapping them in a positioned span.
+         */
         outline:
-          'rounded-pill border-[length:var(--border-button)] border-primary bg-transparent text-primary hover:bg-primary hover:text-primary-foreground',
+          'relative isolate overflow-hidden rounded-pill border-[length:var(--border-button)] border-primary bg-transparent text-primary ' +
+          'before:absolute before:-left-1/4 before:-top-1/2 before:-z-10 before:h-[200%] before:w-[150%] before:scale-0 before:rounded-full before:bg-primary ' +
+          'before:transition-transform before:duration-500 before:[transition-timing-function:var(--ease-primary)] ' +
+          'hover:text-primary-foreground hover:delay-100 hover:before:scale-100 hover:before:delay-0',
         /**
          * Borderless, for toolbar and icon affordances. Keeps the 2px border
          * as transparent so a ghost and a solid button of the same size line
@@ -54,6 +70,14 @@ export const buttonVariants = cva(
         sm: 'h-9 px-5',
         md: 'h-11 px-7',
         lg: 'h-12 px-8',
+        /**
+         * Their measured button: 56px tall, 26px of horizontal padding, label
+         * at the body weight. Everything on mesonart that reads as a button —
+         * hero CTA, collection toolbar, add-to-cart — is this size. Named for
+         * the shape rather than a t-shirt letter because it is the scale, not
+         * a step on a ladder.
+         */
+        pill: 'h-14 px-[26px] font-normal',
         icon: 'h-10 w-10 rounded-full p-0',
       },
     },

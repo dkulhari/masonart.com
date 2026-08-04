@@ -10,7 +10,7 @@
  * the hardest control on the page to reach.
  */
 
-import { Check, ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { buttonVariants } from '~/components/ui/Button'
@@ -63,6 +63,20 @@ function formatCount(total: number): string {
   return `${total.toLocaleString('en-IN')} product${total === 1 ? '' : 's'}`
 }
 
+/**
+ * The open panel's geometry, in pixels.
+ *
+ * Their panel animates to a measured size rather than to `auto`, because
+ * neither width nor height transitions from a keyword. Ours is derived from
+ * the content instead of hardcoded to their 320x469: same header, same 32px
+ * option rows, eight options instead of nine.
+ */
+const PILL_HEIGHT = 56
+const PANEL_WIDTH = 320
+const PANEL_PADDING = 40
+const PANEL_HEADER = 40
+const PANEL_ROW = 32
+
 export function CollectionToolbar({
   totalProducts,
   sortId,
@@ -72,10 +86,25 @@ export function CollectionToolbar({
   className,
 }: CollectionToolbarProps) {
   const [isOpen, setIsOpen] = useState(false)
+  /**
+   * Second frame of the open transition. The panel mounts at the pill's size
+   * and only then grows, so the browser has two states to interpolate between
+   * — mounting straight into the open size would just appear.
+   */
+  const [expanded, setExpanded] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const current =
     SORT_OPTIONS.find((option) => option.id === sortId) ?? SORT_OPTIONS[0]
+
+  useEffect(() => {
+    if (!isOpen) {
+      setExpanded(false)
+      return
+    }
+    const frame = requestAnimationFrame(() => setExpanded(true))
+    return () => cancelAnimationFrame(frame)
+  }, [isOpen])
 
   // Close on outside click and on Escape — same expectations as any menu.
   useEffect(() => {
@@ -101,7 +130,12 @@ export function CollectionToolbar({
       className={cn(
         // The site header is `sticky top-0` at h-16 (4rem). Anything at top-0
         // here would sit behind it.
-        'sticky top-16 z-30 flex items-center justify-between gap-4 border-b border-border bg-background/95 py-3 backdrop-blur',
+        // The site header is `sticky top-0` at h-16 (4rem). Anything at top-0
+        // here would sit behind it.
+        //
+        // No bottom rule: theirs has none, and the count reads as a caption to
+        // the row above it once a line is drawn under it.
+        'sticky top-16 z-30 flex items-center gap-4 bg-background/95 py-3 backdrop-blur',
         className
       )}
     >
@@ -112,7 +146,7 @@ export function CollectionToolbar({
         aria-expanded={!filtersHidden}
         aria-controls={FILTER_SIDEBAR_ID}
         className={cn(
-          buttonVariants({ variant: 'outline', size: 'sm' }),
+          buttonVariants({ variant: 'outline', size: 'pill' }),
           'hidden lg:inline-flex'
         )}
       >
@@ -120,7 +154,10 @@ export function CollectionToolbar({
         {filtersHidden ? 'Show filters' : 'Hide filters'}
       </button>
 
-      <p className="text-sm text-muted-foreground" aria-live="polite">
+      {/* `grow` rather than a `justify-between` row: theirs sits against the
+       * toggle and lets the empty space fall before the sort pill. Centred, it
+       * reads as a page heading instead of a caption on the toggle. */}
+      <p className="grow text-lg text-foreground" aria-live="polite">
         {formatCount(totalProducts)}
       </p>
 
@@ -130,37 +167,75 @@ export function CollectionToolbar({
           onClick={() => setIsOpen((open) => !open)}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
-          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+          className={cn(
+            buttonVariants({ variant: 'outline', size: 'pill' }),
+            'gap-6'
+          )}
         >
-          Sort by: {current.label}
-          <ChevronDown className="h-4 w-4" />
+          <span>Sort by: {current.label}</span>
+          {/* Their marker is a dot, not a chevron. A chevron promises a menu
+           * that drops below; this one opens in place. */}
+          <span aria-hidden="true">•</span>
         </button>
 
         {isOpen && (
           <div
             role="listbox"
             aria-label="Sort by"
-            className="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-background py-1 shadow-lg"
+            style={{
+              width: expanded ? PANEL_WIDTH : '100%',
+              height: expanded
+                ? PANEL_PADDING + PANEL_HEADER + SORT_OPTIONS.length * PANEL_ROW
+                : PILL_HEIGHT,
+            }}
+            className={cn(
+              // The panel is the pill: same top-right corner, same overflow
+              // clip, growing out of it rather than dropping below it. No
+              // shadow — theirs sits flat on the page.
+              'absolute right-0 top-0 z-40 overflow-hidden bg-primary px-[26px] py-5 text-primary-foreground',
+              'transition-[width,height,border-radius] duration-500 [transition-timing-function:var(--ease-primary)]',
+              expanded ? 'rounded-[32px]' : 'rounded-pill'
+            )}
           >
-            {SORT_OPTIONS.map((option) => (
+            <div className="flex items-center justify-between">
+              <span className="text-xs uppercase tracking-[0.1em] text-primary-foreground/80">
+                Sort by
+              </span>
               <button
-                key={option.id}
                 type="button"
-                role="option"
-                aria-selected={option.id === current.id}
-                onClick={() => {
-                  onSortChange(option.id)
-                  setIsOpen(false)
-                }}
-                className={cn(
-                  'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-accent',
-                  option.id === current.id && 'font-medium'
-                )}
+                onClick={() => setIsOpen(false)}
+                aria-label="Close sort"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background text-foreground"
               >
-                {option.label}
-                {option.id === current.id && <Check className="h-4 w-4" />}
+                <X className="h-4 w-4" />
               </button>
-            ))}
+            </div>
+
+            <div className="mt-2 flex flex-col items-start">
+              {SORT_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="option"
+                  aria-selected={option.id === current.id}
+                  onClick={() => {
+                    onSortChange(option.id)
+                    setIsOpen(false)
+                  }}
+                  className={cn(
+                    'flex h-8 items-center whitespace-nowrap text-left transition-opacity',
+                    // The current option is dimmed, not ticked. A checkmark
+                    // needs a legend; a dimmed row reads as "already applied"
+                    // on its own.
+                    option.id === current.id
+                      ? 'text-primary-foreground/50'
+                      : 'text-primary-foreground hover:opacity-70'
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
