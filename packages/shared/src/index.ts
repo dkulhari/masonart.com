@@ -26,4 +26,5 @@ export * from './schemas/ai-generation';
 export * from './constants/brand';
 export * from './constants/sizes';
 export * from './constants/frames';
+export * from './constants/facets';
 export * from './constants/styles';

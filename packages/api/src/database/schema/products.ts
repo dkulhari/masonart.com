@@ -44,6 +44,15 @@ export const orientationEnum = pgEnum("orientation", [
   "landscape",
   "panoramic",
   "round",
+  /**
+   * Panel count, not proportion — mesonart exposes "Set of 2/3" as an
+   * orientation facet (analysis §5.2) and we match so filtering behaves the
+   * same. It has no size ladder; getSizesForOrientation returns empty and the
+   * seed falls back rather than emitting a variant-less product.
+   *
+   * Postgres cannot drop an enum value, so this is effectively permanent.
+   */
+  "set-of-2-3",
 ]);
 
 /**
@@ -91,6 +100,28 @@ export const products = pgTable(
     subjects: text("subjects").array(),
     colors: text("colors").array(),
     rooms: text("rooms").array(),
+
+    /**
+     * Expanded facets (mesonart parity, analysis §1.3 / §4).
+     *
+     * Values come from the vocabularies in @chobii/shared/constants/facets —
+     * that module is the single source of truth and the API validates against
+     * it. Do not write free text here.
+     *
+     * vibe/aesthetic/medium are arrays because a piece can genuinely be both
+     * Japandi and Organic Modern.
+     */
+    vibe: text("vibe").array(),
+    aesthetic: text("aesthetic").array(),
+    medium: text("medium").array(),
+
+    /**
+     * Scalar, unlike the four above: a product has exactly one edition type
+     * and one availability. Arrays here would permit a row that is both open
+     * and limited edition.
+     */
+    uniqueness: text("uniqueness"),
+    availability: text("availability"),
     tags: text("tags").array(),
     orientation: orientationEnum("orientation").notNull(),
 
