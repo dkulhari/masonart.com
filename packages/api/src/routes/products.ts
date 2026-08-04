@@ -13,7 +13,18 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, or, ilike, desc, asc, sql, inArray, type SQL } from "drizzle-orm";
+import {
+  eq,
+  and,
+  or,
+  ilike,
+  desc,
+  asc,
+  sql,
+  inArray,
+  type SQL,
+  type AnyColumn,
+} from "drizzle-orm";
 
 import { db } from "../database";
 import {
@@ -307,7 +318,7 @@ productsApp.get(
      * default, so "Featured" without an explicit NULLS LAST leads with the
      * products nobody featured — the exact opposite of what the option says.
      */
-    const nullsLast = (column: typeof products.featuredOrder, direction: "asc" | "desc") =>
+    const nullsLast = (column: AnyColumn, direction: "asc" | "desc") =>
       direction === "asc"
         ? sql`${column} asc nulls last`
         : sql`${column} desc nulls last`;

@@ -39,7 +39,15 @@ export interface ProductFilters {
   priceMax?: number;
   isFeatured?: boolean;
   isAiGenerated?: boolean;
-  sortBy?: "createdAt" | "updatedAt" | "title" | "basePrice" | "featuredOrder";
+  /** Mirrors the `sortBy` enum on GET /api/products. */
+  sortBy?:
+    | "createdAt"
+    | "updatedAt"
+    | "title"
+    | "basePrice"
+    | "featuredOrder"
+    /** Real units sold from settled orders, with the curator pin above it. */
+    | "salesCount";
   sortOrder?: "asc" | "desc";
 }
 

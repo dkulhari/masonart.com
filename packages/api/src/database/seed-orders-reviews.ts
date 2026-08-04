@@ -32,7 +32,7 @@
  * make.
  */
 
-import { eq, inArray, asc } from "drizzle-orm";
+import { inArray, asc } from "drizzle-orm";
 
 import { db } from "./index";
 import { products, productVariants } from "./schema/products";
@@ -491,12 +491,14 @@ export async function seedOrdersAndReviews(): Promise<void> {
 
     for (const seedReview of seedOrder.reviews) {
       const item = insertedItems[seedReview.itemIndex];
-      const line = lines[seedReview.itemIndex];
-      if (!item || !line?.productId) continue;
+      const productId = lines[seedReview.itemIndex]?.productId;
+      const authorId = CUSTOMER_IDS[seedReview.customerIndex];
+      // A review with no author or no authorising purchase is not a review.
+      if (!item || !productId || !authorId) continue;
 
       await db.insert(reviews).values({
-        productId: line.productId,
-        userId: CUSTOMER_IDS[seedReview.customerIndex],
+        productId,
+        userId: authorId,
         orderItemId: item.id,
         rating: seedReview.rating,
         title: seedReview.title,
