@@ -1,5 +1,14 @@
 import { Link, useRouteContext } from '@tanstack/react-router'
-import { Heart, LayoutDashboard, Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
+import {
+  Heart,
+  LayoutDashboard,
+  Menu,
+  Search,
+  ShoppingCart,
+  User,
+  X,
+  Sparkles,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useCartItemCount, useCartHydration } from '~/stores/cart'
 import { useWishlistCount, useWishlistActions, useWishlistStore } from '~/stores/wishlist'
@@ -9,6 +18,7 @@ import {
   staffAreaLabel,
 } from '~/lib/admin-nav'
 import { STYLE_OPTIONS } from '@chobii/shared'
+import { SearchDrawer } from './SearchDrawer'
 
 /**
  * The header's own height, and the offset everything sticky below it uses.
@@ -30,6 +40,7 @@ export const HEADER_HEIGHT_CLASS = 'h-16'
  */
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
   const wishlistCount = useWishlistCount()
@@ -54,6 +65,36 @@ export function Header() {
   useEffect(() => {
     if (isHydrated && !isWishlistLoaded) void loadWishlist()
   }, [isHydrated, isWishlistLoaded, loadWishlist])
+
+  /**
+   * `/` and Cmd/Ctrl-K open search.
+   *
+   * `/` must NOT hijack an ordinary keystroke: if focus is already in a field
+   * the user is typing a slash, not asking for search.
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const isTyping =
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setIsSearchOpen(true)
+        return
+      }
+      if (event.key === '/' && !isTyping) {
+        event.preventDefault()
+        setIsSearchOpen(true)
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen((prev) => !prev)
@@ -136,6 +177,14 @@ export function Header() {
                 {staffLabel}
               </Link>
             )}
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              aria-label="Search"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <Search className="h-5 w-5" />
+            </button>
             {/* Wishlist. The destination is the account area until Phase F
                 builds the wishlist page proper — the parity work needs the
                 affordance and the count, not the page. */}
@@ -204,6 +253,14 @@ export function Header() {
         </div>
 
       </header>
+
+      {/* Sibling of <header>, not a child: the header sets backdrop-blur,
+          which establishes a containing block and collapses a nested fixed
+          overlay to zero height (#348). */}
+      <SearchDrawer
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
 
       {/* Nav row 2 — styles.
        *
