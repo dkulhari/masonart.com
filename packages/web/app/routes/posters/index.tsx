@@ -10,13 +10,14 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
-import { useState, useCallback, useEffect } from 'react'
 import {
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from 'lucide-react'
+  createFileRoute,
+  useNavigate,
+  useRouterState,
+  Link,
+} from '@tanstack/react-router'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { X } from 'lucide-react'
 import { productsApi, type ProductFilters as ProductFiltersType } from '~/lib/api'
 import { cn } from '~/lib/utils'
 import {
@@ -33,12 +34,16 @@ import {
 } from '~/components/product/ProductFilters'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
+import { Button } from '~/components/ui/Button'
 import { SectionBand } from '~/components/ui/SectionBand'
 import { DisplayHeading } from '~/components/ui/DisplayHeading'
 import {
   CollectionToolbar,
   FILTER_SIDEBAR_ID,
 } from '~/components/product/CollectionToolbar'
+
+/** Cards per page. `?page=N` renders N × this many. */
+const PAGE_SIZE = 24
 
 /** localStorage key for the collapsed-filter-rail preference. */
 const FILTERS_HIDDEN_KEY = 'chobii:collection:filters-hidden'
@@ -86,9 +91,20 @@ export interface PostersSearchParams {
 async function fetchPostersData(params: PostersSearchParams): Promise<PostersPageData> {
   try {
     // Build API query parameters
+    /**
+     * `?page=N` means "everything up to page N", not "page N alone".
+     *
+     * The grid appends rather than replaces, so a shared or reloaded URL has
+     * to reproduce what the sharer was looking at. Fetching pages 1..N in one
+     * request (page 1 at N × PAGE_SIZE) does that server-side, which keeps the
+     * whole accumulated view crawlable and removes any need for the client to
+     * stitch pages together — the earlier attempt did stitch, and navigating
+     * to page 2 then wiped page 1 out from under it.
+     */
+    const requestedPage = params.page || 1
     const apiParams: ProductFiltersType = {
-      page: params.page || 1,
-      pageSize: 24,
+      page: 1,
+      pageSize: PAGE_SIZE * requestedPage,
       sortBy: params.sortBy || 'createdAt',
       sortOrder: params.sortOrder || 'desc',
     }
@@ -126,12 +142,13 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
     return {
       products,
       pagination: {
-        page: response.page || 1,
-        pageSize: response.pageSize || 24,
+        // Reported in PAGE_SIZE units, not in the widened request size.
+        page: requestedPage,
+        pageSize: PAGE_SIZE,
         total: response.total || 0,
-        totalPages: response.totalPages || 1,
-        hasNextPage: response.hasNextPage || false,
-        hasPreviousPage: response.hasPreviousPage || false,
+        totalPages: Math.ceil((response.total || 0) / PAGE_SIZE),
+        hasNextPage: requestedPage * PAGE_SIZE < (response.total || 0),
+        hasPreviousPage: requestedPage > 1,
       },
       filters: {
         styles: params.styles?.split(',').filter(Boolean) || [],
@@ -153,7 +170,7 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
       products: [],
       pagination: {
         page: 1,
-        pageSize: 24,
+        pageSize: PAGE_SIZE,
         total: 0,
         totalPages: 0,
         hasNextPage: false,
@@ -444,26 +461,47 @@ function PostersPage() {
   )
 
   // Handle page change
-  const handlePageChange = useCallback(
-    (newPage: number) => {
-      // Build new search params preserving existing filters
-      const newSearch: PostersSearchParams = {
-        ...search,
-        page: newPage > 1 ? newPage : undefined, // Only include page param if > 1
-      }
+  /**
+   * The loader returns pages 1..page, so this is already the accumulated set —
+   * nothing to stitch on the client. `loadMore` just widens the URL.
+   */
+  const visibleProducts = products
+  const hasMore = pagination.hasNextPage
+  const isLoadingMore = useRouterState({ select: (state) => state.isLoading })
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-      // Remove undefined values to keep URL clean
-      const cleanSearch = Object.fromEntries(
-        Object.entries(newSearch).filter(([, v]) => v !== undefined)
-      ) as PostersSearchParams
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return
 
-      navigate({
-        to: '/posters',
-        search: cleanSearch,
-      })
-    },
-    [navigate, search]
-  )
+    /**
+     * `replace` because scrolling is not a navigation the back button should
+     * have to unwind one page at a time — back should leave the collection,
+     * not step through however many batches were loaded.
+     */
+    navigate({
+      to: '/posters',
+      search: { ...search, page: pagination.page + 1 },
+      replace: true,
+    })
+  }, [hasMore, isLoadingMore, navigate, pagination.page, search])
+
+  /**
+   * The observer is an enhancement over the button, never a replacement: it
+   * presses Load more when the sentinel approaches the viewport.
+   */
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || !hasMore || isLoadingMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore()
+      },
+      { rootMargin: '400px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, loadMore])
 
   // Count active filters for badge
   const activeFilterCount =
@@ -595,23 +633,34 @@ function PostersPage() {
             )}
 
             {/* Product Grid */}
-            {products.length > 0 ? (
+            {visibleProducts.length > 0 ? (
               <>
-                {/* ItemList structured data for the visible page (#244) */}
+                {/* ItemList structured data. Describes everything currently
+                    rendered, so it stays in step as pages accumulate. */}
                 <ItemListJsonLd
-                  items={products.map((p) => ({ name: p.title, slug: p.slug }))}
+                  items={visibleProducts.map((p) => ({
+                    name: p.title,
+                    slug: p.slug,
+                  }))}
                 />
-                <ProductGrid products={products} />
+                <ProductGrid products={visibleProducts} />
 
-                {/* Pagination */}
-                {pagination.totalPages > 1 && (
-                  <Pagination
-                    currentPage={pagination.page}
-                    totalPages={pagination.totalPages}
-                    hasNextPage={pagination.hasNextPage}
-                    hasPreviousPage={pagination.hasPreviousPage}
-                    onPageChange={handlePageChange}
-                  />
+                {/* Load more.
+                 *
+                 * A REAL BUTTON, not a bare scroll sentinel. Pure infinite
+                 * scroll is unreachable by keyboard, invisible to crawlers,
+                 * and impossible to recover from if the request fails. The
+                 * observer below simply presses this early for mouse users. */}
+                {hasMore && (
+                  <div ref={sentinelRef} className="mt-10 flex justify-center">
+                    <Button
+                      variant="outline"
+                      onClick={loadMore}
+                      disabled={isLoadingMore}
+                    >
+                      {isLoadingMore ? 'Loading…' : 'Load more'}
+                    </Button>
+                  </div>
                 )}
               </>
             ) : (
@@ -816,138 +865,6 @@ function ActiveFilterTags({
         Clear all
       </button>
     </div>
-  )
-}
-
-// ============================================================================
-// Pagination Component
-// ============================================================================
-
-interface PaginationProps {
-  currentPage: number
-  totalPages: number
-  hasNextPage: boolean
-  hasPreviousPage: boolean
-  onPageChange: (page: number) => void
-}
-
-function Pagination({
-  currentPage,
-  totalPages,
-  hasNextPage,
-  hasPreviousPage,
-  onPageChange,
-}: PaginationProps) {
-  // Generate page numbers to show
-  const getPageNumbers = () => {
-    const pages: (number | 'ellipsis')[] = []
-    const showEllipsis = totalPages > 7
-
-    if (!showEllipsis) {
-      // Show all pages
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i)
-      }
-    } else {
-      // Always show first page
-      pages.push(1)
-
-      if (currentPage > 3) {
-        pages.push('ellipsis')
-      }
-
-      // Show pages around current
-      const start = Math.max(2, currentPage - 1)
-      const end = Math.min(totalPages - 1, currentPage + 1)
-
-      for (let i = start; i <= end; i++) {
-        if (!pages.includes(i)) {
-          pages.push(i)
-        }
-      }
-
-      if (currentPage < totalPages - 2) {
-        pages.push('ellipsis')
-      }
-
-      // Always show last page
-      if (!pages.includes(totalPages)) {
-        pages.push(totalPages)
-      }
-    }
-
-    return pages
-  }
-
-  return (
-    <nav
-      className="mt-12 flex items-center justify-center gap-1"
-      aria-label="Pagination"
-    >
-      {/* Previous Button */}
-      <button
-        type="button"
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={!hasPreviousPage}
-        className={cn(
-          'flex h-10 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
-          hasPreviousPage
-            ? 'border-border hover:bg-accent'
-            : 'cursor-not-allowed border-border/50 text-muted-foreground'
-        )}
-        aria-label="Go to previous page"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        <span className="hidden sm:inline">Previous</span>
-      </button>
-
-      {/* Page Numbers */}
-      <div className="flex items-center gap-1">
-        {getPageNumbers().map((page, index) =>
-          page === 'ellipsis' ? (
-            <span
-              key={`ellipsis-${index}`}
-              className="flex h-10 w-10 items-center justify-center text-muted-foreground"
-            >
-              ...
-            </span>
-          ) : (
-            <button
-              key={page}
-              type="button"
-              onClick={() => onPageChange(page)}
-              className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium transition-colors',
-                page === currentPage
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-accent'
-              )}
-              aria-label={`Go to page ${page}`}
-              aria-current={page === currentPage ? 'page' : undefined}
-            >
-              {page}
-            </button>
-          )
-        )}
-      </div>
-
-      {/* Next Button */}
-      <button
-        type="button"
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={!hasNextPage}
-        className={cn(
-          'flex h-10 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
-          hasNextPage
-            ? 'border-border hover:bg-accent'
-            : 'cursor-not-allowed border-border/50 text-muted-foreground'
-        )}
-        aria-label="Go to next page"
-      >
-        <span className="hidden sm:inline">Next</span>
-        <ChevronRight className="h-4 w-4" />
-      </button>
-    </nav>
   )
 }
 
