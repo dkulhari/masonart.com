@@ -34,11 +34,24 @@ Two of these already exist in ticketrack as empty todo features — use them, do
 
 | # | Feature | ticketrack | Covers | Est |
 |---|---|---|---|---|
-| 1 | `wishlist` | **exists, 0 tickets** | API routes over the existing column, `useWishlist` hook, heart on card + PDP, header badge | 0.5–1 d |
-| 2 | `collection-page-parity` | new | §6 Phase C UI half: sticky toolbar (hide-filters, inline count, sort pill), beige header band with display H1 + breadcrumbs + SEO copy, active-filter chips, facet counts, lazy-load paging, card rating + review count + heart | 2–3 d |
-| 3 | `product-metadata-facets` | new | §6 Phase C data half + §4: facet vocabularies to shared constants, new `vibe`/`aesthetic`/`medium`/`uniqueness`/`availability`, Room 7→12, Subject 9→17, Orientation +Circle/+Set-of-2-3, filter API params, count endpoint, reseed | 2–3 d |
-| 4 | `global-chrome-parity` | new | §6 Phase B minus the sale strip: centered wordmark, right cluster, two-row nav, announcement bar, footer USP row + contact column + beige restyle | 2 d |
+| 1 | `wishlist` | ✅ **done** — #387–#389 | API routes over the existing column, `useWishlist` store, heart on card + PDP, header badge | 0.5–1 d |
+| 2 | `collection-page-parity` | ✅ **done** — #390–#394 | Beige header band + breadcrumbs, sticky toolbar (hide-filters, count, sort pill), facet-count API + sidebar counts, card star row, lazy-load paging | 2–3 d |
+| 3 | `product-metadata-facets` | next | §6 Phase C data half + §4: facet vocabularies to shared constants, new `vibe`/`aesthetic`/`medium`/`uniqueness`/`availability`, Room 7→12, Subject 9→17, Orientation +Circle/+Set-of-2-3, filter API params, reseed | 2–3 d |
+| 4 | `global-chrome-parity` | pending | §6 Phase B minus the sale strip: centered wordmark, right cluster, two-row nav, announcement bar, footer USP row + contact column + beige restyle | 2 d |
 | 5 | `advanced-search` | **exists, 0 tickets** | Search drawer over the existing `GET /api/products/search`, wired into the new header | 1 d |
+
+### Delivered so far
+
+**Feature 1 — wishlist (#387–#389).** Four auth-gated routes over the `users.wishlistProductIds` column that had existed with nothing reading it. Add/remove are atomic SQL (`array_append` guarded by containment, `array_remove`) rather than read-modify-write, so two tabs cannot clobber each other, and both are idempotent because the UI is an optimistic toggle. The heart is monochrome — `--sale` is reserved for sale prices. The PDP button that had carried `aria-label="Add to wishlist"` and no handler is now wired.
+
+**Feature 2 — collection-page-parity (#390–#394).** Beige header band with breadcrumbs + `BreadcrumbList` JSON-LD; sticky toolbar carrying the count and a sort pill (sort moved out of the filter sidebar, where mesonart does not put it); `GET /api/products/facets` plus a review aggregate on the list; sidebar counts with zero-count options *disabled rather than hidden*; a card star row that renders **nothing** when a product has no approved reviews; and lazy-load paging where `?page=N` means "everything up to N", fetched in one widened request.
+
+### Corrections to the analysis, found while building
+
+- **"No active-filter chips" was already wrong** — `ActiveFilterTags` existed on both mobile and desktop.
+- **The product API returned no review data at all**, despite populated reviews tables. That, not the card, was why stars were missing.
+- **Facet vocabularies are hardcoded literals** in `ProductFilters.tsx` while the API validates them as unconstrained comma-separated strings. No single source of truth — the same disease the size ladders had. Feature 3 is the fix.
+- **The `sql.raw` ARRAY construction in the products filter escapes quotes by hand.** Safe only because the vocabularies are fixed; feature 3 should close it properly.
 
 Deferred to a later pass, unchanged from the analysis: Phase D (home rebuild), Phase E remainder (PDP restructure), Phase F (new pages), and the sale strip.
 
@@ -57,11 +70,11 @@ For each feature in the order above:
 
 Every feature must leave these green before the next one starts:
 
-- `cd packages/web && bunx vitest run` — currently 1601 passing, 0 failing. **No new failures.**
-- `cd packages/shared && bunx vitest run` — currently 859 passing, 0 failing. **No new failures.**
-- `cd packages/api && bunx vitest run` — **36 failing is the baseline** (38 on `feat/product-grid-alignment`). Pre-existing AI/redis/queue/auth/health suites. Diff against it; never attribute them to new work.
+- `cd packages/web && bunx vitest run` — **1653 passing, 0 failing** as of #394. No new failures.
+- `cd packages/shared && bunx vitest run` — 859 passing, 0 failing. No new failures.
+- `cd packages/api && bunx vitest run` — **~34–36 failing is the baseline** (38 on `feat/product-grid-alignment`). Pre-existing AI/redis/queue/auth/health suites, and the failing *file set* varies between identical runs under parallelism — confirm any suspected regression by running the single file alone before believing it.
 - `bun run typecheck` — **23 errors is the baseline.** Never higher.
-- `bunx playwright test tests/e2e/product-grid-alignment.spec.ts` — 92 passing; 2 Firefox hover failures are pre-existing and reproduce on the parent branch.
+- `bunx playwright test tests/e2e/product-grid-alignment.spec.ts --project=chromium --no-deps` — **18 passing.** Use `--no-deps`: the four `auth.setup.ts` projects fail to log in the test users for pre-existing reasons, and the grid spec needs no auth.
 - `bunx vitest run tests/styles/storefront-token-compliance.test.ts` — the Phase A guard. Any new component that reaches for `font-bold`, `fill-yellow-400`, the `brand-*` scale, `blur-3xl` or a brand gradient fails here.
 
 ## Constraints carried into every ticket
@@ -91,4 +104,11 @@ Every feature must leave these green before the next one starts:
 | Product schema | [schema/products.ts](../../../packages/api/src/database/schema/products.ts) (facet columns at :90) |
 | Wishlist column | [schema/users.ts](../../../packages/api/src/database/schema/users.ts) (:170) |
 | Size ladders | [constants/sizes.ts](../../../packages/shared/src/constants/sizes.ts) · [seed-variants.ts](../../../packages/api/src/database/seed-variants.ts) |
-| Local dev | DB on host port **5440** (not the 5433 in `.env`); web `:3001`, API `:3000` |
+| Local dev | DB on host port **5440**, web `:3001`, API `:3000` |
+
+## Local environment traps (all cost real time on 2026-08-04)
+
+1. **Seed from the repo root**, never from `packages/api`. Bun loads `.env` from cwd, so running it in the package directory loses the R2/minio credentials — and `processProductImages` treats upload failure as non-fatal, so the seed reports **success** while writing products with zero images. That breaks every grid E2E in a way that looks exactly like a component regression. Check afterwards: `SELECT count(*) FILTER (WHERE jsonb_array_length(coalesce(images,'[]'))=0) FROM products;` must be 0.
+2. **`.env` used to point `DATABASE_URL` at port 5433**, which is a *different project's* postgres (`surveytrack-postgres`). Corrected 2026-08-04; backup at `.env.bak-1785829333`. It hid for so long because `packages/api/package.json` runs `bun run --env-file=../../.env`, and **`--env-file` overrides inherited environment variables** — so an inline override reached vitest but never anything started through `bun run dev`.
+3. **API route tests mock `db`, so they cannot catch a reference to a column that does not exist.** A route filtering on `products.isActive` passed 17 green tests; the table has `status`. When adding a route, run its queries against the real database once and add a schema-assumption test.
+4. **Reviews require a real `order_item_id`**, and no orders are seeded. The three fixture reviews on `synthetic-nature` exist because the FK was dropped and restored `NOT VALID`.
