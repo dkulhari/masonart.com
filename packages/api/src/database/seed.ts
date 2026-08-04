@@ -15,6 +15,7 @@ const LADDERED_ORIENTATIONS = new Set([
   "landscape",
   "panoramic",
 ]);
+import { sql } from "drizzle-orm";
 import { db, closeDatabase } from "./index";
 import {
   products,
@@ -1656,9 +1657,12 @@ async function seed(): Promise<void> {
     // Summary
     console.log("Summary:");
     console.log(`  - Products: ${sampleProducts.length}`);
-    console.log(
-      `  - Variants: ${sampleProducts.length * 4} (approx 4 per product)`
-    );
+    // Counted, not guessed: the ladder gives 13-17 steps depending on
+    // orientation, so the old `length * 4` has been wrong since #386.
+    const [{ count: variantCount = 0 } = {}] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(productVariants);
+    console.log(`  - Variants: ${variantCount}`);
     console.log(`  - Frames: ${sampleFrames.length}`);
     console.log("");
   } catch (error) {

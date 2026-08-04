@@ -1,7 +1,8 @@
 import { Link, useRouteContext } from '@tanstack/react-router'
-import { LayoutDashboard, Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
+import { Heart, LayoutDashboard, Menu, ShoppingCart, User, X, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useCartItemCount, useCartHydration } from '~/stores/cart'
+import { useWishlistCount, useWishlistActions, useWishlistStore } from '~/stores/wishlist'
 import {
   ADMIN_PRODUCTS_SEARCH,
   staffAreaHref,
@@ -17,6 +18,9 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
+  const wishlistCount = useWishlistCount()
+  const { load: loadWishlist } = useWishlistActions()
+  const isWishlistLoaded = useWishlistStore((state) => state.isLoaded)
 
   // Session comes from the root route's beforeLoad; staff get an entry into
   // the staff area, labelled for what their role can actually reach (#362).
@@ -28,8 +32,14 @@ export function Header() {
   const staffSearch =
     staffHref === '/admin/products' ? ADMIN_PRODUCTS_SEARCH : undefined
 
-  // Only show cart count after hydration to avoid SSR mismatch
+  // Only show counts after hydration to avoid SSR mismatch (#498) — the
+  // server cannot know either number.
   const displayCartCount = isHydrated ? cartItemCount : 0
+  const displayWishlistCount = isHydrated ? wishlistCount : 0
+
+  useEffect(() => {
+    if (isHydrated && !isWishlistLoaded) void loadWishlist()
+  }, [isHydrated, isWishlistLoaded, loadWishlist])
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen((prev) => !prev)
@@ -107,6 +117,21 @@ export function Header() {
                 {staffLabel}
               </Link>
             )}
+            {/* Wishlist. The destination is the account area until Phase F
+                builds the wishlist page proper — the parity work needs the
+                affordance and the count, not the page. */}
+            <Link
+              to="/account"
+              className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              aria-label={`Wishlist${displayWishlistCount > 0 ? `, ${displayWishlistCount} items` : ''}`}
+            >
+              <Heart className="h-5 w-5" />
+              {displayWishlistCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                  {displayWishlistCount > 99 ? '99+' : displayWishlistCount}
+                </span>
+              )}
+            </Link>
             <Link
               to="/cart"
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"

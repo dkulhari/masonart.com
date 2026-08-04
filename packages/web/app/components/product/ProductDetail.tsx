@@ -11,7 +11,6 @@ import { useState, useMemo, useCallback } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
-  Heart,
   Share2,
   ShoppingCart,
   Star,
@@ -22,6 +21,7 @@ import {
   Palette,
 } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
+import { WishlistButton } from './WishlistButton'
 import { useCartStore } from '~/stores/cart'
 import { SizeSelector, type SizeVariant } from './SizeSelector'
 import { FrameSelector, calculateFramePrice, type FrameOptionData } from './FrameSelector'
@@ -400,13 +400,8 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                   <ShoppingCart className="h-5 w-5" />
                   Add to Cart
                 </button>
-                <button
-                  type="button"
-                  className="flex items-center justify-center rounded-lg border border-border p-3 transition-colors hover:bg-muted"
-                  aria-label="Add to wishlist"
-                >
-                  <Heart className="h-5 w-5" />
-                </button>
+                {/* Was a button with this aria-label and no handler. */}
+                <WishlistButton productId={product.id} variant="detail" />
                 <button
                   type="button"
                   className="flex items-center justify-center rounded-lg border border-border p-3 transition-colors hover:bg-muted"

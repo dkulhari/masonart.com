@@ -29,6 +29,7 @@ import { Palette, Sparkles } from 'lucide-react'
 import type { ProductImage } from '@chobii/shared'
 import { cn, formatPrice } from '~/lib/utils'
 import { ProductCardMedia } from './ProductCardMedia'
+import { WishlistButton } from './WishlistButton'
 import { MEDIA_RATIO } from './productCardTokens'
 
 export type { ProductImage }
@@ -123,7 +124,17 @@ export function ProductCard({
           </Link>
         </p>
 
-        <div className="flex flex-col gap-2">
+        {/* Heart + price share the right column.
+         *
+         * mesonart puts the heart on its own row above the title, opposite the
+         * star rating (analysis §1.3.6). We have no star row yet — it lands
+         * with collection-page-parity — so it rides here until then.
+         *
+         * Nothing added here may introduce min-height or line-clamp: the row
+         * alignment is grid stretch plus `grow` on this block, and both would
+         * fight it. Guarded by ProductCard.tokens.test.ts. */}
+        <div className="flex items-center gap-2 lg:flex-col lg:items-end">
+          <WishlistButton productId={product.id} />
           <span className="whitespace-nowrap text-product font-light lg:text-right">
             <small className="text-[0.8em]">From</small> {formatPrice(price)}
           </span>
