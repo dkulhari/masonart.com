@@ -1554,16 +1554,49 @@ async function clearData(): Promise<void> {
  * falls back to its declared URL.
  */
 const REFERENCE_MEDIA: Record<string, string> = {
-  "wabi-sabi-study": "tx462", // misty mountain, heavy texture
-  "floating-islands": "tx463", // mountains dissolving into mist
-  "imperfect-vessel": "tx450", // lone tree against a broken white field
-  "weathered-stone": "tx466", // eroded cliff face
-  "paper-layers": "tx449", // two-panel set, layered
-  "desert-bloom": "tx070", // seed-head field
-  "mountain-majesty": "tx218", // peak above a river
-  "ocean-horizon": "tx556", // sea against a pale sky
-  "serene-waves": "tx557", // abstract water
-  "forest-whispers": "tx532", // trees over still water
+  // The first ten also have room mockups; the rest are artwork only.
+  "wabi-sabi-study": "tx462", // misty mountain, heavy texture (+3 rooms)
+  "floating-islands": "tx463", // mountains dissolving into mist (+3 rooms)
+  "imperfect-vessel": "tx450", // lone tree against a broken white field (+2 rooms)
+  "weathered-stone": "tx466", // eroded cliff face (+3 rooms)
+  "paper-layers": "tx449", // two-panel set, layered (+3 rooms)
+  "desert-bloom": "tx070", // seed-head field (+3 rooms)
+  "mountain-majesty": "tx218", // peak above a river (+3 rooms)
+  "ocean-horizon": "tx556", // sea against a pale sky (+3 rooms)
+  "serene-waves": "tx557", // abstract water (+3 rooms)
+  "forest-whispers": "tx532", // trees over still water (+3 rooms)
+
+  "cosmic-harmony": "sa126", // celestial figure
+  "golden-flow": "sg259", // gold tree, heavy impasto
+  "monstera-dreams": "bp085", // monstera leaves
+  "eucalyptus-study": "ma314", // bare branches in a vase
+  "circle-of-zen": "uk002", // ukiyo-e line figure
+  "linear-horizons": "aea038", // white line field
+  "stay-curious": "ma237", // block lettering
+  "dream-big": "csq025", // loose script over texture
+  "neon-dreams": "ca180", // high-chroma pop face
+  "comic-burst": "ga009", // comic-panel graffiti
+  "paris-1920": "sg324", // Eiffel Tower under snow
+  "botanical-atlas": "sg486", // white blooms in a vase
+  "melting-time": "sa001", // surrealist portrait
+  "desert-tapestry": "bp093", // kilim diamonds, terracotta
+  "urban-geometry": "ma217", // interlocking beige forms
+  "color-block": "ma194", // flat colour blocks
+  "city-lights": "sg667", // skyline at night
+  "wild-spirit": "ma273", // single-line horse
+  "concrete-poetry": "llc068", // concrete columns
+  "be-present": "tx479", // bamboo over water
+  "create-every-day": "ga246", // graffiti with lettering
+  "sunset-boulevard": "aq006", // pier at golden hour
+  "vinyl-vibes": "csq166", // jazz players
+  "alpine-majesty": "sg177", // snow slope, plaster relief
+  "urban-soul": "pac022", // pop-art portrait
+  "emerald-dreams": "ca340", // green and teal wash
+  "blush-hour": "ca106", // pink and olive shapes
+  "neural-dreams": "sg613", // banded plaster waves
+  "digital-cosmos": "sp108", // two-panel moon study
+  "synthetic-nature": "sg595", // gold botanicals on black
+  "mandala-garden": "bp094", // kilim diamonds, rose
 };
 
 /** A resolved image source: a local fixture file, or a remote URL. */
