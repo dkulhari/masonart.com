@@ -22,6 +22,13 @@
       "when": 1785832164280,
       "tag": "0002_abandoned_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785842486217,
+      "tag": "0003_smiling_forge",
+      "breakpoints": true
     }
   ]
 }

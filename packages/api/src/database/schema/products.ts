@@ -140,6 +140,21 @@ export const products = pgTable(
     featuredOrder: integer("featured_order"),
     isFeatured: boolean("is_featured").default(false).notNull(),
 
+    /**
+     * Curator popularity pin (mesonart parity, analysis §1.3.5).
+     *
+     * The Best-selling sort is driven by real units sold, aggregated from
+     * order_items at query time. These two columns let a curator lift a
+     * product above that ordering — a merchandising decision, deliberately
+     * kept separate from the measurement so the admin can see the two
+     * disagree. Pinning never writes a sales figure.
+     *
+     * Same shape as the featured pair above so the admin form, the query and
+     * the index all follow a path the codebase already has.
+     */
+    popularOrder: integer("popular_order"),
+    isPopular: boolean("is_popular").default(false).notNull(),
+
     // AI generation metadata (for AI-generated posters)
     isAiGenerated: boolean("is_ai_generated").default(false).notNull(),
     aiGenerationId: uuid("ai_generation_id"),
@@ -155,6 +170,10 @@ export const products = pgTable(
     featuredIdx: index("products_featured_idx").on(
       table.isFeatured,
       table.featuredOrder
+    ),
+    popularIdx: index("products_popular_idx").on(
+      table.isPopular,
+      table.popularOrder
     ),
     createdAtIdx: index("products_created_at_idx").on(table.createdAt),
   })
