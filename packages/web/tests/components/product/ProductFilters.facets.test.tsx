@@ -107,3 +107,103 @@ describe('token compliance', () => {
     expect(src).not.toMatch(/\b(bg|text|border|from|to)-brand-/)
   })
 })
+
+/**
+ * The measured mesonart rail (#415). Numbers came off their live collection
+ * page at 1440px on 2026-08-04, read as computed styles rather than eyeballed:
+ * a 300px column with no box, no radius and no inner scroll; group titles at
+ * the body weight; counts inline in parentheses at 60% opacity; option rows
+ * with no padding and no hover fill; a 5px checkbox.
+ *
+ * Their rail also renders in a serif (`AtacamaTrial VAR`) — a trial-licensed
+ * face, and the only text on their site that is neither Poppins nor Urbanist.
+ * We match their metrics on Poppins and leave the face alone.
+ */
+describe('the rail carries their chrome, not ours', () => {
+  const routeSrc = readFileSync(
+    join(process.cwd(), 'app/routes/posters/index.tsx'),
+    'utf8'
+  )
+
+  const styleGroup = FACET_GROUPS.find((group) => group.key === 'styles')!
+  const firstStyle = styleGroup.options[0]
+
+  it('renders no header row on the desktop rail', () => {
+    // Active filters are already removable as chips above the grid, so the
+    // rail's own "Filters / Clear all" row is a second, redundant affordance.
+    render(<ProductFilters filters={emptyFilters} onFiltersChange={() => {}} />)
+
+    expect(screen.queryByRole('heading', { name: 'Filters' })).toBeNull()
+    expect(screen.queryByText('Clear all')).toBeNull()
+  })
+
+  it('keeps the header in the mobile drawer', () => {
+    // The drawer has no chips above it and no other way out.
+    render(
+      <ProductFilters
+        filters={{ ...emptyFilters, styles: [firstStyle.id] }}
+        onFiltersChange={() => {}}
+        isMobile
+      />
+    )
+
+    expect(screen.getByRole('heading', { name: 'Filters' })).toBeTruthy()
+    expect(screen.getByText('Clear all')).toBeTruthy()
+  })
+
+  it('renders group titles at the body weight', () => {
+    render(<ProductFilters filters={emptyFilters} onFiltersChange={() => {}} />)
+
+    expect(screen.getByText(styleGroup.label).className).not.toContain(
+      'font-medium'
+    )
+  })
+
+  it('carries no per-group count badge', () => {
+    render(
+      <ProductFilters
+        filters={{ ...emptyFilters, styles: [firstStyle.id] }}
+        onFiltersChange={() => {}}
+      />
+    )
+
+    const head = screen.getByText(styleGroup.label).closest('button')
+    expect(head?.textContent?.trim()).toBe(styleGroup.label)
+  })
+
+  it('prints the option count inline in parentheses', () => {
+    render(
+      <ProductFilters
+        filters={emptyFilters}
+        onFiltersChange={() => {}}
+        facetCounts={{ styles: new Map([[firstStyle.id, 9]]) }}
+      />
+    )
+
+    expect(screen.getByText('(9)')).toBeTruthy()
+  })
+
+  it('gives option rows no padding and no hover fill', () => {
+    render(<ProductFilters filters={emptyFilters} onFiltersChange={() => {}} />)
+
+    const row = screen.getByText(firstStyle.label).closest('label')
+    expect(row?.className).not.toContain('hover:bg-accent')
+    expect(row?.className).not.toContain('px-2')
+  })
+
+  it('sets the checkbox to the measured 5px radius', () => {
+    render(<ProductFilters filters={emptyFilters} onFiltersChange={() => {}} />)
+
+    const box = screen
+      .getByText(firstStyle.label)
+      .closest('label')
+      ?.querySelector('div')
+    expect(box?.className).toContain('rounded-[5px]')
+  })
+
+  it('strips the box and the inner scroll off the desktop rail', () => {
+    expect(routeSrc).not.toMatch(/rounded-lg border border-border/)
+    expect(routeSrc).not.toContain('max-h-[calc(100vh-6rem)]')
+    expect(routeSrc).toContain('w-[300px]')
+  })
+})

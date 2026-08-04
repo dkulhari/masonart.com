@@ -635,11 +635,17 @@ function PostersPage() {
           <aside
             id={FILTER_SIDEBAR_ID}
             className={cn(
-              'hidden w-64 shrink-0',
+              'hidden w-[300px] shrink-0',
               filtersHidden ? 'lg:hidden' : 'lg:block'
             )}
           >
-            <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border border-border">
+            {/* No box, no radius, no inner scroll (#415).
+             *
+             * mesonart's rail is a bare 300px column that sticks to the top and
+             * scrolls with the page. Ours was a bordered card with its own
+             * scrollbar, which read as a widget dropped onto the page and put a
+             * second scrollbar inside the first. */}
+            <div className="sticky top-20">
               <ProductFilters
                 filters={filters}
                 onFiltersChange={handleFiltersChange}

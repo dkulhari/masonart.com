@@ -9,13 +9,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import {
-  X,
-  SlidersHorizontal,
-  ChevronDown,
-  ChevronUp,
-  Check,
-} from 'lucide-react'
+import { X, SlidersHorizontal, ChevronUp, Check } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { FACET_GROUPS, type FacetOption } from '@chobii/shared'
 
@@ -88,10 +82,10 @@ export interface ProductFiltersProps {
   className?: string
 }
 
+
 // ============================================================================
 // Default Filter Options
 // ============================================================================
-
 
 // ============================================================================
 // Component
@@ -190,39 +184,49 @@ export function ProductFilters({
         className
       )}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border p-4">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-5 w-5" />
-          <h2 className="text-lg font-semibold">Filters</h2>
-          {activeFilterCount > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-              {activeFilterCount}
-            </span>
-          )}
+      {/* Header — mobile only.
+       *
+       * mesonart's rail carries no header at all (analysis §1.3.4): no title,
+       * no active count, no "Clear all". It does not need one — active values
+       * render as removable chips above the grid, so a second clear affordance
+       * inside the rail is redundant furniture.
+       *
+       * The drawer is a different case. It has no chips above it and no other
+       * way out, so it keeps the row. */}
+      {isMobile && (
+        <div className="flex items-center justify-between border-b border-border p-4">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="h-5 w-5" />
+            <h2 className="text-lg font-semibold">Filters</h2>
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Clear all
+              </button>
+            )}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-accent"
+                aria-label="Close filters"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {activeFilterCount > 0 && (
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Clear all
-            </button>
-          )}
-          {isMobile && onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-accent"
-              aria-label="Close filters"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Filter Sections
        *
@@ -231,7 +235,7 @@ export function ProductFilters({
        * consumed by the schema, the API, the seed and here. Nine groups
        * written out by hand is also where the previous copy started drifting
        * from the API's idea of the same values. */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={cn('flex-1', isMobile && 'overflow-y-auto px-4')}>
         {FACET_GROUPS.map((group) => {
           const counts = facetCounts?.[group.key]
           const options: FilterOption[] = group.options.map(
@@ -257,9 +261,8 @@ export function ProductFilters({
               sectionKey={group.key}
               isExpanded={expandedSections.has(group.key)}
               onToggle={toggleSection}
-              activeCount={selected.length}
             >
-              <div className="space-y-1">
+              <div className="space-y-3">
                 {options.map((option) => (
                   <FilterCheckbox
                     key={option.id}
@@ -317,41 +320,45 @@ interface FilterSectionProps {
   sectionKey: string
   isExpanded: boolean
   onToggle: (key: string) => void
-  activeCount?: number
   children: React.ReactNode
 }
 
+/**
+ * A facet group.
+ *
+ * Measured against mesonart: the divider is a warm hairline at 6% of the
+ * foreground rather than `--border`, whose cool slate reads blue next to the
+ * beige band; the title sits at the body weight, not `font-medium`; and there
+ * is no active-count badge — the chips above the grid already say which values
+ * are on, and a filled pill in a monochrome rail is a second voice saying it.
+ *
+ * One chevron that rotates, rather than two that swap, so the state change is
+ * a movement on `--ease-primary` instead of a substitution.
+ */
 function FilterSection({
   title,
   sectionKey,
   isExpanded,
   onToggle,
-  activeCount,
   children,
 }: FilterSectionProps) {
   return (
-    <div className="border-b border-border">
+    <div className="border-b border-foreground/[0.06]">
       <button
         type="button"
         onClick={() => onToggle(sectionKey)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left"
+        className="flex w-full items-center justify-between py-4 text-left"
         aria-expanded={isExpanded}
       >
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-foreground">{title}</span>
-          {activeCount !== undefined && activeCount > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-              {activeCount}
-            </span>
+        <span className="text-foreground">{title}</span>
+        <ChevronUp
+          className={cn(
+            'h-5 w-5 text-muted-foreground transition-transform duration-500 [transition-timing-function:var(--ease-primary)]',
+            !isExpanded && 'rotate-180'
           )}
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        )}
+        />
       </button>
-      {isExpanded && <div className="px-4 pb-4">{children}</div>}
+      {isExpanded && <div className="pb-6">{children}</div>}
     </div>
   )
 }
@@ -389,18 +396,16 @@ function FilterCheckbox({
     <label
       htmlFor={id}
       className={cn(
-        'flex items-center gap-3 rounded-md px-2 py-1.5',
-        isEmpty
-          ? 'cursor-not-allowed opacity-40'
-          : 'cursor-pointer hover:bg-accent'
+        'flex items-center gap-3',
+        isEmpty ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'
       )}
     >
       <div
         className={cn(
-          'flex h-5 w-5 items-center justify-center rounded border transition-colors',
+          'flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] border transition-colors',
           checked
             ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-muted-foreground/30'
+            : 'border-foreground/40'
         )}
       >
         {checked && <Check className="h-3.5 w-3.5" />}
@@ -413,12 +418,17 @@ function FilterCheckbox({
         disabled={isEmpty}
         className="sr-only"
       />
-      <span className="flex-1 text-sm">{label}</span>
-      {count !== undefined && (
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {count}
-        </span>
-      )}
+      {/* Count sits inline against the label, not pinned to the far edge.
+       * Theirs reads "Wabi-Sabi Art (788)" as one phrase; a right-aligned
+       * column of numbers reads as a separate table. */}
+      <span className="flex items-baseline gap-1">
+        <span className="text-sm">{label}</span>
+        {count !== undefined && (
+          <span className="text-sm tabular-nums text-foreground/60">
+            ({count})
+          </span>
+        )}
+      </span>
     </label>
   )
 }
