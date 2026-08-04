@@ -30,6 +30,7 @@ import type { ProductImage } from '@chobii/shared'
 import { cn, formatPrice } from '~/lib/utils'
 import { ProductCardMedia } from './ProductCardMedia'
 import { WishlistButton } from './WishlistButton'
+import { ProductRating } from './ProductRating'
 import { MEDIA_RATIO } from './productCardTokens'
 
 export type { ProductImage }
@@ -45,6 +46,9 @@ export interface ProductCardData {
   styles?: string[]
   isFeatured?: boolean
   isAiGenerated?: boolean
+  /** Null when the product has no approved reviews — see ProductRating. */
+  averageRating?: number | null
+  reviewCount?: number
 }
 
 export interface ProductCardProps {
@@ -107,6 +111,19 @@ export function ProductCard({
           )}
         </div>
       </div>
+
+      {/* Rating row — mesonart puts stars and the review count left, the
+          wishlist heart right (§1.3.6). Renders nothing at all when the
+          product has no reviews, so unrated cards simply lose the row rather
+          than showing an invented score. */}
+      {(product.reviewCount ?? 0) > 0 && (
+        <div className="mt-[11px] flex items-center justify-between">
+          <ProductRating
+            averageRating={product.averageRating ?? null}
+            reviewCount={product.reviewCount ?? 0}
+          />
+        </div>
+      )}
 
       {/* `grow` is what absorbs the slack when the grid stretches this card to
           its row height. That is the entire alignment mechanism on this side. */}

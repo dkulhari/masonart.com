@@ -203,6 +203,31 @@ export function getClient() {
  */
 export const productsApi = {
   /**
+   * Per-option facet counts, for the collection sidebar.
+   *
+   * Separate from list() because the counts describe the whole catalogue
+   * under the current filters, while list() returns one page of 24 — the
+   * client cannot derive one from the other.
+   */
+  async facets(): Promise<{
+    styles: Array<{ value: string; count: number }>;
+    subjects: Array<{ value: string; count: number }>;
+    colors: Array<{ value: string; count: number }>;
+    rooms: Array<{ value: string; count: number }>;
+    orientation: Array<{ value: string; count: number }>;
+  }> {
+    const response = await fetch(`${getApiUrl()}/api/products/facets`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch product facets");
+    }
+
+    return response.json();
+  },
+  /**
    * List products with optional filters and pagination
    */
   async list(params?: ProductFilters) {

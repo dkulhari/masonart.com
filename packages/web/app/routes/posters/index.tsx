@@ -118,6 +118,8 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         styles: item.styles as string[] | undefined,
         isFeatured: item.isFeatured as boolean | undefined,
         isAiGenerated: item.isAiGenerated as boolean | undefined,
+        averageRating: (item.averageRating as number | null) ?? null,
+        reviewCount: (item.reviewCount as number | undefined) ?? 0,
       })
     )
 
@@ -328,6 +330,40 @@ function PostersPage() {
    */
   const [filtersHidden, setFiltersHidden] = useState(false)
 
+  /**
+   * Facet counts. Fetched client-side rather than in the loader: they describe
+   * the whole catalogue, not this page, so they do not change with filters or
+   * paging and would only slow the SSR response down.
+   */
+  const [facetCounts, setFacetCounts] = useState<Record<
+    string,
+    Map<string, number>
+  > | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    productsApi
+      .facets()
+      .then((facets) => {
+        if (cancelled) return
+        const toMap = (rows: Array<{ value: string; count: number }>) =>
+          new Map(rows.map((row) => [row.value, row.count]))
+        setFacetCounts({
+          styles: toMap(facets.styles),
+          subjects: toMap(facets.subjects),
+          colors: toMap(facets.colors),
+          rooms: toMap(facets.rooms),
+          orientation: toMap(facets.orientation),
+        })
+      })
+      // Counts are an enhancement; without them the labels simply render
+      // bare, which is what they did before this feature.
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     setFiltersHidden(
       window.localStorage.getItem(FILTERS_HIDDEN_KEY) === 'true'
@@ -460,6 +496,7 @@ function PostersPage() {
               <ProductFilters
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
+                facetCounts={facetCounts}
               />
             </div>
           </aside>

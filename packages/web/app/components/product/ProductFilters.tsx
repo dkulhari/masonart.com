@@ -45,6 +45,12 @@ export interface FilterOption {
   name: string
   description?: string
   hex?: string
+  /**
+   * How many products carry this value under the currently applied filters.
+   * Undefined until the facets endpoint has responded — the label renders
+   * bare rather than flashing "(0)".
+   */
+  count?: number
 }
 
 export interface ProductFiltersProps {
@@ -53,6 +59,12 @@ export interface ProductFiltersProps {
   /** Callback when filters change */
   onFiltersChange: (filters: FilterState) => void
   /** Available style options */
+  /**
+   * Per-facet counts keyed by option id, from GET /api/products/facets.
+   * Null until the request lands; options render without counts until then
+   * rather than flashing zeros.
+   */
+  facetCounts?: Record<string, Map<string, number>> | null
   styleOptions?: FilterOption[]
   /** Available subject options */
   subjectOptions?: FilterOption[]
@@ -140,6 +152,7 @@ const ORIENTATION_OPTIONS: FilterOption[] = [
 export function ProductFilters({
   filters,
   onFiltersChange,
+  facetCounts,
   styleOptions = DEFAULT_STYLE_OPTIONS,
   subjectOptions = DEFAULT_SUBJECT_OPTIONS,
   colorOptions = DEFAULT_COLOR_OPTIONS,
@@ -166,6 +179,22 @@ export function ProductFilters({
   }, [])
 
   // Toggle a multi-select filter value
+  /**
+   * Attach counts to whichever option lists we were given. Done here rather
+   * than at each call site so every facet section gets the same treatment.
+   */
+  const withCounts = useCallback(
+    (options: FilterOption[], facet: string): FilterOption[] => {
+      const counts = facetCounts?.[facet]
+      if (!counts) return options
+      return options.map((option) => ({
+        ...option,
+        count: counts.get(option.id) ?? 0,
+      }))
+    },
+    [facetCounts]
+  )
+
   const toggleMultiFilter = useCallback(
     (key: keyof FilterState, value: string) => {
       const currentValues = (filters[key] as string[]) || []
@@ -306,11 +335,12 @@ export function ProductFilters({
           activeCount={filters.styles.length}
         >
           <div className="space-y-1">
-            {styleOptions.map((option) => (
+            {withCounts(styleOptions, 'styles').map((option) => (
               <FilterCheckbox
                 key={option.id}
                 id={`style-${option.id}`}
                 label={option.name}
+                count={option.count}
                 checked={filters.styles.includes(option.id)}
                 onChange={() => toggleMultiFilter('styles', option.id)}
               />
@@ -327,11 +357,12 @@ export function ProductFilters({
           activeCount={filters.subjects.length}
         >
           <div className="space-y-1">
-            {subjectOptions.map((option) => (
+            {withCounts(subjectOptions, 'subjects').map((option) => (
               <FilterCheckbox
                 key={option.id}
                 id={`subject-${option.id}`}
                 label={option.name}
+                count={option.count}
                 checked={filters.subjects.includes(option.id)}
                 onChange={() => toggleMultiFilter('subjects', option.id)}
               />
@@ -348,7 +379,7 @@ export function ProductFilters({
           activeCount={filters.colors.length}
         >
           <div className="flex flex-wrap gap-2">
-            {colorOptions.map((option) => (
+            {withCounts(colorOptions, 'colors').map((option) => (
               <button
                 key={option.id}
                 type="button"
@@ -381,11 +412,12 @@ export function ProductFilters({
           activeCount={filters.rooms.length}
         >
           <div className="space-y-1">
-            {roomOptions.map((option) => (
+            {withCounts(roomOptions, 'rooms').map((option) => (
               <FilterCheckbox
                 key={option.id}
                 id={`room-${option.id}`}
                 label={option.name}
+                count={option.count}
                 checked={filters.rooms.includes(option.id)}
                 onChange={() => toggleMultiFilter('rooms', option.id)}
               />
@@ -501,13 +533,35 @@ interface FilterCheckboxProps {
   label: string
   checked: boolean
   onChange: () => void
+  count?: number
 }
 
-function FilterCheckbox({ id, label, checked, onChange }: FilterCheckboxProps) {
+function FilterCheckbox({
+  id,
+  label,
+  checked,
+  onChange,
+  count,
+}: FilterCheckboxProps) {
+  /**
+   * Zero-count options are DISABLED, not hidden. Hiding them makes the list
+   * jump and reflow every time the shopper ticks a box, and removes the
+   * information that the value exists at all.
+   *
+   * A checked option is never disabled — the shopper must be able to untick
+   * the thing that emptied the results.
+   */
+  const isEmpty = count === 0 && !checked
+
   return (
     <label
       htmlFor={id}
-      className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-accent"
+      className={cn(
+        'flex items-center gap-3 rounded-md px-2 py-1.5',
+        isEmpty
+          ? 'cursor-not-allowed opacity-40'
+          : 'cursor-pointer hover:bg-accent'
+      )}
     >
       <div
         className={cn(
@@ -524,9 +578,15 @@ function FilterCheckbox({ id, label, checked, onChange }: FilterCheckboxProps) {
         id={id}
         checked={checked}
         onChange={onChange}
+        disabled={isEmpty}
         className="sr-only"
       />
-      <span className="text-sm">{label}</span>
+      <span className="flex-1 text-sm">{label}</span>
+      {count !== undefined && (
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      )}
     </label>
   )
 }
