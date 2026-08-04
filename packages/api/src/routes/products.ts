@@ -17,6 +17,7 @@ import { eq, and, or, ilike, desc, asc, sql, inArray } from "drizzle-orm";
 
 import { db } from "../database";
 import { products, productVariants, frames } from "../database/schema/products";
+import { reviews } from "../database/schema/reviews";
 import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
 import { getCached, setCached, CacheKeys } from "../lib/redis";
 
@@ -227,9 +228,36 @@ productsApp.get(
           isAiGenerated: products.isAiGenerated,
           featuredOrder: products.featuredOrder,
           createdAt: products.createdAt,
+          /**
+           * Review aggregate.
+           *
+           * NULL average, not 0, when a product has no approved reviews —
+           * a synthetic 0.0 renders as "rated badly" rather than "not yet
+           * rated", which is the fabricated-social-proof problem the parity
+           * analysis rules out. The card omits the star row entirely on null.
+           *
+           * `count` is 0 rather than null because "0 reviews" is a true
+           * statement and the UI wants a number.
+           */
+          averageRating: sql<
+            number | null
+          >`round(avg(${reviews.rating})::numeric, 1)`,
+          reviewCount: sql<number>`count(${reviews.id})::int`,
         })
         .from(products)
+        /**
+         * A join, not a correlated subquery per row: on a 24-card page the
+         * subquery form is an N+1 wearing a disguise.
+         *
+         * Only `approved` reviews count — a pending or rejected one must not
+         * move a public rating.
+         */
+        .leftJoin(
+          reviews,
+          and(eq(reviews.productId, products.id), eq(reviews.status, "approved"))
+        )
         .where(and(...conditions))
+        .groupBy(products.id)
         .orderBy(orderByDirection(orderByColumn))
         .limit(pageSize)
         .offset(offset);
@@ -390,6 +418,75 @@ productsApp.get(
     }
   }
 );
+
+// ============================================================================
+// GET /api/products/facets - Per-Option Counts
+// ============================================================================
+
+/**
+ * Counts for every facet option, so the sidebar can render "Wabi-Sabi (788)"
+ * the way mesonart does (analysis §1.3.4).
+ *
+ * This has to live on the server. The client only ever holds the current page
+ * of 24, so counting there would report the page, not the catalogue.
+ *
+ * Registered BEFORE `/:slug` — otherwise "facets" is read as a product slug.
+ */
+productsApp.get("/facets", async (c) => {
+  const cacheKey = `${CacheKeys.PRODUCT}facets`;
+
+  const cached = await getCached<Record<string, unknown>>(cacheKey);
+  if (cached) return c.json({ ...cached, fromCache: true });
+
+  try {
+    /**
+     * styles/subjects/colors/rooms are `text[]`, so each needs unnest before
+     * it can be grouped. orientation is a plain enum column and groups
+     * directly.
+     */
+    type ArrayFacetColumn =
+      | typeof products.styles
+      | typeof products.subjects
+      | typeof products.colors
+      | typeof products.rooms;
+
+    const arrayFacet = async (column: ArrayFacetColumn) => {
+      const rows = await db
+        .select({
+          value: sql<string>`unnest(${column})`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(products)
+        .where(eq(products.status, "active"))
+        .groupBy(sql`1`)
+        .orderBy(sql`2 desc`);
+      return rows;
+    };
+
+    const [styles, subjects, colors, rooms, orientation] = await Promise.all([
+      arrayFacet(products.styles),
+      arrayFacet(products.subjects),
+      arrayFacet(products.colors),
+      arrayFacet(products.rooms),
+      db
+        .select({
+          value: sql<string>`${products.orientation}`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(products)
+        .where(eq(products.status, "active"))
+        .groupBy(products.orientation)
+        .orderBy(sql`2 desc`),
+    ]);
+
+    const result = { styles, subjects, colors, rooms, orientation };
+    await setCached(cacheKey, result, CACHE_TTL_PRODUCTS);
+    return c.json(result);
+  } catch (error) {
+    console.error("Error fetching product facets:", error);
+    return c.json({ error: "Failed to fetch facets" }, 500);
+  }
+});
 
 // ============================================================================
 // GET /api/products/frames - Get Available Frames
