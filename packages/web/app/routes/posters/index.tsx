@@ -35,6 +35,13 @@ import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
 import { SectionBand } from '~/components/ui/SectionBand'
 import { DisplayHeading } from '~/components/ui/DisplayHeading'
+import {
+  CollectionToolbar,
+  FILTER_SIDEBAR_ID,
+} from '~/components/product/CollectionToolbar'
+
+/** localStorage key for the collapsed-filter-rail preference. */
+const FILTERS_HIDDEN_KEY = 'chobii:collection:filters-hidden'
 
 // ============================================================================
 // Types
@@ -314,6 +321,33 @@ function PostersPage() {
   const [filters, setFilters] = useState<FilterState>(initialFilters)
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false)
 
+  /**
+   * Hide-filters is remembered: a shopper who collapsed the rail does not want
+   * it back on every navigation. Read lazily and guarded — this component is
+   * server-rendered, where localStorage does not exist.
+   */
+  const [filtersHidden, setFiltersHidden] = useState(false)
+
+  useEffect(() => {
+    setFiltersHidden(
+      window.localStorage.getItem(FILTERS_HIDDEN_KEY) === 'true'
+    )
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem(FILTERS_HIDDEN_KEY, String(filtersHidden))
+  }, [filtersHidden])
+
+  const handleSortChange = useCallback(
+    (sortId: string) => {
+      const [sortBy, sortOrder] = sortId.split('-') as [SortOption, SortOrder]
+      handleFiltersChange({ ...filters, sortBy, sortOrder })
+    },
+    // handleFiltersChange is defined below; both are stable per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filters]
+  )
+
   // Sync filters when URL changes
   useEffect(() => {
     setFilters(initialFilters)
@@ -415,7 +449,13 @@ function PostersPage() {
       <div className="container-wide py-6 lg:py-8">
         <div className="flex gap-8">
           {/* Desktop Filters Sidebar */}
-          <aside className="hidden w-64 shrink-0 lg:block">
+          <aside
+            id={FILTER_SIDEBAR_ID}
+            className={cn(
+              'hidden w-64 shrink-0',
+              filtersHidden ? 'lg:hidden' : 'lg:block'
+            )}
+          >
             <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border border-border">
               <ProductFilters
                 filters={filters}
@@ -426,6 +466,15 @@ function PostersPage() {
 
           {/* Products Content */}
           <div className="flex-1">
+            <CollectionToolbar
+              totalProducts={pagination.total}
+              sortId={`${filters.sortBy || 'createdAt'}-${filters.sortOrder || 'desc'}`}
+              onSortChange={handleSortChange}
+              filtersHidden={filtersHidden}
+              onToggleFilters={() => setFiltersHidden((hidden) => !hidden)}
+              className="mb-6"
+            />
+
             {/* Mobile Filter Button and Active Filters */}
             <div className="mb-6 flex flex-col gap-4 lg:hidden">
               <MobileFilterButton

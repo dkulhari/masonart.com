@@ -130,15 +130,6 @@ const ORIENTATION_OPTIONS: FilterOption[] = [
   { id: 'panoramic', name: 'Panoramic' },
 ]
 
-const SORT_OPTIONS = [
-  { id: 'createdAt-desc', label: 'Newest First' },
-  { id: 'createdAt-asc', label: 'Oldest First' },
-  { id: 'basePrice-asc', label: 'Price: Low to High' },
-  { id: 'basePrice-desc', label: 'Price: High to Low' },
-  { id: 'title-asc', label: 'Name: A to Z' },
-  { id: 'title-desc', label: 'Name: Z to A' },
-]
-
 // ============================================================================
 // Component
 // ============================================================================
@@ -201,18 +192,6 @@ export function ProductFilters({
   )
 
   // Handle sort change
-  const handleSortChange = useCallback(
-    (sortId: string) => {
-      const [sortBy, sortOrder] = sortId.split('-') as [SortOption, SortOrder]
-      onFiltersChange({
-        ...filters,
-        sortBy,
-        sortOrder,
-      })
-    },
-    [filters, onFiltersChange]
-  )
-
   // Clear all filters
   const clearAllFilters = useCallback(() => {
     onFiltersChange({
@@ -241,7 +220,6 @@ export function ProductFilters({
     (filters.priceMax !== undefined ? 1 : 0) +
     (filters.isAiGenerated !== undefined ? 1 : 0)
 
-  const currentSortId = `${filters.sortBy || 'createdAt'}-${filters.sortOrder || 'desc'}`
 
   return (
     <div
@@ -287,34 +265,6 @@ export function ProductFilters({
 
       {/* Filter Sections */}
       <div className="flex-1 overflow-y-auto">
-        {/* Sort Section */}
-        <FilterSection
-          title="Sort By"
-          sectionKey="sort"
-          isExpanded={expandedSections.has('sort')}
-          onToggle={toggleSection}
-        >
-          <div className="space-y-1">
-            {SORT_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => handleSortChange(option.id)}
-                className={cn(
-                  'flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors',
-                  currentSortId === option.id
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'hover:bg-accent'
-                )}
-              >
-                {option.label}
-                {currentSortId === option.id && (
-                  <Check className="h-4 w-4" />
-                )}
-              </button>
-            ))}
-          </div>
-        </FilterSection>
 
         {/* Orientation Section */}
         <FilterSection
