@@ -13,7 +13,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, or, ilike, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, or, ilike, desc, asc, sql, inArray, type SQL } from "drizzle-orm";
 
 import { db } from "../database";
 import {
@@ -35,6 +35,7 @@ import {
   uniquenessSchema,
   availabilitySchema,
 } from "@chobii/shared";
+import { unitsSoldSql } from "../lib/product-sales";
 import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
 import { getCached, setCached, CacheKeys } from "../lib/redis";
 
@@ -109,7 +110,7 @@ const listProductsQuerySchema = z.object({
   isAiGenerated: z.coerce.boolean().optional(),
 
   // Sorting
-  sortBy: z.enum(["createdAt", "updatedAt", "title", "basePrice", "featuredOrder"]).optional().default("createdAt"),
+  sortBy: z.enum(["createdAt", "updatedAt", "title", "basePrice", "featuredOrder", "salesCount"]).optional().default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
@@ -294,9 +295,39 @@ productsApp.get(
       title: products.title,
       basePrice: products.basePrice,
       featuredOrder: products.featuredOrder,
+      salesCount: products.createdAt,
     }[sortBy];
 
     const orderByDirection = sortOrder === "asc" ? asc : desc;
+
+    /**
+     * `featuredOrder` and `popularOrder` are both nullable and null on most
+     * of the catalogue. Postgres sorts nulls first on DESC and last on ASC by
+     * default, so "Featured" without an explicit NULLS LAST leads with the
+     * products nobody featured — the exact opposite of what the option says.
+     */
+    const nullsLast = (column: typeof products.featuredOrder, direction: "asc" | "desc") =>
+      direction === "asc"
+        ? sql`${column} asc nulls last`
+        : sql`${column} desc nulls last`;
+
+    const orderByClauses: SQL[] =
+      sortBy === "salesCount"
+        ? [
+            /**
+             * Curator pin first, real units second. The pin reorders; it
+             * never rewrites the number, which is why both are visible to
+             * an admin side by side.
+             */
+            desc(products.isPopular),
+            nullsLast(products.popularOrder, "asc"),
+            sql`${unitsSoldSql()} desc`,
+            nullsLast(products.featuredOrder, "asc"),
+            desc(products.createdAt),
+          ]
+        : sortBy === "featuredOrder"
+          ? [nullsLast(products.featuredOrder, sortOrder), desc(products.createdAt)]
+          : [orderByDirection(orderByColumn)];
 
     // Calculate offset
     const offset = (page - 1) * pageSize;
@@ -358,7 +389,7 @@ productsApp.get(
         )
         .where(and(...conditions))
         .groupBy(products.id)
-        .orderBy(orderByDirection(orderByColumn))
+        .orderBy(...orderByClauses)
         .limit(pageSize)
         .offset(offset);
 
