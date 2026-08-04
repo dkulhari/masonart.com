@@ -364,6 +364,62 @@ const reviewsApp = new Hono<{ Variables: OptionalAuthVariables }>();
 reviewsApp.use("*", optionalAuth);
 
 /**
+ * GET /api/reviews/stats - catalogue-wide review aggregate
+ *
+ * Feeds the collection-grid promo tile (analysis §1.3.6). The stats route
+ * above it is per-product; this is the figure for the whole catalogue.
+ *
+ * `averageRating` is null, not 0, when nothing is approved — the same rule
+ * the product list applies to its per-product aggregate. A synthetic 0.0
+ * renders as "rated badly" rather than "not yet rated". The tile renders
+ * nothing on null rather than rounding a thin sample up into a marketing
+ * number.
+ *
+ * Registered BEFORE `/:reviewId`, or "stats" is read as a review id.
+ */
+reviewsApp.get("/stats", async (c) => {
+  const cacheKey = `${REVIEW_CACHE_PREFIX}stats:catalogue:v1`;
+
+  const cached = await getCached<{
+    averageRating: number | null;
+    reviewCount: number;
+  }>(cacheKey);
+  if (cached) return c.json(cached);
+
+  try {
+    const [row] = await db
+      .select({
+        averageRating: sql<
+          string | null
+        >`round(avg(${reviews.rating})::numeric, 1)`,
+        reviewCount: sql<number>`count(*)::int`,
+      })
+      .from(reviews)
+      .where(eq(reviews.status, "approved" as ReviewStatus));
+
+    const reviewCount = row?.reviewCount ?? 0;
+
+    const payload = {
+      // postgres hands numeric back as a string; a string here renders fine
+      // and then silently concatenates the first time anything does
+      // arithmetic on it.
+      averageRating:
+        reviewCount > 0 && row?.averageRating != null
+          ? Number(row.averageRating)
+          : null,
+      reviewCount,
+    };
+
+    await setCached(cacheKey, payload, CACHE_TTL_REVIEWS);
+
+    return c.json(payload);
+  } catch (error) {
+    console.error("Error fetching catalogue review stats:", error);
+    return c.json({ error: "Failed to fetch review stats" }, 500);
+  }
+});
+
+/**
  * GET /api/reviews/:reviewId - Get a single review
  */
 reviewsApp.get("/:reviewId", async (c) => {
