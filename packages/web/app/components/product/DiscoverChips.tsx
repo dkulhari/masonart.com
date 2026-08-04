@@ -34,11 +34,59 @@ import { useRef } from 'react'
 import { cn } from '~/lib/utils'
 import { buttonVariants } from '~/components/ui/Button'
 
+/**
+ * Roughly how wide each orientation family's artwork is relative to its
+ * longest side. Square is 1; a 3:4 portrait is 0.75; our panoramic ladder is
+ * 3:1, so 0.33.
+ *
+ * Approximations on purpose — the exact aspect of a given painting is not
+ * stored anywhere, and the chip only needs enough to keep mat out of an 80px
+ * circle.
+ */
+const NARROW_SIDE_RATIO: Record<string, number> = {
+  square: 1,
+  portrait: 0.75,
+  landscape: 0.75,
+  panoramic: 0.34,
+  round: 1,
+}
+
+/** Mirrors MAT_ART_INSET in @chobii/shared — artwork fraction of the longest side. */
+const MAT_ART_INSET = 0.88
+
+/** A little past the mat edge, so antialiasing at the circle never shows white. */
+const CROP_MARGIN = 1.08
+
+/**
+ * How far into the artwork the circle cuts, per orientation.
+ *
+ * `main` product images are **matted**: sharp contains the artwork at
+ * MAT_ART_INSET of the LONGEST side on a #fafafa square at upload time.
+ * Dropping that square into the chip at 1:1 puts the whole matted picture
+ * inside the circle — the artwork shrinks to fit and floats on white, which
+ * is a thumbnail, not a collection chip.
+ *
+ * Scaling past the mat makes the circle a window *inside* the picture. How
+ * far depends on the aspect, because the inset applies to the longest side:
+ * a square needs ~1.14, a 3:4 portrait ~1.5, and a 3:1 panoramic ~3.3 before
+ * the short edge clears the circle. A single constant cannot serve all three
+ * — 1.5 leaves white arcs on the panoramic representatives (wabi-sabi and
+ * plaster-and-texture both are) while already cropping squares hard.
+ *
+ * The image is never downscaled to fit; it is enlarged and centre-cropped.
+ */
+export function chipArtScale(orientation: string | null | undefined): number {
+  const ratio = NARROW_SIDE_RATIO[orientation ?? 'square'] ?? 1
+  return +(CROP_MARGIN / (MAT_ART_INSET * ratio)).toFixed(3)
+}
+
 export interface DiscoverCollection {
   id: string
   label: string
   count: number
   image: string | null
+  /** Orientation of the product the image came from — drives the crop depth. */
+  orientation?: string | null
 }
 
 export interface DiscoverChipsProps {
@@ -112,7 +160,14 @@ export function DiscoverChips({
                       src={collection.image}
                       alt=""
                       loading="lazy"
-                      className="h-full w-full object-cover"
+                      /**
+                       * Enlarged and centre-cropped, never shrunk to fit —
+                       * see chipArtScale. The round parent clips it.
+                       */
+                      style={{
+                        transform: `scale(${chipArtScale(collection.orientation)})`,
+                      }}
+                      className="h-full w-full object-cover object-center"
                     />
                   ) : (
                     <span className="text-xl text-muted-foreground">

@@ -8,11 +8,20 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { DiscoverChips } from '~/components/product/DiscoverChips'
+import {
+  DiscoverChips,
+  chipArtScale,
+} from '~/components/product/DiscoverChips'
 
 const collections = [
-  { id: 'wabi-sabi-art', label: 'Wabi-Sabi Art', count: 9, image: 'https://cdn.test/a.webp' },
-  { id: 'ukiyo-e-art', label: 'Ukiyo-e Art', count: 12, image: null },
+  {
+    id: 'wabi-sabi-art',
+    label: 'Wabi-Sabi Art',
+    count: 9,
+    image: 'https://cdn.test/a.webp',
+    orientation: 'square',
+  },
+  { id: 'ukiyo-e-art', label: 'Ukiyo-e Art', count: 12, image: null, orientation: 'portrait' },
 ]
 
 const defaults = {
@@ -42,6 +51,27 @@ describe('rendering', () => {
     const images = container.querySelectorAll('img')
     expect(images).toHaveLength(1)
     expect(images[0]?.getAttribute('src')).toContain('a.webp')
+  })
+
+  it('crops into the artwork rather than shrinking it to fit', () => {
+    // `main` images are matted — artwork at 0.88 inset on a #fafafa square.
+    // Rendered 1:1 the chip shows a shrunken picture floating on white. The
+    // circle has to be a window INSIDE the picture, so the image is enlarged
+    // and the round parent clips it.
+    const { container } = render(<DiscoverChips {...defaults} />)
+    const image = container.querySelector('img')
+
+    expect(image?.style.transform).toBe(`scale(${chipArtScale('square')})`)
+    expect(image?.className).toContain('object-cover')
+    expect(image?.className).toContain('object-center')
+  })
+
+  it('clips the enlarged image at the circle', () => {
+    const { container } = render(<DiscoverChips {...defaults} />)
+    const frame = container.querySelector('img')?.parentElement
+
+    expect(frame?.className).toContain('overflow-hidden')
+    expect(frame?.className).toContain('rounded-full')
   })
 
   it('falls back to an initial rather than a broken image', () => {
@@ -90,6 +120,36 @@ describe('selection', () => {
     expect(
       screen.getByRole('button', { name: /Ukiyo-e Art/ }).getAttribute('aria-pressed')
     ).toBe('false')
+  })
+})
+
+describe('crop depth per orientation', () => {
+  it('always clears the mat inset', () => {
+    // Below 1/0.88 the mat is still inside the circle, which is the bug this
+    // whole mechanism exists to fix.
+    for (const orientation of ['square', 'portrait', 'landscape', 'panoramic']) {
+      expect(chipArtScale(orientation)).toBeGreaterThan(1 / 0.88)
+    }
+  })
+
+  it('crops a panoramic far deeper than a square', () => {
+    // The inset applies to the LONGEST side, so a 3:1 strip has far more mat
+    // along its short edge. wabi-sabi-art and plaster-and-texture-art both
+    // have panoramic representatives — a single shared scale left white arcs
+    // on exactly those two chips.
+    expect(chipArtScale('panoramic')).toBeGreaterThan(chipArtScale('square') * 2)
+  })
+
+  it('treats portrait and landscape alike — the aspect is the same, just rotated', () => {
+    expect(chipArtScale('portrait')).toBe(chipArtScale('landscape'))
+  })
+
+  it('falls back to the square depth for a missing or unknown orientation', () => {
+    // Never crop harder than necessary on a guess: a too-deep crop destroys
+    // the picture, a too-shallow one shows a sliver of mat.
+    expect(chipArtScale(null)).toBe(chipArtScale('square'))
+    expect(chipArtScale(undefined)).toBe(chipArtScale('square'))
+    expect(chipArtScale('hexagonal')).toBe(chipArtScale('square'))
   })
 })
 

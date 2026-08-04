@@ -610,11 +610,24 @@ productsApp.get("/collections", async (c) => {
         image: sql<
           string | null
         >`(array_agg(t.image order by t.featured_order asc nulls last, t.created_at desc))[1]`,
+        /**
+         * The same representative product's orientation, picked by the same
+         * ordering so it cannot describe a different row than the image.
+         *
+         * The chip needs it: `main` images are matted at a fixed fraction of
+         * the LONGEST side, so how much mat sits along the short side depends
+         * entirely on the aspect. A panoramic representative needs a far
+         * deeper crop than a square one to keep white out of the circle.
+         */
+        orientation: sql<
+          string | null
+        >`(array_agg(t.orientation order by t.featured_order asc nulls last, t.created_at desc))[1]`,
       })
       .from(
         sql`(
           select
             unnest(${products.styles}) as style,
+            ${products.orientation} as orientation,
             coalesce(
               (
                 select element ->> 'url'
@@ -649,6 +662,7 @@ productsApp.get("/collections", async (c) => {
           label: option.label,
           count: row.count,
           image: row.image ?? null,
+          orientation: row.orientation ?? null,
         },
       ];
     });

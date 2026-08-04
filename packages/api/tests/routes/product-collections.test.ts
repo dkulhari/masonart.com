@@ -60,9 +60,14 @@ describe('GET /api/products/collections', () => {
     expect(res.status).toBe(200);
   });
 
-  it('returns id, label, count and image per collection', async () => {
+  it('returns id, label, count, image and orientation per collection', async () => {
     queueSelects([
-      { style: firstStyle.id, count: 12, image: 'https://cdn.test/a.webp' },
+      {
+        style: firstStyle.id,
+        count: 12,
+        image: 'https://cdn.test/a.webp',
+        orientation: 'panoramic',
+      },
     ]);
 
     const res = await app.request('/api/products/collections');
@@ -74,8 +79,33 @@ describe('GET /api/products/collections', () => {
         label: firstStyle.label,
         count: 12,
         image: 'https://cdn.test/a.webp',
+        orientation: 'panoramic',
       },
     ]);
+  });
+
+  it('carries orientation so the chip knows how deep to crop', async () => {
+    // `main` images are matted at a fixed fraction of the LONGEST side, so a
+    // panoramic representative needs a far deeper crop than a square one to
+    // keep mat out of a circular chip. Without this the two panoramic
+    // representatives render with white arcs.
+    queueSelects([
+      { style: firstStyle.id, count: 2, image: null, orientation: 'square' },
+    ]);
+
+    const body = await (await app.request('/api/products/collections')).json();
+
+    expect(body.collections[0].orientation).toBe('square');
+  });
+
+  it('returns a null orientation rather than dropping the collection', async () => {
+    queueSelects([
+      { style: firstStyle.id, count: 2, image: null, orientation: null },
+    ]);
+
+    const body = await (await app.request('/api/products/collections')).json();
+
+    expect(body.collections[0]).toMatchObject({ orientation: null });
   });
 
   it('takes labels from the shared vocabulary, not from the database', async () => {

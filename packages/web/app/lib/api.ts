@@ -260,6 +260,8 @@ export const productsApi = {
       label: string;
       count: number;
       image: string | null;
+      /** Orientation of the product the image came from — drives the chip crop. */
+      orientation: string | null;
     }>;
   }> {
     const response = await fetch(`${getApiUrl()}/api/products/collections`, {
