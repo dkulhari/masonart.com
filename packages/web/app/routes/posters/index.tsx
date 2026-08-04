@@ -32,6 +32,10 @@ import {
   type SortOption,
   type SortOrder,
 } from '~/components/product/ProductFilters'
+import {
+  DiscoverChips,
+  type DiscoverCollection,
+} from '~/components/product/DiscoverChips'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
 import { Button } from '~/components/ui/Button'
@@ -404,6 +408,29 @@ function PostersPage() {
     }
   }, [])
 
+  /**
+   * Discover collections. Client-side for the same reason as the facet counts
+   * above: they describe the catalogue, not this page, so they neither change
+   * with the filters nor belong in the SSR critical path.
+   */
+  const [collections, setCollections] = useState<DiscoverCollection[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    productsApi
+      .collections()
+      .then((response) => {
+        if (cancelled) return
+        setCollections(response.collections)
+      })
+      // The rail is an enhancement. Without it the page is what it was
+      // before this feature, rather than a broken version of what it is now.
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   useEffect(() => {
     setFiltersHidden(
       window.localStorage.getItem(FILTERS_HIDDEN_KEY) === 'true'
@@ -541,6 +568,30 @@ function PostersPage() {
     <div className="flex flex-col">
       {/* Page Header */}
       <PageHeader />
+
+      {/*
+        Discover rail (analysis §1.3.2). Between the header band and the
+        toolbar, where mesonart puts it.
+
+        Selection is folded into the existing filter handler rather than
+        navigated directly: router.tsx overrides TanStack's search
+        serialisation, so a hand-built search object skips the comma-joining
+        that validateSearch expects and error-boundaries the route.
+      */}
+      {collections.length > 0 && (
+        <div className="container-wide pt-6">
+          <DiscoverChips
+            collections={collections}
+            activeStyle={filters.styles?.[0]}
+            onSelect={(styleId) =>
+              handleFiltersChange({
+                ...filters,
+                styles: styleId ? [styleId] : [],
+              })
+            }
+          />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="container-wide py-6 lg:py-8">

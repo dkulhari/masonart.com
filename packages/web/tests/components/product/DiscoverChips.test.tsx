@@ -1,0 +1,109 @@
+/**
+ * Discover chips — the collection rail mesonart runs above the grid (§1.3.2).
+ *
+ * Presentational on purpose: it receives collections and reports a selection
+ * upward. Fetching lives in the route, or the rail refires a request on every
+ * filter change.
+ */
+
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { DiscoverChips } from '~/components/product/DiscoverChips'
+
+const collections = [
+  { id: 'wabi-sabi-art', label: 'Wabi-Sabi Art', count: 9, image: 'https://cdn.test/a.webp' },
+  { id: 'ukiyo-e-art', label: 'Ukiyo-e Art', count: 12, image: null },
+]
+
+const defaults = {
+  collections,
+  activeStyle: undefined,
+  onSelect: () => {},
+}
+
+describe('rendering', () => {
+  it('renders a chip per collection', () => {
+    render(<DiscoverChips {...defaults} />)
+    expect(screen.getByRole('button', { name: /Wabi-Sabi Art/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Ukiyo-e Art/ })).toBeTruthy()
+  })
+
+  it('shows each collection count', () => {
+    render(<DiscoverChips {...defaults} />)
+    expect(screen.getByText('9')).toBeTruthy()
+    expect(screen.getByText('12')).toBeTruthy()
+  })
+
+  it('renders the representative image when there is one', () => {
+    // Queried by tag, not by role: the image is decorative (`alt=""`) because
+    // the chip's own label already names the collection. Giving it alt text
+    // would make a screen reader announce the name twice.
+    const { container } = render(<DiscoverChips {...defaults} />)
+    const images = container.querySelectorAll('img')
+    expect(images).toHaveLength(1)
+    expect(images[0]?.getAttribute('src')).toContain('a.webp')
+  })
+
+  it('falls back to an initial rather than a broken image', () => {
+    // A collection with no product imagery still leads somewhere populated.
+    // Dropping it would hide part of the catalogue; an empty <img> renders as
+    // the browser's broken-file icon.
+    const { container } = render(<DiscoverChips {...defaults} />)
+    expect(container.querySelectorAll('img')).toHaveLength(1)
+    expect(screen.getByText('U')).toBeTruthy()
+  })
+
+  it('renders nothing at all when there are no collections', () => {
+    const { container } = render(<DiscoverChips {...defaults} collections={[]} />)
+    expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('selection', () => {
+  it('reports the chosen collection', () => {
+    const onSelect = vi.fn()
+    render(<DiscoverChips {...defaults} onSelect={onSelect} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Wabi-Sabi Art/ }))
+
+    expect(onSelect).toHaveBeenCalledWith('wabi-sabi-art')
+  })
+
+  it('marks the active collection', () => {
+    render(<DiscoverChips {...defaults} activeStyle="wabi-sabi-art" />)
+    expect(
+      screen.getByRole('button', { name: /Wabi-Sabi Art/ }).getAttribute('aria-pressed')
+    ).toBe('true')
+  })
+
+  it('clears the filter when the active chip is clicked again', () => {
+    const onSelect = vi.fn()
+    render(<DiscoverChips {...defaults} activeStyle="wabi-sabi-art" onSelect={onSelect} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Wabi-Sabi Art/ }))
+
+    expect(onSelect).toHaveBeenCalledWith(undefined)
+  })
+
+  it('leaves the other chips unpressed', () => {
+    render(<DiscoverChips {...defaults} activeStyle="wabi-sabi-art" />)
+    expect(
+      screen.getByRole('button', { name: /Ukiyo-e Art/ }).getAttribute('aria-pressed')
+    ).toBe('false')
+  })
+})
+
+describe('the rail itself', () => {
+  it('is a labelled list, so a screen reader can skip it', () => {
+    render(<DiscoverChips {...defaults} />)
+    expect(screen.getByRole('list', { name: /discover/i })).toBeTruthy()
+  })
+
+  it('offers scroll buttons that are real buttons', () => {
+    // Arrow affordances must be reachable by keyboard. A div with an onClick
+    // is not.
+    render(<DiscoverChips {...defaults} />)
+    expect(screen.getByRole('button', { name: /scroll left/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /scroll right/i })).toBeTruthy()
+  })
+})

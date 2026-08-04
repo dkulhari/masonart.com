@@ -248,6 +248,32 @@ export const productsApi = {
     return response.json();
   },
   /**
+   * Collections for the Discover chip rail (analysis §1.3.2).
+   *
+   * Separate from facets(): facets returns counts keyed by value for the
+   * sidebar, this returns a display-ready row per collection including the
+   * representative image the sidebar has no use for.
+   */
+  async collections(): Promise<{
+    collections: Array<{
+      id: string;
+      label: string;
+      count: number;
+      image: string | null;
+    }>;
+  }> {
+    const response = await fetch(`${getApiUrl()}/api/products/collections`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch collections");
+    }
+
+    return response.json();
+  },
+  /**
    * List products with optional filters and pagination
    */
   async list(params?: ProductFilters) {
