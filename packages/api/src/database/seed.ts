@@ -9,6 +9,10 @@ import {
 } from "./seed-images";
 import { buildVariantsForOrientation } from "./seed-variants";
 import { facetsForProduct } from "./seed-facets";
+import {
+  clearOrdersAndReviews,
+  seedOrdersAndReviews,
+} from "./seed-orders-reviews";
 
 /**
  * Orientations the shared ladder covers. `round` has no ladder yet — it falls
@@ -1519,6 +1523,13 @@ const sampleFrames: NewFrame[] = [
  */
 async function clearData(): Promise<void> {
   console.log("Clearing existing data...");
+  /**
+   * Before products: reviews hold a NOT NULL FK to order_items, and orders
+   * outlive a product deletion (order_items.product_id is ON DELETE SET
+   * NULL), so clearing products alone leaves orphaned purchase history that
+   * the next seed would double.
+   */
+  await clearOrdersAndReviews();
   await db.delete(productVariants);
   await db.delete(products);
   await db.delete(frames);
@@ -1772,6 +1783,9 @@ async function seed(): Promise<void> {
     // Seed all data
     await seedProducts();
     await seedFrames();
+    // After products and their variants: an order item snapshots a real
+    // variant, and a review needs the order item that authorises it.
+    await seedOrdersAndReviews();
 
     console.log("\n========================================");
     console.log("  Seed completed successfully!");
