@@ -71,6 +71,11 @@ export interface AdminProduct {
   status: 'draft' | 'active' | 'archived'
   isFeatured: boolean
   featuredOrder?: number | null
+  /** Curator pin for the Best-selling sort. Reorders; never rewrites a total. */
+  isPopular?: boolean
+  popularOrder?: number | null
+  /** Real units sold from settled orders — the figure the pin overrides. */
+  unitsSold?: number
   isAiGenerated: boolean
   createdAt: string
   updatedAt: string
@@ -409,6 +414,39 @@ export function ProductsTable({
           )
         ),
         size: 80,
+      },
+      /**
+       * Units sold and the pin, side by side and in that order.
+       *
+       * The pin lifts a product in the Best-selling sort without touching
+       * what it actually sold. Showing only the pin would let a
+       * merchandising decision pass for a sales fact; showing them together
+       * makes a disagreement visible.
+       *
+       * Zero is rendered as zero, not hidden. "Nothing has sold yet" is a
+       * true and useful statement.
+       */
+      {
+        accessorKey: 'unitsSold',
+        header: 'Units sold',
+        cell: ({ row }: CellContext<AdminProduct, unknown>) => (
+          <span className="tabular-nums">{row.original.unitsSold ?? 0}</span>
+        ),
+        size: 90,
+      },
+      {
+        accessorKey: 'isPopular',
+        header: 'Popular',
+        cell: ({ row }: CellContext<AdminProduct, unknown>) =>
+          row.original.isPopular ? (
+            <span className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+              Pinned
+              {row.original.popularOrder != null && ` #${row.original.popularOrder}`}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          ),
+        size: 90,
       },
       // Date column
       {

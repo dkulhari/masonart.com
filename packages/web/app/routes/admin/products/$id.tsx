@@ -65,6 +65,8 @@ interface ProductWithVariants {
   status: 'draft' | 'active' | 'archived'
   isFeatured: boolean
   featuredOrder: number | null
+  isPopular: boolean
+  popularOrder: number | null
   isAiGenerated: boolean
   createdAt: string
   updatedAt: string
@@ -136,6 +138,8 @@ async function updateProduct(
       status: data.status,
       isFeatured: data.isFeatured,
       featuredOrder: data.featuredOrder,
+      isPopular: data.isPopular,
+      popularOrder: data.popularOrder,
       isAiGenerated: data.isAiGenerated,
     }),
   })
@@ -404,6 +408,8 @@ function EditProductPage() {
         status: product.status,
         isFeatured: product.isFeatured,
         featuredOrder: product.featuredOrder,
+        isPopular: product.isPopular ?? false,
+        popularOrder: product.popularOrder ?? null,
         isAiGenerated: product.isAiGenerated,
         variants: product.variants.map((v) => ({
           id: v.id,

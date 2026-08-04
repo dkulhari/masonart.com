@@ -105,6 +105,13 @@ export interface ProductFormData {
   status: 'draft' | 'active' | 'archived'
   isFeatured: boolean
   featuredOrder?: number | null
+  /**
+   * Curator pin for the Best-selling sort. It reorders; it never rewrites
+   * what the product sold. The admin list shows the real units-sold figure
+   * beside it so the two can be seen to disagree.
+   */
+  isPopular: boolean
+  popularOrder?: number | null
   isAiGenerated: boolean
   variants: ProductVariant[]
 }
@@ -199,6 +206,9 @@ const DEFAULT_FORM_DATA: ProductFormData = {
   status: 'draft',
   isFeatured: false,
   featuredOrder: null,
+  isPopular: false,
+  // null, not 0 — unpinned is not the same as ranked first.
+  popularOrder: null,
   isAiGenerated: false,
   variants: [],
 }
@@ -794,6 +804,16 @@ export function ProductForm({
           <label className="flex cursor-pointer items-center gap-3">
             <input
               type="checkbox"
+              checked={formData.isPopular}
+              onChange={(e) => updateField('isPopular', e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+            />
+            <span className="text-sm font-medium text-foreground">Pin as popular</span>
+          </label>
+
+          <label className="flex cursor-pointer items-center gap-3">
+            <input
+              type="checkbox"
               checked={formData.isAiGenerated}
               onChange={(e) => updateField('isAiGenerated', e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
@@ -801,6 +821,42 @@ export function ProductForm({
             <span className="text-sm font-medium text-foreground">AI Generated</span>
           </label>
         </div>
+
+        {/*
+          Rank within the pinned set. Only meaningful while the pin is on,
+          so it appears with it.
+
+          The helper text is deliberate: the pin moves a product up the
+          Best-selling list without changing the units-sold figure shown on
+          the product table, and an admin should know that before using it.
+        */}
+        {formData.isPopular && (
+          <div className="mt-4 max-w-xs">
+            <label
+              htmlFor="popularOrder"
+              className="mb-1 block text-sm font-medium text-foreground"
+            >
+              Popular rank
+            </label>
+            <input
+              id="popularOrder"
+              type="number"
+              min={0}
+              value={formData.popularOrder ?? ''}
+              onChange={(e) =>
+                updateField(
+                  'popularOrder',
+                  e.target.value === '' ? null : Number(e.target.value)
+                )
+              }
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Lower ranks first. Pinning reorders the Best-selling list; it does
+              not change the units-sold figure.
+            </p>
+          </div>
+        )}
       </FormSection>
 
       {/* Taxonomy */}
