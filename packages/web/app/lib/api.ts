@@ -274,6 +274,34 @@ export const productsApi = {
     return response.json();
   },
   /**
+   * Catalogue-wide review aggregate, for the collection-grid promo tile.
+   *
+   * Lives here rather than in hooks/useReviews.ts, which fetches against a
+   * relative `API_BASE = '/api'`. There is no Vite proxy for `/api`, so a
+   * relative request from the dev server never reaches the API at all — the
+   * promo tile stayed invisible in the browser while the endpoint returned a
+   * perfectly good aggregate to curl. Everything in this module goes through
+   * getApiUrl().
+   *
+   * `averageRating` is null when nothing is approved — never 0, which a tile
+   * would render as "rated badly" rather than "not yet rated".
+   */
+  async catalogueReviewStats(): Promise<{
+    averageRating: number | null;
+    reviewCount: number;
+  }> {
+    const response = await fetch(`${getApiUrl()}/api/reviews/stats`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch catalogue review stats");
+    }
+
+    return response.json();
+  },
+  /**
    * List products with optional filters and pagination
    */
   async list(params?: ProductFilters) {

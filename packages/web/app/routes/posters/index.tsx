@@ -37,7 +37,6 @@ import {
   type DiscoverCollection,
 } from '~/components/product/DiscoverChips'
 import { PromoTile } from '~/components/product/PromoTile'
-import { fetchCatalogueReviewStats } from '~/hooks/useReviews'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
 import { Button } from '~/components/ui/Button'
@@ -437,7 +436,8 @@ function PostersPage() {
 
   useEffect(() => {
     let cancelled = false
-    fetchCatalogueReviewStats()
+    productsApi
+      .catalogueReviewStats()
       .then((stats) => {
         if (cancelled) return
         setReviewStats(stats)
