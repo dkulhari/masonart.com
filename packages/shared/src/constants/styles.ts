@@ -3,6 +3,24 @@
  *
  * Defines all style presets, subjects, colors, rooms, and collections
  * based on the requirements specification (Sections 4.1 and 6.2).
+ *
+ * ---------------------------------------------------------------------------
+ * @deprecated for FACETING. Use `./facets.ts` instead.
+ *
+ * As of 2026-08-04, `STYLE_CONFIGS`, `SUBJECT_CONFIGS`, `COLOR_CONFIGS` and
+ * the `ALL_*` / `*_BY_ID` lookups derived from them are referenced NOWHERE
+ * outside this file and its own test — the same dead-but-tested state the size
+ * ladders were in before #386. Meanwhile the product filters had their own
+ * hardcoded copy in the web component and the API validated the same values as
+ * free text: three parallel vocabularies, none authoritative.
+ *
+ * `facets.ts` is now the single source of truth for what a product may be
+ * tagged with, and is consumed by the schema, the API validation, the seed and
+ * the sidebar. Do not add a fourth list here.
+ *
+ * The AI-generation style presets in this file (prompt fragments, previews)
+ * are a different concern and are NOT superseded.
+ * ---------------------------------------------------------------------------
  */
 
 import type {
