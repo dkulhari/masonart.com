@@ -46,11 +46,123 @@ function queueSelects(...results: unknown[][]) {
   });
 }
 
-const [firstStyle, secondStyle] = STYLE_OPTIONS;
+const [firstStyle, secondStyle, thirdStyle] = STYLE_OPTIONS;
+
+/**
+ * One shortlisted candidate row, as the window-function query returns it.
+ *
+ * `productId` matters: the route assigns each product to at most one chip, so
+ * a fixture that leaves identities off cannot exercise that at all.
+ */
+let autoId = 0;
+function candidate(overrides: {
+  style: string;
+  count: number;
+  productId?: string;
+  rank?: number;
+  image?: string | null;
+  orientation?: string | null;
+}) {
+  autoId += 1;
+  return {
+    productId: `product-${autoId}`,
+    rank: 1,
+    image: null,
+    orientation: 'square',
+    ...overrides,
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  autoId = 0;
   vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+/**
+ * A product carries several styles, so the naive "best product per style"
+ * pick handed one product every chip it qualified for and the rail showed the
+ * same picture two or three times. These pin the assignment that replaced it.
+ */
+describe('one product, one chip', () => {
+  it('never repeats an image while alternatives exist', async () => {
+    // `shared` tops both styles; `spare` is second choice for the first.
+    queueSelects([
+      candidate({ style: firstStyle.id, productId: 'shared', rank: 1, count: 2, image: 'https://cdn.test/shared.webp' }),
+      candidate({ style: firstStyle.id, productId: 'spare', rank: 2, count: 2, image: 'https://cdn.test/spare.webp' }),
+      candidate({ style: secondStyle.id, productId: 'shared', rank: 1, count: 1, image: 'https://cdn.test/shared.webp' }),
+    ]);
+
+    const body = await (await app.request('/api/products/collections')).json();
+    const images = body.collections.map((c: { image: string }) => c.image);
+
+    expect(body.collections).toHaveLength(2);
+    expect(new Set(images).size).toBe(images.length);
+  });
+
+  it('lets the scarcest collection pick first', async () => {
+    // The style with one option must take `shared`, or it is left with
+    // nothing and falls back to a duplicate. The style with two can absorb
+    // losing its first choice.
+    queueSelects([
+      candidate({ style: firstStyle.id, productId: 'shared', rank: 1, count: 9, image: 'https://cdn.test/shared.webp' }),
+      candidate({ style: firstStyle.id, productId: 'spare', rank: 2, count: 9, image: 'https://cdn.test/spare.webp' }),
+      candidate({ style: secondStyle.id, productId: 'shared', rank: 1, count: 1, image: 'https://cdn.test/shared.webp' }),
+    ]);
+
+    const body = await (await app.request('/api/products/collections')).json();
+    const bySlug = Object.fromEntries(
+      body.collections.map((c: { id: string; image: string }) => [c.id, c.image])
+    );
+
+    expect(bySlug[secondStyle.id]).toBe('https://cdn.test/shared.webp');
+    expect(bySlug[firstStyle.id]).toBe('https://cdn.test/spare.webp');
+  });
+
+  it('reuses a picture rather than dropping a collection', async () => {
+    // Every candidate for the third style is already claimed. A duplicate
+    // image is a smaller failure than a collection missing from the rail.
+    queueSelects([
+      candidate({ style: firstStyle.id, productId: 'only', rank: 1, count: 1, image: 'https://cdn.test/only.webp' }),
+      candidate({ style: secondStyle.id, productId: 'only', rank: 1, count: 1, image: 'https://cdn.test/only.webp' }),
+      candidate({ style: thirdStyle.id, productId: 'only', rank: 1, count: 1, image: 'https://cdn.test/only.webp' }),
+    ]);
+
+    const body = await (await app.request('/api/products/collections')).json();
+
+    expect(body.collections).toHaveLength(3);
+  });
+
+  it('counts every product in the style, not just the assigned one', async () => {
+    // `count` is a window over the whole partition; the shortlist is capped.
+    // If the count ever came from the shortlist, chips would under-report.
+    queueSelects([
+      candidate({ style: firstStyle.id, productId: 'a', rank: 1, count: 40 }),
+      candidate({ style: firstStyle.id, productId: 'b', rank: 2, count: 40 }),
+    ]);
+
+    const body = await (await app.request('/api/products/collections')).json();
+
+    expect(body.collections[0].count).toBe(40);
+  });
+
+  it('is deterministic across identical requests', async () => {
+    // A chip that changes picture between two identical requests reads as a
+    // bug. Equal-scarcity styles break the tie on id, not on Map order.
+    const rows = [
+      candidate({ style: firstStyle.id, productId: 'shared', rank: 1, count: 3, image: 'https://cdn.test/shared.webp' }),
+      candidate({ style: firstStyle.id, productId: 'spare-a', rank: 2, count: 3, image: 'https://cdn.test/a.webp' }),
+      candidate({ style: secondStyle.id, productId: 'shared', rank: 1, count: 3, image: 'https://cdn.test/shared.webp' }),
+      candidate({ style: secondStyle.id, productId: 'spare-b', rank: 2, count: 3, image: 'https://cdn.test/b.webp' }),
+    ];
+
+    queueSelects(rows);
+    const first = await (await app.request('/api/products/collections')).json();
+    queueSelects(rows);
+    const second = await (await app.request('/api/products/collections')).json();
+
+    expect(first.collections).toEqual(second.collections);
+  });
 });
 
 describe('GET /api/products/collections', () => {
@@ -64,6 +176,8 @@ describe('GET /api/products/collections', () => {
     queueSelects([
       {
         style: firstStyle.id,
+        productId: 'p1',
+        rank: 1,
         count: 12,
         image: 'https://cdn.test/a.webp',
         orientation: 'panoramic',
@@ -90,7 +204,7 @@ describe('GET /api/products/collections', () => {
     // keep mat out of a circular chip. Without this the two panoramic
     // representatives render with white arcs.
     queueSelects([
-      { style: firstStyle.id, count: 2, image: null, orientation: 'square' },
+      candidate({ style: firstStyle.id, count: 2, orientation: 'square' }),
     ]);
 
     const body = await (await app.request('/api/products/collections')).json();
@@ -100,7 +214,7 @@ describe('GET /api/products/collections', () => {
 
   it('returns a null orientation rather than dropping the collection', async () => {
     queueSelects([
-      { style: firstStyle.id, count: 2, image: null, orientation: null },
+      candidate({ style: firstStyle.id, count: 2, orientation: null }),
     ]);
 
     const body = await (await app.request('/api/products/collections')).json();
@@ -111,7 +225,7 @@ describe('GET /api/products/collections', () => {
   it('takes labels from the shared vocabulary, not from the database', async () => {
     // The database column holds ids. If a label ever came back from the
     // query instead, the chip row and the filter sidebar would drift apart.
-    queueSelects([{ style: secondStyle.id, count: 3, image: null }]);
+    queueSelects([candidate({ style: secondStyle.id, count: 3 })]);
 
     const res = await app.request('/api/products/collections');
     const body = await res.json();
@@ -121,7 +235,7 @@ describe('GET /api/products/collections', () => {
 
   it('omits collections with no active products', async () => {
     // A chip leading to an empty grid is worse than no chip.
-    queueSelects([{ style: firstStyle.id, count: 4, image: null }]);
+    queueSelects([candidate({ style: firstStyle.id, count: 4 })]);
 
     const res = await app.request('/api/products/collections');
     const body = await res.json();
@@ -134,8 +248,8 @@ describe('GET /api/products/collections', () => {
     // Free text in the column must not become a chip — it has no label and
     // filtering on it would 400.
     queueSelects([
-      { style: 'some-legacy-tag', count: 9, image: null },
-      { style: firstStyle.id, count: 1, image: null },
+      candidate({ style: 'some-legacy-tag', count: 9 }),
+      candidate({ style: firstStyle.id, count: 1 }),
     ]);
 
     const res = await app.request('/api/products/collections');
@@ -146,8 +260,8 @@ describe('GET /api/products/collections', () => {
 
   it('keeps the vocabulary order rather than the query order', async () => {
     queueSelects([
-      { style: secondStyle.id, count: 1, image: null },
-      { style: firstStyle.id, count: 99, image: null },
+      candidate({ style: secondStyle.id, count: 1 }),
+      candidate({ style: firstStyle.id, count: 99 }),
     ]);
 
     const res = await app.request('/api/products/collections');
@@ -162,7 +276,7 @@ describe('GET /api/products/collections', () => {
   it('returns a null image rather than omitting the collection', async () => {
     // The chip falls back to an initial. Dropping the collection because it
     // has no photograph would hide a populated part of the catalogue.
-    queueSelects([{ style: firstStyle.id, count: 7, image: null }]);
+    queueSelects([candidate({ style: firstStyle.id, count: 7 })]);
 
     const res = await app.request('/api/products/collections');
     const body = await res.json();

@@ -61,6 +61,18 @@ const CACHE_TTL_PRODUCTS = 300; // 5 minutes
 const CACHE_TTL_PRODUCT_DETAIL = 600; // 10 minutes
 const CACHE_TTL_FEATURED = 900; // 15 minutes
 
+/**
+ * How many products per style the Discover rail shortlists.
+ *
+ * Products carry several styles, so the rail assigns each product to at most
+ * one chip (see the collections route). That needs alternatives to fall back
+ * on: with a shortlist of one it degenerates to the duplicate-picture
+ * behaviour it exists to prevent. Twelve is comfortably more than the number
+ * of styles, so a chip runs out of options only if its entire shortlist is
+ * shared.
+ */
+const CANDIDATES_PER_COLLECTION = 12;
+
 // ============================================================================
 // Validation Schemas
 // ============================================================================
@@ -587,74 +599,139 @@ productsApp.get(
  * Registered BEFORE `/:slug`, same as `/facets`.
  */
 productsApp.get("/collections", async (c) => {
-  const cacheKey = `${CacheKeys.PRODUCT}collections:v1`;
+  /**
+   * v2: the rail went from "best product per style" to one product per chip.
+   * A cached v1 entry holds the duplicate pictures that change was made to
+   * remove, and it would outlive the deploy by the full TTL.
+   */
+  const cacheKey = `${CacheKeys.PRODUCT}collections:v2`;
 
   const cached = await getCached<Record<string, unknown>>(cacheKey);
   if (cached) return c.json({ ...cached, fromCache: true });
 
   try {
     /**
-     * One grouped pass. `styles` is text[], so it needs unnest before it can
-     * be grouped — the same shape as `arrayFacet` in the facets route below.
+     * Ranked candidates per style, not one winner per style.
      *
-     * The representative image is picked inside the aggregate rather than by
-     * a second query: array_agg with an ORDER BY takes the winner per group
-     * in the same scan. Prefer the image explicitly typed `main`; fall back
-     * to the first element, which the ProductImage contract documents as the
-     * main image after sorting.
+     * `styles` is text[] and products carry several, so picking the best
+     * product for each style *independently* hands one product every chip it
+     * qualifies for — the rail then shows the same picture two or three
+     * times. Fetching a shortlist lets the assignment below give each product
+     * to at most one chip.
+     *
+     * `total` is a window over the whole partition, so the chip count still
+     * reflects every product in the style, not just the shortlisted ones.
+     *
+     * Image preference: the element explicitly typed `main`, else element 0,
+     * which the ProductImage contract documents as the main image after
+     * sorting.
      */
     const rows = await db
       .select({
-        style: sql<string>`t.style`,
-        count: sql<number>`count(*)::int`,
-        image: sql<
-          string | null
-        >`(array_agg(t.image order by t.featured_order asc nulls last, t.created_at desc))[1]`,
+        style: sql<string>`x.style`,
+        productId: sql<string>`x.product_id`,
+        image: sql<string | null>`x.image`,
         /**
-         * The same representative product's orientation, picked by the same
-         * ordering so it cannot describe a different row than the image.
+         * The candidate's own orientation, carried alongside its image so the
+         * two can never describe different products.
          *
          * The chip needs it: `main` images are matted at a fixed fraction of
          * the LONGEST side, so how much mat sits along the short side depends
          * entirely on the aspect. A panoramic representative needs a far
          * deeper crop than a square one to keep white out of the circle.
          */
-        orientation: sql<
-          string | null
-        >`(array_agg(t.orientation order by t.featured_order asc nulls last, t.created_at desc))[1]`,
+        orientation: sql<string | null>`x.orientation`,
+        count: sql<number>`x.total::int`,
+        rank: sql<number>`x.rn::int`,
       })
       .from(
         sql`(
           select
-            unnest(${products.styles}) as style,
-            ${products.orientation} as orientation,
-            coalesce(
-              (
-                select element ->> 'url'
-                from jsonb_array_elements(${products.images}) as element
-                where element ->> 'type' = 'main'
-                limit 1
-              ),
-              ${products.images} -> 0 ->> 'url'
-            ) as image,
-            ${products.featuredOrder} as featured_order,
-            ${products.createdAt} as created_at
-          from ${products}
-          where ${products.status} = 'active'
-        ) as t`
+            t.*,
+            row_number() over (
+              partition by t.style
+              order by t.featured_order asc nulls last, t.created_at desc
+            ) as rn,
+            count(*) over (partition by t.style) as total
+          from (
+            select
+              unnest(${products.styles}) as style,
+              ${products.id} as product_id,
+              ${products.orientation} as orientation,
+              coalesce(
+                (
+                  select element ->> 'url'
+                  from jsonb_array_elements(${products.images}) as element
+                  where element ->> 'type' = 'main'
+                  limit 1
+                ),
+                ${products.images} -> 0 ->> 'url'
+              ) as image,
+              ${products.featuredOrder} as featured_order,
+              ${products.createdAt} as created_at
+            from ${products}
+            where ${products.status} = 'active'
+          ) t
+        ) x`
       )
-      .groupBy(sql`t.style`);
+      .where(sql`x.rn <= ${CANDIDATES_PER_COLLECTION}`);
 
-    const byStyle = new Map(rows.map((row) => [row.style, row]));
+    /** Shortlist per style, already in rank order from the window function. */
+    const candidatesByStyle = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const list = candidatesByStyle.get(row.style);
+      if (list) list.push(row);
+      else candidatesByStyle.set(row.style, [row]);
+    }
+    for (const list of candidatesByStyle.values()) {
+      list.sort((a, b) => a.rank - b.rank);
+    }
+
+    /**
+     * Assign each product to at most one chip.
+     *
+     * Scarcest style first. A style with two products has almost no choice,
+     * so letting a style with forty pick ahead of it is how the scarce one
+     * ends up with nothing left and falls back to a duplicate.
+     *
+     * Ties break on the style id so the rail is deterministic — a chip that
+     * changes picture between two identical requests looks like a bug.
+     */
+    const claimed = new Set<string>();
+    const chosen = new Map<string, (typeof rows)[number]>();
+
+    const styleIds = [...candidatesByStyle.keys()].sort((a, b) => {
+      const byScarcity =
+        (candidatesByStyle.get(a)?.[0]?.count ?? 0) -
+        (candidatesByStyle.get(b)?.[0]?.count ?? 0);
+      return byScarcity !== 0 ? byScarcity : a.localeCompare(b);
+    });
+
+    for (const styleId of styleIds) {
+      const candidates = candidatesByStyle.get(styleId) ?? [];
+      const free = candidates.find((row) => !claimed.has(row.productId));
+
+      /**
+       * Every candidate already taken — only possible when a style's whole
+       * shortlist is shared with styles that picked first. Reuse the top
+       * candidate rather than dropping the chip: a duplicate picture is a
+       * smaller failure than a collection missing from the rail.
+       */
+      const pick = free ?? candidates[0];
+      if (!pick) continue;
+
+      claimed.add(pick.productId);
+      chosen.set(styleId, pick);
+    }
 
     /**
      * Driven by the vocabulary, not the query result: this both supplies the
-     * labels and fixes the order, and it silently drops any free-text value
-     * that reached the column — such a value has no label and filtering on
-     * it would 400.
+     * labels and fixes the display order, and it silently drops any free-text
+     * value that reached the column — such a value has no label and filtering
+     * on it would 400.
      */
     const collections = STYLE_OPTIONS.flatMap((option) => {
-      const row = byStyle.get(option.id);
+      const row = chosen.get(option.id);
       if (!row || row.count <= 0) return [];
       return [
         {
