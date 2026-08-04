@@ -34,6 +34,7 @@ import {
   type AuthVariables,
 } from "../../middleware/auth";
 import { deleteCached, CacheKeys } from "../../lib/redis";
+import { unitsSoldSql } from "../../lib/product-sales";
 import { buildProductMedia } from "../../lib/product-media";
 
 // ============================================================================
@@ -148,6 +149,16 @@ const createProductSchema = z.object({
   status: z.enum(["draft", "active", "archived"]).optional().default("draft"),
   isFeatured: z.boolean().optional().default(false),
   featuredOrder: z.number().int().optional().nullable(),
+  /**
+   * Curator pin for the Best-selling sort. Reordering only — the units-sold
+   * figure on the list is the measurement and stays untouched by this, which
+   * is why an admin sees both side by side.
+   *
+   * `popularOrder` is nullable on purpose: unpinning is not the same as
+   * ranking first.
+   */
+  isPopular: z.boolean().optional().default(false),
+  popularOrder: z.number().int().optional().nullable(),
   isAiGenerated: z.boolean().optional().default(false),
   aiGenerationId: z.string().uuid().optional().nullable(),
 });
@@ -352,6 +363,14 @@ adminProductsApp.get(
           status: products.status,
           isFeatured: products.isFeatured,
           featuredOrder: products.featuredOrder,
+          isPopular: products.isPopular,
+          popularOrder: products.popularOrder,
+          /**
+           * The real figure, beside the pin that can override it. Curating
+           * without seeing what you are overriding is how a merchandising
+           * decision quietly becomes a belief about sales.
+           */
+          unitsSold: unitsSoldSql(),
           isAiGenerated: products.isAiGenerated,
           createdAt: products.createdAt,
           updatedAt: products.updatedAt,
@@ -466,6 +485,8 @@ adminProductsApp.post(
           status: (input.status as ProductStatus) || "draft",
           isFeatured: input.isFeatured || false,
           featuredOrder: input.featuredOrder || null,
+          isPopular: input.isPopular || false,
+          popularOrder: input.popularOrder ?? null,
           isAiGenerated: input.isAiGenerated || false,
           aiGenerationId: input.aiGenerationId || null,
         })
@@ -583,6 +604,9 @@ adminProductsApp.patch(
         updateData.isFeatured = input.isFeatured;
       if (input.featuredOrder !== undefined)
         updateData.featuredOrder = input.featuredOrder;
+      if (input.isPopular !== undefined) updateData.isPopular = input.isPopular;
+      if (input.popularOrder !== undefined)
+        updateData.popularOrder = input.popularOrder;
       if (input.isAiGenerated !== undefined)
         updateData.isAiGenerated = input.isAiGenerated;
       if (input.aiGenerationId !== undefined)
