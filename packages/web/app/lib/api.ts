@@ -2073,6 +2073,99 @@ export const addressesApi = {
   },
 };
 
+// ============================================================================
+// Wishlist API
+// ============================================================================
+
+/**
+ * A saved product, in the shape the product cards already consume.
+ * The server drops ids whose product has left the catalogue, so this list can
+ * be shorter than what the user once saved.
+ */
+export interface WishlistItemResponse {
+  id: string;
+  sku: string;
+  title: string;
+  slug: string;
+  basePrice: string;
+  images: unknown[];
+  orientation: string;
+  styles: string[] | null;
+  isFeatured: boolean;
+  isAiGenerated: boolean;
+}
+
+export const wishlistApi = {
+  /** The user's saved products, hydrated. */
+  async list(): Promise<{ items: WishlistItemResponse[] }> {
+    const response = await fetch(`${getApiUrl()}/api/wishlist`, {
+      method: "GET",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to load wishlist");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Just the count, for the header badge — deliberately separate from list()
+   * so the header does not pull a product join on every page.
+   */
+  async count(): Promise<{ count: number }> {
+    const response = await fetch(`${getApiUrl()}/api/wishlist/count`, {
+      method: "GET",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to count wishlist");
+    }
+
+    return response.json();
+  },
+
+  /** Save a product. Idempotent server-side. */
+  async add(productId: string): Promise<{ saved: boolean; productId: string }> {
+    const response = await fetch(`${getApiUrl()}/api/wishlist/${productId}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to add to wishlist");
+    }
+
+    return response.json();
+  },
+
+  /** Unsave a product. Idempotent server-side. */
+  async remove(
+    productId: string
+  ): Promise<{ saved: boolean; productId: string }> {
+    const response = await fetch(`${getApiUrl()}/api/wishlist/${productId}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to remove from wishlist");
+    }
+
+    return response.json();
+  },
+};
+
 export const api = {
   products: productsApi,
   cart: cartApi,
@@ -2087,6 +2180,7 @@ export const api = {
   tracking: trackingApi,
   notificationPreferences: notificationPreferencesApi,
   addresses: addressesApi,
+  wishlist: wishlistApi,
 };
 
 export default api;
