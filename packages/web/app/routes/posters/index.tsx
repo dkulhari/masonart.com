@@ -10,7 +10,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useState, useCallback, useEffect } from 'react'
 import {
   ChevronLeft,
@@ -33,6 +33,8 @@ import {
 } from '~/components/product/ProductFilters'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
+import { SectionBand } from '~/components/ui/SectionBand'
+import { DisplayHeading } from '~/components/ui/DisplayHeading'
 
 // ============================================================================
 // Types
@@ -407,10 +409,7 @@ function PostersPage() {
   return (
     <div className="flex flex-col">
       {/* Page Header */}
-      <PageHeader
-        totalProducts={pagination.total}
-        activeFilterCount={activeFilterCount}
-      />
+      <PageHeader />
 
       {/* Main Content */}
       <div className="container-wide py-6 lg:py-8">
@@ -555,30 +554,77 @@ function PostersPage() {
 // Page Header Component
 // ============================================================================
 
-interface PageHeaderProps {
-  totalProducts: number
-  activeFilterCount: number
-}
+/**
+ * SEO copy for the collection. mesonart runs a paragraph here with a "Show
+ * More" toggle; ours is short enough to render whole.
+ */
+const COLLECTION_DESCRIPTION =
+  'Museum-grade posters and framed art, printed on archival paper with pigment inks. ' +
+  'Filter by style, subject, colour or the room you are furnishing — every piece ships ' +
+  'free over ₹999 and returns free within 30 days.'
 
-function PageHeader({ totalProducts, activeFilterCount }: PageHeaderProps) {
+const BREADCRUMBS = [
+  { name: 'Home', href: '/' },
+  { name: 'Posters', href: '/posters' },
+]
+
+/**
+ * Collection header — mesonart's beige band (analysis §1.3.1).
+ *
+ * Was a flat `bg-muted/30` strip with a plain h1 and the result count. The
+ * count now lives in the toolbar, where mesonart puts it; this band carries
+ * breadcrumbs, the display H1 and the SEO paragraph.
+ *
+ * SectionBand and DisplayHeading both landed in Phase A and until now were
+ * used only on the home page.
+ */
+function PageHeader() {
   return (
-    <section className="border-b border-border bg-muted/30 py-8 sm:py-12">
-      <div className="container-wide">
-        <h1 className="text-3xl tracking-tight text-foreground sm:text-4xl">
-          Shop Posters
-        </h1>
-        <p className="mt-2 text-muted-foreground">
-          {totalProducts > 0 ? (
-            <>
-              Showing {totalProducts} product{totalProducts !== 1 && 's'}
-              {activeFilterCount > 0 && ' matching your filters'}
-            </>
-          ) : (
-            'Browse our collection of premium posters'
-          )}
-        </p>
-      </div>
-    </section>
+    <SectionBand tone="beige" className="py-8 sm:py-12">
+      {/* Real navigation markup, not a decorative string — breadcrumbs are
+          the one piece of structured data Google renders directly in the
+          result, and #244 already established JSON-LD on this page. */}
+      <nav aria-label="Breadcrumb" className="mb-4">
+        <ol className="flex items-center gap-2 text-sm text-muted-foreground">
+          {BREADCRUMBS.map((crumb, index) => (
+            <li key={crumb.href} className="flex items-center gap-2">
+              {index > 0 && <span aria-hidden="true">/</span>}
+              {index === BREADCRUMBS.length - 1 ? (
+                <span aria-current="page" className="text-foreground">
+                  {crumb.name}
+                </span>
+              ) : (
+                <Link to={crumb.href} className="hover:text-foreground">
+                  {crumb.name}
+                </Link>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: BREADCRUMBS.map((crumb, index) => ({
+              '@type': 'ListItem',
+              position: index + 1,
+              name: crumb.name,
+              item: `https://chobii.art${crumb.href}`,
+            })),
+          }),
+        }}
+      />
+
+      <DisplayHeading className="text-foreground">Shop Posters</DisplayHeading>
+
+      <p className="mt-4 max-w-2xl text-muted-foreground">
+        {COLLECTION_DESCRIPTION}
+      </p>
+    </SectionBand>
   )
 }
 
