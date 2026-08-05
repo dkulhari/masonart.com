@@ -187,6 +187,69 @@ wishlistApp.get("/count", async (c) => {
  * atomic and idempotent in one statement.
  */
 /**
+ * POST /api/wishlist/replace
+ *
+ * Swap the whole list for a different one. Used when staff load a collection's
+ * members in to rearrange them.
+ *
+ * ## Why this is not PUT /api/wishlist
+ *
+ * `PUT` refuses ANY change to the set — its permutation guard exists so a tab
+ * left open since before an item was saved elsewhere cannot silently drop it.
+ * Loading a collection is exactly a set change, so it cannot go through that
+ * door, and loosening the guard would reopen the hole it closed.
+ *
+ * Two operations, two endpoints: reordering stays absolutely guarded, and
+ * replacement is opt-in and named for what it does. Do not merge them.
+ *
+ * MUST be registered before `/:productId` — both are POST, Hono matches in
+ * registration order, and "replace" is not a uuid, so the param route would
+ * answer 400 for every call. Same trap as `/merge`.
+ */
+wishlistApp.post(
+  "/replace",
+  zValidator("json", reorderBodySchema),
+  async (c) => {
+    const user = c.get("user");
+    const { productIds } = c.req.valid("json");
+
+    if (new Set(productIds).size !== productIds.length) {
+      return c.json({ error: "Duplicate product ids" }, 400);
+    }
+
+    try {
+      /**
+       * Every id checked against the catalogue before anything is written. A
+       * wishlist full of ids matching no product renders as an empty page with
+       * a non-zero badge — the same mismatch `/count` already works to avoid.
+       */
+      if (productIds.length > 0) {
+        const found = await db
+          .select({ id: products.id })
+          .from(products)
+          .where(inArray(products.id, productIds));
+
+        const known = new Set(found.map((row) => row.id));
+        const unknown = productIds.filter((id) => !known.has(id));
+        if (unknown.length > 0) {
+          return c.json({ error: "Unknown product ids", unknown }, 400);
+        }
+      }
+
+      await db
+        .update(users)
+        .set({ wishlistProductIds: productIds })
+        .where(eq(users.id, user.id));
+
+      return c.json({ productIds });
+    } catch (error) {
+      console.error("Failed to replace wishlist:", error);
+      return c.json({ error: "Failed to replace wishlist" }, 500);
+    }
+  }
+);
+
+/**
  * POST /api/wishlist/merge
  *
  * Signing in folds the guest's localStorage list into the account. The result
