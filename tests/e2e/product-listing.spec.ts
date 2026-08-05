@@ -28,9 +28,16 @@ const ORIENTATION = { id: 'portrait', label: 'Vertical', chip: 'portrait' };
 const ROOM = { id: 'living-room', label: 'Living Room' };
 const COLOR = { id: 'blue', label: 'Blue' };
 
-/** The desktop chip row and the mobile one both render; scope or you get both. */
+/**
+ * The desktop chip row and the mobile one both render; scope or you get both.
+ *
+ * The desktop copy moved into the toolbar in #454 — it used to be a
+ * `div.hidden.lg:block` sitting in the products column, after the `</aside>`.
+ * Addressed by test id now rather than by class, so the next placement change
+ * does not silently resolve this locator to some other hidden block.
+ */
 const desktopChips = (page: import('@playwright/test').Page) =>
-  page.locator('div.hidden.lg\\:block');
+  page.getByTestId('toolbar-active-filters');
 
 /**
  * Product Listing Page E2E Tests
@@ -931,23 +938,28 @@ test.describe('Product Listing - URL State', () => {
     await expect(page).toHaveURL(/isFeatured=true/);
   });
 
-  test.fixme('should chip isFeatured like every other filter', async ({
-    page,
-  }) => {
-    /**
-     * BLOCKED on #453 — the page is the bug, not this test.
-     *
-     * `ActiveFilterTags` builds a "Featured" chip, but the whole chip row is
-     * gated on `activeFilterCount` (routes/posters/index.tsx:592), and that
-     * sum counts styles, subjects, colors, rooms, orientation, price and
-     * isAiGenerated — not isFeatured, and not vibe/aesthetic/medium/
-     * uniqueness/availability either. Filter by any of those and the page
-     * silently shows no chip and no mobile badge.
-     */
+  test('should chip isFeatured like every other filter', async ({ page }) => {
+    // Was fixme against #453: the chip row is gated on the active-filter
+    // count, and that sum did not know isFeatured existed. Both come off one
+    // derivation now (app/lib/activeFilters.ts).
     await page.goto('/posters?isFeatured=true', { waitUntil: 'networkidle' });
 
     await expect(
       desktopChips(page).getByRole('button', { name: /Featured/ }).first()
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should chip the facets the rail added in #415', async ({ page }) => {
+    // Vibe, Aesthetic, Medium, Uniqueness and Availability were the other
+    // five the old sum missed — filterable, but with no chip and no badge.
+    await page.goto('/posters?vibe=tranquility-and-zen', {
+      waitUntil: 'networkidle',
+    });
+
+    await expect(
+      desktopChips(page)
+        .getByRole('button', { name: /tranquility and zen/i })
+        .first()
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -1455,9 +1467,10 @@ test.describe('Product Listing - Special Filters', () => {
   test('should show AI Generated in active filter tags', async ({ page }) => {
     await page.goto('/posters?isAiGenerated=true', { waitUntil: 'networkidle' });
 
-    // Scope to desktop active filter container
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const aiTag = desktopFilters.locator('button:has-text("AI Generated")');
+    // Scope to the desktop chip row — in the toolbar since #454.
+    const aiTag = desktopChips(page).locator(
+      'button:has-text("AI Generated")'
+    );
     await expect(aiTag.first()).toBeVisible({ timeout: 10000 });
   });
 });

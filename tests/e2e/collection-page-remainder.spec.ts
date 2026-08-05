@@ -213,3 +213,124 @@ test('cards in a row keep identical heights with the promo tile present', async 
     expect(new Set(heights).size, `row at y=${top} has mixed heights`).toBe(1)
   }
 })
+
+// ============================================================================
+// Active filter chips in the toolbar (#454)
+// ============================================================================
+
+/**
+ * The chips rendered in the products column, after the `</aside>`, so they
+ * read as a caption on the grid rather than as the state of the filters.
+ *
+ * They did not move into the rail, which is where mesonart puts theirs: the
+ * rail is `lg:hidden` once filters are hidden, and chips inside it go with it
+ * — active filter, reduced count, nothing on screen to clear it with. The
+ * toolbar spans both columns and survives the collapse.
+ *
+ * The constraint the geometry tests exist for: the rail is pinned at
+ * `calc(var(--chrome-offset) + 5rem)` and the 5rem IS this bar. A chips row
+ * that wraps grows the bar and drops the rail behind it — the #401 overlap.
+ */
+test.describe('active filter chips', () => {
+  /** Ten valid COLOR_OPTIONS ids — ten chips, whatever the seed stocks. */
+  const TEN_FILTERS =
+    'black,white,gray,beige,brown,yellow,blue,gold,green,orange'
+
+  const toolbar = (page: import('@playwright/test').Page) =>
+    page.getByTestId('collection-toolbar')
+  const chips = (page: import('@playwright/test').Page) =>
+    page.getByTestId('toolbar-active-filters')
+
+  test('renders inside the toolbar, not in the products column', async ({
+    page,
+  }) => {
+    await page.goto('/posters?colors=blue', { waitUntil: 'networkidle' })
+
+    await expect(chips(page)).toBeVisible()
+
+    const bar = await toolbar(page).boundingBox()
+    const row = await chips(page).boundingBox()
+    expect(bar).not.toBeNull()
+    expect(row).not.toBeNull()
+
+    // Contained by the bar, vertically and horizontally.
+    expect(row!.y).toBeGreaterThanOrEqual(bar!.y - 1)
+    expect(row!.y + row!.height).toBeLessThanOrEqual(bar!.y + bar!.height + 1)
+    expect(row!.x).toBeGreaterThanOrEqual(bar!.x - 1)
+  })
+
+  test('stays on screen when the rail is hidden', async ({ page }) => {
+    await page.goto('/posters?colors=blue', { waitUntil: 'networkidle' })
+
+    await page.getByRole('button', { name: /Hide filters/ }).click()
+    await expect(
+      page.getByRole('button', { name: /Show filters/ })
+    ).toBeVisible()
+
+    // The whole point: the rail is gone and the chips are not.
+    await expect(page.locator('#collection-filters')).toBeHidden()
+    await expect(chips(page)).toBeVisible()
+    await expect(
+      chips(page).getByRole('button', { name: /blue/i })
+    ).toBeVisible()
+  })
+
+  test('keeps the toolbar one row tall with 0, 1 and 10 filters', async ({
+    page,
+  }) => {
+    const heightAt = async (query: string) => {
+      await page.goto(`/posters${query}`, { waitUntil: 'networkidle' })
+      const box = await toolbar(page).boundingBox()
+      expect(box).not.toBeNull()
+      return Math.round(box!.height)
+    }
+
+    const none = await heightAt('')
+    const one = await heightAt('?colors=blue')
+    const ten = await heightAt(`?colors=${TEN_FILTERS}`)
+
+    expect(one).toBe(none)
+    expect(ten).toBe(none)
+  })
+
+  test('leaves the rail clear of the toolbar once both are stuck', async ({
+    page,
+  }) => {
+    // The 5rem offset is only true while the bar stays one row. Ten chips is
+    // the case that used to wrap.
+    await page.goto(`/posters?colors=${TEN_FILTERS}`, {
+      waitUntil: 'networkidle',
+    })
+
+    // Far enough that both are pinned, not so far that the rail unpins: the
+    // rail is ~2100px of facets against a 720px viewport, and a sticky box
+    // taller than the viewport holds only until its bottom edge arrives.
+    await page.evaluate(() => window.scrollTo(0, 600))
+    await page.waitForTimeout(400)
+
+    const bar = await toolbar(page).boundingBox()
+    const rail = await page.locator('#collection-filters > div').boundingBox()
+    expect(bar).not.toBeNull()
+    expect(rail).not.toBeNull()
+
+    // Both stuck — otherwise the comparison below measures nothing.
+    expect(bar!.y).toBeLessThan(120)
+
+    // Below the bar, not underneath it. The rail's `top` is the hardcoded
+    // `--chrome-offset + 5rem`; a taller bar overlaps it without either
+    // constant changing, which is exactly the failure this asserts against.
+    expect(rail!.y).toBeGreaterThanOrEqual(bar!.y + bar!.height - 1)
+  })
+
+  test('still removes one chip and clears all (#147)', async ({ page }) => {
+    await page.goto('/posters?colors=blue,red', { waitUntil: 'networkidle' })
+
+    await chips(page).getByRole('button', { name: /^blue/i }).click()
+    await expect(page).not.toHaveURL(/colors=[^&]*blue/, { timeout: 10000 })
+    await expect(page).toHaveURL(/colors=red/)
+
+    await chips(page).getByRole('button', { name: /Clear all/ }).click()
+    await expect(page).not.toHaveURL(/colors=/, { timeout: 10000 })
+    await expect(chips(page)).toHaveCount(0)
+  })
+})

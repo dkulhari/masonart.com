@@ -116,6 +116,65 @@ describe('hide filters', () => {
   })
 })
 
+/**
+ * The chips row (#454).
+ *
+ * The chips used to render in the products column, after the `</aside>`, which
+ * read as a caption on the grid rather than as the state of the filters. They
+ * could not move into the rail either: the rail is `lg:hidden` once filters are
+ * hidden, and chips nested inside it would vanish with it — an active filter, a
+ * reduced count, and no way to see or clear what is filtering.
+ *
+ * The toolbar already spans both columns (#419) and survives the rail
+ * collapsing, so it is the one place that holds in every combination.
+ */
+describe('active filter chips', () => {
+  const chips = <span data-testid="chip-fixture">minimalist art</span>
+
+  it('renders the chips it is handed', () => {
+    render(<CollectionToolbar {...defaults} chips={chips} />)
+    expect(screen.getByTestId('chip-fixture')).toBeTruthy()
+  })
+
+  it('renders no chips row when there are none', () => {
+    render(<CollectionToolbar {...defaults} />)
+    expect(screen.queryByTestId('toolbar-active-filters')).toBeNull()
+  })
+
+  it('keeps the chips row to a single line that scrolls', () => {
+    // The rail's sticky offset is `calc(var(--chrome-offset) + 5rem)`, and the
+    // 5rem IS this toolbar. A row that wraps makes the bar taller and silently
+    // puts the rail behind it — the #401 overlap, again. So the chips scroll
+    // sideways rather than wrap.
+    render(<CollectionToolbar {...defaults} chips={chips} />)
+    const row = screen.getByTestId('toolbar-active-filters')
+
+    expect(row.className).toContain('flex-nowrap')
+    expect(row.className).toContain('overflow-x-auto')
+    expect(row.className).not.toContain('flex-wrap')
+  })
+
+  it('hides the toolbar copy below lg, where the sheet carries its own', () => {
+    render(<CollectionToolbar {...defaults} chips={chips} />)
+    const row = screen.getByTestId('toolbar-active-filters')
+
+    expect(row.className).toContain('hidden')
+    expect(row.className).toContain('lg:flex')
+  })
+
+  it('gives the flexible space to the chips so sort stays right-aligned', () => {
+    render(<CollectionToolbar {...defaults} chips={chips} />)
+
+    // The count grows into the empty space when it is the only thing between
+    // the toggle and sort; with chips present the chips take it instead, or
+    // they get squeezed to nothing against a count that never shrinks.
+    expect(screen.getByText(/3,?878 products/).className).toContain('lg:grow-0')
+    expect(screen.getByTestId('toolbar-active-filters').className).toContain(
+      'grow'
+    )
+  })
+})
+
 describe('placement', () => {
   it('is sticky and clears the sticky header rather than sitting under it', () => {
     const { container } = render(<CollectionToolbar {...defaults} />)

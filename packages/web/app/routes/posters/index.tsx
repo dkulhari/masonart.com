@@ -19,6 +19,11 @@ import {
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { productsApi, type ProductFilters as ProductFiltersType } from '~/lib/api'
+import {
+  buildActiveFilterTags,
+  countActiveFilters,
+  type ActiveFilterKey,
+} from '~/lib/activeFilters'
 import { cn } from '~/lib/utils'
 import {
   ProductGrid,
@@ -588,16 +593,69 @@ function PostersPage() {
     return () => observer.disconnect()
   }, [hasMore, isLoadingMore, loadMore])
 
-  // Count active filters for badge
-  const activeFilterCount =
-    filters.styles.length +
-    filters.subjects.length +
-    filters.colors.length +
-    filters.rooms.length +
-    (filters.orientation ? 1 : 0) +
-    (filters.priceMin !== undefined ? 1 : 0) +
-    (filters.priceMax !== undefined ? 1 : 0) +
-    (filters.isAiGenerated !== undefined ? 1 : 0)
+  /**
+   * How many filters are on — the mobile badge, and the gate on the chip row.
+   *
+   * Derived, not summed by hand (#453). The hand-written version knew about
+   * eight fields while the rail had grown to ten facet groups, so Vibe,
+   * Aesthetic, Medium, Uniqueness, Availability and Featured all counted zero
+   * — and since this number gates the chips, filtering by any of them narrowed
+   * the grid with nothing on screen saying why.
+   */
+  const activeFilterCount = countActiveFilters(filters)
+
+  /**
+   * Chip handlers, shared by the toolbar row and the mobile sheet (#454).
+   *
+   * They were written out twice, once per copy — forty lines of clear-all
+   * object duplicated verbatim, which is how one copy ends up resetting a
+   * facet the other forgets.
+   */
+  const removeFilter = useCallback(
+    (key: ActiveFilterKey, value?: string) => {
+      // Price is one chip over two bounds — dropping it drops both.
+      if (key === 'price') {
+        handleFiltersChange({
+          ...filters,
+          priceMin: undefined,
+          priceMax: undefined,
+        })
+        return
+      }
+
+      if (Array.isArray(filters[key])) {
+        const currentValues = filters[key] as string[]
+        handleFiltersChange({
+          ...filters,
+          [key]: currentValues.filter((v) => v !== value),
+        })
+      } else {
+        handleFiltersChange({ ...filters, [key]: undefined })
+      }
+    },
+    [filters, handleFiltersChange]
+  )
+
+  const clearAllFilters = useCallback(() => {
+    handleFiltersChange({
+      styles: [],
+      subjects: [],
+      colors: [],
+      rooms: [],
+      vibe: [],
+      aesthetic: [],
+      medium: [],
+      uniqueness: undefined,
+      availability: undefined,
+      orientation: undefined,
+      priceMin: undefined,
+      priceMax: undefined,
+      isAiGenerated: undefined,
+      isFeatured: undefined,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+    })
+  }, [handleFiltersChange])
 
   return (
     <div className="flex flex-col">
@@ -648,6 +706,24 @@ function PostersPage() {
           filtersHidden={filtersHidden}
           onToggleFilters={() => setFiltersHidden((hidden) => !hidden)}
           className="mb-8"
+          /*
+           * The desktop chips ride in the toolbar (#454), not in the products
+           * column where they used to render and not in the rail where
+           * mesonart puts theirs: the rail is `lg:hidden` once filters are
+           * hidden, and chips inside it would go with it — active filter,
+           * reduced count, nothing on screen to clear it with. The bar spans
+           * both columns and survives the collapse.
+           */
+          chips={
+            activeFilterCount > 0 ? (
+              <ActiveFilterTags
+                variant="row"
+                filters={filters}
+                onRemoveFilter={removeFilter}
+                onClearAll={clearAllFilters}
+              />
+            ) : null
+          }
         />
 
         <div className="flex gap-8">
@@ -694,86 +770,11 @@ function PostersPage() {
               {activeFilterCount > 0 && (
                 <ActiveFilterTags
                   filters={filters}
-                  onRemoveFilter={(key, value) => {
-                    if (Array.isArray(filters[key])) {
-                      const currentValues = filters[key] as string[]
-                      handleFiltersChange({
-                        ...filters,
-                        [key]: currentValues.filter((v) => v !== value),
-                      })
-                    } else {
-                      handleFiltersChange({
-                        ...filters,
-                        [key]: undefined,
-                      })
-                    }
-                  }}
-                  onClearAll={() =>
-                    handleFiltersChange({
-                      styles: [],
-                      subjects: [],
-                      colors: [],
-                      rooms: [],
-                      vibe: [],
-                      aesthetic: [],
-                      medium: [],
-                      uniqueness: undefined,
-                      availability: undefined,
-                      orientation: undefined,
-                      priceMin: undefined,
-                      priceMax: undefined,
-                      isAiGenerated: undefined,
-                      isFeatured: undefined,
-                      sortBy: 'createdAt',
-                      sortOrder: 'desc',
-                    })
-                  }
+                  onRemoveFilter={removeFilter}
+                  onClearAll={clearAllFilters}
                 />
               )}
             </div>
-
-            {/* Active Filters Tags (Desktop) */}
-            {activeFilterCount > 0 && (
-              <div className="mb-6 hidden lg:block">
-                <ActiveFilterTags
-                  filters={filters}
-                  onRemoveFilter={(key, value) => {
-                    if (Array.isArray(filters[key])) {
-                      const currentValues = filters[key] as string[]
-                      handleFiltersChange({
-                        ...filters,
-                        [key]: currentValues.filter((v) => v !== value),
-                      })
-                    } else {
-                      handleFiltersChange({
-                        ...filters,
-                        [key]: undefined,
-                      })
-                    }
-                  }}
-                  onClearAll={() =>
-                    handleFiltersChange({
-                      styles: [],
-                      subjects: [],
-                      colors: [],
-                      rooms: [],
-                      vibe: [],
-                      aesthetic: [],
-                      medium: [],
-                      uniqueness: undefined,
-                      availability: undefined,
-                      orientation: undefined,
-                      priceMin: undefined,
-                      priceMax: undefined,
-                      isAiGenerated: undefined,
-                      isFeatured: undefined,
-                      sortBy: 'createdAt',
-                      sortOrder: 'desc',
-                    })
-                  }
-                />
-              </div>
-            )}
 
             {/* Product Grid */}
             {visibleProducts.length > 0 ? (
@@ -930,89 +931,61 @@ function PageHeader() {
 
 interface ActiveFilterTagsProps {
   filters: FilterState
-  onRemoveFilter: (key: keyof FilterState, value?: string) => void
+  onRemoveFilter: (key: ActiveFilterKey, value?: string) => void
   onClearAll: () => void
+  /**
+   * `wrap` is the sheet's stacked block. `row` is the toolbar's single line
+   * (#454): it may not wrap, because the bar's height is the 5rem the rail's
+   * sticky offset is pinned against, and a second line puts the rail behind
+   * the bar. Overflow scrolls sideways instead — see CollectionToolbar.
+   */
+  variant?: 'wrap' | 'row'
 }
 
 function ActiveFilterTags({
   filters,
   onRemoveFilter,
   onClearAll,
+  variant = 'wrap',
 }: ActiveFilterTagsProps) {
-  const tags: Array<{
-    key: keyof FilterState
-    value: string
-    label: string
-  }> = []
-
-  // Build tags array from filters
-  filters.styles.forEach((style) => {
-    tags.push({
-      key: 'styles',
-      value: style,
-      label: style.replace(/-/g, ' '),
-    })
-  })
-
-  filters.subjects.forEach((subject) => {
-    tags.push({
-      key: 'subjects',
-      value: subject,
-      label: subject.replace(/-/g, ' '),
-    })
-  })
-
-  filters.colors.forEach((color) => {
-    tags.push({
-      key: 'colors',
-      value: color,
-      label: color.replace(/-/g, ' '),
-    })
-  })
-
-  filters.rooms.forEach((room) => {
-    tags.push({
-      key: 'rooms',
-      value: room,
-      label: room.replace(/-/g, ' '),
-    })
-  })
-
-  if (filters.orientation) {
-    tags.push({
-      key: 'orientation',
-      value: filters.orientation,
-      label: filters.orientation,
-    })
-  }
-
-  if (filters.isAiGenerated !== undefined) {
-    tags.push({
-      key: 'isAiGenerated',
-      value: 'true',
-      label: 'AI Generated',
-    })
-  }
-
-  if (filters.isFeatured !== undefined) {
-    tags.push({
-      key: 'isFeatured',
-      value: 'true',
-      label: 'Featured',
-    })
-  }
+  /**
+   * One derivation, shared with the badge (#453). Written out by hand here,
+   * this list covered four of the ten facet groups and neither of the two
+   * booleans — and the badge that gated it covered a different subset again.
+   */
+  const tags = buildActiveFilterTags(filters)
 
   if (tags.length === 0) return null
 
+  const isRow = variant === 'row'
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm text-muted-foreground">Active filters:</span>
+    <div
+      data-testid="active-filter-tags"
+      className={cn(
+        'flex items-center gap-2',
+        isRow ? 'flex-nowrap' : 'flex-wrap'
+      )}
+    >
+      <span
+        className={cn(
+          'text-sm text-muted-foreground',
+          isRow && 'shrink-0 whitespace-nowrap'
+        )}
+      >
+        Active filters:
+      </span>
       {tags.map((tag, index) => (
         <button
           key={`${tag.key}-${tag.value}-${index}`}
           type="button"
           onClick={() => onRemoveFilter(tag.key, tag.value)}
-          className="flex items-center gap-1 rounded-full border border-border bg-background px-3 py-1 text-sm capitalize transition-colors hover:bg-muted"
+          className={cn(
+            'flex items-center gap-1 rounded-full border border-border bg-background px-3 py-1 text-sm capitalize transition-colors hover:bg-muted',
+            // A chip that shrinks to fit the row loses its label before it
+            // loses the row; the row scrolls instead.
+            isRow && 'shrink-0 whitespace-nowrap'
+          )}
         >
           {tag.label}
           <X className="h-3.5 w-3.5" />
@@ -1021,7 +994,10 @@ function ActiveFilterTags({
       <button
         type="button"
         onClick={onClearAll}
-        className="text-sm text-muted-foreground hover:text-foreground"
+        className={cn(
+          'text-sm text-muted-foreground hover:text-foreground',
+          isRow && 'shrink-0 whitespace-nowrap'
+        )}
       >
         Clear all
       </button>

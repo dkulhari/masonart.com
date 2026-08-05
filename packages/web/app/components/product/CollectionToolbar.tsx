@@ -11,7 +11,7 @@
  */
 
 import { SlidersHorizontal, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { cn } from '~/lib/utils'
 import { buttonVariants } from '~/components/ui/Button'
 
@@ -55,6 +55,16 @@ export interface CollectionToolbarProps {
   onSortChange: (sortId: string) => void
   filtersHidden: boolean
   onToggleFilters: () => void
+  /**
+   * The desktop active-filter chips (#454), rendered between the count and
+   * sort. A slot rather than props of its own: the chips are the route's
+   * `ActiveFilterTags`, which already knows the filter shape and the handlers,
+   * and this bar has no business learning either.
+   *
+   * They live here because the toolbar is the only row that survives the rail
+   * collapsing — see the comment on the chips row below.
+   */
+  chips?: ReactNode
   className?: string
 }
 
@@ -83,6 +93,7 @@ export function CollectionToolbar({
   onSortChange,
   filtersHidden,
   onToggleFilters,
+  chips,
   className,
 }: CollectionToolbarProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -163,10 +174,49 @@ export function CollectionToolbar({
 
       {/* `grow` rather than a `justify-between` row: theirs sits against the
        * toggle and lets the empty space fall before the sort pill. Centred, it
-       * reads as a page heading instead of a caption on the toggle. */}
-      <p className="grow text-lg text-foreground" aria-live="polite">
+       * reads as a page heading instead of a caption on the toggle.
+       *
+       * With chips present the chips take that space instead, or a count that
+       * never shrinks squeezes them to nothing. Below `lg` the chips row is
+       * hidden, so the count goes back to being the thing that grows. */}
+      <p
+        className={cn(
+          'grow whitespace-nowrap text-lg text-foreground',
+          chips && 'lg:grow-0'
+        )}
+        aria-live="polite"
+      >
         {formatCount(totalProducts)}
       </p>
+
+      {/* Active filters (#454), desktop only — the mobile copy stays with the
+       * sheet button.
+       *
+       * They rendered in the products column, after the `</aside>`, which read
+       * as a caption on the grid. The rail was the obvious home and the wrong
+       * one: it is `lg:hidden` once filters are hidden, so chips nested inside
+       * would leave a shopper with an active filter, a reduced count, and no
+       * way to see or clear it. A deliberate departure from mesonart, which
+       * puts theirs in the lane.
+       *
+       * One line, scrolling sideways. The rail is pinned at
+       * `calc(var(--chrome-offset) + 5rem)` and the 5rem is this bar: a row
+       * that wraps grows the bar and drops the rail behind it, which is the
+       * #401 overlap all over again. Scrolling keeps that constant true
+       * without a second height to keep in sync. */}
+      {chips && (
+        <div
+          data-testid="toolbar-active-filters"
+          className={cn(
+            'hidden min-w-0 grow items-center gap-2 overflow-x-auto flex-nowrap lg:flex',
+            // A visible scrollbar would add its own height to the row, which
+            // is the very thing this row must not do.
+            '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          )}
+        >
+          {chips}
+        </div>
+      )}
 
       <div className="relative" ref={menuRef}>
         <button
