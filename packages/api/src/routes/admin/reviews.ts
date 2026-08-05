@@ -28,7 +28,7 @@ import {
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
-import { deleteCached, deleteCachedPattern } from "../../lib/redis";
+import { deleteCachedPattern } from "../../lib/redis";
 import { deleteFile } from "../../lib/storage";
 
 // ============================================================================
@@ -505,8 +505,9 @@ adminReviewsApp.patch(
         return c.json({ error: "Failed to moderate review" }, 500);
       }
 
-      // Invalidate cache for this product's reviews
-      await deleteCached(`${REVIEW_CACHE_PREFIX}product:${review.productId}:*`);
+      // Approving a review publishes its media too, so drop every cached read
+      // the review appears in — not just the product list.
+      await invalidateReviewMediaCaches(review.productId);
 
       return c.json({
         message: `Review ${status} successfully`,
@@ -558,8 +559,9 @@ adminReviewsApp.delete("/:reviewId", async (c) => {
     // Delete the review
     await db.delete(reviews).where(eq(reviews.id, reviewId));
 
-    // Invalidate cache for this product's reviews
-    await deleteCached(`${REVIEW_CACHE_PREFIX}product:${review.productId}:*`);
+    // Deleting takes the review's media with it (cascade), so invalidate the
+    // media and site-wide feeds as well as the product list.
+    await invalidateReviewMediaCaches(review.productId);
 
     return c.json({
       message: "Review deleted successfully",
