@@ -16,6 +16,7 @@ initSentry();
 
 import { auth } from "./auth";
 import { productsApp } from "./routes/products";
+import { collectionsApp } from "./routes/collections";
 import { cartApp } from "./routes/cart";
 import { ordersApp } from "./routes/orders";
 import { aiApp } from "./routes/ai";
@@ -113,6 +114,9 @@ app.on(["POST", "GET"], "/api/auth/*", async (c) => {
 
 // Products API - list, search, get by slug
 app.route("/api/products", productsApp);
+
+// Collections API - the Discover rail and the collection pages behind it
+app.route("/api/collections", collectionsApp);
 
 // Cart API - get, add item, update, remove
 app.route("/api/cart", cartApp);

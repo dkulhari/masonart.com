@@ -73,6 +73,12 @@ export const CacheKeys = {
   USER: 'user:',
   AI_GENERATION: 'ai-gen:',
   RATE_LIMIT: 'rate-limit:',
+  /**
+   * Curated collections. Unlike the style-derived rail this replaced, the
+   * input is a table rather than a constants file, so admin writes MUST bust
+   * this prefix or the rail keeps serving the old set for the full TTL.
+   */
+  COLLECTION: 'collection:',
 } as const;
 
 /**
