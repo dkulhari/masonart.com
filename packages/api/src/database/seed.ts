@@ -14,6 +14,7 @@ import {
   clearOrdersAndReviews,
   seedOrdersAndReviews,
 } from "./seed-orders-reviews";
+import { seedCollections, countCollections } from "./seed-collections";
 
 /**
  * Orientations the shared ladder covers. `round` has no ladder yet — it falls
@@ -1719,6 +1720,10 @@ async function seed(): Promise<void> {
     // After products and their variants: an order item snapshots a real
     // variant, and a review needs the order item that authorises it.
     await seedOrdersAndReviews();
+    // Collections resolve their members live, so they do not depend on the
+    // products existing first. Seeded last anyway, so the summary below can
+    // report a count that means something.
+    await seedCollections();
 
     console.log("\n========================================");
     console.log("  Seed completed successfully!");
@@ -1734,6 +1739,7 @@ async function seed(): Promise<void> {
       .from(productVariants);
     console.log(`  - Variants: ${variantCount}`);
     console.log(`  - Frames: ${sampleFrames.length}`);
+    console.log(`  - Collections: ${await countCollections()}`);
     console.log("");
   } catch (error) {
     console.error("\nSeed failed with error:", error);

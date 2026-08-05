@@ -21,6 +21,10 @@ export * from './types/ai';
 export * from './schemas/product';
 export * from './schemas/checkout';
 export * from './schemas/ai-generation';
+// Curated collections. Listed here explicitly because this barrel enumerates
+// schema modules rather than re-exporting ./schemas/index.ts — adding a module
+// there alone leaves it unreachable through the package entry point.
+export * from './schemas/collection';
 
 // Constants
 export * from './constants/brand';
