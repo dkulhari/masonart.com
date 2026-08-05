@@ -122,6 +122,12 @@ export function Footer() {
               <li>
                 <FooterLink to="/faq">FAQs</FooterLink>
               </li>
+              {/* mesonart lists this under customer services — the column
+                  this footer calls Company. It is the same job: what a buyer
+                  reads before deciding, alongside shipping and returns. */}
+              <li>
+                <FooterLink to="/reviews">Reviews &amp; Ratings</FooterLink>
+              </li>
               <li>
                 <FooterLink to="/shipping">Shipping Info</FooterLink>
               </li>

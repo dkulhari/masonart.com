@@ -120,6 +120,13 @@ function getStaticPages(): SitemapEntry[] {
     // AI gallery page
     { url: `${SITE_URL}/gallery`, changefreq: "daily", priority: 0.7 },
 
+    /**
+     * Site-wide reviews. Above the informational pages because its content is
+     * customer-written and grows with the catalogue, and `daily` for the same
+     * reason — a static-page cadence would leave new reviews uncrawled.
+     */
+    { url: `${SITE_URL}/reviews`, changefreq: "daily", priority: 0.6 },
+
     // Static informational pages
     { url: `${SITE_URL}/about`, changefreq: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/faq`, changefreq: "monthly", priority: 0.5 },

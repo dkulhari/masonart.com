@@ -413,6 +413,16 @@ export function Header() {
                   Gallery
                 </NavLink>
               </li>
+              {/* Reviews is a destination on mesonart, not a PDP-only tab:
+                  the catalogue's reviews are readable without first picking a
+                  poster. Both nav trees carry it — see the mobile drawer
+                  below, which is a separate list and the usual thing to
+                  forget. */}
+              <li>
+                <NavLink to="/reviews" onClick={closeMobileMenu}>
+                  Reviews
+                </NavLink>
+              </li>
               <li>
                 <NavLink to="/about" onClick={closeMobileMenu}>
                   About
@@ -524,6 +534,10 @@ export function Header() {
               </MobileNavLink>
               <MobileNavLink to="/gallery" onClick={closeMobileMenu}>
                 Gallery
+              </MobileNavLink>
+              {/* The mobile half of the pair added above. */}
+              <MobileNavLink to="/reviews" onClick={closeMobileMenu}>
+                Reviews
               </MobileNavLink>
               <MobileNavLink to="/about" onClick={closeMobileMenu}>
                 About
