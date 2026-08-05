@@ -59,6 +59,13 @@ describe('behaviour a restructure must not delete', () => {
     expect(src).toContain('Shopping cart${')
   })
 
+  it('opens the cart drawer rather than routing to /cart (#460)', () => {
+    // Both the desktop cluster and the mobile bar trigger the drawer; /cart
+    // stays routable, but nothing in the header links to it any more.
+    expect(src).toContain('openCartDrawer')
+    expect(src).not.toMatch(/to="\/cart"/)
+  })
+
   it('keeps the role-aware staff entry (#362)', () => {
     expect(src).toContain('staffAreaLabel')
     expect(src).toContain('staffAreaHref')

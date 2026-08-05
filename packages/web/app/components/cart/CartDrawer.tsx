@@ -1,10 +1,13 @@
 /**
- * CartSheet Component
+ * CartDrawer Component
  *
- * Slide-out cart panel that shows a summary of items in the cart.
- * Accessible overlay with keyboard navigation and focus trapping.
+ * Slide-out cart panel anchored to the LEFT edge, matching mesonart.com (#460).
+ * The header cart control opens it; `/cart` stays routable for deep links.
  *
- * Following patterns from docs/poster-app-tech-stack.md
+ * Open state lives on the cart store rather than in props, so the header, the
+ * PDP and the quickview can all open the cart without prop-drilling through
+ * __root. Backdrop/panel layering and the Escape + scroll-lock effect mirror
+ * SearchDrawer.
  */
 
 import { useEffect, useCallback, useRef } from 'react'
@@ -15,6 +18,7 @@ import {
   useCartSubtotal,
   useCartItemCount,
   useCartActions,
+  useIsCartDrawerOpen,
 } from '~/stores/cart'
 import { CartItem } from './CartItem'
 
@@ -22,12 +26,8 @@ import { CartItem } from './CartItem'
 // Types
 // ============================================================================
 
-export interface CartSheetProps {
-  /** Whether the sheet is open */
-  isOpen: boolean
-  /** Callback to close the sheet */
-  onClose: () => void
-  /** Optional className for the sheet panel */
+export interface CartDrawerProps {
+  /** Optional className for the drawer panel */
   className?: string
 }
 
@@ -36,91 +36,76 @@ export interface CartSheetProps {
 // ============================================================================
 
 /**
- * CartSheet - Slide-out cart panel
+ * CartDrawer - Left slide-out cart panel
  *
  * @example
- * const [isCartOpen, setIsCartOpen] = useState(false);
+ * // Mounted once, beside the Header:
+ * <CartDrawer />
  *
- * <button onClick={() => setIsCartOpen(true)}>
- *   <ShoppingCart />
- * </button>
- *
- * <CartSheet
- *   isOpen={isCartOpen}
- *   onClose={() => setIsCartOpen(false)}
- * />
+ * // Opened from anywhere:
+ * const openDrawer = useCartStore((state) => state.openDrawer)
  */
-export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
+export function CartDrawer({ className }: CartDrawerProps) {
+  const isOpen = useIsCartDrawerOpen()
   const items = useCartItems()
   const subtotal = useCartSubtotal()
   const itemCount = useCartItemCount()
-  const { updateQuantity, removeItem } = useCartActions()
+  const { updateQuantity, removeItem, closeDrawer } = useCartActions()
 
-  const sheetRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   // Handle escape key
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        closeDrawer()
       }
     },
-    [onClose]
-  )
-
-  // Handle click outside
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
-        onClose()
-      }
-    },
-    [onClose]
+    [closeDrawer]
   )
 
   // Focus management and scroll lock
   useEffect(() => {
-    if (isOpen) {
-      // Focus the close button when opening
-      closeButtonRef.current?.focus()
+    if (!isOpen) return
 
-      // Lock scroll
-      const originalOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
+    // Focus the close button when opening
+    closeButtonRef.current?.focus()
 
-      // Add escape key listener
-      document.addEventListener('keydown', handleKeyDown)
+    // Lock scroll
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
 
-      return () => {
-        document.body.style.overflow = originalOverflow
-        document.removeEventListener('keydown', handleKeyDown)
-      }
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = originalOverflow
+      document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen, handleKeyDown])
 
-  // Don't render if closed (for animation purposes, we still render but hide)
   if (!isOpen) return null
 
   return (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity"
-        onClick={handleBackdropClick}
+        data-testid="cart-drawer-backdrop"
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity"
+        onClick={closeDrawer}
         aria-hidden="true"
       />
 
-      {/* Sheet Panel */}
+      {/* Drawer Panel */}
       <div
-        ref={sheetRef}
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="cart-sheet-title"
+        aria-labelledby="cart-drawer-title"
         className={cn(
-          'fixed right-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl',
+          'fixed left-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl',
           'flex flex-col',
-          'animate-in slide-in-from-right duration-300',
+          'animate-in slide-in-from-left duration-300',
           className
         )}
       >
@@ -128,7 +113,7 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
         <div className="flex items-center justify-between border-b border-border px-4 py-4">
           <div className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
-            <h2 id="cart-sheet-title" className="text-lg font-semibold">
+            <h2 id="cart-drawer-title" className="text-lg font-semibold">
               Your Cart
             </h2>
             {itemCount > 0 && (
@@ -140,7 +125,7 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
           <button
             ref={closeButtonRef}
             type="button"
-            onClick={onClose}
+            onClick={closeDrawer}
             className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Close cart"
           >
@@ -150,7 +135,7 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
 
         {/* Cart Content */}
         {items.length === 0 ? (
-          <EmptyCartState onClose={onClose} />
+          <EmptyCartState onClose={closeDrawer} />
         ) : (
           <>
             {/* Items List */}
@@ -186,16 +171,16 @@ export function CartSheet({ isOpen, onClose, className }: CartSheetProps) {
               <div className="space-y-2">
                 <a
                   href="/checkout"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
-                  onClick={onClose}
+                  className="flex w-full items-center justify-center gap-2 rounded-pill bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
+                  onClick={closeDrawer}
                 >
                   Checkout
                   <ArrowRight className="h-4 w-4" />
                 </a>
                 <a
                   href="/cart"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                  onClick={onClose}
+                  className="flex w-full items-center justify-center gap-2 rounded-pill border border-border bg-background px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  onClick={closeDrawer}
                 >
                   View Cart
                 </a>
@@ -226,7 +211,7 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
       </p>
       <a
         href="/posters"
-        className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary/85"
+        className="inline-flex items-center gap-2 rounded-pill bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
         onClick={onClose}
       >
         Browse Posters
@@ -236,42 +221,4 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
   )
 }
 
-// ============================================================================
-// Cart Trigger Button
-// ============================================================================
-
-export interface CartTriggerProps {
-  /** Callback when clicked */
-  onClick: () => void
-  /** Optional className */
-  className?: string
-}
-
-/**
- * CartTrigger - Button to open the cart sheet
- * Shows a badge with item count when cart is not empty
- */
-export function CartTrigger({ onClick, className }: CartTriggerProps) {
-  const itemCount = useCartItemCount()
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
-        className
-      )}
-      aria-label={`Shopping cart${itemCount > 0 ? `, ${itemCount} items` : ''}`}
-    >
-      <ShoppingCart className="h-5 w-5" />
-      {itemCount > 0 && (
-        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-medium text-white">
-          {itemCount > 99 ? '99+' : itemCount}
-        </span>
-      )}
-    </button>
-  )
-}
-
-export default CartSheet
+export default CartDrawer

@@ -51,13 +51,14 @@ test.describe('Root Layout - Header', () => {
     await expect(aboutLink).toBeVisible();
   });
 
-  test('should display cart icon with link to cart page', async ({ page }) => {
-    // Look for cart link with proper aria-label
-    const cartLink = page.locator('a[href="/cart"]').first();
-    await expect(cartLink).toBeVisible();
+  test('should display cart button that opens the drawer', async ({ page }) => {
+    // The cart is a left drawer, not a page (#460) — the control is a button.
+    const cartButton = page
+      .locator('header button[aria-label^="Shopping cart"]')
+      .first();
+    await expect(cartButton).toBeVisible();
 
-    // Cart link should have aria-label containing "cart"
-    const ariaLabel = await cartLink.getAttribute('aria-label');
+    const ariaLabel = await cartButton.getAttribute('aria-label');
     expect(ariaLabel?.toLowerCase()).toContain('cart');
   });
 
@@ -175,11 +176,16 @@ test.describe('Root Layout - Navigation', () => {
     await expect(page).toHaveURL('/about');
   });
 
-  test('should navigate to Cart page', async ({ page }) => {
-    const cartLink = page.locator('a[href="/cart"]').first();
-    await expect(cartLink).toBeVisible();
-    await cartLink.click();
-    await expect(page).toHaveURL('/cart');
+  test('should open the cart drawer from the header', async ({ page }) => {
+    const cartButton = page
+      .locator('header button[aria-label^="Shopping cart"]')
+      .first();
+    await expect(cartButton).toBeVisible();
+    await cartButton.click();
+
+    // The drawer opens in place — the URL does not change.
+    await expect(page.getByRole('dialog', { name: /your cart/i })).toBeVisible();
+    await expect(page).toHaveURL('/');
   });
 
   test('should navigate to Account page', async ({ page }) => {
@@ -678,12 +684,14 @@ test.describe('Root Layout - Cart Integration', () => {
   test('should display cart badge when items exist', async ({ page }) => {
     // The cart badge is shown conditionally based on cartItemCount
     // Initial state might be 0 items
-    const cartLink = page.locator('a[href="/cart"]').first();
-    await expect(cartLink).toBeVisible();
+    const cartButton = page
+      .locator('header button[aria-label^="Shopping cart"]')
+      .first();
+    await expect(cartButton).toBeVisible();
 
     // Cart badge is only visible when count > 0
     // This test verifies the element structure exists
-    const cartBadge = cartLink.locator('span');
+    const cartBadge = cartButton.locator('span');
     // Badge may or may not be visible depending on cart state
     expect(await cartBadge.count()).toBeGreaterThanOrEqual(0);
   });
@@ -691,8 +699,10 @@ test.describe('Root Layout - Cart Integration', () => {
   test('should show cart count limited to 99+', async ({ page }) => {
     // This test validates the UI handles large numbers
     // The actual count display logic: {cartItemCount > 99 ? '99+' : cartItemCount}
-    const cartLink = page.locator('a[href="/cart"]').first();
-    await expect(cartLink).toBeVisible();
+    const cartButton = page
+      .locator('header button[aria-label^="Shopping cart"]')
+      .first();
+    await expect(cartButton).toBeVisible();
   });
 });
 

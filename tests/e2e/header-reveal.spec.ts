@@ -50,7 +50,9 @@ test.describe('header nav reveal', () => {
 
     // The compact bar keeps the wordmark and the actions.
     await expect(page.locator('header a[href="/"]').first()).toBeVisible();
-    await expect(page.locator('header a[href="/cart"]').first()).toBeVisible();
+    await expect(
+      page.locator('header button[aria-label^="Shopping cart"]').first()
+    ).toBeVisible();
 
     // Collapsed rows are out of the tab order, not merely faded.
     await expect(page.getByTestId('styles-nav')).toBeHidden();

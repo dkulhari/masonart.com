@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { useNavReveal } from '~/hooks/useNavReveal'
 import { useChromeOffset } from '~/hooks/useChromeOffset'
-import { useCartItemCount, useCartHydration } from '~/stores/cart'
+import { useCartItemCount, useCartHydration, useCartStore } from '~/stores/cart'
 import { useWishlistCount, useWishlistActions, useWishlistStore } from '~/stores/wishlist'
 import {
   ADMIN_PRODUCTS_SEARCH,
@@ -70,6 +70,9 @@ export function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
+  // The cart is a left slide-out drawer, not a page (#460). CartDrawer is
+  // mounted in __root and reads its own open state off the store.
+  const openCartDrawer = useCartStore((state) => state.openDrawer)
   const wishlistCount = useWishlistCount()
   const { load: loadWishlist } = useWishlistActions()
   const isWishlistLoaded = useWishlistStore((state) => state.isLoaded)
@@ -226,8 +229,9 @@ export function Header() {
                 </span>
               )}
             </Link>
-            <Link
-              to="/cart"
+            <button
+              type="button"
+              onClick={openCartDrawer}
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ''}`}
             >
@@ -237,7 +241,7 @@ export function Header() {
                   {displayCartCount > 99 ? '99+' : displayCartCount}
                 </span>
               )}
-            </Link>
+            </button>
             <Link
               to="/account"
               className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -249,8 +253,9 @@ export function Header() {
 
           {/* Mobile Menu Button */}
           <div className="flex items-center space-x-2 md:hidden">
-            <Link
-              to="/cart"
+            <button
+              type="button"
+              onClick={openCartDrawer}
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ''}`}
             >
@@ -260,7 +265,7 @@ export function Header() {
                   {displayCartCount > 99 ? '99+' : displayCartCount}
                 </span>
               )}
-            </Link>
+            </button>
             <button
               type="button"
               onClick={toggleMobileMenu}

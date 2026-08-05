@@ -14,6 +14,7 @@ import type * as React from 'react'
 import { AnnouncementBar } from '~/components/layout/AnnouncementBar'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
+import { CartDrawer } from '~/components/cart/CartDrawer'
 import { buttonVariants } from '~/components/ui/Button'
 import { cn } from '~/lib/utils'
 import globalsCss from '~/styles/globals.css?url'
@@ -257,6 +258,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           </main>
           {!isAdminRoute && <Footer />}
         </div>
+        {/* Mounted once at the root so any surface can open the cart (#460) */}
+        {!isAdminRoute && <CartDrawer />}
         <Scripts />
       </body>
     </html>

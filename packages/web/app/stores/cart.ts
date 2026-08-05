@@ -125,9 +125,14 @@ export interface AddToCartInput {
 interface CartStore {
   // State
   items: CartItem[];
+  /** Whether the slide-out cart drawer is showing. Never persisted. */
+  isDrawerOpen: boolean;
 
   // Actions
   addItem: (input: AddToCartInput) => void;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+  toggleDrawer: () => void;
   updateQuantity: (id: string, quantity: number) => void;
   updateFrame: (
     id: string,
@@ -196,6 +201,15 @@ export const useCartStore = create<CartStore>()(
     (set, get) => ({
       // Initial state
       items: [],
+      isDrawerOpen: false,
+
+      // Drawer visibility. It lives here rather than in a parent component so
+      // any surface — header button, PDP, quickview — can open the cart
+      // without prop-drilling through __root.
+      openDrawer: () => set({ isDrawerOpen: true }),
+      closeDrawer: () => set({ isDrawerOpen: false }),
+      toggleDrawer: () =>
+        set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
 
       // Add item to cart
       addItem: (input: AddToCartInput) =>
@@ -219,6 +233,8 @@ export const useCartStore = create<CartStore>()(
                     }
                   : item
               ),
+              // Adding always slides the cart open, the way mesonart's does.
+              isDrawerOpen: true,
             };
           }
 
@@ -245,7 +261,7 @@ export const useCartStore = create<CartStore>()(
             addedAt: new Date().toISOString(),
           };
 
-          return { items: [...state.items, newItem] };
+          return { items: [...state.items, newItem], isDrawerOpen: true };
         }),
 
       // Update item quantity
@@ -367,13 +383,7 @@ const selectSubtotal = (state: CartStore) =>
     0
   );
 const selectIsEmpty = (state: CartStore) => state.items.length === 0;
-const selectActions = (state: CartStore) => ({
-  addItem: state.addItem,
-  updateQuantity: state.updateQuantity,
-  updateFrame: state.updateFrame,
-  removeItem: state.removeItem,
-  clearCart: state.clearCart,
-});
+const selectIsDrawerOpen = (state: CartStore) => state.isDrawerOpen;
 
 // ============================================================================
 // Selector Hooks (for optimized re-renders)
@@ -408,8 +418,16 @@ export const useCartActions = () =>
       updateFrame: state.updateFrame,
       removeItem: state.removeItem,
       clearCart: state.clearCart,
+      openDrawer: state.openDrawer,
+      closeDrawer: state.closeDrawer,
+      toggleDrawer: state.toggleDrawer,
     }))
   );
+
+/**
+ * Hook to read whether the cart drawer is open
+ */
+export const useIsCartDrawerOpen = () => useCartStore(selectIsDrawerOpen);
 
 /**
  * Hook to check if cart is empty
