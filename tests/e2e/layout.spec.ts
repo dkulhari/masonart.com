@@ -65,8 +65,12 @@ test.describe('Root Layout - Header', () => {
     // Set desktop viewport
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    // Look for account link
-    const accountLink = page.locator('a[href="/account"]');
+    // Three header controls point at /account — the wishlist heart parks
+    // there until Phase F builds the wishlist page, and the mobile drawer
+    // carries its own entry. The aria-label is what names this one.
+    const accountLink = page.locator(
+      'header a[href="/account"][aria-label="Account"]'
+    );
     await expect(accountLink).toBeVisible();
 
     // Account link should have aria-label
@@ -130,7 +134,12 @@ test.describe('Root Layout - Navigation', () => {
     // Set desktop viewport
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    const postersLink = page.locator('nav a[href="/posters"]');
+    // Scoped to the pages row: the styles row (#401) opens with an "All Art"
+    // link at the same href, so an unscoped `nav a[href="/posters"]` resolves
+    // to two.
+    const postersLink = page
+      .getByTestId('pages-nav')
+      .locator('a[href="/posters"]');
     await expect(postersLink).toBeVisible();
     await postersLink.click();
     await expect(page).toHaveURL('/posters');
@@ -177,7 +186,11 @@ test.describe('Root Layout - Navigation', () => {
     // Set desktop viewport
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    const accountLink = page.locator('header a[href="/account"]');
+    // The wishlist heart and the mobile drawer link at /account too — the
+    // aria-label picks out the account control itself.
+    const accountLink = page.locator(
+      'header a[href="/account"][aria-label="Account"]'
+    );
     await expect(accountLink).toBeVisible();
     await accountLink.click();
     await expect(page).toHaveURL(/\/(account|auth)/);
@@ -191,7 +204,11 @@ test.describe('Root Layout - Navigation', () => {
 
     // TanStack Router uses activeProps for active state
     // The active link should have different styling (text-foreground vs text-muted-foreground)
-    const postersLink = page.locator('nav a[href="/posters"]');
+    // Scoped to the pages row — the styles row carries "All Art" at the same
+    // href (#401).
+    const postersLink = page
+      .getByTestId('pages-nav')
+      .locator('a[href="/posters"]');
     await expect(postersLink).toBeVisible();
   });
 });
@@ -230,16 +247,21 @@ test.describe('Root Layout - Footer', () => {
     const shopHeader = footer.locator('h3:has-text("Shop")');
     await expect(shopHeader).toBeVisible();
 
-    // Shop links from Footer.tsx
+    // Shop links from Footer.tsx. The singular `?style=` was wrong even
+    // before #452; each link now names the facet group its value belongs to,
+    // and Botanical was retired in favour of Flowers, which the catalogue
+    // actually tags.
     const allPostersLink = footer.locator('a[href="/posters"]');
-    const abstractLink = footer.locator('a[href="/posters?style=abstract"]');
-    const botanicalLink = footer.locator('a[href="/posters?style=botanical"]');
-    const minimalistLink = footer.locator('a[href="/posters?style=minimalist"]');
+    const abstractLink = footer.locator('a[href="/posters?subjects=abstract"]');
+    const flowersLink = footer.locator('a[href="/posters?subjects=flowers"]');
+    const minimalistLink = footer.locator(
+      'a[href="/posters?styles=minimalist-art"]'
+    );
     const createLink = footer.locator('a[href="/create"]');
 
     await expect(allPostersLink).toBeVisible();
     await expect(abstractLink).toBeVisible();
-    await expect(botanicalLink).toBeVisible();
+    await expect(flowersLink).toBeVisible();
     await expect(minimalistLink).toBeVisible();
     await expect(createLink).toBeVisible();
   });
@@ -508,10 +530,13 @@ test.describe('Root Layout - Accessibility', () => {
     const cartLink = page.locator('a[href="/cart"]').first();
     await expect(cartLink).toHaveAttribute('aria-label', /cart/i);
 
-    // Account link should have aria-label
-    // Set desktop viewport to ensure it's visible
+    // Account link should have aria-label.
+    // Set desktop viewport to ensure it's visible. Scoped by the label
+    // itself — the wishlist heart and the mobile drawer share the href.
     await page.setViewportSize({ width: 1280, height: 720 });
-    const accountLink = page.locator('header a[href="/account"]');
+    const accountLink = page.locator(
+      'header a[href="/account"][aria-label="Account"]'
+    );
     await expect(accountLink).toHaveAttribute('aria-label', 'Account');
   });
 
@@ -680,8 +705,11 @@ test.describe('Root Layout - User Menu', () => {
     // Set desktop viewport
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    // Account link should be visible
-    const accountLink = page.locator('header a[href="/account"]');
+    // Account link should be visible. Labelled rather than href-only: the
+    // wishlist heart parks at /account too.
+    const accountLink = page.locator(
+      'header a[href="/account"][aria-label="Account"]'
+    );
     await expect(accountLink).toBeVisible();
   });
 
@@ -689,7 +717,9 @@ test.describe('Root Layout - User Menu', () => {
     // Set desktop viewport
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    const accountLink = page.locator('header a[href="/account"]');
+    const accountLink = page.locator(
+      'header a[href="/account"][aria-label="Account"]'
+    );
     const userIcon = accountLink.locator('svg');
     await expect(userIcon).toBeVisible();
   });
@@ -799,8 +829,10 @@ test.describe('Root Layout - SEO Meta Tags', () => {
   test('should have theme-color meta tag', async ({ page }) => {
     await page.goto('/');
 
+    // Follows --primary. The orange was the retired brand palette, and
+    // leaving it here put a strip of it above every page (__root.tsx).
     const themeColor = await page.locator('meta[name="theme-color"]').getAttribute('content');
-    expect(themeColor).toBe('#f97316'); // Orange color from __root.tsx
+    expect(themeColor).toBe('#171717');
   });
 });
 

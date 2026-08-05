@@ -71,9 +71,10 @@ test.describe('Home Page - Hero Section', () => {
     const rating = page.locator('text=4.9/5 from 2,000+ reviews');
     await expect(rating).toBeVisible();
 
-    // Should display 5 star icons
+    // Should display 5 star icons. The rebrand retired the amber palette:
+    // stars carry `fill-rating`/`text-rating` now, not `fill-yellow-400`.
     const heroSection = page.locator('section').first();
-    const stars = heroSection.locator('svg.fill-yellow-400');
+    const stars = heroSection.locator('svg.fill-rating');
     await expect(stars).toHaveCount(5);
   });
 
@@ -133,9 +134,16 @@ test.describe('Home Page - Featured Products Section', () => {
   });
 
   test('should display products grid or placeholder', async ({ page }) => {
+    // Scoped to the section: `.grid.grid-cols-2` also matches the category
+    // tiles and the AI feature row, so an unscoped locator resolves to three.
+    // The featured grid is the shared ProductGrid <ul>.
+    const featured = page.locator(
+      'section:has(h2:has-text("Featured Collection"))'
+    );
+
     // Either products grid or placeholder should be visible
-    const productsGrid = page.locator('.grid.grid-cols-2');
-    const placeholder = page.locator('text=Coming Soon');
+    const productsGrid = featured.locator('ul.grid.grid-cols-2');
+    const placeholder = featured.locator('text=Coming Soon');
 
     // One of these should be visible
     const hasProducts = await productsGrid.isVisible();
@@ -203,25 +211,27 @@ test.describe('Home Page - Product Cards', () => {
   });
 
   test('should display product title in card', async ({ page }) => {
-    const productCards = page.locator('a[href^="/posters/"]');
-    const count = await productCards.count();
+    // Same card markup #448 re-pointed the listing spec at: the title is a
+    // Link inside a <p>, not a heading — one h1 per page and a heading per
+    // card underneath it was the wrong hierarchy anyway.
+    const cards = page.getByTestId('card-content');
+    const count = await cards.count();
 
     if (count > 0) {
-      // Each card should have an h3 title
-      const firstCard = productCards.first();
-      const title = firstCard.locator('h3');
+      const title = cards.first().locator('p a[href^="/posters/"]');
       await expect(title).toBeVisible();
+      await expect(title).not.toHaveText('');
     }
   });
 
   test('should display product price in card', async ({ page }) => {
-    const productCards = page.locator('a[href^="/posters/"]');
-    const count = await productCards.count();
+    // Price sits BESIDE the title link, sharing the right column with the
+    // wishlist heart — not inside the product anchor (#448).
+    const cards = page.getByTestId('card-content');
+    const count = await cards.count();
 
     if (count > 0) {
-      // Each card should show price starting with "From"
-      const firstCard = productCards.first();
-      const price = firstCard.locator('text=/From ₹/');
+      const price = cards.first().locator('text=/From ₹/');
       await expect(price).toBeVisible();
     }
   });
@@ -376,9 +386,17 @@ test.describe('Home Page - AI Generator Section', () => {
   });
 
   test('should display Sparkles icon', async ({ page }) => {
-    // The section has a Sparkles icon in a container
-    const iconContainer = page.locator('.bg-white\\/10.backdrop-blur');
-    await expect(iconContainer.first()).toBeVisible();
+    // The section has a Sparkles icon in a container. The container is a
+    // translucent scrim over the inverted band now (`bg-background/10`), not
+    // the retired `bg-white/10 backdrop-blur`. `rounded-2xl` separates it from
+    // the three feature boxes below, which share the same tint at
+    // `rounded-lg`.
+    const aiSection = page.locator(
+      'section:has(h2:has-text("Create Your Own Masterpiece"))'
+    );
+    const iconContainer = aiSection.locator('.rounded-2xl.bg-background\\/10');
+    await expect(iconContainer).toBeVisible();
+    await expect(iconContainer.locator('svg')).toBeVisible();
   });
 
   test('should display Easy to use feature', async ({ page }) => {
@@ -416,14 +434,18 @@ test.describe('Home Page - AI Generator Section', () => {
     await expect(page).toHaveURL('/create');
   });
 
-  test('should have gradient background', async ({ page }) => {
-    // The AI section has a branded gradient background
+  test('should sit on the inverted band', async ({ page }) => {
+    // Was `should have gradient background`. The brand-orange gradient wash
+    // went with the rebrand; SectionBand tone="ink" is what now says "this
+    // section is different" without a hue, and it inverts rather than
+    // gradients.
     const section = page.locator('section:has(h2:has-text("Create Your Own Masterpiece"))');
     await expect(section).toBeVisible();
+    await expect(section).toHaveClass(/bg-foreground/);
+    await expect(section).toHaveClass(/text-background/);
 
-    // Check for gradient background element
-    const gradientBg = section.locator('.bg-gradient-to-br.from-brand-600.to-brand-800');
-    await expect(gradientBg).toBeVisible();
+    // And no gradient survives on it.
+    await expect(section.locator('[class*="bg-gradient-to"]')).toHaveCount(0);
   });
 });
 
@@ -487,8 +509,10 @@ test.describe('Home Page - Value Propositions Section', () => {
 
   test('should display icons for each value prop', async ({ page }) => {
     // Each value prop card has an icon
+    // `bg-brand-100 text-brand-600` was the amber pair the rebrand removed;
+    // the icon tiles carry the neutral highlight token now.
     const valuePropsSection = page.locator('section:has(h2:has-text("Why Choose chobii.art"))');
-    const iconContainers = valuePropsSection.locator('.bg-brand-100.text-brand-600');
+    const iconContainers = valuePropsSection.locator('.bg-highlight.text-foreground');
     await expect(iconContainers).toHaveCount(4);
   });
 });
