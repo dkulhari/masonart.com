@@ -1,0 +1,79 @@
+ticket_number: 466
+title: API - GET /api/collections/:slug resolving a collection to products
+description: |-
+  ## Task
+
+  The collection page's data endpoint.
+
+  `GET /api/collections/:slug` accepts the same query parameters `/api/products` does (facets, price, page, pageSize, sortBy, sortOrder) and returns:
+
+  - the collection itself — title, subtitle, description, seoTitle, seoDescription, imageUrl
+  - the resolved, paginated products
+  - facet counts scoped to the collection, not to the whole catalogue
+
+  The collection's rule is the base query; shopper facets narrow within it, per the resolver's intersection rule. The rule's sort is the default; an explicit `sortBy` wins.
+
+  404 on an unknown or inactive slug — an inactive collection must not be reachable by guessing the URL.
+
+  ## Context
+
+  Feature: curated-collections, Phase 3. Depends on the resolver.
+
+  Facet counts: reuse the path from #392 rather than issuing a per-facet count query. Scoping them to the collection is the part that differs — counts from the whole catalogue would offer a shopper filters that return nothing inside this collection.
+
+  Manual collections keep `position` as their default order, so paging must be stable across requests.
+feature: curated-collections
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:02.492Z'
+last_updated: '2026-08-05T13:51:02.492Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 463
+    feature: curated-collections
+    description: 'API - collection resolver: one collection to one product query'
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing endpoint tests
+    file: packages/api/tests/routes/collection-detail.test.ts
+    command: cd packages/api && npx vitest run tests/routes/collection-detail.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: returns the collection and its products; unknown slug 404s; inactive slug 404s; a shopper facet narrows within the rule and never widens past it; facet counts are scoped to the collection; manual collections page in position order and the order is stable across page 1 and 2; the rule''s sort is the default and an explicit sortBy overrides it.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && npx vitest run tests/routes/collection-detail.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the detail handler
+    file: packages/api/src/routes/collections.ts
+    status: pending
+    code: GET /:slug. Registration order matters — a literal segment must be registered before /:slug, the same trap products.ts documents for /facets and /collections.
+  - id: 4
+    action: verify-pass
+    description: Confirm the detail tests pass
+    command: cd packages/api && npx vitest run tests/routes/collection-detail.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/collections.ts packages/api/tests/routes/collection-detail.test.ts && git commit -m "feat(api): GET /api/collections/:slug (#TICKET)"'
+    status: pending
+current_step: 1

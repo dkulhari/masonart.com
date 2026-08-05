@@ -1,0 +1,77 @@
+ticket_number: 472
+title: Admin - collections list with discover reorder
+description: |-
+  ## Task
+
+  `/admin/collections` — the list view.
+
+  Columns: title, slug, kind, resolved product count, active, in-discover, discover order. Row actions: edit, delete (confirm first), toggle active, toggle in-discover.
+
+  Discover ordering is edited here, not on the form: ordering is a property of the set, not of any one collection. Reordering posts the whole ordered list to the transactional endpoint.
+
+  Empty state points at the create button rather than rendering a headless table.
+
+  ## Context
+
+  Feature: curated-collections, Phase 6. Depends on the admin API tickets.
+
+  Follow `packages/web/app/routes/admin/products/index.tsx` and `components/admin/ProductsTable.tsx` for the table, filter and pagination idiom. Add the nav entry in `packages/web/app/lib/admin-nav.ts` so the role-aware sidebar picks it up.
+feature: curated-collections
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:59.842Z'
+last_updated: '2026-08-05T13:51:59.842Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 467
+    feature: curated-collections
+    description: API - admin CRUD for collections
+  - ticket: 468
+    feature: curated-collections
+    description: API - manual membership and Discover ordering
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing list tests
+    file: packages/web/tests/routes/admin/collections-list.test.tsx
+    command: cd packages/web && npx vitest run tests/routes/admin/collections-list.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: renders a row per collection with its count and kind; the empty state renders the create call to action and no table; reordering posts the full ordered id list, not a single row; delete asks for confirmation before firing; the nav entry appears for staff roles that can reach it.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && npx vitest run tests/routes/admin/collections-list.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the list route, the table and the nav entry
+    file: packages/web/app/routes/admin/collections/index.tsx
+    status: pending
+    code: Route, CollectionsTable component, admin-nav.ts entry.
+  - id: 4
+    action: verify-pass
+    description: Confirm they pass and typecheck is clean
+    command: cd packages/web && npx vitest run tests/routes/admin/collections-list.test.tsx && npx tsc --noEmit -p tsconfig.json
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app/routes/admin/collections packages/web/app/components/admin packages/web/app/lib/admin-nav.ts packages/web/tests/routes/admin && git commit -m "feat(web): admin collections list with discover reorder (#TICKET)"'
+    status: pending
+current_step: 1

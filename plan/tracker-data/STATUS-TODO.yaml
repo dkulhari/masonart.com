@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-05T13:46:40.326Z'
-total_tickets: 37
+last_updated: '2026-08-05T13:53:12.222Z'
+total_tickets: 52
 summary:
   critical: 1
-  high: 9
-  medium: 22
-  low: 5
+  high: 13
+  medium: 30
+  low: 8
 priorities:
   critical:
     - feature: go-live
@@ -97,6 +97,32 @@ priorities:
           title: Schema - gallery membership columns and the session field
           assignee: unassigned
           blocked_by: []
+    - feature: curated-collections
+      tickets:
+        - ticket_number: 461
+          title: Shared - collection contracts, superseding the dead collectionSchema
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 462
+          title: Schema - collections and collection_products tables
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 461
+              title: Shared - collection contracts, superseding the dead collectionSchema
+        - ticket_number: 463
+          title: 'API - collection resolver: one collection to one product query'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 461
+              title: Shared - collection contracts, superseding the dead collectionSchema
+            - ticket_number: 462
+              title: Schema - collections and collection_products tables
+        - ticket_number: 464
+          title: Seed - twelve style collections plus Latest Work and Best Sellers
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 462
+              title: Schema - collections and collection_products tables
   medium:
     - feature: go-to-production
       tickets:
@@ -241,6 +267,66 @@ priorities:
           blocked_by:
             - ticket_number: 445
               title: Web - dismissible sale banner with session and 7-day cooldown
+    - feature: curated-collections
+      tickets:
+        - ticket_number: 465
+          title: API - GET /api/collections for the Discover rail
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 463
+              title: 'API - collection resolver: one collection to one product query'
+            - ticket_number: 464
+              title: Seed - twelve style collections plus Latest Work and Best Sellers
+        - ticket_number: 466
+          title: API - GET /api/collections/:slug resolving a collection to products
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 463
+              title: 'API - collection resolver: one collection to one product query'
+        - ticket_number: 467
+          title: API - admin CRUD for collections
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 461
+              title: Shared - collection contracts, superseding the dead collectionSchema
+            - ticket_number: 462
+              title: Schema - collections and collection_products tables
+        - ticket_number: 468
+          title: API - manual membership and Discover ordering
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 467
+              title: API - admin CRUD for collections
+        - ticket_number: 469
+          title: Web - Discover chips become links to collections
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 465
+              title: API - GET /api/collections for the Discover rail
+        - ticket_number: 470
+          title: Web - /collections/$slug reusing the collection-page shell
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 466
+              title: API - GET /api/collections/:slug resolving a collection to products
+            - ticket_number: 469
+              title: Web - Discover chips become links to collections
+        - ticket_number: 472
+          title: Admin - collections list with discover reorder
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 467
+              title: API - admin CRUD for collections
+            - ticket_number: 468
+              title: API - manual membership and Discover ordering
+        - ticket_number: 473
+          title: Admin - collection form with rule builder and manual picker
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 467
+              title: API - admin CRUD for collections
+            - ticket_number: 468
+              title: API - manual membership and Discover ordering
   low:
     - feature: go-to-production
       tickets:
@@ -295,6 +381,30 @@ priorities:
               title: Web - black vertical rail tab on the right edge
             - ticket_number: 438
               title: E2E - sale lifecycle from no promotion to expiry
+    - feature: curated-collections
+      tickets:
+        - ticket_number: 471
+          title: Web - collection SEO and sitemap entries
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 470
+              title: Web - /collections/$slug reusing the collection-page shell
+        - ticket_number: 474
+          title: Cleanup - retire GET /api/products/collections
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 469
+              title: Web - Discover chips become links to collections
+        - ticket_number: 475
+          title: E2E - collection pages, the Discover rail and admin authoring
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 470
+              title: Web - /collections/$slug reusing the collection-page shell
+            - ticket_number: 472
+              title: Admin - collections list with discover reorder
+            - ticket_number: 473
+              title: Admin - collection form with rule builder and manual picker
 blocked_tickets:
   - ticket_number: 294
     title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
@@ -360,6 +470,26 @@ blocked_tickets:
       - ticket_number: 344
         title: 'Content-Security-Policy for SSR pages (deferred from #264)'
     description: 'Content-Security-Policy for SSR pages (deferred from #264)'
+  - ticket_number: 462
+    title: Schema - collections and collection_products tables
+    blocked_by:
+      - ticket_number: 461
+        title: Shared - collection contracts, superseding the dead collectionSchema
+    description: Shared - collection contracts, superseding the dead collectionSchema
+  - ticket_number: 463
+    title: 'API - collection resolver: one collection to one product query'
+    blocked_by:
+      - ticket_number: 461
+        title: Shared - collection contracts, superseding the dead collectionSchema
+      - ticket_number: 462
+        title: Schema - collections and collection_products tables
+    description: Shared - collection contracts, superseding the dead collectionSchema, Schema - collections and collection_products tables
+  - ticket_number: 464
+    title: Seed - twelve style collections plus Latest Work and Best Sellers
+    blocked_by:
+      - ticket_number: 462
+        title: Schema - collections and collection_products tables
+    description: Schema - collections and collection_products tables
   - ticket_number: 278
     title: Set up external uptime monitoring for production
     blocked_by:
@@ -471,6 +601,64 @@ blocked_tickets:
       - ticket_number: 445
         title: Web - dismissible sale banner with session and 7-day cooldown
     description: Web - dismissible sale banner with session and 7-day cooldown
+  - ticket_number: 465
+    title: API - GET /api/collections for the Discover rail
+    blocked_by:
+      - ticket_number: 463
+        title: 'API - collection resolver: one collection to one product query'
+      - ticket_number: 464
+        title: Seed - twelve style collections plus Latest Work and Best Sellers
+    description: 'API - collection resolver: one collection to one product query, Seed - twelve style collections plus Latest Work and Best Sellers'
+  - ticket_number: 466
+    title: API - GET /api/collections/:slug resolving a collection to products
+    blocked_by:
+      - ticket_number: 463
+        title: 'API - collection resolver: one collection to one product query'
+    description: 'API - collection resolver: one collection to one product query'
+  - ticket_number: 467
+    title: API - admin CRUD for collections
+    blocked_by:
+      - ticket_number: 461
+        title: Shared - collection contracts, superseding the dead collectionSchema
+      - ticket_number: 462
+        title: Schema - collections and collection_products tables
+    description: Shared - collection contracts, superseding the dead collectionSchema, Schema - collections and collection_products tables
+  - ticket_number: 468
+    title: API - manual membership and Discover ordering
+    blocked_by:
+      - ticket_number: 467
+        title: API - admin CRUD for collections
+    description: API - admin CRUD for collections
+  - ticket_number: 469
+    title: Web - Discover chips become links to collections
+    blocked_by:
+      - ticket_number: 465
+        title: API - GET /api/collections for the Discover rail
+    description: API - GET /api/collections for the Discover rail
+  - ticket_number: 470
+    title: Web - /collections/$slug reusing the collection-page shell
+    blocked_by:
+      - ticket_number: 466
+        title: API - GET /api/collections/:slug resolving a collection to products
+      - ticket_number: 469
+        title: Web - Discover chips become links to collections
+    description: API - GET /api/collections/:slug resolving a collection to products, Web - Discover chips become links to collections
+  - ticket_number: 472
+    title: Admin - collections list with discover reorder
+    blocked_by:
+      - ticket_number: 467
+        title: API - admin CRUD for collections
+      - ticket_number: 468
+        title: API - manual membership and Discover ordering
+    description: API - admin CRUD for collections, API - manual membership and Discover ordering
+  - ticket_number: 473
+    title: Admin - collection form with rule builder and manual picker
+    blocked_by:
+      - ticket_number: 467
+        title: API - admin CRUD for collections
+      - ticket_number: 468
+        title: API - manual membership and Discover ordering
+    description: API - admin CRUD for collections, API - manual membership and Discover ordering
   - ticket_number: 283
     title: Document and configure database backup procedures
     blocked_by:
@@ -512,3 +700,25 @@ blocked_tickets:
       - ticket_number: 438
         title: E2E - sale lifecycle from no promotion to expiry
     description: API - registration opt-in and post-auth auto-join from the join intent, Web - join modal, one field, Web - dismissible sale banner with session and 7-day cooldown, Web - black vertical rail tab on the right edge, E2E - sale lifecycle from no promotion to expiry
+  - ticket_number: 471
+    title: Web - collection SEO and sitemap entries
+    blocked_by:
+      - ticket_number: 470
+        title: Web - /collections/$slug reusing the collection-page shell
+    description: Web - /collections/$slug reusing the collection-page shell
+  - ticket_number: 474
+    title: Cleanup - retire GET /api/products/collections
+    blocked_by:
+      - ticket_number: 469
+        title: Web - Discover chips become links to collections
+    description: Web - Discover chips become links to collections
+  - ticket_number: 475
+    title: E2E - collection pages, the Discover rail and admin authoring
+    blocked_by:
+      - ticket_number: 470
+        title: Web - /collections/$slug reusing the collection-page shell
+      - ticket_number: 472
+        title: Admin - collections list with discover reorder
+      - ticket_number: 473
+        title: Admin - collection form with rule builder and manual picker
+    description: Web - /collections/$slug reusing the collection-page shell, Admin - collections list with discover reorder, Admin - collection form with rule builder and manual picker

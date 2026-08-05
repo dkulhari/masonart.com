@@ -1,0 +1,85 @@
+ticket_number: 465
+title: API - GET /api/collections for the Discover rail
+description: |-
+  ## Task
+
+  Public list endpoint feeding the rail and anything else that needs the collection inventory.
+
+  `GET /api/collections?discover=true` returns active collections ordered by `discoverOrder`, each with:
+
+  - id, slug, title, subtitle
+  - `count` — resolved product count (rule or manual)
+  - `image` — `imageUrl` when the admin set one, else the main image of a representative product, else null
+  - `imageIsMatted` — true only for the product fallback
+
+  That last flag matters: `chipArtScale()` in `DiscoverChips.tsx` exists because product `main` images are matted at a fixed fraction of the longest side. An admin-uploaded image is not matted, and scaling it by the same factor crops into it wrongly. The API is where the two cases are distinguishable, so say so here rather than guessing in the component.
+
+  Drop collections that resolve to zero products — a chip leading to an empty grid is worse than no chip (the rule #406 already established).
+
+  Cache it the way `collections:v2` is cached today, under a new key.
+
+  ## Context
+
+  Feature: curated-collections, Phase 3.
+
+  This supersedes `GET /api/products/collections` (#406) at `packages/api/src/routes/products.ts:601`. Leave the old route in place for now; the web ticket removes its last caller and a later step deletes it.
+
+  Keep #406's representative-product assignment logic — it hands each product to at most one chip so the rail does not show the same picture three times.
+feature: curated-collections
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:49:55.492Z'
+last_updated: '2026-08-05T13:49:55.492Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 463
+    feature: curated-collections
+    description: 'API - collection resolver: one collection to one product query'
+  - ticket: 464
+    feature: curated-collections
+    description: Seed - twelve style collections plus Latest Work and Best Sellers
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing endpoint tests
+    file: packages/api/tests/routes/collections.test.ts
+    command: cd packages/api && npx vitest run tests/routes/collections.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: returns only active collections; discover=true filters and orders by discoverOrder; counts are right for both kinds; admin imageUrl wins over the product fallback and reports imageIsMatted false; the fallback reports true; zero-product collections are dropped; response is cached and the second call reports fromCache.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && npx vitest run tests/routes/collections.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the route and mount it
+    file: packages/api/src/routes/collections.ts
+    status: pending
+    code: Hono app; reuse the resolver for counts; lift the representative-product query from products.ts:601. Mount with app.route('/api/collections', collectionsApp) in packages/api/src/index.ts.
+  - id: 4
+    action: verify-pass
+    description: Confirm the endpoint tests pass
+    command: cd packages/api && npx vitest run tests/routes/collections.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/collections.ts packages/api/src/index.ts packages/api/tests/routes/collections.test.ts && git commit -m "feat(api): GET /api/collections for the Discover rail (#TICKET)"'
+    status: pending
+current_step: 1

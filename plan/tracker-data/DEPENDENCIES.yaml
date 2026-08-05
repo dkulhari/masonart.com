@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-05T13:46:41.498Z'
+  last_updated: '2026-08-05T13:53:12.473Z'
   features:
     chobi-external-services:
       - ticket_number: 315
@@ -545,6 +545,107 @@ dependencies:
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
+    curated-collections:
+      - ticket_number: 462
+        title: Schema - collections and collection_products tables
+        blocks: []
+        blocked_by:
+          - ticket_number: 461
+            title: Shared - collection contracts, superseding the dead collectionSchema
+      - ticket_number: 463
+        title: 'API - collection resolver: one collection to one product query'
+        blocks: []
+        blocked_by:
+          - ticket_number: 461
+            title: Shared - collection contracts, superseding the dead collectionSchema
+          - ticket_number: 462
+            title: Schema - collections and collection_products tables
+      - ticket_number: 464
+        title: Seed - twelve style collections plus Latest Work and Best Sellers
+        blocks: []
+        blocked_by:
+          - ticket_number: 462
+            title: Schema - collections and collection_products tables
+      - ticket_number: 465
+        title: API - GET /api/collections for the Discover rail
+        blocks: []
+        blocked_by:
+          - ticket_number: 463
+            title: 'API - collection resolver: one collection to one product query'
+          - ticket_number: 464
+            title: Seed - twelve style collections plus Latest Work and Best Sellers
+      - ticket_number: 466
+        title: API - GET /api/collections/:slug resolving a collection to products
+        blocks: []
+        blocked_by:
+          - ticket_number: 463
+            title: 'API - collection resolver: one collection to one product query'
+      - ticket_number: 467
+        title: API - admin CRUD for collections
+        blocks: []
+        blocked_by:
+          - ticket_number: 461
+            title: Shared - collection contracts, superseding the dead collectionSchema
+          - ticket_number: 462
+            title: Schema - collections and collection_products tables
+      - ticket_number: 468
+        title: API - manual membership and Discover ordering
+        blocks: []
+        blocked_by:
+          - ticket_number: 467
+            title: API - admin CRUD for collections
+      - ticket_number: 469
+        title: Web - Discover chips become links to collections
+        blocks: []
+        blocked_by:
+          - ticket_number: 465
+            title: API - GET /api/collections for the Discover rail
+      - ticket_number: 470
+        title: Web - /collections/$slug reusing the collection-page shell
+        blocks: []
+        blocked_by:
+          - ticket_number: 466
+            title: API - GET /api/collections/:slug resolving a collection to products
+          - ticket_number: 469
+            title: Web - Discover chips become links to collections
+      - ticket_number: 471
+        title: Web - collection SEO and sitemap entries
+        blocks: []
+        blocked_by:
+          - ticket_number: 470
+            title: Web - /collections/$slug reusing the collection-page shell
+      - ticket_number: 472
+        title: Admin - collections list with discover reorder
+        blocks: []
+        blocked_by:
+          - ticket_number: 467
+            title: API - admin CRUD for collections
+          - ticket_number: 468
+            title: API - manual membership and Discover ordering
+      - ticket_number: 473
+        title: Admin - collection form with rule builder and manual picker
+        blocks: []
+        blocked_by:
+          - ticket_number: 467
+            title: API - admin CRUD for collections
+          - ticket_number: 468
+            title: API - manual membership and Discover ordering
+      - ticket_number: 474
+        title: Cleanup - retire GET /api/products/collections
+        blocks: []
+        blocked_by:
+          - ticket_number: 469
+            title: Web - Discover chips become links to collections
+      - ticket_number: 475
+        title: E2E - collection pages, the Discover rail and admin authoring
+        blocks: []
+        blocked_by:
+          - ticket_number: 470
+            title: Web - /collections/$slug reusing the collection-page shell
+          - ticket_number: 472
+            title: Admin - collections list with discover reorder
+          - ticket_number: 473
+            title: Admin - collection form with rule builder and manual picker
     gallery-membership:
       - ticket_number: 440
         title: API - POST /api/gallery/join

@@ -1,0 +1,82 @@
+ticket_number: 469
+title: Web - Discover chips become links to collections
+description: |-
+  ## Task
+
+  Re-point `DiscoverChips.tsx` from the style vocabulary to the collections endpoint, and turn each chip from a filter toggle into a link to `/collections/$slug`.
+
+  This is the behaviour change the whole feature exists for. A chip that toggles `styles` structurally cannot express Bestseller or Set of 2/3 — the payload is typed to a style id. Mesonart's own chips are `<a href="/collections/...">`, measured 2026-08-05.
+
+  Keep:
+
+  - the count under the label
+  - the empty-collection cull (the API already drops them)
+  - the round 80px chip, the hover lift, the scroll rail and its arrows
+
+  Change:
+
+  - `onSelect(styleId)` → a `<Link to="/collections/$slug">`. `aria-pressed` goes; the chip for the collection you are on gets `aria-current="page"`, which is now the truthful attribute.
+  - `chipArtScale()` applies ONLY when the image is the matted product fallback. Read `imageIsMatted` from the API rather than inferring it — an admin-uploaded image scaled by the matting factor is cropped into wrongly.
+
+  Drop the `activeStyle`/`onSelect` props and the route wiring that fed them in `routes/posters/index.tsx`.
+
+  ## Context
+
+  Feature: curated-collections, Phase 5. Depends on GET /api/collections.
+
+  `DiscoverChips.tsx` carries a long doc comment explaining why selection went through the route's filter handler — router.tsx overrides TanStack's search serialisation, so a hand-built search object blank-pages the route. That reasoning dies with the toggle, since a link to a path carries no search at all. Update the comment; do not leave it describing behaviour the file no longer has.
+feature: curated-collections
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:02.539Z'
+last_updated: '2026-08-05T13:51:02.539Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 465
+    feature: curated-collections
+    description: API - GET /api/collections for the Discover rail
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing component tests
+    file: packages/web/tests/components/product/DiscoverChips.test.tsx
+    command: cd packages/web && npx vitest run tests/components/product/DiscoverChips.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: renders one link per collection pointing at /collections/<slug>; the current collection''s chip carries aria-current=''page'' and no aria-pressed; the count renders; chipArtScale is applied when imageIsMatted is true and NOT when it is false; an empty list renders nothing rather than a rail with arrows.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && npx vitest run tests/components/product/DiscoverChips.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Rewrite the chips as links and update the route
+    file: packages/web/app/components/product/DiscoverChips.tsx
+    status: pending
+    code: Swap the button for a Link, take activeSlug instead of activeStyle, drop onSelect. Then strip the chip wiring out of routes/posters/index.tsx and point the loader at /api/collections.
+  - id: 4
+    action: verify-pass
+    description: Confirm the component tests pass and typecheck is clean
+    command: cd packages/web && npx vitest run tests/components/product/DiscoverChips.test.tsx && npx tsc --noEmit -p tsconfig.json
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app/components/product/DiscoverChips.tsx packages/web/app/routes/posters/index.tsx packages/web/tests/components/product && git commit -m "feat(web): Discover chips link to collections instead of toggling a style (#TICKET)"'
+    status: pending
+current_step: 1

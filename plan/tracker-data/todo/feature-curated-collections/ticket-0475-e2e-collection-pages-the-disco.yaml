@@ -1,0 +1,75 @@
+ticket_number: 475
+title: E2E - collection pages, the Discover rail and admin authoring
+description: |-
+  ## Task
+
+  One feature-level spec at `tests/e2e/collections.spec.ts`.
+
+  Storefront:
+
+  - the rail on /posters renders chips and a chip navigates to `/collections/<slug>`
+  - the collection page shows the collection's own H1 and description
+  - a facet applied inside a collection narrows within it and never escapes it — the assertion that proves the intersection rule end to end
+  - Best Sellers and Latest Work reach a populated grid, which no style facet could have expressed
+  - an unknown slug 404s
+
+  Admin:
+
+  - create a rule collection, see the count preview, save it, and find it on the storefront
+  - toggle show-in-discover and watch the chip appear in the rail
+
+  ## Context
+
+  Feature: curated-collections, final phase.
+
+  Use `waitUntil: 'networkidle'` in `beforeEach`, per the repo convention in CLAUDE.md. Scope selectors for mobile vs desktop — the same test ids exist in both trees.
+
+  Run with `--project=chromium --no-deps`; the auth setup project's admin/trade login is failing for unrelated reasons and blocks the whole run otherwise. The admin cases need a staff storage state, so check what `tests/e2e/auth.setup.ts` provides before writing them.
+feature: curated-collections
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:59.889Z'
+last_updated: '2026-08-05T13:51:59.889Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 470
+    feature: curated-collections
+    description: Web - /collections/$slug reusing the collection-page shell
+  - ticket: 472
+    feature: curated-collections
+    description: Admin - collections list with discover reorder
+  - ticket: 473
+    feature: curated-collections
+    description: Admin - collection form with rule builder and manual picker
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the E2E spec
+    file: tests/e2e/collections.spec.ts
+    command: npx playwright test tests/e2e/collections.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: FAIL until the feature is wired end to end
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: Run it green against the built feature
+    command: npx playwright test tests/e2e/collections.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: PASS
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit
+    command: 'git add tests/e2e/collections.spec.ts && git commit -m "test(e2e): collection pages, discover rail and admin authoring (#TICKET)"'
+    status: pending
+current_step: 1

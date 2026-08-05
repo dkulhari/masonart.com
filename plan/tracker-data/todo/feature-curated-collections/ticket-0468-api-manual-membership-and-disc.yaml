@@ -1,0 +1,75 @@
+ticket_number: 468
+title: API - manual membership and Discover ordering
+description: |-
+  ## Task
+
+  The two admin operations CRUD alone cannot express.
+
+  - `PUT /api/admin/collections/:id/products` — replace the manual member list with an ordered array of product ids. Whole-list replace, not per-row add/remove: the order IS the data, and incremental edits make position arithmetic the client's problem.
+  - `PUT /api/admin/collections/discover-order` — accepts an ordered array of collection ids and rewrites `discoverOrder` in one transaction, so the rail cannot be observed half-reordered.
+
+  Rejects: member ids that are not real products; manual operations against a `kind='rule'` collection; duplicate ids in either array.
+
+  Both bust the public cache.
+
+  ## Context
+
+  Feature: curated-collections, Phase 4. Depends on the admin CRUD route.
+
+  The transaction on reorder is the point — a per-row update loop leaves the rail in an order that never existed if it fails halfway.
+feature: curated-collections
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:02.526Z'
+last_updated: '2026-08-05T13:51:02.526Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - admin
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 467
+    feature: curated-collections
+    description: API - admin CRUD for collections
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing membership and ordering tests
+    file: packages/api/tests/routes/admin/collection-membership.test.ts
+    command: cd packages/api && npx vitest run tests/routes/admin/collection-membership.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: PUT products sets positions 0..n-1 in the supplied order; replacing with a shorter list removes the dropped members; a non-existent product id 400s and writes nothing; PUT products against a rule collection 400s; discover-order rewrites every listed collection in one transaction and a bad id rolls the whole thing back; duplicates rejected; both bust the cache.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && npx vitest run tests/routes/admin/collection-membership.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add both handlers
+    file: packages/api/src/routes/admin/collections.ts
+    status: pending
+    code: Wrap each in db.transaction. Validate every id up front so a bad one fails before any write.
+  - id: 4
+    action: verify-pass
+    description: Confirm they pass
+    command: cd packages/api && npx vitest run tests/routes/admin/collection-membership.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/admin/collections.ts packages/api/tests/routes/admin && git commit -m "feat(api): manual membership and Discover ordering (#TICKET)"'
+    status: pending
+current_step: 1

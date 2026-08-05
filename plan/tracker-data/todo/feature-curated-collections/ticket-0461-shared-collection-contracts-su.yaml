@@ -1,0 +1,82 @@
+ticket_number: 461
+title: Shared - collection contracts, superseding the dead collectionSchema
+description: |-
+  ## Task
+
+  Add the collection vocabulary and validation to `@chobii/shared`, and deprecate the orphan `collectionSchema` already sitting in `packages/shared/src/schemas/product.ts`.
+
+  That schema is referenced only by its own test — the same dead-but-tested state `styles.ts` and the size ladders were in before #386. Its `CollectionType` is a closed six-value marketing enum (`new-arrivals` | `best-sellers` | `staff-picks` | `seasonal` | `sale` | `ai-generated-gallery`) which cannot express an admin-authored collection. Supersede it; do not extend it, and do not leave two collection vocabularies alive.
+
+  New module `packages/shared/src/schemas/collection.ts`:
+
+  - `collectionKindSchema` = `z.enum(['rule','manual'])`
+  - `collectionRuleSchema` — the facet + sort payload. Every field must be a value `/api/products` already validates: styles, subjects, colors, rooms, vibe, aesthetic, medium, uniqueness, availability, orientation, priceMin, priceMax, isAiGenerated, isFeatured, sortBy, sortOrder. Facet arrays validate against the vocabularies in `constants/facets.ts` — a rule that names a style that does not exist is a rule that renders an empty page.
+  - `curatedCollectionSchema` — id, slug (kebab regex), title, subtitle, description, kind, rule (null when manual), imageUrl, isActive, showInDiscover, discoverOrder, sortOrder, seoTitle, seoDescription, timestamps.
+  - `createCollectionSchema` / `updateCollectionSchema` for the admin API, with the cross-field rule: `kind==='rule'` requires a rule, `kind==='manual'` forbids one.
+
+  ## Context
+
+  Feature: curated-collections, Phase 1 (foundations).
+
+  Export from `packages/shared/src/schemas/index.ts`. Follow the doc-comment style of `constants/facets.ts` — it explains WHY the module is the single source of truth, which is the convention here.
+
+  Mark the old `collectionSchema` deprecated in place with a pointer to this module, in the style of the `@deprecated` block at the top of `constants/styles.ts`. Leave its existing test passing.
+feature: curated-collections
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:49:55.334Z'
+last_updated: '2026-08-05T13:49:55.334Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+  - shared
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the collection contracts
+    file: packages/shared/tests/schemas/collection.test.ts
+    command: cd packages/shared && npx vitest run tests/schemas/collection.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: accepts a rule collection whose rule names real facet values; rejects a rule naming a style absent from STYLE_OPTIONS; rejects kind=''rule'' with rule null; rejects kind=''manual'' carrying a rule; rejects a slug with spaces or uppercase; accepts sortBy values that SORT-capable API fields allow; defaults discoverOrder and sortOrder.'
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail because the module does not exist
+    command: cd packages/shared && npx vitest run tests/schemas/collection.test.ts
+    expected_result: FAIL - cannot resolve ../../src/schemas/collection
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the collection schemas
+    file: packages/shared/src/schemas/collection.ts
+    status: pending
+    code: collectionKindSchema, collectionRuleSchema (facet arrays validated against facets.ts vocabularies), curatedCollectionSchema, createCollectionSchema, updateCollectionSchema with the kind/rule cross-field refine. Export types.
+  - id: 4
+    action: implement
+    description: Export from the shared barrel and deprecate the orphan schema
+    file: packages/shared/src/schemas/index.ts
+    status: pending
+    code: export * from './collection'. In schemas/product.ts, add an @deprecated block above collectionSchema pointing at ./collection, mirroring the block at the top of constants/styles.ts.
+  - id: 5
+    action: verify-pass
+    description: Confirm the new tests pass and the old ones still do
+    command: cd packages/shared && npx vitest run tests/schemas/
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git add packages/shared/src/schemas packages/shared/tests/schemas && git commit -m "feat(shared): collection contracts, superseding the orphan collectionSchema (#TICKET)"'
+    status: pending
+current_step: 1

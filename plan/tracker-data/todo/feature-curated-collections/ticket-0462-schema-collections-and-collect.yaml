@@ -1,0 +1,102 @@
+ticket_number: 462
+title: Schema - collections and collection_products tables
+description: |-
+  ## Task
+
+  Add the Drizzle tables backing the feature.
+
+  ```
+  collections
+    id uuid pk
+    slug text unique not null
+    title text not null
+    subtitle text
+    description text
+    kind collection_kind not null           -- pgEnum('rule','manual')
+    rule jsonb                              -- null when manual
+    image_url text                          -- null falls back to a representative product
+    is_active boolean not null default true
+    show_in_discover boolean not null default false
+    discover_order integer
+    sort_order integer not null default 0
+    seo_title text, seo_description text
+    created_at, updated_at
+
+  collection_products                        -- manual kind only
+    collection_id uuid -> collections.id on delete cascade
+    product_id uuid -> products.id on delete cascade
+    position integer not null
+    primary key (collection_id, product_id)
+  ```
+
+  Indexes: unique on `slug`; index on `(show_in_discover, discover_order)` for the rail; index on `(collection_id, position)` for member ordering.
+
+  ## Context
+
+  Feature: curated-collections, Phase 1 (foundations). Depends on the shared contracts ticket for the rule's shape.
+
+  Follow `packages/api/src/database/schema/reviews.ts` — pgEnum block, table block, relations block, doc comments explaining each non-obvious column. Export from `packages/api/src/database/schema/index.ts`.
+
+  Migration via `pnpm --filter @chobii/api db:generate`; the repo keeps generated SQL under `packages/api/src/database/migrations/`. Do NOT hand-write the SQL.
+feature: curated-collections
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:49:55.380Z'
+last_updated: '2026-08-05T13:49:55.380Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 461
+    feature: curated-collections
+    description: Shared - collection contracts, superseding the dead collectionSchema
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing schema-shape test
+    file: packages/api/tests/database/collections-schema.test.ts
+    command: cd packages/api && npx vitest run tests/database/collections-schema.test.ts
+    expected_result: FAIL
+    status: pending
+    code: Assert the exported tables carry the expected columns and that collectionProducts references collections and products with cascade. Shape-level, no live DB — mirrors how other schema tests here avoid needing Postgres.
+  - id: 2
+    action: verify-fail
+    description: Confirm it fails — no such module
+    command: cd packages/api && npx vitest run tests/database/collections-schema.test.ts
+    expected_result: FAIL - cannot resolve ../../src/database/schema/collections
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the schema module and export it
+    file: packages/api/src/database/schema/collections.ts
+    status: pending
+    code: collectionKindEnum pgEnum; collections pgTable with the columns above and the three indexes; collectionProducts pgTable with composite pk; relations() for both. Then export * from './collections' in schema/index.ts.
+  - id: 4
+    action: verify-pass
+    description: Confirm the shape test passes
+    command: cd packages/api && npx vitest run tests/database/collections-schema.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: implement
+    description: Generate and apply the migration
+    file: packages/api/src/database/migrations/
+    command: pnpm --filter @chobii/api db:generate && pnpm --filter @chobii/api db:migrate
+    status: pending
+    code: Generated SQL only. DB is on host port 5440, not the 5433 in .env — override DATABASE_URL for the migrate run.
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/database packages/api/tests/database && git commit -m "feat(api): collections and collection_products tables (#TICKET)"'
+    status: pending
+current_step: 1

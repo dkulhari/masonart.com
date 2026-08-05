@@ -1,0 +1,180 @@
+name: curated-collections
+title: Curated Collections
+priority: high
+created: '2026-08-05T13:47:57.322Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+
+  A **collection** becomes a first-class entity the admin can create, rather than a projection of the style vocabulary.
+
+  This came out of measuring mesonart's Discover rail directly (fetched HTML from `/collections/artworks`, `/collections/style_pollock-art`, `/collections/subject_city`, 2026-08-05). Their circular chips are Shopify section `collection_navigation`, and they do **not** map onto style:
+
+  - Each chip is an `<a href="/collections/...">` — a destination page, not a facet toggle on the current grid.
+  - The list is one global, hand-curated set of 18, byte-identical across all three collection pages, and the current collection is not marked active.
+  - The vocabulary is four dimensions mixed: **style x8** (Wabi Sabi, Textured, Graffiti, Pollock, Bohemian, Colorful, Expressionist, Minimalism), **subject x7** (Abstract, Landscape, Beach & Ocean, city, Floral, Horse, People), **orientation x1** (Set of 2/3), and **merchandising x2** — `Latest Work` -> `/collections/new` and `Bestseller` -> `/collections/best-selling`. Those last two have no facet to map to; they are a date window and a sort.
+  - Handles are inconsistent (`style_pollock-art` beside `wabi-sabi-wall-art`, `plaste-art`, `abstract-canvas-painting`, and a live typo `landscape-canvas-paitning`), and all 18 chip images come from `/cdn/shop/files/` — the Settings>Files bucket, named after artwork SKUs. Hand-uploaded, hand-assigned. Generated lists do not misspell.
+
+  Ours (#406/#410) generates chips from `STYLE_OPTIONS` and toggles the `styles` filter. Same shape, different thing — and structurally incapable of carrying Abstract, Set of 2/3 or Bestseller, because the chip payload is typed to a style id.
+
+  ## Goals
+
+  - A collection is a stored row with its own slug, title, description, image and SEO — created and edited in the admin, not in a constants file.
+  - The Discover rail renders whatever collections are marked for it, in the order the admin chose, across any mix of facet dimensions plus pure-merchandising entries.
+  - `/collections/$slug` is a real, crawlable page reusing the collection-page shell we already built.
+  - Nothing goes blank on migration: the current twelve style chips survive as seeded collections.
+
+  ## Scope
+
+  **In scope**
+
+  - `collections` table + `collection_products` join, Drizzle schema, migration.
+  - Zod schemas and types in `@chobii/shared`, superseding the dead `collectionSchema`.
+  - Public API: list collections (for the rail and the nav), resolve one collection to a product page.
+  - Admin API: full CRUD, reorder, discover toggle.
+  - Storefront route `/collections/$slug` reusing the /posters shell — beige header band, Discover rail, toolbar, facet rail, grid, lazy paging.
+  - Discover rail re-pointed at collections; chips become links.
+  - Admin UI at `/admin/collections` — list, create, edit, rule builder, manual picker, image, discover order.
+  - Seed: 12 style collections + Latest Work + Best Sellers.
+  - Sitemap entries and per-collection SEO.
+  - Unit + integration tests per ticket, one E2E spec for the feature.
+
+  **Out of scope** (YAGNI)
+
+  - Artist collections — no artist entity exists yet (parity analysis §4).
+  - Scheduled / time-boxed collections, and any sale or discount attached to a collection — that is the `sale-promotions` feature.
+  - Nested or hierarchical collections. Mesonart has none.
+  - Per-collection hero photography. Chips fall back to a representative product's artwork, which is how #410 already solved this.
+  - Replacing the styles nav row. It stays vocabulary-driven; drift there is what #395 ended.
+
+  ## Design
+
+  **Approach: one table, two membership kinds.**
+
+  A collection resolves its products either from a stored filter rule or from a hand-picked ordered list.
+
+  ```
+  collections
+    id, slug (unique), title, subtitle, description
+    kind: 'rule' | 'manual'
+    rule: jsonb            -- validated facet + sort payload, null when manual
+    imageUrl: text         -- null falls back to a representative product
+    isActive, showInDiscover, discoverOrder, sortOrder
+    seoTitle, seoDescription
+    createdAt, updatedAt
+
+  collection_products         -- manual kind only
+    collectionId, productId, position
+  ```
+
+  ### Key decisions
+
+  1. **Rule + manual, not one or the other.** Their own chips are mostly tag-driven smart collections; a rule payload reproduces 16 of the 18 outright, and the two merchandising ones are just a sort (`createdAt desc`, `salesCount desc`). Manual exists for curation a rule cannot express. Supporting only manual would mean re-picking products every time the catalogue grows; supporting only rules makes "these six, in this order" impossible.
+
+  2. **The rule is the existing filter payload, not a new query language.** It stores exactly the fields `/api/products` already validates, so the collection page is the product list with a pre-applied base filter, and shopper facets narrow *within* it. No second query planner, no second vocabulary.
+
+  3. **Chips become links, not toggles.** This changes /posters behaviour deliberately: a chip that toggles `styles` cannot express Bestseller or Set of 2/3. Counts and the empty-collection cull are kept — a chip leading to an empty grid is worse than no chip.
+
+  4. **The dead `collectionSchema` in `packages/shared/src/schemas/product.ts` is superseded, not extended.** Its `CollectionType` is a closed six-value marketing enum (`new-arrivals` | `best-sellers` | `staff-picks` | `seasonal` | `sale` | `ai-generated-gallery`), which cannot express an admin-authored collection. It is referenced only by its own test — the same dead-but-tested state `styles.ts` and the size ladders were in. Deprecate it in place with a pointer, exactly as `styles.ts` documents; do not leave a second collection vocabulary alive.
+
+  5. **Seed twelve style collections + Latest Work + Best Sellers.** The rail must not empty out on deploy, and this preserves today's twelve chips in link form.
+
+  6. **Slugs are admin-authored and unique.** Not derived from a facet id, because a collection may span facets or none.
+
+  ## Technical Considerations
+
+  - **Integration points**: `packages/api/src/database/schema/`, `productsApp` list query (the rule reuses its filter path), `GET /api/products/collections` (superseded by the new endpoint — keep the old route until the web side moves, then delete), `DiscoverChips.tsx`, `routes/posters/index.tsx`, `routes/sitemap.ts`, admin route mounting in `packages/api/src/index.ts`.
+  - **The chip crop logic survives.** `chipArtScale()` compensates for `main` images being matted at a fixed fraction of the longest side. An admin-uploaded `imageUrl` is not matted, so the scale must apply only to the product fallback.
+  - **Router search serialisation.** `router.tsx` overrides TanStack's search handling — `validateSearch` on the new route must coerce numbers and split comma-joined arrays, or the route error-boundaries to a blank page.
+  - **Counts**: reuse the facet-count path from #392 rather than issuing a per-chip count query.
+  - **Caching**: the collections list is cached like `collections:v2` is today; admin writes must bust it, which the current style-derived endpoint never had to do.
+  - **Role gate**: admin CRUD behind the same staff-role middleware as `/api/admin/products`.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    '461': Shared - collection contracts, superseding the dead collectionSchema
+    '462': Schema - collections and collection_products tables
+    '463': 'API - collection resolver: one collection to one product query'
+    '464': Seed - twelve style collections plus Latest Work and Best Sellers
+    '465': API - GET /api/collections for the Discover rail
+    '466': API - GET /api/collections/:slug resolving a collection to products
+    '467': API - admin CRUD for collections
+    '468': API - manual membership and Discover ordering
+    '469': Web - Discover chips become links to collections
+    '470': Web - /collections/$slug reusing the collection-page shell
+    '471': Web - collection SEO and sitemap entries
+    '472': Admin - collections list with discover reorder
+    '473': Admin - collection form with rule builder and manual picker
+    '474': Cleanup - retire GET /api/products/collections
+    '475': E2E - collection pages, the Discover rail and admin authoring
+  in_progress: {}
+  done: {}
+total_tickets: 15
+completion_percentage: 0
+is_completed: false
+design:
+  approach: 'One `collections` table with two membership kinds. `kind: ''rule''` stores the existing validated product-filter payload (facets + sort) as jsonb and resolves through the same query path `/api/products` already uses; `kind: ''manual''` resolves through a `collection_products` join carrying an explicit position. Storefront gets `/collections/$slug` reusing the collection-page shell built for /posters, with the collection''s rule as the base query and shopper facets narrowing within it. The Discover rail is re-pointed from STYLE_OPTIONS to the collections table and its chips become links rather than filter toggles. Admin gets full CRUD at /admin/collections with a rule builder over the shared facet vocabulary.'
+  decisions:
+    - 'Rule AND manual membership, not one or the other. Measured against mesonart: a rule payload reproduces 16 of their 18 chips outright, and the two merchandising ones (Latest Work, Bestseller) are just a sort. Manual covers curation a rule cannot express; rule-only makes ''these six, in this order'' impossible, manual-only means re-picking as the catalogue grows.'
+    - The rule IS the existing filter payload, not a new query language. It stores exactly the fields /api/products already validates, so a collection page is the product list with a pre-applied base filter. No second query planner, no second vocabulary.
+    - 'Chips become links, not toggles. Deliberate behaviour change on /posters: a chip that toggles `styles` structurally cannot express Bestseller or Set of 2/3. Counts and the empty-collection cull are kept.'
+    - Supersede the dead `collectionSchema` in packages/shared/src/schemas/product.ts rather than extend it. Its CollectionType is a closed six-value marketing enum that cannot express an admin-authored collection, and it is referenced only by its own test — the same dead-but-tested state styles.ts and the size ladders were in. Deprecate in place with a pointer; do not leave a second collection vocabulary alive.
+    - Seed 12 style collections + Latest Work + Best Sellers so the rail cannot empty out on deploy, and today's twelve chips survive in link form.
+    - Slugs are admin-authored and unique, not derived from a facet id — a collection may span facets or none.
+    - chipArtScale() applies only to the representative-product fallback image. Product `main` images are matted at a fixed fraction of the longest side; an admin-uploaded image is not, so scaling it would crop into it wrongly.
+    - Admin writes must bust the collections cache. The style-derived endpoint never had to, because its input was a constants file.
+  approved: true
+  approved_at: '2026-08-05T13:48:11.068Z'
+plan:
+  phases:
+    - name: Foundations
+      location: packages/shared/src/schemas, packages/api/src/database/schema, packages/api/src/lib
+      tickets:
+        - 461
+        - 462
+        - 463
+    - name: Seed
+      location: packages/api/src
+      tickets:
+        - 464
+    - name: Public API
+      location: packages/api/src/routes/collections.ts
+      tickets:
+        - 465
+        - 466
+    - name: Admin API
+      location: packages/api/src/routes/admin/collections.ts
+      tickets:
+        - 467
+        - 468
+    - name: Storefront
+      location: packages/web/app/routes/collections, packages/web/app/components/product
+      tickets:
+        - 469
+        - 470
+        - 471
+    - name: Admin UI
+      location: packages/web/app/routes/admin/collections, packages/web/app/components/admin
+      tickets:
+        - 472
+        - 473
+    - name: Cleanup
+      location: packages/api/src/routes/products.ts
+      tickets:
+        - 474
+    - name: E2E
+      location: tests/e2e/collections.spec.ts
+      tickets:
+        - 475
+  generated_at: '2026-08-05T13:53:18.667Z'
