@@ -56,6 +56,8 @@ interface WishlistStore {
   load: () => Promise<void>;
   setAuthenticated: (isAuthenticated: boolean) => void;
   toggle: (productId: string) => Promise<void>;
+  /** Forget ids the catalogue no longer has. Guest lists only — see below. */
+  dropMissing: (productIds: string[]) => void;
 }
 
 /** Exported so tests can read exactly what was written, not guess the key. */
@@ -188,6 +190,25 @@ export const useWishlistStore = create<WishlistStore>()(
           set({ isAuthenticated: true, isLoaded: false });
           await get().load();
         })();
+      },
+
+      /**
+       * A guest's ids outlive the catalogue: a product can be deleted, or the
+       * whole database reseeded, long after it was saved. Those ids resolve to
+       * nothing, so the header badge counts saves the page cannot show — which
+       * is what made the page look broken (#494).
+       *
+       * Guest lists ONLY. A signed-in list came from the server, which already
+       * filtered it to live products, so an empty answer there means the
+       * request failed, not that the saves are dead — and deleting an
+       * account's wishlist over a bad round-trip cannot be undone.
+       */
+      dropMissing(productIds: string[]) {
+        if (get().isAuthenticated === true || productIds.length === 0) return;
+
+        const dead = new Set(productIds);
+        const remaining = get().ids.filter((id) => !dead.has(id));
+        if (remaining.length !== get().ids.length) set({ ids: remaining });
       },
 
       async toggle(productId: string) {

@@ -85,6 +85,33 @@ test.describe('wishlist, signed out', () => {
     await expect(cards(page)).toHaveCount(0);
   });
 
+  test('a saved id the catalogue has lost is explained, not blank', async ({
+    page,
+  }) => {
+    // Reported live (#494): the badge said 3 and the page rendered the
+    // collection grid's "adjusting your filters" copy. A guest's ids outlive
+    // the catalogue — reseeding the database changes every product id.
+    await page.evaluate(
+      ({ key, value }) => localStorage.setItem(key, value),
+      {
+        key: WISHLIST_STORAGE_KEY,
+        value: JSON.stringify({
+          state: { ids: ['deadbeef-0000-4000-8000-000000000000'] },
+          version: 0,
+        }),
+      }
+    );
+
+    await page.goto('/wishlist', { waitUntil: 'networkidle' });
+
+    await expect(page.getByText(/no longer available/i)).toBeVisible();
+    await expect(page.getByText(/adjusting your filters/i)).toHaveCount(0);
+    // Cleared, so the badge stops counting what the page cannot show.
+    await expect(
+      page.locator('header a[aria-label="Wishlist"]')
+    ).toBeVisible();
+  });
+
   test('a guest page load spends no wishlist requests', async ({ page }) => {
     // The store used to fetch the auth-gated endpoint before it knew the
     // session — one 401 per mounted heart (#417).

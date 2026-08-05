@@ -420,6 +420,30 @@ describe('toggle', () => {
   })
 })
 
+describe('dropMissing', () => {
+  it('forgets ids the catalogue no longer has', async () => {
+    // A guest's ids outlive the catalogue — a reseeded database changes every
+    // product id — and the header badge counts them until they are dropped.
+    useWishlistStore.setState({ isAuthenticated: false, ids: [PRODUCT_A, PRODUCT_B] })
+
+    useWishlistStore.getState().dropMissing([PRODUCT_B])
+
+    expect(useWishlistStore.getState().ids).toEqual([PRODUCT_A])
+    expect(persistedIds()).toEqual([PRODUCT_A])
+  })
+
+  it('refuses to touch a signed-in list', async () => {
+    // That list came from the server already filtered to live products, so an
+    // empty answer means the request failed. Deleting an account's saves over
+    // a bad round-trip is unrecoverable.
+    useWishlistStore.setState({ isAuthenticated: true, ids: [PRODUCT_A] })
+
+    useWishlistStore.getState().dropMissing([PRODUCT_A])
+
+    expect(useWishlistStore.getState().ids).toEqual([PRODUCT_A])
+  })
+})
+
 describe('persistence', () => {
   it('persists a guest list', () => {
     // A guest cart is real and so is a guest wishlist (#477) — it must survive

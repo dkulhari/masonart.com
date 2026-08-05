@@ -129,6 +129,65 @@ describe('WishlistContents', () => {
     expect(requestedIds(spy).map((ids) => ids.length)).toEqual([50, 10])
   })
 
+  it('says so when everything saved has gone stale, and clears the dead ids', async () => {
+    /**
+     * Reported live: the badge said 3, the page rendered ProductGrid's own
+     * "No products found — try adjusting your filters" state, and nothing
+     * explained why. A guest's ids outlive the catalogue (a reseeded database
+     * changes every product id), so ALL of them can dangle at once. `ids` is
+     * not empty, so the saved-nothing state never showed.
+     */
+    useWishlistStore.setState({ ids: [PRODUCT_A, PRODUCT_B] })
+    stubProducts([])
+
+    render(<WishlistContents />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/no longer available/i)).toBeTruthy()
+    })
+    // Never the collection grid's filter copy — there are no filters here.
+    expect(screen.queryByText(/adjusting your filters/i)).toBeNull()
+    // And the dead ids are gone, so the badge stops disagreeing with the page.
+    expect(useWishlistStore.getState().ids).toEqual([])
+  })
+
+  it('keeps a signed-in list intact even when nothing resolves', async () => {
+    // The server already filtered these to live products, so an empty answer
+    // is a failure of this request, not proof the saves are dead. Deleting an
+    // account's wishlist over a bad round-trip is unrecoverable.
+    useWishlistStore.setState({ ids: [PRODUCT_A], isAuthenticated: true })
+    stubProducts([])
+
+    render(<WishlistContents />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/no longer available/i)).toBeTruthy()
+    })
+    expect(useWishlistStore.getState().ids).toEqual([PRODUCT_A])
+  })
+
+  it('offers a retry when the lookup fails outright', async () => {
+    useWishlistStore.setState({ ids: [PRODUCT_A] })
+    const spy = vi.fn().mockRejectedValue(new Error('offline'))
+    vi.stubGlobal('fetch', spy)
+
+    render(<WishlistContents />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/could not load your saved items/i)).toBeTruthy()
+    })
+    // A failed lookup must not be mistaken for stale saves and delete them.
+    expect(useWishlistStore.getState().ids).toEqual([PRODUCT_A])
+
+    spy.mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [productRow(PRODUCT_A, 'Alpha')] }),
+    })
+    screen.getByRole('button', { name: /try again/i }).click()
+
+    await waitFor(() => expect(screen.getByText('Alpha')).toBeTruthy())
+  })
+
   it('does not re-fetch a product it already has', async () => {
     useWishlistStore.setState({ ids: [PRODUCT_A] })
     const spy = stubProducts([productRow(PRODUCT_A, 'Alpha')])
