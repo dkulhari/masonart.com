@@ -1,0 +1,130 @@
+ticket_number: 508
+title: 'Web - Save as collection: create new, or overwrite an existing one'
+description: |-
+  ## Task
+
+  Replace the staging bar's single **Create collection from these** with a **Save as collection** flow offering two destinations:
+
+  - **New collection** — what exists today: post an unpublished manual collection, PUT the ordered membership, land on its edit form.
+  - **Overwrite an existing collection** — pick from the manual collections, confirm, then `PUT /api/admin/collections/:id/products` with the wishlist's ids.
+
+  The choice is made at save time. The wishlist does NOT remember which collection its contents came from — load and save are independent, so loading collection A and saving over collection B is legitimate rather than a mistake to prevent.
+
+  The overwrite confirm must name the target and what it currently holds: this replaces a collection's whole membership, it does not merge into it.
+
+  Only manual collections are offered. `GET /api/admin/collections` already returns `kind`, so filter client-side — offering a rule collection would be offering an operation the API refuses.
+
+  ## Context
+
+  Feature: wishlist-collection-editing, Phase 2. Depends on the load action existing, so the loop can be exercised.
+
+  `packages/web/app/components/wishlist/WishlistStagingBar.tsx`. `PUT /api/admin/collections/:id/products` (#468) already replaces membership transactionally and validates every id, so overwrite needs no new endpoint.
+feature: wishlist-collection-editing
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T20:51:19.297Z'
+last_updated: '2026-08-05T21:05:36.595Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T20:57:48.083Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T21:05:08.623Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T21:05:36.595Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `0f125f66` — feat(web): save the wishlist as a new collection or over an existing one
+
+      **Files Changed**:
+      - `packages/web/app/components/wishlist/WishlistStagingBar.tsx` — the two-destination save flow
+      - `packages/web/tests/components/wishlist/WishlistSaveAs.test.tsx` — 8 tests
+      - `packages/web/tests/components/wishlist/WishlistStagingBar.test.tsx` — 4 tests updated for the changed interaction
+
+      **The loop closes here.** #507 could load a collection in, but saving only offered "create new" — so editing produced a *copy*. Verified end to end in the browser:
+
+      ```
+      1. wishlist   : Emerald Dreams | Blush Hour | Urban Soul
+      2. loaded back: Emerald Dreams | Blush Hour | Urban Soul   matches: true
+      3. rearranged : Blush Hour | Emerald Dreams | Urban Soul
+      4. overwritten
+      5. storefront : Blush Hour | Emerald Dreams | Urban Soul
+         LOOP CLOSED: true
+      ```
+
+      **A real ambiguity the tests surfaced.** The overwrite panel and its nested confirm dialog both had a button labelled "Cancel". The test failed with `Found multiple elements with the role "button" and name /Cancel/i` — and the same ambiguity applies to a person reading the panel. Renamed the outer one to **"Back"**, which is what it actually does. Fixing the UI beat scoping the query.
+
+      **Four #503 tests were updated, not deleted.** They clicked "Create collection from these" directly; that button now sits behind "Save as collection". The interaction genuinely changed, so the tests follow it through the new flow rather than asserting on markup that no longer exists.
+
+      **Decisions**
+      - **No staging context.** The wishlist remembers nothing about where its contents came from. Load A, rearrange, save over B is legitimate. Carrying context to prevent that would be more state for less freedom — the owner's simplification of my first design, and it is better.
+      - **Overwrite confirms with numbers**: which collection, and how many products it currently holds. It replaces rather than merges, and a destructive action offered through a dropdown otherwise reads as harmless.
+      - **Manual collections only in the picker.** `GET /api/admin/collections` already returns `kind`, so the filter is client-side. A rule collection's rule *is* its membership; offering it would be offering an operation the API refuses.
+
+      **Verification**
+      - Command: `cd packages/web && npx vitest run tests/components/ tests/stores/`
+      - Result: PASS — **1239 tests across 63 files**, 0 failing
+      - Build: `npx tsc --noEmit -p tsconfig.json` — clean
+      - Probe collections cleaned up after each browser run
+
+      **Note on the probe runs**: a partially-failed run left two collections both titled "Loop Probe", and the next run's `a[aria-label="Edit Loop Probe"]` hit a strict-mode violation. Stamped titles, not just stamped slugs, would have avoided it — worth doing in #509's spec.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 507
+    feature: wishlist-collection-editing
+    description: Web - load a collection's members into the wishlist from the admin form
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests
+    file: packages/web/tests/components/wishlist/WishlistSaveAs.test.tsx
+    command: cd packages/web && npx vitest run tests/components/wishlist/WishlistSaveAs.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: Save as collection offers both destinations; the picker lists only manual collections; overwrite confirms first, naming the target and its current product count; cancelling writes nothing; confirming PUTs the ordered ids to that collection; create still works as before; an empty wishlist disables both; a failed overwrite surfaces rather than silently succeeding.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && npx vitest run tests/components/wishlist/WishlistSaveAs.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the save-as flow
+    file: packages/web/app/components/wishlist/WishlistStagingBar.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the wishlist suites pass and typecheck is clean
+    command: cd packages/web && npx vitest run tests/components/wishlist/ && npx tsc --noEmit -p tsconfig.json
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app/components/wishlist packages/web/tests/components/wishlist && git commit -m "feat(web): save the wishlist as a new collection or over an existing one (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T20:57:48.083Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/web && npx vitest run tests/components/ tests/stores/
+  test_output: '1239 tests across 63 files passing, including 8 new save-as tests and the 4 updated #503 tests. Browser: the full loop closes — create from wishlist, load back with identical order, rearrange, overwrite, storefront shows the new order.'
+  build_passed: true
+  build_command: cd packages/web && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T21:05:00.478Z'
+completed: '2026-08-05T21:05:08.623Z'

@@ -1,0 +1,81 @@
+name: wishlist-collection-editing
+title: Wishlist Collection Editing
+priority: medium
+created: "2026-08-05T20:50:28.575Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+
+  Close the loop on curating with the wishlist. `wishlist-curation` (#500–#504) let staff stage a NEW collection from their saved items; this lets them edit an EXISTING one — load its members in, rearrange them with the drag and keyboard controls already there, and save the result back.
+
+  ## The shape, after simplification
+
+  The first design carried a "staging context" so the wishlist remembered which collection it came from, and the bar switched into an editing mode. That is more state than the job needs.
+
+  Instead: **load and save are independent operations.**
+
+  - Loading replaces the wishlist with a collection's members, and the wishlist remembers nothing about where they came from.
+  - Saving asks, at that moment, whether this is a new collection or an overwrite of an existing one.
+
+  The wishlist stays a dumb ordered list. A side effect worth having: you can load collection A, rearrange, and save over collection B.
+
+  ## Scope
+
+  **In scope**
+
+  - `POST /api/wishlist/replace` — explicit set replacement.
+  - Admin collection edit form: **Load into wishlist**, manual collections only, warning that it replaces whatever is there.
+  - Wishlist staging bar: **Save as collection** offering *create new* or *overwrite an existing manual collection*.
+  - E2E for the full loop — load, reorder, overwrite, and confirm the new order on the storefront.
+
+  **Out of scope**
+
+  - A separate staging list on the user row. Considered, and rejected by the owner: a staff account is a work account, and anyone wanting a real wishlist uses a personal one. Revisit only if it actually bites.
+  - Remembering the source collection. Deliberately dropped — see above.
+  - Loading or overwriting **rule** collections. They have no explicit membership; their rule is their membership.
+
+  ## Design
+
+  ### Why replacement needs its own endpoint
+
+  `PUT /api/wishlist` **refuses any change to the set** — its permutation guard exists precisely so a stale tab cannot silently drop an item saved on another device (#500). Loading a collection is exactly a set change.
+
+  Loosening that guard to accommodate this would reopen the data-loss hole it closed. So replacement is a separate, explicitly-named operation, and the guard on reordering stays absolute.
+
+  ### Overwrite reuses what already exists
+
+  `PUT /api/admin/collections/:id/products` (#468) already replaces a manual collection's membership in one transaction, validating every id before writing. Overwrite is that call with the wishlist's ids. No new admin endpoint.
+
+  ### The overwrite picker lists manual collections only
+
+  `GET /api/admin/collections` already returns `kind` for every row, so the picker filters client-side. Offering a rule collection would be offering an operation the API refuses.
+
+  ## Technical Considerations
+
+  - **Destructiveness is accepted, not hidden.** Loading replaces the admin's wishlist outright. The warning names how many items will be lost, and Copy IDs sits beside it so they can be recovered by hand.
+  - **Overwrite is destructive too** — it replaces a collection's whole membership, not merges. The confirm says which collection and how many products it currently holds.
+  - **Volume.** A 60-product collection loaded into the wishlist is 60 cards to drag through. Fine for the 3–20 case this is for; worth knowing before someone tries it on a large collection.
+  - The E2E must assert the order **read back from the storefront**, not from the admin form, since the form could hold the right order and fail to persist it.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done:
+    "506": API - POST /api/wishlist/replace, the explicit set change
+    "507": Web - load a collection's members into the wishlist from the admin form
+    "508": "Web - Save as collection: create new, or overwrite an existing one"
+    "509": "E2E - the full loop: load a collection, reorder it, save it back"
+total_tickets: 4
+completion_percentage: 100
+is_completed: true

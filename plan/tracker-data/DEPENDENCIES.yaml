@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-05T20:37:12.019Z'
+  last_updated: '2026-08-05T21:09:17.019Z'
   features:
     chobi-external-services:
       - ticket_number: 315
@@ -784,6 +784,27 @@ dependencies:
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
+    wishlist-collection-editing:
+      - ticket_number: 507
+        title: Web - load a collection's members into the wishlist from the admin form
+        blocks: []
+        blocked_by:
+          - ticket_number: 506
+            title: API - POST /api/wishlist/replace, the explicit set change
+      - ticket_number: 508
+        title: 'Web - Save as collection: create new, or overwrite an existing one'
+        blocks: []
+        blocked_by:
+          - ticket_number: 507
+            title: Web - load a collection's members into the wishlist from the admin form
+      - ticket_number: 509
+        title: 'E2E - the full loop: load a collection, reorder it, save it back'
+        blocks: []
+        blocked_by:
+          - ticket_number: 507
+            title: Web - load a collection's members into the wishlist from the admin form
+          - ticket_number: 508
+            title: 'Web - Save as collection: create new, or overwrite an existing one'
     wishlist-curation:
       - ticket_number: 501
         title: Store - reorder action, optimistic, guest and signed-in

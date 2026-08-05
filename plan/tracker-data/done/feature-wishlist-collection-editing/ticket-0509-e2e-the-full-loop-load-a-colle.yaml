@@ -1,0 +1,116 @@
+ticket_number: 509
+title: 'E2E - the full loop: load a collection, reorder it, save it back'
+description: |-
+  ## Task
+
+  One spec on `chromium-admin`, covering the round trip this feature exists for:
+
+  1. create a manual collection with a known order (staging from the wishlist is fine)
+  2. open it in the admin, **Load into wishlist**
+  3. confirm the wishlist holds its members **in the collection's order**
+  4. reorder them
+  5. **Save as collection → overwrite** that same collection
+  6. open `/collections/<slug>` and confirm the NEW order
+
+  Step 6 is the assertion that matters. Read the order off the storefront, not the admin form — the form can hold the right order and fail to persist it, which is precisely how #503's membership-wiping bug looked from the inside.
+
+  Also cover: loading warns before replacing, and a rule collection offers no load action at all.
+
+  ## Context
+
+  Feature: wishlist-collection-editing, final phase.
+
+  Mark the spec **serial**, as `wishlist-staging.admin.spec.ts` is: every test signs in as the same staff account, one account has one wishlist, and in parallel they overwrite each other and trip the reorder guard.
+
+  Poll rather than reading order once — a move applies optimistically while the store's `load()` may still be in flight, which is #505.
+
+  Stamp slugs per run and clean up; the staff specs create real collections.
+feature: wishlist-collection-editing
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T20:51:19.393Z'
+last_updated: '2026-08-05T21:09:29.682Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T21:05:42.313Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T21:09:15.546Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T21:09:29.682Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `88c84e2c` — test(e2e): load a collection, reorder it, save it back
+
+      **Files Changed**:
+      - `tests/e2e/wishlist-collection-edit.admin.spec.ts` — 7 tests, chromium-admin, serial
+
+      **Passed on the first run**, which is worth noting only because every other spec in this feature needed two or three attempts — the traps had all been hit and written down by then: hearts toggle, ProductCard has no heading, the staff wishlist is shared, and optimistic moves need polling.
+
+      **The order is read off the storefront, not the admin form.** The form can hold the right order and fail to persist it — that is precisely how #503's membership-wiping bug looked from the inside, and it passed its own tests while doing it. Anything asserting on the form would have been green through that bug too.
+
+      **What it pins**
+      - loading brings members back **in the collection's order**, matching what was staged
+      - the confirm appears before a non-empty wishlist is replaced, and names it
+      - a **rule collection offers no load action at all**
+      - the overwrite confirm names the target before anything is destroyed
+      - the reordered list reaches `/collections/<slug>` in the new order
+
+      **Titles are stamped, not just slugs.** A partially-failed probe run earlier left two collections both called "Loop Probe", and `aria-label="Edit Loop Probe"` hit a strict-mode violation on the next run. A unique slug does not help when the locator reads the title — noted on #508 and acted on here.
+
+      **Verification**
+      - Command: `npx playwright test tests/e2e/wishlist-collection-edit.admin.spec.ts --project=chromium-admin --workers=1`
+      - Result: PASS — 7 tests, 0 failing, first attempt
+      - Probe collections cleaned up; the table is back to the seeded 14
+
+      **Serial, and why**: one staff account means one wishlist, so parallel tests overwrite each other and trip the reorder guard. Same as `wishlist-staging.admin.spec.ts`, documented in the file rather than left as a bare `mode: 'serial'`.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 507
+    feature: wishlist-collection-editing
+    description: Web - load a collection's members into the wishlist from the admin form
+  - ticket: 508
+    feature: wishlist-collection-editing
+    description: 'Web - Save as collection: create new, or overwrite an existing one'
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the spec
+    file: tests/e2e/wishlist-collection-edit.admin.spec.ts
+    command: npx playwright test tests/e2e/wishlist-collection-edit.admin.spec.ts --project=chromium-admin --workers=1 --reporter=line
+    expected_result: FAIL until wired
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: Run it green
+    command: npx playwright test tests/e2e/wishlist-collection-edit.admin.spec.ts --project=chromium-admin --workers=1 --reporter=line
+    expected_result: PASS
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit
+    command: 'git add tests/e2e/wishlist-collection-edit.admin.spec.ts && git commit -m "test(e2e): load a collection, reorder it, save it back (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T21:05:42.313Z'
+verification:
+  tests_passed: true
+  test_command: npx playwright test tests/e2e/wishlist-collection-edit.admin.spec.ts --project=chromium-admin --workers=1
+  test_output: '7 passed on the first run, including the full round trip: create from the wishlist, load back in collection order, rearrange, overwrite the same collection, and the storefront renders the new order. Also covers the replace warning and a rule collection offering no load action.'
+  build_passed: true
+  build_command: n/a — E2E only
+  verified_at: '2026-08-05T21:09:09.270Z'
+completed: '2026-08-05T21:09:15.546Z'

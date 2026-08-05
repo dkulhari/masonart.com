@@ -95,14 +95,14 @@ work_session_summary:
       duration: "00:11:00"
       tokens: 0
 tickets:
-  todo:
-    "499": E2E - resweep the review specs for the masonry grid
+  todo: {}
   in_progress: {}
   done:
     "495": Backend API - widen the review read shape with itemType, verified and product chip
     "496": Frontend - ReviewGrid masonry and the fused ReviewGridCard
     "497": Frontend - rebuild /reviews on ReviewGrid with the Loox header row
     "498": Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+    "499": E2E - resweep the review specs for the masonry grid
 total_tickets: 5
-completion_percentage: 80
-is_completed: false
+completion_percentage: 100
+is_completed: true

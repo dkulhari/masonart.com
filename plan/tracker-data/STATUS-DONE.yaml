@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-08-05T20:37:11.545Z'
-total_tickets: 435
+last_updated: '2026-08-05T21:09:16.611Z'
+total_tickets: 440
 summary:
   critical: 21
-  high: 164
-  medium: 190
-  low: 60
+  high: 165
+  medium: 193
+  low: 61
 priorities:
   critical:
     - feature: qa-testing
@@ -913,6 +913,12 @@ priorities:
           blocked_by:
             - ticket_number: 500
               title: API - PUT /api/wishlist to rewrite the order, permutation-guarded
+    - feature: wishlist-collection-editing
+      tickets:
+        - ticket_number: 506
+          title: API - POST /api/wishlist/replace, the explicit set change
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: admin-panel
       tickets:
@@ -1889,6 +1895,14 @@ priorities:
               title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
             - ticket_number: 497
               title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+        - ticket_number: 499
+          title: E2E - resweep the review specs for the masonry grid
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 497
+              title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+            - ticket_number: 498
+              title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
     - feature: wishlist-curation
       tickets:
         - ticket_number: 502
@@ -1903,6 +1917,20 @@ priorities:
           blocked_by:
             - ticket_number: 502
               title: Web - drag and keyboard reordering on /wishlist
+    - feature: wishlist-collection-editing
+      tickets:
+        - ticket_number: 507
+          title: Web - load a collection's members into the wishlist from the admin form
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 506
+              title: API - POST /api/wishlist/replace, the explicit set change
+        - ticket_number: 508
+          title: 'Web - Save as collection: create new, or overwrite an existing one'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 507
+              title: Web - load a collection's members into the wishlist from the admin form
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -2254,6 +2282,16 @@ priorities:
               title: Web - drag and keyboard reordering on /wishlist
             - ticket_number: 503
               title: 'Web - staff staging bar: copy ids, or create a collection from them'
+    - feature: wishlist-collection-editing
+      tickets:
+        - ticket_number: 509
+          title: 'E2E - the full loop: load a collection, reorder it, save it back'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 507
+              title: Web - load a collection's members into the wishlist from the admin form
+            - ticket_number: 508
+              title: 'Web - Save as collection: create new, or overwrite an existing one'
 blocked_tickets:
   - ticket_number: 29
     title: API Routes - Public Review Endpoints
@@ -2826,6 +2864,14 @@ blocked_tickets:
       - ticket_number: 497
         title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
     description: Frontend - ReviewGrid masonry and the fused ReviewGridCard, Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+  - ticket_number: 499
+    title: E2E - resweep the review specs for the masonry grid
+    blocked_by:
+      - ticket_number: 497
+        title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+      - ticket_number: 498
+        title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+    description: Frontend - rebuild /reviews on ReviewGrid with the Loox header row, Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
   - ticket_number: 502
     title: Web - drag and keyboard reordering on /wishlist
     blocked_by:
@@ -2838,6 +2884,18 @@ blocked_tickets:
       - ticket_number: 502
         title: Web - drag and keyboard reordering on /wishlist
     description: Web - drag and keyboard reordering on /wishlist
+  - ticket_number: 507
+    title: Web - load a collection's members into the wishlist from the admin form
+    blocked_by:
+      - ticket_number: 506
+        title: API - POST /api/wishlist/replace, the explicit set change
+    description: API - POST /api/wishlist/replace, the explicit set change
+  - ticket_number: 508
+    title: 'Web - Save as collection: create new, or overwrite an existing one'
+    blocked_by:
+      - ticket_number: 507
+        title: Web - load a collection's members into the wishlist from the admin form
+    description: Web - load a collection's members into the wishlist from the admin form
   - ticket_number: 232
     title: Implement save-address-on-checkout
     blocked_by:
@@ -2992,3 +3050,11 @@ blocked_tickets:
       - ticket_number: 503
         title: 'Web - staff staging bar: copy ids, or create a collection from them'
     description: 'Web - drag and keyboard reordering on /wishlist, Web - staff staging bar: copy ids, or create a collection from them'
+  - ticket_number: 509
+    title: 'E2E - the full loop: load a collection, reorder it, save it back'
+    blocked_by:
+      - ticket_number: 507
+        title: Web - load a collection's members into the wishlist from the admin form
+      - ticket_number: 508
+        title: 'Web - Save as collection: create new, or overwrite an existing one'
+    description: 'Web - load a collection''s members into the wishlist from the admin form, Web - Save as collection: create new, or overwrite an existing one'

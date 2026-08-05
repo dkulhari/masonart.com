@@ -1,0 +1,119 @@
+ticket_number: 507
+title: Web - load a collection's members into the wishlist from the admin form
+description: |-
+  ## Task
+
+  On the admin collection edit form, for **manual collections only**: a **Load into wishlist** action.
+
+  - Warns first, naming how many items are currently in the wishlist and that they will be replaced. The admin's wishlist is a work list, not precious — but destroying it silently is still wrong.
+  - Offers **Copy IDs** of the current wishlist in the same warning, so what is about to be lost can be recovered by hand.
+  - On confirm: `POST /api/wishlist/replace` with the collection's members in position order, then navigate to `/wishlist`.
+
+  Rule collections do not get the action at all. Their rule IS their membership; there is no explicit list to load.
+
+  ## Context
+
+  Feature: wishlist-collection-editing, Phase 2. Depends on the replace endpoint.
+
+  `packages/web/app/routes/admin/collections/$id.tsx` already loads `productIds` (added in #503 to stop the form wiping membership), so the members are in hand — no extra fetch.
+
+  The store needs a matching action so the client state does not go stale against the server. Follow `reorder`'s shape in `packages/web/app/stores/wishlist.ts`.
+feature: wishlist-collection-editing
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T20:51:19.160Z'
+last_updated: '2026-08-05T20:57:42.527Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T20:54:34.499Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T20:57:21.964Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T20:57:42.527Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `c22243a4` — feat(web): load a collection into the wishlist to reorder it
+
+      **Files Changed**:
+      - `packages/web/app/components/admin/LoadIntoWishlist.tsx` — new
+      - `packages/web/app/routes/admin/collections/$id.tsx` — mounts it above the form, manual only
+      - `packages/web/app/stores/wishlist.ts` — `replaceAll(productIds)`
+      - `packages/web/app/lib/api.ts` — `wishlistApi.replace(productIds)`
+      - `packages/web/tests/components/admin/LoadIntoWishlist.test.tsx` — 11 tests
+
+      **`replaceAll` is deliberately NOT optimistic**, unlike `reorder`. A drag has to feel instant; a confirmed destructive action does not, and applying it locally before the server agreed would leave a staff member rearranging a list the server never accepted. It throws, and the caller stays on the page and says so rather than navigating away from a write that did not land. There is a test for exactly that (`surfaces a failure instead of navigating`).
+
+      **The warning earns its place rather than being ceremony**
+      - It names **how many** saved items will go. "This will clear your wishlist" without a number is a warning nobody can weigh.
+      - It offers **Copy current ids** in the same dialog, so a mistake is recoverable by hand.
+      - With an **empty wishlist it does not appear at all** — nothing to lose means nothing to weigh, and a confirm dialog over a no-op trains people to click through confirms.
+
+      **Rule collections get nothing.** Their rule *is* their membership; there is no explicit list to load and no ordering to edit. The component returns null rather than rendering a disabled control, because a disabled button invites the question "why not?".
+
+      **Verification**
+      - Command: `cd packages/web && npx vitest run tests/components/admin/ tests/stores/ tests/components/wishlist/`
+      - Result: PASS — 176 tests across 13 suites, 0 failing
+      - Build: `npx tsc --noEmit -p tsconfig.json` — clean
+
+      **Not yet usable end to end.** Loading works, but saving back still only offers "create new" — so right now this produces a *copy*, not an edit. #508 adds the overwrite destination, and #509 proves the loop. Flagging because the feature reads as complete from the admin form and is not.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 506
+    feature: wishlist-collection-editing
+    description: API - POST /api/wishlist/replace, the explicit set change
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests
+    file: packages/web/tests/routes/admin/collection-load-to-wishlist.test.tsx
+    command: cd packages/web && npx vitest run tests/routes/admin/collection-load-to-wishlist.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: the action is absent for a rule collection; present for a manual one; clicking warns before doing anything and names the current wishlist count; cancelling writes nothing; confirming posts the members in position order to /api/wishlist/replace and then navigates to /wishlist; the warning offers the current ids for copying.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && npx vitest run tests/routes/admin/collection-load-to-wishlist.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the action, the confirm, and a store action to match
+    status: pending
+    code: 'Store: replaceAll(productIds). Form: the button plus its warning.'
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass and typecheck is clean
+    command: cd packages/web && npx vitest run tests/routes/admin/ tests/stores/ && npx tsc --noEmit -p tsconfig.json
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app packages/web/tests && git commit -m "feat(web): load a collection into the wishlist to reorder it (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T20:54:34.499Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/web && npx vitest run tests/components/admin/ tests/stores/ tests/components/wishlist/
+  test_output: 176 tests passing across 13 suites, 11 of them new. Covers the action being absent for rule collections, disabled with no members, the warning naming the count, cancel writing nothing, confirm replacing in order then navigating, and a failure staying put.
+  build_passed: true
+  build_command: cd packages/web && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T20:57:16.720Z'
+completed: '2026-08-05T20:57:21.964Z'
