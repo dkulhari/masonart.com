@@ -22,6 +22,7 @@ import {
 } from '~/lib/admin-nav'
 import { STYLE_OPTIONS } from '@chobii/shared'
 import { SearchDrawer } from './SearchDrawer'
+import { AllArtMegaMenu } from './AllArtMegaMenu'
 
 /**
  * The header's own height, and the offset everything sticky below it uses.
@@ -68,6 +69,13 @@ const NEW_IN_SEARCH = { sortBy: 'createdAt', sortOrder: 'desc' }
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+
+  // The mega panel opens itself; the header only needs to know so it can
+  // raise the scrim. The scrim cannot live inside the panel: the nav-rows
+  // block carries a transform for its reveal, and a transform is a containing
+  // block for fixed descendants — which is what collapsed a full-screen
+  // overlay to zero height in #348 (#476).
+  const [isAllArtOpen, setIsAllArtOpen] = useState(false)
   const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
   // The cart is a left slide-out drawer, not a page (#460). CartDrawer is
@@ -167,7 +175,18 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header
+        className={cn(
+          'sticky top-0 z-50 w-full border-b border-border',
+          // The bar is translucent so the page shows through as it scrolls
+          // under — but a translucent bar over the mega panel's scrim reads
+          // as dimmed chrome, which is not what mesonart does: their header
+          // stays white while the panel is open. Go opaque for the duration.
+          isAllArtOpen
+            ? 'bg-background'
+            : 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60'
+        )}
+      >
         <div className="container-wide">
         {/* The compact bar. Wordmark + actions only — the pages row moved out
             below it (mesonart puts nav under the wordmark line, not beside
@@ -293,6 +312,22 @@ export function Header() {
         onClose={() => setIsSearchOpen(false)}
       />
 
+      {/* The mega panel's scrim (#476). Sibling of <header> for the same
+          reason the drawer's is — see the note on the state above.
+          `z-40` puts it over the announcement bar and the page while the
+          nav rows, which come later at the same level, and the header at
+          z-50 keep painting above it. Pointer-events off, so moving the
+          pointer out of the panel still closes it. */}
+      <div
+        aria-hidden="true"
+        data-testid="all-art-mega-scrim"
+        className={cn(
+          'pointer-events-none fixed inset-0 z-40 bg-black/30 transition-opacity duration-500 motion-reduce:transition-none',
+          isAllArtOpen ? 'opacity-100' : 'invisible opacity-0'
+        )}
+        style={{ transitionTimingFunction: 'cubic-bezier(0.6, 0, 0.4, 1)' }}
+      />
+
       {/* Nav rows 1 and 2 — pages, then styles.
        *
        * Both live BELOW the wordmark line, the way mesonart stacks them, not
@@ -400,17 +435,22 @@ export function Header() {
           aria-label="Shop by style"
           data-testid="styles-nav"
           data-revealed={isNavRevealed}
-          className="transition-[transform,opacity] duration-200 motion-reduce:transition-none"
+          // `relative` so the All Art panel's `absolute left-0 top-full`
+          // resolves against this row — full width, dropping from under it.
+          className="relative transition-[transform,opacity] duration-200 motion-reduce:transition-none"
         >
           <div className="container-wide">
             <ul className="scrollbar-hide flex items-center gap-6 overflow-x-auto py-2">
-              <li>
-                <Link
-                  to="/posters"
-                  className="whitespace-nowrap text-nav text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  All Art
-                </Link>
+              {/* Not a link any more but a door: All Art opens the whole
+                  filter vocabulary as a panel, the way mesonart's does
+                  (#476). `static` so the panel measures against the row
+                  rather than this list item. Clicking it still lands on an
+                  unfiltered /posters. */}
+              <li className="static">
+                <AllArtMegaMenu
+                  onOpenChange={setIsAllArtOpen}
+                  onNavigate={closeMobileMenu}
+                />
               </li>
               {STYLE_OPTIONS.map((style) => (
                 <li key={style.id}>
