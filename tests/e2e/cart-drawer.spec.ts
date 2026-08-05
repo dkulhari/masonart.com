@@ -91,9 +91,12 @@ test.describe('Cart Drawer - opening', () => {
     await cartButton(page).click();
     await expect(drawer(page)).toBeVisible();
 
-    // Click the far right of the backdrop, well clear of the left-hand panel.
+    // The backdrop is inset-0, so it sits UNDER the panel too — the position is
+    // element-relative, and anything inside the first 448px (max-w-md) hits the
+    // drawer instead. Click well clear of it, on the right.
+    const viewport = page.viewportSize();
     await page.getByTestId('cart-drawer-backdrop').click({
-      position: { x: 100, y: 100 },
+      position: { x: viewport!.width - 100, y: 300 },
     });
 
     await expect(drawer(page)).toBeHidden();

@@ -177,6 +177,10 @@ test.describe('Root Layout - Navigation', () => {
   });
 
   test('should open the cart drawer from the header', async ({ page }) => {
+    // The button only does anything once React has hydrated; this describe's
+    // beforeEach does a bare goto.
+    await page.waitForLoadState('networkidle');
+
     const cartButton = page
       .locator('header button[aria-label^="Shopping cart"]')
       .first();
@@ -532,9 +536,11 @@ test.describe('Root Layout - Accessibility', () => {
   });
 
   test('should have proper ARIA labels on interactive elements', async ({ page }) => {
-    // Cart link should have aria-label
-    const cartLink = page.locator('a[href="/cart"]').first();
-    await expect(cartLink).toHaveAttribute('aria-label', /cart/i);
+    // The cart control is a drawer button (#460), and carries the aria-label
+    const cartButton = page
+      .locator('header button[aria-label^="Shopping cart"]')
+      .first();
+    await expect(cartButton).toHaveAttribute('aria-label', /cart/i);
 
     // Account link should have aria-label.
     // Set desktop viewport to ensure it's visible. Scoped by the label
