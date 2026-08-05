@@ -210,44 +210,74 @@ describe('Database Seeding Tests', () => {
       });
     });
 
+    /**
+     * The frames moved out of seed.ts (#420). Both seeds need them and the
+     * copy in seed-admin.ts carried a comment promising it was kept in sync by
+     * hand, so the list now lives in seed-frames.ts and both import it.
+     */
     describe('Frame Options', () => {
-      it('should define sample frames array', () => {
-        expect(seedContent).toContain('sampleFrames');
-        expect(seedContent).toContain('NewFrame[]');
+      let framesContent: string;
+
+      beforeAll(() => {
+        framesContent = fs.readFileSync(
+          path.join(process.cwd(), 'packages', 'api', 'src', 'database', 'seed-frames.ts'),
+          'utf-8'
+        );
       });
 
-      it('should include various frame types', () => {
-        expect(seedContent).toContain('type: "none"');
-        expect(seedContent).toContain('type: "black"');
-        expect(seedContent).toContain('type: "white"');
-        expect(seedContent).toContain('type: "oak"');
-        expect(seedContent).toContain('type: "walnut"');
-        expect(seedContent).toContain('type: "gold"');
-        expect(seedContent).toContain('type: "silver"');
-        expect(seedContent).toContain('type: "wood"');
+      it('should define sample frames array', () => {
+        expect(framesContent).toContain('sampleFrames');
+        expect(framesContent).toContain('NewFrame[]');
+      });
+
+      it('is the one list both seeds read', () => {
+        for (const seed of ['seed.ts', 'seed-admin.ts']) {
+          const content = fs.readFileSync(
+            path.join(process.cwd(), 'packages', 'api', 'src', 'database', seed),
+            'utf-8'
+          );
+          expect(content, seed).toContain('from "./seed-frames"');
+          expect(content, seed).not.toContain('const sampleFrames');
+        }
+      });
+
+      it('offers the format ladder, not a moulding catalogue', () => {
+        // mesonart's axis: the print in a tube, the print stretched, or the
+        // print stretched and framed.
+        expect(framesContent).toContain('type: "rolled"');
+        expect(framesContent).toContain('type: "frameless"');
+        for (const type of ['gold', 'silver', 'black', 'white', 'wood']) {
+          expect(framesContent, type).toContain(`type: "${type}"`);
+        }
+      });
+
+      it('names them the way the storefront axis reads', () => {
+        expect(framesContent).toContain('Rolled Canvas');
+        expect(framesContent).toContain('Frameless');
+        expect(framesContent).toContain('Stretch + Silver Frame');
       });
 
       it('should have required frame fields', () => {
-        expect(seedContent).toContain('name:');
-        expect(seedContent).toContain('type:');
-        expect(seedContent).toContain('description:');
-        expect(seedContent).toContain('material:');
-        expect(seedContent).toContain('priceModifier:');
-        expect(seedContent).toContain('priceAddition:');
-        expect(seedContent).toContain('isActive:');
-        expect(seedContent).toContain('sortOrder:');
+        expect(framesContent).toContain('name:');
+        expect(framesContent).toContain('type:');
+        expect(framesContent).toContain('description:');
+        expect(framesContent).toContain('material:');
+        expect(framesContent).toContain('priceModifier:');
+        expect(framesContent).toContain('priceAddition:');
+        expect(framesContent).toContain('isActive:');
+        expect(framesContent).toContain('sortOrder:');
       });
 
-      it('should have frame with no frame option', () => {
-        expect(seedContent).toContain('No Frame');
-        expect(seedContent).toContain('priceAddition: "0.00"');
+      it('leads with the option that adds nothing', () => {
+        expect(framesContent).toContain('priceAddition: "0.00"');
       });
 
-      it('should have frames with different price additions', () => {
-        expect(seedContent).toContain('priceAddition: "399.00"');
-        expect(seedContent).toContain('priceAddition: "599.00"');
-        expect(seedContent).toContain('priceAddition: "699.00"');
-        expect(seedContent).toContain('priceAddition: "799.00"');
+      it('prices every framed option the same, as theirs does', () => {
+        // Measured on mesonart: $260 rolled, $460 frameless, $480 for any
+        // Stretch+Frame. One step up to stretched, a smaller one to framed,
+        // and no premium between mouldings.
+        expect(framesContent).toContain('priceAddition: "499.00"');
+        expect(framesContent.match(/priceAddition: "599\.00"/g)).toHaveLength(5);
       });
     });
 

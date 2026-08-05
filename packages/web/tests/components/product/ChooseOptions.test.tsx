@@ -135,32 +135,41 @@ const apiProduct = {
   ],
   frames: [
     {
-      id: 'f-none',
-      type: 'none',
-      name: 'No Frame',
-      description: 'Print only',
+      id: 'f-rolled',
+      type: 'rolled',
+      name: 'Rolled Canvas',
+      description: 'Shipped in a tube',
       color: 'N/A',
       priceAddition: '0.00',
       thumbnailUrl: null,
     },
     {
+      id: 'f-frameless',
+      type: 'frameless',
+      name: 'Frameless',
+      description: 'Stretched, no moulding',
+      color: 'N/A',
+      priceAddition: '499.00',
+      thumbnailUrl: null,
+    },
+    {
       id: 'f-black',
       type: 'black',
-      name: 'Classic Black',
-      description: 'Matte black wood',
+      name: 'Stretch + Black Frame',
+      description: 'Matte black',
       color: 'Matte Black',
       priceAddition: '499.00',
-      // What the seed actually ships today.
+      // A placeholder is what the seed used to ship; it must not reach a swatch.
       thumbnailUrl: 'https://placehold.co/100x100/1a1a1a/ffffff?text=Black',
     },
     {
-      id: 'f-oak',
-      type: 'oak',
-      name: 'Natural Oak',
-      description: 'Oak',
-      color: 'Natural Oak',
+      id: 'f-gold',
+      type: 'gold',
+      name: 'Stretch + Gold Frame',
+      description: 'Antique gold',
+      color: 'Antique Gold',
       priceAddition: '599.00',
-      thumbnailUrl: '/frames/natural-oak.webp',
+      thumbnailUrl: '/frames/gold.webp',
     },
   ],
 }
@@ -295,7 +304,7 @@ describe('the panel', () => {
     await ready()
 
     expect(getBySlug).toHaveBeenCalledWith('blush-hour')
-    expect(screen.getByRole('button', { name: 'Classic Black' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stretch + Black Frame' })).toBeTruthy()
   })
 
   it('fetches once across repeated opens', async () => {
@@ -351,13 +360,38 @@ describe('choosing a size', () => {
 })
 
 describe('choosing a frame', () => {
+  it('heads the row with their format axis, not the word "Frame"', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    // Ours is their ladder now: the print in a tube, the print stretched, or
+    // the print stretched and framed. "Frame:" named only the last of those.
+    expect(screen.getByTestId('quickview-frame-label').textContent).toContain(
+      'Rolled Canvas/Frameless/Framed:'
+    )
+  })
+
+  it('opens on the tube option, the cheapest way to buy the piece', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    expect(screen.getByTestId('quickview-frame-value').textContent).toBe(
+      'Rolled Canvas'
+    )
+    expect(
+      screen.getByRole('button', { name: /add to cart/i }).textContent
+    ).toContain('1,999')
+  })
+
   it('offers a swatch per frame, named', async () => {
     render(<ChooseOptions product={product} />)
     await open()
     await ready()
 
-    expect(screen.getByRole('button', { name: 'No Frame' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Classic Black' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Rolled Canvas' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stretch + Black Frame' })).toBeTruthy()
   })
 
   /**
@@ -374,9 +408,9 @@ describe('choosing a frame', () => {
     await open()
     await ready()
 
-    const swatch = screen.getByRole('button', { name: 'Natural Oak' })
+    const swatch = screen.getByRole('button', { name: 'Stretch + Gold Frame' })
     expect(swatch.querySelector('img')?.getAttribute('src')).toBe(
-      '/frames/natural-oak.webp'
+      '/frames/gold.webp'
     )
   })
 
@@ -385,17 +419,17 @@ describe('choosing a frame', () => {
     await open()
     await ready()
 
-    const swatch = screen.getByRole('button', { name: 'Classic Black' })
+    const swatch = screen.getByRole('button', { name: 'Stretch + Black Frame' })
     expect(swatch.querySelector('img')).toBeNull()
     expect(swatch.querySelector('[data-testid="frame-corner"]')).not.toBeNull()
   })
 
-  it('draws the bare sheet when there is no frame at all', async () => {
+  it('draws the roll for the tube option', async () => {
     render(<ChooseOptions product={product} />)
     await open()
     await ready()
 
-    const swatch = screen.getByRole('button', { name: 'No Frame' })
+    const swatch = screen.getByRole('button', { name: 'Rolled Canvas' })
     expect(swatch.querySelector('img')).toBeNull()
     expect(swatch.querySelector('[data-testid="frame-corner"]')).not.toBeNull()
   })
@@ -405,10 +439,10 @@ describe('choosing a frame', () => {
     await open()
     await ready()
 
-    const swatch = screen.getByRole('button', { name: 'Natural Oak' })
+    const swatch = screen.getByRole('button', { name: 'Stretch + Gold Frame' })
     const pill = swatch.querySelector('[data-testid="frame-name"]')
 
-    expect(pill?.textContent).toBe('Natural Oak')
+    expect(pill?.textContent).toBe('Stretch + Gold Frame')
     // Decorative duplicate — the button already carries the name.
     expect(pill?.getAttribute('aria-hidden')).toBe('true')
   })
@@ -418,12 +452,12 @@ describe('choosing a frame', () => {
     await open()
     await ready()
 
-    const black = screen.getByRole('button', { name: 'Classic Black' })
+    const black = screen.getByRole('button', { name: 'Stretch + Black Frame' })
     fireEvent.click(black)
 
     expect(black.getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByTestId('quickview-frame-value').textContent).toBe(
-      'Classic Black'
+      'Stretch + Black Frame'
     )
   })
 })
@@ -437,7 +471,7 @@ describe('the price on the button', () => {
     const cta = screen.getByRole('button', { name: /add to cart/i })
     expect(cta.textContent).toContain('1,999')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Classic Black' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stretch + Black Frame' }))
     await waitFor(() => expect(cta.textContent).toContain('2,498'))
   })
 
@@ -474,7 +508,7 @@ describe('adding to cart', () => {
     fireEvent.change(screen.getByLabelText('Size'), {
       target: { value: 'v-24x36' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Classic Black' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Stretch + Black Frame' }))
     fireEvent.click(screen.getByRole('button', { name: /increase quantity/i }))
     fireEvent.click(screen.getByRole('button', { name: /add to cart/i }))
 
@@ -495,7 +529,7 @@ describe('adding to cart', () => {
     await open()
     await ready()
 
-    fireEvent.click(screen.getByRole('button', { name: 'No Frame' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Rolled Canvas' }))
     fireEvent.click(screen.getByRole('button', { name: /add to cart/i }))
 
     await waitFor(() => expect(useCartStore.getState().items).toHaveLength(1))

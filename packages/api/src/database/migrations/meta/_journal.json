@@ -29,6 +29,13 @@
       "when": 1785842486217,
       "tag": "0003_smiling_forge",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785934072438,
+      "tag": "0004_perfect_stardust",
+      "breakpoints": true
     }
   ]
 }

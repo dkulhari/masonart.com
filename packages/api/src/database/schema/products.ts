@@ -65,7 +65,17 @@ export const productStatusEnum = pgEnum("product_status", [
 ]);
 
 /**
- * Frame type enum for frame options
+ * Frame type enum for frame options.
+ *
+ * `rolled` and `frameless` are formats rather than mouldings — the print
+ * shipped in a tube, and the print stretched on bars with no moulding at all.
+ * They join the list because the storefront's option axis is
+ * "Rolled Canvas / Frameless / Framed" (#420), and both need to be a real row
+ * so the cart can carry a frameId for them like any other choice.
+ *
+ * `none`, `walnut` and `oak` are no longer seeded but stay in the enum: a
+ * Postgres enum cannot drop a value without recreating the type, and nothing
+ * is gained by the churn.
  */
 export const frameTypeEnum = pgEnum("frame_type", [
   "none",
@@ -76,6 +86,8 @@ export const frameTypeEnum = pgEnum("frame_type", [
   "oak",
   "gold",
   "silver",
+  "rolled",
+  "frameless",
 ]);
 
 // ============================================================================

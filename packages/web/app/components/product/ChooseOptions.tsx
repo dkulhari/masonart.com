@@ -155,6 +155,41 @@ function usablePhoto(
  * angle, catching a shadow, over the print's white.
  */
 function FrameCorner({ type }: { type: string }) {
+  // The tube. Theirs photographs a rolled canvas with the paper edge showing;
+  // this is the same read — a cylinder lying at an angle, lit down one side.
+  if (type === 'rolled') {
+    return (
+      <span
+        data-testid="frame-corner"
+        aria-hidden="true"
+        className={cn(
+          'block h-[34px] w-[18px] -rotate-[24deg] rounded-[9px]',
+          'shadow-[0_3px_6px_rgba(23,23,23,0.28)]'
+        )}
+        style={{
+          backgroundImage:
+            'linear-gradient(100deg, #efe9df 0%, #ffffff 35%, #e0d7c8 100%)',
+        }}
+      />
+    )
+  }
+
+  // Stretched over bars with nothing around it: the face, and the depth of the
+  // bar catching shadow down one edge.
+  if (type === 'frameless') {
+    return (
+      <span
+        data-testid="frame-corner"
+        aria-hidden="true"
+        className={cn(
+          'block h-[32px] w-[32px] -rotate-[14deg] rounded-[2px] bg-background',
+          'shadow-[3px_3px_0_0_#d9d3c8,0_4px_7px_rgba(23,23,23,0.25)]',
+          'border border-foreground/15'
+        )}
+      />
+    )
+  }
+
   const moulding = FRAME_SWATCH[type]
 
   return (
@@ -166,7 +201,7 @@ function FrameCorner({ type }: { type: string }) {
         'shadow-[0_3px_6px_rgba(23,23,23,0.28)]',
         moulding
           ? 'p-[7px]'
-          : // No moulding at all — the bare sheet, edged just enough to be
+          : // No moulding we know of — the bare sheet, edged just enough to be
             // seen against the white circle behind it.
             'border border-foreground/25 bg-background'
       )}
@@ -270,8 +305,12 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
       const loaded = toOptions(response as ProductOptionsResponse | null)
       setOptions(loaded)
       setVariantId(loaded.variants[0]?.id ?? null)
-      // Theirs opens with the first swatch chosen; ours is the print-only one.
-      setFrameId(loaded.frames.find((f) => f.type === 'none')?.id ?? null)
+      // Theirs opens on Rolled Canvas — the format that adds nothing. Falling
+      // back to the first row keeps that true if the ladder is ever reordered.
+      setFrameId(
+        (loaded.frames.find((f) => f.type === 'rolled') ?? loaded.frames[0])
+          ?.id ?? null
+      )
       setStatus('ready')
     } catch {
       setStatus('error')
@@ -505,8 +544,14 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
 
                   {options.frames.length > 0 && (
                     <div className="space-y-3">
-                      <p className="flex items-center gap-2 text-foreground">
-                        Frame:
+                      {/* Their heading names the whole axis, not the last
+                       * rung of it: the print in a tube, the print stretched,
+                       * or the print stretched and framed. */}
+                      <p
+                        data-testid="quickview-frame-label"
+                        className="flex flex-wrap items-center gap-2 text-foreground"
+                      >
+                        Rolled Canvas/Frameless/Framed:
                         <span
                           data-testid="quickview-frame-value"
                           className="font-medium"
