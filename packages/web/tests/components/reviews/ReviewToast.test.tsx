@@ -91,10 +91,17 @@ function makeReview(overrides: Partial<ReviewFeedItem> = {}): ReviewFeedItem {
     createdAt: '2026-07-14T09:30:00.000Z',
     updatedAt: '2026-07-14T09:30:00.000Z',
     author: { id: 'user-1', name: 'Ananya R' },
+    verified: true,
+    itemType: {
+      sizeLabel: '24"Hx 20"W/ 61x 51 CM',
+      frameName: 'Stretch+Black Frame',
+      frameType: 'stretched',
+    },
     product: {
       id: 'prod-1',
       title: 'Kyoto Rain',
       slug: 'kyoto-rain',
+      sku: 'KR001',
       imageUrl: 'https://cdn.test/kyoto.webp',
     },
     media: [],
@@ -112,6 +119,7 @@ const SECOND_REVIEW = makeReview({
     id: 'prod-2',
     title: 'Osaka Dusk',
     slug: 'osaka-dusk',
+    sku: 'OD002',
     imageUrl: 'https://cdn.test/osaka.webp',
   },
 })

@@ -42,6 +42,15 @@ export const reviewKeys = {
   feeds: () => [...reviewKeys.all, 'feed'] as const,
   feed: (page: number, pageSize: number) =>
     [...reviewKeys.feeds(), page, pageSize] as const,
+  /** Prefix for every page of the masonry grid, filtered or not. */
+  cardFeeds: () => [...reviewKeys.all, 'cards'] as const,
+  /**
+   * `'all'` rather than `undefined` for the unfiltered grid, for the same
+   * reason `mediaFeed` does it: an undefined tail serialises to the same key
+   * as a missing one, so /reviews and a PDP grid would collide.
+   */
+  cards: (productId: string | undefined, page: number, pageSize: number) =>
+    [...reviewKeys.cardFeeds(), productId ?? 'all', page, pageSize] as const,
   /** Prefix for every media feed, filtered or not. */
   mediaFeeds: () => [...reviewKeys.all, 'media'] as const,
   /**
@@ -326,6 +335,36 @@ export function useReviewFeed(
 }
 
 /**
+ * One page of review cards for the masonry grid — filtered to a product, or
+ * not.
+ *
+ * The `productId` is the ONLY difference between the two deployments of the
+ * grid: the PDP passes one, /reviews does not, exactly the way mesonart runs
+ * the same Loox grid on both surfaces.
+ *
+ * Reads through `reviewsApi` rather than the relative-URL helpers at the top
+ * of this module. There is no Vite proxy for `/api` in this repo, so a
+ * relative request from the dev server never reaches the API — it passes in
+ * jsdom and fails in the browser (#493).
+ */
+export function useReviewCards(
+  productId: string | undefined,
+  page: number,
+  pageSize = 24,
+  options?: Omit<UseQueryOptions<ReviewFeedResponse>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: reviewKeys.cards(productId, page, pageSize),
+    queryFn: () =>
+      productId
+        ? reviewsApi.listForProduct(productId, { page, pageSize })
+        : reviewsApi.listAll({ page, pageSize }),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...options,
+  })
+}
+
+/**
  * Flat feed of customer photos and videos.
  *
  * Pass a productId for the PDP media wall; omit it for the site-wide strip.
@@ -366,6 +405,7 @@ export function useCreateReview(productId: string) {
       // the home strip read the same rows, and a review with photos changes
       // the media wall too. Prefix keys, so every page and every filter goes.
       queryClient.invalidateQueries({ queryKey: reviewKeys.feeds() })
+      queryClient.invalidateQueries({ queryKey: reviewKeys.cardFeeds() })
       queryClient.invalidateQueries({ queryKey: reviewKeys.mediaFeeds() })
     },
   })

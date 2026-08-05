@@ -37,3 +37,16 @@ export type {
 
 export { ReviewModal } from './ReviewModal'
 export type { ReviewModalProps } from './ReviewModal'
+
+export { ReviewGridCard, composeItemType } from './ReviewGridCard'
+export type { ReviewGridCardProps, ReviewCardData } from './ReviewGridCard'
+
+export { ReviewGrid } from './ReviewGrid'
+export type { ReviewGridProps } from './ReviewGrid'
+
+export { ReviewMediaLightbox } from './ReviewMediaLightbox'
+export type {
+  ReviewMediaLightboxProps,
+  LightboxMedia,
+  LightboxCaption,
+} from './ReviewMediaLightbox'

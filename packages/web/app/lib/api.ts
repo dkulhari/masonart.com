@@ -581,6 +581,35 @@ export interface ReviewMediaFeedItem extends ReviewMediaItem {
 }
 
 /**
+ * The variant the reviewer actually bought — the "Item type:" line on a card.
+ *
+ * Parts, not a composed string: the API deliberately leaves the separator and
+ * the ordering to the surface rendering it (#495). Compose with
+ * `composeItemType` in ReviewGridCard rather than joining these by hand.
+ *
+ * Every part is nullable. A frameless poster is a real purchase, not a missing
+ * value.
+ */
+export interface ReviewItemType {
+  sizeLabel: string | null;
+  frameName: string | null;
+  frameType: string | null;
+}
+
+/**
+ * The product chip on a review card: a thumbnail, a title, a link and the sku
+ * the badge shows.
+ */
+export interface ReviewProductChip {
+  id: string;
+  title: string;
+  slug: string;
+  sku: string;
+  /** Already resolved to a single url by the API — not the image array. */
+  imageUrl: string | null;
+}
+
+/**
  * One review from GET /api/reviews.
  *
  * Unlike the product-scoped list, this one embeds the product: a review shown
@@ -596,13 +625,14 @@ export interface ReviewFeedItem {
   updatedAt: string;
   /** Null when the author's account is gone — the review survives them. */
   author: { id: string; name: string | null } | null;
-  product: {
-    id: string;
-    title: string;
-    slug: string;
-    /** Already resolved to a single url by the API — not the image array. */
-    imageUrl: string | null;
-  };
+  /**
+   * Derived server-side, never stored: a review row hangs off an order item
+   * behind a NOT NULL foreign key, so a review IS a purchase (#495).
+   */
+  verified: boolean;
+  /** Null when the order item behind the review has gone missing. */
+  itemType: ReviewItemType | null;
+  product: ReviewProductChip;
   media: ReviewMediaItem[];
 }
 
@@ -638,6 +668,49 @@ export const reviewsApi = {
 
     const response = await fetch(`${getApiUrl()}${url}`, {
       method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to fetch reviews");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * One page of a single product's approved reviews, in the same card shape
+   * `listAll` returns.
+   *
+   * The same rows `hooks/useReviews.ts` reads — but that module fetches
+   * against a relative `API_BASE = '/api'`, and there is no Vite proxy for
+   * `/api` in this repo, so a relative request from the dev server never
+   * reaches the API. It passes in jsdom and fails in the browser; that exact
+   * bug bit ReviewModal in #493. The review grid reads through here instead.
+   */
+  async listForProduct(
+    productId: string,
+    params?: ReviewFeedParams
+  ): Promise<ReviewFeedResponse> {
+    const queryParams: Record<string, string> = {};
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams[key] = String(value);
+        }
+      });
+    }
+
+    const queryString = new URLSearchParams(queryParams).toString();
+    const path = `/api/products/${encodeURIComponent(productId)}/reviews`;
+    const url = queryString ? `${path}?${queryString}` : path;
+
+    const response = await fetch(`${getApiUrl()}${url}`, {
+      method: "GET",
+      // The signed-in reader's own pending review comes back on this read.
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
     });
 
