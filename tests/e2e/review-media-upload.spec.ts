@@ -24,8 +24,8 @@
  * reviewed every delivered item this customer owns — so there is no "Write
  * Review" button to press until one is freed. `beforeAll` frees the least
  * load-bearing one it can find (preferring a review with no photos, so the PDP
- * media wall is untouched) and `afterAll` puts it back, moderated to whatever
- * status it had. Net effect on the database across a run: nothing.
+ * review grid keeps its media cards) and `afterAll` puts it back, moderated to
+ * whatever status it had. Net effect on the database across a run: nothing.
  *
  * The one rule that makes that safe: teardown deletes the id it captured off
  * the create response and NOTHING ELSE. An order item's `review` is resolved
@@ -178,9 +178,10 @@ test.beforeAll(async () => {
      * Review" and there is no form to open. A review reported against exactly
      * one candidate is the one with no twin behind it.
      *
-     * Among those, still prefer no photos, so the media wall the
-     * read-surfaces spec looks at keeps its tiles — and so teardown, which can
-     * restore a review's text but not its uploads, has nothing to lose.
+     * Among those, still prefer no photos, so the review grid the
+     * read-surfaces spec looks at keeps its media cards — and so teardown,
+     * which can restore a review's text but not its uploads, has nothing to
+     * lose.
      */
     const timesReported = new Map<string, number>()
     for (const candidate of candidates) {

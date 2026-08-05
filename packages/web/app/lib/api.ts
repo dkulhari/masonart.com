@@ -319,6 +319,51 @@ export const productsApi = {
     return response.json();
   },
   /**
+   * One product's review aggregate — the figure the PDP's buy box and its
+   * review header row both print.
+   *
+   * The product detail endpoint does NOT carry it. The LIST endpoint joins the
+   * aggregate per card, so `rating` on a product card is real; `/api/products/
+   * :slug` selects the product row alone, which left `product.rating`
+   * undefined on every poster and the buy box's star row rendering on none of
+   * them. Rather than widen the detail payload (it is server-cached, and a
+   * rating that moves on approval would go stale behind that cache), the page
+   * reads the aggregate from the review endpoint that already owns it and
+   * invalidates with the reviews.
+   *
+   * Shaped to `{ averageRating, reviewCount }` here rather than at the call
+   * site: the endpoint says `totalReviews`, every consumer in the web app says
+   * `reviewCount`, and one of those names has to give.
+   */
+  async productReviewStats(productId: string): Promise<{
+    averageRating: number | null;
+    reviewCount: number;
+  }> {
+    const response = await fetch(
+      `${getApiUrl()}/api/products/${encodeURIComponent(productId)}/reviews/stats`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch product review stats");
+    }
+
+    const stats = (await response.json()) as {
+      averageRating: number | null;
+      totalReviews: number;
+    };
+
+    return {
+      // Never coalesced to 0: "not yet rated" and "rated badly" are different
+      // claims, and the surfaces above suppress the star row on null.
+      averageRating: stats.averageRating ?? null,
+      reviewCount: stats.totalReviews ?? 0,
+    };
+  },
+  /**
    * List products with optional filters and pagination
    */
   async list(params?: ProductFilters) {

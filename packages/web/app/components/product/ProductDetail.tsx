@@ -298,19 +298,29 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
                 </p>
               )}
 
-              {/* Rating */}
+              {/* Rating — and the way down to the reviews.
+                  mesonart hangs the buy box's count off the wall below it: the
+                  "(104)" is a jump to the review section, not a label. The
+                  `#reviews` anchor is owned by ProductReviewSection, which
+                  carries the scroll margin that keeps the landing clear of the
+                  sticky header. A plain anchor rather than a <Link>: this is a
+                  move within the document, not a route change. */}
               {product.rating && product.rating.reviewCount > 0 && (
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex items-center gap-1">
+                <a
+                  href="#reviews"
+                  data-testid="buybox-reviews-link"
+                  className="mt-2 flex w-fit items-center gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="flex items-center gap-1">
                     <Star className="h-4 w-4 fill-rating text-rating" />
                     <span className="text-sm font-medium">
                       {product.rating.averageRating.toFixed(1)}
                     </span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
+                  </span>
+                  <span className="text-sm text-muted-foreground underline-offset-4 hover:underline">
                     ({product.rating.reviewCount} reviews)
                   </span>
-                </div>
+                </a>
               )}
 
               {/* SKU */}

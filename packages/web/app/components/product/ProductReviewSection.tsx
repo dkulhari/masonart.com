@@ -68,7 +68,14 @@ export function ProductReviewSection({
     <section
       id="reviews"
       data-testid="product-reviews"
-      className={cn('border-t border-border bg-background', className)}
+      // `scroll-mt` is what makes the anchor land on the wall rather than
+      // behind the header: the buy box's star row jumps here, and the header is
+      // `sticky top-0`, so without the margin the section's first rows arrive
+      // underneath it.
+      className={cn(
+        'scroll-mt-20 border-t border-border bg-background',
+        className
+      )}
     >
       <div className="container-wide py-12">
         {/* The reference carries no visible heading — the wall is the section.

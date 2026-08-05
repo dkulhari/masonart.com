@@ -156,6 +156,36 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
 }
 
 /**
+ * The poster's review aggregate, which the detail payload does not carry.
+ *
+ * Two surfaces read it: the buy box's star row (whose "(N reviews)" is the way
+ * down to the wall) and the review section's Loox header row. Both were wired
+ * to `product.rating` and both rendered nothing, because `/api/products/:slug`
+ * returns the product row alone — the join that gives a product CARD its rating
+ * is on the list endpoint only.
+ *
+ * Never throws, for the same reason `fetchRelatedProducts` does not: a poster
+ * with an unreachable aggregate is a poster without a star row, not a 404.
+ */
+async function fetchReviewAggregate(
+  productId: string
+): Promise<{ averageRating: number; reviewCount: number } | undefined> {
+  try {
+    const stats = await productsApi.productReviewStats(productId)
+    // Undefined rather than a zeroed object: every consumer treats the absence
+    // as "not yet rated" and drops the row, which is what nothing-approved
+    // should look like.
+    if (stats.reviewCount <= 0 || stats.averageRating === null) return undefined
+    return {
+      averageRating: stats.averageRating,
+      reviewCount: stats.reviewCount,
+    }
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Fetch products related to this one for the "You May Also Like" row.
  *
  * Never throws: the section is supplementary, so a failure here should hide
@@ -184,9 +214,14 @@ export const Route = createFileRoute('/posters/$slug')({
       throw notFound()
     }
 
-    const related = await fetchRelatedProducts(params.slug)
+    // In parallel: neither one gates the other, and the aggregate is the
+    // slower of the two only because it counts.
+    const [related, rating] = await Promise.all([
+      fetchRelatedProducts(params.slug),
+      fetchReviewAggregate(product.id),
+    ])
 
-    return { product, related }
+    return { product: { ...product, rating: product.rating ?? rating }, related }
   },
   head: ({ loaderData }) => {
     if (!loaderData) {

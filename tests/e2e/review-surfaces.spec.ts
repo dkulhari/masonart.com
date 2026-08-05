@@ -1,30 +1,50 @@
 /**
- * Review surfaces — #486, #487, #488, #489.
+ * Review surfaces — #486, #487, #488, #489, reswept for the grid in #499.
  *
  * The unit suites already pin what each surface renders from a given payload.
- * What only a browser can answer is whether the four surfaces are wired into
- * the running app at all: the /reviews destination and its paging, the home
- * strip, the PDP media wall and its lightbox, and the floating toast —
+ * What only a browser can answer is whether the surfaces are wired into the
+ * running app at all: the /reviews destination and its paging, the home strip,
+ * the product page's review section and its lightbox, and the floating toast —
  * including the route it must stay away from.
  *
- * Two things this file deliberately does NOT do:
+ * ## What changed under this file (#497, #498)
  *
- *  - It never asserts an exact review count. The rule the surfaces encode is a
- *    threshold (ten approved reviews before an average is printable), so the
- *    threshold is what gets asserted. The seed carries twelve; a spec that
- *    pinned "12 reviews" would fail the next time anyone reviewed anything.
+ * The reviews UI was rebuilt against mesonart's actual Loox layout
+ * (docs/design/mesonart/mesonart-reviews-page-loox.png and
+ * mesonart-pdp-reviews-loox.png). Three things this file used to assert are
+ * gone, and each one is ported rather than dropped:
+ *
+ *  - The beige aggregate band became the compact header row — a star row, a
+ *    "<N> Reviews" chevron that discloses the average on request, and a "Write
+ *    a review" pill. `reviews-aggregate` → `reviews-header`.
+ *  - Numbered page-2 paging became "Show more reviews", which APPENDS. The
+ *    `?page=2` deep link still has to resolve, though: `validateSearch` still
+ *    coerces the param, and a link shared while the pager existed must land on
+ *    a working page rather than on a blank error boundary. Both halves are
+ *    below.
+ *  - The PDP's media-only wall above a written list became one grid. A review
+ *    without a photo is the same card with its media slot omitted, in the same
+ *    masonry as the ones with photos — so the spec that proved the wall came
+ *    first now proves the two kinds of review share one grid.
+ *
+ * ## Two things this file deliberately does NOT do
+ *
+ *  - It never asserts an exact review count. The rules the surfaces encode are
+ *    thresholds, so thresholds are what get asserted. The seed carries twelve
+ *    approved reviews; a spec that pinned "12" would fail the next time anyone
+ *    reviewed anything.
  *  - It never waits on a clock for something that is meant not to appear. The
  *    toast's opening delay is real, so the positive cases wait on the element;
  *    the negative cases assert on the request the suppressed toast never makes,
  *    which needs no window at all.
  */
 
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 
 /** Every selector below is scoped to the desktop tree this viewport produces. */
 const DESKTOP = { width: 1440, height: 900 }
 
-/** Seeded with two customer photos and a clip. */
+/** Seeded with a review carrying two photos and a clip, and one carrying none. */
 const PRODUCT_WITH_MEDIA = '/posters/wabi-sabi-study'
 
 /** The toast is mounted once in `__root.tsx`, so this is never ambiguous. */
@@ -34,7 +54,7 @@ const toast = (page: Page) => page.getByTestId('review-toast')
  * Record calls to the site-wide review feed, matched on the exact pathname.
  *
  * `/api/reviews/media` and `/api/reviews/stats` share the prefix and are
- * fetched by the media wall and by both score bands, so a substring match would
+ * fetched by the header row and by the home strip, so a substring match would
  * be true everywhere and prove nothing.
  */
 function recordFeedRequests(page: Page): string[] {
@@ -49,6 +69,45 @@ function recordFeedRequests(page: Page): string[] {
     if (pathname === '/api/reviews') calls.push(request.url())
   })
   return calls
+}
+
+/**
+ * Shrink the feed's page size on its way to the API.
+ *
+ * "Show more reviews" only exists while the response says `hasNextPage`, and
+ * the wall asks for 24 rows against a seed of twelve — so on real data the
+ * button never appears and appending could not be exercised at all. Rewriting
+ * the query is the smallest possible shim: the API still answers, with real
+ * rows in the real order, and the ONLY thing the browser sees differently is
+ * how many arrive at a time. Nothing is stubbed and no payload is fabricated.
+ */
+async function shrinkFeedPages(page: Page, pageSize: number) {
+  await page.route('**/api/reviews?**', async (route) => {
+    const url = new URL(route.request().url())
+    // `/api/reviews/media` and `/api/reviews/stats` share the prefix; only the
+    // feed itself is paged.
+    if (url.pathname !== '/api/reviews') {
+      await route.fallback()
+      return
+    }
+    url.searchParams.set('pageSize', String(pageSize))
+    await route.continue({ url: url.toString() })
+  })
+}
+
+/** The review ids currently on the wall, in the order they are rendered. */
+async function cardIds(scope: Locator | Page): Promise<string[]> {
+  return scope.locator('[data-testid="review-grid-item"]').evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('data-review-id') ?? '')
+  )
+}
+
+/** `1 / 3` → 3. The lightbox walks every attachment on the wall, not one card's. */
+async function lightboxTotal(lightbox: Locator): Promise<number> {
+  const text = (await lightbox.innerText()).replace(/\s+/g, ' ')
+  const match = text.match(/(\d+) \/ (\d+)/)
+  expect(match, 'the viewer prints its position as "<n> / <total>"').not.toBeNull()
+  return Number(match![2])
 }
 
 // ============================================================================
@@ -70,58 +129,119 @@ test.describe('the /reviews destination', () => {
     // which surfaces as a redirect to ?page=1. That is the router doing its
     // job, not a bug — but it does mean the URL is never bare.
     await expect(page).toHaveURL(/\/reviews\?page=1$/)
+
+    // The reference page carries no visible title — the wall is the page — so
+    // the h1 is present for the crawler and the screen reader and clipped to a
+    // point for everyone else. Attached, and NOT laid out as a page title.
+    const heading = page.getByRole('heading', {
+      level: 1,
+      name: 'Reviews & Ratings',
+    })
+    await expect(heading).toBeAttached()
+    const headingBox = await heading.boundingBox()
+    expect(headingBox).not.toBeNull()
+    expect(headingBox!.height).toBeLessThan(4)
+  })
+
+  test('opens on the Loox header row, above the wall', async ({ page }) => {
+    const header = page.getByTestId('reviews-header')
+    await expect(header).toBeVisible()
+
+    // A star row and a count, which is what the reference prints. The stars
+    // carry the figure; the average itself is disclosed rather than displayed.
     await expect(
-      page.getByRole('heading', { name: 'Reviews & Ratings' })
+      header.getByRole('img', { name: /Rating: \d\.\d out of 5 stars/ })
     ).toBeVisible()
+
+    const toggle = header.getByTestId('reviews-count-toggle')
+    await expect(toggle).toContainText(/[\d,]+ Reviews/)
+
+    // No beige score band on this page: nothing prints an average until the
+    // chevron is pressed.
+    await expect(page.getByTestId('reviews-average')).toHaveCount(0)
+    await toggle.click()
+    await expect(page.getByTestId('reviews-average')).toContainText(
+      /\d\.\d out of 5 across the catalogue/
+    )
+
+    // The row carries the only way in on this page — a review needs a purchase
+    // behind it, so the pill points at the orders list rather than at a form.
+    await expect(header.getByTestId('reviews-write')).toHaveAttribute(
+      'href',
+      '/account/orders'
+    )
+
+    // And it sits above the wall, which is the ordering the reference has.
+    const headerBox = await header.boundingBox()
+    const gridBox = await page.getByTestId('review-grid').boundingBox()
+    expect(headerBox).not.toBeNull()
+    expect(gridBox).not.toBeNull()
+    expect(headerBox!.y).toBeLessThan(gridBox!.y)
   })
 
-  test('prints the catalogue aggregate above the feed', async ({ page }) => {
-    // Present because the catalogue is over MIN_REVIEWS_FOR_AGGREGATE. Below it
-    // the whole band is suppressed, which is the other half of the rule and is
-    // covered at the unit level where the count can be dialled down.
-    const aggregate = page.getByTestId('reviews-aggregate')
-    await expect(aggregate).toBeVisible()
-    await expect(aggregate).toContainText(/\d\.\d/)
-    await expect(aggregate).toContainText(/reviews/)
-  })
+  test('every card carries the poster it is about', async ({ page }) => {
+    const cards = page.getByTestId('review-grid-card')
+    const count = await cards.count()
+    expect(count).toBeGreaterThan(0)
 
-  test('every row carries the poster it is about', async ({ page }) => {
-    const rows = page.getByTestId('review-feed-row')
-    expect(await rows.count()).toBeGreaterThan(0)
+    // The product chip is what makes a catalogue-wide wall readable: every card
+    // on it is about a different poster.
+    const chips = page.getByTestId('review-card-product')
+    expect(await chips.count()).toBe(count)
 
-    const link = rows.first().getByRole('link').first()
-    const href = await link.getAttribute('href')
+    const href = await chips.first().getAttribute('href')
     expect(href).toMatch(/^\/posters\/[a-z0-9-]+/)
 
-    await link.click()
+    await chips.first().click()
 
     expect(page.url()).toContain(href as string)
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
   })
 
-  test('page 2 renders the page rather than an error boundary', async ({
+  test('Show more reviews appends to the wall rather than replacing it', async ({
     page,
   }) => {
+    // Six at a time, so the seed spans more than one page. See shrinkFeedPages.
+    await shrinkFeedPages(page, 6)
+    await page.goto('/reviews', { waitUntil: 'networkidle' })
+
+    const cards = page.getByTestId('review-grid-card')
+    const before = await cards.count()
+    expect(before).toBeGreaterThan(0)
+
+    const firstIds = await cardIds(page)
+
+    const more = page.getByTestId('review-grid-more')
+    await expect(more).toBeVisible()
+    await more.click()
+
+    // Appending, not paging: the wall grows.
+    await expect.poll(() => cards.count()).toBeGreaterThan(before)
+
+    const afterIds = await cardIds(page)
+
+    // The first page is still there, still in front, still in order — a pager
+    // would have replaced it.
+    expect(afterIds.slice(0, firstIds.length)).toEqual(firstIds)
+
+    // And nothing arrived twice. The grid keys by review id precisely because a
+    // review written between two fetches shifts every later row down by one.
+    expect(new Set(afterIds).size).toBe(afterIds.length)
+  })
+
+  test('a ?page=2 deep link still resolves rather than error-boundarying', async ({
+    page,
+  }) => {
+    // The wall appends now and nothing reads `page` any more, but the param
+    // survives in links shared while the numbered pager existed. The route
+    // error-boundaries to a blank page if validateSearch throws on the STRING
+    // '2' — router.tsx hands every search param over as a string — so a
+    // rendered header row and a populated wall are the proof that it coerced.
     await page.goto('/reviews?page=2', { waitUntil: 'networkidle' })
 
-    // The route error-boundaries to a blank page if validateSearch throws on
-    // the STRING '2' — router.tsx hands every search param over as a string.
-    // A rendered header is the proof that it coerced instead.
     await expect(page).toHaveURL(/\/reviews\?page=2$/)
-    await expect(
-      page.getByRole('heading', { name: 'Reviews & Ratings' })
-    ).toBeVisible()
-    await expect(page.getByTestId('reviews-aggregate')).toBeVisible()
-
-    // Whatever the catalogue's size, page 2 always has a page 1 behind it, so
-    // the pager is there and it leads back to rows.
-    await page
-      .getByTestId('reviews-pagination')
-      .getByRole('link', { name: /Previous/ })
-      .click()
-
-    await expect(page).toHaveURL(/\/reviews\?page=1$/)
-    await expect(page.getByTestId('review-feed-row').first()).toBeVisible()
+    await expect(page.getByTestId('reviews-header')).toBeVisible()
+    expect(await page.getByTestId('review-grid-card').count()).toBeGreaterThan(0)
   })
 })
 
@@ -142,8 +262,9 @@ test.describe('the home Customer Reviews strip', () => {
       strip.getByRole('heading', { name: 'What Customers Say' })
     ).toBeVisible()
 
-    // A score printed at all means the strip's own >= 10 gate is open. It is
-    // the same threshold /reviews uses, restated there rather than imported.
+    // A score printed at all means the strip's own >= 10 gate is open. This is
+    // the one surface that still prints an average unasked; /reviews discloses
+    // it behind the chevron instead.
     await expect(page.getByTestId('home-reviews-score')).toContainText(/\d\.\d/)
     expect(await page.getByTestId('home-review-card').count()).toBeGreaterThan(0)
   })
@@ -155,9 +276,7 @@ test.describe('the home Customer Reviews strip', () => {
       .click()
 
     await expect(page).toHaveURL(/\/reviews/)
-    await expect(
-      page.getByRole('heading', { name: 'Reviews & Ratings' })
-    ).toBeVisible()
+    await expect(page.getByTestId('reviews-header')).toBeVisible()
   })
 
   test('the desktop nav carries the same destination', async ({ page }) => {
@@ -170,67 +289,114 @@ test.describe('the home Customer Reviews strip', () => {
       .click()
 
     await expect(page).toHaveURL(/\/reviews/)
-    await expect(
-      page.getByRole('heading', { name: 'Reviews & Ratings' })
-    ).toBeVisible()
+    await expect(page.getByTestId('reviews-header')).toBeVisible()
   })
 })
 
 // ============================================================================
-// PDP media wall
+// The PDP review section
 // ============================================================================
 
-test.describe('the PDP customer media wall', () => {
+test.describe('the PDP review section', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize(DESKTOP)
     await page.goto(PRODUCT_WITH_MEDIA, { waitUntil: 'networkidle' })
   })
 
-  test('renders a tile per upload, above the written reviews', async ({
+  test('fuses photos and prose into one grid under the header row', async ({
     page,
   }) => {
-    const wall = page.getByTestId('review-media-wall')
-    await expect(wall).toBeVisible()
+    const section = page.getByTestId('product-reviews')
+    await expect(section).toBeVisible()
 
-    const tiles = page.getByTestId('review-media-tile')
-    const count = await tiles.count()
+    // The anchor the section is linked and located by. It stays on the
+    // <section>, with the grid inside it, so a jump lands on the wall.
+    await expect(section).toHaveAttribute('id', 'reviews')
+
+    // The media-only wall of square tiles that used to sit above a written list
+    // is retired, not hidden. Its absence is asserted rather than assumed.
+    await expect(page.getByTestId('review-media-wall')).toHaveCount(0)
+    await expect(page.getByTestId('review-media-tile')).toHaveCount(0)
+
+    // Same header row as /reviews, scoped to this poster.
+    const header = section.getByTestId('reviews-header')
+    await expect(header).toBeVisible()
+    await header.getByTestId('reviews-count-toggle').click()
+    await expect(section.getByTestId('reviews-average')).toContainText(
+      /\d\.\d out of 5 for this poster/
+    )
+
+    const cards = section.getByTestId('review-grid-card')
+    const count = await cards.count()
     expect(count).toBeGreaterThan(0)
 
-    // The header states a count; it has to be the count of what is on screen.
-    await expect(wall).toContainText(`${count} post`)
+    // The claim the rebuild rests on: one grid, both kinds of review. The
+    // seeded poster carries a review with attachments and a review without, and
+    // they are cards in the same masonry.
+    const withMedia = section.locator(
+      '[data-testid="review-grid-card"][data-has-media="true"]'
+    )
+    const withoutMedia = section.locator(
+      '[data-testid="review-grid-card"][data-has-media="false"]'
+    )
+    expect(await withMedia.count()).toBeGreaterThan(0)
+    expect(await withoutMedia.count()).toBeGreaterThan(0)
+    expect((await withMedia.count()) + (await withoutMedia.count())).toBe(count)
 
-    // The pictures come first and the prose after — the mesonart ordering the
-    // wall exists to reproduce.
-    const wallBox = await wall.boundingBox()
-    const proseBox = await page
-      .getByRole('heading', { name: 'Customer Reviews' })
-      .boundingBox()
-    expect(wallBox).not.toBeNull()
-    expect(proseBox).not.toBeNull()
-    expect(wallBox!.y).toBeLessThan(proseBox!.y)
+    // Every card, media or not, carries the words that were written.
+    expect(await section.getByTestId('review-card-body').count()).toBe(count)
+
+    // And the wall is filtered to THIS poster. `productId` is the only thing
+    // separating this deployment of the grid from the catalogue-wide one, so a
+    // chip pointing anywhere else means the filter was dropped.
+    const chips = section.getByTestId('review-card-product')
+    expect(await chips.count()).toBe(count)
+    const hrefs = await chips.evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('href'))
+    )
+    for (const href of hrefs) {
+      expect(href).toBe(PRODUCT_WITH_MEDIA)
+    }
   })
 
-  test('a tile opens the lightbox and Escape closes it', async ({ page }) => {
-    const total = await page.getByTestId('review-media-tile').count()
+  test("a card's photo opens the shared lightbox and Escape closes it", async ({
+    page,
+  }) => {
+    const section = page.getByTestId('product-reviews')
+    const triggers = section.getByTestId('review-card-media-trigger')
+    expect(await triggers.count()).toBeGreaterThan(0)
 
-    await page.getByTestId('review-media-tile').first().click()
+    await triggers.first().click()
 
     const lightbox = page.getByTestId('review-media-lightbox')
     await expect(lightbox).toBeVisible()
     await expect(lightbox).toHaveAttribute('aria-modal', 'true')
-    await expect(lightbox).toContainText(`1 / ${total}`)
+    await expect(lightbox).toContainText(/1 \/ \d+/)
 
     await page.keyboard.press('Escape')
     await expect(lightbox).toBeHidden()
   })
 
-  test('the arrow keys walk the wall without closing it', async ({ page }) => {
-    const total = await page.getByTestId('review-media-tile').count()
-    test.skip(total < 2, 'needs at least two uploads to step between')
+  test('the arrow keys walk every attachment on the wall', async ({ page }) => {
+    const section = page.getByTestId('product-reviews')
+    const triggers = section.getByTestId('review-card-media-trigger')
+    expect(await triggers.count()).toBeGreaterThan(0)
 
-    await page.getByTestId('review-media-tile').first().click()
+    await triggers.first().click()
 
     const lightbox = page.getByTestId('review-media-lightbox')
+    await expect(lightbox).toBeVisible()
+
+    // The viewer walks a FLAT list of every attachment in the grid, so a review
+    // carrying more than one photo is reachable past its cover — a lightbox per
+    // card would trap prev/next inside one review. The seeded poster's review
+    // carries three attachments, which is what makes the arrows testable here.
+    const total = await lightboxTotal(lightbox)
+    expect(
+      total,
+      'the seeded poster must carry more than one attachment or the arrows have nothing to walk'
+    ).toBeGreaterThan(1)
+
     await expect(lightbox).toContainText(`1 / ${total}`)
 
     await page.keyboard.press('ArrowRight')
@@ -238,6 +404,61 @@ test.describe('the PDP customer media wall', () => {
 
     await page.keyboard.press('ArrowLeft')
     await expect(lightbox).toContainText(`1 / ${total}`)
+  })
+
+  test('the clip opens with a poster frame, no autoplay and no preload', async ({
+    page,
+  }) => {
+    const section = page.getByTestId('product-reviews')
+    await section.getByTestId('review-card-media-trigger').first().click()
+
+    const lightbox = page.getByTestId('review-media-lightbox')
+    await expect(lightbox).toBeVisible()
+
+    // The seeded clip is the review's third attachment, so it is reached
+    // through the wall's flat list rather than off a card cover.
+    const total = await lightboxTotal(lightbox)
+    const video = lightbox.getByTestId('review-media-video')
+    let position = 1
+    while (position < total && (await video.count()) === 0) {
+      await page.keyboard.press('ArrowRight')
+      position += 1
+      await expect(lightbox).toContainText(`${position} / ${total}`)
+    }
+    expect(
+      await video.count(),
+      'the seeded poster must carry a clip for this rule to be testable'
+    ).toBe(1)
+
+    // Opening the viewer is not the same as pressing play. A wall of clips that
+    // fetch themselves on sight is tens of megabytes before anyone asks for
+    // one, so the poster frame is the whole of what loads.
+    await expect(video).toHaveAttribute('preload', 'none')
+    await expect(video).toHaveAttribute('poster', /^https?:\/\//)
+    expect(await video.getAttribute('autoplay')).toBeNull()
+  })
+
+  test('the buy-box star row jumps down to the review section', async ({
+    page,
+  }) => {
+    // mesonart's buy box hangs its review count off the section below it. The
+    // #reviews anchor existed with nothing pointing at it until #499.
+    const link = page.getByTestId('buybox-reviews-link')
+    await expect(link).toBeVisible()
+    await expect(link).toHaveAttribute('href', '#reviews')
+    await expect(link).toContainText(/\d+ reviews/)
+
+    // The star row is above the fold and the wall is not, so this is a real
+    // jump rather than a no-op.
+    await expect(page.getByTestId('review-grid')).not.toBeInViewport()
+
+    await link.click()
+
+    await expect(page).toHaveURL(/#reviews$/)
+    // Landing on the wall, not above an empty container — and clear of the
+    // sticky header, which is what the section's scroll margin buys.
+    await expect(page.getByTestId('reviews-header')).toBeInViewport()
+    await expect(page.getByTestId('review-grid')).toBeInViewport()
   })
 })
 
