@@ -64,10 +64,13 @@ Researched 2026-08-05; sources in §12.
 | D3 | Targeting | **Scope + exclusions.** One promotion targets the whole catalogue, a filter (style / subject / room / featured), or a hand-picked product list — plus an exclusion list that always wins | Covers "all products" and "these ones" in one model. A rule engine is not needed for one 40%-off sale |
 | D4 | What "the gallery" is | **Registered account + explicit opt-in flag** (`galleryMember`, `galleryJoinedAt`, consent timestamp) | Gives a genuinely consented marketing list. Treating any account as a member would silently enrol every past customer and give consent we were never granted |
 | D5 | Countdown | **Rolling window per visitor**, clamped by the real end. Configurable per promotion | §6. Deliberate; the deception is a config field, not hardcoded |
-| D6 | Stacking | **Never.** Highest `priority` wins, ties broken by deeper discount | One price per product. Stacking rules are where discount systems become unauditable |
+| D6 | Stacking | **Never.** Highest `priority` wins, ties broken by deeper discount | One price per product. Stacking rules are where discount systems become unauditable. Scope of D6 is promotion-vs-promotion only — codes are D8 |
 | D7 | Tracker shape | Two features: `sale-promotions`, `gallery-membership` | Promotions can ship ungated and useful; membership is independently testable |
+| D8 | Codes and gift cards | **Out of scope to build, reserved in the model.** Promotion money and code money live in separate columns (§4), and the layering order is fixed now (§5) | A shared `discount` column makes a settled order unattributable after the fact — you cannot tell a sale from a code six months later. One column and one paragraph now, versus a data migration and a resolver rewrite later |
 
 **Out of scope** (YAGNI — named so they are not re-litigated per ticket): discount codes, stacking, BOGO / tiered / volume discounts, minimum-cart thresholds, loyalty tiers or points, scheduled email sends to the member list, multi-currency sale pricing, per-variant or per-size discount depth.
+
+**Gift cards are not a discount** and never enter this feature. A gift card is **tender**: it applies after tax against the amount due, carries a balance, is partially consumable, and refunds return to it. It must never reach `resolveSalePrice` and must never be written to a discount column. The separate `gift-cards` feature owns it. The one input Shopify labels "Discount code or gift card" (as seen at mesonart's checkout) is a single box routing to two unrelated systems — copying the label is not copying the design.
 
 ---
 
@@ -107,7 +110,20 @@ promotion_exclusion  (promotionId, productId)  pk both   -- always wins, any sco
 **Order-side additions** — `packages/api/src/database/schema/orders.ts`:
 
 - `orders.promotionId` → `promotion.id`, nullable
-- `orders.discount` and `orders.couponDiscount` start carrying real numbers; `order_items.itemDiscount` (already declared, line 258) starts being written
+- `orders.promotionDiscount` decimal(10,2) default `'0.00'` — **new**
+- `order_items.itemDiscount` (already declared, line 258) starts being written
+
+**One bucket per discount source.** `orders.discount` already exists (line 171) alongside `orders.couponDiscount` (line 179). The promotion does **not** write into either. Instead:
+
+```
+orders.promotionDiscount  -- this feature, automatic, line-level
+orders.couponDiscount     -- reserved for D8, order-level, stays '0.00'
+orders.discount           -- derived total: promotionDiscount + couponDiscount
+```
+
+`orders.discount` is what the customer saved and what the invoice shows; the two source columns are what reporting attributes. Writing the promotion into the shared `discount` column and nothing else would settle orders that cannot be attributed once codes exist — a report cannot separate "the sale worked" from "someone leaked a code". Adding the column now costs one migration line; adding it after orders exist costs a backfill that has no source data to backfill from.
+
+`orders.couponCode` stays, and stays **unwritten from client input** (§5). Today `routes/orders.ts:298` persists whatever string the request sends beside a hardcoded `couponDiscount: "0.00"` — an order record that claims a code was applied when none was.
 
 This is the §2 "compare-at trap" avoided deliberately: the discount is recorded as a discount, so revenue reporting stays honest even while the countdown is not.
 
@@ -131,6 +147,25 @@ resolveSalePrice(product, activePromotions, { isMember })
 **Stored `lineTotal` stays a base price.** `cart.ts:196-204` computes `(unitPrice + framePrice) * quantity` and stores it on the row at add-to-cart time. Promotion pricing must **not** be baked into that column: a cart sitting for three days across the end of a sale would otherwise still charge the sale price. Sale price is resolved at read time and returned alongside the stored base as `{ base, sale, locked }`.
 
 **The server is the only authority.** Order creation re-resolves from the database and ignores any price the client sends. If the viewer is not a member at the moment the order is created, they pay base — the gate cannot be bypassed by holding a cart open through a logout. `perCustomerOrderLimit`, when set, is enforced at the same point by counting that customer's settled orders carrying the `promotionId`.
+
+**No code is read from the request.** `routes/orders.ts:298` currently writes `couponCode: input.couponCode` — unvalidated client text stored next to a hardcoded zero discount. This feature has no codes (D1), so order creation writes `couponCode: null` and drops `couponCode` from the create-order input schema (`routes/orders.ts:75`). The checkout UI already has a complete coupon input at `OrderSummary.tsx:201` that never renders, because no caller passes `onApplyCoupon` — it stays dormant, and is the seam a future D8 would wire up.
+
+**Layering order — fixed now, built later.** Even with codes out of scope, the order in which money comes off has to be settled before the resolver exists, because it determines what `resolveSalePrice` returns and what the totals code composes:
+
+```
+1. line base price            (cart.ts stored lineTotal)
+2. − promotion discount       per line, half-up 2dp   → order_items.itemDiscount
+   = discounted line subtotal → orders.subtotal
+3. − code discount            order level, applied to the ALREADY-discounted subtotal
+                                                       → orders.couponDiscount   [D8, unbuilt]
+4. + shipping
+5. + tax                      on the post-discount amount
+   = orders.total
+6. − gift card                tender against the total, not a discount [gift-cards feature]
+   = amount charged to Razorpay
+```
+
+A code applies to the discounted subtotal, not the base — otherwise a 40% sale plus a 20% code takes 60% off the base and the two discounts can exceed the price. Tax is computed after discounts because the customer is taxed on what they pay. The gift card sits below tax because it is payment, not price.
 
 **Checkout already requires an account** (`orders.ts` builds the order from `user.id`), while carts support guests via a cookie session (`cart.ts:272-276`). So the funnel is: guest browses and sees the teased price → adds to cart → cart shows the locked saving → join → price unlocks. The gate sits where the customer was already going to have to register.
 
