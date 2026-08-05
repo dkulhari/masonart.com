@@ -22,6 +22,7 @@
  */
 
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -49,6 +50,16 @@ const productIdSchema = z.string().uuid();
  * a payload someone hand-wrote to make Postgres build a 100k-element array.
  */
 const mergeBodySchema = z.object({
+  productIds: z.array(productIdSchema).max(500),
+});
+
+/**
+ * The body of a reorder: the whole list, in its new order.
+ *
+ * Same cap as the merge, and for the same reason — this is the boundary
+ * between a wishlist and a hand-written payload.
+ */
+const reorderBodySchema = z.object({
   productIds: z.array(productIdSchema).max(500),
 });
 
@@ -86,7 +97,7 @@ async function savedIdsFor(userId: string): Promise<string[]> {
 async function hydrate(ids: string[]) {
   if (ids.length === 0) return [];
 
-  return db
+  const rows = await db
     .select({
       id: products.id,
       sku: products.sku,
@@ -101,6 +112,27 @@ async function hydrate(ids: string[]) {
     })
     .from(products)
     .where(and(inArray(products.id, ids), eq(products.status, "active")));
+
+  /**
+   * Return them in the order the ARRAY holds, not the order Postgres happens
+   * to return rows in.
+   *
+   * `inArray` places no ordering on the result, so this endpoint used to hand
+   * back an effectively arbitrary sequence. The client sets its `ids` from
+   * this response, which meant a signed-in shopper's "saved order" was
+   * whatever the planner produced — and once reordering existed, dragging a
+   * card would have appeared to do nothing after a reload.
+   *
+   * Sorted here rather than with `array_position` in SQL because the miss case
+   * has to be handled anyway: a product deleted from the catalogue leaves a
+   * dangling id with no row to sort, and dropping it is already this
+   * function's contract.
+   */
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids.flatMap((id) => {
+    const row = byId.get(id);
+    return row ? [row] : [];
+  });
 }
 
 wishlistApp.get("/", async (c) => {
@@ -275,6 +307,67 @@ wishlistApp.delete("/:productId", async (c) => {
   } catch (error) {
     console.error("Failed to remove from wishlist:", error);
     return c.json({ error: "Failed to remove from wishlist" }, 500);
+  }
+});
+
+/**
+ * PUT /api/wishlist
+ *
+ * Rewrite the saved order. `wishlist_product_ids` is a `text[]`, so the array
+ * order IS the order and a reorder is a single write — no position column, no
+ * per-row updates.
+ *
+ * ## Why this refuses anything but a permutation
+ *
+ * A plain "replace the array" endpoint is a data-loss bug wearing a feature's
+ * clothes. A tab left open since before the shopper saved something on their
+ * phone still holds the old list; dragging one card there would post that list
+ * and silently delete the newer item.
+ *
+ * So the write is accepted only when the incoming ids are the same SET as the
+ * stored ones. That is exactly what a reorder is, and never what a stale write
+ * is — the guard rejects nothing legitimate. A mismatch returns 409 carrying
+ * the current list, so the client resyncs instead of overwriting.
+ *
+ * Adding and removing stay on POST/DELETE `/:productId`, which mutate the
+ * array in place and cannot clobber a concurrent write. This endpoint is only
+ * for order.
+ */
+wishlistApp.put("/", zValidator("json", reorderBodySchema), async (c) => {
+  const user = c.get("user");
+  const { productIds } = c.req.valid("json");
+
+  try {
+    const saved = await savedIdsFor(user.id);
+
+    /**
+     * Same multiset, not merely the same set: `[A, A, B]` shares a set with
+     * `[A, B]` but is not a permutation of it, and de-duplicating silently
+     * would make the response disagree with what was written.
+     */
+    const isPermutation =
+      productIds.length === saved.length &&
+      [...productIds].sort().join(" ") === [...saved].sort().join(" ");
+
+    if (!isPermutation) {
+      return c.json(
+        {
+          error: "The list has changed since it was loaded",
+          productIds: saved,
+        },
+        409
+      );
+    }
+
+    await db
+      .update(users)
+      .set({ wishlistProductIds: productIds })
+      .where(eq(users.id, user.id));
+
+    return c.json({ productIds });
+  } catch (error) {
+    console.error("Failed to reorder wishlist:", error);
+    return c.json({ error: "Failed to reorder wishlist" }, 500);
   }
 });
 
