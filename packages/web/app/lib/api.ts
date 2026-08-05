@@ -2613,6 +2613,29 @@ export const wishlistApi = {
   },
 
   /**
+   * Swap the list for a different one.
+   *
+   * Deliberately not `reorder`: that endpoint refuses any change to the set,
+   * because its guard is what stops a stale tab dropping an item saved
+   * elsewhere. Replacing is a different operation and says so.
+   */
+  async replace(productIds: string[]): Promise<{ productIds: string[] }> {
+    const response = await fetch(`${getApiUrl()}/api/wishlist/replace`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productIds }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to replace the wishlist");
+    }
+
+    return response.json();
+  },
+
+  /**
    * Just the count, for the header badge — deliberately separate from list()
    * so the header does not pull a product join on every page.
    */

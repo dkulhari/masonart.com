@@ -64,6 +64,14 @@ interface WishlistStore {
    * them look it up only for this to look it up again.
    */
   reorder: (from: number, to: number) => Promise<void>;
+  /**
+   * Swap the list for a different one entirely — staff loading a collection's
+   * members in to rearrange them.
+   *
+   * Separate from `reorder` because it changes the SET, which the reorder
+   * endpoint refuses by design.
+   */
+  replaceAll: (productIds: string[]) => Promise<void>;
   /** Forget ids the catalogue no longer has. Guest lists only — see below. */
   dropMissing: (productIds: string[]) => void;
 }
@@ -274,6 +282,31 @@ export const useWishlistStore = create<WishlistStore>()(
           } catch {
             set({ ids: previous });
           }
+        } finally {
+          set({ isPending: false });
+        }
+      },
+
+      /**
+       * Replace the whole list.
+       *
+       * NOT optimistic, unlike `reorder`. This is a deliberate, confirmed
+       * action rather than a drag, so a moment's wait is fine — and applying
+       * it locally before the server agreed would leave a staff member editing
+       * a list the server never accepted. It throws on failure so the caller
+       * can say so rather than navigating away from a write that did not land.
+       */
+      async replaceAll(productIds: string[]) {
+        if (get().isAuthenticated !== true) {
+          // A guest has no server list. Local is authoritative.
+          set({ ids: [...productIds], isLoaded: true });
+          return;
+        }
+
+        set({ isPending: true });
+        try {
+          const { productIds: saved } = await wishlistApi.replace(productIds);
+          set({ ids: saved, isLoaded: true });
         } finally {
           set({ isPending: false });
         }

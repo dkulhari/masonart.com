@@ -14,6 +14,7 @@ import {
   CollectionForm,
   type CollectionFormValues,
 } from '~/components/admin/CollectionForm'
+import { LoadIntoWishlist } from '~/components/admin/LoadIntoWishlist'
 
 export const Route = createFileRoute('/admin/collections/$id')({
   head: () => ({
@@ -94,6 +95,20 @@ function EditCollectionPage() {
           className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"
         >
           {error}
+        </div>
+      )}
+
+      {initial?.kind === 'manual' && (
+        <div className="rounded-lg border border-border px-4 py-3">
+          <p className="mb-1 text-sm font-medium">Reorder these products</p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Load them into your wishlist, drag them into the order you want,
+            then save back over this collection.
+          </p>
+          <LoadIntoWishlist
+            kind="manual"
+            productIds={initial.productIds ?? []}
+          />
         </div>
       )}
 
