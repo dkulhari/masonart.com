@@ -44,6 +44,9 @@ export type { ReviewGridCardProps, ReviewCardData } from './ReviewGridCard'
 export { ReviewGrid } from './ReviewGrid'
 export type { ReviewGridProps } from './ReviewGrid'
 
+export { ReviewSectionHeader, REVIEW_PILL } from './ReviewSectionHeader'
+export type { ReviewSectionHeaderProps } from './ReviewSectionHeader'
+
 export { ReviewMediaLightbox } from './ReviewMediaLightbox'
 export type {
   ReviewMediaLightboxProps,

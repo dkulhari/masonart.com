@@ -35,13 +35,14 @@
  * the promo tile on /posters.
  */
 
-import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown } from 'lucide-react'
 import { z } from 'zod'
-import { StarRating } from '~/components/reviews/StarRating'
 import { ReviewGrid } from '~/components/reviews/ReviewGrid'
+import {
+  ReviewSectionHeader,
+  REVIEW_PILL,
+} from '~/components/reviews/ReviewSectionHeader'
 import { productsApi } from '~/lib/api'
 import { cn } from '~/lib/utils'
 
@@ -85,89 +86,19 @@ export const Route = createFileRoute('/reviews')({
   component: ReviewsPage,
 })
 
-/** The thin outline pill both this page's controls wear. Matches the grid's. */
-const PILL =
-  'inline-flex items-center gap-2 rounded-full border border-border px-6 py-2 ' +
-  'text-sm text-foreground transition-colors hover:bg-muted'
-
 // ============================================================================
 // Header row
 // ============================================================================
 
-export interface ReviewsHeaderProps {
-  /** Null when there is nothing to average. NOT to be coalesced to 0. */
-  averageRating: number | null
-  /** Null while the aggregate is still in flight — not the same as zero. */
-  reviewCount: number | null
-}
-
 /**
- * Stars, a count and a way in — one row, the whole chrome of the page.
- *
- * The count segment is absent rather than zeroed while the aggregate loads: a
- * row that flashes "0 Reviews" before the real number arrives reads as a
- * catalogue nobody has reviewed.
+ * The row itself lives in `components/reviews/ReviewSectionHeader.tsx` — the
+ * PDP renders the same one, and one route importing another route's module
+ * would couple two code-split entry points for nothing. Re-exported under the
+ * name this page has always called it, so the page's own tests and any reader
+ * following the /reviews thread still find it here.
  */
-export function ReviewsHeader({
-  averageRating,
-  reviewCount,
-}: ReviewsHeaderProps) {
-  const [showAverage, setShowAverage] = useState(false)
-
-  const hasCount = reviewCount !== null && reviewCount > 0
-
-  return (
-    <div
-      data-testid="reviews-header"
-      className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4"
-    >
-      <div className="flex flex-wrap items-center gap-3">
-        {averageRating !== null && (
-          <StarRating rating={averageRating} size="sm" showHalfStars />
-        )}
-
-        {hasCount && (
-          <button
-            type="button"
-            data-testid="reviews-count-toggle"
-            aria-expanded={showAverage}
-            onClick={() => setShowAverage((open) => !open)}
-            className="inline-flex items-center gap-1 text-sm text-foreground"
-          >
-            {/* en-IN grouping: this is an Indian store and the count is read
-                by Indian customers. */}
-            {reviewCount.toLocaleString('en-IN')} Reviews
-            <ChevronDown
-              aria-hidden="true"
-              className={cn(
-                'h-4 w-4 transition-transform duration-300',
-                showAverage && 'rotate-180'
-              )}
-            />
-          </button>
-        )}
-
-        {/* The chevron discloses the figure the stars only approximate. It is
-            deliberately not a second score band — one line, on request. */}
-        {showAverage && averageRating !== null && (
-          <span
-            data-testid="reviews-average"
-            className="text-sm text-muted-foreground"
-          >
-            {averageRating.toFixed(1)} out of 5 across the catalogue
-          </span>
-        )}
-      </div>
-
-      {/* A review needs a purchase behind it — the API creates one against an
-          order item — so the CTA leads to the orders list, not to a form that
-          could not be submitted from here. */}
-      <Link to="/account/orders" data-testid="reviews-write" className={PILL}>
-        Write a review
-      </Link>
-    </div>
-  )
-}
+export { ReviewSectionHeader as ReviewsHeader } from '~/components/reviews/ReviewSectionHeader'
+export type { ReviewSectionHeaderProps as ReviewsHeaderProps } from '~/components/reviews/ReviewSectionHeader'
 
 // ============================================================================
 // Empty catalogue
@@ -188,7 +119,7 @@ export function ReviewsEmptyState() {
         Once customers start writing about their posters, their words and photos
         land here.
       </p>
-      <Link to="/posters" className={cn(PILL, 'mt-8')}>
+      <Link to="/posters" className={cn(REVIEW_PILL, 'mt-8')}>
         Browse posters
       </Link>
     </div>
@@ -224,7 +155,7 @@ export function ReviewsPage() {
         <ReviewsEmptyState />
       ) : (
         <>
-          <ReviewsHeader
+          <ReviewSectionHeader
             averageRating={stats?.averageRating ?? null}
             reviewCount={stats?.reviewCount ?? null}
           />

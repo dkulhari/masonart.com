@@ -1,11 +1,10 @@
 /**
  * The review media viewer — one lightbox, every review surface.
  *
- * Lifted out of `ReviewMediaWall` unchanged rather than written twice: the
- * masonry grid opens the same overlay from a card's media slot that the PDP
- * wall opens from a tile, and a second implementation would be a second focus
- * trap, a second Escape handler and a second place for the `preload` rule to
- * rot.
+ * Lifted unchanged out of the retired PDP media wall rather than written
+ * twice: every review surface opens the same overlay from a card's media slot,
+ * and a second implementation would be a second focus trap, a second Escape
+ * handler and a second place for the `preload` rule to rot.
  *
  * Two rules it carries:
  *

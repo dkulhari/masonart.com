@@ -323,6 +323,24 @@ describe('ReviewGrid — lightbox', () => {
 
     expect(screen.queryByTestId('review-media-lightbox')).toBeNull()
   })
+
+  it('hands focus back to the card that opened it', async () => {
+    // Carried over from the PDP media wall this grid replaced (#498). A
+    // keyboard reader who opens a card and closes the viewer must land back on
+    // that card, not at the top of the document.
+    renderGrid(<ReviewGrid />)
+
+    await screen.findByTestId('review-grid')
+    const trigger = screen.getAllByTestId('review-card-media-trigger')[0]!
+
+    fireEvent.click(trigger)
+    await screen.findByTestId('review-media-lightbox')
+    expect(document.activeElement).not.toBe(trigger)
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(document.activeElement).toBe(trigger)
+  })
 })
 
 // ============================================================================

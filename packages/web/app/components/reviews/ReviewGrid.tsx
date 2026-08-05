@@ -22,7 +22,7 @@
  *    one review.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { useReviewCards } from '~/hooks/useReviews'
 import { ReviewGridCard, type ReviewCardData } from './ReviewGridCard'
@@ -85,6 +85,8 @@ export function ReviewGrid({
   className,
 }: ReviewGridProps) {
   const [page, setPage] = useState(1)
+  /** The wall itself — used to hand focus back to the card that opened the viewer. */
+  const gridRef = useRef<HTMLDivElement>(null)
   /**
    * Pages accumulate rather than replace: "Show more reviews" extends the
    * wall, it does not page through it. Keyed by id because a review written
@@ -159,7 +161,32 @@ export function ReviewGrid({
     [flatMedia.length]
   )
 
-  const close = useCallback(() => setOpenIndex(null), [])
+  /**
+   * Focus goes back to the media slot that opened the viewer, rather than to
+   * the top of the document. Carried over from the PDP media wall this grid
+   * replaced (#498) — a keyboard reader who opens the fourth card and closes it
+   * must land back on the fourth card.
+   *
+   * The trigger is looked up rather than held in a ref array: cards are keyed
+   * by review id and "Show more reviews" appends to the list, so an index-keyed
+   * ref array goes stale the moment a page lands.
+   */
+  const close = useCallback(() => {
+    const reviewId =
+      openIndex !== null ? flatMedia[openIndex]?.review.id : undefined
+
+    setOpenIndex(null)
+
+    if (reviewId === undefined) return
+    // Runs before the overlay unmounts, which is fine: the trigger is in the
+    // grid and was never unmounted, and removing an unfocused node does not
+    // move focus away from it.
+    gridRef.current
+      ?.querySelector<HTMLElement>(
+        `[data-review-id="${reviewId}"] [data-testid="review-card-media-trigger"]`
+      )
+      ?.focus()
+  }, [flatMedia, openIndex])
 
   const open = openIndex !== null ? flatMedia[openIndex] : undefined
 
@@ -193,6 +220,7 @@ export function ReviewGrid({
   return (
     <>
       <div
+        ref={gridRef}
         data-testid="review-grid"
         // `gap` on a multi-column container is the column gap; the row gap
         // between stacked cards is the wrapper's own margin below.
@@ -206,6 +234,7 @@ export function ReviewGrid({
           <div
             key={review.id}
             data-testid="review-grid-item"
+            data-review-id={review.id}
             // `break-inside-avoid` is what makes CSS columns a masonry rather
             // than a shredder: without it a card is split across two columns.
             className="mb-4 block break-inside-avoid"

@@ -15,8 +15,10 @@ import {
   ProductDetailSkeleton,
   type ProductDetailData,
 } from '~/components/product/ProductDetail'
-import { ProductReviews, ProductReviewsSkeleton } from '~/components/product/ProductReviews'
-import { ReviewMediaWall } from '~/components/product/ReviewMediaWall'
+import {
+  ProductReviewSection,
+  ProductReviewSectionSkeleton,
+} from '~/components/product/ProductReviewSection'
 import type { SizeVariant } from '~/components/product/SizeSelector'
 import type { FrameOptionData } from '~/components/product/FrameSelector'
 
@@ -301,12 +303,15 @@ function ProductPage() {
       {/* Main Product Detail */}
       <ProductDetail product={product} />
 
-      {/* Customer media, then the written reviews — mesonart's order. The wall
-          renders nothing at all when this product has no photos or clips. */}
-      <ReviewMediaWall productId={product.id} />
-
-      {/* Customer Reviews Section */}
-      <ProductReviews productId={product.id} />
+      {/* ONE review surface, not two. mesonart runs the same Loox grid here
+          that it runs on /reviews, filtered to this poster — photos, clips and
+          prose in a single masonry, never a media wall stacked on a list. The
+          aggregate is the one the loader already fetched. */}
+      <ProductReviewSection
+        productId={product.id}
+        averageRating={product.rating?.averageRating ?? null}
+        reviewCount={product.rating?.reviewCount ?? null}
+      />
 
       {/* Related Products Section (placeholder) */}
       <RelatedProductsSection products={related} />
@@ -327,7 +332,7 @@ function ProductPageLoading() {
         </div>
       </div>
       <ProductDetailSkeleton />
-      <ProductReviewsSkeleton />
+      <ProductReviewSectionSkeleton />
     </>
   )
 }
