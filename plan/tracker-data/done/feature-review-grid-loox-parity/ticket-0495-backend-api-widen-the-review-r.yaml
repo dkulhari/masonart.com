@@ -1,0 +1,154 @@
+ticket_number: 495
+title: Backend API - widen the review read shape with itemType, verified and product chip
+description: |-
+  ## Task
+
+  The Loox card carries three things our payload does not: the exact variant purchased ("Item type: 40''Hx 30''W / Stretch+Gold Frame"), a Verified badge, and a product chip with thumbnail, title and SKU.
+
+  Add all three to the shared review read shape so every surface gets them from one definition.
+
+  ## Context
+
+  Part of feature: review-grid-loox-parity
+  Phase: Backend API
+
+  - `packages/api/src/routes/reviews.ts` already has a single shared media-select definition and an `attachMedia` helper explicitly written so no read can regress into an N+1. Follow that pattern exactly — one join, applied to all callers.
+  - `itemType` comes from the `orderItems` row the review already points at via `orderItemId`. Columns exist: `sizeLabel`, `frameName`, `frameType` (`packages/api/src/database/schema/orders.ts:77-81`). No schema change.
+  - `verified` is DERIVED, not stored. Every review is `orderItemId`-gated and that column is `notNull`, so it is true for all of them. Do not add a column.
+  - Product chip: title, slug, sku and a thumbnail from `products`. The list-all read already joins products for the link — widen that select rather than adding a second join.
+  - **Bump the cache key version.** The payload shape changes; warm nodes would otherwise serve cards with no chip and no item type. The prior feature bumped `product:` to `product:v2:` for exactly this reason.
+  - Affects three reads: `GET /api/reviews`, `GET /api/products/:productId/reviews`, `GET /api/reviews/:reviewId`. The flat media feed does not need it — the grid renders whole reviews now.
+feature: review-grid-loox-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T19:40:09.274Z'
+last_updated: '2026-08-05T19:49:31.124Z'
+time_spent_minutes: 6
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T19:43:39.609Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T19:49:24.048Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d7ee35e1` - feat(api): carry item type, verified and product chip on review reads
+
+      **Files Changed**:
+      - `packages/api/src/routes/reviews.ts` — shared card definitions (`reviewProductColumns`, `reviewOrderItemColumns`, `toItemType`, `toProductChip`, `toReviewCard`) beside the existing media select; applied to all three whole-review reads; cache keys bumped
+      - `packages/api/tests/routes/review-card-shape.test.ts` — new, 17 tests
+      - `packages/api/tests/routes/review-feed.test.ts` — the two assertions that pin the cache key versions
+      - `packages/api/src/routes/review-media.ts`, `packages/api/src/routes/admin/reviews.ts` — duplicate invalidation patterns moved to the new versions
+
+      **Summary**:
+      - `verified: true` is derived in the mapper, not stored and not selected — `reviews.order_item_id` is NOT NULL behind an FK, so every row is a purchase. No schema change.
+      - `itemType` is returned as **parts** (`{ sizeLabel, frameName, frameType }`), per the ticket's preference — the separator/ordering is presentation, and a frameless purchase keeps its size with the frame fields null. Null overall when the order item is gone or carries none of the three.
+      - `product` chip is `{ id, title, slug, sku, imageUrl }`; `imageUrl` picked with `mainImage()` the way the product cards pick it. The raw `images` array never leaves the API.
+      - **No N+1.** The two list reads take one `leftJoin` on `order_items` for the whole page. The product-scoped list reuses the product lookup it already ran to decide its 404 rather than joining `products` down a page where every row is the same product — query counts per request are unchanged (4 / 3 / 2), and the tests assert the counts and read the JOIN condition itself.
+      - Media stays exactly as it was: still embedded, still `ready`-only on public reads. The flat media feed is untouched (tiles, not cards) and `media:v1:` is deliberately not bumped.
+      - **Cache**: `product:v2:` → `product:v3:`, `all:v1:` → `all:v2:`. `review-media.ts` and `admin/reviews.ts` hold copies of the same invalidation patterns; left on the old versions they would have matched nothing and moderation/media uploads would have silently stopped busting the lists.
+
+      **Verification**:
+      - Command: `cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/routes/review-card-shape.test.ts tests/routes/reviews.test.ts tests/routes/review-feed.test.ts tests/routes/review-media.test.ts`
+      - Result: PASS — Test Files 4 passed (4), Tests 123 passed (123)
+      - The DB-backed runtime tests in `reviews.test.ts` genuinely ran, not skipped: the run logs `Database connection available for runtime tests` and no `Skipping:` lines.
+      - Red first: before the implementation the same file was 12 failed | 5 passed (17), failing on `itemType` undefined, missing `verified`, missing chip, unbumped keys, and no `order_item_id` join.
+      - Collateral (files whose source I touched): `admin/reviews.test.ts` + `admin/review-media.test.ts` + `review-catalogue-stats.test.ts` — 122 passed (3 files).
+      - Build: `bunx tsc --noEmit` in `packages/api` — clean, zero errors.
+  - author: system
+    timestamp: '2026-08-05T19:49:31.124Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T19:43:43.227Z'
+    agent: claude-code
+    summary: Widened the three whole-review reads with verified (derived), itemType (parts, one leftJoin on order_items) and the product chip; bumped product:v3 / all:v2 cache keys plus the duplicate invalidation patterns in review-media.ts and admin/reviews.ts. 17 new tests, 123 green across the four named files, tsc clean. Commit d7ee35e1.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T19:49:28.468Z'
+    duration: '00:05:45'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the widened payload across all three reads
+    file: packages/api/tests/routes/review-card-shape.test.ts
+    command: cd /Users/dhruv/work/masonart.com/packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/routes/review-card-shape.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      // GET /api/reviews items carry:
+      //   verified: true
+      //   itemType: a string combining sizeLabel and the frame, or null when the
+      //     order item has no frame (frameless is a real case)
+      //   product: { id, title, slug, sku, imageUrl }
+      // GET /api/products/:productId/reviews items carry the same three
+      // GET /api/reviews/:reviewId carries the same three
+      // the widened read issues a BOUNDED number of queries regardless of page size —
+      //   assert no N+1 by counting queries or by asserting a single joined call
+      // media[] is still present and still ready-only
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail on the missing fields
+    command: cd /Users/dhruv/work/masonart.com/packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/routes/review-card-shape.test.ts
+    expected_result: FAIL - itemType is undefined
+    status: done
+  - id: 3
+    action: implement
+    description: Widen the shared select and join orderItems
+    file: packages/api/src/routes/reviews.ts
+    status: done
+    code: |-
+      // Define the card fields ONCE, beside the existing shared media-select:
+      //   const reviewCardColumns = { ...existing, verified: sql`true`, ... }
+      // Join orderItems for sizeLabel / frameName / frameType and compose itemType in
+      // one place — the string shape is presentation, so build it in the API only if
+      // every surface wants it identically; otherwise return the parts and let the
+      // card compose. Prefer returning the parts.
+      // Widen the products join with slug, sku and the first image.
+      // Apply to all three reads. Bump every affected cache key version.
+  - id: 4
+    action: verify-pass
+    description: Confirm the new tests and every pre-existing review route test pass
+    command: cd /Users/dhruv/work/masonart.com/packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/routes/review-card-shape.test.ts tests/routes/reviews.test.ts tests/routes/review-feed.test.ts tests/routes/review-media.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit the widened read shape
+    command: 'git add packages/api/src/routes/reviews.ts packages/api/tests/routes/review-card-shape.test.ts && git commit -m "feat(api): carry item type, verified and product chip on review reads"'
+    status: done
+current_step: 5
+started: '2026-08-05T19:43:39.609Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:06:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:06:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/routes/review-card-shape.test.ts tests/routes/reviews.test.ts tests/routes/review-feed.test.ts tests/routes/review-media.test.ts
+  test_output: 'Test Files 4 passed (4); Tests 123 passed (123). reviews.test.ts logged "Database connection available for runtime tests" — the DB-backed runtime tests executed, no skips. Collateral: admin/reviews.test.ts + admin/review-media.test.ts + review-catalogue-stats.test.ts = 122 passed (3 files).'
+  build_passed: true
+  build_command: cd packages/api && bunx tsc --noEmit
+  verified_at: '2026-08-05T19:48:42.728Z'
+completed: '2026-08-05T19:49:31.124Z'

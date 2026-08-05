@@ -20,11 +20,11 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: low
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:15:59.722Z'
-last_updated: '2026-08-05T17:48:41.089Z'
+last_updated: '2026-08-05T18:56:05.094Z'
 time_spent_minutes: 0
 labels:
   - testing
@@ -95,6 +95,27 @@ comments:
       An early version of the upload spec's teardown deleted "whatever review is on the order item now" rather than the id it created. The order-detail API resolves an item's review by (productId, userId) and this customer owns two order items for the same poster, so the teardown removed a *different* seeded review — "Better in person" — and its 3 media rows cascaded with it. Restored via a one-off script that re-inserted the row verbatim from `SEED_ORDERS` and re-ran the idempotent `seedReviewMedia()`; the script was deleted afterwards. Verified back to baseline: `{"pending":2,"approved":12,"rejected":0,"total":14}` and `wabi-sabi-study` carrying 2 photos + 1 video again. The spec now captures `createdReviewId` off the POST response and deletes only that, with the reasoning written into the file so it cannot be re-introduced. A before/after check across the final run shows the database unchanged.
 
       **Remaining for this ticket**: step 3 stays pending until #493 lands and the `fixme` comes off.
+  - author: mcp-client
+    timestamp: '2026-08-05T18:56:04.914Z'
+    text: |-
+      Unblocked and complete.
+
+      The photo-upload spec was `test.fixme()`'d on #493 (`/account/orders/$id` never rendered, so `ReviewModal` — the only mount point of the upload flow — was unreachable). #493 landed in bc63c02d and also cleared two bugs it had been hiding: `ReviewModal` posting to a relative `/api/...` URL across origins, and the success refetch unmounting the confirmation dialog.
+
+      The fixme is gone. Full run against the live app on :3001:
+
+      ```
+      20 passed (1.2m)
+      ```
+
+      17 specs across `tests/e2e/review-surfaces.spec.ts` (14) and `tests/e2e/review-media-upload.spec.ts` (3), plus auth setup projects. Covers: the `/reviews` destination including the aggregate header and the page-2 search-coercion path that would otherwise error-boundary blank; the home strip and its View All plus desktop nav links; the PDP media wall with lightbox open, Escape close and arrow traversal; the toast arriving, linking through, staying dismissed for the session, and being suppressed on `/checkout` before it can fetch; and a signed-in review submission carrying a photo end to end.
+
+      Video upload is deliberately not covered here — the transcode is async and the assertion would degenerate into a sleep. `packages/api/tests/queues/review-media.test.ts` covers it instead.
+
+      The one `test.skip` remaining is a data guard (lightbox stepping needs at least two uploads), not a disabled assertion.
+  - author: system
+    timestamp: '2026-08-05T18:56:05.094Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -162,3 +183,4 @@ implementation_steps:
     status: done
 current_step: 3
 started: '2026-08-05T17:27:29.940Z'
+completed: '2026-08-05T18:56:05.094Z'

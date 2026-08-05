@@ -22,11 +22,12 @@ description: |-
   - **D2 Teased price, gated at cart.** Logged-out visitors see base struck through + sale price + "Members" tag; the cart shows the saving as locked with a Join button. Server charges base until the viewer is a member.
   - **D3 Scope + exclusions.** One promotion targets `all` / `filter` (styles, subjects, rooms, isFeatured) / hand-picked `products`, plus an exclusion list that always wins.
   - **D5 Rolling countdown.** Per-visitor deadline minted into a cookie, clamped by `min(cookieDeadline, endsAt)`, re-minted on the next load when it runs out. `countdownMode` is a config field ('rolling' | 'real'), never hardcoded — see the CCPA dark-patterns note in doc §6.
-  - **D6 Never stack.** Highest `priority` wins, ties broken by deeper discount.
+  - **D6 Never stack.** Highest `priority` wins, ties broken by deeper discount. Promotion-vs-promotion only — codes are D8.
+  - **D8 Codes and gift cards: reserved, not built.** No code system ships here, but promotion money and code money get separate columns and the layering order is fixed now (doc §5), so a settled order stays attributable once codes exist.
 
   ## Data model (doc §4)
 
-  New `packages/api/src/database/schema/promotions.ts`: `promotion` (headline, discountType/Value, scopeType, scopeFilter jsonb, membersOnly, startsAt/endsAt, isEnabled, priority, perCustomerOrderLimit, countdownMode/rollingWindowMinutes/rollingJitterMinutes), `promotion_product`, `promotion_exclusion`. State is **derived**, never stored — no status column. `endsAt` is private and never serialized to the storefront. Orders gain `promotionId`; `orders.discount` and `order_items.itemDiscount` start carrying real numbers.
+  New `packages/api/src/database/schema/promotions.ts`: `promotion` (headline, discountType/Value, scopeType, scopeFilter jsonb, membersOnly, startsAt/endsAt, isEnabled, priority, perCustomerOrderLimit, countdownMode/rollingWindowMinutes/rollingJitterMinutes), `promotion_product`, `promotion_exclusion`. State is **derived**, never stored — no status column. `endsAt` is private and never serialized to the storefront. Orders gain `promotionId` and `promotionDiscount`; `order_items.itemDiscount` starts carrying real numbers. `orders.discount` becomes the derived total `promotionDiscount + couponDiscount` — the promotion never writes into the shared column, or a settled order cannot be attributed once codes exist.
 
   ## Resolver (doc §5)
 
@@ -41,6 +42,8 @@ description: |-
   ## Out of scope
 
   Discount codes, stacking, BOGO/tiered/volume, minimum-cart thresholds, loyalty points, scheduled email sends, multi-currency sale pricing, per-variant discount depth.
+
+  **Gift cards are not a discount.** A gift card is tender: it applies after tax against the amount due, carries a balance, is partially consumable, and refunds return to it. It never reaches `resolveSalePrice` and is never written to a discount column — the separate `gift-cards` feature owns it. Shopify's single "Discount code or gift card" input (mesonart's checkout) is one box routing to two unrelated systems.
 
   ## Depends on / pairs with
 

@@ -1,52 +1,10 @@
 status: in-progress
-last_updated: '2026-08-05T18:35:35.303Z'
-total_tickets: 2
+last_updated: '2026-08-05T20:37:11.348Z'
+total_tickets: 0
 summary:
   critical: 0
-  high: 1
+  high: 0
   medium: 0
-  low: 1
-priorities:
-  high:
-    - feature: review-surfaces-parity
-      tickets:
-        - ticket_number: 493
-          title: Bug - /account/orders/$id never renders; the order-list route swallows it
-          assignee: unassigned
-          blocked_by: []
-  low:
-    - feature: review-surfaces-parity
-      tickets:
-        - ticket_number: 492
-          title: E2E - review surfaces and media upload flows
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 485
-              title: Frontend - photo and video upload in ReviewForm
-            - ticket_number: 486
-              title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
-            - ticket_number: 487
-              title: Frontend - home Customer Reviews strip with score band and carousel
-            - ticket_number: 488
-              title: Frontend - PDP review media wall with lightbox and video playback
-            - ticket_number: 489
-              title: Frontend - site-wide floating review toast
-            - ticket_number: 491
-              title: Seed - attach photo and video media to approved reviews
-blocked_tickets:
-  - ticket_number: 492
-    title: E2E - review surfaces and media upload flows
-    blocked_by:
-      - ticket_number: 485
-        title: Frontend - photo and video upload in ReviewForm
-      - ticket_number: 486
-        title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
-      - ticket_number: 487
-        title: Frontend - home Customer Reviews strip with score band and carousel
-      - ticket_number: 488
-        title: Frontend - PDP review media wall with lightbox and video playback
-      - ticket_number: 489
-        title: Frontend - site-wide floating review toast
-      - ticket_number: 491
-        title: Seed - attach photo and video media to approved reviews
-    description: Frontend - photo and video upload in ReviewForm, Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links, Frontend - home Customer Reviews strip with score band and carousel, Frontend - PDP review media wall with lightbox and video playback, Frontend - site-wide floating review toast, Seed - attach photo and video media to approved reviews
+  low: 0
+priorities: {}
+blocked_tickets: []

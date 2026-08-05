@@ -1,0 +1,104 @@
+name: wishlist-curation
+title: Wishlist Curation
+priority: medium
+created: "2026-08-05T19:42:24.952Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+
+  Two related capabilities on `/wishlist`, sharing one mechanism: **the wishlist is an ordered list, and the order is the point.**
+
+  1. **Reordering** — shoppers drag their saved pieces into the order they actually rank them. A wishlist of thirty items in save order is a pile; in the owner's order it is a shortlist.
+  2. **Staging a curated collection** — staff heart products in the order they want them, then create a manual collection from that list in one press.
+
+  The second falls out of the first. `curated-collections` (#461–#475) shipped manual collections whose ordering contract is fully wired, but the admin form takes raw product UUIDs pasted into a textarea — the limitation recorded on #473. Browsing the store and clicking hearts already *is* a product picker; it just had no export.
+
+  ## Why this is cheap
+
+  Three findings from reading the existing code, all of which remove work:
+
+  - **The wishlist is already an ordered array.** `user.wishlist_product_ids` is a `text[]` column on the user row, not a join table. Reordering is writing a reordered array — no migration, no position column, no per-row updates.
+  - **`WishlistContents.tsx` already renders "in the order they were saved"**, so the display contract needs no change; only the ability to rewrite that order.
+  - **The drag idiom already exists here.** `ProductForm.tsx` reorders product images with plain HTML5 `draggable` + `onDragStart`/`onDragOver`/`onDrop`. No library to add, and following it keeps one pattern in the codebase rather than two.
+
+  ## Scope
+
+  **In scope**
+
+  - `PUT /api/wishlist` — replace the ordered id array, guarded so it must be a **permutation** of what is stored.
+  - Store: a `reorder` action, optimistic, persisting to the server when signed in and to localStorage for guests.
+  - `/wishlist`: drag-to-reorder, **plus explicit move-up / move-down controls**.
+  - Staff-only staging bar: **Copy IDs** and **Create collection from these**.
+  - E2E covering the property everything rests on — order out equals order in, through a reload.
+
+  **Out of scope**
+
+  - A drag-and-drop library. The repo already reorders without one.
+  - Multiple named wishlists / boards. The staging slot is single and that is a stated limitation, not an oversight.
+  - Reordering from the wishlist drawer or the product card heart — the page is where ordering belongs.
+  - Replacing the admin form's textarea. It stays as the escape hatch for pasting into an existing collection.
+
+  ## Design
+
+  ### The permutation guard
+
+  A naive "replace the array" endpoint is a data-loss bug: a tab open since before an item was added elsewhere would post a stale list and silently drop it.
+
+  `PUT /api/wishlist` therefore accepts the new order only when its **set** equals the stored set. Different set → 409 with the current list, and the client refreshes rather than overwriting. Same-set-different-order is exactly what a reorder is, so the guard costs nothing legitimate.
+
+  ### Keyboard controls are not optional
+
+  Drag alone is unreachable by keyboard and invisible to a screen reader. Every draggable row also gets move-up / move-down buttons with real labels — the same call made on the admin collections list (#472), for the same reason.
+
+  ### Staging is staff-only
+
+  A "copy product IDs" button on every shopper's wishlist is clutter. Gated on role the way the header's staff entry already is (`staffAreaLabel`). The IDs are not secret — they are already in the DOM and in API responses — so this is about noise, not exposure.
+
+  ### Direct create beats clipboard
+
+  **Create collection from these** posts to `/api/admin/collections` with `kind: 'manual'`, then `PUT /:id/products` with the ordered array, and lands on the new collection's edit form. That removes the copy/paste round trip entirely. **Copy IDs** stays for pasting into a collection that already exists.
+
+  ## Technical Considerations
+
+  - **Guests**: the store persists to localStorage and there is no server call. Reordering must work signed-out; only persistence differs.
+  - **Optimism**: the reorder applies locally first. A failed write reloads from the server rather than leaving the list disagreeing with storage — the same contract the admin rail reorder uses.
+  - **Single staging slot**: an admin's wishlist is their personal wishlist. Curating a second collection means clearing the first. Say so in the UI rather than letting it be discovered.
+  - **Order is the tested property** at every layer: store, endpoint, page, and E2E through a reload.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: "00:00:00"
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    "505": Bug - a late wishlist load() reverts a reorder made during it
+  in_progress: {}
+  done:
+    "500": API - PUT /api/wishlist to rewrite the order, permutation-guarded
+    "501": Store - reorder action, optimistic, guest and signed-in
+    "502": Web - drag and keyboard reordering on /wishlist
+    "503": "Web - staff staging bar: copy ids, or create a collection from them"
+    "504": E2E - order survives a reload, and staging reaches the storefront
+total_tickets: 6
+completion_percentage: 83
+is_completed: false
+design:
+  approach: "The wishlist is already an ordered `text[]` column on the user row, so reordering is writing a reordered array — no migration, no join table, no position column. A single `PUT /api/wishlist` replaces the order, guarded to accept only a permutation of the stored set so a stale tab cannot silently drop items added elsewhere. The page gets HTML5 drag-and-drop following the existing `ProductForm` image-reorder idiom (no library), plus move-up/move-down buttons for keyboard and screen-reader users. On top of that ordering, a staff-only bar exports the list: Copy IDs, or Create collection from these — which posts a manual collection and its ordered membership directly, retiring the raw-UUID textarea limitation recorded on #473."
+  decisions:
+    - Reordering writes the whole array, not per-row positions. `user.wishlist_product_ids` is a text[] column, so the array order IS the order — a join table with a position column would be new storage for something already stored.
+    - "PUT /api/wishlist accepts only a PERMUTATION of the stored set. A plain replace endpoint is a data-loss bug: a tab open since before an item was added elsewhere posts a stale list and silently drops it. Different set returns 409 with the current list so the client refreshes instead of overwriting."
+    - Drag is accompanied by explicit move-up/move-down buttons, never replaced by them. Drag alone is unreachable by keyboard and invisible to a screen reader — the same call made on the admin collections list (#472).
+    - No drag-and-drop library. ProductForm.tsx already reorders images with plain HTML5 draggable/onDragStart/onDragOver/onDrop; following it keeps one pattern in the codebase instead of two.
+    - The staging bar is staff-only, gated on role like the header's staff entry. Product IDs are not secret — they are already in the DOM and API responses — so this is about not putting internal identifiers in every shopper's face, not about exposure.
+    - Create collection from these posts directly (POST /api/admin/collections then PUT /:id/products) rather than only copying to the clipboard. Clipboard stays as the escape hatch for pasting into a collection that already exists.
+    - Reordering works signed-out. Guests persist to localStorage; only the persistence path differs, not the interaction.
+    - The staging slot is single and shared with the admin's real wishlist. Stated in the UI rather than left to be discovered.
+  approved: true
+  approved_at: "2026-08-05T19:42:38.768Z"

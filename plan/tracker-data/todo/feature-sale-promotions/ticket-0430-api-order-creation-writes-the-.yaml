@@ -2,16 +2,27 @@ ticket_number: 430
 title: API - order creation writes the real discount and enforces the per-customer limit
 description: |-
   ## Task
-  Replace `const discount = "0.00"; // TODO: Apply coupon if provided` (`routes/orders.ts:268`). Order creation re-resolves sale pricing from the database, writes `promotionId`, a real `orders.discount`, and per-line `order_items.itemDiscount`, and enforces `perCustomerOrderLimit`.
+  Replace `const discount = "0.00"; // TODO: Apply coupon if provided` (`routes/orders.ts:268`). Order creation re-resolves sale pricing from the database, writes `promotionId`, `orders.promotionDiscount`, a derived `orders.discount`, and per-line `order_items.itemDiscount`, and enforces `perCustomerOrderLimit`.
 
   **The server is the only pricing authority.** Any price sent by the client is ignored. A non-member at order time pays base, so the gate cannot be bypassed by holding a cart open through a logout.
 
-  Also stop storing an unvalidated `couponCode` from client input (`routes/orders.ts:298`) — this feature has no codes (design D1), so the field should not be written from request input.
+  ## Money buckets (design D8)
+  ```
+  orders.promotionDiscount = sum of line discounts   <- this feature writes it
+  orders.couponDiscount    = '0.00'                  <- reserved for codes, untouched
+  orders.discount          = promotionDiscount + couponDiscount   <- derived total
+  ```
+  Compose `discount` from the two source columns rather than assigning the promotion total to it directly, so the expression is already correct on the day codes land.
+
+  ## Remove the dead coupon path
+  `routes/orders.ts:298` persists `input.couponCode` — unvalidated client text stored beside a hardcoded `couponDiscount: "0.00"`, making the order record claim a code was applied when none was. Drop `couponCode` from the create-order input schema (`routes/orders.ts:75`) and write `couponCode: null`. The dormant checkout UI at `OrderSummary.tsx:201` stays as-is: it never renders, because no caller passes `onApplyCoupon`.
+
+  Gift cards are tender, not a discount — they apply after tax against the total and are out of scope here entirely (`gift-cards` feature owns them). Nothing in this ticket touches `giftCardAmount`.
 
   ## Context
   Part of feature: sale-promotions
   Phase: 3 — API surfaces
-  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5 (layering order), D8
 
   Order creation already requires an account (`routes/orders.ts` builds from `user.id`). `perCustomerOrderLimit` counts that customer's settled orders carrying the same `promotionId` — reuse the settled-order status logic from `lib/product-sales.ts` (`VOIDED_ORDER_STATUSES`).
 feature: sale-promotions
@@ -55,6 +66,14 @@ implementation_steps:
           // assert: inserted order.discount === '10120.00' && order.promotionId === promo.id
         })
 
+        it('books the saving to promotionDiscount, never to couponDiscount', async () => {
+          // assert: order.promotionDiscount === '10120.00' && order.couponDiscount === '0.00'
+        })
+
+        it('derives discount as promotionDiscount + couponDiscount', async () => {
+          // assert: order.discount === order.promotionDiscount (couponDiscount is '0.00' here)
+        })
+
         it('writes itemDiscount per line', async () => {
           // assert: every inserted order_item carries a non-zero itemDiscount
         })
@@ -74,6 +93,10 @@ implementation_steps:
 
         it('does not write couponCode from client input', async () => {
           // assert: inserted order.couponCode === null even when the body sends one
+        })
+
+        it('rejects couponCode at the input schema', async () => {
+          // assert: the create-order zod schema has no couponCode key
         })
       })
   - id: 2
@@ -124,10 +147,22 @@ implementation_steps:
         }
       }
 
-      const discount = discountTotal.toFixed(2)
+      // One bucket per source (design D8). `discount` is composed, not assigned:
+      // the expression is then already correct on the day codes land.
+      const promotionDiscount = discountTotal.toFixed(2)
+      const couponDiscount = "0.00" // reserved for D8; nothing here writes it
+      const discount = (
+        parseFloat(promotionDiscount) + parseFloat(couponDiscount)
+      ).toFixed(2)
 
-      // ...and on the insert: promotionId: appliedPromotionId, couponCode: null
-      // (no codes in this feature — design D1), plus itemDiscount from lineDiscounts.
+      // ...and on the insert: promotionId: appliedPromotionId, promotionDiscount,
+      // couponDiscount, discount, couponCode: null (no codes in this feature —
+      // design D1), plus itemDiscount from lineDiscounts.
+      //
+      // Also: drop `couponCode` from the create-order zod schema (orders.ts:75),
+      // and add promotionId / promotionDiscount to the order response mappings
+      // (orders.ts:569-570 and admin/orders.ts:529-530), which already return
+      // couponCode / couponDiscount.
   - id: 4
     action: verify-pass
     description: Confirm the tests pass

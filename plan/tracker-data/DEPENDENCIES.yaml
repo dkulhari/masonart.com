@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-05T18:35:37.174Z'
+  last_updated: '2026-08-05T20:37:12.019Z'
   features:
     chobi-external-services:
       - ticket_number: 315
@@ -442,6 +442,35 @@ dependencies:
             title: Docs - Rebrand CLAUDE.md, README, external services and deploy docs
           - ticket_number: 310
             title: Deploy - Fresh chobi DB, staging live at chobi.xtoms.xyz, smoke test
+    review-grid-loox-parity:
+      - ticket_number: 496
+        title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+        blocks: []
+        blocked_by:
+          - ticket_number: 495
+            title: Backend API - widen the review read shape with itemType, verified and product chip
+      - ticket_number: 497
+        title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+        blocks: []
+        blocked_by:
+          - ticket_number: 496
+            title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+      - ticket_number: 498
+        title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+        blocks: []
+        blocked_by:
+          - ticket_number: 496
+            title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+          - ticket_number: 497
+            title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+      - ticket_number: 499
+        title: E2E - resweep the review specs for the masonry grid
+        blocks: []
+        blocked_by:
+          - ticket_number: 497
+            title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+          - ticket_number: 498
+            title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
     review-surfaces-parity:
       - ticket_number: 479
         title: Media Infrastructure - video validation, ffmpeg processing and Docker image
@@ -755,6 +784,33 @@ dependencies:
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
           - title: 'Ticket #undefined'
+    wishlist-curation:
+      - ticket_number: 501
+        title: Store - reorder action, optimistic, guest and signed-in
+        blocks: []
+        blocked_by:
+          - ticket_number: 500
+            title: API - PUT /api/wishlist to rewrite the order, permutation-guarded
+      - ticket_number: 502
+        title: Web - drag and keyboard reordering on /wishlist
+        blocks: []
+        blocked_by:
+          - ticket_number: 501
+            title: Store - reorder action, optimistic, guest and signed-in
+      - ticket_number: 503
+        title: 'Web - staff staging bar: copy ids, or create a collection from them'
+        blocks: []
+        blocked_by:
+          - ticket_number: 502
+            title: Web - drag and keyboard reordering on /wishlist
+      - ticket_number: 504
+        title: E2E - order survives a reload, and staging reaches the storefront
+        blocks: []
+        blocked_by:
+          - ticket_number: 502
+            title: Web - drag and keyboard reordering on /wishlist
+          - ticket_number: 503
+            title: 'Web - staff staging bar: copy ids, or create a collection from them'
     wishlist:
       - ticket_number: 422
         title: Web - wishlist page at /wishlist

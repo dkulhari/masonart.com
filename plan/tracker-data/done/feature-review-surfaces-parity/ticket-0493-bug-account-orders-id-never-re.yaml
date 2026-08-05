@@ -1,0 +1,128 @@
+ticket_number: 493
+title: Bug - /account/orders/$id never renders; the order-list route swallows it
+description: |
+  ## What happens
+
+  Every URL under `/account/orders/<anything>` renders the **order history list**, never the order detail page. Verified in a real browser against the running app with the signed-in customer storage state:
+
+  ```
+  {"target":"/account/orders",                                       "url":".../account/orders?page=1",              "h1":"Order History","writeReview":0}
+  {"target":"/account/orders/CH-SEED-0006",                          "url":".../account/orders/CH-SEED-0006?page=1", "h1":"Order History","writeReview":0}
+  {"target":"/account/orders/b4a39113-cf0d-436f-b8d3-d7c115d09b8d",  "url":".../account/orders/b4a39...?page=1",     "h1":"Order History","writeReview":0}
+  ```
+
+  The `?page=1` appended to every one of them is the list route's own `validateSearch` running — the parent route is what rendered.
+
+  ## Root cause
+
+  `app/routes/_authed/account/orders.tsx` is a *leaf* page (`component: OrderHistoryPage`) but file-based routing makes it the **parent** of `orders.$id.tsx`. `routeTree.gen.ts` confirms it:
+
+  ```ts
+  const AuthedAccountOrdersIdRoute = AuthedAccountOrdersIdRouteImport.update({
+    getParentRoute: () => AuthedAccountOrdersRoute,
+  ```
+
+  `OrderHistoryPage` renders no `<Outlet />`, so the child's component is never mounted. The list is what you get at every child URL.
+
+  The likely fix is to move the list to `orders.index.tsx` and leave `orders.tsx` as a pass-through layout (`<Outlet />`), or add an `<Outlet />` to the current component. Route-shape change — wants its own verification pass, not a drive-by.
+
+  ## Blast radius
+
+  `orders.$id.tsx` is the **only** mount point of `ReviewModal` → `ReviewForm` → `ReviewMediaUpload`. So the entire customer-facing review-writing flow, including the photo/video attachment shipped in #485, has no reachable entry point in the app today. The API side is fine (`POST /api/orders/:orderId/items/:itemId/review`, presign, complete all work when called directly).
+
+  Also worth noting: the order list's own "View Details" links point at `/account/orders/CH-SEED-0006` — the **order number** — while `GET /api/orders/:id` 400s on anything that is not a UUID. So even once the `<Outlet />` lands, the link target needs checking.
+
+  ## Pre-existing, not introduced here
+
+  `main` has the same shape: `git show main:app/routes/_authed/account/orders.tsx | grep -c Outlet` → `0`, and `main`'s `routeTree.gen.ts` carries the same `getParentRoute: () => AuthedAccountOrdersRoute`.
+
+  It stayed invisible because every existing e2e test that touches the flow guards itself out — `tests/e2e/reviews.spec.ts` calls `test.skip()` when the "Write Review" button is not found, which is exactly the symptom.
+
+  ## How it was found
+
+  Writing the E2E for #492. `tests/e2e/review-media-upload.spec.ts` is written against the real flow and is currently `test.fixme()`'d against this ticket; dropping the annotation is the acceptance test for the fix.
+feature: review-surfaces-parity
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T17:39:53.616Z'
+last_updated: '2026-08-05T18:53:17.970Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - frontend
+  - routing
+  - orders
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T17:51:10.020Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T18:53:08.845Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `bc63c02d` — fix(web): render the order detail route, and the review flow behind it
+      (the two file renames themselves landed a moment earlier inside `c2ef1792`, a concurrent agent's commit that swept up the staged `git mv`; the route ids, generated tree and everything else are in `bc63c02d`.)
+
+      **Root Cause**: `packages/web/app/routes/_authed/account/orders.tsx` was a leaf page (`component: OrderHistoryPage`, no `<Outlet />`) that TanStack's flat file routing made the PARENT of `orders.$id.tsx`. The child's component never mounted, so every `/account/orders/<id>` URL rendered the LIST. `orders.$id.return.tsx` was caught the same way one level down, under `orders.$id.tsx`.
+
+      **Fix**: moved both leaves to index routes — `orders.index.tsx` and `orders.$id.index.tsx` — so the list, the detail and the return flow all parent directly to `_authed`. This matches the shape `admin/orders/{index,$id}.tsx` already uses in this repo; nothing had to become a layout. Verified live with the signed-in customer:
+
+      ```
+      /account/orders                       -> "Order History | chobii.art"  h1: Order History      final: /account/orders?page=1
+      /account/orders/<uuid>                -> "Order Details | chobii.art"  h1: Order CH-SEED-0011 final: /account/orders/<uuid>
+      /account/orders/<uuid>/return         -> "Request Return | chobii.art" h1: Request Return     final: /account/orders/<uuid>/return
+      ```
+
+      **Two further defects were behind it**, both hit by the acceptance spec once the route rendered, both fixed here:
+
+      1. `ReviewModal.handleSubmit` posted the review at a **relative** `/api/...` URL. The API is a separate origin in dev with no `/api` proxy, so the submit 404'd against the web app and the form showed "Failed to submit review". Now absolute via `getApiUrl()` (which is `''` in the production image, so same-origin still holds). Same fix applied to the review fetch in `handleEditReview`.
+      2. On success the page called `fetchOrder()`, which flips `isLoading` — and the loading skeleton `return`s **above** the `ReviewModal`, so the confirmation panel was unmounted the same tick it rendered and the dialog just vanished. `fetchOrder` now takes a `background` mode.
+
+      The note in the description about "View Details" linking by order number is **not** a defect: `GET /api/orders/:id` accepts an order number as well as a UUID.
+
+      **Files Changed**:
+      - `packages/web/app/routes/_authed/account/orders.index.tsx` — route id `/_authed/account/orders/`, `useSearch` from updated
+      - `packages/web/app/routes/_authed/account/orders.$id.index.tsx` — route id `/_authed/account/orders/$id/`, absolute review fetch, background refetch
+      - `packages/web/app/routeTree.gen.ts` — regenerated; all three order routes now `getParentRoute: () => AuthedRoute`
+      - `packages/web/app/components/reviews/ReviewModal.tsx` — absolute submit URL
+      - `packages/web/tests/routes/account-orders-routing.test.ts` — new regression test
+      - `tests/e2e/review-media-upload.spec.ts` — `fixme` removed, routing guard added, setup made worker-safe and duplicate-safe
+
+      **Regression test**: the sharpest assertion is deliberately general — it reads the generated tree and fails ANY route the generator gives children to while its module renders no `<Outlet />`. That guards the class of bug, not just this instance. Plus specific guards that `/account/orders/$id` is not nested under the list, that the detail module carries `ReviewModal` and none of the list's markers, and that `to="/account/orders"` still resolves.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/routes/account-orders-routing.test.ts`
+      - Result: PASS (8 tests, 8 passing)
+      ```
+       ✓ tests/routes/account-orders-routing.test.ts (8 tests) 6ms
+       Test Files  1 passed (1)
+            Tests  8 passed (8)
+      ```
+      - Command: `npx playwright test tests/e2e/review-media-upload.spec.ts --workers=1`
+      - Result: PASS (6 tests incl. 4 auth setup, 6 passing) — run twice consecutively from a canonical seed
+      ```
+        ✓  5 [chromium] › review-media-upload.spec.ts:297:3 › renders the order detail page, not the order history list (1.8s)
+        ✓  6 [chromium] › review-media-upload.spec.ts:323:3 › carries the photo through and says it publishes after approval (2.1s)
+        6 passed (1.4m)
+      ```
+      - Database unchanged after each run: 12 approved reviews, 2 pending, 8 photos + 1 video = 9 `review_media`.
+      - Also ran `packages/web/tests/routes/` + `tests/build.test.ts`: 233 passing, 1 pre-existing unrelated failure (`home-tokens.test.ts`, `from-slate-700/80` on the untouched home route).
+
+      **Two environment hazards found, worth their own tickets:**
+      1. `./scripts/run-tests.sh e2e` **reseeds the real database**. It reports "PostgreSQL (port 5433)" — which is a *different app's* container — but `bun run seed` resolves `DATABASE_URL` from the root `.env` and hits `poster-app-postgres` on 5440, wiping and recreating orders + reviews mid-flight. Order ids changed under every run. Run this spec with `npx playwright test` directly to avoid it.
+      2. The seed writes a review per delivered **order item** while `GET /api/orders/:id` resolves an item's review by **(productId, userId)**, so `test-customer-001` holds *two* reviews for the one poster they bought twice — a violation of the API's own one-review-per-(product, customer) rule, and invisible because the map keeps only the last. The spec now works around it by borrowing only a review reported against exactly one item, but the seed should stop emitting the duplicate.
+  - author: system
+    timestamp: '2026-08-05T18:53:17.971Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T17:51:10.020Z'
+completed: '2026-08-05T18:53:17.970Z'

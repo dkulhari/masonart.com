@@ -1,0 +1,108 @@
+name: review-grid-loox-parity
+title: Review Grid Loox Parity
+priority: high
+created: "2026-08-05T19:38:35.120Z"
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+
+  Corrective feature. `review-surfaces-parity` (#478–#493) shipped the review surfaces against a spec that never described them: `mesonart-parity-analysis.md` names `/pages/reviews` only as a bare URL in a list of missing pages, and says "Loox photo reviews" of the PDP without describing the layout. The UI was extrapolated from the *home strip* description instead, and got the structure wrong.
+
+  Captured the real thing 2026-08-05:
+  - `docs/design/mesonart/mesonart-reviews-page-loox.png`
+  - `docs/design/mesonart/mesonart-pdp-reviews-loox.png`
+
+  **Both mesonart surfaces are the same Loox widget** — `loox.io/widget/NJZhsWm4ra/reviews`, iframed, with the PDP passing a product id and the page passing none. One component, two filters, not two designs.
+
+  ## The gap
+
+  | Mesonart (Loox) | What shipped |
+  |---|---|
+  | One masonry grid; media and text fused in a **single card** | Media wall (photos only) *above* a separate written-review list — an invented split |
+  | Pinterest column flow, variable card heights | Uniform square tiles + list rows |
+  | Header: star row + "9,605 Reviews" + chevron + **"Write a review"** pill | Large beige aggregate band with score |
+  | **"Show more reviews"** button | Numbered prev/next paging |
+  | Every card carries a **product chip** (thumbnail + title + SKU) | Product link as plain text |
+  | **"Verified"** check badge per review | absent |
+  | **"Item type:"** — the exact variant bought | absent |
+  | **"+1" / "+2"** multi-photo corner badge | absent |
+  | Video inline in the grid, same card type, play overlay | video quarantined in the media wall |
+
+  ## Goals
+
+  - One shared masonry `ReviewGrid`, product-filtered on the PDP and unfiltered on `/reviews`
+  - Fused card: media on top, then author + Verified, date, stars, body, Item type, product chip
+  - Loox-style header row and Show-more paging on both surfaces
+  - Retire `ReviewMediaWall` and the bespoke `/reviews` list body
+
+  ## Scope
+
+  **In scope**
+  - API: `itemType` (from `orderItems.sizeLabel` + `frameName`/`frameType`), `verified`, and product-chip fields (title, slug, sku, thumbnail) added to the shared review read shape — list-all, product-scoped, and single-review
+  - Web: `ReviewGrid` + `ReviewGridCard`, CSS-columns masonry, multi-photo `+N` badge, inline video with poster and play overlay, existing lightbox retained
+  - Web: `/reviews` and the PDP both rebuilt on `ReviewGrid` with the Loox header row and Show-more paging
+  - Delete `ReviewMediaWall` and any `/reviews` list code it replaces; update E2E
+
+  **Out of scope**
+  - Auto-translation ("Auto-translated from Japanese · Show original") — needs a translation service, no infrastructure for it
+  - The Seel "Worry-Free Purchase" chip — a third-party product we do not sell
+  - The hover product-card popup on the PDP grid
+  - Home strip (#487) and the toast (#489) — those already match; leave them
+  - Any schema change. `reviewMedia` and `reviews` are unchanged; this is presentation plus a read-shape widening
+
+  ## Design
+
+  **Approach**: one component, two filters — mirroring how Loox itself is deployed. `ReviewGrid` takes an optional `productId`; the PDP passes it, `/reviews` does not. The fused card is the unit of layout, which is the structural correction: media and text were never separate surfaces on mesonart.
+
+  **Key decisions**
+
+  1. **Fused card replaces the wall/list split.** The split was the core error. A review with a photo and a review without are the same card type, differing only in whether the media slot renders.
+  2. **CSS `columns` masonry, not JS layout.** Variable-height cards in a column flow, no measuring pass, no layout dependency. Reading order goes down each column rather than across — acceptable for a review wall, and what Loox does.
+  3. **`verified` is derived, not stored.** Every review is `orderItemId`-gated by `verified-purchase-reviews` (#169–#180), so the badge is true for all of them. Deriving it keeps one source of truth rather than adding a column that could drift.
+  4. **`itemType` joins `orderItems`, no schema work.** `sizeLabel`, `frameName` and `frameType` are already on the row the review points at.
+  5. **Show-more replaces numbered paging.** Appends to the grid; masonry reflows. The `page` search param stays on `/reviews` so a deep link still works and `validateSearch` keeps its coercion.
+  6. **Media stays `ready`-only on public reads.** Unchanged from the prior feature — `processing` and `failed` remain invisible outside the admin queue.
+
+  ## Technical Considerations
+
+  - `hooks/useReviews.ts` must keep fetching through `getApiUrl()`. A relative `/api` breaks in dev — there is no Vite proxy, and this exact bug already bit `ReviewModal` in #493.
+  - The `/reviews` route's `validateSearch` must keep coercing `page`; `router.tsx` overrides TanStack's serialisation and a bare `z.number()` error-boundaries the page to blank.
+  - Cache keys embed the payload shape. Widening the read shape means another version bump, or warm nodes serve cards with no product chip and no item type.
+  - Deleting `ReviewMediaWall` touches specs written in #492. Update them in the same ticket that removes it, or the suite breaks between commits.
+  - Card heights vary with body length; the `+N` badge and play overlay are absolutely positioned inside the media slot, which must hold its aspect ratio to avoid reflow as images decode.
+
+  ## Objectives
+  - Widen the shared review read shape with itemType, verified and product-chip fields
+  - Build ReviewGrid + ReviewGridCard with masonry layout and the fused card
+  - Rebuild /reviews on ReviewGrid with the Loox header row and Show-more
+  - Rebuild the PDP review section on ReviewGrid, retiring ReviewMediaWall
+  - Update E2E and delete the replaced components
+
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 2
+  total_duration: "00:11:00"
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 2
+      duration: "00:11:00"
+      tokens: 0
+tickets:
+  todo:
+    "499": E2E - resweep the review specs for the masonry grid
+  in_progress: {}
+  done:
+    "495": Backend API - widen the review read shape with itemType, verified and product chip
+    "496": Frontend - ReviewGrid masonry and the fused ReviewGridCard
+    "497": Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+    "498": Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+total_tickets: 5
+completion_percentage: 80
+is_completed: false

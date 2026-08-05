@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-05T18:35:35.297Z'
-total_tickets: 35
+last_updated: '2026-08-05T20:37:11.344Z'
+total_tickets: 37
 summary:
   critical: 1
   high: 9
-  medium: 20
-  low: 5
+  medium: 21
+  low: 6
 priorities:
   critical:
     - feature: go-live
@@ -231,6 +231,16 @@ priorities:
           blocked_by:
             - ticket_number: 445
               title: Web - dismissible sale banner with session and 7-day cooldown
+    - feature: review-grid-loox-parity
+      tickets:
+        - ticket_number: 499
+          title: E2E - resweep the review specs for the masonry grid
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 497
+              title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+            - ticket_number: 498
+              title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
   low:
     - feature: go-to-production
       tickets:
@@ -285,6 +295,12 @@ priorities:
               title: Web - black vertical rail tab on the right edge
             - ticket_number: 438
               title: E2E - sale lifecycle from no promotion to expiry
+    - feature: wishlist-curation
+      tickets:
+        - ticket_number: 505
+          title: Bug - a late wishlist load() reverts a reorder made during it
+          assignee: unassigned
+          blocked_by: []
 blocked_tickets:
   - ticket_number: 294
     title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
@@ -461,6 +477,14 @@ blocked_tickets:
       - ticket_number: 445
         title: Web - dismissible sale banner with session and 7-day cooldown
     description: Web - dismissible sale banner with session and 7-day cooldown
+  - ticket_number: 499
+    title: E2E - resweep the review specs for the masonry grid
+    blocked_by:
+      - ticket_number: 497
+        title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+      - ticket_number: 498
+        title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+    description: Frontend - rebuild /reviews on ReviewGrid with the Loox header row, Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
   - ticket_number: 283
     title: Document and configure database backup procedures
     blocked_by:

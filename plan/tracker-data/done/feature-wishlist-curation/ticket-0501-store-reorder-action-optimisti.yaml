@@ -1,0 +1,114 @@
+ticket_number: 501
+title: Store - reorder action, optimistic, guest and signed-in
+description: |-
+  ## Task
+
+  A `reorder(from, to)` action on the wishlist store.
+
+  - Moves the id within `ids` and applies it immediately — the interaction has to feel like dragging, not like waiting.
+  - Signed in: `PUT /api/wishlist` with the new order. On failure, reload from the server rather than leaving the list disagreeing with storage.
+  - Signed out: nothing to call. The persisted slice writes localStorage and that is the whole of it.
+
+  ## Context
+
+  Feature: wishlist-curation, Phase 1. Depends on the endpoint.
+
+  `packages/web/app/stores/wishlist.ts` already distinguishes the two cases — `isAuthenticated` gates the API calls in `toggle`, and the `persist` middleware handles guests. Follow `toggle`'s shape exactly: it applies optimistically and rolls back on failure, and it is the precedent for this.
+
+  Watch the rollback: `toggle` restores the previous array. A reorder failure should re-fetch instead, because the server may have changed underneath — which is the 409 case the endpoint returns.
+feature: wishlist-curation
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T19:43:43.786Z'
+last_updated: '2026-08-05T19:54:45.268Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - state
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T19:51:56.888Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T19:54:24.370Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T19:54:45.268Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `77ca6b34` — feat(web): reorder action on the wishlist store
+
+      **Files Changed**:
+      - `packages/web/app/stores/wishlist.ts` — `reorder(from, to)`
+      - `packages/web/app/lib/api.ts` — `wishlistApi.reorder(productIds)`, carrying the response status on the thrown error so a 409 is distinguishable
+      - `packages/web/tests/stores/wishlist-reorder.test.ts` — 10 tests
+
+      **Indices, not ids.** Both callers — the drag handler and the move buttons — already know positions. An id-based signature would make them look one up only for the store to look it up again.
+
+      **The failure path differs from `toggle`'s, deliberately.** `toggle` rolls back to the previous array, which is correct when the server refused *one item*. A reorder is refused when **the list changed underneath** — that is exactly the 409 #500 returns — so the previous array is stale too, and rolling back would leave the client wrong in a second way. It reloads instead, and falls back to the previous array only if the reload also fails, because a stale usable list beats an empty one.
+
+      **Out-of-range indices are ignored, not thrown on.** A drop outside the list is an ordinary mouse event. A store that throws there would surface as an error boundary over a dropped card.
+
+      **Optimism is asserted directly** rather than assumed — one test holds the request open and checks the ids have already moved. "Applies eventually" and "applies immediately" are indistinguishable once the promise resolves, and only the second feels like dragging.
+
+      **Verification**
+      - Command: `cd packages/web && npx vitest run tests/stores/`
+      - Result: PASS — 95 tests across 4 suites, 0 failing
+      - Build: `npx tsc --noEmit -p tsconfig.json` — clean
+
+      The existing wishlist store tests (85) still pass unchanged, so the new action did not disturb `toggle`, `load`, `merge` or the guest persistence path.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 500
+    feature: wishlist-curation
+    description: API - PUT /api/wishlist to rewrite the order, permutation-guarded
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing store tests
+    file: packages/web/tests/stores/wishlist-reorder.test.ts
+    command: cd packages/web && npx vitest run tests/stores/wishlist-reorder.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: moving an item down puts it at the target index and shifts the rest; moving up likewise; moving to its own index is a no-op; a guest reorder issues NO fetch; a signed-in reorder PUTs the new order; a failed PUT reloads from the server rather than keeping the optimistic order; out-of-range indices are ignored rather than corrupting the array.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && npx vitest run tests/stores/wishlist-reorder.test.ts
+    expected_result: FAIL - no reorder action
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the action and the API client method
+    file: packages/web/app/stores/wishlist.ts
+    status: pending
+    code: reorder(from, to) in the store; wishlistApi.reorder(productIds) in lib/api.ts.
+  - id: 4
+    action: verify-pass
+    description: Confirm the store tests pass, including the existing ones
+    command: cd packages/web && npx vitest run tests/stores/
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app/stores/wishlist.ts packages/web/app/lib/api.ts packages/web/tests/stores && git commit -m "feat(web): reorder action on the wishlist store (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T19:51:56.888Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/web && npx vitest run tests/stores/
+  test_output: 95 tests passing across 4 store suites, 10 of them new. Covers move up/down/one-place, no-op, out-of-range, guest issuing no request, signed-in sending the new order, optimism before the request settles, and the reload-on-failure path.
+  build_passed: true
+  build_command: cd packages/web && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T19:54:19.382Z'
+completed: '2026-08-05T19:54:24.370Z'

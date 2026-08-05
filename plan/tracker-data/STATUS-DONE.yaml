@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-08-05T18:35:35.444Z'
-total_tickets: 424
+last_updated: '2026-08-05T20:37:11.545Z'
+total_tickets: 435
 summary:
   critical: 21
-  high: 159
-  medium: 186
-  low: 58
+  high: 164
+  medium: 190
+  low: 60
 priorities:
   critical:
     - feature: qa-testing
@@ -885,6 +885,34 @@ priorities:
               title: Database Schema - reviewMedia table, enums, relations and migration
             - ticket_number: 479
               title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+        - ticket_number: 493
+          title: Bug - /account/orders/$id never renders; the order-list route swallows it
+          assignee: unassigned
+          blocked_by: []
+    - feature: review-grid-loox-parity
+      tickets:
+        - ticket_number: 495
+          title: Backend API - widen the review read shape with itemType, verified and product chip
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 496
+          title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 495
+              title: Backend API - widen the review read shape with itemType, verified and product chip
+    - feature: wishlist-curation
+      tickets:
+        - ticket_number: 500
+          title: API - PUT /api/wishlist to rewrite the order, permutation-guarded
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 501
+          title: Store - reorder action, optimistic, guest and signed-in
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 500
+              title: API - PUT /api/wishlist to rewrite the order, permutation-guarded
   medium:
     - feature: admin-panel
       tickets:
@@ -1845,6 +1873,36 @@ priorities:
           blocked_by:
             - ticket_number: 484
               title: Frontend - API client functions and hooks for review feed and media
+    - feature: review-grid-loox-parity
+      tickets:
+        - ticket_number: 497
+          title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 496
+              title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+        - ticket_number: 498
+          title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 496
+              title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+            - ticket_number: 497
+              title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+    - feature: wishlist-curation
+      tickets:
+        - ticket_number: 502
+          title: Web - drag and keyboard reordering on /wishlist
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 501
+              title: Store - reorder action, optimistic, guest and signed-in
+        - ticket_number: 503
+          title: 'Web - staff staging bar: copy ids, or create a collection from them'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 502
+              title: Web - drag and keyboard reordering on /wishlist
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -2170,6 +2228,32 @@ priorities:
               title: Database Schema - reviewMedia table, enums, relations and migration
             - ticket_number: 479
               title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+        - ticket_number: 492
+          title: E2E - review surfaces and media upload flows
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 485
+              title: Frontend - photo and video upload in ReviewForm
+            - ticket_number: 486
+              title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+            - ticket_number: 487
+              title: Frontend - home Customer Reviews strip with score band and carousel
+            - ticket_number: 488
+              title: Frontend - PDP review media wall with lightbox and video playback
+            - ticket_number: 489
+              title: Frontend - site-wide floating review toast
+            - ticket_number: 491
+              title: Seed - attach photo and video media to approved reviews
+    - feature: wishlist-curation
+      tickets:
+        - ticket_number: 504
+          title: E2E - order survives a reload, and staging reaches the storefront
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 502
+              title: Web - drag and keyboard reordering on /wishlist
+            - ticket_number: 503
+              title: 'Web - staff staging bar: copy ids, or create a collection from them'
 blocked_tickets:
   - ticket_number: 29
     title: API Routes - Public Review Endpoints
@@ -2363,6 +2447,18 @@ blocked_tickets:
       - ticket_number: 479
         title: Media Infrastructure - video validation, ffmpeg processing and Docker image
     description: Database Schema - reviewMedia table, enums, relations and migration, Media Infrastructure - video validation, ffmpeg processing and Docker image
+  - ticket_number: 496
+    title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+    blocked_by:
+      - ticket_number: 495
+        title: Backend API - widen the review read shape with itemType, verified and product chip
+    description: Backend API - widen the review read shape with itemType, verified and product chip
+  - ticket_number: 501
+    title: Store - reorder action, optimistic, guest and signed-in
+    blocked_by:
+      - ticket_number: 500
+        title: API - PUT /api/wishlist to rewrite the order, permutation-guarded
+    description: API - PUT /api/wishlist to rewrite the order, permutation-guarded
   - ticket_number: 229
     title: Add addressesApi to web API client
     blocked_by:
@@ -2716,6 +2812,32 @@ blocked_tickets:
       - ticket_number: 484
         title: Frontend - API client functions and hooks for review feed and media
     description: Frontend - API client functions and hooks for review feed and media
+  - ticket_number: 497
+    title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+    blocked_by:
+      - ticket_number: 496
+        title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+    description: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+  - ticket_number: 498
+    title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+    blocked_by:
+      - ticket_number: 496
+        title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+      - ticket_number: 497
+        title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+    description: Frontend - ReviewGrid masonry and the fused ReviewGridCard, Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+  - ticket_number: 502
+    title: Web - drag and keyboard reordering on /wishlist
+    blocked_by:
+      - ticket_number: 501
+        title: Store - reorder action, optimistic, guest and signed-in
+    description: Store - reorder action, optimistic, guest and signed-in
+  - ticket_number: 503
+    title: 'Web - staff staging bar: copy ids, or create a collection from them'
+    blocked_by:
+      - ticket_number: 502
+        title: Web - drag and keyboard reordering on /wishlist
+    description: Web - drag and keyboard reordering on /wishlist
   - ticket_number: 232
     title: Implement save-address-on-checkout
     blocked_by:
@@ -2846,3 +2968,27 @@ blocked_tickets:
       - ticket_number: 479
         title: Media Infrastructure - video validation, ffmpeg processing and Docker image
     description: Database Schema - reviewMedia table, enums, relations and migration, Media Infrastructure - video validation, ffmpeg processing and Docker image
+  - ticket_number: 492
+    title: E2E - review surfaces and media upload flows
+    blocked_by:
+      - ticket_number: 485
+        title: Frontend - photo and video upload in ReviewForm
+      - ticket_number: 486
+        title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+      - ticket_number: 487
+        title: Frontend - home Customer Reviews strip with score band and carousel
+      - ticket_number: 488
+        title: Frontend - PDP review media wall with lightbox and video playback
+      - ticket_number: 489
+        title: Frontend - site-wide floating review toast
+      - ticket_number: 491
+        title: Seed - attach photo and video media to approved reviews
+    description: Frontend - photo and video upload in ReviewForm, Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links, Frontend - home Customer Reviews strip with score band and carousel, Frontend - PDP review media wall with lightbox and video playback, Frontend - site-wide floating review toast, Seed - attach photo and video media to approved reviews
+  - ticket_number: 504
+    title: E2E - order survives a reload, and staging reaches the storefront
+    blocked_by:
+      - ticket_number: 502
+        title: Web - drag and keyboard reordering on /wishlist
+      - ticket_number: 503
+        title: 'Web - staff staging bar: copy ids, or create a collection from them'
+    description: 'Web - drag and keyboard reordering on /wishlist, Web - staff staging bar: copy ids, or create a collection from them'

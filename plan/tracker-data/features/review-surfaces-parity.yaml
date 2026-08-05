@@ -96,9 +96,7 @@ work_session_summary:
       tokens: 0
 tickets:
   todo: {}
-  in_progress:
-    "492": E2E - review surfaces and media upload flows
-    "493": Bug - /account/orders/$id never renders; the order-list route swallows it
+  in_progress: {}
   done:
     "478": Database Schema - reviewMedia table, enums, relations and migration
     "479": Media Infrastructure - video validation, ffmpeg processing and Docker image
@@ -114,9 +112,11 @@ tickets:
     "489": Frontend - site-wide floating review toast
     "490": Frontend - review media in the admin moderation UI
     "491": Seed - attach photo and video media to approved reviews
+    "492": E2E - review surfaces and media upload flows
+    "493": Bug - /account/orders/$id never renders; the order-list route swallows it
 total_tickets: 16
-completion_percentage: 88
-is_completed: false
+completion_percentage: 100
+is_completed: true
 design:
   approach: "Extend the existing review system in place. One `reviewMedia` table (media-agnostic: image + video) hanging off `reviews`, media inheriting the parent review's moderation status. New endpoints added to the already-mounted `reviewsApp` plus a `review-media` route. New web surfaces (/reviews page, home strip, PDP media wall, site-wide toast) compose the existing `packages/web/app/components/reviews/*`. Video handled with self-hosted ffmpeg in the API Docker image driven by a BullMQ transcode queue modelled on `queues/ai-generation.ts`. Rejected alternatives: a separate `social-proof` module (duplicate caching/aggregate logic, second admin queue) and a materialised `review_feed` table (refresh machinery and staleness bugs for a 12-row dataset)."
   decisions:

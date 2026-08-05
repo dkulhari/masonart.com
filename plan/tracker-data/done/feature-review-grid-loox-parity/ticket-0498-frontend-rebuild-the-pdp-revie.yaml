@@ -1,0 +1,146 @@
+ticket_number: 498
+title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+description: |-
+  ## Task
+
+  Collapse the PDP's two review surfaces into one. `ReviewMediaWall` (media-only tiles) and `ProductReviews` (written list) become a single product-filtered `ReviewGrid` under the Loox header row.
+
+  This is the ticket that deletes the invented split.
+
+  ## Context
+
+  Part of feature: review-grid-loox-parity
+  Phase: Frontend
+  Depends on: ReviewGrid, and the /reviews rebuild landing first
+
+  - Reference: `docs/design/mesonart/mesonart-pdp-reviews-loox.png`. Header row is star row + "66 Reviews" + chevron + "Write a review" pill, then the grid, then "Show more reviews".
+  - PDP is `packages/web/app/routes/posters/$slug.tsx`. It currently mounts `ReviewMediaWall` above `ProductReviews`.
+  - DELETE `packages/web/app/components/product/ReviewMediaWall.tsx` and its test file once nothing imports it. Check with grep before deleting, not after.
+  - `ProductReviews.tsx` may still be needed for the write-a-review entry point and the rating summary — read it before assuming it can go. Retire only what the grid genuinely replaces; leaving a dead component is better than breaking the review-submission path, which #493 already showed is easy to sever.
+  - The buy-box star row links down to the review section. Verify that anchor still lands correctly after the restructure.
+  - Keep the `preload="none"` / no-autoplay video assertions from #488 alive — they moved into the grid's tests, they must not simply vanish with the deleted file.
+  - vitest gotcha: stub localStorage/sessionStorage in `vi.hoisted` above the imports if you hit `setItem is not a function`.
+feature: review-grid-loox-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T19:40:09.320Z'
+last_updated: '2026-08-05T20:30:30.232Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T20:21:44.105Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T20:30:24.806Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `be0e16c2` — feat(web): collapse the PDP's two review surfaces into one ReviewGrid
+
+      **Files Changed**:
+      - `packages/web/app/components/product/ProductReviewSection.tsx` (new) — the unified section: `id="reviews"`, sr-only "Customer Reviews" h2, Loox header row, product-filtered `ReviewGrid`, plus a matching skeleton for the route's pendingComponent
+      - `packages/web/app/components/reviews/ReviewSectionHeader.tsx` (new) — the header row lifted out of `routes/reviews.tsx` so the PDP and /reviews render ONE component. `scopeLabel` is the only difference ("for this poster" vs "across the catalogue")
+      - `packages/web/app/routes/posters/$slug.tsx` — mounts `ProductReviewSection`; `ReviewMediaWall` and `ProductReviews` no longer mounted
+      - `packages/web/app/routes/reviews.tsx` — uses the shared header, re-exports it as `ReviewsHeader` so #497's tests still resolve
+      - `packages/web/app/components/reviews/ReviewGrid.tsx` — regains the wall's focus-return-to-trigger
+      - `packages/web/app/components/reviews/index.ts`, `ReviewMediaLightbox.tsx` (stale prose)
+      - **Deleted**: `app/components/product/ReviewMediaWall.tsx` + `tests/components/product/ReviewMediaWall.test.tsx`
+      - **New tests**: `tests/routes/posters-review-section.test.tsx` (13), `tests/components/reviews/ReviewMediaLightbox.test.tsx` (8), +1 in `ReviewGrid.test.tsx`
+
+      **Summary**:
+      The invented split is gone. One product-filtered grid under the Loox header row — media-bearing and text-only reviews in the same masonry (5 columns on a PDP vs 6 unfiltered), "Show more reviews" at the foot.
+
+      Care taken on the three flagged hazards:
+
+      1. **Review-submission path preserved.** `ProductReviews.tsx` owned the only "leave a review" link on the PDP ("Purchased this item? Leave a review from your order history"). The header row's "Write a review" pill is now that link, pointing at the same `/account/orders`. Asserted directly. `ProductReviews.tsx` is **left in place, unmounted** rather than deleted — a live tokens test (`ProductCard.tokens.test.ts:43`) still reads it, and per the ticket a dead component beats a severed path.
+      2. **Grepped before deleting.** Nothing imported `ReviewMediaWall`; the new suite asserts the file is gone AND that no file under `app/` mentions it, so a dangling import cannot come back silently. The `preload="none"` / no-autoplay assertions were verified present in `ReviewGridCard.test.tsx:223` before removal. **But** the old test file was also the only coverage of the shared `ReviewMediaLightbox` (focus trap, Escape, arrow keys, not a native `<dialog>`) — that would have vanished with it, so those moved into a new `ReviewMediaLightbox.test.tsx`. The wall's focus-return-to-trigger was a real behaviour the grid lacked; added to `ReviewGrid` with a test rather than dropped.
+      3. **Anchor verified.** `id="reviews"` moved onto the new `<section>`, with the grid inside it. Note for the record: the buy-box star row in `ProductDetail.tsx:302-313` is **not** an anchor link today — it is a plain display div, and the only `href="#"` in the app is the skip-link. So `#reviews` is a target with no in-page link pointing at it; the target survives, and the e2e locators (`page.locator('#reviews')`) still resolve. Worth a look in #499 if the star row was meant to link down.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/routes/posters-review-section.test.tsx tests/components/reviews/ReviewMediaLightbox.test.tsx tests/components/reviews/ReviewGrid.test.tsx tests/components/reviews/ReviewGridCard.test.tsx tests/routes/reviews.test.tsx`
+      - Result: PASS (5 files, 68 tests, 68 passing, 0 failing)
+      - Output:
+      ```
+       ✓ tests/routes/reviews.test.tsx (17 tests) 543ms
+       ✓ tests/routes/posters-review-section.test.tsx (13 tests) 714ms
+       ✓ tests/components/reviews/ReviewGridCard.test.tsx (17 tests) 196ms
+       ✓ tests/components/reviews/ReviewGrid.test.tsx (13 tests) 370ms
+       ✓ tests/components/reviews/ReviewMediaLightbox.test.tsx (8 tests) 154ms
+       Test Files  5 passed (5)
+            Tests  68 passed (68)
+      ```
+      - Wider sweep: `bunx vitest run tests/components/reviews tests/components/product` → 22 files, 465 passed, 0 failed.
+      - Type-check: `bunx tsc --noEmit` → 22 pre-existing errors, all in `admin/*`, `track/*`, `ai-generator/PromptSuggestions.tsx`. **Zero errors reference any file this ticket touched, created or deleted** — grep for `ReviewMediaWall|ProductReviewSection|ReviewSectionHeader|ReviewGrid|ReviewMediaLightbox|routes/reviews|posters/$slug|ProductReviews` over the output returns nothing. No dangling references to the deleted component.
+
+      **Left red on purpose**: `tests/e2e/review-surfaces.spec.ts` — the "PDP customer media wall" describe block (4 assertions on `review-media-wall` / `review-media-tile` / the "pictures above prose" ordering) is now testing a surface that no longer exists. Left for #499's sweep as instructed. Also unrelated and pre-existing: `tests/routes/home-tokens.test.ts` and `tests/routes/wishlist-page.test.ts` fail from another agent's concurrent edits to `globals.css` / `routes/index.tsx` / `ProductCard.tsx` in the shared working tree — those files are not in this commit.
+  - author: system
+    timestamp: '2026-08-05T20:30:30.232Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 496
+    feature: review-grid-loox-parity
+    description: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+  - ticket: 497
+    feature: review-grid-loox-parity
+    description: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the unified PDP section
+    file: packages/web/tests/components/product/ProductReviewSection.test.tsx
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/product/ProductReviewSection.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |-
+      // the PDP renders ONE review section, not a media wall plus a list
+      // the header shows the star row, the product's review count and Write a review
+      // cards are scoped to this product only
+      // a review with media and one without both appear in the same grid
+      // the buy-box star row anchor still resolves to the section
+      // the review submission entry point still works
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails against the split layout
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/product/ProductReviewSection.test.tsx
+    expected_result: FAIL - two separate sections render
+    status: done
+  - id: 3
+    action: implement
+    description: Mount the product-filtered grid and remove the split
+    file: packages/web/app/routes/posters/$slug.tsx
+    status: done
+    code: |-
+      // Replace <ReviewMediaWall /> + <ProductReviews /> with the Loox header row and
+      // <ReviewGrid productId={product.id} />, preserving whatever ProductReviews
+      // owned that the grid does not (write-a-review entry, rating summary).
+  - id: 4
+    action: implement
+    description: Delete ReviewMediaWall once nothing imports it
+    command: cd /Users/dhruv/work/masonart.com && grep -rn 'ReviewMediaWall' packages/web --include=*.tsx --include=*.ts
+    expected_result: No remaining imports, then delete the component and its test
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm the PDP tests pass and nothing references the deleted file
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/product/ && bunx tsc --noEmit 2>&1 | grep -i reviewmediawall || echo 'no dangling references'
+    expected_result: PASS, no dangling references
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the unified PDP section
+    command: 'git add packages/web/app/routes/posters/\$slug.tsx packages/web/app/components/product packages/web/tests/components/product && git commit -m "feat(web): one review grid on the product page, retiring the media wall"'
+    status: done
+current_step: 6
+started: '2026-08-05T20:21:44.105Z'
+completed: '2026-08-05T20:30:30.232Z'

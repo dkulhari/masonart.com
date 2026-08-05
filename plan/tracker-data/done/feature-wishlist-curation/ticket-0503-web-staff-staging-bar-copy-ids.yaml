@@ -1,0 +1,135 @@
+ticket_number: 503
+title: 'Web - staff staging bar: copy ids, or create a collection from them'
+description: |-
+  ## Task
+
+  A bar above the wishlist grid, **staff only**, turning the list into a curated collection.
+
+  - Reads the count: *"12 items — staging for a collection"*, with a line saying this is the admin's own wishlist and curating a second collection means clearing it. Better stated than discovered.
+  - **Copy IDs** — the ordered ids to the clipboard, for pasting into a collection that already exists.
+  - **Create collection from these** — POST `/api/admin/collections` with `kind: 'manual'`, then PUT `/:id/products` with the ordered array, then navigate to that collection's edit form so a title can be given.
+
+  Gate on role the way the header's staff entry does (`staffAreaLabel(session?.user?.role)` in `~/lib/admin-nav`). Product ids are not secret — they are already in the DOM and in API responses — so this is about not putting internal identifiers in every shopper's face.
+
+  This retires the limitation recorded on #473: the admin form's manual picker is a textarea of raw UUIDs, and browsing the store with hearts is a far better picker that already exists.
+
+  ## Context
+
+  Feature: wishlist-curation, Phase 2. Depends on reordering, because the order is the entire value.
+
+  Clipboard: `navigator.clipboard.writeText` is unavailable on insecure origins and in some browsers. Fall back to showing the ids in a selectable field rather than failing silently — a copy button that does nothing is worse than no button.
+feature: wishlist-curation
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T19:43:43.813Z'
+last_updated: '2026-08-05T20:08:08.739Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T20:02:20.049Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T20:07:49.562Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T20:08:08.739Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `581ff626` — feat(web): stage a curated collection from the wishlist
+
+      **Files Changed**:
+      - `packages/web/app/components/wishlist/WishlistStagingBar.tsx` — new
+      - `packages/web/app/routes/wishlist.tsx` — mounts it, reads the role from the root route context
+      - `packages/api/src/routes/admin/collections.ts` — GET `/:id` now returns `productIds`
+      - `packages/web/app/routes/admin/collections/$id.tsx` — loads them
+      - `packages/web/tests/components/wishlist/WishlistStagingBar.test.tsx` — 13 tests
+
+      **A destructive bug in #473 that this exposed**
+
+      The first staged collection came back from the round trip with **zero members**, despite the PUT succeeding.
+
+      `$id.tsx` set `productIds: []` because it never loaded existing membership — a shortcut I took in #473 and noted at the time. `CollectionForm` replaces the member list on save, so **saving any manual collection posted an empty array and wiped its curation.** Not a staging bug: opening a hand-curated collection, fixing a typo in its title and pressing Save would have silently deleted every product in it.
+
+      Fixed at both ends — the admin GET returns the members, the form loads them. This is the sort of thing that only shows up when a feature is exercised end to end rather than through its own tests; #473's suite was green and stayed green.
+
+      **Decisions**
+      - **Created unpublished.** A half-built collection should not be reachable while it is being assembled. The admin ticks Published when it is ready — which is also why the first live check returned 404, correctly.
+      - **Create posts, then navigates to the edit form.** Prompting for a title here would be a worse version of the form that already exists.
+      - **Clipboard falls back to a selectable textarea.** `navigator.clipboard` is absent on insecure origins; a copy button that silently does nothing is worse than no button.
+      - **One staging slot, stated in the UI.** It is the admin's personal wishlist, so curating a second collection means clearing the first. Better said than discovered.
+
+      **End-to-end verification**
+
+      ```
+      staged order : Synthetic Nature | Digital Cosmos | Neural Dreams
+      → Create collection from these → named, published →
+      storefront h1: Staged From Wishlist
+      members      : 0:Synthetic Nature , 1:Digital Cosmos , 2:Neural Dreams
+      ```
+
+      Read back from the database, not from the page, because the page could render the right products in the wrong order and look fine at a glance. Probe rows cleaned up afterwards.
+
+      **Verification**
+      - `cd packages/web && npx vitest run tests/components/wishlist/` — 33 passing
+      - `cd packages/api && npx vitest run tests/routes/admin/collections.test.ts tests/routes/admin/collection-membership.test.ts` — 36 passing
+      - `npx tsc --noEmit` clean in both packages
+
+      **One gap worth naming**: the admin GET returning `productIds` has no test of its own — it is covered only by the end-to-end run. #504 should assert it, since it is now load-bearing against data loss.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 502
+    feature: wishlist-curation
+    description: Web - drag and keyboard reordering on /wishlist
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the staging bar
+    file: packages/web/tests/components/wishlist/WishlistStagingBar.test.tsx
+    command: cd packages/web && npx vitest run tests/components/wishlist/WishlistStagingBar.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: renders nothing for a shopper and for a signed-out visitor; renders for content-manager, admin and super-admin; copies the ids in list order, newline separated; falls back to a visible selectable field when the clipboard API is unavailable; Create posts kind manual then PUTs the ordered ids and navigates to the edit form; an empty wishlist disables both actions rather than posting an empty collection.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && npx vitest run tests/components/wishlist/WishlistStagingBar.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the bar and mount it on the wishlist route
+    file: packages/web/app/components/wishlist/WishlistStagingBar.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass and typecheck is clean
+    command: cd packages/web && npx vitest run tests/components/wishlist/ && npx tsc --noEmit -p tsconfig.json
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app/components/wishlist packages/web/app/routes/wishlist.tsx packages/web/tests/components/wishlist && git commit -m "feat(web): stage a curated collection from the wishlist (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T20:02:20.049Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/web && npx vitest run tests/components/wishlist/ && cd ../api && npx vitest run tests/routes/admin/collections.test.ts tests/routes/admin/collection-membership.test.ts
+  test_output: '33 web wishlist tests (13 new) and 36 admin collection tests passing. End-to-end in the browser: three items staged in a chosen order, created from the wishlist, named and published, and the database shows members at positions 0/1/2 in exactly the staged order.'
+  build_passed: true
+  build_command: npx tsc --noEmit in both packages/web and packages/api
+  verified_at: '2026-08-05T20:07:42.401Z'
+completed: '2026-08-05T20:07:49.562Z'

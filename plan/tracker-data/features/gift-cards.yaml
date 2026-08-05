@@ -22,6 +22,9 @@ description: |-
   ## Source
   Roadmap Feature 29 (Phase 4)
 
+  ## A gift card is tender, not a discount
+  Redemption applies **after tax**, against the amount due — not against the price. It carries a balance, is partially consumable, and refunds return to it. So it must never enter `resolveSalePrice` (`sale-promotions`) and must never be written to a discount column. Layering order is fixed in `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5: promotion, then code, then shipping and tax, then gift card against the total, then the Razorpay charge.
+
   ## Objectives
   - TBD
 objectives:

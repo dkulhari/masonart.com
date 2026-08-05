@@ -2,14 +2,23 @@ ticket_number: 425
 title: Schema - record the promotion and its discount on orders
 description: |-
   ## Task
-  Add `orders.promotionId` (nullable FK) so a settled order records which promotion priced it, and confirm `order_items.itemDiscount` (already declared at `orders.ts:258`) is the per-line store. Migration included.
+  Add `orders.promotionId` (nullable FK) so a settled order records which promotion priced it, add `orders.promotionDiscount` as the promotion's own money bucket, and confirm `order_items.itemDiscount` (already declared at `orders.ts:258`) is the per-line store. Migration included.
 
   This is the design's §4 point about the compare-at trap: a discount recorded as a discount keeps revenue reporting honest, where inflating a compare-at price would hide it.
+
+  ## One bucket per discount source (design D8)
+  The promotion must NOT write into `orders.discount` or `orders.couponDiscount`:
+
+  - `orders.promotionDiscount` — this feature, automatic, sum of the line discounts
+  - `orders.couponDiscount` — reserved for codes, stays `'0.00'`, nothing in this feature writes it
+  - `orders.discount` — derived total, `promotionDiscount + couponDiscount`
+
+  Without the split, a settled order cannot be attributed once codes exist — reporting cannot separate "the sale worked" from "a code leaked". One migration line now; after orders exist there is no source data to backfill from.
 
   ## Context
   Part of feature: sale-promotions
   Phase: 1 — Schema + contracts
-  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §4
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §4, D8
 
   Columns only — the write path lands in T8 (order creation). `orders.discount` and `orders.couponDiscount` already exist (`schema/orders.ts:171,179`) and today are always `"0.00"` (`routes/orders.ts:268,299`).
 feature: sale-promotions
@@ -62,6 +71,13 @@ implementation_steps:
           expect(orders.promotionId.notNull).toBe(false)
         })
 
+        it('gives the promotion its own money bucket', () => {
+          // Separate from couponDiscount, or a settled order cannot be
+          // attributed once discount codes exist (design D8).
+          expect(orders.promotionDiscount).toBeDefined()
+          expect(orders.promotionDiscount.default).toBe('0.00')
+        })
+
         it('keeps the money columns it already had', () => {
           expect(orders.discount).toBeDefined()
           expect(orders.couponDiscount).toBeDefined()
@@ -81,7 +97,7 @@ implementation_steps:
     status: pending
   - id: 3
     action: implement
-    description: Add promotionId to the orders table beside the existing discount columns
+    description: Add promotionId and promotionDiscount to the orders table beside the existing discount columns
     file: packages/api/src/database/schema/orders.ts
     status: pending
     code: |-
@@ -95,6 +111,17 @@ implementation_steps:
           promotionId: uuid("promotion_id").references(() => promotions.id, {
             onDelete: "set null",
           }),
+
+          /**
+           * The promotion's own share of the discount. Deliberately NOT merged into
+           * `discount` or `couponDiscount`: `discount` is the derived total the
+           * customer sees, and `couponDiscount` is reserved for codes (design D8).
+           * Sharing one column makes a settled order unattributable — reporting
+           * could not separate an automatic sale from a leaked code.
+           */
+          promotionDiscount: decimal("promotion_discount", { precision: 10, scale: 2 })
+            .notNull()
+            .default("0.00"),
 
       // plus, at the top of the file:
       // import { promotions } from "./promotions";

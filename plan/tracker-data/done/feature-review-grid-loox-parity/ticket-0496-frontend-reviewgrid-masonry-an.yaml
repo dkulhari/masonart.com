@@ -1,0 +1,141 @@
+ticket_number: 496
+title: Frontend - ReviewGrid masonry and the fused ReviewGridCard
+description: |-
+  ## Task
+
+  The structural correction. One card holds media AND text; one grid holds every review. This replaces the invented media-wall / written-list split.
+
+  Card anatomy, top to bottom, per `docs/design/mesonart/mesonart-reviews-page-loox.png`:
+  media slot (photo, or video with poster + play overlay, `+N` corner badge when the review has more than one) → author name + Verified check badge → date → star row → body text → "Item type:" line → product chip (thumbnail, title, SKU).
+
+  A review with no media renders the same card with the media slot omitted. That is the whole point — they are not different things.
+
+  ## Context
+
+  Part of feature: review-grid-loox-parity
+  Phase: Frontend
+  Depends on: the widened read shape
+
+  - Reference screenshots: `docs/design/mesonart/mesonart-reviews-page-loox.png` (unfiltered, 6 columns) and `mesonart-pdp-reviews-loox.png` (product-filtered, 5 columns).
+  - `ReviewGrid` takes an optional `productId` — the PDP passes it, `/reviews` does not. One component, two filters, mirroring how Loox itself is deployed.
+  - **CSS `columns` masonry, not a JS layout pass.** No measuring, no layout dependency. Reading order goes down each column; that is what Loox does and it is acceptable for a review wall.
+  - The media slot MUST hold its aspect ratio before the image decodes, or the whole column reflows as images land. The `+N` badge and play overlay are absolutely positioned inside it.
+  - Video: `preload="none"`, `poster` set, never `autoPlay`. This was a hard requirement in #488 with a test asserting it — carry the assertion over, do not drop it.
+  - Reuse the lightbox already built for `ReviewMediaWall` rather than writing a second one.
+  - Do NOT delete `ReviewMediaWall` in this ticket — the PDP still imports it until the next one. Deleting here breaks the build midway.
+  - vitest gotcha: Node 25's inert localStorage/sessionStorage shadows jsdom's. Stub in `vi.hoisted` above the imports if you hit `setItem is not a function`.
+feature: review-grid-loox-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T19:40:09.293Z'
+last_updated: '2026-08-05T20:07:45.471Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-05T20:07:41.467Z'
+    text: |-
+      Done in a1b87351 — the fused card and the masonry grid, built against docs/design/mesonart/mesonart-reviews-page-loox.png (6 columns, unfiltered) and mesonart-pdp-reviews-loox.png (5 columns, product-filtered).
+
+      **What landed**
+      - `app/components/reviews/ReviewGridCard.tsx` — one card, media and words: media slot (photo, or clip with poster + centred play overlay, `+N` corner badge for the extra attachments) → author + Verified check → date → stars → body → "Item type:" → product chip (thumb, title, `#SKU`). A review with no media is this same card with the slot omitted. `composeItemType()` joins the API's parts (#495 returns sizeLabel/frameName/frameType, never a string) and prefers frameName over frameType.
+      - `app/components/reviews/ReviewGrid.tsx` — CSS `columns` masonry with `break-inside-avoid` wrappers. No measuring pass, no layout dependency. `xl:columns-6` unfiltered / `xl:columns-5` with a productId — that prop is the only difference between the two deployments. Accumulates pages behind "Show more reviews", owns the lightbox, and walks a flat list of every attachment in the wall so prev/next is not trapped inside one review.
+      - `app/components/reviews/ReviewMediaLightbox.tsx` — the wall's lightbox lifted out verbatim and now shared. `ReviewMediaWall` imports it; **not deleted**, the PDP still needs it until #498. Its 11 tests still pass untouched.
+      - `hooks/useReviews.ts` — `useReviewCards(productId, page, pageSize)` + `reviewKeys.cards`, and `useCreateReview` now invalidates the card feeds too.
+      - `lib/api.ts` — `ReviewItemType` / `ReviewProductChip`, `ReviewFeedItem` gains `verified` + `itemType` + `product.sku`, and a new `reviewsApi.listForProduct()` that goes through `getApiUrl()`. The three existing feed fixtures were updated for the widened shape.
+
+      **Guards carried / added**
+      - #488's video rule survives the component swap: `preload="none"`, poster set, `autoplay` null — asserted on the card, not just on the old wall.
+      - The media slot's `aspect-ratio` is reserved from the stored dimensions before decode (clamped 0.6–1.8 so one 9:21 screen recording can't reserve a column of nothing), so columns don't re-balance as photos land.
+      - `reviewsApi.listForProduct` is asserted to fetch an absolute URL, never a relative `/api` — the #493 bug.
+
+      **Tests** — 40 passing across the three suites:
+      ```
+      ✓ tests/components/reviews/ReviewGridCard.test.tsx (17 tests)
+      ✓ tests/components/reviews/ReviewGrid.test.tsx (12 tests)
+      ✓ tests/components/product/ReviewMediaWall.test.tsx (11 tests)
+       Test Files  3 passed (3)
+            Tests  40 passed (40)
+      ```
+      Wider sweep clean too: `tests/components tests/hooks tests/lib` → 74 files / 1570 tests passed. Two failures in `tests/routes` are not mine — `home-tokens.test.ts` fails against unmodified HEAD source (pre-existing), and `wishlist-page.test.ts` fails on another agent's dirty `routes/wishlist.tsx`. tsc is at 22 errors, below the 26-error baseline, none in the touched files.
+
+      Nothing is wired to a page yet — /reviews is #497 and the PDP (plus retiring the wall) is #498.
+  - author: system
+    timestamp: '2026-08-05T20:07:45.473Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 495
+    feature: review-grid-loox-parity
+    description: Backend API - widen the review read shape with itemType, verified and product chip
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing component tests for the fused card and the grid
+    file: packages/web/tests/components/reviews/ReviewGrid.test.tsx
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/reviews/ReviewGrid.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |-
+      // a review WITH media and one WITHOUT render the same card component,
+      //   differing only in the presence of the media slot
+      // a photo review renders <img>; a video review renders <video> with a poster,
+      //   preload="none", and no autoPlay attribute
+      // a review with 3 media shows a '+2' badge
+      // the Verified badge renders when verified is true
+      // the item type line renders the size and frame, and is omitted when null
+      // the product chip renders thumbnail, title and SKU and links to the product
+      // the grid renders nothing at all when the feed is empty - no orphan heading
+      // passing productId scopes the fetch; omitting it fetches unfiltered
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/reviews/ReviewGrid.test.tsx
+    expected_result: FAIL - cannot resolve ReviewGrid
+    status: done
+  - id: 3
+    action: implement
+    description: Build the fused card
+    file: packages/web/app/components/reviews/ReviewGridCard.tsx
+    status: done
+    code: |-
+      // One card, media optional. Media slot keeps a fixed aspect box so the column
+      // does not reflow as images decode. Video: poster + play overlay, preload none.
+      // +N badge top-right when media.length > 1.
+      // Then: author + Verified check, date, stars, body, 'Item type:' line, product
+      // chip (thumb + title + sku) linking to the product.
+  - id: 4
+    action: implement
+    description: Build the masonry grid
+    file: packages/web/app/components/reviews/ReviewGrid.tsx
+    status: done
+    code: |-
+      // props: { productId?: string, pageSize?: number }
+      // CSS columns masonry: columns-2 md:columns-3 xl:columns-5, gap via column-gap,
+      // each card `break-inside-avoid` and `mb-*`.
+      // Loox header row above the grid: star row + '<N> Reviews' + a 'Write a review'
+      // affordance slot the caller can fill.
+      // 'Show more reviews' button appends the next page and reflows.
+      // Reuse the existing lightbox from ReviewMediaWall.
+  - id: 5
+    action: verify-pass
+    description: Confirm the grid tests pass
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/reviews/ReviewGrid.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the grid and card
+    command: 'git add packages/web/app/components/reviews/ReviewGrid.tsx packages/web/app/components/reviews/ReviewGridCard.tsx packages/web/tests/components/reviews/ReviewGrid.test.tsx && git commit -m "feat(web): masonry review grid with fused media and text cards"'
+    status: done
+current_step: 6
+completed: '2026-08-05T20:07:45.471Z'
