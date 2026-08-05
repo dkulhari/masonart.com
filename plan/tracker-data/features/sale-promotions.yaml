@@ -1,0 +1,114 @@
+name: sale-promotions
+title: Sale Promotions
+priority: high
+created: '2026-08-05T07:53:57.826Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Design
+
+  Full approved design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md`. Closes the two remaining ❌ rows in mesonart parity analysis §3.1 (sale strip + countdown, floating offer tab) and the Sale/promo page gap in §3.5.
+
+  Site-wide sale capability: a real promotion entity, automatic sale pricing, admin configuration, and every storefront surface that advertises it.
+
+  ## Why
+
+  There is no promotion entity anywhere in the system. `packages/api/src/routes/orders.ts:268` reads `const discount = "0.00"; // TODO: Apply coupon if provided`, and `couponCode` is stored verbatim from client input while `couponDiscount` stays hardcoded `"0.00"` (orders.ts:298-299). A customer can type any code at checkout; it is recorded and changes nothing. `packages/web/app/components/layout/AnnouncementBar.tsx:11-14` records the sale strip as blocked on exactly this.
+
+  ## Decisions (see doc §3)
+
+  - **D1 Automatic only.** No discount codes anywhere. The sale applies by itself to eligible products.
+  - **D2 Teased price, gated at cart.** Logged-out visitors see base struck through + sale price + "Members" tag; the cart shows the saving as locked with a Join button. Server charges base until the viewer is a member.
+  - **D3 Scope + exclusions.** One promotion targets `all` / `filter` (styles, subjects, rooms, isFeatured) / hand-picked `products`, plus an exclusion list that always wins.
+  - **D5 Rolling countdown.** Per-visitor deadline minted into a cookie, clamped by `min(cookieDeadline, endsAt)`, re-minted on the next load when it runs out. `countdownMode` is a config field ('rolling' | 'real'), never hardcoded — see the CCPA dark-patterns note in doc §6.
+  - **D6 Never stack.** Highest `priority` wins, ties broken by deeper discount.
+
+  ## Data model (doc §4)
+
+  New `packages/api/src/database/schema/promotions.ts`: `promotion` (headline, discountType/Value, scopeType, scopeFilter jsonb, membersOnly, startsAt/endsAt, isEnabled, priority, perCustomerOrderLimit, countdownMode/rollingWindowMinutes/rollingJitterMinutes), `promotion_product`, `promotion_exclusion`. State is **derived**, never stored — no status column. `endsAt` is private and never serialized to the storefront. Orders gain `promotionId`; `orders.discount` and `order_items.itemDiscount` start carrying real numbers.
+
+  ## Resolver (doc §5)
+
+  One function, `packages/api/src/lib/promotion-pricing.ts` (modelled on `product-sales.ts`): `resolveSalePrice(product, activePromotions, { isMember }) → { promotionId, percentOff, basePrice, salePrice, locked } | null`. 60s in-process cache. Rounding per line, half-up, 2dp. Called by product list, product detail, cart read, order creation and the /sale page — never reimplemented.
+
+  Stored `cartItem.lineTotal` (cart.ts:196-204) stays a BASE price; sale price resolves at read time, or a cart held across the end of a sale would still charge sale. Server re-resolves at order creation and ignores any client-sent price.
+
+  ## Surfaces (doc §7)
+
+  Sale strip in AnnouncementBar · product card + PDP sale badges · cart locked-saving row · `/sale` landing page + red Sale nav link · admin `/admin/promotions` list and editor. Every surface renders `null` when no promotion is active; no hardcoded "40% OFF" string anywhere.
+
+  ## Out of scope
+
+  Discount codes, stacking, BOGO/tiered/volume, minimum-cart thresholds, loyalty points, scheduled email sends, multi-currency sale pricing, per-variant discount depth.
+
+  ## Depends on / pairs with
+
+  `gallery-membership` supplies `isMember`. Promotions can ship ungated (`membersOnly = false`) before membership exists.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    '423': Schema - promotion, promotion_product and promotion_exclusion tables
+    '424': Schema - shared Zod schemas and types for promotions
+    '425': Schema - record the promotion and its discount on orders
+    '426': Resolver - active promotion selection with derived state and no stacking
+    '427': Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+    '428': API - product list and detail return the resolved sale price
+    '429': API - cart returns base, sale and locked per line without touching stored lineTotal
+    '430': API - order creation writes the real discount and enforces the per-customer limit
+    '431': API - admin promotions CRUD
+    '432': API - countdown deadline resolution, cookie mint and clamp
+    '433': Admin UI - /admin/promotions list and editor
+    '434': Storefront - sale strip with live countdown above the header
+    '435': Storefront - sale pricing on product cards and the PDP buy panel
+    '436': Storefront - cart saving row, locked for non-members
+    '437': Storefront - /sale landing page and the red Sale nav link
+    '438': E2E - sale lifecycle from no promotion to expiry
+  in_progress: {}
+  done: {}
+total_tickets: 16
+completion_percentage: 0
+is_completed: false
+plan:
+  phases:
+    - name: Schema + contracts
+      location: packages/api/src/database/schema, packages/shared/src/schemas
+      tickets:
+        - 423
+        - 424
+        - 425
+    - name: Resolver
+      location: packages/api/src/lib/promotion-pricing.ts
+      tickets:
+        - 426
+        - 427
+    - name: API surfaces
+      location: packages/api/src/routes
+      tickets:
+        - 428
+        - 429
+        - 430
+        - 431
+        - 432
+    - name: Frontend
+      location: packages/web/app
+      tickets:
+        - 433
+        - 434
+        - 435
+        - 436
+        - 437
+    - name: E2E
+      location: tests/e2e
+      tickets:
+        - 438
+  generated_at: '2026-08-05T08:05:50.837Z'

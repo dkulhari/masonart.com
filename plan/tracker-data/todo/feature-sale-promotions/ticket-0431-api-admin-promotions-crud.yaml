@@ -1,0 +1,129 @@
+ticket_number: 431
+title: API - admin promotions CRUD
+description: |-
+  ## Task
+  Admin-guarded CRUD at `packages/api/src/routes/admin/promotions.ts`: list, create, update, enable/disable, delete, plus setting the pinned product list and the exclusion list.
+
+  Writes call `invalidateActivePromotions()` so enabling a sale takes effect immediately rather than after the 60s resolver cache expires.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 3 — API surfaces
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §9
+
+  Follow the existing admin route pattern (`routes/admin/orders.ts`, `routes/admin/customers.ts`) and their admin-role guard. Validate with `createPromotionInputSchema` / `updatePromotionInputSchema` from `@chobii/shared` (T2). Tests go in `tests/routes/admin/`, matching `tests/routes/admin/customers.test.ts`.
+feature: sale-promotions
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:03:30.781Z'
+last_updated: '2026-08-05T08:03:30.781Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 424
+    feature: sale-promotions
+    description: Schema - shared Zod schemas and types for promotions
+  - ticket: 426
+    feature: sale-promotions
+    description: Resolver - active promotion selection with derived state and no stacking
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the admin promotions endpoints
+    file: packages/api/tests/routes/admin/promotions.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/promotions.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('admin promotions', () => {
+        it('rejects a non-admin', async () => {
+          // assert: 403
+        })
+
+        it('creates a sitewide promotion, disabled by default', async () => {
+          // assert: 201 && body.isEnabled === false
+        })
+
+        it('rejects a filter scope with no filter', async () => {
+          // assert: 400 from createPromotionInputSchema
+        })
+
+        it('stores the pinned product list for a products scope', async () => {
+          // assert: promotion_product rows written
+        })
+
+        it('stores exclusions independently of scope', async () => {
+          // assert: promotion_exclusion rows written for a scopeType='all' promotion
+        })
+
+        it('invalidates the resolver cache on enable', async () => {
+          // assert: invalidateActivePromotions was called
+        })
+
+        it('lists promotions with derived active state', async () => {
+          // assert: body[0].isActive is computed, not read from a column
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin/promotions.test.ts
+    expected_result: FAIL - route module does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Implement the admin promotions router and mount it
+    file: packages/api/src/routes/admin/promotions.ts
+    status: pending
+    code: |-
+      /**
+       * Admin CRUD for sale promotions.
+       *
+       * Writes invalidate the resolver's 60s cache, so enabling a sale is visible
+       * on the storefront immediately rather than up to a minute later.
+       *
+       * `isActive` in the list response is DERIVED per row — there is no status
+       * column to read (see schema/promotions.ts).
+       */
+
+      import { Hono } from 'hono'
+      import { createPromotionInputSchema, updatePromotionInputSchema } from '@chobii/shared'
+      import { db } from '../../database'
+      import {
+        promotions,
+        promotionProducts,
+        promotionExclusions,
+      } from '../../database/schema/promotions'
+      import { invalidateActivePromotions, isPromotionActive } from '../../lib/promotion-pricing'
+
+      // GET / — list with derived isActive
+      // POST / — create (validated), plus promotion_product / promotion_exclusion rows
+      // PATCH /:id — update, replacing the pinned and excluded id sets in a transaction
+      // POST /:id/enable, POST /:id/disable — toggle isEnabled
+      // DELETE /:id
+      // Every mutating handler ends with invalidateActivePromotions()
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/promotions.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the admin promotions API
+    command: 'git add packages/api/src/routes/admin/promotions.ts packages/api/src/routes/admin/index.ts packages/api/tests/routes/admin/promotions.test.ts && git commit -m "feat(api): admin CRUD for sale promotions"'
+    status: pending
+current_step: 1

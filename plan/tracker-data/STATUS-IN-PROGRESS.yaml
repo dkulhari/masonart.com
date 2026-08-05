@@ -1,10 +1,10 @@
 status: in-progress
-last_updated: '2026-08-04T15:06:10.277Z'
-total_tickets: 1
+last_updated: '2026-08-05T09:47:36.672Z'
+total_tickets: 2
 summary:
   critical: 0
   high: 0
-  medium: 1
+  medium: 2
   low: 0
 priorities:
   medium:
@@ -12,6 +12,12 @@ priorities:
       tickets:
         - ticket_number: 344
           title: 'Content-Security-Policy for SSR pages (deferred from #264)'
+          assignee: unassigned
+          blocked_by: []
+    - feature: collection-page-parity-remainder
+      tickets:
+        - ticket_number: 448
+          title: Re-point product-listing.spec.ts at the redesigned collection page
           assignee: unassigned
           blocked_by: []
 blocked_tickets: []

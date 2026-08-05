@@ -52,13 +52,13 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 1
-  total_duration: '00:11:00'
+  total_sessions: 3
+  total_duration: '00:54:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 1
-      duration: '00:11:00'
+      sessions: 3
+      duration: '00:54:00'
       tokens: 0
 tickets:
   todo: {}
@@ -75,7 +75,9 @@ tickets:
     '384': Sweep - remaining storefront routes off font-bold, brand orange and rounded-lg CTAs
     '385': Guard - storefront token-compliance test and full verification against the main baseline
     '386': Sizes - make the shared ladders the single source of truth, extend them, and price by area
-total_tickets: 11
+    '449': Remove dark mode — palette, config and .dark branches
+    '450': SEED_MEDIA_DIR resolves off cwd — seeding from packages/api silently drops the reference imagery
+total_tickets: 13
 completion_percentage: 100
 is_completed: true
 design:

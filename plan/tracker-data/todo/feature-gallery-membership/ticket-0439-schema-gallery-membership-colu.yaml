@@ -1,0 +1,145 @@
+ticket_number: 439
+title: Schema - gallery membership columns and the session field
+description: |-
+  ## Task
+  `packages/api/src/database/schema/users.ts` gains `galleryMember`, `galleryJoinedAt`, `marketingConsentAt`, `joinSource`. Migration included.
+
+  The field must also be declared in `packages/api/src/auth/index.ts` under `user.additionalFields` (alongside `role`, `tradeStatus`, `aiCreditsRemaining` at lines 253-296) or it never reaches the session payload, and every surface would need a second request to learn whether the viewer is a member.
+
+  Consent is a **timestamp, not a boolean** — a date is what has to be produced if the consent is ever questioned.
+
+  ## Context
+  Part of feature: gallery-membership
+  Phase: 1 — Schema + auth field
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §8
+
+  Existing customers are NOT backfilled as members — the migration default is `false` for everyone, including accounts that predate it. That is the point of design decision D4: a member is someone who joined, not someone who once bought something.
+
+  Shape assertions go in `tests/database/`, matching `product-popularity-columns.test.ts`.
+feature: gallery-membership
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:14:23.255Z'
+last_updated: '2026-08-05T08:14:23.255Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing assertions for the membership columns and the auth field
+    file: packages/api/tests/database/gallery-membership-columns.test.ts
+    command: cd packages/api && bunx vitest run tests/database/gallery-membership-columns.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      /**
+       * Gallery membership columns.
+       *
+       * Membership is a deliberate join, not "has an account" — so the flag defaults
+       * to false for everyone, including accounts that predate the migration.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { users } from '../../src/database/schema/users'
+      import { auth } from '../../src/auth'
+
+      describe('gallery membership columns', () => {
+        it('carries the membership flag', () => {
+          expect(users.galleryMember).toBeDefined()
+        })
+
+        it('defaults to false — no existing customer is silently enrolled', () => {
+          expect(users.galleryMember.default).toBe(false)
+        })
+
+        it('records when they joined', () => {
+          expect(users.galleryJoinedAt).toBeDefined()
+          expect(users.galleryJoinedAt.notNull).toBe(false)
+        })
+
+        it('stores consent as a timestamp, not a boolean', () => {
+          expect(users.marketingConsentAt).toBeDefined()
+          expect(users.marketingConsentAt.columnType).toBe(users.galleryJoinedAt.columnType)
+        })
+
+        it('records where the join came from', () => {
+          expect(users.joinSource).toBeDefined()
+        })
+      })
+
+      describe('session payload', () => {
+        it('declares galleryMember as an auth additional field', () => {
+          // Without this the flag never reaches the session and every surface needs
+          // a second request to learn whether the viewer is a member.
+          const fields = (auth.options.user as { additionalFields: Record<string, unknown> })
+            .additionalFields
+          expect(fields.galleryMember).toBeDefined()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/database/gallery-membership-columns.test.ts
+    expected_result: FAIL - users.galleryMember is undefined
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the membership columns to the users table
+    file: packages/api/src/database/schema/users.ts
+    status: pending
+    code: |2-
+          /**
+           * "The gallery" — an explicit opt-in, not a synonym for having an account.
+           * Defaults false for every existing customer: they see the same join
+           * prompt as anyone else, because we were never granted their consent.
+           */
+          galleryMember: boolean("gallery_member").default(false).notNull(),
+          galleryJoinedAt: timestamp("gallery_joined_at", { withTimezone: true }),
+          /** A timestamp, not a boolean — a date is what has to be produced if the
+           *  consent is ever questioned. */
+          marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
+          /** banner | rail | cart | registration | sale-page */
+          joinSource: text("join_source"),
+  - id: 4
+    action: implement
+    description: Declare galleryMember in better-auth additionalFields
+    file: packages/api/src/auth/index.ts
+    status: pending
+    code: |-
+      // Inside user.additionalFields, beside role / tradeStatus (lines 253-296):
+            galleryMember: {
+              type: "boolean",
+              required: false,
+              defaultValue: false,
+            },
+  - id: 5
+    action: verify-pass
+    description: Confirm the assertions pass
+    command: cd packages/api && bunx vitest run tests/database/gallery-membership-columns.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: implement
+    description: Generate and apply the migration
+    file: packages/api/drizzle/
+    command: cd packages/api && bunx drizzle-kit generate && bunx drizzle-kit migrate
+    expected_result: Migration file created and applied
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the membership columns
+    command: 'git add packages/api/src/database/schema/users.ts packages/api/src/auth/index.ts packages/api/tests/database/gallery-membership-columns.test.ts packages/api/drizzle && git commit -m "feat(api): gallery membership columns and session field"'
+    status: pending
+current_step: 1

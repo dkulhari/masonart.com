@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-04T15:06:10.276Z'
-total_tickets: 9
+last_updated: '2026-08-05T09:47:36.544Z'
+total_tickets: 38
 summary:
   critical: 1
-  high: 2
-  medium: 4
-  low: 2
+  high: 9
+  medium: 23
+  low: 5
 priorities:
   critical:
     - feature: go-live
@@ -55,6 +55,48 @@ priorities:
           title: 'Ops: point UptimeRobot monitors at https://chobii.art'
           assignee: unassigned
           blocked_by: []
+    - feature: sale-promotions
+      tickets:
+        - ticket_number: 423
+          title: Schema - promotion, promotion_product and promotion_exclusion tables
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 424
+          title: Schema - shared Zod schemas and types for promotions
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 425
+          title: Schema - record the promotion and its discount on orders
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 423
+              title: Schema - promotion, promotion_product and promotion_exclusion tables
+        - ticket_number: 426
+          title: Resolver - active promotion selection with derived state and no stacking
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 423
+              title: Schema - promotion, promotion_product and promotion_exclusion tables
+        - ticket_number: 427
+          title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 424
+              title: Schema - shared Zod schemas and types for promotions
+            - ticket_number: 426
+              title: Resolver - active promotion selection with derived state and no stacking
+    - feature: gallery-membership
+      tickets:
+        - ticket_number: 439
+          title: Schema - gallery membership columns and the session field
+          assignee: unassigned
+          blocked_by: []
+    - feature: testsuite-bug-auth
+      tickets:
+        - ticket_number: 451
+          title: 'Test Bug: auth.setup fails for trade/admin/content-manager, blocking 90 E2E tests'
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: go-to-production
       tickets:
@@ -79,6 +121,132 @@ priorities:
           title: 'DECISION: order numbers still use the masonart MA- prefix after the rebrand'
           assignee: unassigned
           blocked_by: []
+    - feature: wishlist
+      tickets:
+        - ticket_number: 417
+          title: Wishlist store fetches before it knows the session — six 401s per collection load
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 422
+          title: Web - wishlist page at /wishlist
+          assignee: unassigned
+          blocked_by: []
+    - feature: collection-page-parity-remainder
+      tickets:
+        - ticket_number: 420
+          title: Choose options — add to cart without leaving the collection page
+          assignee: unassigned
+          blocked_by: []
+    - feature: sale-promotions
+      tickets:
+        - ticket_number: 428
+          title: API - product list and detail return the resolved sale price
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 427
+              title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+        - ticket_number: 429
+          title: API - cart returns base, sale and locked per line without touching stored lineTotal
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 427
+              title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+        - ticket_number: 430
+          title: API - order creation writes the real discount and enforces the per-customer limit
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 425
+              title: Schema - record the promotion and its discount on orders
+            - ticket_number: 427
+              title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+        - ticket_number: 431
+          title: API - admin promotions CRUD
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 424
+              title: Schema - shared Zod schemas and types for promotions
+            - ticket_number: 426
+              title: Resolver - active promotion selection with derived state and no stacking
+        - ticket_number: 432
+          title: API - countdown deadline resolution, cookie mint and clamp
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 423
+              title: Schema - promotion, promotion_product and promotion_exclusion tables
+        - ticket_number: 433
+          title: Admin UI - /admin/promotions list and editor
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 431
+              title: API - admin promotions CRUD
+        - ticket_number: 434
+          title: Storefront - sale strip with live countdown above the header
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 432
+              title: API - countdown deadline resolution, cookie mint and clamp
+        - ticket_number: 435
+          title: Storefront - sale pricing on product cards and the PDP buy panel
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 428
+              title: API - product list and detail return the resolved sale price
+            - ticket_number: 432
+              title: API - countdown deadline resolution, cookie mint and clamp
+        - ticket_number: 436
+          title: Storefront - cart saving row, locked for non-members
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 429
+              title: API - cart returns base, sale and locked per line without touching stored lineTotal
+    - feature: gallery-membership
+      tickets:
+        - ticket_number: 440
+          title: API - POST /api/gallery/join
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 439
+              title: Schema - gallery membership columns and the session field
+        - ticket_number: 441
+          title: API - registration opt-in and post-auth auto-join from the join intent
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 440
+              title: API - POST /api/gallery/join
+        - ticket_number: 442
+          title: API + Admin - member filter and consented-email export
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 439
+              title: Schema - gallery membership columns and the session field
+        - ticket_number: 443
+          title: Web - SSR-safe member state hook
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 439
+              title: Schema - gallery membership columns and the session field
+            - ticket_number: 440
+              title: API - POST /api/gallery/join
+        - ticket_number: 444
+          title: Web - join modal, one field
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 443
+              title: Web - SSR-safe member state hook
+            - ticket_number: 432
+              title: API - countdown deadline resolution, cookie mint and clamp
+        - ticket_number: 445
+          title: Web - dismissible sale banner with session and 7-day cooldown
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 444
+              title: Web - join modal, one field
+        - ticket_number: 446
+          title: Web - black vertical rail tab on the right edge
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 445
+              title: Web - dismissible sale banner with session and 7-day cooldown
   low:
     - feature: go-to-production
       tickets:
@@ -93,6 +261,46 @@ priorities:
           title: Production Cutover Gate - chobi.art domain external registrations
           assignee: unassigned
           blocked_by: []
+    - feature: sale-promotions
+      tickets:
+        - ticket_number: 437
+          title: Storefront - /sale landing page and the red Sale nav link
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 428
+              title: API - product list and detail return the resolved sale price
+            - ticket_number: 432
+              title: API - countdown deadline resolution, cookie mint and clamp
+        - ticket_number: 438
+          title: E2E - sale lifecycle from no promotion to expiry
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 433
+              title: Admin UI - /admin/promotions list and editor
+            - ticket_number: 434
+              title: Storefront - sale strip with live countdown above the header
+            - ticket_number: 435
+              title: Storefront - sale pricing on product cards and the PDP buy panel
+            - ticket_number: 436
+              title: Storefront - cart saving row, locked for non-members
+            - ticket_number: 437
+              title: Storefront - /sale landing page and the red Sale nav link
+    - feature: gallery-membership
+      tickets:
+        - ticket_number: 447
+          title: E2E - locked to unlocked, and the banner-rail handover
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 441
+              title: API - registration opt-in and post-auth auto-join from the join intent
+            - ticket_number: 444
+              title: Web - join modal, one field
+            - ticket_number: 445
+              title: Web - dismissible sale banner with session and 7-day cooldown
+            - ticket_number: 446
+              title: Web - black vertical rail tab on the right edge
+            - ticket_number: 438
+              title: E2E - sale lifecycle from no promotion to expiry
 blocked_tickets:
   - ticket_number: 294
     title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
@@ -132,13 +340,175 @@ blocked_tickets:
       - ticket_number: 292
         title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
     description: 'Infra: same-origin web bundle + single-hostname config, Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls, Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate, BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start, SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel, Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
+  - ticket_number: 425
+    title: Schema - record the promotion and its discount on orders
+    blocked_by:
+      - ticket_number: 423
+        title: Schema - promotion, promotion_product and promotion_exclusion tables
+    description: Schema - promotion, promotion_product and promotion_exclusion tables
+  - ticket_number: 426
+    title: Resolver - active promotion selection with derived state and no stacking
+    blocked_by:
+      - ticket_number: 423
+        title: Schema - promotion, promotion_product and promotion_exclusion tables
+    description: Schema - promotion, promotion_product and promotion_exclusion tables
+  - ticket_number: 427
+    title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+    blocked_by:
+      - ticket_number: 424
+        title: Schema - shared Zod schemas and types for promotions
+      - ticket_number: 426
+        title: Resolver - active promotion selection with derived state and no stacking
+    description: Schema - shared Zod schemas and types for promotions, Resolver - active promotion selection with derived state and no stacking
   - ticket_number: 278
     title: Set up external uptime monitoring for production
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
+  - ticket_number: 428
+    title: API - product list and detail return the resolved sale price
+    blocked_by:
+      - ticket_number: 427
+        title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+    description: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+  - ticket_number: 429
+    title: API - cart returns base, sale and locked per line without touching stored lineTotal
+    blocked_by:
+      - ticket_number: 427
+        title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+    description: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+  - ticket_number: 430
+    title: API - order creation writes the real discount and enforces the per-customer limit
+    blocked_by:
+      - ticket_number: 425
+        title: Schema - record the promotion and its discount on orders
+      - ticket_number: 427
+        title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+    description: Schema - record the promotion and its discount on orders, Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+  - ticket_number: 431
+    title: API - admin promotions CRUD
+    blocked_by:
+      - ticket_number: 424
+        title: Schema - shared Zod schemas and types for promotions
+      - ticket_number: 426
+        title: Resolver - active promotion selection with derived state and no stacking
+    description: Schema - shared Zod schemas and types for promotions, Resolver - active promotion selection with derived state and no stacking
+  - ticket_number: 432
+    title: API - countdown deadline resolution, cookie mint and clamp
+    blocked_by:
+      - ticket_number: 423
+        title: Schema - promotion, promotion_product and promotion_exclusion tables
+    description: Schema - promotion, promotion_product and promotion_exclusion tables
+  - ticket_number: 433
+    title: Admin UI - /admin/promotions list and editor
+    blocked_by:
+      - ticket_number: 431
+        title: API - admin promotions CRUD
+    description: API - admin promotions CRUD
+  - ticket_number: 434
+    title: Storefront - sale strip with live countdown above the header
+    blocked_by:
+      - ticket_number: 432
+        title: API - countdown deadline resolution, cookie mint and clamp
+    description: API - countdown deadline resolution, cookie mint and clamp
+  - ticket_number: 435
+    title: Storefront - sale pricing on product cards and the PDP buy panel
+    blocked_by:
+      - ticket_number: 428
+        title: API - product list and detail return the resolved sale price
+      - ticket_number: 432
+        title: API - countdown deadline resolution, cookie mint and clamp
+    description: API - product list and detail return the resolved sale price, API - countdown deadline resolution, cookie mint and clamp
+  - ticket_number: 436
+    title: Storefront - cart saving row, locked for non-members
+    blocked_by:
+      - ticket_number: 429
+        title: API - cart returns base, sale and locked per line without touching stored lineTotal
+    description: API - cart returns base, sale and locked per line without touching stored lineTotal
+  - ticket_number: 440
+    title: API - POST /api/gallery/join
+    blocked_by:
+      - ticket_number: 439
+        title: Schema - gallery membership columns and the session field
+    description: Schema - gallery membership columns and the session field
+  - ticket_number: 441
+    title: API - registration opt-in and post-auth auto-join from the join intent
+    blocked_by:
+      - ticket_number: 440
+        title: API - POST /api/gallery/join
+    description: API - POST /api/gallery/join
+  - ticket_number: 442
+    title: API + Admin - member filter and consented-email export
+    blocked_by:
+      - ticket_number: 439
+        title: Schema - gallery membership columns and the session field
+    description: Schema - gallery membership columns and the session field
+  - ticket_number: 443
+    title: Web - SSR-safe member state hook
+    blocked_by:
+      - ticket_number: 439
+        title: Schema - gallery membership columns and the session field
+      - ticket_number: 440
+        title: API - POST /api/gallery/join
+    description: Schema - gallery membership columns and the session field, API - POST /api/gallery/join
+  - ticket_number: 444
+    title: Web - join modal, one field
+    blocked_by:
+      - ticket_number: 443
+        title: Web - SSR-safe member state hook
+      - ticket_number: 432
+        title: API - countdown deadline resolution, cookie mint and clamp
+    description: Web - SSR-safe member state hook, API - countdown deadline resolution, cookie mint and clamp
+  - ticket_number: 445
+    title: Web - dismissible sale banner with session and 7-day cooldown
+    blocked_by:
+      - ticket_number: 444
+        title: Web - join modal, one field
+    description: Web - join modal, one field
+  - ticket_number: 446
+    title: Web - black vertical rail tab on the right edge
+    blocked_by:
+      - ticket_number: 445
+        title: Web - dismissible sale banner with session and 7-day cooldown
+    description: Web - dismissible sale banner with session and 7-day cooldown
   - ticket_number: 283
     title: Document and configure database backup procedures
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
+  - ticket_number: 437
+    title: Storefront - /sale landing page and the red Sale nav link
+    blocked_by:
+      - ticket_number: 428
+        title: API - product list and detail return the resolved sale price
+      - ticket_number: 432
+        title: API - countdown deadline resolution, cookie mint and clamp
+    description: API - product list and detail return the resolved sale price, API - countdown deadline resolution, cookie mint and clamp
+  - ticket_number: 438
+    title: E2E - sale lifecycle from no promotion to expiry
+    blocked_by:
+      - ticket_number: 433
+        title: Admin UI - /admin/promotions list and editor
+      - ticket_number: 434
+        title: Storefront - sale strip with live countdown above the header
+      - ticket_number: 435
+        title: Storefront - sale pricing on product cards and the PDP buy panel
+      - ticket_number: 436
+        title: Storefront - cart saving row, locked for non-members
+      - ticket_number: 437
+        title: Storefront - /sale landing page and the red Sale nav link
+    description: Admin UI - /admin/promotions list and editor, Storefront - sale strip with live countdown above the header, Storefront - sale pricing on product cards and the PDP buy panel, Storefront - cart saving row, locked for non-members, Storefront - /sale landing page and the red Sale nav link
+  - ticket_number: 447
+    title: E2E - locked to unlocked, and the banner-rail handover
+    blocked_by:
+      - ticket_number: 441
+        title: API - registration opt-in and post-auth auto-join from the join intent
+      - ticket_number: 444
+        title: Web - join modal, one field
+      - ticket_number: 445
+        title: Web - dismissible sale banner with session and 7-day cooldown
+      - ticket_number: 446
+        title: Web - black vertical rail tab on the right edge
+      - ticket_number: 438
+        title: E2E - sale lifecycle from no promotion to expiry
+    description: API - registration opt-in and post-auth auto-join from the join intent, Web - join modal, one field, Web - dismissible sale banner with session and 7-day cooldown, Web - black vertical rail tab on the right edge, E2E - sale lifecycle from no promotion to expiry

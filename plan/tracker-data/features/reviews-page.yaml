@@ -1,0 +1,63 @@
+name: reviews-page
+title: Reviews Page
+priority: medium
+created: '2026-08-05T07:48:30.906Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+
+  Public, site-wide reviews page. Analysis §3.5 lists it among the pages we don't have; mesonart runs `/pages/reviews` ("Reviews & Ratings") and links it from both nav rows and the footer.
+
+  Distinct from the two existing review features, both complete:
+  - `user-reviews` (#28–#35) — schema, submission, moderation, product-page display
+  - `verified-purchase-reviews` (#169–#180) — order-gated submission
+
+  Those built the review *system*. This builds a *destination* that reads from it. No moderation or submission work here.
+
+  ## Why now
+
+  The data is real as of #414 — 12 approved reviews across 9 products, seeded with the settled orders that authorise them. The catalogue-wide aggregate already ships: `reviewsApp.get("/stats")` at `packages/api/src/routes/reviews.ts:380`, consumed by `PromoTile` via `lib/api.ts:279`.
+
+  ## Rough scope
+
+  **In**
+  - One new API endpoint: list all approved reviews, paginated. `reviewsApp` is already mounted (`index.ts:138`) and has `/stats` and `/:reviewId` but no list-all — that gap is the only backend work.
+  - Client fn in `packages/web/app/lib/api.ts`
+  - `/reviews` route: aggregate header (score + count, mesonart's "9000+ Score 4.9/5.0" strip) over a review list
+  - Nav/footer link
+
+  **Out**
+  - Submission and moderation — done elsewhere
+  - Photo/UGC reviews (theirs runs Loox)
+  - Per-artist or per-collection review filtering
+
+  ## Open questions — decide when planning
+
+  - Paging: lazy-load on scroll, matching the collection grid, vs numbered
+  - Filter/sort controls, or a flat reverse-chronological list
+  - Whether the aggregate header suppresses itself below a sample threshold, the way `PromoTile` renders null under ten approved reviews
+  - Whether it links back to the reviewed product
+
+  ## Notes
+
+  - Adds a route, so it writes `packages/web/app/routeTree.gen.ts` — tracked, not gitignored. Shares that file with the wishlist page ticket; if both run in parallel, stay in one checkout and stage by explicit path.
+  - Placeholder feature. Plan the tickets at work time.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo: {}
+  in_progress: {}
+  done: {}
+total_tickets: 0
+completion_percentage: 0
+is_completed: false

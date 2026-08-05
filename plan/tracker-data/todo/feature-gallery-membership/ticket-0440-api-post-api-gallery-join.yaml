@@ -1,0 +1,137 @@
+ticket_number: 440
+title: API - POST /api/gallery/join
+description: |-
+  ## Task
+  Authenticated, idempotent endpoint that joins the caller to the gallery: sets `galleryMember`, `galleryJoinedAt`, `marketingConsentAt` and `joinSource`.
+
+  Idempotent means a second call does not move `galleryJoinedAt` or re-stamp consent — the original consent date is the one that matters. Returns the membership state either way so the client can unlock without a refetch.
+
+  ## Context
+  Part of feature: gallery-membership
+  Phase: 2 — API
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §8
+
+  New router `packages/api/src/routes/gallery.ts`, mounted like the other storefront routers. `joinSource` is validated against the fixed set (`banner` | `rail` | `cart` | `registration` | `sale-page`) rather than stored as free text from the client. Guests get 401 — the join modal routes them through registration first (T-G3).
+feature: gallery-membership
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:14:23.279Z'
+last_updated: '2026-08-05T08:14:23.279Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 439
+    feature: gallery-membership
+    description: Schema - gallery membership columns and the session field
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the join endpoint
+    file: packages/api/tests/routes/gallery.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/gallery.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('POST /api/gallery/join', () => {
+        it('rejects a guest with 401', async () => {})
+
+        it('joins an authenticated user and stamps consent', async () => {
+          // assert: galleryMember true, galleryJoinedAt and marketingConsentAt set
+        })
+
+        it('is idempotent — a second call keeps the original consent date', async () => {
+          // The first consent is the one that has to be producible later.
+        })
+
+        it('rejects an unknown joinSource rather than storing free text', async () => {
+          // assert: 400
+        })
+
+        it('returns membership state so the client unlocks without a refetch', async () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/gallery.test.ts
+    expected_result: FAIL - route module does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Implement the gallery router and mount it
+    file: packages/api/src/routes/gallery.ts
+    status: pending
+    code: |-
+      /**
+       * Joining the gallery.
+       *
+       * Idempotent: re-joining does not move galleryJoinedAt or re-stamp consent.
+       * The first consent date is the one that has to be producible if the consent
+       * is ever questioned.
+       */
+
+      import { Hono } from 'hono'
+      import { z } from 'zod'
+      import { eq } from 'drizzle-orm'
+      import { db } from '../database'
+      import { users } from '../database/schema/users'
+
+      const joinSourceSchema = z.enum(['banner', 'rail', 'cart', 'registration', 'sale-page'])
+
+      const gallery = new Hono()
+
+      gallery.post('/join', async (c) => {
+        const user = c.get('user')
+        if (!user) return c.json({ error: 'Sign in to join the gallery' }, 401)
+
+        const parsed = joinSourceSchema.safeParse((await c.req.json().catch(() => ({}))).source)
+        if (!parsed.success) return c.json({ error: 'Unknown join source' }, 400)
+
+        const [existing] = await db
+          .select({ galleryMember: users.galleryMember, joinedAt: users.galleryJoinedAt })
+          .from(users)
+          .where(eq(users.id, user.id))
+
+        if (existing?.galleryMember) {
+          return c.json({ galleryMember: true, galleryJoinedAt: existing.joinedAt })
+        }
+
+        const now = new Date()
+        await db
+          .update(users)
+          .set({
+            galleryMember: true,
+            galleryJoinedAt: now,
+            marketingConsentAt: now,
+            joinSource: parsed.data,
+          })
+          .where(eq(users.id, user.id))
+
+        return c.json({ galleryMember: true, galleryJoinedAt: now })
+      })
+
+      export default gallery
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/gallery.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the join endpoint
+    command: 'git add packages/api/src/routes/gallery.ts packages/api/src/routes/index.ts packages/api/tests/routes/gallery.test.ts && git commit -m "feat(api): idempotent gallery join endpoint"'
+    status: pending
+current_step: 1

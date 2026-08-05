@@ -1,0 +1,119 @@
+ticket_number: 425
+title: Schema - record the promotion and its discount on orders
+description: |-
+  ## Task
+  Add `orders.promotionId` (nullable FK) so a settled order records which promotion priced it, and confirm `order_items.itemDiscount` (already declared at `orders.ts:258`) is the per-line store. Migration included.
+
+  This is the design's §4 point about the compare-at trap: a discount recorded as a discount keeps revenue reporting honest, where inflating a compare-at price would hide it.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 1 — Schema + contracts
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §4
+
+  Columns only — the write path lands in T8 (order creation). `orders.discount` and `orders.couponDiscount` already exist (`schema/orders.ts:171,179`) and today are always `"0.00"` (`routes/orders.ts:268,299`).
+feature: sale-promotions
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:01:36.037Z'
+last_updated: '2026-08-05T08:01:36.037Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 423
+    feature: sale-promotions
+    description: Schema - promotion, promotion_product and promotion_exclusion tables
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing shape assertions for the order-side promotion columns
+    file: packages/api/tests/database/promotion-order-columns.test.ts
+    command: cd packages/api && bunx vitest run tests/database/promotion-order-columns.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      /**
+       * Order-side promotion columns.
+       *
+       * A discount must be recorded as a discount. The alternative — inflating a
+       * compare-at price — hides the discount from every revenue report.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { orders, orderItems } from '../../src/database/schema/orders'
+
+      describe('orders promotion columns', () => {
+        it('records which promotion priced the order', () => {
+          expect(orders.promotionId).toBeDefined()
+        })
+
+        it('promotionId is nullable — most orders carry no promotion', () => {
+          expect(orders.promotionId.notNull).toBe(false)
+        })
+
+        it('keeps the money columns it already had', () => {
+          expect(orders.discount).toBeDefined()
+          expect(orders.couponDiscount).toBeDefined()
+        })
+      })
+
+      describe('order item discount', () => {
+        it('itemDiscount is the per-line store', () => {
+          expect(orderItems.itemDiscount).toBeDefined()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/database/promotion-order-columns.test.ts
+    expected_result: FAIL - orders.promotionId is undefined
+    status: pending
+  - id: 3
+    action: implement
+    description: Add promotionId to the orders table beside the existing discount columns
+    file: packages/api/src/database/schema/orders.ts
+    status: pending
+    code: |-
+      // Beside couponCode / couponDiscount (~line 178):
+
+          /**
+           * Which promotion priced this order. Nullable: most orders carry none.
+           * Recorded so the discount is visible in reporting rather than buried in
+           * an inflated compare-at price.
+           */
+          promotionId: uuid("promotion_id").references(() => promotions.id, {
+            onDelete: "set null",
+          }),
+
+      // plus, at the top of the file:
+      // import { promotions } from "./promotions";
+  - id: 4
+    action: verify-pass
+    description: Confirm the shape assertions pass
+    command: cd packages/api && bunx vitest run tests/database/promotion-order-columns.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: implement
+    description: Generate and apply the migration
+    file: packages/api/drizzle/
+    command: cd packages/api && bunx drizzle-kit generate && bunx drizzle-kit migrate
+    expected_result: Migration file created and applied
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the order-side columns
+    command: 'git add packages/api/src/database/schema/orders.ts packages/api/tests/database/promotion-order-columns.test.ts packages/api/drizzle && git commit -m "feat(api): record the pricing promotion on orders"'
+    status: pending
+current_step: 1

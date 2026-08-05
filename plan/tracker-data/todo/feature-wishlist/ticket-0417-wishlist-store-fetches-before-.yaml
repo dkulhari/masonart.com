@@ -1,0 +1,242 @@
+ticket_number: 417
+title: Wishlist store fetches before it knows the session — six 401s per collection load
+description: |-
+  ## Task
+
+  A signed-out visitor loading a collection page fires ~6 `GET /api/wishlist` requests, all 401. Nothing breaks visibly, but the store is fetching an auth-gated resource before it knows whether anyone is signed in, and it is doing so once per mounting component instead of once per page.
+
+  Two separate defects, both in `packages/web/app/stores/wishlist.ts`:
+
+  **1. No in-flight dedupe.** `load()` guards on `if (get().isLoaded) return` (wishlist.ts:48), but `isLoaded` only flips *after* the await resolves. Every caller that mounts in the same tick passes the guard and issues its own request. Callers are `Header.tsx:64` (one) and `WishlistButton.tsx:41` (one per heart), so a grid produces one request per visible card. The comment at `WishlistButton.tsx:39` — "24 cards mounting produce one request, not 24" — is only true for sequential calls.
+
+  **2. The store never sees auth.** It fetches unconditionally and swallows the 401 in the catch (wishlist.ts:53-60). The session is already resolved server-side in the root route (`routes/__root.tsx:60`, `session: Session | null` in the router context), so the client can know it is a guest before spending any request.
+
+  The existing test `tests/stores/wishlist.test.ts:61` ("fetches once, not once per card") awaits the two `load()` calls sequentially, which is why this never showed up.
+
+  **Fix scope agreed:** dedupe *and* auth gate. After the fix a signed-out visitor makes zero `/api/wishlist` requests; a signed-in one makes exactly one per page load regardless of card count.
+
+  ## Context
+
+  **Design — keep the router out of the leaf components.** `WishlistButton` is rendered bare in `tests/components/product/WishlistButton.test.tsx` with no router; calling `useRouteContext` inside it (or inside a hook it uses) breaks those tests. Instead the store carries a tri-state `isAuthenticated: boolean | null`:
+
+  - `null` = the root route has not reported yet. `load()` does nothing — this is what stops the guest 401s, since leaf effects run before the root effect.
+  - `false` = guest. `setAuthenticated(false)` marks `{ ids: [], isLoaded: true }` so every heart renders in its empty state and nothing waits.
+  - `true` = signed in. `setAuthenticated(true)` kicks the single load.
+
+  `Header.tsx` and `WishlistButton.tsx` keep their existing `load()` effects — they become harmless no-ops until auth is known, and still cover components that mount after that point.
+
+  **Existing tests need adjusting, not deleting:** the `reset()` helper at `tests/stores/wishlist.test.ts:19` must also clear `isAuthenticated` and `inFlight`, and the existing `describe('load')` cases must set `isAuthenticated: true` first or they will now correctly make no request.
+
+  Related files: `packages/web/app/stores/wishlist.ts`, `packages/web/app/routes/__root.tsx`, `packages/web/app/components/layout/Header.tsx`, `packages/web/app/components/product/WishlistButton.tsx`.
+feature: wishlist
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T06:55:38.631Z'
+last_updated: '2026-08-05T06:55:38.631Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - wishlist
+  - auth
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Add store tests for concurrent dedupe and the guest path; update reset() and the existing load cases for the new auth gate
+    file: packages/web/tests/stores/wishlist.test.ts
+    command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts
+    expected_result: FAIL - concurrent load() makes 3 requests instead of 1, and load() with an unknown session still hits the network
+    status: pending
+    code: |-
+      // reset() gains the two new fields:
+      const reset = () =>
+        useWishlistStore.setState({
+          ids: [],
+          isLoaded: false,
+          isPending: false,
+          isAuthenticated: null,
+          inFlight: null,
+        })
+
+      // Every existing case inside describe('load') now needs a known session,
+      // e.g. at the top of each:
+      //   useWishlistStore.setState({ isAuthenticated: true })
+
+      describe('load', () => {
+        it('makes one request when every card mounts in the same tick', async () => {
+          // The isLoaded guard flips only after the await resolves, so concurrent
+          // callers all sailed past it — six hearts were six 401s.
+          useWishlistStore.setState({ isAuthenticated: true })
+          const spy = stubFetch({ items: [{ id: PRODUCT_A }] })
+
+          await Promise.all([
+            useWishlistStore.getState().load(),
+            useWishlistStore.getState().load(),
+            useWishlistStore.getState().load(),
+          ])
+
+          expect(spy).toHaveBeenCalledTimes(1)
+          expect(useWishlistStore.getState().ids).toEqual([PRODUCT_A])
+        })
+
+        it('does not touch the network before the session is known', async () => {
+          const spy = stubFetch({ items: [] })
+
+          await useWishlistStore.getState().load()
+
+          expect(spy).not.toHaveBeenCalled()
+        })
+      })
+
+      describe('setAuthenticated', () => {
+        it('settles a signed-out visitor without a request', () => {
+          const spy = stubFetch({ items: [] })
+
+          useWishlistStore.getState().setAuthenticated(false)
+
+          expect(spy).not.toHaveBeenCalled()
+          // Loaded, so the hearts stop waiting and render empty.
+          expect(useWishlistStore.getState().isLoaded).toBe(true)
+          expect(useWishlistStore.getState().ids).toEqual([])
+        })
+
+        it('loads once when the session turns out to be signed in', async () => {
+          const spy = stubFetch({ items: [{ id: PRODUCT_A }] })
+
+          useWishlistStore.getState().setAuthenticated(true)
+          await useWishlistStore.getState().inFlight
+
+          expect(spy).toHaveBeenCalledTimes(1)
+          expect(useWishlistStore.getState().ids).toEqual([PRODUCT_A])
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the new cases fail against the current store
+    command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the tri-state auth flag and the shared in-flight promise to the store
+    file: packages/web/app/stores/wishlist.ts
+    status: pending
+    code: |-
+      interface WishlistStore {
+        /** Product ids the user has saved. */
+        ids: string[]
+        /** Whether `load()` has completed at least once. */
+        isLoaded: boolean
+        /** A toggle request is in flight. */
+        isPending: boolean
+        /**
+         * `null` until the root route reports the session. Leaf effects run before
+         * the root's, so "unknown" has to mean "do nothing" — otherwise a guest
+         * spends one 401 per mounting heart before the answer arrives.
+         */
+        isAuthenticated: boolean | null
+        /** Shared by concurrent callers: N cards mounting produce one request. */
+        inFlight: Promise<void> | null
+
+        setAuthenticated: (value: boolean) => void
+        load: () => Promise<void>
+        toggle: (productId: string) => Promise<void>
+      }
+
+      export const useWishlistStore = create<WishlistStore>()((set, get) => ({
+        ids: [],
+        isLoaded: false,
+        isPending: false,
+        isAuthenticated: null,
+        inFlight: null,
+
+        setAuthenticated(value: boolean) {
+          if (get().isAuthenticated === value) return
+          set({ isAuthenticated: value })
+
+          if (value) {
+            void get().load()
+            return
+          }
+
+          // A guest has nothing on the server. Mark loaded so the hearts stop
+          // waiting and every one of them renders empty.
+          set({ ids: [], isLoaded: true })
+        },
+
+        async load() {
+          // Session unknown or signed out: the request would only ever be a 401.
+          if (get().isAuthenticated !== true) return
+          if (get().isLoaded) return
+
+          const existing = get().inFlight
+          if (existing) return existing
+
+          const request = (async () => {
+            try {
+              const { items } = await wishlistApi.list()
+              set({ ids: items.map((item) => item.id), isLoaded: true })
+            } catch {
+              // A session can still expire between the root route and here; treat it
+              // the way a guest is treated rather than leaving the hearts pending.
+              set({ ids: [], isLoaded: true })
+            } finally {
+              set({ inFlight: null })
+            }
+          })()
+
+          // The body above runs synchronously up to the first await, so this is set
+          // before `load()` returns and the next caller in the same tick sees it.
+          set({ inFlight: request })
+          return request
+        },
+
+        // ...toggle unchanged
+      }))
+  - id: 4
+    action: implement
+    description: Report the session from the root route, the one place that already has it
+    file: packages/web/app/routes/__root.tsx
+    status: pending
+    code: |-
+      import { useEffect } from 'react'
+      import { useWishlistStore } from '~/stores/wishlist'
+
+      // Inside RootComponent, alongside the existing context read:
+      const { session } = Route.useRouteContext()
+      const setWishlistAuthenticated = useWishlistStore(
+        (state) => state.setAuthenticated
+      )
+
+      // The root is the only component that knows whether anyone is signed in; the
+      // store stays router-free so WishlistButton can still render bare in tests.
+      useEffect(() => {
+        setWishlistAuthenticated(Boolean(session?.user))
+      }, [session, setWishlistAuthenticated])
+  - id: 5
+    action: verify-pass
+    description: Store, button and header tests all green
+    command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts tests/components/product/WishlistButton.test.tsx tests/components/layout/Header.structure.test.tsx
+    expected_result: PASS - no regression in the existing heart or header-badge cases
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Confirm the request count in a real browser
+    command: bun run dev
+    expected_result: 'Manual verification — signed out, load /posters with the network panel filtered to ''wishlist'': zero requests (was six). Sign in, reload: exactly one GET /api/wishlist, 200. Hearts fill on click in both directions.'
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the fix
+    command: 'git add packages/web/app/stores/wishlist.ts packages/web/app/routes/__root.tsx packages/web/tests/stores/wishlist.test.ts && git commit -m "fix(web): wishlist waits for the session and shares one request (#417)"'
+    status: pending
+current_step: 1

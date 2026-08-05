@@ -1,0 +1,95 @@
+ticket_number: 433
+title: Admin UI - /admin/promotions list and editor
+description: |-
+  ## Task
+  Admin screen to configure a sale: list of promotions with derived active state, plus an editor covering name, headline, depth, scope (all / filter / product picker), exclusion picker, `membersOnly`, start and end, `isEnabled`, `priority`, `perCustomerOrderLimit`, and the countdown block.
+
+  The countdown block carries the §6 note inline in the form — whoever configures the sale should see what `countdownMode: rolling` actually does before switching it on.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 4 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §9
+
+  Follow existing admin route patterns (`app/routes/admin/products`, `app/routes/admin/reviews.tsx`) and their shadcn/ui form idiom. Consumes the T9 endpoints. Remember the search-param gotcha: `router.tsx` overrides TanStack search serialization, so any `validateSearch` schema must coerce numbers and split comma-joined arrays or the route error-boundaries to a blank page.
+feature: sale-promotions
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:04:59.153Z'
+last_updated: '2026-08-05T08:04:59.153Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 431
+    feature: sale-promotions
+    description: API - admin promotions CRUD
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing component tests for the list and editor
+    file: packages/web/tests/routes/admin/promotions.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/admin/promotions.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('admin promotions screen', () => {
+        it('lists promotions with a derived active badge', () => {})
+        it('shows the product picker only for a products scope', () => {})
+        it('shows the facet filter fields only for a filter scope', () => {})
+        it('renders the exclusion picker whatever the scope', () => {})
+        it('explains the rolling countdown inline before it can be enabled', () => {})
+        it('blocks save when endsAt precedes startsAt', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/routes/admin/promotions.test.tsx
+    expected_result: FAIL - route component does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the promotions list route
+    file: packages/web/app/routes/admin/promotions/index.tsx
+    status: pending
+    code: |-
+      // Table: name, headline, depth, scope, members-only, window, active badge
+      // (derived client-side from the API's isActive), enable/disable toggle,
+      // edit link. Empty state explains that no sale is running — which is also
+      // what the storefront shows.
+  - id: 4
+    action: implement
+    description: Build the promotion editor form
+    file: packages/web/app/routes/admin/promotions/$id.tsx
+    status: pending
+    code: |-
+      // Sections: Identity (name, headline) · Discount (type, value) · Scope
+      // (all | filter | products, with pickers) · Exclusions · Eligibility
+      // (membersOnly, perCustomerOrderLimit) · Window (startsAt, endsAt, isEnabled,
+      // priority) · Countdown (mode, window, jitter) with the design §6 note shown
+      // beside the mode selector.
+      // Validation mirrors createPromotionInputSchema from @chobii/shared.
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/routes/admin/promotions.test.tsx
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the admin promotions screens
+    command: 'git add packages/web/app/routes/admin/promotions packages/web/tests/routes/admin/promotions.test.tsx && git commit -m "feat(web): admin promotions list and editor"'
+    status: pending
+current_step: 1

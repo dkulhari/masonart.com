@@ -65,13 +65,19 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 4
+  total_duration: "01:07:00"
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 4
+      duration: "01:07:00"
+      tokens: 0
 tickets:
-  todo: {}
-  in_progress: {}
+  todo:
+    "420": Choose options — add to cart without leaving the collection page
+  in_progress:
+    "448": Re-point product-listing.spec.ts at the redesigned collection page
   done:
     "404": Schema - curator pin columns and sales index
     "405": API - Best selling sort over real orders, plus NULLS LAST on Featured
@@ -86,9 +92,11 @@ tickets:
     "414": Seed - settled orders and approved reviews so the real signals have data
     "415": Web - filter rail typography and chrome parity (strip the box)
     "416": "Web - toolbar pill parity: 56px pills, fill-wipe hover, in-place black sort panel"
-total_tickets: 13
-completion_percentage: 100
-is_completed: true
+    "418": Card media shows two mats — match ours to the source background
+    "419": Move the Hide filters control above the facet rail
+total_tickets: 17
+completion_percentage: 88
+is_completed: false
 design:
   approach: |-
     Real signals, live aggregate. Sales computed at query time from order_items joined to paid/fulfilled orders, indexed on order_items(product_id), rather than a denormalized counter maintained by the payment webhook. Discover chips derive per-style imagery from a representative product; promo tiles carry the real catalogue review aggregate or render nothing. Sort goes 6 -> 8 (Featured, Best selling); Most relevant is dropped as undefinable without a search query.</approach>

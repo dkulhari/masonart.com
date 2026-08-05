@@ -1,0 +1,122 @@
+ticket_number: 448
+title: Re-point product-listing.spec.ts at the redesigned collection page
+description: |-
+  ## Task
+
+  `tests/e2e/product-listing.spec.ts` fails ~24 cases against selectors the #404–#419 redesign removed. Verified while working #421: these are stale tests, not app bugs. Left alone they make the suite unreadable — a real regression on this page would land in a sea of red that everyone has learned to ignore.
+
+  `tests/e2e/collection-page-remainder.spec.ts`, written against the redesign, passes clean. That is the model.
+
+  ## Context
+
+  Each category checked against current source, not guessed:
+
+  - **Card title / price** (2 cases) — spec wants `a[href^="/posters/"] h3`. `ProductCard.tsx:134-142` renders `<p><Link>{product.title}</Link></p>`; there is no `h3` on the card any more.
+  - **Sort from URL** (4 cases) — spec wants `aside button:has-text("Price: Low to High")`. Sort left the filter sidebar for the toolbar pill in #416; `SORT_OPTIONS` now lives in `CollectionToolbar.tsx` and the sidebar has no sort control at all.
+  - **Active filter tags** (6 cases) — spec scopes `text=Active filters:` to `div.hidden.lg\:block`. The label still exists (`routes/posters/index.tsx:1009`) and the desktop wrapper is at `:737`, but #419 moved the toolbar out of the products column; re-check the scoping rather than assuming the label is gone.
+  - **"Special" filters section** (5 cases) — `FACET_GROUPS` (`packages/shared/src/constants/facets.ts:210`) is ten groups and none of them is Special. **This one is a decision, not a cleanup**: `isAiGenerated` and `isFeatured` are still in the search-param contract, the API still filters on them, and `ActiveFilterTags` still renders a Featured tag — but no sidebar control produces either any more. Either re-home the two toggles or delete the tests deliberately; do not quietly drop coverage for a filter that is still in the URL contract. Ask before choosing.
+  - **Mobile filter sheet** (2 cases), **accessible filter sidebar header**, **navigate from home page category link** — re-verify individually against the current markup.
+  - **Performance** (3 cases) — likely flake rather than staleness: "should render header quickly" failed in the full run and passed on a targeted re-run. Confirm before touching thresholds.
+
+  ## Constraints
+
+  - Fix the selectors, do not weaken the assertions. A test that now only checks `toBeVisible()` on a wrapper div is worse than the failing one it replaced.
+  - New `data-testid`s are fine where the markup genuinely has no stable handle (`collection-toolbar` was added for exactly that reason in #421). Do not add one to dodge a selector that could just be correct.
+  - Run with `--no-deps`: the `auth.setup` project fails on the local dev instance and blocks the whole chromium project otherwise.
+
+  ## Acceptance
+
+  `bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps` is green, or any remaining case is `test.skip` with a comment naming the ticket that removed the feature it covered. The Special-filters question is answered explicitly in a ticket comment either way.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:59:20.616Z'
+last_updated: '2026-08-05T09:04:36.867Z'
+time_spent_minutes: 0
+labels:
+  - tests
+  - e2e
+  - frontend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T09:04:30.444Z'
+    text: Status changed from 'todo' to 'in-progress'
+work_sessions:
+  - start: '2026-08-05T09:04:36.866Z'
+    agent: claude-code
+    summary: 'Starting: re-point product-listing.spec.ts at the redesigned collection page'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: verify-fail
+    description: Enumerate the current failures and their errors, so the categories above are worked from evidence rather than from this description
+    command: E2E_BASE_URL=http://localhost:3001 bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps --reporter=list
+    expected_result: FAIL — record the exact count and group the errors by cause
+    status: pending
+  - id: 2
+    action: implement
+    description: 'Card title and price: point at the real element instead of the h3 the redesign removed'
+    file: tests/e2e/product-listing.spec.ts
+    status: pending
+    code: |-
+      // ProductCard.tsx:134 — the title is a Link inside a <p>, not a heading.
+      const card = page.locator('[data-testid="card-content"]').first()
+      await expect(card.getByRole('link', { name: /\S/ })).toBeVisible()
+  - id: 3
+    action: implement
+    description: 'Sort from URL: assert against the toolbar pill, which is where sort moved in #416'
+    file: tests/e2e/product-listing.spec.ts
+    status: pending
+    code: |-
+      // Sort is no longer a radio list in the sidebar (#416).
+      const sortPill = page
+        .getByTestId('collection-toolbar')
+        .getByRole('button', { name: /^Sort by:/ })
+      await expect(sortPill).toHaveText(/Price: Low to High/)
+  - id: 4
+    action: implement
+    description: 'Active filter tags: re-scope to where the desktop tag row actually renders after #419'
+    file: tests/e2e/product-listing.spec.ts
+    status: pending
+  - id: 5
+    action: implement
+    description: 'Mobile filter sheet, accessible sidebar header, home category link: re-verify each against current markup and fix or skip with a reason'
+    file: tests/e2e/product-listing.spec.ts
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Confirm the performance cases are flake, not staleness, before changing any threshold
+    command: E2E_BASE_URL=http://localhost:3001 bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps -g "Performance" --repeat-each=3
+    expected_result: PASS across repeats — if it fails consistently, it is a real regression and needs its own ticket
+    status: pending
+  - id: 7
+    action: implement
+    description: 'Special filters: put the question to the user — re-home the AI Generated / Featured toggles, or delete the five tests deliberately — then act on the answer'
+    file: tests/e2e/product-listing.spec.ts
+    expected_result: Manual verification — the decision and its reason recorded as a ticket comment
+    status: pending
+  - id: 8
+    action: verify-pass
+    description: Whole spec green, and the rest of the collection suite unchanged
+    command: E2E_BASE_URL=http://localhost:3001 bunx playwright test tests/e2e/product-listing.spec.ts tests/e2e/collection-page-remainder.spec.ts --project=chromium --no-deps
+    expected_result: PASS — no skipped case without a comment naming the ticket that removed its feature
+    status: pending
+  - id: 9
+    action: commit
+    description: Commit the spec repair
+    command: 'git add tests/e2e/product-listing.spec.ts && git commit -m "test(e2e): re-point the product listing spec at the redesigned collection page"'
+    status: pending
+current_step: 1
+started: '2026-08-05T09:04:30.444Z'
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}

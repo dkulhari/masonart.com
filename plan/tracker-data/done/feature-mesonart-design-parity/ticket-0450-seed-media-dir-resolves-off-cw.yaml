@@ -1,0 +1,196 @@
+ticket_number: 450
+title: SEED_MEDIA_DIR resolves off cwd — seeding from packages/api silently drops the reference imagery
+description: |-
+  ## Bug
+
+  `SEED_MEDIA_DIR` is anchored to `process.cwd()`, so which directory you invoke
+  the seed from decides whether the catalogue gets the reference imagery or
+  quietly falls back to stock URLs. No warning, no error, exit code 0.
+
+  `packages/api/src/database/seed-images.ts:39`
+
+  ```ts
+  export const SEED_MEDIA_DIR =
+    process.env.SEED_MEDIA_DIR ?? join(process.cwd(), ".cache", "seed-media");
+  ```
+
+  The media lives at repo root: `.cache/seed-media/`. But the seed's own script
+  runs from the package directory — `packages/api/package.json:31`:
+
+  ```
+  "seed": "bun run --env-file=../../.env src/database/seed.ts"
+  ```
+
+  A package script executes with cwd at the package root, so the canonical
+  invocation resolves to `packages/api/.cache/seed-media`, which does not exist.
+
+  ## Why it is silent
+
+  `localSeedMediaSet` (`seed-images.ts:114`) returns `[]` when the directory or the
+  `-main.webp` file is missing, and `seed.ts:1629` reads an empty set as "no local
+  media, use the declared URLs". That degradation is deliberate and correct — a
+  fresh clone has no `.cache/seed-media/` and must still seed. The defect is that
+  a *wrong cwd* is indistinguishable from *a clone that never had the files*. Both
+  produce the same successful-looking run.
+
+  ## Observed
+
+  Today's reseed produced 41 products with room-mockup images on only **3** of
+  them. `docs/design/mesonart/PLAN-OF-ACTION.md:148` names that exact number as
+  the degraded signature — the healthy count is **122**:
+
+  ```sql
+  SELECT count(*) FROM products p, jsonb_array_elements(p.images) i
+  WHERE i->>'type' = 'room-mockup';
+  ```
+
+  So this is not hypothetical; it has already silently produced a degraded dev
+  catalogue during design-parity work.
+
+  ## Prior art in the tree
+
+  `packages/api/tests/lib/image-processing-seed-media.test.ts:25-32` already hit
+  this and worked around it locally, with a comment naming the cause:
+
+  > Anchored to this file rather than reused from seed-images.ts, whose
+  > SEED_MEDIA_DIR resolves off process.cwd() — correct when the seed runs from
+  > the repo root, wrong under vitest, which runs from packages/api.
+
+  That workaround should collapse into the shared fix rather than stay duplicated.
+
+  ## Separate from #418
+
+  #418 was the double-mat defect in `matToSquare` — wrong pixels in images that
+  were present. This is wrong images being absent. Same reseed surfaced both;
+  different causes.
+
+  ## Fix direction
+
+  Anchor the default to the repo root rather than the caller's cwd — resolve
+  relative to the module (`import.meta.url`) or walk up to the workspace root.
+  The `SEED_MEDIA_DIR` env override stays as-is. Once the default is
+  cwd-independent, the test file can import `SEED_MEDIA_DIR` instead of
+  re-deriving it.
+
+  Then close the silence: when `REFERENCE_MEDIA` maps a slug but the directory is
+  absent, log once at the top of the run — how many of the 41 slugs resolved to
+  local media and how many fell back. A clone with no media prints "0 of 41, using
+  declared URLs" and proceeds; a bad cwd prints the same line, which is now
+  visible rather than inferred from a SQL count afterwards.
+
+  ## Note on CACHE_DIR
+
+  `seed-images.ts:25` has the same cwd-relative shape for `.cache/seed-images/`.
+  Harmless by comparison — a wrong path is a cache miss that re-downloads — but
+  worth fixing in the same pass for consistency.
+
+  ## Acceptance
+
+  `bun run seed` from `packages/api`, from the repo root, and via
+  `pnpm --filter api seed` all pick up the same reference imagery. Room-mockup
+  count is 122 after a reseed on a machine that has `.cache/seed-media/`. A run
+  without the directory still succeeds, and says so. The test file's local
+  re-derivation is gone.
+feature: mesonart-design-parity
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T09:21:16.015Z'
+last_updated: '2026-08-05T09:40:13.352Z'
+time_spent_minutes: 17
+labels:
+  - backend
+  - seed
+  - dx
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T09:22:55.406Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T09:39:25.113Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4dbc372d` - fix(api): anchor the seed's media directory to the repo, not the caller
+
+      **Files Changed**:
+      - `packages/api/src/database/seed-images.ts` - `REPO_ROOT` anchored to `import.meta.url`; `SEED_MEDIA_DIR` and the renamed, now-exported `SEED_IMAGE_CACHE_DIR` derive from it; added `summarizeLocalSeedMedia()`
+      - `packages/api/src/database/seed.ts` - `reportReferenceMedia()` logs resolved/total and the directory at the top of `seedProducts()`
+      - `packages/api/tests/database/seed-media-dir.test.ts` - new, 7 tests
+      - `packages/api/tests/lib/image-processing-seed-media.test.ts` - dropped its duplicate anchored path for the shared constant
+
+      **Root Cause**: `SEED_MEDIA_DIR` defaulted to `join(process.cwd(), ".cache", "seed-media")`. `packages/api/package.json:31` runs the seed with cwd at the package root, so it resolved to `packages/api/.cache/seed-media` — absent. `localSeedMediaSet` returns `[]` for a missing directory and `sourcesFor` reads that as "use the declared URLs", so the run exited 0 having seeded all 41 products from remote stock photos.
+
+      **Location**: `packages/api/src/database/seed-images.ts:39-40` (pre-fix)
+
+      **Fix**: Both cache paths derive from the module's own location. Four levels up lands on the repo root from `src/database/` and from `dist/database/` alike, so the built output behaves the same. The `SEED_MEDIA_DIR` env override is untouched. `seedProducts()` now prints the resolved count and directory before it starts, so a wrong path and a fixture-less clone stop being indistinguishable.
+
+      **Verification**:
+      - Command: `npx vitest run tests/database/seed-media-dir.test.ts tests/database/seed-images.test.ts tests/lib/image-processing-seed-media.test.ts tests/lib/image-processing-mat.test.ts tests/lib/image-processing-crop.test.ts`
+      - Result: PASS (5 files, 56 tests, 0 failing, 304s)
+      - Command: `npx tsc --noEmit` in `packages/api`
+      - Result: PASS (exit 0, no diagnostics)
+
+      Red-phase evidence, run from `packages/api`:
+      ```
+      Expected: "/Users/dhruv/work/masonart.com/.cache/seed-media"
+      Received: "/Users/dhruv/work/masonart.com/packages/api/.cache/seed-media"
+      ```
+
+      Direct proof of the fix, probe run from the cwd that broke it:
+      ```
+      cwd                 : /Users/dhruv/work/masonart.com/packages/api
+      SEED_MEDIA_DIR      : /Users/dhruv/work/masonart.com/.cache/seed-media
+      SEED_IMAGE_CACHE_DIR: /Users/dhruv/work/masonart.com/.cache/seed-images
+      summary             : { resolved: 41, total: 41, dir: ".../.cache/seed-media" }
+      ```
+      41/41 where the broken build resolved 0/41.
+
+      Corroborating disk state before the fix: `packages/api/.cache/seed-images/` existed (written by the bad run) while `packages/api/.cache/seed-media/` never did, and the root `.cache/seed-media/` holds all 168 fixture files.
+
+      **Not verified — needs a reseed**: the acceptance line "room-mockup count is 122 after a reseed" is unrun. It mutates the dev database, so it was left for an explicit go-ahead rather than triggered from this ticket. Everything upstream of that count is proven above; the count is its consequence. Run `bun run seed` in `packages/api` and check:
+      ```sql
+      SELECT count(*) FROM products p, jsonb_array_elements(p.images) i
+      WHERE i->>'type' = 'room-mockup';
+      ```
+  - author: system
+    timestamp: '2026-08-05T09:39:32.850Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T09:23:15.968Z'
+    agent: claude-code
+    summary: 'Fixed #450 in one session. Anchored SEED_MEDIA_DIR and SEED_IMAGE_CACHE_DIR to the module rather than process.cwd(); added summarizeLocalSeedMedia() and a resolved/total log line at the top of seedProducts(); collapsed the duplicate anchored path in image-processing-seed-media.test.ts. New suite seed-media-dir.test.ts (7 tests) written red first. 56/56 tests pass, tsc clean. Probe from packages/api resolves 41/41 where the bug resolved 0/41. Commit 4dbc372d. Dev-DB reseed left for explicit go-ahead.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T09:40:12.799Z'
+    duration: '00:16:56'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T09:22:55.406Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:17:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:17:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/database/seed-media-dir.test.ts tests/database/seed-images.test.ts tests/lib/image-processing-seed-media.test.ts tests/lib/image-processing-mat.test.ts tests/lib/image-processing-crop.test.ts
+  test_output: 'Test Files 5 passed (5) | Tests 56 passed (56), duration 304.05s. New suite seed-media-dir.test.ts: 7/7. image-processing-seed-media.test.ts ran its real-media test rather than skipping, confirming the shared SEED_MEDIA_DIR resolves from vitest''s packages/api cwd.'
+  build_passed: true
+  build_command: npx tsc --noEmit (packages/api) — exit 0, no diagnostics
+  verified_at: '2026-08-05T09:38:59.825Z'
+completed: '2026-08-05T09:39:32.849Z'

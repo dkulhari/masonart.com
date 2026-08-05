@@ -1,0 +1,135 @@
+ticket_number: 418
+title: Card media shows two mats — match ours to the source background
+description: |-
+  ## Task
+
+  Our cards currently show two nested mats. `--mat: 0 0% 98%` pads every image to square in `matToSquare`, but the seed artwork was captured from a storefront that already sits its pieces on its own light background. The result is a mat inside a mat, with a visible seam between the two tones.
+
+  This is only visible now because the seed carries real captured artwork rather than stock photography that filled the frame.
+
+  ## Context
+
+  - Token: `--mat` in `packages/web/app/styles/globals.css`
+  - Padding happens in `matToSquare`, `packages/api/src/lib/image-processing.ts` — the colour is baked into the pixels, so changing the token alone will NOT fix existing images; they need a reseed.
+  - Sample the actual background colour from a seed file in `.cache/seed-media/` (e.g. `tx462-main.webp`, a corner pixel) rather than eyeballing it from a screenshot.
+  - The analysis §2 lists mat colour as an open decision: theirs is `rgb(250 250 250)` per their served tokens, ours is `0 0% 98%` — nominally the same, so confirm by measurement whether the seam is a token mismatch or the captured images carrying a different background from their own token.
+  - Do not break the square contract (#360–#375). Only the fill colour is in scope.
+
+  ## Acceptance
+
+  One mat visible per card, no seam, at both grid and PDP sizes. Verified against a reseeded catalogue, not just a token change.
+feature: collection-page-parity-remainder
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T07:39:21.800Z'
+last_updated: '2026-08-05T09:42:31.696Z'
+time_spent_minutes: 49
+labels:
+  - frontend
+  - ui
+  - design-tokens
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T08:36:07.080Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T09:41:42.918Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T09:42:31.693Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `f495f9b8` — fix(api): strip the border a source arrives with, so cards show one mat
+
+      **Root cause — the ticket's premise was wrong.**
+
+      Not a token mismatch. `--mat` is `0 0% 98%` and `MAT_COLOR` is `{250,250,250}` — already identical, already guarded by `mat-token.test.ts`. Two separate defects, both measured:
+
+      1. **The captured artwork carries its own field** at rgb(240,240,240) — ten levels off our mat, over a band 90–347px wide. That step is the seam.
+      2. **`matToSquare` ran twice.** `.cache/seed-media/tools/fetch-media.ts:109` mats on capture, `product-media.ts:61` mats again on seed. Art landed at 0.88² = **77.5%** of canvas instead of 88%.
+
+      The existing idempotency test (`image-processing-mat.test.ts:104`) only asserted the canvas stayed 1500×1500, which is true of both correct and broken output. Size stability is not idempotency — the art box is what moved, and nothing was watching it.
+
+      **Files Changed**
+      - `packages/api/src/lib/image-processing.ts` — `stripUniformBorder()` trims a uniform border before insetting. Guarded two ways: a trim leaving under half the longest side is refused, so a piece composed *as* a light field is matted as it came; and art may grow back toward the inset but never past the longest side the source delivered.
+      - `packages/api/tests/lib/image-processing-mat.test.ts` — 4 tests for bordered sources; 3 failed first for the right reason (90px of tone 240 in the mat, art box 198px short, 158px lost on re-run).
+      - `packages/api/tests/lib/image-processing-seed-media.test.ts` — new; runs the real captured artwork through the pipeline. Skips when the machine-local seed directory is absent.
+
+      **Why not change MAT_COLOR to 240**: that matches our design token to throwaway third-party placeholder imagery and diverges from mesonart's actual served token, which analysis §2 measures at `rgb(250 250 250)`. The source is what was wrong, not the mat.
+
+      **Verification** (against a reseeded catalogue, per acceptance)
+      - Reseed run, catalogue rebuilt: 41 products, 629 variants, 122 room-mockups
+      - All 41 **stored** `main` images pulled back from MinIO and measured: canvas 1500×1500, content longest side **1320–1325px** vs the 1320 target, **0** second-mat pixels
+      - Visual at 1440×900: grid and PDP both show one uniform mat, no seam
+      - `image-processing-mat` + `image-processing-seed-media` + `product-media` + `seed-images`: 47 passed
+      - `image-processing-crop`: 13 passed · web `mat-token`: 9 passed
+      - `product-grid-alignment.spec.ts`: **68 passed** — square contract (#360–#375) intact
+      - `tsc --noEmit` (packages/api): 0 errors
+
+      **Found while working, not fixed — worth its own ticket.** `SEED_MEDIA_DIR` (`seed-images.ts:40`) resolves off `process.cwd()`, but `bun run seed` runs from `packages/api`. Seeding from there silently swaps the whole catalogue to stock URLs — room-mockups drop 122 → 3 with no warning and no error. It caught me mid-ticket. Correct invocation needs `SEED_MEDIA_DIR` set explicitly.
+
+      **Decision recorded**: mat stays baked into pixels rather than moving to display-time CSS. Display-time was the stronger option on one axis only — dark mode, which a baked near-white block cannot adapt to — and dark mode is not shipping. Baking also can't be eliminated anyway, since OG images and email have no CSS; moving would have duplicated the mat definition across two rendering paths instead of removing one.
+work_sessions:
+  - start: '2026-08-05T08:36:08.258Z'
+    agent: claude-code
+    summary: 'Diagnosed and fixed the double mat. Root cause was NOT the token: --mat and MAT_COLOR are both rgb(250,250,250) and already guarded. Measured two real defects — the captured artwork carries its own rgb(240,240,240) field (a 10-level step over a 90-347px band), and matToSquare ran twice (fetch-media.ts on capture, product-media.ts on seed), leaving art at 0.88^2 = 77.5% of canvas. Fixed by trimming a uniform border before insetting, with a 50% floor so light-field compositions are not eaten, and an enlargement cap at the source''s own longest side so mat width stays consistent across a grid row. Added 4 TDD tests plus a real-media regression suite over all 41 captured artworks. Committed f495f9b8. Remaining: reseed the dev catalogue and verify visually at grid and PDP sizes.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T08:56:17.031Z'
+    duration: '00:20:08'
+  - start: '2026-08-05T09:11:59.368Z'
+    agent: claude-code
+    summary: 'Dropped the proposed ProductCardMedia guard hardening — that component only sees ProductImage metadata, no pixels, so a uniform-border check is not implementable there, and the trim already makes matToSquare idempotent so it is not needed server-side. Confirmed mat architecture decision: keep baking (dark mode is not shipping, which was the only cost that could not be engineered away). Ran the reseed and it reverted the reference imagery — room-mockups 122 to 3 — because SEED_MEDIA_DIR resolves off process.cwd() and bun run seed runs from packages/api. Corrective re-run with SEED_MEDIA_DIR set was declined, so the dev catalogue is currently on stock URLs. Code fix remains verified and committed at f495f9b8. Outstanding: restore the catalogue, then verify one mat at grid and PDP sizes in a browser.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T09:18:44.693Z'
+    duration: '00:06:45'
+  - start: '2026-08-05T09:19:40.223Z'
+    agent: claude-code
+    summary: 'Restored the reference imagery (room-mockups 3 back to 122) by reseeding with SEED_MEDIA_DIR set explicitly. Verified the acceptance against the reseeded catalogue: pulled all 41 stored main images from MinIO and measured 1500x1500 canvas, content longest side 1320-1325px against the 1320 target, zero second-mat pixels. Visual check at 1440x900 on grid and PDP shows one uniform mat, no seam. product-grid-alignment.spec.ts 68 passed, so the square contract survives. Ticket complete.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T09:41:32.958Z'
+    duration: '00:21:52'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T08:36:07.080Z'
+work_session_summary:
+  total_sessions: 3
+  total_duration: '00:49:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 3
+      duration: '00:49:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/lib/image-processing-mat.test.ts tests/lib/image-processing-seed-media.test.ts tests/lib/product-media.test.ts tests/database/seed-images.test.ts && npx playwright test tests/e2e/product-grid-alignment.spec.ts --no-deps
+  test_output: 'API image pipeline: 47 passed (4 files). Plus image-processing-crop 13 passed, web mat-token 9 passed. E2E product-grid-alignment: 68 passed (12.3m). All 41 stored catalogue images measured post-reseed: canvas 1500x1500, content longest side 1320-1325px vs 1320 target, 0 second-mat pixels.'
+  build_passed: true
+  build_command: npx tsc --noEmit -p tsconfig.json (packages/api) — 0 errors
+  verified_at: '2026-08-05T09:41:37.931Z'
+completed: '2026-08-05T09:41:42.918Z'

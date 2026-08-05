@@ -1,0 +1,96 @@
+name: gallery-membership
+title: Gallery Membership
+priority: high
+created: '2026-08-05T07:54:14.887Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Design
+
+  Full approved design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` (§8 for this feature). Pairs with `sale-promotions`, which supplies the discount this membership gates.
+
+  "The gallery" is chobii's membership: joining unlocks sale pricing and grants marketing consent. Mesonart gates its 40% behind signup the same way; the dismissible banner and the black vertical right-edge rail tab are the acquisition surfaces (parity analysis §1.1 "Floating right-edge vertical 'Get 40% OFF' tab").
+
+  ## Decisions (doc §3)
+
+  - **D4 Account + explicit opt-in flag.** Membership is a registered account PLUS a deliberate join, not "any logged-in user". Treating every account as a member would silently enrol every past customer and claim consent that was never granted.
+  - Consent is stored as a **timestamp, not a boolean** — that is what has to be produced if consent is questioned.
+  - Existing customers are NOT backfilled as members; they see the same join prompt as anyone else.
+
+  ## Data model (doc §8)
+
+  `packages/api/src/database/schema/users.ts` gains `galleryMember boolean default false`, `galleryJoinedAt timestamptz null`, `marketingConsentAt timestamptz null`, `joinSource text null` (`banner` | `rail` | `cart` | `registration` | `sale-page`).
+
+  `POST /api/gallery/join` — authenticated, idempotent, sets all four. Membership ships in the session payload so every surface resolves the locked/unlocked price without an extra request.
+
+  ## Flows
+
+  Guest: banner takes an email → routes to registration with `?join=gallery` → intent survives the auth redirect → first successful session auto-joins and returns the visitor where they were, price now unlocked. Registration also carries an opt-in checkbox for people arriving the ordinary way. Checkout already requires an account (`orders.ts` builds from `user.id`) while carts allow guests via cookie (`cart.ts:272-276`), so the gate sits where the customer was already going to register.
+
+  ## Surfaces (doc §7)
+
+  - **Sale banner** — modal: headline, depth, single email field, "Join the gallery". Once per session, 7-day cooldown after dismissal (research §2: discount popups convert ~7.65% vs 5.10% incentive-free; minimal fields win).
+  - **Rail tab** — black vertical tab, right edge, mid-viewport, `Get 40% OFF` read from the promotion row. Appears when the banner is dismissed or cooled down; click reopens it. This is the documented dismissed-popup teaser pattern, not decoration — it is the recovery path for a dismissed offer.
+  - **Member state hook/store**, SSR-safe, drives `locked` vs unlocked everywhere.
+  - **`/admin/customers`** gains a gallery-member filter and a consented-email export.
+
+  Both banner and rail render nothing when no promotion is active — they read the live promotion headline and depth, never a hardcoded string.
+
+  ## Out of scope
+
+  Loyalty tiers or points, scheduled email sends to the member list, a separate membership entity with expiry/benefits.
+
+  ## Depends on
+
+  `sale-promotions` — schema and the join endpoint can be built in parallel, but the banner, rail and locked-price UI need the resolver returning `locked`.
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    '439': Schema - gallery membership columns and the session field
+    '440': API - POST /api/gallery/join
+    '441': API - registration opt-in and post-auth auto-join from the join intent
+    '442': API + Admin - member filter and consented-email export
+    '443': Web - SSR-safe member state hook
+    '444': Web - join modal, one field
+    '445': Web - dismissible sale banner with session and 7-day cooldown
+    '446': Web - black vertical rail tab on the right edge
+    '447': E2E - locked to unlocked, and the banner-rail handover
+  in_progress: {}
+  done: {}
+total_tickets: 9
+completion_percentage: 0
+is_completed: false
+plan:
+  phases:
+    - name: Schema + auth field
+      location: packages/api/src/database/schema/users.ts, packages/api/src/auth/index.ts
+      tickets:
+        - 439
+    - name: API
+      location: packages/api/src/routes
+      tickets:
+        - 440
+        - 441
+        - 442
+    - name: Frontend
+      location: packages/web/app
+      tickets:
+        - 443
+        - 444
+        - 445
+        - 446
+    - name: E2E
+      location: tests/e2e
+      tickets:
+        - 447
+  generated_at: '2026-08-05T08:15:39.857Z'

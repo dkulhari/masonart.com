@@ -1,0 +1,187 @@
+ticket_number: 432
+title: API - countdown deadline resolution, cookie mint and clamp
+description: |-
+  ## Task
+  `packages/api/src/lib/promotion-countdown.ts`: resolve the deadline a visitor sees.
+
+  1. Cookie `promo_deadline_<promotionId>` holds this visitor's deadline. Absent or already past → mint `now + rollingWindowMinutes − rand(rollingJitterMinutes)` and set it. Jitter stops every visitor seeing an identical `12:00:00`.
+  2. Displayed deadline = `min(cookieDeadline, endsAt)` when `endsAt` is set — so the number drops below the usual window when the sale genuinely is ending, and never exceeds the time actually remaining.
+  3. Zero reached mid-session while the sale is live → next load mints a fresh window.
+  4. `countdownMode = 'real'` → deadline is `endsAt`, cookie unused.
+
+  Only the resolved deadline is serialized. `endsAt` never crosses the wire.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 3 — API surfaces
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §6 — read the CCPA dark-patterns note there before implementing. The behaviour is configurable precisely so it can be switched to a truthful countdown in one admin edit.
+
+  Resolution runs server-side (SSR) so there is no hydration flicker and no client clock to tamper with. Cookie handling follows `routes/cart.ts:272-283` (`getCookie`/`setCookie` from `hono/cookie`). Inject `now` and the random source for testability.
+feature: sale-promotions
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:03:30.871Z'
+last_updated: '2026-08-05T08:03:30.871Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 423
+    feature: sale-promotions
+    description: Schema - promotion, promotion_product and promotion_exclusion tables
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for minting, clamping and re-minting
+    file: packages/api/tests/lib/promotion-countdown.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/promotion-countdown.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import { resolveCountdownDeadline } from '../../src/lib/promotion-countdown'
+
+      const NOW = new Date('2026-08-10T12:00:00.000Z')
+      const promo = {
+        id: 'p',
+        countdownMode: 'rolling' as const,
+        rollingWindowMinutes: 720,
+        rollingJitterMinutes: 90,
+        endsAt: null as Date | null,
+      }
+
+      describe('resolveCountdownDeadline', () => {
+        it('mints a window for a fresh visitor', () => {
+          const { deadline, shouldSetCookie } = resolveCountdownDeadline(promo, null, NOW, () => 0)
+          expect(shouldSetCookie).toBe(true)
+          expect(deadline.getTime()).toBe(NOW.getTime() + 720 * 60_000)
+        })
+
+        it('applies jitter so visitors do not share one deadline', () => {
+          const { deadline } = resolveCountdownDeadline(promo, null, NOW, () => 1)
+          expect(deadline.getTime()).toBe(NOW.getTime() + (720 - 90) * 60_000)
+        })
+
+        it('keeps a live cookie deadline', () => {
+          const existing = new Date(NOW.getTime() + 60_000)
+          const { deadline, shouldSetCookie } = resolveCountdownDeadline(promo, existing, NOW, () => 0)
+          expect(deadline).toEqual(existing)
+          expect(shouldSetCookie).toBe(false)
+        })
+
+        it('re-mints once the previous window has run out', () => {
+          const expired = new Date(NOW.getTime() - 1000)
+          const { shouldSetCookie } = resolveCountdownDeadline(promo, expired, NOW, () => 0)
+          expect(shouldSetCookie).toBe(true)
+        })
+
+        it('clamps to the real end — never shows more time than remains', () => {
+          const ending = { ...promo, endsAt: new Date(NOW.getTime() + 30 * 60_000) }
+          const { deadline } = resolveCountdownDeadline(ending, null, NOW, () => 0)
+          expect(deadline).toEqual(ending.endsAt)
+        })
+
+        it("uses endsAt directly in 'real' mode and ignores the cookie", () => {
+          const real = {
+            ...promo,
+            countdownMode: 'real' as const,
+            endsAt: new Date('2026-08-31T00:00:00.000Z'),
+          }
+          const cookie = new Date(NOW.getTime() + 60_000)
+          const { deadline, shouldSetCookie } = resolveCountdownDeadline(real, cookie, NOW, () => 0)
+          expect(deadline).toEqual(real.endsAt)
+          expect(shouldSetCookie).toBe(false)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/lib/promotion-countdown.test.ts
+    expected_result: FAIL - Cannot find module '../../src/lib/promotion-countdown'
+    status: pending
+  - id: 3
+    action: implement
+    description: Implement deadline resolution with mint, clamp and re-mint
+    file: packages/api/src/lib/promotion-countdown.ts
+    status: pending
+    code: |-
+      /**
+       * The countdown a visitor sees.
+       *
+       * In 'rolling' mode the deadline is per-visitor and re-mints when it runs
+       * out — the urgency device described in the design doc §6, including the
+       * legal note there. It is a configured behaviour, not a hardcoded one:
+       * countdownMode='real' makes the timer truthful in a single admin edit.
+       *
+       * The displayed deadline is always min(minted, endsAt), so it never claims
+       * more time than actually remains, and drops below the usual window when the
+       * sale genuinely is ending.
+       *
+       * `endsAt` itself is never serialized — only the resolved deadline.
+       */
+
+      export type CountdownConfig = {
+        id: string
+        countdownMode: 'real' | 'rolling'
+        rollingWindowMinutes: number
+        rollingJitterMinutes: number
+        endsAt: Date | null
+      }
+
+      export const countdownCookieName = (promotionId: string) => `promo_deadline_${promotionId}`
+
+      export function resolveCountdownDeadline(
+        promotion: CountdownConfig,
+        cookieDeadline: Date | null,
+        now: Date = new Date(),
+        random: () => number = Math.random
+      ): { deadline: Date; shouldSetCookie: boolean } {
+        if (promotion.countdownMode === 'real') {
+          return { deadline: promotion.endsAt ?? now, shouldSetCookie: false }
+        }
+
+        const live = cookieDeadline && cookieDeadline > now
+        const minted = live
+          ? cookieDeadline
+          : new Date(
+              now.getTime() +
+                (promotion.rollingWindowMinutes - random() * promotion.rollingJitterMinutes) * 60_000
+            )
+
+        const deadline =
+          promotion.endsAt && promotion.endsAt < minted ? promotion.endsAt : minted
+
+        return { deadline, shouldSetCookie: !live }
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/lib/promotion-countdown.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: implement
+    description: Expose the active promotion and its resolved deadline to the storefront, setting the cookie
+    file: packages/api/src/routes/promotions.ts
+    status: pending
+    code: |-
+      // GET /api/promotions/active
+      // Returns { promotionId, headline, percentOff, membersOnly, deadline } or null.
+      // Reads promo_deadline_<id> via getCookie, resolves, and setCookie()s when
+      // shouldSetCookie. endsAt is NOT in the response — assert that in the test.
+  - id: 6
+    action: commit
+    description: Commit the countdown resolver and the public endpoint
+    command: 'git add packages/api/src/lib/promotion-countdown.ts packages/api/src/routes/promotions.ts packages/api/tests/lib/promotion-countdown.test.ts && git commit -m "feat(api): per-visitor countdown deadline, clamped by the real end"'
+    status: pending
+current_step: 1

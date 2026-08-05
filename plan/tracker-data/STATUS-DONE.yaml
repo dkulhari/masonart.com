@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-08-04T15:06:10.491Z'
-total_tickets: 373
+last_updated: '2026-08-05T09:47:39.666Z'
+total_tickets: 378
 summary:
   critical: 21
   high: 144
-  medium: 156
+  medium: 161
   low: 52
 priorities:
   critical:
@@ -1539,6 +1539,14 @@ priorities:
           title: Sizes - make the shared ladders the single source of truth, extend them, and price by area
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 449
+          title: Remove dark mode — palette, config and .dark branches
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 450
+          title: SEED_MEDIA_DIR resolves off cwd — seeding from packages/api silently drops the reference imagery
+          assignee: unassigned
+          blocked_by: []
     - feature: collection-page-parity
       tickets:
         - ticket_number: 394
@@ -1549,6 +1557,10 @@ priorities:
       tickets:
         - ticket_number: 402
           title: Chrome - footer USP strip, contact column and beige restyle
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 421
+          title: Reveal the nav rows on scroll up, collapse on scroll down
           assignee: unassigned
           blocked_by: []
     - feature: collection-page-parity-remainder
@@ -1585,6 +1597,14 @@ priorities:
               title: API - catalogue-wide review aggregate for the promo tile
             - ticket_number: 414
               title: Seed - settled orders and approved reviews so the real signals have data
+        - ticket_number: 418
+          title: Card media shows two mats — match ours to the source background
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 419
+          title: Move the Hide filters control above the facet rail
+          assignee: unassigned
+          blocked_by: []
   low:
     - feature: order-tracking-notifications
       tickets:

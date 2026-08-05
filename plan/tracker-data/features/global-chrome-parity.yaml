@@ -1,7 +1,7 @@
 name: global-chrome-parity
 title: Global Chrome Parity
 priority: high
-created: "2026-08-04T08:46:54.935Z"
+created: '2026-08-04T08:46:54.935Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -38,17 +38,22 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 2
+  total_duration: '00:29:00'
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 2
+      duration: '00:29:00'
+      tokens: 0
 tickets:
   todo: {}
   in_progress: {}
   done:
-    "400": Chrome - announcement bar above the header
-    "401": Chrome - centered wordmark, right action cluster, two-row nav
-    "402": Chrome - footer USP strip, contact column and beige restyle
-total_tickets: 3
+    '400': Chrome - announcement bar above the header
+    '401': Chrome - centered wordmark, right action cluster, two-row nav
+    '402': Chrome - footer USP strip, contact column and beige restyle
+    '421': Reveal the nav rows on scroll up, collapse on scroll down
+total_tickets: 4
 completion_percentage: 100
 is_completed: true

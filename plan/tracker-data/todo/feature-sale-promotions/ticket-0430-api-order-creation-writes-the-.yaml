@@ -1,0 +1,148 @@
+ticket_number: 430
+title: API - order creation writes the real discount and enforces the per-customer limit
+description: |-
+  ## Task
+  Replace `const discount = "0.00"; // TODO: Apply coupon if provided` (`routes/orders.ts:268`). Order creation re-resolves sale pricing from the database, writes `promotionId`, a real `orders.discount`, and per-line `order_items.itemDiscount`, and enforces `perCustomerOrderLimit`.
+
+  **The server is the only pricing authority.** Any price sent by the client is ignored. A non-member at order time pays base, so the gate cannot be bypassed by holding a cart open through a logout.
+
+  Also stop storing an unvalidated `couponCode` from client input (`routes/orders.ts:298`) — this feature has no codes (design D1), so the field should not be written from request input.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 3 — API surfaces
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5
+
+  Order creation already requires an account (`routes/orders.ts` builds from `user.id`). `perCustomerOrderLimit` counts that customer's settled orders carrying the same `promotionId` — reuse the settled-order status logic from `lib/product-sales.ts` (`VOIDED_ORDER_STATUSES`).
+feature: sale-promotions
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:03:30.589Z'
+last_updated: '2026-08-05T08:03:30.589Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 425
+    feature: sale-promotions
+    description: Schema - record the promotion and its discount on orders
+  - ticket: 427
+    feature: sale-promotions
+    description: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for server-authoritative discount writing
+    file: packages/api/tests/routes/order-promotion-pricing.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('order creation under a promotion', () => {
+        it('writes a real discount rather than the "0.00" placeholder', async () => {
+          // assert: inserted order.discount === '10120.00' && order.promotionId === promo.id
+        })
+
+        it('writes itemDiscount per line', async () => {
+          // assert: every inserted order_item carries a non-zero itemDiscount
+        })
+
+        it('ignores any price sent by the client', async () => {
+          // post a body claiming salePrice '1.00'
+          // assert: totals come from the resolver, not the request
+        })
+
+        it('charges base when the customer is not a gallery member', async () => {
+          // assert: order.discount === '0.00' && order.promotionId === null
+        })
+
+        it('refuses a second order once perCustomerOrderLimit is reached', async () => {
+          // assert: 400 with a message naming the limit
+        })
+
+        it('does not write couponCode from client input', async () => {
+          // assert: inserted order.couponCode === null even when the body sends one
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
+    expected_result: FAIL - discount is hardcoded "0.00"
+    status: pending
+  - id: 3
+    action: implement
+    description: Re-resolve pricing server-side and write the discount, promotionId and limit check
+    file: packages/api/src/routes/orders.ts
+    status: pending
+    code: |-
+      // Replaces: const discount = "0.00"; // TODO: Apply coupon if provided
+
+      const activePromotions = await getActivePromotions()
+      const { includedIds, excludedIds } = await loadPromotionProductSets(activePromotions)
+      const isMember = Boolean(user.galleryMember)
+
+      let discountTotal = 0
+      let appliedPromotionId: string | null = null
+      const lineDiscounts = new Map<string, string>()
+
+      for (const item of activeItems) {
+        const sale = resolveSalePrice(item.product, activePromotions, {
+          isMember,
+          includedIds,
+          excludedIds,
+        })
+        // locked === the viewer is not a member: they pay base. The gate cannot be
+        // bypassed by holding a cart open through a logout.
+        if (!sale || sale.locked) continue
+        const perUnit = parseFloat(sale.basePrice) - parseFloat(sale.salePrice)
+        const lineDiscount = (perUnit * item.quantity).toFixed(2)
+        lineDiscounts.set(item.id, lineDiscount)
+        discountTotal += parseFloat(lineDiscount)
+        appliedPromotionId = sale.promotionId
+      }
+
+      if (appliedPromotionId) {
+        const limit = activePromotions.find((p) => p.id === appliedPromotionId)?.perCustomerOrderLimit
+        if (limit) {
+          const used = await countSettledOrdersForPromotion(user.id, appliedPromotionId)
+          if (used >= limit) {
+            return c.json({ error: `This offer is limited to ${limit} order(s) per customer` }, 400)
+          }
+        }
+      }
+
+      const discount = discountTotal.toFixed(2)
+
+      // ...and on the insert: promotionId: appliedPromotionId, couponCode: null
+      // (no codes in this feature — design D1), plus itemDiscount from lineDiscounts.
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the existing order suites still pass
+    command: cd packages/api && bunx vitest run tests/routes/orders.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit server-authoritative discount writing
+    command: 'git add packages/api/src/routes/orders.ts packages/api/tests/routes/order-promotion-pricing.test.ts && git commit -m "feat(api): write real promotion discounts on orders, enforce per-customer limit"'
+    status: pending
+current_step: 1

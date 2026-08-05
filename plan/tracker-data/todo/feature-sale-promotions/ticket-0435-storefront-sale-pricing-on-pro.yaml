@@ -1,0 +1,94 @@
+ticket_number: 435
+title: Storefront - sale pricing on product cards and the PDP buy panel
+description: |-
+  ## Task
+  Show the sale on the two surfaces that sell: the grid card and the product buy panel. Base price struck through, sale price beside it, percent-off marker, and a "Members" tag when `locked`. PDP additionally carries the countdown echo their buy panel runs (parity §1.4 item 6).
+
+  All of it reads `product.sale` from the API (T6). No component computes a discount.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 4 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §7
+
+  Files: `packages/web/app/components/product/ProductCard.tsx`, the PDP buy panel under `app/routes/posters/`. Parity §3.3 already flags our orange/purple badges as clashing with a monochrome system — do not add a third loud colour; the sale marker follows the existing token set. Card tests live in `packages/web/tests/components/product/`.
+feature: sale-promotions
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:04:59.183Z'
+last_updated: '2026-08-05T08:04:59.183Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 428
+    feature: sale-promotions
+    description: API - product list and detail return the resolved sale price
+  - ticket: 432
+    feature: sale-promotions
+    description: API - countdown deadline resolution, cookie mint and clamp
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for card and buy-panel sale rendering
+    file: packages/web/tests/components/product/ProductCard.sale.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCard.sale.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('ProductCard sale pricing', () => {
+        it('shows only the base price when sale is null', () => {})
+        it('strikes the base price and shows the sale price', () => {})
+        it('marks the price as members-only when locked', () => {})
+        it('keeps the title-left / price-right line intact', () => {})
+        it('uses no colour outside the existing token set', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCard.sale.test.tsx
+    expected_result: FAIL - no sale price rendered
+    status: pending
+  - id: 3
+    action: implement
+    description: Render sale pricing on the card
+    file: packages/web/app/components/product/ProductCard.tsx
+    status: pending
+    code: |-
+      // Price line becomes: struck base + sale price + optional "Members" tag.
+      // product.sale === null keeps the existing single-price rendering byte for
+      // byte, so the no-sale path cannot regress.
+  - id: 4
+    action: implement
+    description: Render sale pricing and the countdown echo in the buy panel
+    file: packages/web/app/routes/posters/$slug.tsx
+    status: pending
+    code: |-
+      // Price block: struck base, sale price, percent-off marker, Members tag when
+      // locked. Below it, the countdown echo ("Hurry up! Sale ends in HH : MM : SS")
+      // reusing the same resolved deadline as the strip — one deadline per page, or
+      // the two timers disagree on screen.
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/components/product/
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the storefront sale pricing
+    command: 'git add packages/web/app/components/product/ProductCard.tsx packages/web/app/routes/posters packages/web/tests/components/product/ProductCard.sale.test.tsx && git commit -m "feat(web): sale pricing on product cards and the buy panel"'
+    status: pending
+current_step: 1

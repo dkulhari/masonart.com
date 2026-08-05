@@ -1,0 +1,57 @@
+ticket_number: 422
+title: Web - wishlist page at /wishlist
+description: |-
+  ## Overview
+
+  Build the wishlist destination page. Analysis §3.5 lists Wishlist among the pages we don't have; mesonart routes theirs at `/apps/wishlist`.
+
+  This un-defers what the feature scope deliberately pushed to Phase F ("the parity work needs the affordance and the count, not the destination"). The affordance and count shipped with #387–#389; the destination is what's left.
+
+  ## Why it's cheap now
+
+  Backend and client are already complete — this is a UI-only ticket:
+
+  - `packages/api/src/routes/wishlist.ts` — `GET /` (:68), `GET /count` (:113), `POST /:productId` (:145), `DELETE /:productId` (:181)
+  - `packages/web/app/lib/api.ts:2199` — `wishlistApi`, all four methods
+  - `packages/web/app/stores/wishlist.ts` — hydration-safe store, 131 lines
+  - `WishlistButton`, header count badge — live
+
+  Nothing new needed in `packages/api`.
+
+  ## Rough scope
+
+  - New route (auth-gated; `routes/_authed/` is the existing pattern for account pages)
+  - Reuse `ProductGrid` / `ProductCard` rather than inventing a card
+  - Empty state
+  - Header/account nav entry point
+
+  ## Open questions — decide when planning
+
+  - `/wishlist` top-level vs `_authed/account/wishlist` (all other authed pages live under `account/`)
+  - Signed-out behaviour: sign-in prompt vs redirect
+  - Whether the list endpoint's dangling-id drop needs surfacing ("2 items no longer available") or stays silent
+
+  ## Notes
+
+  - Both this and the reviews page add routes, so both write `packages/web/app/routeTree.gen.ts` — tracked, not gitignored. If worked in parallel, stay in one checkout and stage by explicit path.
+  - Details to be planned at work time; this is a placeholder with the groundwork recorded.
+feature: wishlist
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T07:48:20.093Z'
+last_updated: '2026-08-05T07:48:20.093Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - mesonart-parity
+  - phase-f
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

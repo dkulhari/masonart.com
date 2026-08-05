@@ -1,0 +1,110 @@
+ticket_number: 419
+title: Move the Hide filters control above the facet rail
+description: |-
+  ## Task
+
+  Their "Hide filters" pill sits at the top of the LEFT column, directly above the facet groups it collapses. Ours sits in the toolbar row above the GRID, to the right of the sidebar — so the control is not adjacent to the thing it controls.
+
+  ## Context
+
+  - `packages/web/app/components/product/CollectionToolbar.tsx` currently owns the pill alongside the count and the sort control.
+  - `FILTER_SIDEBAR_ID` already exists so the toggle can point `aria-controls` at the rail — moving the button should keep that wiring intact.
+  - The count and sort pill stay where they are; only the filter toggle moves.
+  - Watch the sticky offset: the toolbar is `top-16` and agrees with `HEADER_HEIGHT_CLASS` by hand. #401's commit records how a 37px overlap happened last time these two numbers drifted.
+
+  ## Acceptance
+
+  Toggle renders at the head of the facet rail on desktop, keeps its `aria-controls` and expanded state, and the toolbar row still carries count + sort. Mobile layout unchanged.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T07:39:21.837Z'
+last_updated: '2026-08-05T08:55:07.272Z'
+time_spent_minutes: 18
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T08:36:37.449Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T08:54:52.784Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `946e5927` — feat(web): put the Hide filters pill at the head of the rail it collapses
+
+      **Files Changed**:
+      - `packages/web/app/routes/posters/index.tsx` — CollectionToolbar moves out of the products column and spans both columns; rail sticky offset picks up the toolbar's 5rem
+      - `packages/web/tests/routes/posters-toolbar-placement.test.ts` — new, 5 tests
+
+      **Summary**:
+      Measured mesonart at 1440px first (headless Chromium, computed boxes) rather than reading the screenshot:
+
+      ```
+      .page-width.facet-topbar   x=0    w=1440  h=56   spans BOTH columns
+        .facet-wrapper > button  x=48   w=176   h=56   "Hide filters"
+        "3906 products"          x=262
+        sort control             x=1130 w=262
+      "Style" (first facet head) x=48   y=903          directly beneath it
+      first product card         x=408                 grid clears the rail
+      ```
+
+      That changed the shape of the fix. Their pill is **not** nested inside the rail — it heads a full-width row the count and sort share, and its left edge is the rail's left edge. Clicking it leaves the button at x=48 (before and after) while the facets vanish and the grid reflows to x=48.
+
+      So the toolbar moved out of the products column instead of the button moving into the `<aside>`. Nesting it would have matched the picture and broken the behaviour: the aside is `lg:hidden` once filters are hidden, so the only way back would have gone with it.
+
+      Ours now measures the same way: toggle x=20 (container gutter) before and after, count x=202, sort flush to the right margin, cards reflowing 352 → 20.
+
+      **Interaction with #421** (in flight in a parallel session): the rail's sticky offset went from `calc(var(--chrome-offset)+1rem)` to `+5rem` — the toolbar's own height, a 56px pill inside `py-3`. Now that the bar passes over this column, a rail pinned any higher scrolls under a translucent bar. Measured at 1440: toolbar pins at 64, rail at 144, flush. That one line of #421's uncommitted work rode along in this commit because this change rewrote it; the rest of #421 (Header.tsx, CollectionToolbar.tsx, globals.css, header-reveal.spec.ts) is untouched and still uncommitted.
+
+      **Verification**:
+      - Command: `bunx vitest run` (packages/web)
+      - Result: PASS — 71 files, 1806/1806, including 5 new placement tests
+      - Command: `bunx playwright test collection-page-remainder product-listing product-grid-alignment header-reveal --project=chromium --no-deps`
+      - Result: PASS — 118 passed. (`--no-deps` because the auth setup project fails to log in the trade/admin/content-manager fixtures in this local DB — pre-existing, unrelated.)
+      - Command: `bun run typecheck`
+      - Result: 23 errors, identical to the documented baseline; none in the touched files.
+  - author: system
+    timestamp: '2026-08-05T08:54:56.059Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T08:36:43.092Z'
+    agent: claude-code
+    summary: Measured mesonart's .facet-topbar at 1440 (full-width row, toggle at the rail's left edge, button stationary on collapse), moved CollectionToolbar out of the products column to span both, bumped the rail sticky offset by the toolbar's 5rem. 5 new placement tests; 1806/1806 unit, 118 E2E, typecheck at baseline. Committed 946e5927.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T08:55:07.229Z'
+    duration: '00:18:24'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T08:36:37.449Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:18:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:18:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run (packages/web) + bunx playwright test collection-page-remainder,product-listing,product-grid-alignment,header-reveal --project=chromium --no-deps
+  test_output: 'Unit: 71 files, 1806/1806 passed (5 new in tests/routes/posters-toolbar-placement.test.ts). E2E: 118 passed. Typecheck: 23 errors, identical to the documented pre-existing baseline, none in the touched files.'
+  build_passed: true
+  build_command: bun run typecheck
+  verified_at: '2026-08-05T08:54:35.578Z'
+completed: '2026-08-05T08:54:56.059Z'

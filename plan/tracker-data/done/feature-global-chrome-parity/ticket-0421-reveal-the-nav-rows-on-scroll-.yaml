@@ -1,0 +1,160 @@
+ticket_number: 421
+title: Reveal the nav rows on scroll up, collapse on scroll down
+description: |-
+  ## Task
+
+  On their site the header collapses to a compact bar — wordmark plus the four action icons — once you scroll down, and the two nav rows come back the moment you scroll up, without needing to return to the top. Ours keeps a single fixed bar and the nav rows scroll away for good.
+
+  ## Context
+
+  - Confirmed from captures of their collection page: scrolled down shows the compact bar only; scrolling up re-reveals both the pages row and the styles row.
+  - I could not reverse-engineer their exact mechanism — their header carries no `sticky-header` element and my nav-row measurements came back degenerate. Build ours on scroll direction; do not try to match their implementation.
+  - Ours: `Header.tsx` exports `HEADER_HEIGHT_CLASS`, and `CollectionToolbar` sticks at `top-16` in agreement with it. **A reveal changes the header's effective height at runtime**, which is exactly the drift that put the toolbar 37px behind the header in #401. Whatever lands here has to keep those two in agreement while the header is animating, or pin the toolbar to the collapsed height.
+  - The styles row deliberately lives OUTSIDE `<header>` (#401) so the sticky box stays one row tall. Reintroducing it into the sticky box is the regression to avoid.
+
+  ## Acceptance
+
+  Scroll down collapses to the compact bar; scroll up reveals the nav rows at any scroll position. Toolbar never sits behind the header — assert both bounding boxes after a scroll, as #401 did. Respects `prefers-reduced-motion`.
+feature: global-chrome-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T07:39:21.959Z'
+last_updated: '2026-08-05T08:55:14.754Z'
+time_spent_minutes: 29
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T07:55:45.721Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T08:04:35.611Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `56f23914` - feat(web): reveal the nav rows on scroll up, collapse on scroll down
+
+      **Files Changed**:
+      - `packages/web/app/hooks/useNavReveal.ts` — new; scroll-direction state with a 96px top threshold and a 6px jitter floor
+      - `packages/web/app/components/layout/Header.tsx` — pages row and styles row both bound to the flag; styles row now `sticky top-16 z-40`, collapsed state translates up and goes `invisible`
+      - `packages/web/app/components/product/CollectionToolbar.tsx` — `data-testid="collection-toolbar"` for the bounding-box assertion; comment says why top-16 is a constant (also removed a duplicated comment pair)
+      - `packages/web/tests/hooks/useNavReveal.test.ts` — new; 7 cases
+      - `packages/web/tests/components/layout/Header.structure.test.tsx` — 7 new source-level guards
+      - `tests/e2e/header-reveal.spec.ts` — new; 5 cases
+
+      **Summary**:
+      Direction, not position. Scrolling down collapses to the compact bar (wordmark + four action icons); scrolling up reveals both nav rows at any scroll position. Guards: always revealed within 96px of the top, and deltas under 6px are treated as trackpad/rubber-band wobble.
+
+      On the sticky-offset question the ticket posed, this takes the second option — **pin the toolbar to the collapsed height**. `HEADER_HEIGHT_CLASS` stays `h-16` and the styles row sticks *below* the header on its own account (z-40 under the header's z-50) rather than rejoining the sticky box, so the toolbar's `top-16` never has to track a runtime-varying header height. Consequence, deliberate and documented in the source: a revealed styles row passes over the toolbar for as long as the user is scrolling up. The alternative — a CSS-variable offset both sides transition in lockstep — is exactly the kind of drift that put the toolbar 37px behind the header in #401.
+
+      Collapsed rows use `invisible`, not just `opacity-0`, so twelve style links and four page links leave the tab order instead of remaining focusable but unseen. `motion-reduce:transition-none` on both rows.
+
+      **Verification**:
+      - Command: `bunx vitest run` (packages/web)
+      - Result: PASS — 1793 tests, 69 files, 0 failing
+      - Command: `bunx playwright test tests/e2e/header-reveal.spec.ts --project=chromium --no-deps`
+      - Result: PASS — 5/5. Includes the acceptance assertion: after each of +1200 / -300 / +800 scroll steps, `toolbar.y >= header.y + header.height - 1` and `header.height <= 65`.
+      - Regression check: `layout.spec.ts` + `mobile-nav.spec.ts` → 53 passed / 9 failed. Re-ran the identical pair with this ticket's changes stashed: **same 9 failures, same 53 passes** — all pre-existing (strict-mode violations from two `nav a[href="/posters"]` matches, and the orange `theme-color` meta from the rebrand).
+      - Typecheck: `bunx tsc --noEmit` reports 23 errors, all pre-existing and none in the files this ticket touched (verified by grepping the output for Header.tsx / useNavReveal / CollectionToolbar — no hits). Recorded as build FAILED because the repo's typecheck does not currently pass on this branch.
+
+      **Note on the reduced-motion test**: `test.use({ reducedMotion: 'reduce' })` did not reach the page in this Playwright setup (`matchMedia('(prefers-reduced-motion: reduce)').matches` came back `false`); `page.emulateMedia({ reducedMotion: 'reduce' })` does, and the spec uses that.
+  - author: system
+    timestamp: '2026-08-05T08:04:38.228Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T08:35:14.922Z'
+    text: |-
+      🔄 **Reopened — feedback from dhruv**
+
+      > when the nav row shows up, it should push the rest of the page down, currently it hides the filter button
+
+      The overlay trade-off taken in `56f23914` is wrong in practice: the revealed styles row passes over `CollectionToolbar`, and the "Hide filters" button is the first thing it covers. The toolbar's `sticky top-16` has to follow the revealed chrome instead of being pinned to the collapsed height.
+
+      Taking the ticket's first option after all — keep the header height and the toolbar offset in agreement while the header animates — by publishing the measured chrome height as a CSS custom property the toolbar consumes, rather than by hardcoding a second magic number next to `h-16`.
+  - author: system
+    timestamp: '2026-08-05T08:35:19.223Z'
+    text: Status changed from 'done' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T08:54:52.091Z'
+    text: |-
+      ✅ **Completed (rework)**
+
+      **Commit**: `f274ce60` - fix(web): the revealed nav row pushes the toolbar down instead of covering it
+
+      **Files Changed**:
+      - `packages/web/app/hooks/useChromeOffset.ts` — new; measures the styles row and publishes `--chrome-offset` (compact bar + revealed row) on the document element, re-measuring on resize and clearing on unmount
+      - `packages/web/app/components/layout/Header.tsx` — ref on the styles row, wired to the hook; the `HEADER_HEIGHT_CLASS` doc now says the toolbar offsets against the variable, not the constant alone
+      - `packages/web/app/components/product/CollectionToolbar.tsx` — `sticky top-[var(--chrome-offset)]` + `transition-[top] duration-200 motion-reduce:transition-none`
+      - `packages/web/app/styles/globals.css` — `--chrome-offset: 4rem` collapsed fallback, so the server-rendered pass has it before any client code runs
+      - `packages/web/tests/hooks/useChromeOffset.test.ts` — new; 6 cases
+      - `packages/web/tests/components/{layout/Header.structure,product/CollectionToolbar}.test.tsx` — 2 new guards
+
+      **Summary**:
+      The overlay trade-off from `56f23914` is gone. The revealed styles row now pushes the toolbar down by exactly its measured height, over the same 200ms, instead of passing over it and burying the Hide-filters button.
+
+      Measured rather than hardcoded, deliberately: the row is `hidden md:block`, so its real height is zero on a narrow viewport and the offset has to fall back to the bar on its own; and a second magic number sitting next to `HEADER_HEIGHT_CLASS` is exactly the drift that put the toolbar 37px behind the header in #401. One number, measured at runtime, drives both.
+
+      **Verification**:
+      - Browser probe on `/posters` at 1440px, nav revealed: `--chrome-offset` = `101px` (64 bar + 37 row), `CollectionToolbar` computed `top: 101px`, filter rail `top: 181px`. Collapsed: back to `64px`.
+      - Command: `bunx vitest run` (packages/web) → PASS, 1801 tests / 70 files, 0 failing.
+      - Command: `bunx playwright test tests/e2e/header-reveal.spec.ts --project=chromium --no-deps` → PASS, 7/7. Two new cases: the toolbar's top edge is at or below the revealed row's bottom edge, and `document.elementFromPoint` at the Hide-filters button's centre returns the button itself (visible is not enough — something on top of it would still be "visible"), then clicks it and confirms the label flips to "Show filters".
+      - Screenshots of both states reviewed: revealed shows the bar, the styles row, then Hide filters / count / Sort all clear of it; collapsed shows the compact bar with the toolbar directly beneath.
+      - Regression sweep, `product-listing.spec.ts` + `collection-page-remainder.spec.ts`: 91 passed. Every failure is in `product-listing.spec.ts` and every one sampled is a stale selector from the #415/#416 redesign, not a layout regression — `aside button:has-text("Price: Low to High")` (sort left the sidebar for the toolbar pill in #416), `text=Active filters:`, `a[href^="/posters/"] h3`. `collection-page-remainder.spec.ts`, which is the spec written against this page's parity work, has no failures.
+      - Typecheck: 23 errors, unchanged count, none in the files this ticket touched.
+
+      **Left uncommitted on purpose**: `packages/web/app/routes/posters/index.tsx`. The filter rail there now reads `top-[calc(var(--chrome-offset)+5rem)]`, but the same file carries another session's in-flight #419 work (the toolbar moved to span both columns). That file belongs to #419's commit; committing it here would have dragged unfinished work in.
+  - author: system
+    timestamp: '2026-08-05T08:54:54.978Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T07:55:51.109Z'
+    agent: claude-code
+    summary: 'Shipped scroll-direction nav reveal: useNavReveal hook (7 unit tests), Header pages+styles rows bound to it, styles row sticky top-16 below the h-16 box, e2e spec with the toolbar/header bounding-box assertion (5 passing). Committed 56f23914.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T08:04:42.482Z'
+    duration: '00:08:51'
+  - start: '2026-08-05T08:35:23.495Z'
+    agent: claude-code
+    summary: 'Rework after feedback: useChromeOffset publishes the measured chrome height as --chrome-offset, toolbar sticks at the variable and transitions top, so the revealed nav row pushes it down instead of covering the Hide filters button. 6 new hook tests, 2 new wiring guards, 2 new e2e cases incl. an elementFromPoint hit-test. Committed f274ce60.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T08:55:14.751Z'
+    duration: '00:19:51'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T07:55:45.721Z'
+work_session_summary:
+  total_sessions: 2
+  total_duration: '00:29:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 2
+      duration: '00:29:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run (packages/web) + bunx playwright test tests/e2e/header-reveal.spec.ts --project=chromium --no-deps
+  test_output: 'vitest: 1801 passed / 70 files. header-reveal.spec.ts: 7 passed (includes elementFromPoint hit-test on the Hide filters button). product-listing + collection-page-remainder sweep: 91 passed; all remaining failures are product-listing.spec.ts stale selectors from the #415/#416 redesign (sort radios inside aside, ''Active filters:'' label, h3 card title) — none in collection-page-remainder.spec.ts.'
+  build_passed: false
+  build_command: bunx tsc --noEmit -p packages/web/tsconfig.json
+  verified_at: '2026-08-05T08:54:33.221Z'
+completed: '2026-08-05T08:04:38.228Z'

@@ -1,0 +1,89 @@
+ticket_number: 444
+title: Web - join modal, one field
+description: |-
+  ## Task
+  The modal the offer opens: promotion headline, what joining unlocks, one email field, one button. Signed-in visitors join in place; guests are routed to registration carrying `?join=gallery` and the prefilled email.
+
+  One field is the research finding, not a stylistic preference — minimal-field capture converts best, and every extra field on this modal is a member we do not get.
+
+  ## Context
+  Part of feature: gallery-membership
+  Phase: 3 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §2, §7, §8
+
+  New `packages/web/app/components/promo/JoinGalleryModal.tsx`, shadcn/ui dialog. Headline and depth come from the active promotion — the modal renders nothing when no promotion is active, and contains no hardcoded discount. Uses `useGalleryMembership().join('banner' | 'rail' | 'cart' | 'sale-page')` from T-G5, passing the surface that opened it.
+
+  Do not trigger a browser dialog/alert anywhere in this flow.
+feature: gallery-membership
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:15:20.017Z'
+last_updated: '2026-08-05T08:15:20.017Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 443
+    feature: gallery-membership
+    description: Web - SSR-safe member state hook
+  - ticket: 432
+    feature: sale-promotions
+    description: API - countdown deadline resolution, cookie mint and clamp
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the modal
+    file: packages/web/tests/components/promo/JoinGalleryModal.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/promo/JoinGalleryModal.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('JoinGalleryModal', () => {
+        it('renders nothing when no promotion is active', () => {})
+        it('shows the promotion headline rather than a hardcoded discount', () => {})
+        it('asks for an email and nothing else', () => {})
+        it('joins in place for a signed-in visitor', () => {})
+        it('routes a guest to registration carrying the intent and the email', () => {})
+        it('reports a failed join instead of closing as if it worked', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/components/promo/JoinGalleryModal.test.tsx
+    expected_result: FAIL - component does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the modal
+    file: packages/web/app/components/promo/JoinGalleryModal.tsx
+    status: pending
+    code: |-
+      // Dialog: headline from the promotion, one line on what joining unlocks, an
+      // email input, a submit button, and a plain dismiss.
+      // Signed in -> join(source) from useGalleryMembership.
+      // Guest      -> navigate to /auth/register?join=gallery&email=<encoded>.
+      // One field is deliberate: every extra field costs members.
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/components/promo/JoinGalleryModal.test.tsx
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the join modal
+    command: 'git add packages/web/app/components/promo/JoinGalleryModal.tsx packages/web/tests/components/promo/JoinGalleryModal.test.tsx && git commit -m "feat(web): join-the-gallery modal"'
+    status: pending
+current_step: 1

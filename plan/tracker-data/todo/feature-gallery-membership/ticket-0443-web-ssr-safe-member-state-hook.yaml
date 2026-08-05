@@ -1,0 +1,115 @@
+ticket_number: 443
+title: Web - SSR-safe member state hook
+description: |-
+  ## Task
+  One hook, `useGalleryMembership()`, reading `galleryMember` from the better-auth session and exposing `{ isMember, isLoading, join }`. Every surface that shows a locked price reads it from here rather than deriving membership itself.
+
+  SSR-safe: the server already knows the answer from the session, so the first paint must not flash an unlocked price and then lock it (or the reverse).
+
+  ## Context
+  Part of feature: gallery-membership
+  Phase: 3 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §8
+
+  `galleryMember` reaches the client through better-auth `additionalFields` (T-G1), so `authClient.$Infer.Session['user']` carries it — see `packages/web/app/lib/auth-client.ts`. `join()` posts to the T-G2 endpoint and optimistically flips local state on success.
+
+  Note the price shown is still the server's: the hook decides whether the saving reads as locked, never what the saving is.
+feature: gallery-membership
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:14:23.311Z'
+last_updated: '2026-08-05T08:14:23.311Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 439
+    feature: gallery-membership
+    description: Schema - gallery membership columns and the session field
+  - ticket: 440
+    feature: gallery-membership
+    description: API - POST /api/gallery/join
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the membership hook
+    file: packages/web/tests/hooks/useGalleryMembership.test.ts
+    command: cd packages/web && bunx vitest run tests/hooks/useGalleryMembership.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('useGalleryMembership', () => {
+        it('reports a guest as not a member', () => {})
+        it('reads galleryMember from the session', () => {})
+        it('does not flash the wrong state on first paint', () => {})
+        it('join() posts the source and flips state on success', () => {})
+        it('leaves state untouched when join() fails', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/hooks/useGalleryMembership.test.ts
+    expected_result: FAIL - hook does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Implement the hook over the better-auth session
+    file: packages/web/app/hooks/useGalleryMembership.ts
+    status: pending
+    code: |-
+      /**
+       * Whether the viewer is in the gallery.
+       *
+       * Reads the flag better-auth ships in the session (additionalFields), so the
+       * server already knows it at first paint — no flash of an unlocked price.
+       *
+       * This hook decides whether a saving reads as locked. It never decides what
+       * the saving is: that number comes resolved from the API.
+       */
+
+      import { useSession } from '~/lib/auth-client'
+
+      export type JoinSource = 'banner' | 'rail' | 'cart' | 'registration' | 'sale-page'
+
+      export function useGalleryMembership() {
+        const { data, isPending, refetch } = useSession()
+        const isMember = Boolean(data?.user?.galleryMember)
+
+        async function join(source: JoinSource) {
+          const response = await fetch('/api/gallery/join', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source }),
+          })
+          if (!response.ok) return false
+          await refetch()
+          return true
+        }
+
+        return { isMember, isLoading: isPending, join }
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/hooks/useGalleryMembership.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the membership hook
+    command: 'git add packages/web/app/hooks/useGalleryMembership.ts packages/web/tests/hooks/useGalleryMembership.test.ts && git commit -m "feat(web): SSR-safe gallery membership hook"'
+    status: pending
+current_step: 1
