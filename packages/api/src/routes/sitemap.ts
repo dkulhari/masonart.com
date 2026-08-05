@@ -16,6 +16,7 @@ import { eq, desc } from "drizzle-orm";
 
 import { db } from "../database";
 import { products } from "../database/schema/products";
+import { collections } from "../database/schema/collections";
 import { getCached, setCached, CacheKeys } from "../lib/redis";
 
 // ============================================================================
@@ -158,10 +159,43 @@ sitemapApp.get("/", async (c) => {
       .where(eq(products.status, "active"))
       .orderBy(desc(products.updatedAt));
 
+    /**
+     * Active collections.
+     *
+     * A separate query rather than a join: the entries have different shapes
+     * and priorities, and joining would tie a collection's presence to its
+     * products' — an inactive collection would drag its products out of the
+     * sitemap with it.
+     *
+     * `isActive` is the whole filter. An inactive collection 404s, and a
+     * sitemap entry pointing at a 404 is worse than no entry: search engines
+     * read it as a quality signal about the site, not about the one URL.
+     */
+    const collectionList = await db
+      .select({
+        slug: collections.slug,
+        updatedAt: collections.updatedAt,
+      })
+      .from(collections)
+      .where(eq(collections.isActive, true))
+      .orderBy(desc(collections.updatedAt));
+
     // Build sitemap entries
     const entries: SitemapEntry[] = [
       // Static pages first
       ...getStaticPages(),
+
+      /**
+       * Collection pages. Above products in priority but below /posters —
+       * they are curated entry points into the catalogue, not the catalogue
+       * itself.
+       */
+      ...collectionList.map((collection) => ({
+        url: `${SITE_URL}/collections/${collection.slug}`,
+        lastmod: collection.updatedAt,
+        changefreq: "weekly" as const,
+        priority: 0.85,
+      })),
 
       // Product pages
       ...productList.map((product) => {

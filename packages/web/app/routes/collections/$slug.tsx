@@ -265,12 +265,23 @@ export const Route = createFileRoute('/collections/$slug')({
       return { meta: [{ title: 'Collection | chobii.art' }] }
     }
 
-    const { collection, total } = loaderData
+    const { collection, total, items } = loaderData
     const title = `${collection.seoTitle ?? collection.title} | chobii.art`
     const description =
       collection.seoDescription ??
       collection.description ??
       `Browse ${total} pieces in ${collection.title}.`
+
+    /**
+     * The admin's image if they chose one, else the first piece on the page.
+     * A share card with no picture is the one that does not get clicked, and
+     * this collection is guaranteed to have at least one product or it would
+     * not be reachable.
+     */
+    const firstImage = (
+      items?.[0] as { images?: Array<{ url?: string }> } | undefined
+    )?.images?.[0]?.url
+    const ogImage = collection.imageUrl ?? firstImage
 
     return {
       meta: [
@@ -279,6 +290,7 @@ export const Route = createFileRoute('/collections/$slug')({
         { property: 'og:title', content: title },
         { property: 'og:description', content: description },
         { property: 'og:type', content: 'website' },
+        ...(ogImage ? [{ property: 'og:image', content: ogImage }] : []),
       ],
       links: [
         {
