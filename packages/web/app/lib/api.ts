@@ -2248,6 +2248,30 @@ export const wishlistApi = {
     return response.json();
   },
 
+  /**
+   * Fold a guest's locally-saved ids into the account on sign-in.
+   *
+   * Returns the merged list in the same shape as `list()`, so the client needs
+   * one round trip rather than a write followed by a read.
+   */
+  async merge(
+    productIds: string[]
+  ): Promise<{ items: WishlistItemResponse[] }> {
+    const response = await fetch(`${getApiUrl()}/api/wishlist/merge`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productIds }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to merge wishlist");
+    }
+
+    return response.json();
+  },
+
   /** Unsave a product. Idempotent server-side. */
   async remove(
     productId: string

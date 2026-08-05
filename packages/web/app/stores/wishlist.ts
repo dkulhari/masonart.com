@@ -1,14 +1,17 @@
 /**
  * Wishlist Store
  *
- * Holds the set of saved product ids for the signed-in user.
+ * Holds the set of saved product ids, for a guest as much as for a signed-in
+ * user.
  *
  * TWO DELIBERATE DIFFERENCES FROM THE CART STORE
  *
- * 1. **No `persist` middleware.** The cart persists to localStorage because a
- *    guest cart is a real thing that must survive a reload. The wishlist is
- *    server-owned and auth-gated — persisting it would show a signed-out
- *    visitor, or the next user on a shared machine, the previous user's hearts.
+ * 1. **Persisted, but only while signed out.** Saving must not require an
+ *    account, so a guest's list lives in localStorage and survives a reload
+ *    like a guest cart does. Signing in merges it into the account, and from
+ *    that moment the persisted slice writes empty — the original reason this
+ *    store had no `persist` at all was that a shared machine must never show
+ *    the next visitor the previous user's hearts (#477).
  *
  * 2. **One fetch, not one per card — and none at all for a guest.** The grid
  *    renders up to 24 cards. Each asking the server "am I saved?" is 24
@@ -22,6 +25,7 @@
 
 import { useEffect, useState } from "react";
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { wishlistApi } from "~/lib/api";
 
@@ -54,92 +58,186 @@ interface WishlistStore {
   toggle: (productId: string) => Promise<void>;
 }
 
-export const useWishlistStore = create<WishlistStore>()((set, get) => ({
-  ids: [],
-  isLoaded: false,
-  isPending: false,
-  isAuthenticated: null,
-  inFlight: null,
+/** Exported so tests can read exactly what was written, not guess the key. */
+export const WISHLIST_STORAGE_KEY = "chobii-wishlist-storage";
 
-  async load() {
-    // Unknown session or a known guest: `/api/wishlist` is auth-gated, so the
-    // only possible answer is a 401 nobody acts on (#417).
-    if (get().isAuthenticated !== true) return;
-    if (get().isLoaded) return;
+/** localStorage exists only in the browser; SSR gets a storage that forgets. */
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
 
-    // `isLoaded` only flips after the await, so it cannot dedupe callers that
-    // arrive in the same tick — a 24-card grid cleared the guard 24 times.
-    // The promise itself is the lock.
-    const existing = get().inFlight;
-    if (existing) return existing;
+/**
+ * Resolves once the persisted guest list is back in the store.
+ *
+ * Referenced lazily from inside `load()` — the store it reads is the one being
+ * defined here, so it cannot run at module scope.
+ */
+function whenRehydrated(): Promise<void> {
+  if (useWishlistStore.persist.hasHydrated()) return Promise.resolve();
 
-    const request = (async () => {
-      try {
-        const { items } = await wishlistApi.list();
-        set({ ids: items.map((item) => item.id), isLoaded: true });
-      } catch {
-        /**
-         * A session can lapse between the root route reading it and this
-         * request; mark loaded either way so the UI stops waiting and every
-         * heart renders in its empty state.
-         */
-        set({ ids: [], isLoaded: true });
-      } finally {
-        // Cleared on both paths — leaving a settled promise here wedges the
-        // store for the rest of the session.
-        set({ inFlight: null });
-      }
-    })();
-
-    set({ inFlight: request });
-    return request;
-  },
-
-  /**
-   * Called from the root route, the one place that already has the session.
-   * Keeping it out of the leaf components is deliberate: `WishlistButton` is
-   * rendered bare in its own tests, with no router to read a context from.
-   */
-  setAuthenticated(isAuthenticated: boolean) {
-    if (get().isAuthenticated === isAuthenticated) return;
-
-    if (!isAuthenticated) {
-      // A guest is "loaded" — there is nothing to fetch and nothing to wait for.
-      set({ isAuthenticated: false, ids: [], isLoaded: true, inFlight: null });
-      return;
-    }
-
-    set({ isAuthenticated: true });
-    void get().load();
-  },
-
-  async toggle(productId: string) {
-    const wasSaved = get().ids.includes(productId);
-    const previous = get().ids;
-
-    // Optimistic.
-    set({
-      ids: wasSaved
-        ? previous.filter((id) => id !== productId)
-        : [...previous, productId],
-      isPending: true,
+  return new Promise((resolve) => {
+    const unsubscribe = useWishlistStore.persist.onFinishHydration(() => {
+      unsubscribe();
+      resolve();
     });
+  });
+}
 
-    try {
-      if (wasSaved) {
-        await wishlistApi.remove(productId);
-      } else {
-        await wishlistApi.add(productId);
-      }
-    } catch {
-      // Roll back to exactly what was there, rather than re-deriving it —
-      // a concurrent load() could otherwise be undone.
-      set({ ids: previous });
-    } finally {
-      set({ isPending: false });
+export const useWishlistStore = create<WishlistStore>()(
+  persist(
+    (set, get) => ({
+      ids: [],
+      isLoaded: false,
+      isPending: false,
+      isAuthenticated: null,
+      inFlight: null,
+
+      async load() {
+        // Unknown session: leaf effects run before the root route reports, and
+        // guessing costs a 401 per mounted heart (#417). A known guest has
+        // nothing to load — their list is already here, from localStorage.
+        if (get().isAuthenticated !== true) return;
+        if (get().isLoaded) return;
+
+        // `isLoaded` only flips after the await, so it cannot dedupe callers
+        // that arrive in the same tick — a 24-card grid cleared the guard 24
+        // times. The promise itself is the lock.
+        const existing = get().inFlight;
+        if (existing) return existing;
+
+        // Whatever is here was saved while signed out: `setAuthenticated` only
+        // flips the flag once rehydration has finished, so by now the guest's
+        // list is back.
+        const local = get().ids;
+
+        const request = (async () => {
+          try {
+            /**
+             * Anything still in `ids` at this point was saved while signed
+             * out, so signing in folds it into the account. With nothing local
+             * — the usual case, a signed-in user opening a second page — this
+             * stays a plain read rather than a write on every page load.
+             */
+            const { items } =
+              local.length > 0
+                ? await wishlistApi.merge(local)
+                : await wishlistApi.list();
+            set({ ids: items.map((item) => item.id), isLoaded: true });
+          } catch {
+            /**
+             * A session can lapse between the root route reading it and this
+             * request. Keep whatever was local rather than dropping saves on a
+             * flaky sign-in — the next load merges again — and mark loaded so
+             * the UI stops waiting.
+             */
+            set({ isLoaded: true });
+          } finally {
+            // Cleared on both paths — leaving a settled promise here wedges
+            // the store for the rest of the session.
+            set({ inFlight: null });
+          }
+        })();
+
+        set({ inFlight: request });
+        return request;
+      },
+
+      /**
+       * Called from the root route, the one place that already has the session.
+       * Keeping it out of the leaf components is deliberate: `WishlistButton`
+       * is rendered bare in its own tests, with no router to read a context
+       * from.
+       */
+      setAuthenticated(isAuthenticated: boolean) {
+        if (get().isAuthenticated === isAuthenticated) return;
+
+        if (!isAuthenticated) {
+          const wasAuthenticated = get().isAuthenticated === true;
+          set({
+            isAuthenticated: false,
+            /**
+             * Signing OUT drops the list: what is on screen belongs to the
+             * account, and keeping it would persist one user's hearts for the
+             * next. Arriving as a guest (`null`) keeps the rehydrated local
+             * list — that IS the guest's wishlist.
+             */
+            ...(wasAuthenticated ? { ids: [] } : {}),
+            // A guest is "loaded": nothing to fetch, nothing to wait for.
+            isLoaded: true,
+            inFlight: null,
+          });
+          return;
+        }
+
+        /**
+         * Do NOT flip the flag before the guest list is back. `partialize`
+         * writes an empty list the moment this store counts as signed in, so
+         * flipping first wipes the stored guest list while rehydration is
+         * still reading it — the merge then sends nothing and the saves are
+         * gone. Observed in the browser, not theorised.
+         */
+        void (async () => {
+          await whenRehydrated();
+          /**
+           * `isLoaded` goes back to false: a guest counts as loaded because
+           * there was nothing to wait for, and leaving it set sends the merge
+           * straight into `load()`'s already-loaded guard.
+           */
+          set({ isAuthenticated: true, isLoaded: false });
+          await get().load();
+        })();
+      },
+
+      async toggle(productId: string) {
+        const wasSaved = get().ids.includes(productId);
+        const previous = get().ids;
+        const next = wasSaved
+          ? previous.filter((id) => id !== productId)
+          : [...previous, productId];
+
+        // A guest's list is local and authoritative — nothing to send, and so
+        // nothing that can fail and need rolling back.
+        if (get().isAuthenticated !== true) {
+          set({ ids: next, isLoaded: true });
+          return;
+        }
+
+        // Optimistic.
+        set({ ids: next, isPending: true });
+
+        try {
+          if (wasSaved) {
+            await wishlistApi.remove(productId);
+          } else {
+            await wishlistApi.add(productId);
+          }
+        } catch {
+          // Roll back to exactly what was there, rather than re-deriving it —
+          // a concurrent load() could otherwise be undone.
+          set({ ids: previous });
+        } finally {
+          set({ isPending: false });
+        }
+      },
+    }),
+    {
+      name: WISHLIST_STORAGE_KEY,
+      storage: createJSONStorage(() =>
+        typeof window !== "undefined" ? window.localStorage : noopStorage
+      ),
+      /**
+       * Only the guest list is ever written. Once the account owns it the
+       * persisted slice is empty, which also wipes what the guest had on the
+       * next write — the merge has already put it on the server by then.
+       */
+      partialize: (state) => ({
+        ids: state.isAuthenticated === true ? [] : state.ids,
+      }),
     }
-  },
-}));
+  )
+);
 
 // ============================================================================
 // Selectors

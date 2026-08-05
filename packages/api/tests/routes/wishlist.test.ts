@@ -138,6 +138,7 @@ describe('authentication', () => {
     ['GET', '/api/wishlist'],
     ['GET', '/api/wishlist/count'],
     ['POST', `/api/wishlist/${PRODUCT_A}`],
+    ['POST', '/api/wishlist/merge'],
     ['DELETE', `/api/wishlist/${PRODUCT_A}`],
   ];
 
@@ -278,6 +279,122 @@ describe('POST /api/wishlist/:productId', () => {
     const res = await app.request('/api/wishlist/not-a-uuid', {
       method: 'POST',
       headers: AUTH,
+    });
+    expect(res.status).toBe(400);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// POST /api/wishlist/merge
+// ============================================================================
+
+describe('POST /api/wishlist/merge', () => {
+  /** The update returns the post-merge column, so the route hydrates that. */
+  function givenMergeReturns(ids: string[]) {
+    updateMock.mockReturnValue({
+      set: () => ({
+        where: () => ({ returning: async () => [{ wishlistProductIds: ids }] }),
+      }),
+    });
+  }
+
+  const post = (body: unknown) =>
+    app.request('/api/wishlist/merge', {
+      method: 'POST',
+      headers: { ...AUTH, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  it('is not swallowed by the /:productId route', async () => {
+    // Both are POST on this app. If `/:productId` is registered first, "merge"
+    // reaches it as a product id and comes back 400 Invalid product id.
+    givenWishlistColumn([]);
+    givenMergeReturns([PRODUCT_A]);
+    givenCatalogueReturns([productRow(PRODUCT_A, 'Alpha')]);
+
+    const res = await post({ productIds: [PRODUCT_A] });
+    expect(res.status).toBe(200);
+  });
+
+  it('returns the merged list hydrated, in the same shape as GET /', async () => {
+    // A guest saved B locally; the account already held A. Signing in keeps
+    // both — merge is a union, never a replacement.
+    givenWishlistColumn([PRODUCT_A]);
+    givenMergeReturns([PRODUCT_A, PRODUCT_B]);
+    givenCatalogueReturns([
+      productRow(PRODUCT_A, 'Alpha'),
+      productRow(PRODUCT_B, 'Beta'),
+    ]);
+
+    const res = await post({ productIds: [PRODUCT_B] });
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.items.map((p: { id: string }) => p.id)).toEqual([
+      PRODUCT_A,
+      PRODUCT_B,
+    ]);
+  });
+
+  it('hydrates what the database returned, not what was sent', async () => {
+    // The union happens in SQL, so the payload is not the answer — a
+    // concurrent tab may have added something this request never saw.
+    givenWishlistColumn([]);
+    givenMergeReturns([PRODUCT_A, PRODUCT_B]);
+    givenCatalogueReturns([
+      productRow(PRODUCT_A, 'Alpha'),
+      productRow(PRODUCT_B, 'Beta'),
+    ]);
+
+    const body = await (await post({ productIds: [PRODUCT_A] })).json();
+    expect(body.items).toHaveLength(2);
+  });
+
+  it('drops merged ids whose product has left the catalogue', async () => {
+    givenWishlistColumn([]);
+    givenMergeReturns([PRODUCT_A, DANGLING]);
+    givenCatalogueReturns([productRow(PRODUCT_A, 'Alpha')]);
+
+    const body = await (await post({ productIds: [DANGLING] })).json();
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].id).toBe(PRODUCT_A);
+  });
+
+  it('writes nothing for an empty list and still returns the current one', async () => {
+    // Every sign-in calls this, most with nothing local to contribute.
+    givenWishlistColumn([PRODUCT_A]);
+    givenCatalogueReturns([productRow(PRODUCT_A, 'Alpha')]);
+
+    const res = await post({ productIds: [] });
+    expect(res.status).toBe(200);
+    expect(updateMock).not.toHaveBeenCalled();
+    expect((await res.json()).items).toHaveLength(1);
+  });
+
+  it('rejects a non-uuid id without touching the column', async () => {
+    // Same reason as the single add: no FK protects this column, and a
+    // poisoned entry is permanent.
+    givenWishlistColumn([]);
+
+    const res = await post({ productIds: [PRODUCT_A, 'not-a-uuid'] });
+    expect(res.status).toBe(400);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a body that is not a productIds array', async () => {
+    givenWishlistColumn([]);
+
+    const res = await post({ ids: [PRODUCT_A] });
+    expect(res.status).toBe(400);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a list long enough to be an attack rather than a wishlist', async () => {
+    givenWishlistColumn([]);
+
+    const res = await post({
+      productIds: Array.from({ length: 501 }, () => PRODUCT_A),
     });
     expect(res.status).toBe(400);
     expect(updateMock).not.toHaveBeenCalled();

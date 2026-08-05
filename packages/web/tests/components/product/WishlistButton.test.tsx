@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { WishlistButton } from '~/components/product/WishlistButton'
 import { useWishlistStore } from '~/stores/wishlist'
 
@@ -18,6 +19,21 @@ afterEach(() => {
 })
 
 describe('WishlistButton', () => {
+  it('renders unsaved on the server, whatever the store holds', () => {
+    // A guest's saves now come back from localStorage before the first render
+    // (#477) and the server cannot know them, so a filled heart in the SSR
+    // output would be a hydration mismatch. What prevents it is zustand v5
+    // serving `getInitialState` as the server snapshot — the store's rehydrated
+    // ids are simply not visible to renderToString or to the hydration pass.
+    // This pins that guarantee; losing it puts the mismatch on every card.
+    useWishlistStore.setState({ ids: [PRODUCT], isLoaded: true })
+
+    const html = renderToString(<WishlistButton productId={PRODUCT} />)
+
+    expect(html).toContain('aria-pressed="false"')
+    expect(html).not.toContain('fill-foreground')
+  })
+
   it('renders a toggle button', () => {
     render(<WishlistButton productId={PRODUCT} />)
     expect(screen.getByRole('button')).toBeTruthy()
