@@ -7,6 +7,7 @@
  * - Category highlights
  * - AI poster generator promo
  * - Value propositions
+ * - Customer reviews strip (client-fetched, and silent on a thin sample)
  *
  * Following patterns from docs/poster-app-tech-stack.md
  */
@@ -36,6 +37,7 @@ import { cn } from '~/lib/utils'
 import { Button, buttonVariants } from '~/components/ui/Button'
 import { SectionBand } from '~/components/ui/SectionBand'
 import { DisplayHeading } from '~/components/ui/DisplayHeading'
+import { CustomerReviewsSection } from '~/components/home/CustomerReviewsSection'
 
 // ============================================================================
 // Types
@@ -158,6 +160,11 @@ function HomePage() {
 
       {/* Value Propositions */}
       <ValuePropsSection />
+
+      {/* Customer Reviews — mesonart places these late, after the
+          merchandising rails. Renders nothing below ten approved reviews or
+          when there is no average to print; see the component. */}
+      <CustomerReviewsSection />
 
       {/* Newsletter Section */}
       <NewsletterSection />
