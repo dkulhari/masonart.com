@@ -11,6 +11,7 @@
 import { useState, useCallback } from 'react'
 import { X, SlidersHorizontal, ChevronUp, Check } from 'lucide-react'
 import { cn } from '~/lib/utils'
+import { countActiveFilters } from '~/lib/activeFilters'
 import { FACET_GROUPS, type FacetOption } from '@chobii/shared'
 
 // ============================================================================
@@ -164,16 +165,10 @@ export function ProductFilters({
     })
   }, [onFiltersChange])
 
-  // Count active filters
-  const activeFilterCount =
-    filters.styles.length +
-    filters.subjects.length +
-    filters.colors.length +
-    filters.rooms.length +
-    (filters.orientation ? 1 : 0) +
-    (filters.priceMin !== undefined ? 1 : 0) +
-    (filters.priceMax !== undefined ? 1 : 0) +
-    (filters.isAiGenerated !== undefined ? 1 : 0)
+  // The drawer's own count — same derivation as the chips and the mobile
+  // badge, rather than a third hand-written sum that disagrees with both
+  // (#453).
+  const activeFilterCount = countActiveFilters(filters)
 
 
   return (
