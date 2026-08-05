@@ -4,9 +4,61 @@
  * Tests form rendering, validation, submission, and states.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ReviewForm, ReviewFormSkeleton } from '~/components/reviews/ReviewForm';
+
+// The form talks to the media helper directly; the network is not under test.
+const { uploadReviewMedia } = vi.hoisted(() => ({
+  uploadReviewMedia: vi.fn(),
+}));
+vi.mock('~/hooks/useReviews', () => ({ uploadReviewMedia }));
+
+/** A File with a forced size — `new File(['a'], ...)` is always 1 byte. */
+function makeFile(name: string, type: string, sizeBytes = 1024): File {
+  const file = new File(['a'], name, { type });
+  Object.defineProperty(file, 'size', { value: sizeBytes, configurable: true });
+  return file;
+}
+
+let objectUrlCounter = 0;
+
+beforeEach(() => {
+  objectUrlCounter = 0;
+  uploadReviewMedia.mockReset();
+  uploadReviewMedia.mockResolvedValue({ id: 'media-1' });
+
+  // jsdom ships neither of these, and the picker mints previews on selection.
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    value: vi.fn(() => `blob:mock-${++objectUrlCounter}`),
+  });
+  Object.defineProperty(URL, 'revokeObjectURL', {
+    configurable: true,
+    value: vi.fn(),
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+/** Fill in a rating and a body long enough to pass validation. */
+function fillValidForm(rating = 5, content = 'This is a great product!') {
+  const starButtons = screen
+    .getAllByRole('button')
+    .filter((btn) => btn.getAttribute('aria-label')?.includes('Rate'));
+  fireEvent.click(starButtons[rating - 1]);
+
+  const contentInput = screen.getByLabelText(/Review \*/);
+  fireEvent.change(contentInput, { target: { value: content } });
+}
+
+function attachFiles(files: File[]) {
+  fireEvent.change(screen.getByTestId('review-media-input'), {
+    target: { files },
+  });
+}
 
 describe('ReviewForm Component', () => {
   describe('Unauthenticated State', () => {
@@ -373,6 +425,191 @@ describe('ReviewForm Component', () => {
 
       fireEvent.click(closeButton);
       expect(handleCancel).toHaveBeenCalled();
+    });
+  });
+
+  describe('Media Upload', () => {
+    it('does not touch the media helper when nothing is attached', async () => {
+      const handleSubmit = vi.fn().mockResolvedValue({ id: 'rev-1' });
+
+      render(
+        <ReviewForm productId="123" isAuthenticated onSubmit={handleSubmit} />
+      );
+
+      fillValidForm();
+      fireEvent.click(screen.getByText('Submit Review'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Thank you for your review!')).toBeInTheDocument();
+      });
+      expect(uploadReviewMedia).not.toHaveBeenCalled();
+    });
+
+    it('creates the review first, then uploads media against the returned id', async () => {
+      const order: string[] = [];
+      const handleSubmit = vi.fn().mockImplementation(async () => {
+        order.push('create-review');
+        return { id: 'rev-99' };
+      });
+      uploadReviewMedia.mockImplementation(async (id: string, file: File) => {
+        order.push(`upload:${id}:${file.name}`);
+        return { id: 'media-1' };
+      });
+
+      render(
+        <ReviewForm productId="123" isAuthenticated onSubmit={handleSubmit} />
+      );
+
+      attachFiles([
+        makeFile('one.jpg', 'image/jpeg'),
+        makeFile('two.png', 'image/png'),
+      ]);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Remove one.jpg')).toBeInTheDocument();
+      });
+
+      fillValidForm();
+      fireEvent.click(screen.getByText('Submit Review'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Thank you for your review!')).toBeInTheDocument();
+      });
+
+      // The review must exist before a single byte is presigned against it.
+      expect(order).toEqual([
+        'create-review',
+        'upload:rev-99:one.jpg',
+        'upload:rev-99:two.png',
+      ]);
+    });
+
+    it('keeps the created review and offers a retry when an upload fails', async () => {
+      const handleSubmit = vi.fn().mockResolvedValue({ id: 'rev-99' });
+      uploadReviewMedia.mockRejectedValue(new Error('Upload failed (500)'));
+
+      render(
+        <ReviewForm productId="123" isAuthenticated onSubmit={handleSubmit} />
+      );
+
+      attachFiles([makeFile('one.jpg', 'image/jpeg')]);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Remove one.jpg')).toBeInTheDocument();
+      });
+
+      fillValidForm();
+      fireEvent.click(screen.getByText('Submit Review'));
+
+      // The review survived: the customer is told it saved, not that it failed.
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: /your review was saved/i })
+        ).toBeInTheDocument();
+      });
+      expect(
+        screen.getByRole('button', { name: /try again/i })
+      ).toBeInTheDocument();
+
+      // The file is still staged, with its own retry.
+      expect(screen.getByLabelText('Remove one.jpg')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /retry one\.jpg/i })
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Upload failed \(500\)/)).toBeInTheDocument();
+
+      // And it is NOT reported as a failed review submission.
+      expect(
+        screen.queryByText('Thank you for your review!')
+      ).not.toBeInTheDocument();
+      expect(handleSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it('retrying a failed upload does not create a second review', async () => {
+      const handleSubmit = vi.fn().mockResolvedValue({ id: 'rev-99' });
+      uploadReviewMedia
+        .mockRejectedValueOnce(new Error('Upload failed (500)'))
+        .mockResolvedValueOnce({ id: 'media-1' });
+
+      render(
+        <ReviewForm productId="123" isAuthenticated onSubmit={handleSubmit} />
+      );
+
+      attachFiles([makeFile('one.jpg', 'image/jpeg')]);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Remove one.jpg')).toBeInTheDocument();
+      });
+
+      fillValidForm();
+      fireEvent.click(screen.getByText('Submit Review'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', { name: /your review was saved/i })
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Thank you for your review!')).toBeInTheDocument();
+      });
+
+      expect(handleSubmit).toHaveBeenCalledTimes(1);
+      expect(uploadReviewMedia).toHaveBeenCalledTimes(2);
+      expect(uploadReviewMedia).toHaveBeenLastCalledWith(
+        'rev-99',
+        expect.objectContaining({ name: 'one.jpg' })
+      );
+    });
+
+    it('tells the customer media publishes with the review once approved', async () => {
+      const handleSubmit = vi.fn().mockResolvedValue({ id: 'rev-99' });
+
+      render(
+        <ReviewForm productId="123" isAuthenticated onSubmit={handleSubmit} />
+      );
+
+      attachFiles([makeFile('one.jpg', 'image/jpeg')]);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Remove one.jpg')).toBeInTheDocument();
+      });
+
+      fillValidForm();
+      fireEvent.click(screen.getByText('Submit Review'));
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/publish with your review once it's approved/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('reports the review as failed when creation itself fails, with no upload', async () => {
+      const handleSubmit = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      render(
+        <ReviewForm productId="123" isAuthenticated onSubmit={handleSubmit} />
+      );
+
+      attachFiles([makeFile('one.jpg', 'image/jpeg')]);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Remove one.jpg')).toBeInTheDocument();
+      });
+
+      fillValidForm();
+      fireEvent.click(screen.getByText('Submit Review'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Network error')).toBeInTheDocument();
+      });
+      expect(uploadReviewMedia).not.toHaveBeenCalled();
+    });
+
+    it('hides the picker when media is not allowed', () => {
+      render(
+        <ReviewForm productId="123" isAuthenticated allowMedia={false} />
+      );
+
+      expect(screen.queryByTestId('review-media-input')).not.toBeInTheDocument();
     });
   });
 

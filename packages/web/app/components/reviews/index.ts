@@ -20,7 +20,20 @@ export { ReviewList } from './ReviewList'
 export type { ReviewListProps } from './ReviewList'
 
 export { ReviewForm, ReviewFormSkeleton } from './ReviewForm'
-export type { ReviewFormProps, ReviewFormData, ReviewFormErrors } from './ReviewForm'
+export type {
+  ReviewFormProps,
+  ReviewFormData,
+  ReviewFormErrors,
+  ReviewSubmitResult,
+} from './ReviewForm'
+
+export { ReviewMediaUpload, MAX_REVIEW_MEDIA } from './ReviewMediaUpload'
+export type {
+  ReviewMediaUploadProps,
+  ReviewMediaItem,
+  ReviewMediaKind,
+  ReviewMediaStatus,
+} from './ReviewMediaUpload'
 
 export { ReviewModal } from './ReviewModal'
 export type { ReviewModalProps } from './ReviewModal'

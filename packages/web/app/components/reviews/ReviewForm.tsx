@@ -10,7 +10,9 @@
 import { useState, useCallback } from 'react'
 import { MessageSquare, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react'
 import { cn } from '~/lib/utils'
+import { uploadReviewMedia } from '~/hooks/useReviews'
 import { StarRating } from './StarRating'
+import { ReviewMediaUpload, type ReviewMediaItem } from './ReviewMediaUpload'
 
 // ============================================================================
 // Types
@@ -20,6 +22,17 @@ export interface ReviewFormData {
   rating: number
   title: string
   content: string
+}
+
+/**
+ * What a submit handler hands back so media can be attached.
+ *
+ * Media uploads are addressed to a review that already exists, so the handler
+ * has to surrender the id it just created. Returning nothing is still valid —
+ * it simply means this form cannot carry photos.
+ */
+export interface ReviewSubmitResult {
+  id: string
 }
 
 export interface ReviewFormErrors {
@@ -35,10 +48,15 @@ export interface ReviewFormProps {
   onSuccess?: (data: ReviewFormData) => void
   /** Callback when form is cancelled */
   onCancel?: () => void
-  /** Submit handler - required for modal usage (direct API call deprecated) */
-  onSubmit?: (data: ReviewFormData) => Promise<void>
+  /**
+   * Submit handler - required for modal usage (direct API call deprecated).
+   * Resolve with the created review's id to enable photo and video uploads.
+   */
+  onSubmit?: (data: ReviewFormData) => Promise<void | ReviewSubmitResult>
   /** Whether user is authenticated */
   isAuthenticated?: boolean
+  /** Show the photo and video picker. Off for surfaces that cannot take media. */
+  allowMedia?: boolean
   /** Custom className */
   className?: string
   /** Initial form data (for editing) */
@@ -54,6 +72,14 @@ export interface ReviewFormProps {
 const TITLE_MAX_LENGTH = 255
 const CONTENT_MIN_LENGTH = 10
 const CONTENT_MAX_LENGTH = 5000
+
+// Plain strings rather than JSX text: apostrophes stay real apostrophes.
+const MEDIA_PUBLISH_NOTE =
+  "Your photos and videos publish with your review once it's approved."
+const MEDIA_VIDEO_NOTE =
+  'Videos keep processing after you submit and appear a little later.'
+const MEDIA_FAILURE_NOTE =
+  "Your review was saved. Some files didn't finish uploading — the review is safe either way."
 
 // ============================================================================
 // Component
@@ -75,6 +101,7 @@ export function ReviewForm({
   onCancel,
   onSubmit,
   isAuthenticated = false,
+  allowMedia = true,
   className,
   initialData,
   variant = 'inline',
@@ -94,8 +121,26 @@ export function ReviewForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<ReviewFormErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  /**
+   * `media-error` is deliberately distinct from `error`: the review exists and
+   * only the attachments failed. Collapsing the two would tell a customer their
+   * review was lost when it is sitting in the moderation queue.
+   */
+  const [submitStatus, setSubmitStatus] = useState<
+    'idle' | 'success' | 'error' | 'media-error'
+  >('idle')
   const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // Media state
+  const [mediaItems, setMediaItems] = useState<ReviewMediaItem[]>([])
+  /** The id the submit handler returned — the target for every upload. */
+  const [createdReviewId, setCreatedReviewId] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  /** Frozen at submit time so the success copy survives the form reset. */
+  const [attachedMedia, setAttachedMedia] = useState<{
+    count: number
+    hasVideo: boolean
+  }>({ count: 0, hasVideo: false })
 
   // Validate form data
   const validateForm = useCallback((data: ReviewFormData): ReviewFormErrors => {
@@ -162,6 +207,87 @@ export function ReviewForm({
     return touched[field] ? errors[field] : undefined
   }
 
+  // Move to the success screen and schedule the reset
+  const finishSuccess = useCallback(() => {
+    setSubmitStatus('success')
+    onSuccess?.(formData)
+
+    // Reset form after success
+    setTimeout(() => {
+      setFormData({ rating: 0, title: '', content: '' })
+      setTouched({})
+      // The picker unmounts with the form, and revokes its object URLs there.
+      setMediaItems([])
+      setCreatedReviewId(null)
+      setAttachedMedia({ count: 0, hasVideo: false })
+      setSubmitStatus('idle')
+    }, 2000)
+  }, [formData, onSuccess])
+
+  /**
+   * Upload `targets` one at a time against an existing review.
+   *
+   * Serial, not parallel: five concurrent 200MB PUTs from one browser is a good
+   * way to have several of them fail together. Returns the settled list so the
+   * caller can decide about failures without re-reading state that React has
+   * not flushed yet.
+   */
+  const runUploads = useCallback(
+    async (
+      reviewId: string,
+      all: ReviewMediaItem[],
+      targets: ReviewMediaItem[]
+    ): Promise<ReviewMediaItem[]> => {
+      let working = all
+
+      const patch = (id: string, changes: Partial<ReviewMediaItem>) => {
+        working = working.map((item) =>
+          item.id === id ? { ...item, ...changes } : item
+        )
+        setMediaItems(working)
+      }
+
+      for (const target of targets) {
+        patch(target.id, { status: 'uploading', progress: 10, error: undefined })
+
+        try {
+          await uploadReviewMedia(reviewId, target.file)
+          patch(target.id, { status: 'uploaded', progress: 100 })
+        } catch (error) {
+          // One bad file must not abandon the rest, and must never unwind the
+          // review that already exists.
+          patch(target.id, {
+            status: 'failed',
+            progress: 0,
+            error:
+              error instanceof Error ? error.message : 'Upload failed',
+          })
+        }
+      }
+
+      return working
+    },
+    []
+  )
+
+  // Retry failed uploads against the review that was already created
+  const retryUploads = useCallback(
+    async (targets: ReviewMediaItem[]) => {
+      if (!createdReviewId || targets.length === 0) return
+
+      setIsUploading(true)
+      try {
+        const settled = await runUploads(createdReviewId, mediaItems, targets)
+        if (!settled.some((item) => item.status === 'failed')) {
+          finishSuccess()
+        }
+      } finally {
+        setIsUploading(false)
+      }
+    },
+    [createdReviewId, finishSuccess, mediaItems, runUploads]
+  )
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -180,28 +306,60 @@ export function ReviewForm({
     setIsSubmitting(true)
     setSubmitError(null)
 
+    let result: void | ReviewSubmitResult
+
+    // --- Phase 1: create the review. A failure here is a failed review. ---
     try {
       if (onSubmit) {
-        await onSubmit(formData)
+        result = await onSubmit(formData)
       } else {
         // Direct product review creation deprecated - onSubmit required
         console.warn('ReviewForm: onSubmit prop required - direct product review creation deprecated')
         throw new Error('Review submission requires onSubmit handler')
       }
-
-      setSubmitStatus('success')
-      onSuccess?.(formData)
-
-      // Reset form after success
-      setTimeout(() => {
-        setFormData({ rating: 0, title: '', content: '' })
-        setTouched({})
-        setSubmitStatus('idle')
-      }, 2000)
     } catch (error) {
       setSubmitStatus('error')
       setSubmitError(error instanceof Error ? error.message : 'Failed to submit review')
+      setIsSubmitting(false)
+      return
+    }
+
+    // --- Phase 2: the review now exists. Nothing below may report it lost. ---
+    const reviewId =
+      result && typeof result === 'object' && typeof result.id === 'string'
+        ? result.id
+        : null
+    setCreatedReviewId(reviewId)
+
+    const pending = allowMedia ? mediaItems : []
+    setAttachedMedia({
+      count: pending.length,
+      hasVideo: pending.some((item) => item.kind === 'video'),
+    })
+
+    try {
+      if (pending.length === 0) {
+        finishSuccess()
+        return
+      }
+
+      if (!reviewId) {
+        // Saved, but there is nothing to address the uploads to.
+        setSubmitStatus('media-error')
+        return
+      }
+
+      setIsUploading(true)
+      const settled = await runUploads(reviewId, pending, pending)
+
+      if (settled.some((item) => item.status === 'failed')) {
+        setSubmitStatus('media-error')
+        return
+      }
+
+      finishSuccess()
     } finally {
+      setIsUploading(false)
       setIsSubmitting(false)
     }
   }
@@ -241,6 +399,63 @@ export function ReviewForm({
           <p className="mt-2 text-sm text-green-700">
             Your review has been submitted and will be visible after approval.
           </p>
+          {attachedMedia.count > 0 && (
+            <p className="mt-2 text-sm text-green-700">{MEDIA_PUBLISH_NOTE}</p>
+          )}
+          {attachedMedia.hasVideo && (
+            <p className="mt-1 text-xs text-green-700">{MEDIA_VIDEO_NOTE}</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Review saved, attachments did not. The review is never re-sent from here.
+  if (submitStatus === 'media-error') {
+    const failedItems = mediaItems.filter((item) => item.status === 'failed')
+
+    return (
+      <div className={cn('rounded-lg border border-amber-200 bg-amber-50 p-6', className)}>
+        <div className="flex flex-col items-center text-center">
+          <AlertCircle className="h-10 w-10 text-amber-500" />
+          <h3 className="mt-4 text-lg font-medium text-amber-900">
+            Your review was saved
+          </h3>
+          <p className="mt-2 text-sm text-amber-800">{MEDIA_FAILURE_NOTE}</p>
+        </div>
+
+        <div className="mt-5">
+          <ReviewMediaUpload
+            items={mediaItems}
+            onChange={setMediaItems}
+            onRetry={(item) => void retryUploads([item])}
+            disabled={isUploading}
+          />
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void retryUploads(failedItems)}
+            disabled={isUploading || failedItems.length === 0}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-colors sm:flex-none',
+              isUploading || failedItems.length === 0
+                ? 'cursor-not-allowed bg-muted text-muted-foreground'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+            )}
+          >
+            {isUploading && <Loader2 className="h-4 w-4 animate-spin" />}
+            Try again
+          </button>
+          <button
+            type="button"
+            onClick={finishSuccess}
+            disabled={isUploading}
+            className="rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            Continue without them
+          </button>
         </div>
       </div>
     )
@@ -382,6 +597,15 @@ export function ReviewForm({
               Minimum {CONTENT_MIN_LENGTH} characters required
             </p>
           </div>
+
+          {/* Photos & videos */}
+          {allowMedia && (
+            <ReviewMediaUpload
+              items={mediaItems}
+              onChange={setMediaItems}
+              disabled={isSubmitting}
+            />
+          )}
         </div>
 
         {/* Actions */}

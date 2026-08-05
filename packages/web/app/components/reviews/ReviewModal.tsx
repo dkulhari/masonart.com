@@ -137,6 +137,17 @@ export function ReviewModal({
         const error = await response.json().catch(() => ({}))
         throw new Error(error.error || 'Failed to submit review')
       }
+
+      // Hand the review id back so ReviewForm can attach photos and videos to
+      // it. Editing already knows the id; creating has to read it off the
+      // response. Returning nothing would leave the picker with no target.
+      if (existingReview) {
+        return { id: existingReview.id }
+      }
+
+      const body = await response.json().catch(() => null)
+      const createdId = body?.review?.id
+      return typeof createdId === 'string' ? { id: createdId } : undefined
     },
     [orderId, orderItemId, existingReview]
   )
