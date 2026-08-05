@@ -1,14 +1,35 @@
 /**
  * ChooseOptions — size, frame and add-to-cart without leaving the grid (#420).
  *
- * mesonart ships one `<button is="hover-button" aria-controls="Quickview-...">
- * Choose options</button>` per card, opening a panel where the purchase is
- * completed in place.
+ * THE MEASURED QUICKVIEW (mesonart, 1440x1000, headless Chromium, computed
+ * boxes — re-measured after the first attempt was rejected as not looking like
+ * theirs):
  *
- * The decision on this ticket was to keep our eye decorative — the whole media
- * box already navigates to the product page — and add the labelled control
- * beside it. So this suite asserts a real, named, focusable button, not an icon
- * that a screen reader has to guess at.
+ *   backdrop            rgba(23,23,23,0.7), no blur
+ *   modal               x 48..1392, y 116..884 — 1344 x 768, two columns
+ *     left              product image 671 x 768, carousel dots along the bottom
+ *     right             content column x 780..1332 (552 wide)
+ *       vendor          y 160, small
+ *       title + price   y ~190; price right-aligned, 24px/300
+ *       rating          y 232, 14px/300
+ *       "Size <value>"  y 275 — label 300 weight, chosen value 500
+ *       SELECT          y 312, 552 x 52, bg rgba(23,23,23,0.024), radius 6
+ *       "Frame: <value>" y 384, same label/value pair
+ *       swatches        60px circles on a 100px pitch, 5 per row
+ *       stock line      y ~605
+ *       CTA row         y 675, h 60 — quantity stepper + black pill, radius 60
+ *       full details    footer link
+ *
+ *   card trigger        172 x 40, radius 60, WHITE pill, black label at
+ *                       16px/400, centred over the foot of the image,
+ *                       `md:opacity-0` + `pointer-events-auto`
+ *
+ * A native `<select>` is theirs and is also the right call for our 17-step
+ * ladder: chips wrapped to five rows and buried the frame row below the fold.
+ *
+ * The decision recorded on the ticket was to keep our eye decorative — the
+ * media box already navigates to the product page — and add the labelled
+ * control beside it. So this suite asserts a real, named, focusable button.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -21,6 +42,21 @@ vi.mock('~/lib/api', () => ({
   productsApi: {
     getBySlug: (slug: string) => getBySlug(slug),
   },
+}))
+
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, to, params, ...rest }: any) => (
+    <a
+      href={
+        typeof to === 'string' && params?.slug
+          ? to.replace('$slug', params.slug)
+          : String(to)
+      }
+      {...rest}
+    >
+      {children}
+    </a>
+  ),
 }))
 
 /**
@@ -44,24 +80,26 @@ vi.stubGlobal('localStorage', {
 const { ChooseOptions } = await import('~/components/product/ChooseOptions')
 const { useCartStore } = await import('~/stores/cart')
 
-const image: ProductImage = {
-  id: 'i0',
-  url: '/blush.webp',
-  altText: 'Blush Hour',
-  type: 'main',
-  sortOrder: 0,
+const img = (i: number): ProductImage => ({
+  id: `i${i}`,
+  url: `/blush-${i}.webp`,
+  altText: `Blush Hour ${i}`,
+  type: i === 0 ? 'main' : 'room-mockup',
+  sortOrder: i,
   width: 1500,
   height: 1500,
-  originalKey: 'o0',
-}
+  originalKey: `o${i}`,
+})
 
 const product = {
   id: 'p1',
   title: 'Blush Hour',
   slug: 'blush-hour',
   basePrice: '1999.00',
-  images: [image],
+  images: [img(0), img(1), img(2)],
   orientation: 'portrait' as const,
+  averageRating: 4.5,
+  reviewCount: 12,
 }
 
 /** What GET /api/products/:slug returns — the shape routes/posters/$slug.tsx reads. */
@@ -71,7 +109,7 @@ const apiProduct = {
   title: 'Blush Hour',
   slug: 'blush-hour',
   description: '',
-  images: [image],
+  images: [img(0), img(1), img(2)],
   orientation: 'portrait',
   variants: [
     {
@@ -91,17 +129,25 @@ const apiProduct = {
       widthInches: 24,
       heightInches: 36,
       price: '3499.00',
-      stockQuantity: 4,
+      stockQuantity: 3,
       isInStock: true,
     },
   ],
   frames: [
     {
+      id: 'f-none',
+      type: 'none',
+      name: 'No Frame',
+      description: 'Print only',
+      color: 'N/A',
+      priceAddition: '0.00',
+    },
+    {
       id: 'f-black',
       type: 'black',
       name: 'Classic Black',
       description: 'Matte black wood',
-      priceModifier: 'fixed',
+      color: 'Matte Black',
       priceAddition: '499.00',
     },
   ],
@@ -112,6 +158,10 @@ const open = async () => {
   fireEvent.click(trigger)
   await screen.findByRole('dialog')
   return trigger
+}
+
+const ready = async () => {
+  await screen.findByLabelText('Size')
 }
 
 beforeEach(() => {
@@ -127,6 +177,19 @@ describe('the trigger', () => {
     const trigger = screen.getByRole('button', { name: /choose options/i })
     expect(trigger.tagName).toBe('BUTTON')
     expect(trigger.getAttribute('aria-hidden')).toBeNull()
+  })
+
+  it('is a white pill at the foot of the image, the way theirs is', () => {
+    render(<ChooseOptions product={product} />)
+    const trigger = screen.getByRole('button', { name: /choose options/i })
+
+    // 172x40 at radius 60 on a white fill, centred — not our full-bleed black
+    // bar. `h-10` is their 40; `rounded-pill` is their 60.
+    expect(trigger.className).toContain('h-10')
+    expect(trigger.className).toContain('rounded-pill')
+    expect(trigger.className).toContain('bg-background')
+    expect(trigger.className).toContain('-translate-x-1/2')
+    expect(trigger.className).not.toContain('inset-x-4')
   })
 
   it('stays reachable by keyboard, so hover is not the only way in', () => {
@@ -171,22 +234,62 @@ describe('the panel', () => {
     expect(dialog.textContent).toContain('Blush Hour')
   })
 
-  it('loads the real variants and frames for the slug', async () => {
+  it('gives the artwork its own column, as theirs does', async () => {
     render(<ChooseOptions product={product} />)
     await open()
 
-    expect(getBySlug).toHaveBeenCalledWith('blush-hour')
+    // Their panel is 1344x768 split down the middle: image left, buy box
+    // right. A 448px centred card with a 64px thumbnail is a different thing.
+    const media = screen.getByTestId('quickview-media')
+    expect(media.querySelector('img')).not.toBeNull()
+    expect(screen.getByRole('dialog').className).toMatch(/md:grid-cols-2/)
+  })
 
-    // Real variant ids matter: the cart carries variantId through to checkout,
-    // so a ladder synthesised on the client would not resolve at order time.
-    await screen.findByText('16" x 20"')
-    await screen.findByText('24" x 36"')
-    await screen.findByText('Classic Black')
+  it('offers the other images as carousel dots', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+
+    // Three images, so three dots — theirs runs one per slide along the foot
+    // of the image.
+    const dots = screen.getAllByRole('button', { name: /view image \d/i })
+    expect(dots).toHaveLength(3)
+
+    fireEvent.click(dots[2]!)
+    expect(
+      screen.getByTestId('quickview-media').querySelector('img')?.getAttribute('src')
+    ).toBe('/blush-2.webp')
+  })
+
+  it('carries the rating row', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+
+    expect(
+      screen.getByLabelText(/Rated 4.5 out of 5 from 12 reviews/)
+    ).toBeTruthy()
+  })
+
+  it('links out to the full product page', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+
+    const link = screen.getByRole('link', { name: /view full details/i })
+    expect(link.getAttribute('href')).toBe('/posters/blush-hour')
+  })
+
+  it('loads the real variants and frames for the slug', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    expect(getBySlug).toHaveBeenCalledWith('blush-hour')
+    expect(screen.getByRole('button', { name: 'Classic Black' })).toBeTruthy()
   })
 
   it('fetches once across repeated opens', async () => {
     render(<ChooseOptions product={product} />)
     const trigger = await open()
+    await ready()
 
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -195,37 +298,119 @@ describe('the panel', () => {
 
     expect(getBySlug).toHaveBeenCalledTimes(1)
   })
+})
+
+describe('choosing a size', () => {
+  it('is a select, not seventeen chips', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    const select = screen.getByLabelText('Size')
+    expect(select.tagName).toBe('SELECT')
+    expect(
+      [...(select as HTMLSelectElement).options].map((o) => o.textContent)
+    ).toEqual(['16" x 20"', '24" x 36"'])
+  })
 
   it('preselects the first available size', async () => {
     render(<ChooseOptions product={product} />)
     await open()
+    await ready()
 
-    const total = await screen.findByTestId('choose-options-total')
-    expect(total.textContent).toContain('1,999')
+    expect((screen.getByLabelText('Size') as HTMLSelectElement).value).toBe(
+      'v-16x20'
+    )
   })
 
-  it('adds the frame price to the total', async () => {
+  it('names the chosen size beside the label, as theirs does', async () => {
     render(<ChooseOptions product={product} />)
     await open()
+    await ready()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Classic Black' }))
+    fireEvent.change(screen.getByLabelText('Size'), {
+      target: { value: 'v-24x36' },
+    })
 
-    // 1999 + 499
-    await waitFor(() =>
-      expect(screen.getByTestId('choose-options-total').textContent).toContain(
-        '2,498'
-      )
+    expect(screen.getByTestId('quickview-size-value').textContent).toBe(
+      '24" x 36"'
     )
   })
 })
 
-describe('adding to cart', () => {
-  it('carries the chosen variant and frame into the cart', async () => {
+describe('choosing a frame', () => {
+  it('offers a swatch per frame, named', async () => {
     render(<ChooseOptions product={product} />)
     await open()
+    await ready()
 
-    fireEvent.click(await screen.findByRole('button', { name: '24" x 36"' }))
+    expect(screen.getByRole('button', { name: 'No Frame' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Classic Black' })).toBeTruthy()
+  })
+
+  it('marks the chosen one as pressed and names it beside the label', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    const black = screen.getByRole('button', { name: 'Classic Black' })
+    fireEvent.click(black)
+
+    expect(black.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('quickview-frame-value').textContent).toBe(
+      'Classic Black'
+    )
+  })
+})
+
+describe('the price on the button', () => {
+  it('quotes the total on the CTA, the way theirs does', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    const cta = screen.getByRole('button', { name: /add to cart/i })
+    expect(cta.textContent).toContain('1,999')
+
     fireEvent.click(screen.getByRole('button', { name: 'Classic Black' }))
+    await waitFor(() => expect(cta.textContent).toContain('2,498'))
+  })
+
+  it('multiplies by the quantity', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    fireEvent.click(screen.getByRole('button', { name: /increase quantity/i }))
+
+    const cta = screen.getByRole('button', { name: /add to cart/i })
+    await waitFor(() => expect(cta.textContent).toContain('3,998'))
+  })
+})
+
+describe('quantity', () => {
+  it('starts at one and will not go below it', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    expect(screen.getByTestId('quickview-quantity').textContent).toBe('1')
+    fireEvent.click(screen.getByRole('button', { name: /decrease quantity/i }))
+    expect(screen.getByTestId('quickview-quantity').textContent).toBe('1')
+  })
+})
+
+describe('adding to cart', () => {
+  it('carries the chosen variant, frame and quantity into the cart', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    fireEvent.change(screen.getByLabelText('Size'), {
+      target: { value: 'v-24x36' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Classic Black' }))
+    fireEvent.click(screen.getByRole('button', { name: /increase quantity/i }))
     fireEvent.click(screen.getByRole('button', { name: /add to cart/i }))
 
     await waitFor(() => expect(useCartStore.getState().items).toHaveLength(1))
@@ -236,12 +421,26 @@ describe('adding to cart', () => {
     expect(item.productSlug).toBe('blush-hour')
     expect(item.unitPrice).toBe(3499)
     expect(item.framePrice).toBe(499)
+    expect(item.quantity).toBe(2)
     expect(item.sizeLabel).toBe('24" x 36"')
+  })
+
+  it('sends no frame id for the print-only option', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    fireEvent.click(screen.getByRole('button', { name: 'No Frame' }))
+    fireEvent.click(screen.getByRole('button', { name: /add to cart/i }))
+
+    await waitFor(() => expect(useCartStore.getState().items).toHaveLength(1))
+    expect(useCartStore.getState().items[0]!.framePrice).toBe(0)
   })
 
   it('closes and hands focus back to the trigger', async () => {
     render(<ChooseOptions product={product} />)
     const trigger = await open()
+    await ready()
 
     fireEvent.click(screen.getByRole('button', { name: /add to cart/i }))
 
@@ -278,6 +477,23 @@ describe('getting out', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(useCartStore.getState().items).toHaveLength(0)
+  })
+})
+
+describe('stock', () => {
+  it('reports a genuinely low count, and says nothing otherwise', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    // 16x20 has ten in stock — no line. Theirs shows "Hurry, only 1 item left"
+    // and ours only ever repeats a real number.
+    expect(screen.queryByTestId('quickview-stock')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Size'), {
+      target: { value: 'v-24x36' },
+    })
+    expect(screen.getByTestId('quickview-stock').textContent).toContain('3')
   })
 })
 

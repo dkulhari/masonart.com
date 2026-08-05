@@ -2,9 +2,33 @@
  * ChooseOptions — buy from the grid without leaving it (#420).
  *
  * mesonart puts one `<button is="hover-button" aria-controls="Quickview-...">
- * Choose options</button>` on every card. It opens a panel where size and
- * frame are picked and the item goes into the cart, so the shopper keeps their
- * scroll position and their place in the grid.
+ * Choose Options</button>` on every card. It opens a Quickview where the
+ * purchase is completed in place, so the shopper keeps their scroll position
+ * and their place in the grid.
+ *
+ * THE MEASURED PANEL (mesonart, 1440x1000, headless Chromium, computed boxes):
+ *
+ *   backdrop            rgba(23,23,23,0.7), no blur
+ *   modal               x 48..1392, y 116..884 — 1344 x 768, TWO COLUMNS
+ *     left              product image 671 x 768, carousel dots along the foot
+ *     right             content column x 780..1332 (552 wide)
+ *       title + price   price right-aligned on the title line, 24px/300
+ *       rating          14px/300
+ *       "Size <value>"  label at 300, the chosen value at 500
+ *       SELECT          552 x 52, bg rgba(23,23,23,0.024), radius 6, no border
+ *       "Frame: <value>" same label/value pair
+ *       swatches        60px circles on a 100px pitch, 5 per row
+ *       stock line      only when the count is genuinely low
+ *       CTA row         h 60 — quantity stepper + black pill at radius 60,
+ *                       the pill quoting the total: "Add to cart - $260.00"
+ *       full details    footer link out to the product page
+ *
+ *   card trigger        172 x 40, radius 60, WHITE pill with a black label at
+ *                       16px/400, centred over the foot of the image
+ *
+ * The size ladder is a native `<select>`, which is both theirs and the right
+ * call for our 17 steps: as chips it wrapped to five rows and pushed the frame
+ * row below the fold.
  *
  * WHY A SECOND CONTROL AND NOT THE EYE
  *
@@ -23,18 +47,15 @@
  * time. One request per card, on first open only, cached for reopens.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Link } from '@tanstack/react-router'
+import { Minus, Plus, X, ArrowRight } from 'lucide-react'
+import { sortedImages } from '@chobii/shared'
 import { cn, formatPrice } from '~/lib/utils'
 import { productsApi } from '~/lib/api'
 import { useCartStore } from '~/stores/cart'
 import { buttonVariants } from '~/components/ui/Button'
-import { SizeSelectorCompact, type SizeVariant } from './SizeSelector'
-import {
-  FrameSelectorCompact,
-  calculateFramePrice,
-  type FrameOptionData,
-} from './FrameSelector'
+import { ProductRating } from './ProductRating'
 import { EASE_FAST } from './productCardTokens'
 import type { ProductCardData } from './ProductCard'
 
@@ -42,29 +63,42 @@ import type { ProductCardData } from './ProductCard'
 interface ProductOptionsResponse {
   variants?: Array<{
     id: string
-    sizeId?: string
     sizeLabel: string
     widthInches: number
     heightInches: number
     price: string | number
     stockQuantity: number
     isInStock: boolean
-    variantSku?: string
   }>
   frames?: Array<{
     id: string
     type: string
     name: string
-    description: string
-    material?: string
-    imageUrl?: string
+    color?: string
     priceAddition: string
   }>
 }
 
+interface QuickviewVariant {
+  id: string
+  sizeLabel: string
+  widthInches: number
+  heightInches: number
+  price: number
+  stockQuantity: number
+}
+
+interface QuickviewFrame {
+  id: string
+  type: string
+  name: string
+  /** Rupees, already converted off the API's string. */
+  priceAddition: number
+}
+
 interface ProductOptions {
-  variants: SizeVariant[]
-  frames: FrameOptionData[]
+  variants: QuickviewVariant[]
+  frames: QuickviewFrame[]
 }
 
 export interface ChooseOptionsProps {
@@ -72,38 +106,48 @@ export interface ChooseOptionsProps {
   className?: string
 }
 
+/**
+ * What each frame looks like, for a 60px swatch.
+ *
+ * The API ships `imageUrl`s that point at placehold.co, which would put a
+ * grey "Black+Frame" placard on the panel; the `color` field beside them is
+ * the real description ("Matte Black", "Weathered Brown"). These are the
+ * physical colours, not palette tokens — a walnut frame is walnut whatever the
+ * site's ink is.
+ */
+const FRAME_SWATCH: Record<string, string> = {
+  black: '#1a1a1a',
+  white: '#f4f2ee',
+  oak: '#c9a06a',
+  walnut: '#5a3a24',
+  gold: '#c9a227',
+  silver: '#b8bcc0',
+  wood: '#8a6a4a',
+}
+
+/** Below this, say how many are left. Above it, say nothing. */
+const LOW_STOCK = 5
+
 const asNumber = (value: string | number): number =>
   typeof value === 'string' ? parseFloat(value) : value
 
-/**
- * Same transform routes/posters/$slug.tsx applies, over the two fields this
- * panel needs. Notably `priceAddition` arrives in rupees and
- * `calculateFramePrice` expects paise for a fixed modifier, so the ×100 here is
- * undone there.
- */
 function toOptions(response: ProductOptionsResponse | null): ProductOptions {
   return {
-    variants: (response?.variants ?? []).map((v) => ({
-      id: v.id,
-      sizeId: v.sizeId || v.id,
-      sizeLabel: v.sizeLabel,
-      widthInches: v.widthInches,
-      heightInches: v.heightInches,
-      price: v.price,
-      stockQuantity: v.stockQuantity,
-      isAvailable: v.isInStock,
-      sku: v.variantSku,
-    })),
+    variants: (response?.variants ?? [])
+      .filter((v) => v.isInStock)
+      .map((v) => ({
+        id: v.id,
+        sizeLabel: v.sizeLabel,
+        widthInches: v.widthInches,
+        heightInches: v.heightInches,
+        price: asNumber(v.price),
+        stockQuantity: v.stockQuantity,
+      })),
     frames: (response?.frames ?? []).map((f) => ({
       id: f.id,
       type: f.type,
       name: f.name,
-      description: f.description,
-      material: f.material,
-      imageUrl: f.imageUrl,
-      priceModifierType: 'fixed' as const,
-      priceModifierValue: parseFloat(f.priceAddition || '0') * 100,
-      isAvailable: true,
+      priceAddition: parseFloat(f.priceAddition || '0'),
     })),
   }
 }
@@ -114,15 +158,31 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
     'idle'
   )
   const [options, setOptions] = useState<ProductOptions | null>(null)
-  const [variant, setVariant] = useState<SizeVariant | null>(null)
-  const [frame, setFrame] = useState<FrameOptionData | null>(null)
+  const [variantId, setVariantId] = useState<string | null>(null)
+  const [frameId, setFrameId] = useState<string | null>(null)
+  const [quantity, setQuantity] = useState(1)
+  const [slide, setSlide] = useState(0)
 
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   /** Whether the one request has been issued. Not state — it must not re-render. */
   const requested = useRef(false)
 
+  const sizeSelectId = useId()
+  const titleId = useId()
+
   const addItem = useCartStore((state) => state.addItem)
+
+  const images = useMemo(() => sortedImages(product.images), [product.images])
+  const active = images[slide] ?? images[0]
+
+  const variant =
+    options?.variants.find((v) => v.id === variantId) ?? options?.variants[0] ?? null
+  const frame = options?.frames.find((f) => f.id === frameId) ?? null
+
+  const unitPrice = variant ? variant.price : parseFloat(product.basePrice)
+  const framePrice = frame?.priceAddition ?? 0
+  const total = (unitPrice + framePrice) * quantity
 
   /** Close and hand the keyboard back where it came from. */
   const close = useCallback(() => {
@@ -148,7 +208,9 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
       const response = await productsApi.getBySlug(product.slug)
       const loaded = toOptions(response as ProductOptionsResponse | null)
       setOptions(loaded)
-      setVariant(loaded.variants.find((v) => v.isAvailable) ?? null)
+      setVariantId(loaded.variants[0]?.id ?? null)
+      // Theirs opens with the first swatch chosen; ours is the print-only one.
+      setFrameId(loaded.frames.find((f) => f.type === 'none')?.id ?? null)
       setStatus('ready')
     } catch {
       setStatus('error')
@@ -157,6 +219,7 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
 
   const openPanel = useCallback(() => {
     setIsOpen(true)
+    setQuantity(1)
     void load()
   }, [load])
 
@@ -191,15 +254,6 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
     if (isOpen) panelRef.current?.focus()
   }, [isOpen])
 
-  const unitPrice = variant ? asNumber(variant.price) : parseFloat(product.basePrice)
-  const framePrice = frame
-    ? calculateFramePrice(
-        unitPrice,
-        frame.priceModifierType,
-        frame.priceModifierValue
-      )
-    : 0
-
   const handleAdd = useCallback(() => {
     if (!variant) return
 
@@ -207,14 +261,14 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
       productId: product.id,
       variantId: variant.id,
       frameId: frame?.id ?? null,
-      quantity: 1,
+      quantity,
       productTitle: product.title,
       productSlug: product.slug,
-      thumbnailUrl: product.images[0]?.url ?? '',
+      thumbnailUrl: images[0]?.url ?? '',
       sizeLabel: variant.sizeLabel,
       widthInches: variant.widthInches,
       heightInches: variant.heightInches,
-      unitPrice: asNumber(variant.price),
+      unitPrice: variant.price,
       framePrice,
       frameName: frame?.name,
       frameType: frame?.type,
@@ -222,15 +276,23 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
     })
 
     close()
-  }, [variant, frame, framePrice, product, addItem, close])
+  }, [variant, frame, framePrice, quantity, product, images, addItem, close])
+
+  const lowStock =
+    variant && variant.stockQuantity > 0 && variant.stockQuantity <= LOW_STOCK
+      ? variant.stockQuantity
+      : null
 
   return (
     <>
       {/*
-        Visible at rest on touch, hover-revealed on desktop — `opacity-0` alone
-        rather than `pointer-events-none`, so it stays in the tab order at every
-        width. A pointer that can click it has already crossed the card and
-        revealed it.
+        Their trigger: a 172x40 white pill at radius 60, centred over the foot
+        of the artwork, that wipes to black on hover. Not the full-bleed bar
+        this used to be.
+
+        `opacity-0` rather than `pointer-events-none` on hover-capable widths,
+        and visible at rest below `md`: it has to stay in the tab order at
+        every width, because a hover-only affordance is not a route in.
       */}
       <button
         ref={triggerRef}
@@ -239,21 +301,23 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         className={cn(
-          buttonVariants({ variant: 'solid', size: 'sm' }),
-          'absolute inset-x-4 bottom-4 z-20 w-auto',
+          buttonVariants({ variant: 'outline' }),
+          'absolute bottom-6 left-1/2 z-20 h-10 -translate-x-1/2 whitespace-nowrap',
+          'border-transparent bg-background px-[22px] text-base font-normal',
           'md:opacity-0 md:motion-safe:transition-opacity md:motion-safe:duration-300',
           EASE_FAST,
           'md:group-hover/card:opacity-100 md:focus-visible:opacity-100',
           className
         )}
       >
-        Choose options
+        Choose Options
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8">
+          {/* Theirs: rgba(23,23,23,0.7), flat — no blur. */}
           <div
-            className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-foreground/70"
             onClick={close}
             aria-hidden="true"
           />
@@ -262,84 +326,220 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
             ref={panelRef}
             role="dialog"
             aria-modal="true"
-            aria-label={`Choose options for ${product.title}`}
+            aria-labelledby={titleId}
             tabIndex={-1}
             className={cn(
-              'relative z-10 max-h-[85vh] w-full max-w-md overflow-y-auto',
-              'rounded-[var(--card-radius)] bg-background p-6 outline-none'
+              'relative z-10 grid w-full max-w-[1344px] overflow-hidden md:grid-cols-2',
+              'max-h-[92vh] overflow-y-auto rounded-[var(--card-radius)] bg-background outline-none',
+              'md:h-[768px] md:max-h-[86vh] md:overflow-y-hidden'
             )}
           >
-            <div className="flex items-start gap-4">
-              {product.images[0] && (
+            {/* LEFT — the artwork gets its own column, at their 671x768. */}
+            <div
+              data-testid="quickview-media"
+              className="relative hidden bg-mat md:block"
+            >
+              {active && (
                 <img
-                  src={product.images[0].url}
-                  alt=""
-                  className="h-16 w-16 shrink-0 rounded-[var(--card-radius)] bg-mat object-contain"
+                  src={active.url}
+                  alt={active.altText}
+                  className="h-full w-full object-contain"
                 />
               )}
-              <div className="grow">
-                <p className="text-product font-medium leading-tight text-foreground">
-                  {product.title}
-                </p>
-                <p
-                  data-testid="choose-options-total"
-                  className="mt-1 text-product font-light text-foreground"
-                >
-                  {formatPrice(unitPrice + framePrice)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Close"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-accent"
-              >
-                <X className="h-4 w-4" />
-              </button>
+
+              {images.length > 1 && (
+                <div className="absolute inset-x-0 bottom-6 flex items-center justify-center gap-2">
+                  {images.map((image, index) => (
+                    <button
+                      key={image.id}
+                      type="button"
+                      onClick={() => setSlide(index)}
+                      aria-label={`View image ${index + 1}`}
+                      aria-current={index === slide}
+                      className={cn(
+                        'h-2 w-2 rounded-full transition-colors',
+                        index === slide
+                          ? 'bg-foreground'
+                          : 'bg-foreground/25 hover:bg-foreground/50'
+                      )}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
-            {status === 'error' && (
-              <p role="alert" className="mt-6 text-sm text-destructive">
-                Could not load the options for this piece. Open the product page
-                to continue.
-              </p>
-            )}
-
-            {(status === 'loading' || status === 'idle') && (
-              <p className="mt-6 text-sm text-muted-foreground">
-                Loading options…
-              </p>
-            )}
-
-            {status === 'ready' && options && (
-              <div className="mt-6 space-y-5">
-                <SizeSelectorCompact
-                  variants={options.variants}
-                  selectedVariantId={variant?.id ?? null}
-                  onVariantSelect={setVariant}
-                />
-
-                {options.frames.length > 0 && (
-                  <FrameSelectorCompact
-                    frames={options.frames}
-                    selectedFrameId={frame?.id ?? null}
-                    onFrameSelect={setFrame}
+            {/* RIGHT — the buy box. Their 60px gutters, their vertical order. */}
+            <div className="flex flex-col gap-5 overflow-y-auto p-6 md:p-[60px]">
+              <div className="flex items-start gap-4">
+                <div className="grow">
+                  <h2
+                    id={titleId}
+                    className="text-2xl font-light leading-tight text-foreground md:text-3xl"
+                  >
+                    {product.title}
+                  </h2>
+                  <ProductRating
+                    averageRating={product.averageRating ?? null}
+                    reviewCount={product.reviewCount ?? 0}
+                    className="mt-2"
                   />
-                )}
+                </div>
+
+                <span className="whitespace-nowrap text-2xl font-light text-foreground">
+                  {formatPrice(unitPrice)}
+                </span>
 
                 <button
                   type="button"
-                  onClick={handleAdd}
-                  disabled={!variant}
-                  className={cn(
-                    buttonVariants({ variant: 'solid', size: 'pill' }),
-                    'w-full'
-                  )}
+                  onClick={close}
+                  aria-label="Close"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-foreground/10 text-foreground transition-colors hover:bg-accent"
                 >
-                  Add to cart
+                  <X className="h-4 w-4" />
                 </button>
               </div>
-            )}
+
+              {status === 'error' && (
+                <p role="alert" className="text-sm text-destructive">
+                  Could not load the options for this piece. Open the product
+                  page to continue.
+                </p>
+              )}
+
+              {(status === 'loading' || status === 'idle') && (
+                <p className="text-sm text-muted-foreground">
+                  Loading options…
+                </p>
+              )}
+
+              {status === 'ready' && options && (
+                <>
+                  <div className="space-y-2">
+                    {/* Their label/value pair: "Size  <chosen>", 300 then 500.
+                     * The value sits OUTSIDE the label — folded in, it becomes
+                     * part of the select's accessible name and the control
+                     * announces as "Size 24 x 36" rather than "Size". */}
+                    <div className="flex items-center gap-2 text-foreground">
+                      <label htmlFor={sizeSelectId}>Size</label>
+                      <span
+                        data-testid="quickview-size-value"
+                        className="font-medium"
+                      >
+                        {variant?.sizeLabel ?? ''}
+                      </span>
+                    </div>
+                    <select
+                      id={sizeSelectId}
+                      value={variant?.id ?? ''}
+                      onChange={(event) => setVariantId(event.target.value)}
+                      className="h-[52px] w-full rounded-md bg-foreground/[0.024] px-4 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {options.variants.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.sizeLabel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {options.frames.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="flex items-center gap-2 text-foreground">
+                        Frame:
+                        <span
+                          data-testid="quickview-frame-value"
+                          className="font-medium"
+                        >
+                          {frame?.name ?? 'None'}
+                        </span>
+                      </p>
+                      {/* 60px circles on a 100px pitch, as measured. */}
+                      <div className="flex flex-wrap gap-10">
+                        {options.frames.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setFrameId(option.id)}
+                            aria-pressed={option.id === frame?.id}
+                            title={option.name}
+                            className={cn(
+                              'h-[60px] w-[60px] rounded-full border border-foreground/15 transition-shadow',
+                              option.id === frame?.id &&
+                                'ring-2 ring-foreground ring-offset-4 ring-offset-background'
+                            )}
+                            style={
+                              FRAME_SWATCH[option.type]
+                                ? { backgroundColor: FRAME_SWATCH[option.type] }
+                                : undefined
+                            }
+                          >
+                            <span className="sr-only">{option.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {lowStock !== null && (
+                    <p
+                      data-testid="quickview-stock"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Only {lowStock} left in stock.
+                    </p>
+                  )}
+
+                  {/* Their CTA row: stepper, then the pill quoting the total. */}
+                  <div className="mt-auto flex items-center gap-4 pt-2">
+                    <div className="flex h-[60px] shrink-0 items-center gap-1 rounded-pill border border-foreground/15 px-2">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        aria-label="Decrease quantity"
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span
+                        data-testid="quickview-quantity"
+                        className="w-6 text-center tabular-nums text-foreground"
+                      >
+                        {quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity((q) => q + 1)}
+                        aria-label="Increase quantity"
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAdd}
+                      disabled={!variant}
+                      className={cn(
+                        buttonVariants({ variant: 'solid' }),
+                        'h-[60px] grow font-normal'
+                      )}
+                    >
+                      Add to cart - {formatPrice(total)}
+                    </button>
+                  </div>
+
+                  <Link
+                    to="/posters/$slug"
+                    params={{ slug: product.slug }}
+                    className="flex items-center justify-between border-t border-foreground/10 pt-4 text-foreground transition-opacity hover:opacity-60"
+                  >
+                    View full details
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
