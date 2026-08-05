@@ -1,0 +1,127 @@
+ticket_number: 454
+title: Active filter chips move into the toolbar row so they always show
+description: |-
+  ## Task
+
+  Put the desktop active-filter chips in the toolbar row, alongside "Hide filters", the product count and the sort control. They render in the products column today (`posters/index.tsx:737`, a `lg:block` div sitting *after* the `</aside>`), which is why they read as belonging to the grid rather than to the filters.
+
+  ## Why the toolbar rather than the filter lane
+
+  The lane was the first instinct, because it puts the chips next to the checkboxes that produced them and it is where mesonart puts theirs. It is the wrong place for us:
+
+  **The `<aside>` is `lg:hidden` when filters are hidden** (`filtersHidden ? 'lg:hidden' : 'lg:block'`, :659) — the same trap #419's commit called out for the Hide-filters pill. Chips nested in the rail vanish with the rail, leaving a shopper with an active filter, a reduced product count, and no way to see or clear what is filtering. That is worse than today.
+
+  The toolbar dissolves the problem instead of working around it: it already spans both columns as of #419, it is sticky, and it survives the rail being hidden. One render site, no state to keep in sync, chips visible in every combination of (filters active, rail hidden). This is a deliberate departure from mesonart's placement — record it as such so it is not "corrected" back later.
+
+  ## The constraint this must not break
+
+  The rail's sticky offset is `calc(var(--chrome-offset) + 5rem)` — 5rem being the toolbar's own height, a 56px pill inside `py-3`, hardcoded by #419. **A chips row that wraps makes the toolbar taller and silently breaks that**, putting the rail behind the bar. Same class of bug as the 37px header/toolbar overlap in #401 and the push-down fix in #421.
+
+  So either:
+
+  1. **Keep the toolbar one row tall** — chips on a single line that scrolls horizontally when they overflow. Preferred: the offset constant stays true, and a long filter set cannot push the grid down the page.
+  2. **Let it wrap and publish the height** — toolbar measures itself into a CSS custom property that the rail's `top` consumes, so the two cannot drift. More correct, more moving parts.
+
+  Do not add a third hardcoded height. Two constants in two files with nothing connecting them is exactly how #401 happened.
+
+  ## Context
+
+  - Mobile copy at :695 is already inside the mobile filter sheet and stays as is.
+  - Chip source stays `ActiveFilterTags` in the same file; this is a placement change, not a rewrite.
+  - Layout order at `lg`: Hide filters · count · chips · sort. Chips take the flexible space so the sort pill stays right-aligned.
+
+  ## Acceptance
+
+  - Chips render in the toolbar row at `lg`, visible with the rail both shown and hidden.
+  - Removing a chip and "Clear all" behave exactly as now (#147 fixed a chip-click regression once already — keep its test green).
+  - **Toolbar height is unchanged with 0, 1 and 10 active filters**, or the rail offset is derived rather than hardcoded. Assert the toolbar and rail bounding boxes after scrolling, as #401 and #419 did — a unit test cannot catch this.
+  - Mobile unchanged.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T09:56:46.375Z'
+last_updated: '2026-08-05T10:32:53.531Z'
+time_spent_minutes: 20
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T10:13:17.594Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T10:32:45.899Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `35c48d4a` - feat(web): move the desktop active-filter chips into the toolbar row
+
+      **Files Changed**:
+      - `packages/web/app/components/product/CollectionToolbar.tsx` - new `chips` slot between the count and sort; `hidden lg:flex`, `flex-nowrap`, `overflow-x-auto`, scrollbar suppressed so the row cannot add height. The count drops `grow` at `lg` when chips are present so sort stays right-aligned.
+      - `packages/web/app/routes/posters/index.tsx` - desktop chip block deleted from the products column and handed to the toolbar instead; `ActiveFilterTags` gains `variant="wrap" | "row"` (row = nowrap, `shrink-0` chips); `removeFilter`/`clearAllFilters` extracted and shared with the mobile copy instead of the clear-all object appearing twice.
+      - `packages/web/tests/components/product/CollectionToolbar.test.tsx` - chips slot: rendered, absent when empty, single-line, desktop-only, takes the flexible space.
+      - `packages/web/tests/routes/posters-filter-chips-placement.test.ts` (new) - placement guards in the #419 idiom: chips inside the toolbar element, no second row left in the column, exactly two copies, rail offset still `calc(var(--chrome-offset)+5rem)`.
+      - `tests/e2e/collection-page-remainder.spec.ts` - five geometry/behaviour tests (below).
+      - `tests/e2e/product-listing.spec.ts` - `desktopChips` re-pointed from `div.hidden.lg:block` to the `toolbar-active-filters` test id, plus the one raw-class locator that bypassed the helper.
+
+      **Summary**:
+      Chips render in the toolbar row rather than the products column. Not in the filter rail, deliberately: the `<aside>` is `lg:hidden` when filters are hidden, so chips inside it disappear along with the only way to clear them. Departure from mesonart's placement, recorded here so it is not "corrected" back.
+
+      Toolbar height is untouched — option 1 from the ticket. The chips row is one line that scrolls sideways, so the hardcoded `+5rem` rail offset stays true and no second height constant was introduced.
+
+      The commit also carries a parallel session's in-flight #453 extraction (`app/lib/activeFilters.ts`), which this route file was interleaved with and could not be committed without; noted in the commit body.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes tests/components/product/CollectionToolbar.test.tsx --maxWorkers=2` (in packages/web)
+      - Result: PASS (69 tests, 6 files)
+      - Command: `SKIP_E2E_SERVER=true bunx playwright test tests/e2e/collection-page-remainder.spec.ts --project=chromium --no-deps -g "active filter chips"`
+      - Result: PASS (5 tests) — renders inside the toolbar; stays visible with the rail hidden; toolbar height identical at 0/1/10 filters; rail top ≥ toolbar bottom once both are stuck; chip removal and Clear all still drive the URL.
+      - RED evidence: with the implementation stashed, 4 of those 5 failed (`git stash push` on the two app files, re-run, `git stash pop`).
+      - Command: `SKIP_E2E_SERVER=true bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps --workers=2`
+      - Result: 110 passed, 2 skipped, 1 flaky ("should maintain layout during scroll") — passes solo; a different test flaked on the previous run of the same file, so it is load-related, not caused by this change.
+      - Command: `bunx tsc --noEmit -p packages/web/tsconfig.json`
+      - Result: no errors in the touched files (pre-existing errors elsewhere unchanged).
+
+      **Geometry measured** (1280×720, ten colour filters, scrollY 600): toolbar y=64 h=80, rail y=144 = `--chrome-offset` 64 + 5rem 80. Exact, with no gap and no overlap.
+  - author: system
+    timestamp: '2026-08-05T10:32:45.954Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T10:13:18.899Z'
+    agent: claude-code
+    summary: 'Moved desktop active-filter chips into the CollectionToolbar via a chips slot; single-line nowrap row with sideways overflow so the toolbar height (and the rail''s +5rem sticky offset) is unchanged. Extracted shared removeFilter/clearAllFilters; ActiveFilterTags gained a wrap/row variant. TDD: component + route placement tests, plus 5 E2E geometry/behaviour tests verified RED with the implementation stashed. Committed 35c48d4a (carries a parallel session''s #453 extraction, unavoidably interleaved).'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T10:32:53.438Z'
+    duration: '00:19:34'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T10:13:17.594Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:20:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:20:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes tests/components/product/CollectionToolbar.test.tsx --maxWorkers=2 ; SKIP_E2E_SERVER=true bunx playwright test tests/e2e/collection-page-remainder.spec.ts --project=chromium --no-deps -g "active filter chips"
+  test_output: 'vitest: 69 passed (6 files). playwright: 5 passed (chips block). Full product-listing.spec.ts: 110 passed, 1 flaky under 2 workers (passes solo). tsc --noEmit: no errors in touched files.'
+  build_passed: true
+  build_command: bunx tsc --noEmit -p packages/web/tsconfig.json
+  verified_at: '2026-08-05T10:30:25.668Z'
+completed: '2026-08-05T10:32:45.954Z'

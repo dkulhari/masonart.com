@@ -1,10 +1,10 @@
 status: todo
-last_updated: '2026-08-05T09:47:36.544Z'
-total_tickets: 38
+last_updated: '2026-08-05T11:20:28.649Z'
+total_tickets: 39
 summary:
   critical: 1
   high: 9
-  medium: 23
+  medium: 24
   low: 5
 priorities:
   critical:
@@ -111,6 +111,12 @@ priorities:
           title: 'Ops: post-cutover Phase 5 — Search Console + old-URL registration cleanup'
           assignee: unassigned
           blocked_by: []
+    - feature: manual-testing-bugs-feb2026
+      tickets:
+        - ticket_number: 344
+          title: 'Content-Security-Policy for SSR pages (deferred from #264)'
+          assignee: unassigned
+          blocked_by: []
     - feature: mobile-responsive-jul2026
       tickets:
         - ticket_number: 359
@@ -129,12 +135,6 @@ priorities:
           blocked_by: []
         - ticket_number: 422
           title: Web - wishlist page at /wishlist
-          assignee: unassigned
-          blocked_by: []
-    - feature: collection-page-parity-remainder
-      tickets:
-        - ticket_number: 420
-          title: Choose options — add to cart without leaving the collection page
           assignee: unassigned
           blocked_by: []
     - feature: sale-promotions
@@ -247,6 +247,12 @@ priorities:
           blocked_by:
             - ticket_number: 445
               title: Web - dismissible sale banner with session and 7-day cooldown
+    - feature: collection-page-parity-remainder
+      tickets:
+        - ticket_number: 455
+          title: Re-point home.spec.ts and layout.spec.ts at the rebranded pages
+          assignee: unassigned
+          blocked_by: []
   low:
     - feature: go-to-production
       tickets:

@@ -30,12 +30,12 @@ description: |-
 feature: collection-page-parity-remainder
 type: task
 priority: medium
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T08:59:20.616Z'
-last_updated: '2026-08-05T09:04:36.867Z'
-time_spent_minutes: 0
+last_updated: '2026-08-05T09:59:59.432Z'
+time_spent_minutes: 55
 labels:
   - tests
   - e2e
@@ -45,10 +45,57 @@ comments:
   - author: system
     timestamp: '2026-08-05T09:04:30.444Z'
     text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T09:59:50.983Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4cef51d4` - test(e2e): re-point the product listing spec at the redesigned collection page
+
+      **Files Changed**:
+      - `tests/e2e/product-listing.spec.ts` — 37 failing cases repaired, 2 turned into `test.fixme` against new bug tickets, 5 dead-UI cases moved to URL-level coverage
+
+      **Summary**:
+
+      Started at 77 passed / 37 failed. Ends at 111 passed / 0 failed / 2 fixme.
+
+      **The vocabulary was most of it.** `?styles=abstract` fails validation since #395 — `abstract` is a SUBJECT; styles are `minimalist-art`, `pop-art`, … So every test built on it was asserting against an *unfiltered* page: no chip, no clear-all, no narrowed grid. Two more of the same kind: `orientation=portrait` is still the parameter but the rail labels it "Vertical" (#415), and a chip renders the raw id with hyphens spaced (`minimalist art`), not the label. All of it now comes from constants at the top of the file rather than being spelled out per test.
+
+      **Re-pointed to where things moved**: sort to the toolbar pill and its in-place panel (#416); the rail's missing "Filters" heading (#415) — the test now asserts the *absence*, since that removal is deliberate parity, and the drawer keeps its own; card title to `<p><Link>` and price to the column beside it rather than inside the product anchor; the count to "N products" in the toolbar.
+
+      **Three were failing on their own merits, not staleness**: `has-text("Color")` also matched the "Colorful Art" discover chip (exact role name fixes it); Colors is one of the four groups open by default, so the test that clicked its header to "expand" it was closing it; and four describes navigated with plain `goto`, so clicks landed on server-rendered HTML before hydration — `networkidle` fixes those.
+
+      **Special filters** — per your call, the five dead-UI cases became URL-level coverage of `isAiGenerated` / `isFeatured` under "URL State", including one that checks `isFeatured` actually narrows the count rather than merely surviving the URL. The sidebar block now asserts the section is *gone*, so the #415 decision is pinned.
+
+      **`should render header quickly`** was measuring Vite compiling the route on first hit — 3.1s of build, not of page. It warms the route, then measures a reload.
+
+      **Two bugs found, both filed, both `fixme` rather than papered over**:
+      - **#452** — every home category tile links `?styles=<slug>` with pre-#395 slugs (`abstract`, `nature`, `minimalist`, `typography`); none is a valid style id, so the four busiest entry points into /posters land on a collection that cannot filter by what the tile promised.
+      - **#453** — `activeFilterCount` (routes/posters/index.tsx:592) omits `isFeatured`, `vibe`, `aesthetic`, `medium`, `uniqueness` and `availability`. That sum gates the entire chip row and the mobile badge, so filtering by any of them narrows the grid with no visible reason. Verified in the browser: `?isAiGenerated=true` chips; `?isFeatured=true` shows nothing, while the API filters correctly.
+
+      Repointing either test at something that passes would have made the suite green and left both bugs in place.
+
+      **Verification**:
+      - Command: `bunx playwright test tests/e2e/product-listing.spec.ts tests/e2e/collection-page-remainder.spec.ts tests/e2e/header-reveal.spec.ts --project=chromium --no-deps --workers=2`
+      - Result: PASS — 134 expected, 0 unexpected, 2 skipped (the two `fixme`s above)
+      - `product-listing.spec.ts` alone: 111 passed, 0 failed, 2 fixme
+      - Note on `--workers=2`: at the default worker count the dev server saturates and unrelated cases fail on 18s page loads. That is machine contention, not the page — the same run at 2 workers is clean. Worth knowing before anyone reads a full-parallel run as a regression.
+  - author: system
+    timestamp: '2026-08-05T09:59:53.749Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions:
   - start: '2026-08-05T09:04:36.866Z'
     agent: claude-code
-    summary: 'Starting: re-point product-listing.spec.ts at the redesigned collection page'
+    summary: 'Repaired product-listing.spec.ts: 77/37 pass/fail to 111/0 with 2 fixme. Vocabulary constants, sort re-pointed at the toolbar pill, rail-header removal asserted, Special filters moved to URL-level coverage, hydration waits added. Filed #452 (home tiles use stale style slugs) and #453 (activeFilterCount omits six facets). Committed 4cef51d4.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T09:59:59.423Z'
+    duration: '00:55:22'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -116,7 +163,17 @@ implementation_steps:
 current_step: 1
 started: '2026-08-05T09:04:30.444Z'
 work_session_summary:
-  total_sessions: 0
-  total_duration: '00:00:00'
+  total_sessions: 1
+  total_duration: '00:55:00'
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:55:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx playwright test tests/e2e/product-listing.spec.ts tests/e2e/collection-page-remainder.spec.ts tests/e2e/header-reveal.spec.ts --project=chromium --no-deps --workers=2
+  test_output: '134 expected, 0 unexpected, 2 skipped (both test.fixme pointing at #452 and #453). product-listing.spec.ts alone: 111 passed / 0 failed / 2 fixme, from 77 passed / 37 failed at the start.'
+  verified_at: '2026-08-05T09:59:29.584Z'
+completed: '2026-08-05T09:59:53.748Z'

@@ -37,9 +37,9 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
-  in_progress:
+  todo:
     "344": "Content-Security-Policy for SSR pages (deferred from #264)"
+  in_progress: {}
   done:
     "238": Products API (/api/products) hangs indefinitely - empty reply from server
     "239": Cart API (/api/cart) hangs indefinitely - empty reply from server

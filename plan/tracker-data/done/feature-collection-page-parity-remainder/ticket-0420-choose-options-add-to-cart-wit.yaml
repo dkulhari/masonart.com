@@ -1,0 +1,113 @@
+ticket_number: 420
+title: Choose options — add to cart without leaving the collection page
+description: |-
+  ## Task
+
+  The last card affordance we do not have. Theirs is a labelled button on hover that opens a Quickview panel where size and finish are picked and the item added to cart, so the shopper keeps their scroll position and their place in the grid.
+
+  ## Context
+
+  - Measured on their site: `<button is="hover-button" aria-controls="Quickview-...">Choose options</button>`, one per card, opening a panel. Whether their eye icon triggers the same panel was NOT confirmed — two probes failed — so do not assume it.
+  - Ours today: `ProductCardMedia.tsx:144` renders an eye that is `aria-hidden` and `pointer-events-none`. It is decorative; it opens nothing.
+  - **Decision needed before building:** one modal with two triggers, or drop the eye and keep a single labelled control. Recommendation is the latter — an unlabelled icon duplicating a labelled button is a worse a11y story than theirs.
+  - Variant data is already available: the size ladder comes from `getSizesForOrientation()` (#386) and frames are a separate add-on list, not a matrix axis (analysis §5.6 item 4).
+  - Cart store already exists; this is a new surface over it, not new cart logic.
+
+  ## Acceptance
+
+  Opens from the card without navigation, picks size and frame, adds to cart, closes and restores focus to the trigger. Scroll position preserved. Keyboard reachable and Escape closes — the hover-only affordance must not be the only route in.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T07:39:21.909Z'
+last_updated: '2026-08-05T10:40:42.237Z'
+time_spent_minutes: 21
+labels:
+  - frontend
+  - ui
+  - cart
+acceptance_criteria: []
+comments:
+  - author: user
+    timestamp: '2026-08-05T10:16:43.919Z'
+    text: my decision is keep the  eye , that takes you to the product page as does clicking anywhere else on the product picture, add the labelled control for options.
+  - author: system
+    timestamp: '2026-08-05T10:19:41.131Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T10:40:21.591Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5165f631` — feat(web): buy from the grid — Choose options opens size, frame and add to cart
+
+      **Files Changed**:
+      - `packages/web/app/components/product/ChooseOptions.tsx` — new; the trigger and the panel
+      - `packages/web/app/components/product/ProductCard.tsx` — renders the trigger as a sibling of the media link
+      - `packages/web/tests/components/product/ChooseOptions.test.tsx` — new, 15 tests
+      - `packages/web/tests/components/product/ProductCard.test.tsx` — 3 tests for the card wiring
+
+      **Summary**:
+      Built to the decision recorded on this ticket: the eye stays decoration on a media box that already navigates to the product page, and a labelled control is added beside it. The eye keeps `aria-hidden` + `pointer-events-none`; the new button is real, named and focusable.
+
+      **The panel fetches, and that was not optional.** The grid carries `basePrice` and images and nothing else, while the cart carries `variantId` through to checkout. A ladder synthesised on the client from `getSizesForOrientation()` would render correctly and fail to resolve at order time. So `ChooseOptions` calls `productsApi.getBySlug()` on first open and caches for reopens — one request per card, only for cards a shopper actually opens. Verified against the running app: the cart receives `822c5871-8265-4346-aa30-e3f1b167769a`, a real variant row, with `sizeLabel: 16" × 20" / 41 × 51 cm`.
+
+      Reuses `SizeSelectorCompact` and `FrameSelectorCompact` rather than growing a second selector vocabulary; the frame list arrives with its own "No Frame" entry.
+
+      **Keyboard**: the trigger is `opacity-0` on hover-capable widths and visible at rest below `md`, but never `pointer-events-none` — it stays in the tab order at every width, because a hover-only affordance is not a route in. Opens on Enter, closes on Escape / the close button / the backdrop, and restores focus to the trigger on every path.
+
+      **Two things worth recording:**
+
+      1. Two of my own assumptions about the scroll behaviour were wrong and both were caught by measuring rather than reasoning. First I attributed a 900 → 707 drop to the body-scroll lock; it was Playwright's `hover()` scrolling an off-screen card into view. Then I switched the lock to the root element on the theory that `body { overflow: hidden }` clamps the offset — measured at a scroll depth that does not trigger pagination, neither element clamps. The lock is back on `<body>`, matching ReviewModal, and the comment says only what was measured.
+
+      2. **Pre-existing, unrelated, worth its own ticket**: scrolling /posters past the pagination threshold loads `?page=2` and then the page scrolls itself to 0. Reproduced with no modal involved — wheel to 2400, and ~900ms later `scrollY` is 107, then 0, with `document.scrollHeight` growing 3797 → 5207 the whole time. That is scroll restoration firing on the append navigation, not a height collapse.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/components tests/routes --maxWorkers=2`
+      - Result: PASS — 50 files, 947/947 (15 new for ChooseOptions, 3 for the card)
+      - Command: `bunx playwright test tests/e2e/product-grid-alignment.spec.ts tests/e2e/product-listing.spec.ts --project=chromium --no-deps --workers=2`
+      - Result: PASS — 131 passed, 1 skipped. Card-click navigation still works, so the overlay does not swallow it.
+      - Command: `bunx tsc --noEmit -p tsconfig.json` (packages/web)
+      - Result: 23 errors, unchanged baseline, none in the touched files.
+      - Browser, against the running app at 1440x900: scrollY 900 before open and 900 after; opened by keyboard; Escape closed it; focus back on the trigger; `body.style.overflow` released; console clean.
+  - author: system
+    timestamp: '2026-08-05T10:40:27.465Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T10:19:47.759Z'
+    agent: claude-code
+    summary: Built ChooseOptions — labelled trigger on the card, modal with real variants and frames fetched on first open, add to cart, focus restored. Eye left decorative per the ticket decision. 18 new tests; 947/947 unit, 131 E2E, typecheck at baseline, browser-verified. Committed 5165f631. Found a pre-existing scroll-reset on the ?page=2 append, unrelated and unticketed.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T10:40:42.225Z'
+    duration: '00:20:54'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T10:19:41.131Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:21:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:21:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/components tests/routes --maxWorkers=2
+  test_output: 'Unit: 50 files, 947/947 passed — 15 new in ChooseOptions.test.tsx, 3 new in ProductCard.test.tsx. E2E: product-grid-alignment + product-listing, 131 passed / 1 skipped (chromium). Typecheck: 23 errors, unchanged baseline, none in the touched files.'
+  build_passed: true
+  build_command: bunx tsc --noEmit -p packages/web/tsconfig.json
+  verified_at: '2026-08-05T10:39:58.102Z'
+completed: '2026-08-05T10:40:27.462Z'

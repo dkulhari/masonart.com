@@ -1,0 +1,108 @@
+ticket_number: 452
+title: Home category tiles link to style ids that no longer exist
+description: |-
+  ## Task
+
+  Every category tile on the home page links to a collection filtered by a style id that is not in the vocabulary any more, so the four busiest entry points into `/posters` land on a page that cannot filter by what the tile promised.
+
+  ## Context
+
+  `packages/web/app/routes/index.tsx:294` still carries the pre-#395 slugs:
+
+  ```ts
+  const categories = [
+    { name: 'Abstract',   slug: 'abstract',   ... },
+    { name: 'Nature',     slug: 'nature',     ... },
+    { name: 'Minimalist', slug: 'minimalist', ... },
+    { name: 'Typography', slug: 'typography', ... },
+  ]
+  ```
+
+  and renders them at `:348` as `` href={`/posters?styles=${category.slug}`} ``.
+
+  `STYLE_OPTIONS` (`packages/shared/src/constants/facets.ts:44`) has none of those four. The ids are `wabi-sabi-art`, `plaster-and-texture-art`, `colorful-art`, `minimalist-art`, `pop-art`, `surrealist-art`, `pollock-art`, `bohemian-art`, `expressionist-art`, `hyperrealism-art`, `graffiti-art`, `ukiyo-e-art`. `abstract` exists, but as a SUBJECT, not a style. There is no `nature` or `typography` in either vocabulary.
+
+  Found while repairing `tests/e2e/product-listing.spec.ts` for #448 — the test that clicks a home tile is `test.fixme` and points here, because repointing it at a valid id would have made the suite green while leaving the tiles broken.
+
+  ## Decisions this needs
+
+  - `Abstract` should probably become `?subjects=abstract`, not a style at all.
+  - `Minimalist` maps cleanly to `minimalist-art`.
+  - `Nature` has no style equivalent; the nearest honest mapping is `?subjects=landscape`.
+  - `Typography` has no equivalent in either vocabulary. Either drop the tile or add the value — do not point it at something close enough.
+
+  The images (`/images/categories/*.jpg`) are keyed off the same slug, so any renaming has to keep the tile's art matched to its destination.
+
+  ## Acceptance
+
+  Every home category tile lands on a collection actually filtered by the tile's subject, with the corresponding chip visible. `tests/e2e/product-listing.spec.ts` — "should navigate from home page category link" — comes off `fixme` and passes. Ideally the tile list derives from the shared vocabulary rather than restating it, so this cannot drift again.
+feature: collection-page-parity-remainder
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T09:55:28.022Z'
+last_updated: '2026-08-05T10:58:19.781Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T10:33:32.006Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T10:58:16.313Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `089ffa41` - fix(web): category links point at facets that exist, and only when filled
+
+      **Files Changed**:
+      - `packages/web/app/lib/homeCategories.ts` — new; tile definitions carrying `group` + `id`, `categoryHref()`, `visibleCategories()`
+      - `packages/web/app/routes/index.tsx` — loader reads `/api/products/facets` alongside featured products; `CategoriesSection` takes the filtered tiles and renders nothing when there are none
+      - `packages/web/app/components/layout/Footer.tsx` — three Shop links had the same defect
+      - `packages/shared/src/constants/facets.ts` — `typography` added to `SUBJECT_OPTIONS`
+      - `packages/shared/tests/constants/facets.test.ts` — Subject 17 → 18, with the reason
+      - `packages/web/tests/lib/homeCategories.test.ts` — new; 11 cases
+      - `tests/e2e/home.spec.ts`, `tests/e2e/product-listing.spec.ts` — the `fixme` comes off; category cases follow the new links
+
+      **Summary**:
+
+      Per your call — keep the categories so new art has something to be filed under, show them only where artwork exists.
+
+      A tile now carries the facet **group** as well as the value, because `abstract` filters as a subject and `minimalist-art` as a style. One `?styles=` for all four is precisely what broke them. A test walks `CATEGORY_TILES` and asserts each value is in the vocabulary its group names, so a dead tile is now a failing test rather than a link that quietly goes nowhere.
+
+      Mapping: Abstract → `subjects=abstract`, Nature → `subjects=landscape` (there is no `nature`; landscape is what the tile's own photograph shows), Minimalist → `styles=minimalist-art`, Typography → `subjects=typography`.
+
+      `typography` is a local addition to `SUBJECT_OPTIONS` — mesonart does not have it, and the parity test says so. A category the storefront advertises has to be one art can be tagged with; the vocabulary is what makes the tile *possible*, and the count is what makes it *visible*. Nothing carries it today, so the tile is hidden, and the admin form (driven by the same constants) now offers it when someone uploads a typographic piece.
+
+      Visibility comes from `/api/products/facets`, fetched in the home loader via `Promise.allSettled` so a failing facets call costs the tiles and not the featured grid. No counts at all renders nothing rather than guessing — a tile onto an empty grid is the failure this ticket is about, and a transient blip should not reintroduce it. Live counts today: abstract 10, landscape 8, minimalist-art 5, typography 0 → three tiles, Typography hidden.
+
+      **Found while here**: the footer's Shop column had the same three broken links. Fixed in the same commit; "Botanical" is now "Flowers", which is the subject it actually filters by — renaming it beat pointing it at something close enough.
+
+      **Verification**:
+      - `bunx vitest run` (shared) → PASS, 881 tests; (web `tests/lib` + `tests/components/layout`) → PASS, 263 tests including 11 new
+      - `bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps --workers=2` → PASS, 115 expected, 0 unexpected, **0 skipped** — the `fixme` this ticket blocked is now a passing test, plus a new one asserting no tile exists for a category nothing carries
+      - `tests/e2e/home.spec.ts` → every category case green. 7 failures remain, all pre-existing rebrand-era staleness (`fill-yellow-400`, `from-brand-600`, `bg-brand-100`, card `h3`/price, an unscoped `.grid.grid-cols-2`) — the same count as before this ticket, now filed as **#455** along with 9 in `layout.spec.ts`
+      - API checked directly: `?subjects=typography` → 200, `?subjects=not-a-subject` → 400, so validation is live against the rebuilt vocabulary
+      - Typecheck: 23 errors, unchanged count, none in the touched files
+  - author: system
+    timestamp: '2026-08-05T10:58:19.781Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T10:33:32.006Z'
+verification:
+  tests_passed: true
+  test_command: bunx vitest run (shared + web lib/layout) + bunx playwright test tests/e2e/home.spec.ts tests/e2e/product-listing.spec.ts --project=chromium --no-deps --workers=2
+  test_output: 'shared: 881 passed / 12 files. web lib+layout: 263 passed / 15 files (11 new homeCategories cases). e2e: product-listing 115 expected 0 unexpected 0 skipped; home.spec category cases all green, 7 remaining failures are pre-existing rebrand-era staleness now filed as #455.'
+  build_passed: false
+  build_command: bunx tsc --noEmit -p packages/web/tsconfig.json
+  verified_at: '2026-08-05T10:57:54.694Z'
+completed: '2026-08-05T10:58:19.781Z'

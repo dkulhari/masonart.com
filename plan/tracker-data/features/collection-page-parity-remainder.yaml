@@ -1,7 +1,7 @@
 name: collection-page-parity-remainder
 title: Collection Page Parity Remainder
 priority: high
-created: "2026-08-04T11:11:16.965Z"
+created: '2026-08-04T11:11:16.965Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -65,44 +65,48 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 4
-  total_duration: "01:07:00"
+  total_sessions: 8
+  total_duration: '03:21:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 4
-      duration: "01:07:00"
+      sessions: 8
+      duration: '03:21:00'
       tokens: 0
 tickets:
   todo:
-    "420": Choose options — add to cart without leaving the collection page
-  in_progress:
-    "448": Re-point product-listing.spec.ts at the redesigned collection page
+    '455': Re-point home.spec.ts and layout.spec.ts at the rebranded pages
+  in_progress: {}
   done:
-    "404": Schema - curator pin columns and sales index
-    "405": API - Best selling sort over real orders, plus NULLS LAST on Featured
-    "406": API - GET /api/products/collections for the Discover chips
-    "407": API - catalogue-wide review aggregate for the promo tile
-    "408": API - admin sees real units sold and can pin a product as popular
-    "409": Web - sort options 6 to 8 (Featured, Best selling)
-    "410": Web - Discover chip carousel on the collection page
-    "411": Web - promo tile occupying a grid cell
-    "412": Web - admin popularity pin and units-sold column
-    "413": E2E - discover chips, both new sorts, promo tile
-    "414": Seed - settled orders and approved reviews so the real signals have data
-    "415": Web - filter rail typography and chrome parity (strip the box)
-    "416": "Web - toolbar pill parity: 56px pills, fill-wipe hover, in-place black sort panel"
-    "418": Card media shows two mats — match ours to the source background
-    "419": Move the Hide filters control above the facet rail
-total_tickets: 17
-completion_percentage: 88
+    '404': Schema - curator pin columns and sales index
+    '405': API - Best selling sort over real orders, plus NULLS LAST on Featured
+    '406': API - GET /api/products/collections for the Discover chips
+    '407': API - catalogue-wide review aggregate for the promo tile
+    '408': API - admin sees real units sold and can pin a product as popular
+    '409': Web - sort options 6 to 8 (Featured, Best selling)
+    '410': Web - Discover chip carousel on the collection page
+    '411': Web - promo tile occupying a grid cell
+    '412': Web - admin popularity pin and units-sold column
+    '413': E2E - discover chips, both new sorts, promo tile
+    '414': Seed - settled orders and approved reviews so the real signals have data
+    '415': Web - filter rail typography and chrome parity (strip the box)
+    '416': 'Web - toolbar pill parity: 56px pills, fill-wipe hover, in-place black sort panel'
+    '418': Card media shows two mats — match ours to the source background
+    '419': Move the Hide filters control above the facet rail
+    '420': Choose options — add to cart without leaving the collection page
+    '448': Re-point product-listing.spec.ts at the redesigned collection page
+    '452': Home category tiles link to style ids that no longer exist
+    '453': activeFilterCount misses six facets, so their chips and badge never show
+    '454': Active filter chips move into the toolbar row so they always show
+total_tickets: 21
+completion_percentage: 95
 is_completed: false
 design:
   approach: |-
     Real signals, live aggregate. Sales computed at query time from order_items joined to paid/fulfilled orders, indexed on order_items(product_id), rather than a denormalized counter maintained by the payment webhook. Discover chips derive per-style imagery from a representative product; promo tiles carry the real catalogue review aggregate or render nothing. Sort goes 6 -> 8 (Featured, Best selling); Most relevant is dropped as undefinable without a search query.</approach>
     <parameter name="decisions">["Real data only, taken literally: promo tile self-hides below the review threshold, Best selling returns honest zeros in an unsold catalogue, and the curator pin reorders without inflating the number the admin sees.", "Live aggregate over a denormalized salesCount column - no backfill, no checkout-path change, no drift on refunds. Materialized view is the documented upgrade path if list latency ever demands it.", "Curator pin mirrors the existing isFeatured/featuredOrder pattern as isPopular/popularOrder, so admin UI and query shape follow a path already in the codebase.", "Discover chips read STYLE_OPTIONS from @chobii/shared - no fourth parallel facet vocabulary, the exact disease #395-#399 removed.", "Toolbar sort contract stays ${sortBy}-${sortOrder}; the two new options are new sortBy enum values, not a new id scheme.", "featuredOrder is nullable, so Featured sort needs NULLS LAST in both directions or ~30 null-ordered products sort first.", "Most relevant is dropped rather than faked: on a collection page with no query there is no honest relevance signal, and a composite editorial score would be our heuristic dressed as a measurement."]
   approved: true
-  approved_at: "2026-08-04T11:11:29.223Z"
+  approved_at: '2026-08-04T11:11:29.223Z'
 plan:
   phases:
     - name: Phase 1 - Schema
@@ -127,4 +131,4 @@ plan:
       location: packages/web/tests/e2e
       tickets:
         - 413
-  generated_at: "2026-08-04T11:18:08.774Z"
+  generated_at: '2026-08-04T11:18:08.774Z'

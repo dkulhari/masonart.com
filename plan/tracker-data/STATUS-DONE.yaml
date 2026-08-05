@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-08-05T09:47:39.666Z'
-total_tickets: 378
+last_updated: '2026-08-05T11:20:28.813Z'
+total_tickets: 384
 summary:
   critical: 21
-  high: 144
-  medium: 161
+  high: 145
+  medium: 166
   low: 52
 priorities:
   critical:
@@ -805,6 +805,10 @@ priorities:
           title: 'Web - toolbar pill parity: 56px pills, fill-wipe hover, in-place black sort panel'
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 452
+          title: Home category tiles link to style ids that no longer exist
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: admin-panel
       tickets:
@@ -1563,6 +1567,10 @@ priorities:
           title: Reveal the nav rows on scroll up, collapse on scroll down
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 456
+          title: Chrome - move the pages nav below the wordmark line and add Best Sellers / New In
+          assignee: unassigned
+          blocked_by: []
     - feature: collection-page-parity-remainder
       tickets:
         - ticket_number: 407
@@ -1603,6 +1611,22 @@ priorities:
           blocked_by: []
         - ticket_number: 419
           title: Move the Hide filters control above the facet rail
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 420
+          title: Choose options — add to cart without leaving the collection page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 448
+          title: Re-point product-listing.spec.ts at the redesigned collection page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 453
+          title: activeFilterCount misses six facets, so their chips and badge never show
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 454
+          title: Active filter chips move into the toolbar row so they always show
           assignee: unassigned
           blocked_by: []
   low:

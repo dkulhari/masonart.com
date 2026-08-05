@@ -1,5 +1,5 @@
 ticket_number: 344
-title: "Content-Security-Policy for SSR pages (deferred from #264)"
+title: 'Content-Security-Policy for SSR pages (deferred from #264)'
 description: |-
   ## Task
   #264 added HSTS, X-Frame-Options, nosniff, Referrer-Policy, and Permissions-Policy to SSR responses via the traefik middleware (docker/docker-compose.prod.yml web labels). CSP was deliberately deferred: TanStack Start SSR hydration uses inline scripts, so a naive CSP breaks the app.
@@ -11,11 +11,11 @@ description: |-
 feature: manual-testing-bugs-feb2026
 type: task
 priority: medium
-status: in-progress
+status: todo
 assignee: unassigned
 reporter: cli
-created: "2026-07-27T14:05:10.580Z"
-last_updated: "2026-07-27T15:14:50.062Z"
+created: '2026-07-27T14:05:10.580Z'
+last_updated: '2026-08-05T09:54:12.703Z'
 time_spent_minutes: 0
 labels:
   - security
@@ -24,20 +24,23 @@ labels:
 acceptance_criteria: []
 comments:
   - author: mcp-client
-    timestamp: "2026-07-27T14:59:32.657Z"
-    text: "Note: #345, #346, #347 were accidental duplicates of this ticket (the createTicket MCP call reported errors on 2026-07-27 but created the tickets anyway) — all three closed as dupes. This ticket is canonical; fullest CSP scope is also recorded in #264's comments."
+    timestamp: '2026-07-27T14:59:32.657Z'
+    text: 'Note: #345, #346, #347 were accidental duplicates of this ticket (the createTicket MCP call reported errors on 2026-07-27 but created the tickets anyway) — all three closed as dupes. This ticket is canonical; fullest CSP scope is also recorded in #264''s comments.'
   - author: system
-    timestamp: "2026-07-27T15:14:50.062Z"
+    timestamp: '2026-07-27T15:14:50.062Z'
     text: Status changed from 'todo' to 'in-progress'
   - author: mcp-client
-    timestamp: "2026-07-27T15:21:45.503Z"
+    timestamp: '2026-07-27T15:21:45.503Z'
     text: |-
       🔶 Phase 1 (Report-Only) LIVE on production — commit 5cefed33, deployed 2026-07-27, header verified via curl on chobii.art. Policy: default-src 'self'; script-src self+inline+checkout.razorpay.com; img-src self+data:+both CDN hosts+unsplash+Google avatars; connect-src self+Razorpay API/lumberjack; frame-src Razorpay; object-src 'none'.
 
       Remaining scope (why this stays in-progress): observe browser-console CSP violation reports across a full checkout (Razorpay modal), AI generation, and Google sign-in over the next days; extend the policy for anything legitimate it flags; then switch the header from Content-Security-Policy-Report-Only to Content-Security-Policy (one label rename + config-only `make -C deploy deploy`).
+  - author: system
+    timestamp: '2026-08-05T09:54:12.703Z'
+    text: Status changed from 'in-progress' to 'todo'
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
-started: "2026-07-27T15:14:50.062Z"
+started: '2026-07-27T15:14:50.062Z'

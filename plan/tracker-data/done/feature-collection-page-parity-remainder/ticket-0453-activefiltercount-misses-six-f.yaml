@@ -1,0 +1,124 @@
+ticket_number: 453
+title: activeFilterCount misses six facets, so their chips and badge never show
+description: |-
+  ## Task
+
+  Filter the collection by Featured, Vibe, Aesthetic, Medium, Uniqueness or Availability and the page shows no active-filter chips at all and no count on the mobile Filters button — the grid narrows with no visible sign of why.
+
+  ## Context
+
+  `packages/web/app/routes/posters/index.tsx:592`:
+
+  ```ts
+  const activeFilterCount =
+    filters.styles.length +
+    filters.subjects.length +
+    filters.colors.length +
+    filters.rooms.length +
+    (filters.orientation ? 1 : 0) +
+    (filters.priceMin !== undefined ? 1 : 0) +
+    (filters.priceMax !== undefined ? 1 : 0) +
+    (filters.isAiGenerated !== undefined ? 1 : 0)
+  ```
+
+  Missing: `vibe`, `aesthetic`, `medium`, `uniqueness`, `availability`, `isFeatured`. The first five are facet groups the #415 rework added to the rail from `FACET_GROUPS`; the sum was never updated to match.
+
+  That number gates the whole chip row — `{activeFilterCount > 0 && (...)}` at `:735` (desktop) and `:687` (mobile) — and feeds `MobileFilterButton`'s badge. `ActiveFilterTags` itself already builds a Featured chip (`:997`), so the chip exists and is never rendered.
+
+  Verified in the browser: `/posters?isAiGenerated=true` renders "Active filters: AI Generated / Clear all"; `/posters?isFeatured=true` renders no chip row whatsoever, though the API filters correctly (`GET /api/products?isFeatured=true` → 200 with items).
+
+  Found while repairing `tests/e2e/product-listing.spec.ts` for #448; the chip test is `test.fixme` and points here.
+
+  ## Note on scope
+
+  `ActiveFilterTags` also has no branch for vibe / aesthetic / medium / uniqueness / availability, so fixing only the count would give those five a row with no chip in it. Both halves need doing together.
+
+  ## Acceptance
+
+  Every facet the rail can set produces a chip and counts toward the mobile badge, including `isFeatured`. Derive the count from the filter state rather than restating the field list, so the next facet added cannot silently fall out of it. `tests/e2e/product-listing.spec.ts` — "should chip isFeatured like every other filter" — comes off `fixme` and passes.
+feature: collection-page-parity-remainder
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T09:55:28.292Z'
+last_updated: '2026-08-05T10:58:32.179Z'
+time_spent_minutes: 38
+labels:
+  - frontend
+  - bug
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T10:20:51.551Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T10:33:27.078Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commits**: `860f107e` - fix(web): count active filters in one place, so the drawer agrees too. The derivation, its tests and the route wiring were swept into `35c48d4a` (#454's chips move) — same working tree, two sessions running at once.
+
+      **Files Changed**:
+      - `packages/web/app/lib/activeFilters.ts` — new; `buildActiveFilterTags()` and `countActiveFilters()`, both derived from `FACET_GROUPS`
+      - `packages/web/app/routes/posters/index.tsx` — badge, chip builder and `removeFilter` all read the helper; `ActiveFilterKey` replaces `keyof FilterState` so price can be one chip over two bounds
+      - `packages/web/app/components/product/ProductFilters.tsx` — the drawer's own sum, the third copy, now reads the same helper
+      - `packages/web/tests/lib/activeFilters.test.ts` — new; 20 cases, parametrised over the vocabulary
+      - `tests/e2e/product-listing.spec.ts` — the `fixme` comes off, plus a case for one of the five #415 facets
+
+      **Summary**:
+
+      Not "add the six missing fields" — there were **three** hand-written lists (route badge, drawer badge, chip builder) and all three disagreed. One derivation from `FACET_GROUPS` now feeds all of them, so the count is *defined* as the number of chips. Add an eleventh facet group to `@chobii/shared` and the chips, the badge and their tests follow it; that is what stops this recurring.
+
+      Two judgement calls worth recording:
+
+      - **Price counts once, not twice.** The old sum added `priceMin` and `priceMax` separately, so a range read as two active filters. It is one filter with two bounds, and it now gets one chip that clears both.
+      - **`=== true`, not `!== undefined`.** The old test chipped "Featured" for `?isFeatured=false` — the URL can carry an explicit false, and a chip claiming the opposite of the filter is worse than no chip.
+
+      The helper's tests are parametrised over `FACET_GROUPS` rather than a fixed key list, for the same reason the bug happened: a hardcoded list of ten is a list that will be nine again.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/lib/activeFilters.test.ts` → PASS, 20 tests
+      - Command: `bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps --workers=2` → PASS, 113 expected, 0 unexpected, 1 skipped (that one is #452's `fixme`, still blocked)
+      - Two of those 113 are new: the isFeatured chip that was `fixme` against this ticket, and `?vibe=tranquility-and-zen` covering the five facets #415 added
+      - Typecheck: 23 errors, unchanged count, none in the files this touched
+      - Full `bunx vitest run` shows 6 failures in `ProductCard.test.tsx` — that is the parallel session's in-flight #420 `ChooseOptions` work, untracked in the tree. The file passes 22/22 when run alone.
+  - author: system
+    timestamp: '2026-08-05T10:33:31.030Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T10:20:52.346Z'
+    agent: claude-code
+    summary: '#453 and #452 both delivered this reply. #453: one derivation of chips and count from FACET_GROUPS, wired into the route, the drawer and the chip builder. #452: home tiles carry the facet group, render only where artwork exists, typography added to the subject vocabulary, footer links fixed. Commits 860f107e and 089ffa41; #455 filed for residual spec staleness.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T10:58:32.175Z'
+    duration: '00:37:39'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T10:20:51.551Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:38:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:38:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/lib/activeFilters.test.ts (packages/web) + bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps --workers=2
+  test_output: 'activeFilters helper: 20 passed (parametrised over FACET_GROUPS). product-listing e2e: 113 expected, 0 unexpected, 1 skipped (the #452 fixme). Two new e2e cases cover the isFeatured chip and a #415 facet chip (vibe).'
+  build_passed: false
+  build_command: bunx tsc --noEmit -p packages/web/tsconfig.json
+  verified_at: '2026-08-05T10:33:09.618Z'
+completed: '2026-08-05T10:33:31.029Z'

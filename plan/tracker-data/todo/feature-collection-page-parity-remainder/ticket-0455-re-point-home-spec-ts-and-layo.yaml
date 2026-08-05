@@ -1,0 +1,53 @@
+ticket_number: 455
+title: Re-point home.spec.ts and layout.spec.ts at the rebranded pages
+description: |-
+  ## Task
+
+  Same job #448 did for `product-listing.spec.ts`, for the two specs next to it: 7 stale cases in `tests/e2e/home.spec.ts` and 9 in `tests/e2e/layout.spec.ts`, all asserting against markup the rebrand and the parity work replaced.
+
+  Measured while working #452 — these are the counts with that ticket's category work already in and passing, so they are the residue, not fallout.
+
+  ## Context
+
+  **home.spec.ts (7)** — mostly the amber-brand palette that #302 and the mesonart rework removed:
+  - `svg.fill-yellow-400` for the rating stars (`should display rating trust indicator`)
+  - `.bg-gradient-to-br.from-brand-600.to-brand-800` (`should have gradient background`)
+  - `.bg-brand-100.text-brand-600` × 4 (`should display icons for each value prop`)
+  - `.bg-white\/10.backdrop-blur` (`should display Sparkles icon`)
+  - `a[href^="/posters/"] h3` and `text=/From ₹/` inside the anchor — the same card-markup change #448 fixed on the collection page: the title is a `<p><Link>` and the price sits beside it, not inside the product link
+  - `.grid.grid-cols-2` now resolves to three elements (`should display products grid or placeholder`) — needs scoping
+
+  **layout.spec.ts (9)**:
+  - `nav a[href="/posters"]` resolves to two since the styles nav row exists (#401) — affects `should navigate to Posters page`, `should highlight active navigation item`
+  - `header a[href="/account"]` — four cases; the account link moved/changed shape in the chrome parity work
+  - `footer a[href="/posters?style=abstract"]` — note the singular `style=`, wrong even before #452 changed that link to `?subjects=abstract`
+  - `theme-color` meta expects `#f97316`, the old brand amber; it is `#171717` since the rebrand
+
+  ## Constraints
+
+  - Fix the selectors, do not weaken the assertions — the same rule #448 worked under.
+  - The theme-color case is a decision, not a selector fix: either the test follows the rebrand to `#171717`, or someone confirms the intended browser-chrome colour.
+  - Run with `--no-deps` and `--workers=2`; at full parallelism the dev server saturates and unrelated cases fail on 18-second page loads.
+
+  ## Acceptance
+
+  Both specs green, or any remaining case `test.skip`/`test.fixme` with a comment naming the ticket that removed the thing it covered.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T10:57:41.449Z'
+last_updated: '2026-08-05T10:57:41.449Z'
+time_spent_minutes: 0
+labels:
+  - tests
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
