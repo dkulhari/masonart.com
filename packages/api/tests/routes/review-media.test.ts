@@ -31,13 +31,51 @@ import '../setup';
 
 const selectMock = vi.fn();
 const insertMock = vi.fn();
-/** Captures the row handed to `db.insert(...).values(...)`. */
+const transactionMock = vi.fn();
+const txSelectMock = vi.fn();
+const txInsertMock = vi.fn();
+/** Captures the row handed to `tx.insert(...).values(...)`. */
 const insertValuesMock = vi.fn();
+
+/**
+ * Ordered trace of the database calls one request makes, labelled by role.
+ *
+ * The cap on media per review is only safe if the count and the insert are in
+ * the *same* transaction — two completes racing would otherwise both read four
+ * rows and both insert. That is a property of where the calls happen, not of
+ * whether they happen, so it takes an ordered trace to assert.
+ */
+const dbCalls: string[] = [];
+
+/** Lock modes passed to `.for(...)` on the parent review row. */
+const lockModes: string[] = [];
+
+interface Tx {
+  select: (...args: unknown[]) => unknown;
+  insert: (...args: unknown[]) => unknown;
+}
+
+/**
+ * The transaction handle `db.transaction(cb)` hands its callback.
+ *
+ * Its select and insert run through their own mocks rather than the outer
+ * ones on purpose: presign counts media on `db`, complete counts it on `tx`,
+ * and a single shared `mockReturnValueOnce` queue would happily let either
+ * path consume the stub queued for the other.
+ */
+const tx: Tx = {
+  select: (...args: unknown[]) => txSelectMock(...args),
+  insert: (...args: unknown[]) => txInsertMock(...args),
+};
 
 vi.mock('../../src/database', () => ({
   db: {
     select: (...args: unknown[]) => selectMock(...args),
+    // Still mocked although the route no longer writes through it: a
+    // regression back to a non-transactional insert must be visible as a
+    // called mock, not invisible as a missing one.
     insert: (...args: unknown[]) => insertMock(...args),
+    transaction: (fn: (t: Tx) => unknown) => transactionMock(fn),
   },
 }));
 
@@ -114,8 +152,14 @@ const ownReview = (overrides: Record<string, unknown> = {}) => ({
 });
 
 /**
- * Stub the two selects the handlers make, in order: the review lookup, then
- * the per-review media count that backs the 5-item cap.
+ * Stub every select the two handlers make, on both paths at once.
+ *
+ * presign:  review lookup, then the media count — both on the outer `db`.
+ * complete: review lookup on the outer `db`, then, inside the transaction, a
+ *           `FOR UPDATE` lock on the parent review and only then the count.
+ *
+ * The outer and transactional queues are separate, so arming both costs
+ * nothing and neither path can be answered by the other's stub.
  */
 function givenReview(
   review: Record<string, unknown> | null,
@@ -124,11 +168,42 @@ function givenReview(
   selectMock
     .mockReturnValueOnce({
       from: () => ({
-        where: () => ({ limit: () => Promise.resolve(review ? [review] : []) }),
+        where: () => ({
+          limit: () => {
+            dbCalls.push('db:review');
+            return Promise.resolve(review ? [review] : []);
+          },
+        }),
       }),
     })
     .mockReturnValueOnce({
-      from: () => ({ where: () => Promise.resolve([{ count: mediaCount }]) }),
+      from: () => ({
+        where: () => {
+          dbCalls.push('db:count');
+          return Promise.resolve([{ count: mediaCount }]);
+        },
+      }),
+    });
+
+  txSelectMock
+    .mockReturnValueOnce({
+      from: () => ({
+        where: () => ({
+          for: (mode: string) => {
+            dbCalls.push('tx:lock');
+            lockModes.push(mode);
+            return Promise.resolve(review ? [{ id: review.id }] : []);
+          },
+        }),
+      }),
+    })
+    .mockReturnValueOnce({
+      from: () => ({
+        where: () => {
+          dbCalls.push('tx:count');
+          return Promise.resolve([{ count: mediaCount }]);
+        },
+      }),
     });
 }
 
@@ -146,16 +221,43 @@ const complete = (body: unknown, headers: Record<string, string> = AUTH) =>
     body: JSON.stringify(body),
   });
 
+/**
+ * No media row was written by either route into the database — neither the
+ * transactional insert the handler uses nor the bare `db.insert` it must never
+ * fall back to.
+ */
+function expectNoMediaInserted(): void {
+  expect(txInsertMock).not.toHaveBeenCalled();
+  expect(insertMock).not.toHaveBeenCalled();
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   // mockReset, not clear: the helpers queue `mockReturnValueOnce` chains and a
   // leftover entry from a previous test would answer the next test's lookup.
   selectMock.mockReset();
   insertMock.mockReset();
+  transactionMock.mockReset();
+  txSelectMock.mockReset();
+  txInsertMock.mockReset();
+  dbCalls.length = 0;
+  lockModes.length = 0;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 
-  insertMock.mockReturnValue({
+  // Runs the callback inline against `tx` and brackets it in the trace, so a
+  // call can be placed inside or outside the transaction.
+  transactionMock.mockImplementation(async (fn: (t: Tx) => unknown) => {
+    dbCalls.push('tx:begin');
+    try {
+      return await fn(tx);
+    } finally {
+      dbCalls.push('tx:end');
+    }
+  });
+
+  txInsertMock.mockReturnValue({
     values: (row: Record<string, unknown>) => {
+      dbCalls.push('tx:insert');
       insertValuesMock(row);
       return { returning: async () => [{ id: MEDIA_ID, ...row }] };
     },
@@ -476,7 +578,7 @@ describe('POST /api/reviews/:reviewId/media/complete', () => {
 
     const res = await complete({ key: OWNED_KEY, contentType: 'image/jpeg' });
     expect(res.status).toBe(404);
-    expect(insertMock).not.toHaveBeenCalled();
+    expectNoMediaInserted();
   });
 
   it("is 403 for someone else's review", async () => {
@@ -487,7 +589,7 @@ describe('POST /api/reviews/:reviewId/media/complete', () => {
       OTHER_AUTH
     );
     expect(res.status).toBe(403);
-    expect(insertMock).not.toHaveBeenCalled();
+    expectNoMediaInserted();
   });
 
   it('is 409 once the review has left pending', async () => {
@@ -495,7 +597,7 @@ describe('POST /api/reviews/:reviewId/media/complete', () => {
 
     const res = await complete({ key: OWNED_KEY, contentType: 'image/jpeg' });
     expect(res.status).toBe(409);
-    expect(insertMock).not.toHaveBeenCalled();
+    expectNoMediaInserted();
   });
 
   it('rejects a key belonging to another review', async () => {
@@ -508,7 +610,7 @@ describe('POST /api/reviews/:reviewId/media/complete', () => {
       contentType: 'image/jpeg',
     });
     expect(res.status).toBe(400);
-    expect(insertMock).not.toHaveBeenCalled();
+    expectNoMediaInserted();
   });
 
   it('rejects a key that escapes the media prefix entirely', async () => {
@@ -519,7 +621,7 @@ describe('POST /api/reviews/:reviewId/media/complete', () => {
       contentType: 'image/jpeg',
     });
     expect(res.status).toBe(400);
-    expect(insertMock).not.toHaveBeenCalled();
+    expectNoMediaInserted();
   });
 
   it('is 400 for a disallowed mime type', async () => {
@@ -530,7 +632,7 @@ describe('POST /api/reviews/:reviewId/media/complete', () => {
       contentType: 'application/pdf',
     });
     expect(res.status).toBe(400);
-    expect(insertMock).not.toHaveBeenCalled();
+    expectNoMediaInserted();
   });
 
   it('is 409 on the sixth media for one review', async () => {
@@ -538,8 +640,33 @@ describe('POST /api/reviews/:reviewId/media/complete', () => {
 
     const res = await complete({ key: OWNED_KEY, contentType: 'image/jpeg' });
     expect(res.status).toBe(409);
-    expect(insertMock).not.toHaveBeenCalled();
+    expectNoMediaInserted();
     expect(queueAddMock).not.toHaveBeenCalled();
+  });
+
+  it('counts and inserts inside one transaction, behind a row lock', async () => {
+    // The cap is only real if these two are atomic. Two completes arriving at
+    // once would otherwise both read four rows, both pass `< 5`, and both
+    // insert — six media on a five-media review. Checking that the count
+    // merely precedes the insert would not catch that; what has to hold is
+    // that the count, the check and the insert are in the same transaction,
+    // and that the transaction takes the parent review's row lock first so
+    // the second caller waits rather than reading stale rows.
+    givenReview(ownReview(), 4);
+
+    const res = await complete({ key: OWNED_KEY, contentType: 'image/jpeg' });
+    expect(res.status).toBe(201);
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(dbCalls).toEqual([
+      'db:review',
+      'tx:begin',
+      'tx:lock',
+      'tx:count',
+      'tx:insert',
+      'tx:end',
+    ]);
+    expect(lockModes).toEqual(['update']);
   });
 
   it('is 400 when key is missing', async () => {

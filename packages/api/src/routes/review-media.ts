@@ -378,8 +378,48 @@ reviewMediaApp.post(
         return c.json({ error: "Unsupported media type" }, 400);
       }
 
-      const existing = await countMedia(reviewId);
-      if (existing >= MAX_MEDIA_PER_REVIEW) {
+      const url = getPublicUrl(key);
+      const isVideo = kind.mediaType === "video";
+
+      // Count and insert have to be atomic. Two uploads finishing at once would
+      // otherwise both read four rows, both pass the check, and both insert —
+      // putting the review over the cap. Locking the parent review row
+      // serialises every concurrent complete() for that review.
+      const inserted = await db.transaction(async (tx) => {
+        await tx
+          .select({ id: reviews.id })
+          .from(reviews)
+          .where(eq(reviews.id, reviewId))
+          .for("update");
+
+        const counted = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(reviewMedia)
+          .where(eq(reviewMedia.reviewId, reviewId));
+
+        const existing = Number(counted[0]?.count ?? 0);
+        if (existing >= MAX_MEDIA_PER_REVIEW) {
+          return null;
+        }
+
+        const [row] = await tx
+          .insert(reviewMedia)
+          .values({
+            reviewId,
+            mediaType: kind.mediaType,
+            url,
+            // A video's thumbnail is the poster frame, which does not exist
+            // until the worker has run.
+            thumbnailUrl: isVideo ? null : url,
+            sortOrder: sortOrder ?? existing,
+            processingStatus: isVideo ? "processing" : "ready",
+          })
+          .returning();
+
+        return row;
+      });
+
+      if (!inserted) {
         return c.json(
           {
             error: `A review may have at most ${MAX_MEDIA_PER_REVIEW} photos or videos.`,
@@ -389,24 +429,7 @@ reviewMediaApp.post(
         );
       }
 
-      const url = getPublicUrl(key);
-      const isVideo = kind.mediaType === "video";
-
-      const [inserted] = await db
-        .insert(reviewMedia)
-        .values({
-          reviewId,
-          mediaType: kind.mediaType,
-          url,
-          // A video's thumbnail is the poster frame, which does not exist
-          // until the worker has run.
-          thumbnailUrl: isVideo ? null : url,
-          sortOrder: sortOrder ?? existing,
-          processingStatus: isVideo ? "processing" : "ready",
-        })
-        .returning();
-
-      if (isVideo && inserted) {
+      if (isVideo) {
         await reviewMediaQueue.add("transcode", {
           mediaId: inserted.id,
           sourceKey: key,
@@ -418,14 +441,14 @@ reviewMediaApp.post(
       return c.json(
         {
           media: {
-            id: inserted!.id,
+            id: inserted.id,
             reviewId,
             mediaType: kind.mediaType,
-            url: inserted!.url,
-            thumbnailUrl: inserted!.thumbnailUrl ?? null,
-            posterUrl: inserted!.posterUrl ?? null,
-            sortOrder: inserted!.sortOrder,
-            processingStatus: inserted!.processingStatus,
+            url: inserted.url,
+            thumbnailUrl: inserted.thumbnailUrl ?? null,
+            posterUrl: inserted.posterUrl ?? null,
+            sortOrder: inserted.sortOrder,
+            processingStatus: inserted.processingStatus,
           },
         },
         201
