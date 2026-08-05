@@ -87,3 +87,6 @@ docker-compose.ticketrack.yml*
 deploy/.env
 deploy/rendered/
 deploy/pre-cutover-*.sql
+
+# ticketrack MCP per-process stdio log — local pids, no shared value
+plan/tracker-data/.mcp-exits.jsonl
