@@ -630,6 +630,26 @@ function PostersPage() {
 
       {/* Main Content */}
       <div className="container-wide py-6 lg:py-8">
+        {/*
+          The toolbar spans BOTH columns (#419). Theirs is a `.facet-topbar`
+          row across the full page width: the Hide-filters pill at the rail's
+          left edge, the count beside it, sort against the right margin. Ours
+          used to live inside the products column, which put the toggle to the
+          right of the rail it collapses.
+
+          The pill is not nested inside the <aside> — that is `lg:hidden` once
+          filters are hidden, so the only way back would go with it. Their own
+          button does not move when the rail collapses either.
+        */}
+        <CollectionToolbar
+          totalProducts={pagination.total}
+          sortId={`${filters.sortBy || 'createdAt'}-${filters.sortOrder || 'desc'}`}
+          onSortChange={handleSortChange}
+          filtersHidden={filtersHidden}
+          onToggleFilters={() => setFiltersHidden((hidden) => !hidden)}
+          className="mb-8"
+        />
+
         <div className="flex gap-8">
           {/* Desktop Filters Sidebar */}
           <aside
@@ -645,7 +665,14 @@ function PostersPage() {
              * scrolls with the page. Ours was a bordered card with its own
              * scrollbar, which read as a widget dropped onto the page and put a
              * second scrollbar inside the first. */}
-            <div className="sticky top-20">
+            {/* Offset against `--chrome-offset` + 1rem, not a fixed top-20:
+             * the header's styles row reveals on scroll up and the rail has to
+             * move with it, same as the toolbar (#421).
+             *
+             * The 5rem is the toolbar itself (#419): 56px pill inside `py-3`,
+             * sticky at `--chrome-offset` and now spanning this column too.
+             * Pinned any higher, the rail scrolls under a translucent bar. */}
+            <div className="sticky top-[calc(var(--chrome-offset)+5rem)] transition-[top] duration-200 motion-reduce:transition-none">
               <ProductFilters
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
@@ -656,15 +683,6 @@ function PostersPage() {
 
           {/* Products Content */}
           <div className="flex-1">
-            <CollectionToolbar
-              totalProducts={pagination.total}
-              sortId={`${filters.sortBy || 'createdAt'}-${filters.sortOrder || 'desc'}`}
-              onSortChange={handleSortChange}
-              filtersHidden={filtersHidden}
-              onToggleFilters={() => setFiltersHidden((hidden) => !hidden)}
-              className="mb-6"
-            />
-
             {/* Mobile Filter Button and Active Filters */}
             <div className="mb-6 flex flex-col gap-4 lg:hidden">
               <MobileFilterButton
