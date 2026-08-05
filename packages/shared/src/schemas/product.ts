@@ -432,6 +432,19 @@ export const paginatedProductsSchema = z.object({
 // Collection Schema
 // ============================================================================
 
+/**
+ * @deprecated Use `curatedCollectionSchema` in `./collection.ts`.
+ *
+ * This schema models a collection as one of six fixed marketing labels
+ * (`CollectionType`: new-arrivals | best-sellers | staff-picks | seasonal |
+ * sale | ai-generated-gallery). An admin cannot author a seventh, which is the
+ * one thing the curated-collections feature exists to allow.
+ *
+ * It is also referenced NOWHERE outside its own test — the same dead-but-tested
+ * state `constants/styles.ts` and the size ladders were in before #386. Left in
+ * place so that test keeps passing; do not build on it, and do not add a second
+ * collection vocabulary beside `./collection.ts`.
+ */
 export const collectionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(100),
