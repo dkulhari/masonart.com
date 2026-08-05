@@ -201,8 +201,10 @@ export function AllArtMegaMenu({
         data-testid="all-art-mega-trigger"
         aria-expanded={isOpen}
         className={cn(
-          'whitespace-nowrap text-nav transition-colors hover:text-foreground',
-          isOpen ? 'text-foreground' : 'text-muted-foreground'
+          // Same weight of ink as the styles beside it; the panel itself is
+          // the open cue, so the trigger no longer carries that with colour.
+          'whitespace-nowrap text-nav text-foreground transition-colors',
+          isOpen ? 'text-foreground' : 'hover:text-foreground/70'
         )}
       >
         All Art

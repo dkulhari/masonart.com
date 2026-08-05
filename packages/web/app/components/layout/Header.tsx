@@ -454,7 +454,15 @@ export function Header() {
           className="relative transition-[transform,opacity] duration-200 motion-reduce:transition-none"
         >
           <div className="container-wide">
-            <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 py-2">
+            {/* Centred so a part-full wrapped line sits under the middle of
+                the row rather than hanging off the left edge.
+
+                Horizontal gap is theirs already — 24px, measured on their
+                `header__menu`. What theirs has and ours did not is vertical
+                room: their nav row stands 96px tall with 24px under each
+                link, against our 8px of padding. py-4 + gap-y-4 gives the
+                wrapped lines air instead of stacking them. */}
+            <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4 py-4">
               {/* Not a link any more but a door: All Art opens the whole
                   filter vocabulary as a panel, the way mesonart's does
                   (#476). `static` so the panel measures against the row
@@ -471,7 +479,10 @@ export function Header() {
                   <Link
                     to="/posters"
                     search={{ styles: style.id }}
-                    className="whitespace-nowrap text-nav text-muted-foreground transition-colors hover:text-foreground"
+                    // Near-black, like theirs (rgb(23,23,23)) — and unlike the
+                    // pages row, this one has no active state, so full
+                    // foreground costs no signal. Hover lightens instead.
+                    className="whitespace-nowrap text-nav text-foreground transition-colors hover:text-foreground/70"
                   >
                     {style.label}
                   </Link>

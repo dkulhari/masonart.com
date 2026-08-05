@@ -47,6 +47,18 @@ describe('three-row structure', () => {
     expect(stylesRow).toMatch(/flex-wrap/)
     expect(stylesRow).not.toMatch(/overflow-x-auto|scrollbar-hide/)
   })
+
+  it('centres the wrapped lines and sets them in full-strength ink', () => {
+    const start = src.indexOf('data-testid="styles-nav"')
+    const stylesRow = src.slice(start, src.indexOf('</nav>', start))
+
+    // A part-full second line hanging off the left edge reads as a mistake.
+    expect(stylesRow).toMatch(/justify-center/)
+    // rgb(23,23,23) on theirs. This row has no active state, so full
+    // foreground costs no signal — unlike the pages row above it.
+    expect(stylesRow).toMatch(/text-foreground/)
+    expect(stylesRow).not.toMatch(/text-muted-foreground/)
+  })
 })
 
 describe('behaviour a restructure must not delete', () => {
