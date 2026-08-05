@@ -32,7 +32,14 @@
  * make.
  */
 
-import { inArray, asc } from "drizzle-orm";
+import { execFile } from "node:child_process";
+import { readFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+
+import { inArray, asc, eq, and } from "drizzle-orm";
+import type { ProductImage } from "@chobii/shared";
 
 import { db } from "./index";
 import { products, productVariants } from "./schema/products";
@@ -43,7 +50,17 @@ import {
   type OrderItemSnapshot,
 } from "./schema/orders";
 import { reviews } from "./schema/reviews";
+import { reviewMedia } from "./schema/review-media";
 import { users } from "./schema/users";
+import { StoragePaths, uploadFile } from "../lib/storage";
+import {
+  extractPosterFrame,
+  isFfmpegAvailable,
+  probeVideo,
+  transcodeToMp4,
+} from "../lib/video-processing";
+
+const execFileAsync = promisify(execFile);
 
 // ============================================================================
 // Fixture data
@@ -359,12 +376,93 @@ const SEED_ORDERS: SeedOrder[] = [
 ];
 
 // ============================================================================
+// Review media fixture
+// ============================================================================
+
+/**
+ * Which approved reviews carry media.
+ *
+ * Deliberately a subset. A wall where every review has a photo never renders
+ * its plain-text branch, and the empty state is the layout most likely to
+ * break — so five of the twelve approved reviews carry media and seven do not.
+ *
+ * Keyed by review title because titles are unique across SEED_ORDERS and
+ * survive a reseed; row ids do not.
+ */
+export interface SeedReviewMedia {
+  /** Matches a `SeedReview.title` above. Must be an approved review. */
+  reviewTitle: string;
+  /** How many of the product's room mockups to attach. */
+  photos: number;
+  /** Whether this review also carries the generated video clip. */
+  video?: boolean;
+}
+
+export const REVIEW_MEDIA_PLAN: SeedReviewMedia[] = [
+  // The video lives on the highest-rated review of the best-selling product,
+  // which is the one the home strip surfaces first.
+  { reviewTitle: "Better in person", photos: 2, video: true },
+  { reviewTitle: "Bought the pair", photos: 2 },
+  { reviewTitle: "Repeat purchase", photos: 1 },
+  { reviewTitle: "Exactly the green I wanted", photos: 2 },
+  { reviewTitle: "The one people ask about", photos: 1 },
+];
+
+/** Generated clip parameters. Six seconds clears extractPosterFrame's 1s seek. */
+const SEED_CLIP_SECONDS = 6;
+const SEED_CLIP_SIZE = "854x480";
+const SEED_CLIP_FPS = 24;
+
+/** Mirrors video-processing.ts, whose binary resolver is module-private. */
+function ffmpegBin(): string {
+  return process.env.FFMPEG_PATH || "ffmpeg";
+}
+
+/**
+ * The photo rows for one review, drawn from renditions the product already has.
+ *
+ * Room mockups first: a customer photo is the print on someone's wall, and the
+ * mockups are the only assets in the catalogue that look like that. A product
+ * without mockups falls back to whatever it does have rather than inventing a
+ * url that would 404 on the wall.
+ *
+ * Pure and exported so the selection rule can be asserted without a database.
+ */
+export function pickReviewPhotos(
+  images: ProductImage[] | null | undefined,
+  count: number
+): Array<{
+  url: string;
+  thumbnailUrl: string | null;
+  width: number | null;
+  height: number | null;
+}> {
+  if (!images || images.length === 0 || count <= 0) return [];
+
+  const mockups = images.filter((image) => image.type === "room-mockup");
+  const ordered = (mockups.length > 0 ? mockups : images)
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  return ordered.slice(0, count).map((image) => ({
+    url: image.url,
+    thumbnailUrl:
+      image.variants?.find((v) => v.name === "thumbnail")?.url ??
+      image.thumbnailUrl ??
+      null,
+    width: image.width ?? null,
+    height: image.height ?? null,
+  }));
+}
+
+// ============================================================================
 // Seeding
 // ============================================================================
 
 /** Deletes what this module owns. Called before products are re-inserted. */
 export async function clearOrdersAndReviews(): Promise<void> {
-  // Reviews first: they hold a NOT NULL FK to order_items.
+  // Reviews first: they hold a NOT NULL FK to order_items. review_media is
+  // ON DELETE CASCADE from reviews, so it goes with them.
   await db.delete(reviews);
   await db.delete(orderItems);
   await db.delete(orders);
@@ -513,6 +611,195 @@ export async function seedOrdersAndReviews(): Promise<void> {
   console.log(
     `  Orders: ${orderCount}, items: ${itemCount}, reviews: ${reviewCount}`
   );
+
+  await seedReviewMedia();
+}
+
+/**
+ * Build one short clip with ffmpeg's own synthetic sources, normalise it
+ * through the real upload pipeline, and return the row values for it.
+ *
+ * `testsrc` is used rather than a committed MP4 so the repository carries no
+ * binary fixture: the clip is regenerated on every machine that seeds. It is
+ * then put through `transcodeToMp4` and `extractPosterFrame` — the same two
+ * functions the review upload worker calls — so the seeded row is produced by
+ * the production path rather than by hand-written column values.
+ *
+ * Returns null when ffmpeg is missing, so seeding still completes on a machine
+ * without it. The wall degrades to photos only, which is a visible gap rather
+ * than a broken seed.
+ */
+async function buildSeedVideo(
+  reviewId: string,
+  sortOrder: number
+): Promise<typeof reviewMedia.$inferInsert | null> {
+  if (!(await isFfmpegAvailable())) {
+    console.warn(
+      "  ffmpeg not found — skipping the review video. Photos are still " +
+        "seeded; install ffmpeg (macOS: `brew install ffmpeg`) and reseed to " +
+        "get the video wall, lightbox and admin queue exercised."
+    );
+    return null;
+  }
+
+  const workDir = await mkdtemp(join(tmpdir(), "chobii-seed-clip-"));
+
+  try {
+    const source = join(workDir, "source.mkv");
+    const clip = join(workDir, "seed-clip.mp4");
+    const poster = join(workDir, "seed-clip-poster.jpg");
+
+    // A synthetic source with a tone, so the transcode's audio path is real.
+    await execFileAsync(ffmpegBin(), [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      `testsrc=duration=${SEED_CLIP_SECONDS}:size=${SEED_CLIP_SIZE}:rate=${SEED_CLIP_FPS}`,
+      "-f",
+      "lavfi",
+      "-i",
+      `sine=frequency=440:duration=${SEED_CLIP_SECONDS}`,
+      "-shortest",
+      "-y",
+      source,
+    ]);
+
+    await transcodeToMp4(source, clip);
+    await extractPosterFrame(clip, poster);
+
+    const metadata = await probeVideo(clip);
+
+    const [uploadedClip, uploadedPoster] = await Promise.all([
+      uploadFile(
+        await readFile(clip),
+        StoragePaths.reviewMedia(reviewId, "seed-clip.mp4"),
+        { contentType: "video/mp4" }
+      ),
+      uploadFile(
+        await readFile(poster),
+        StoragePaths.reviewMedia(reviewId, "seed-clip-poster.jpg"),
+        { contentType: "image/jpeg" }
+      ),
+    ]);
+
+    return {
+      reviewId,
+      mediaType: "video",
+      url: uploadedClip.url,
+      thumbnailUrl: uploadedPoster.url,
+      posterUrl: uploadedPoster.url,
+      durationSeconds: Math.max(1, Math.round(metadata.durationSeconds)),
+      width: metadata.width,
+      height: metadata.height,
+      sizeBytes: metadata.sizeBytes,
+      sortOrder,
+      processingStatus: "ready",
+    };
+  } catch (error) {
+    // A failed clip must not take the whole seed down with it.
+    console.warn(
+      `  Review video skipped: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Attach photos and one video to the approved reviews named in
+ * REVIEW_MEDIA_PLAN.
+ *
+ * ## Idempotency
+ *
+ * Guarded per (review, media type): a review that already has image rows is
+ * not given more, and a review that already has a video row is not given
+ * another. Re-running is therefore a no-op, and a machine that seeded without
+ * ffmpeg picks up the video on the next run once ffmpeg is installed rather
+ * than being stuck photo-only forever.
+ */
+export async function seedReviewMedia(): Promise<void> {
+  console.log("Seeding review media...");
+
+  const titles = REVIEW_MEDIA_PLAN.map((entry) => entry.reviewTitle);
+
+  const targets = await db
+    .select({
+      reviewId: reviews.id,
+      title: reviews.title,
+      images: products.images,
+    })
+    .from(reviews)
+    .innerJoin(products, eq(reviews.productId, products.id))
+    .where(and(eq(reviews.status, "approved"), inArray(reviews.title, titles)));
+
+  if (targets.length === 0) {
+    console.warn(
+      "  Skipped: none of the planned reviews exist yet. Reviews are seeded " +
+        "by seedOrdersAndReviews() — run that first."
+    );
+    return;
+  }
+
+  const byTitle = new Map(targets.map((row) => [row.title, row]));
+
+  let photoCount = 0;
+  let videoCount = 0;
+
+  for (const entry of REVIEW_MEDIA_PLAN) {
+    const target = byTitle.get(entry.reviewTitle);
+    if (!target) {
+      console.warn(`  No approved review titled "${entry.reviewTitle}".`);
+      continue;
+    }
+
+    const existing = await db
+      .select({ mediaType: reviewMedia.mediaType })
+      .from(reviewMedia)
+      .where(eq(reviewMedia.reviewId, target.reviewId));
+
+    const hasImages = existing.some((row) => row.mediaType === "image");
+    const hasVideo = existing.some((row) => row.mediaType === "video");
+
+    let sortOrder = existing.length;
+
+    if (!hasImages) {
+      const photos = pickReviewPhotos(target.images, entry.photos);
+      if (photos.length === 0) {
+        console.warn(
+          `  "${entry.reviewTitle}": product has no images to reuse as a photo.`
+        );
+      } else {
+        await db.insert(reviewMedia).values(
+          photos.map((photo) => ({
+            reviewId: target.reviewId,
+            mediaType: "image" as const,
+            url: photo.url,
+            thumbnailUrl: photo.thumbnailUrl,
+            width: photo.width,
+            height: photo.height,
+            sortOrder: sortOrder++,
+            processingStatus: "ready" as const,
+          }))
+        );
+        photoCount += photos.length;
+      }
+    }
+
+    if (entry.video && !hasVideo) {
+      const video = await buildSeedVideo(target.reviewId, sortOrder);
+      if (video) {
+        await db.insert(reviewMedia).values(video);
+        sortOrder += 1;
+        videoCount += 1;
+      }
+    }
+  }
+
+  console.log(`  Review media - photos: ${photoCount}, videos: ${videoCount}`);
 }
 
 /** Products whose sales must stay zero — the voided-order guard. */
