@@ -23,8 +23,8 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T07:39:21.909Z'
-last_updated: '2026-08-05T10:40:42.237Z'
-time_spent_minutes: 21
+last_updated: '2026-08-05T13:46:49.387Z'
+time_spent_minutes: 23
 labels:
   - frontend
   - ui
@@ -76,6 +76,111 @@ comments:
   - author: system
     timestamp: '2026-08-05T10:40:27.465Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T12:11:09.947Z'
+    text: |-
+      🔁 **Reworked — the first pass did not look like theirs**
+
+      **Commit**: `d0287ca1` — feat(web): rebuild the Quickview against the measured mesonart panel
+
+      The first attempt was functionally complete and visually wrong: a 448px centred card with a 64px thumbnail, seventeen size chips wrapped over five rows, and a full-bleed black bar for a trigger. I had measured their *trigger* and not their *panel*.
+
+      **Re-measured at 1440x1000** (headless Chromium, computed boxes):
+
+      ```
+      backdrop            rgba(23,23,23,0.7), flat — no blur
+      modal               x 48..1392, y 116..884 — 1344 x 768, TWO COLUMNS
+        left              product image 671 x 768, carousel dots along the foot
+        right             content column x 780..1332 (552 wide)
+          title + price   price right-aligned on the title line, 24px/300
+          rating          14px/300
+          "Size <value>"  label at 300, the chosen value at 500
+          SELECT          552 x 52, bg rgba(23,23,23,0.024), radius 6, no border
+          "Frame: <value>" the same label/value pair
+          swatches        60px circles on a 100px pitch, 5 per row
+          stock line      only when the count is genuinely low
+          CTA row         h 60 — quantity stepper + black pill at radius 60,
+                          the pill quoting the total: "Add to cart - $260.00"
+          full details    footer link out to the product page
+
+      card trigger        172 x 40, radius 60, WHITE pill, black label 16px/400,
+                          centred over the foot of the artwork
+      ```
+
+      Ours now lands the swatches at exactly their pitch — 780, 880, 980, 1080, 1180, second row 100 below — and the trigger reuses the `outline` variant's circle-wipe over a white fill, which is what their `button--primary` does.
+
+      **Decisions worth recording:**
+
+      - The size ladder is a native `<select>`. It is theirs, and it is the right call for our 17 steps — as chips it pushed the frame row below the fold.
+      - The chosen size sits **outside** the `<label>`. Folded in, it joins the select's accessible name and the control announces as "Size 24 x 36" instead of "Size".
+      - Frame swatches are painted from the frame's own `color`, not its `imageUrl` — those point at placehold.co and would have put a grey "Black+Frame" placard on the panel.
+      - The stock line only appears when a real variant has ≤5 left. Theirs reads "Hurry, only 1 item left in stock!"; ours repeats a number we actually have, with no urgency copy.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/components/product tests/styles --maxWorkers=2`
+      - Result: PASS — 17 files, 480/480 (ChooseOptions grew from 15 tests to 28)
+      - Command: `bunx tsc --noEmit -p tsconfig.json` (packages/web)
+      - Result: 23 errors, unchanged baseline, none in the touched files
+      - Command: `bunx playwright test product-grid-alignment product-listing --project=chromium --no-deps`
+      - Result: 132 passed, 2 failed. Both unrelated: "offers no category tile the catalogue cannot fill" belongs to a parallel session's commit `089ffa41` and asserts the absence of `a[href="/posters?subjects=typography"]`, which nothing in this ticket renders; "should handle rapid filter changes" passed on re-run.
+      - Browser, against the running app at 1440x1000: scrollY 900 before opening and 900 after adding; CTA quotes ₹1,499 → ₹1,898 with a Classic Black frame → ₹3,796 at quantity 2; the cart receives quantity 2, unit 1499, frame 399, "Classic Black" and the real size label; focus returns to the trigger; console clean.
+  - author: system
+    timestamp: '2026-08-05T12:55:47.961Z'
+    text: Status changed from 'done' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T13:46:32.511Z'
+    text: |-
+      ✅ **Completed** — after four rounds of rework
+
+      **Commits**
+
+      | hash | what |
+      |---|---|
+      | `5165f631` | first pass: trigger, panel, real variants, add to cart |
+      | `d0287ca1` | rebuilt against the measured Quickview — two columns, select, swatches |
+      | `f7411e0e` | swatches read as mouldings and take real photography |
+      | `1c60bba2` | sell their format ladder — Rolled Canvas / Frameless / Stretch + Frame |
+      | `1c7ff2c9` | priced by size, their swatch photography, X wipe, backdrop close |
+
+      **What the reviews caught, in order**
+
+      1. *"a very poor implementation"* — I had measured their trigger and never opened their panel. Theirs is 1344x768 in two columns with the artwork in its own half; mine was a 448px centred card with a 64px thumbnail and seventeen wrapped size chips. Rebuilt to the measurement, and the size ladder became a native `<select>` — theirs, and the only thing that fits 17 steps without pushing the frame row below the fold.
+
+      2. *"the frame options need to match, use the photos from mesonart"* — ours was a moulding catalogue (No Frame, Classic Black, Natural Oak…). Theirs is a FORMAT axis under the heading "Rolled Canvas/Frameless/Framed": the print in a tube, stretched, or stretched and framed. Reseeded to their seven. `rolled` and `frameless` joined `frame_type` (migration `0004_perfect_stardust`); `none`, `oak` and `walnut` stay in the enum unseeded because Postgres cannot drop an enum value without recreating the type. Safe to reshape because the store is pre-launch with no live orders carrying the old `frameName`.
+
+      3. *"won't the frame price depend on size as well"* — it does on theirs, and ours was flat. Measured across three sizes of one piece:
+
+         ```
+         24x24   $260 rolled   $460 frameless (+77%)   $480 framed (+85%)
+         40x40   $585          $990           (+69%)   $1,030      (+76%)
+         72x72   $1,625        $3,020         (+86%)   $3,100      (+91%)
+         ```
+
+         So the frame is a multiplier on the piece. `priceModifier` carries it, `priceAddition` is zero everywhere, magnitude stays ours (+33% stretched, +40% framed — within a few rupees of the old flat ₹499/₹599 on a small print). **That made `priceAddition` a silent-zero trap**, so `routes/posters/$slug.tsx` moved with it: it read the flat field and would have quoted every frame at ₹0 while the quickview charged correctly. `tests/routes/posters-frame-pricing.test.ts` now pins both surfaces to `priceModifier`.
+
+      4. *"the X should have the same black effect, and hovering outside should show a cross"* — the close button took the toolbar pills' circle-wipe on a 48px circle, and the backdrop hides the native cursor and follows the pointer with a round X, as theirs does. Escape and the button still cover everyone the pointer does not.
+
+      **Things fixed on the way that were not asked for**
+
+      - **Reseeding left stale prices and assets in Redis.** `GET /api/products/:slug` caches its whole payload, frames included, so after a reseed that endpoint served the previous run's data while `/api/products/frames` served the new — and the storefront looked like it had ignored the seed. `clearData()` now drops `product:*` and `product-list:*`. This cost real time to diagnose; it will not again.
+      - **The frames list was duplicated** between `seed.ts` and `seed-admin.ts`, the second under a comment promising it was "same data as seed.ts to keep them in sync". Moved to `seed-frames.ts`; the integration test asserts neither file declares its own.
+
+      **Corrections to my own earlier claims on this ticket** — both caught by measuring rather than reasoning:
+      - I blamed a 900 → 707 scroll drop on the body-scroll lock. It was Playwright's `hover()` scrolling an off-screen card into view.
+      - I then moved the lock to the root element on the theory that `body { overflow: hidden }` clamps the offset. Measured at a depth that does not trigger pagination, neither element clamps. The lock is back on `<body>`, matching ReviewModal.
+
+      **Not done, deliberately**: the swatch images are mesonart's product photography, served from our own `/frames` at the owner's explicit direction after I raised it twice. The drawn fallback stays for any row without an asset, so replacing them with our own photography is a drop-in — the panel renders whatever `thumbnailUrl` points at.
+
+      **Verification**
+      - `bunx vitest run tests/components/product tests/routes/posters-frame-pricing.test.ts tests/routes/posters-toolbar-placement.test.ts --maxWorkers=2` → PASS, 14 files, 254/254. ChooseOptions went 15 → 40 tests across the rework.
+      - `bunx vitest run tests/integration/seed.test.ts` → all Frame Options assertions pass. Four Product Variants failures remain and fail at HEAD too — they assert `sizeLabel` / `square:` in `seed.ts`, where the variant ladder no longer lives.
+      - `bunx tsc --noEmit` → web 22 (baseline), api 0.
+      - Browser, 1440x1000: 12x16 + black = ₹1,699 → ₹2,379; 60x80 + black = ₹41,031; seven swatch photographs load; backdrop cursor and click-to-close work; focus returns to the trigger; console clean.
+
+      **Unrelated, still open** (both from parallel session commit `089ffa41`): `home-tokens.test.ts` expects `from-slate-700/80` on a home page that now uses a flat scrim, and the `?subjects=typography` E2E assertion fails against the seeded catalogue.
+  - author: system
+    timestamp: '2026-08-05T13:46:39.218Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions:
   - start: '2026-08-05T10:19:47.759Z'
     agent: claude-code
@@ -89,25 +194,37 @@ work_sessions:
       cache_read: 0
     end: '2026-08-05T10:40:42.225Z'
     duration: '00:20:54'
+  - start: '2026-08-05T13:45:14.936Z'
+    agent: claude-code
+    summary: 'Closed #420. Five commits across four rework rounds: panel rebuilt to the measured Quickview, format ladder reseeded, frames priced by size (both surfaces), mesonart swatch photography, X wipe and backdrop close cursor. Verified 254/254 web, seed Frame Options green, typecheck at baseline, browser-checked. Also fixed a stale-Redis-after-reseed trap and de-duplicated the frames seed.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T13:46:49.382Z'
+    duration: '00:01:34'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
 started: '2026-08-05T10:19:41.131Z'
 work_session_summary:
-  total_sessions: 1
-  total_duration: '00:21:00'
+  total_sessions: 2
+  total_duration: '00:23:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 1
-      duration: '00:21:00'
+      sessions: 2
+      duration: '00:23:00'
       tokens: 0
 verification:
   tests_passed: true
-  test_command: bunx vitest run tests/components tests/routes --maxWorkers=2
-  test_output: 'Unit: 50 files, 947/947 passed — 15 new in ChooseOptions.test.tsx, 3 new in ProductCard.test.tsx. E2E: product-grid-alignment + product-listing, 131 passed / 1 skipped (chromium). Typecheck: 23 errors, unchanged baseline, none in the touched files.'
+  test_command: bunx vitest run tests/components/product tests/routes/posters-frame-pricing.test.ts tests/routes/posters-toolbar-placement.test.ts --maxWorkers=2 (web) + bunx vitest run tests/integration/seed.test.ts (root)
+  test_output: 'Web: 14 files, 254/254 passed — ChooseOptions.test.tsx grew 15 -> 40 tests across the rework, plus posters-frame-pricing.test.ts. Seed integration: all Frame Options assertions pass; the 4 remaining failures are pre-existing Product Variants source assertions that fail at HEAD too. Typecheck: web 22 (baseline), api 0.'
   build_passed: true
-  build_command: bunx tsc --noEmit -p packages/web/tsconfig.json
-  verified_at: '2026-08-05T10:39:58.102Z'
+  build_command: bunx tsc --noEmit (packages/web and packages/api)
+  verified_at: '2026-08-05T13:46:00.305Z'
 completed: '2026-08-05T10:40:27.462Z'

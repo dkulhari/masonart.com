@@ -1,7 +1,7 @@
 name: testsuite-bug-auth
 title: Testsuite Bug Auth
 priority: low
-created: "2026-01-31T09:39:20.844Z"
+created: '2026-01-31T09:39:20.844Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -13,19 +13,23 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 1
+  total_duration: '00:07:00'
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:07:00'
+      tokens: 0
 tickets:
-  todo:
-    "451": "Test Bug: auth.setup fails for trade/admin/content-manager, blocking 90 E2E tests"
+  todo: {}
   in_progress: {}
   done:
-    "140": "Test Bug: Google OAuth divider text - incorrect text selector"
-    "141": "Test Bug: OTP Flow Resend link - invalid CSS selector syntax"
-    "142": "Test Bug: Auth setup customer login timeout"
-    "143": "Test Bug: Auth setup admin login timeout"
+    '140': 'Test Bug: Google OAuth divider text - incorrect text selector'
+    '141': 'Test Bug: OTP Flow Resend link - invalid CSS selector syntax'
+    '142': 'Test Bug: Auth setup customer login timeout'
+    '143': 'Test Bug: Auth setup admin login timeout'
+    '451': 'Test Bug: auth.setup fails for trade/admin/content-manager, blocking 90 E2E tests'
 total_tickets: 5
-completion_percentage: 80
-is_completed: false
+completion_percentage: 100
+is_completed: true

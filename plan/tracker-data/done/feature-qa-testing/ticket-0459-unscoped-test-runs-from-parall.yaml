@@ -1,0 +1,103 @@
+ticket_number: 459
+title: Unscoped test runs from parallel agents saturate the 8-core box — cap workers and enforce scope
+description: |-
+  ## Problem
+
+  Many Claude sessions work this single checkout at once (measured 2026-08-05:
+  5 CLI + 8 VS Code extension, no worktrees). Every agent verified its ticket by
+  running far more than the ticket touched, and nothing bounded the result.
+
+  Measured at 15:08 on 2026-08-05 — **load average 58 on 8 logical cores**:
+
+  - `pnpm vitest run` in `packages/web`, no path — 888 tests, ~7 forks
+  - `playwright test tests/e2e/product-grid-alignment.spec.ts --no-deps`, no
+    `--project` — one spec against all 5 browser projects, 11 headless Chromes
+  - a second concurrent `playwright test` from another session
+  - a 22-hour-old `pnpm -r test` + `node (vitest)` leaked from an Aug 4 session
+    (cwd inside a `/private/tmp/claude-501/...` scratchpad of another project)
+
+  ## Causes
+
+  1. `.claude/skills/tt-work-ticket/SKILL.md:56` said `VERIFY -> Run full relevant
+     test suite`, contradicting the path-scoped step template 160 lines below it.
+  2. No worker caps. Vitest defaults to cores-1; `playwright.config.ts` had
+     `workers: CI ? 1 : undefined` = half the cores. Each run claimed the machine.
+  3. No default project filter — a bare `playwright test <spec>` is 5x the work.
+  4. `turbo.json` `test` has `dependsOn: ["build"]`, `cache: false`, so a
+     repo-root run rebuilds all three packages first. Turbo concurrency was 10.
+  5. Nothing serialised across agents and nothing reaped strays.
+
+  ## Fix
+
+  Caps, so one run cannot claim the box:
+
+  - `maxWorkers: Number(process.env.VITEST_MAX_WORKERS ?? 2)` in all four
+    vitest configs (root, api, web, shared)
+  - `workers: CI ? 1 : Number(process.env.PW_WORKERS ?? 2)` in playwright.config
+  - firefox / webkit / Mobile Chrome / Mobile Safari projects exist only under
+    `CI` or `PW_ALL_BROWSERS=true` — verified 11 tests locally vs 39 with the
+    matrix on
+  - `--concurrency=2` on the three root turbo test scripts
+  - `scripts/run-tests.sh` default workers 4 -> 2 (`PW_WORKERS` honoured)
+
+  Enforcement, because caps do not undo a run that never needed to happen —
+  `.claude/hooks/guard-test-scope.py`, PreToolUse on Bash via `.claude/settings.json`:
+
+  - **deny**: pathless `vitest run`, watch-mode `vitest`, bare `playwright test`,
+    `--ui`/`--debug`, root-wide `bun test` / `npm test` / `pnpm -r test` /
+    `turbo run test` / `bun run test`. Each deny names the scoped command.
+  - **repair**: `playwright test <spec>` with no `--project` is rewritten with
+    `--project=chromium` inserted after `playwright test` (not appended, which
+    would land past a `| head` pipe) — the run proceeds, on one browser.
+  - **allow**: everything scoped, `./scripts/run-tests.sh` in any form,
+    `--list`/`--version`/`show-report`, and all non-test commands.
+  - escape hatch `ALLOW_FULL_SUITE=1` for a deliberate whole-suite run.
+  - fails open — a missing python3 or script allows everything rather than
+    blocking every Bash call.
+
+  Plus `tt-work-ticket` VERIFY rewritten to demand a path, with a "One Machine,
+  Many Agents" section documenting the guard, the escape hatch and a pre-run
+  `uptime` check.
+
+  ## Verification
+
+  - 37/37 cases in an offline battery, including false-positive guards:
+    `grep -rn "vitest run" docs/`, `git commit -m 'test: bunx vitest run ...'`,
+    unbalanced quotes, and `bun test` inside `packages/shared` (bun's own runner,
+    one process, 4.5s) all pass clean while root `bun test` is denied.
+  - Live in-session: deny fired on `node ./node_modules/.bin/vitest run`;
+    `ALLOW_FULL_SUITE=1` passed through; the repair path rewrote a real
+    `playwright test ... --grep "reduced motion"` and it ran chromium-only.
+  - Configs re-validated: web `styles.test.ts` 205 passed, api
+    `image-processing-seed-media.test.ts` 1 passed, shared 880 passed.
+  - Load average 58 -> 24 after the stale processes were killed.
+
+  ## Follow-ups not done here
+
+  - Nothing serialises heavy runs across agents; a lock wrapper would.
+  - Nothing reaps strays. Two `auth.setup.ts` failures (trade + admin) are
+    pre-existing and unrelated.
+feature: qa-testing
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T12:59:28.569Z'
+last_updated: '2026-08-05T13:00:56.513Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - tooling
+  - dx
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T13:00:56.513Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-08-05T13:00:56.513Z'

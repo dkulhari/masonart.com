@@ -43,6 +43,7 @@ tickets:
     "332": "BUG: database unit tests DROP and recreate real dev-DB tables with stale schemas"
     "343": Escape user-controlled values in order/approval email templates (pre-existing pattern)
     "347": Add Content-Security-Policy header for SSR pages
-total_tickets: 22
+    "459": Unscoped test runs from parallel agents saturate the 8-core box — cap workers and enforce scope
+total_tickets: 23
 completion_percentage: 100
 is_completed: true

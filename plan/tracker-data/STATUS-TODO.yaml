@@ -1,10 +1,10 @@
 status: todo
-last_updated: '2026-08-05T11:20:28.649Z'
-total_tickets: 39
+last_updated: '2026-08-05T13:46:40.326Z'
+total_tickets: 37
 summary:
   critical: 1
   high: 9
-  medium: 24
+  medium: 22
   low: 5
 priorities:
   critical:
@@ -55,6 +55,12 @@ priorities:
           title: 'Ops: point UptimeRobot monitors at https://chobii.art'
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 458
+          title: Verify enforced CSP on production after deploy (post-#344 gate)
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 344
+              title: 'Content-Security-Policy for SSR pages (deferred from #264)'
     - feature: sale-promotions
       tickets:
         - ticket_number: 423
@@ -91,12 +97,6 @@ priorities:
           title: Schema - gallery membership columns and the session field
           assignee: unassigned
           blocked_by: []
-    - feature: testsuite-bug-auth
-      tickets:
-        - ticket_number: 451
-          title: 'Test Bug: auth.setup fails for trade/admin/content-manager, blocking 90 E2E tests'
-          assignee: unassigned
-          blocked_by: []
   medium:
     - feature: go-to-production
       tickets:
@@ -109,12 +109,6 @@ priorities:
       tickets:
         - ticket_number: 335
           title: 'Ops: post-cutover Phase 5 — Search Console + old-URL registration cleanup'
-          assignee: unassigned
-          blocked_by: []
-    - feature: manual-testing-bugs-feb2026
-      tickets:
-        - ticket_number: 344
-          title: 'Content-Security-Policy for SSR pages (deferred from #264)'
           assignee: unassigned
           blocked_by: []
     - feature: mobile-responsive-jul2026
@@ -247,12 +241,6 @@ priorities:
           blocked_by:
             - ticket_number: 445
               title: Web - dismissible sale banner with session and 7-day cooldown
-    - feature: collection-page-parity-remainder
-      tickets:
-        - ticket_number: 455
-          title: Re-point home.spec.ts and layout.spec.ts at the rebranded pages
-          assignee: unassigned
-          blocked_by: []
   low:
     - feature: go-to-production
       tickets:
@@ -366,6 +354,12 @@ blocked_tickets:
       - ticket_number: 426
         title: Resolver - active promotion selection with derived state and no stacking
     description: Schema - shared Zod schemas and types for promotions, Resolver - active promotion selection with derived state and no stacking
+  - ticket_number: 458
+    title: Verify enforced CSP on production after deploy (post-#344 gate)
+    blocked_by:
+      - ticket_number: 344
+        title: 'Content-Security-Policy for SSR pages (deferred from #264)'
+    description: 'Content-Security-Policy for SSR pages (deferred from #264)'
   - ticket_number: 278
     title: Set up external uptime monitoring for production
     blocked_by:

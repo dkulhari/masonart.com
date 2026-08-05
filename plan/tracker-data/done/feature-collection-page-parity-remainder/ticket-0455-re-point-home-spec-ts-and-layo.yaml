@@ -1,0 +1,120 @@
+ticket_number: 455
+title: Re-point home.spec.ts and layout.spec.ts at the rebranded pages
+description: |-
+  ## Task
+
+  Same job #448 did for `product-listing.spec.ts`, for the two specs next to it: 7 stale cases in `tests/e2e/home.spec.ts` and 9 in `tests/e2e/layout.spec.ts`, all asserting against markup the rebrand and the parity work replaced.
+
+  Measured while working #452 — these are the counts with that ticket's category work already in and passing, so they are the residue, not fallout.
+
+  ## Context
+
+  **home.spec.ts (7)** — mostly the amber-brand palette that #302 and the mesonart rework removed:
+  - `svg.fill-yellow-400` for the rating stars (`should display rating trust indicator`)
+  - `.bg-gradient-to-br.from-brand-600.to-brand-800` (`should have gradient background`)
+  - `.bg-brand-100.text-brand-600` × 4 (`should display icons for each value prop`)
+  - `.bg-white\/10.backdrop-blur` (`should display Sparkles icon`)
+  - `a[href^="/posters/"] h3` and `text=/From ₹/` inside the anchor — the same card-markup change #448 fixed on the collection page: the title is a `<p><Link>` and the price sits beside it, not inside the product link
+  - `.grid.grid-cols-2` now resolves to three elements (`should display products grid or placeholder`) — needs scoping
+
+  **layout.spec.ts (9)**:
+  - `nav a[href="/posters"]` resolves to two since the styles nav row exists (#401) — affects `should navigate to Posters page`, `should highlight active navigation item`
+  - `header a[href="/account"]` — four cases; the account link moved/changed shape in the chrome parity work
+  - `footer a[href="/posters?style=abstract"]` — note the singular `style=`, wrong even before #452 changed that link to `?subjects=abstract`
+  - `theme-color` meta expects `#f97316`, the old brand amber; it is `#171717` since the rebrand
+
+  ## Constraints
+
+  - Fix the selectors, do not weaken the assertions — the same rule #448 worked under.
+  - The theme-color case is a decision, not a selector fix: either the test follows the rebrand to `#171717`, or someone confirms the intended browser-chrome colour.
+  - Run with `--no-deps` and `--workers=2`; at full parallelism the dev server saturates and unrelated cases fail on 18-second page loads.
+
+  ## Acceptance
+
+  Both specs green, or any remaining case `test.skip`/`test.fixme` with a comment naming the ticket that removed the thing it covered.
+feature: collection-page-parity-remainder
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T10:57:41.449Z'
+last_updated: '2026-08-05T11:46:41.240Z'
+time_spent_minutes: 8
+labels:
+  - tests
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T11:38:54.376Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T11:46:31.020Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d8af6605` - test(e2e): re-point home and layout specs at the rebranded markup
+
+      **Files Changed**:
+      - `tests/e2e/home.spec.ts` — 7 cases re-pointed
+      - `tests/e2e/layout.spec.ts` — 9 cases re-pointed
+
+      **Summary**:
+
+      home.spec.ts
+      - `svg.fill-yellow-400` → `svg.fill-rating` (rating stars)
+      - `.bg-brand-100.text-brand-600` → `.bg-highlight.text-foreground`, still count 4 (value-prop icons)
+      - `.bg-white/10.backdrop-blur` → `.rounded-2xl.bg-background/10`, scoped to the AI section — `rounded-2xl` separates the icon scrim from the three feature boxes that share the tint at `rounded-lg`
+      - `should have gradient background` → `should sit on the inverted band`. The brand gradient is gone; the section is `SectionBand tone="ink"`. Now asserts `bg-foreground` + `text-background` on the section AND that no `bg-gradient-to-*` survives on it — strictly more than the old case checked.
+      - `.grid.grid-cols-2` matched three elements; scoped to `section:has(h2:has-text("Featured Collection"))` and narrowed to the ProductGrid `ul`
+      - card title and price go through `getByTestId('card-content')` — the title is `p a[href^="/posters/"]` and the price sits beside it, per the pattern #448 established. Title case also gained `not.toHaveText('')`.
+
+      layout.spec.ts
+      - `nav a[href="/posters"]` → `getByTestId('pages-nav').locator('a[href="/posters"]')` — the styles row's "All Art" link shares the href (#401). 2 cases.
+      - `header a[href="/account"]` → `header a[href="/account"][aria-label="Account"]` — the wishlist heart parks at /account until Phase F and the mobile drawer carries its own entry, so the bare href resolves to three. 4 cases.
+      - footer shop links: `?style=abstract` → `?subjects=abstract`, `?style=botanical` → `?subjects=flowers`, `?style=minimalist` → `?styles=minimalist-art` (#452). The singular `?style=` was wrong before that ticket too.
+      - theme-color `#f97316` → `#171717`. Decision resolved in favour of the rebrand: `__root.tsx` carries an explicit comment that it follows `--primary` and that leaving it orange put a strip of the retired palette above every page. The source is the intent; the test was the stale side.
+
+      No assertion weakened. Nothing skipped or `fixme`d — the 9 skips in the run are the pre-existing `describe.skip('Root Layout - Responsive Design')` block and the `aria-expanded` case, untouched by this ticket.
+
+      **Verification**:
+      - Command: `bunx playwright test tests/e2e/home.spec.ts tests/e2e/layout.spec.ts --project=chromium --no-deps --workers=2 --reporter=line`
+      - Result: PASS (153 tests — 144 passing, 0 failing, 9 skipped, 1.7m)
+      - Baseline before the fix, same command: 128 passed, 16 failed, 9 skipped — the 16 being exactly the 7 + 9 the ticket measured.
+  - author: system
+    timestamp: '2026-08-05T11:46:33.331Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T11:38:55.773Z'
+    agent: claude-code
+    summary: Re-pointed 16 stale cases (7 home.spec.ts, 9 layout.spec.ts) at the rebranded markup. Baseline 128/16/9 verified before touching anything; 144 passed, 0 failed after. No assertion weakened, nothing skipped. Committed d8af6605.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T11:46:41.219Z'
+    duration: '00:07:45'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T11:38:54.376Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:08:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:08:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx playwright test tests/e2e/home.spec.ts tests/e2e/layout.spec.ts --project=chromium --no-deps --workers=2
+  test_output: '144 passed, 0 failed, 9 skipped (1.7m). Baseline before the fix: 128 passed, 16 failed, 9 skipped.'
+  verified_at: '2026-08-05T11:46:18.574Z'
+completed: '2026-08-05T11:46:33.331Z'

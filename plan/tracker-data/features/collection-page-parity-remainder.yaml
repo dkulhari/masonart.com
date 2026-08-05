@@ -65,17 +65,16 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 8
-  total_duration: '03:21:00'
+  total_sessions: 11
+  total_duration: '03:47:00'
   total_tokens: 0
   agents:
     claude-code:
-      sessions: 8
-      duration: '03:21:00'
+      sessions: 11
+      duration: '03:47:00'
       tokens: 0
 tickets:
-  todo:
-    '455': Re-point home.spec.ts and layout.spec.ts at the rebranded pages
+  todo: {}
   in_progress: {}
   done:
     '404': Schema - curator pin columns and sales index
@@ -98,9 +97,11 @@ tickets:
     '452': Home category tiles link to style ids that no longer exist
     '453': activeFilterCount misses six facets, so their chips and badge never show
     '454': Active filter chips move into the toolbar row so they always show
-total_tickets: 21
-completion_percentage: 95
-is_completed: false
+    '455': Re-point home.spec.ts and layout.spec.ts at the rebranded pages
+    '457': 'Bug: infinite scroll on /posters jumps back to the top when page 2 appends'
+total_tickets: 22
+completion_percentage: 100
+is_completed: true
 design:
   approach: |-
     Real signals, live aggregate. Sales computed at query time from order_items joined to paid/fulfilled orders, indexed on order_items(product_id), rather than a denormalized counter maintained by the payment webhook. Discover chips derive per-style imagery from a representative product; promo tiles carry the real catalogue review aggregate or render nothing. Sort goes 6 -> 8 (Featured, Best selling); Most relevant is dropped as undefinable without a search query.</approach>

@@ -1,0 +1,211 @@
+ticket_number: 457
+title: 'Bug: infinite scroll on /posters jumps back to the top when page 2 appends'
+description: |-
+  ## Symptom
+
+  Scrolling /posters past the pagination threshold loads `?page=2` and the page then scrolls itself back to the top.
+
+  Reproduced in the browser with no modal involved:
+
+  - wheel down to `scrollY` 2400
+  - ~900ms later `scrollY` reads 107, then 0
+  - `scrollHeight` grows 3797 -> 5207 over the same window (page 2 really did append)
+
+  So the products load correctly and the reader is thrown back to the first row. Pre-existing; found while working the collection-page parity tickets, not caused by them.
+
+  ## Leading hypothesis: router scroll restoration on the append navigation
+
+  `loadMore` widens the URL rather than stitching pages client-side (`packages/web/app/routes/posters/index.tsx:563-576`):
+
+  ```ts
+  navigate({
+    to: '/posters',
+    search: { ...search, page: pagination.page + 1 },
+    replace: true,
+  })
+  ```
+
+  and the router runs with `scrollRestoration: true` (`packages/web/app/router.tsx:75`). Appending a batch is therefore a location change as far as the router is concerned, so it restores the scroll position it has stored for that location — 0 — instead of leaving the reader where they were. The `scrollY` 2400 -> 107 -> 0 sequence matches a restore landing while the new rows are still laying out.
+
+  The IntersectionObserver at `:586` presses `loadMore` with `rootMargin: '400px'`, so this fires while scrolling rather than only on the Load more button — which is why it reads as the page fighting the reader.
+
+  Not yet confirmed by instrumenting the restore itself. Worth one check before fixing, because a layout-shift-driven jump would look similar in the numbers.
+
+  ## Suggested approach
+
+  `navigate` accepts `resetScroll` (present in `@tanstack/react-router` 1.93's `link.d.ts`). Passing `resetScroll: false` on the `loadMore` navigation keeps the position across the append while leaving scroll restoration on for real navigations. Verify the Load more button path too — it calls the same `loadMore` (`:820`).
+
+  ## Context
+
+  - `?page=N` means "everything up to page N" here — the loader returns the accumulated set (`:119-128`), so nothing on the client re-renders from scratch. The scroll reset is the router's, not a remount.
+  - `/gallery` does not share this pattern — no `loadMore` there — so the fix is local to the posters route.
+  - Existing pagination coverage lives in `tests/e2e/product-listing.spec.ts:807-845`.
+feature: collection-page-parity-remainder
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T11:55:18.964Z'
+last_updated: '2026-08-05T12:12:47.347Z'
+time_spent_minutes: 16
+labels:
+  - frontend
+  - ui
+  - posters
+  - pagination
+  - router
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T11:56:39.528Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T12:12:37.673Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `3ea53e79` - fix(web): keep the scroll position when posters appends the next page
+
+      **Files Changed**:
+      - `packages/web/app/routes/posters/index.tsx` — `resetScroll: false` on the `loadMore` navigation
+      - `tests/e2e/product-listing.spec.ts` — new test: scroll into the append, assert the position survives
+
+      **Root Cause**: Confirmed by instrumentation, not inferred from the numbers. Patching `window.scrollTo`/`scrollIntoView`/`scrollTop` before app code ran caught the caller with a stack:
+
+      ```
+      2267ms  window.scrollTo([{"top":0,"left":0}])  from scrollY=2400
+        at Object.fn (@tanstack/router-core/dist/esm/scroll-restoration.js:174:32)
+        at RouterCore.emit (router.js:138:24)
+        at Match.js:116:138
+      ```
+
+      `loadMore` widens the URL (`replace: true`) rather than stitching pages client-side, so the router treats the append as a fresh location and restores that location's stored position — 0.
+
+      Two things the original report could not have known:
+
+      1. The reset is a **~750ms smooth glide**, not a jump: `html` computes `scroll-behavior: smooth`. The sampled descent — 2400, 2375, 2270, 2154, 1368, 870, 621, 465, 326, 229, 176, 98, 63, 32, 18, 5, 0 — is an easing curve, which is why it reads as the page fighting the reader.
+      2. The descent begins **after** `scrollHeight` has already grown (append at 480ms, descent starts 558ms, `replaceState` at 86ms). Timing alone was therefore ambiguous between "router restore" and "layout shift" — hence the stack trace. Layout shift is ruled out.
+
+      **Location**: `packages/web/app/routes/posters/index.tsx:571-583` (the navigate), `packages/web/app/router.tsx:75` (`scrollRestoration: true`).
+
+      **Fix**: `resetScroll: false` on that one navigation. Scroll restoration stays on for real navigations; the Load more button shares the same `loadMore` callback, so it is covered by the same line.
+
+      **Verification**:
+      - Command: `SKIP_E2E_SERVER=true bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps --grep="keep the scroll position"`
+      - Result before the fix: FAIL — `Expected: > 1000 / Received: 0`, having already passed the `page=2` and `scrollHeight` growth assertions (so the append really happened and the test is not vacuous)
+      - Result after the fix: PASS (1 test)
+
+      - Command: `SKIP_E2E_SERVER=true bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps`
+      - Result: 115 passed, 1 failed (`offers no category tile the catalogue cannot fill`). That failure is **not** from this change — reverting `posters/index.tsx` to HEAD and re-running it reproduces the same failure, `a[href="/posters?subjects=typography"]` expected count 0. It belongs to the category-tile/facet work in #448/#455.
+
+      - Command: `cd packages/web && bunx tsc --noEmit` — 0 errors in `posters/index.tsx`
+      - Instrumented probe after the fix: the `scrollTo` call from `scrollY=2400` is gone entirely, `final scrollY = 2400`. The two remaining calls are the ordinary page-load restore at `scrollY=0`.
+
+      **Note**: `--no-deps` was needed because auth setup still fails against the API on :3000, which predates #451's fix and belongs to another session's process. Unrelated to this ticket.
+  - author: system
+    timestamp: '2026-08-05T12:12:40.034Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T11:56:40.971Z'
+    agent: claude-code
+    summary: 'Traced the reset to router-core scroll-restoration.js:174 by patching window.scrollTo (ruling out layout shift), found html scroll-behavior: smooth explains the 750ms glide. Added a failing e2e test (scrollY 0), fixed with resetScroll: false on the loadMore navigation (scrollY 2400). 115/116 spec pass, the one failure reproduces at HEAD. Commit 3ea53e79.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T12:12:47.342Z'
+    duration: '00:16:06'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+current_step: 6
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Confirm the restore before fixing it — instrument the append and watch where scrollY goes
+    file: packages/web/app/routes/posters/index.tsx
+    command: 'Browser: scroll /posters until ?page=2 appears; log scrollY and scrollHeight each 100ms across the navigation'
+    expected_result: scrollY drops toward 0 in step with the router settling the new location, not in step with scrollHeight growing. If it tracks scrollHeight instead, the cause is layout shift and the rest of these steps are wrong — reopen the diagnosis.
+    status: done
+  - id: 2
+    action: write-test
+    description: Write a failing e2e test that scrolls into the append and asserts the position survives
+    file: tests/e2e/product-listing.spec.ts
+    command: ./scripts/run-tests.sh e2e --file=product-listing.spec.ts --grep="scroll position" --max-failures=1
+    expected_result: FAIL — scrollY collapses to 0 once ?page=2 lands
+    status: done
+    code: |
+      test('keeps the scroll position when the next page appends', async ({ page }) => {
+        await page.goto('/posters', { waitUntil: 'networkidle' })
+
+        // Far enough down that the sentinel's 400px rootMargin has fired
+        await page.mouse.wheel(0, 2400)
+        await expect(page).toHaveURL(/page=2/, { timeout: 10000 })
+
+        // The append has to have actually happened, or this asserts nothing
+        await expect
+          .poll(() => page.evaluate(() => document.body.scrollHeight), { timeout: 10000 })
+          .toBeGreaterThan(4000)
+
+        // Give any restore time to land before reading the position
+        await page.waitForTimeout(1500)
+        const scrollY = await page.evaluate(() => window.scrollY)
+        expect(scrollY).toBeGreaterThan(1000)
+      })
+  - id: 3
+    action: verify-fail
+    description: Confirm the test reproduces the jump
+    command: ./scripts/run-tests.sh e2e --file=product-listing.spec.ts --grep="scroll position" --max-failures=1
+    expected_result: FAIL
+    status: done
+  - id: 4
+    action: implement
+    description: Opt the append navigation out of scroll restoration
+    file: packages/web/app/routes/posters/index.tsx
+    status: done
+    code: |
+      navigate({
+        to: '/posters',
+        search: { ...search, page: pagination.page + 1 },
+        replace: true,
+        /**
+         * Appending a batch is not a navigation the reader made — the router
+         * would otherwise restore this location's stored position (0) and
+         * throw them back to the first row mid-scroll.
+         */
+        resetScroll: false,
+      })
+  - id: 5
+    action: verify-pass
+    description: Confirm the position survives the append, via both the observer and the Load more button
+    command: ./scripts/run-tests.sh e2e --file=product-listing.spec.ts --max-failures=5
+    expected_result: PASS — new test green and the existing pagination tests at :807-845 unaffected
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the fix
+    command: 'git add packages/web/app/routes/posters/index.tsx tests/e2e/product-listing.spec.ts && git commit -m "fix(web): keep the scroll position when posters appends the next page"'
+    status: done
+started: '2026-08-05T11:56:39.528Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:16:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:16:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: SKIP_E2E_SERVER=true bunx playwright test tests/e2e/product-listing.spec.ts --project=chromium --no-deps
+  test_output: '115 passed / 1 failed; the failure (''offers no category tile the catalogue cannot fill'') reproduces at HEAD without this change. New test red before (scrollY 0), green after (scrollY 2400). Instrumented probe: router-core scroll-restoration.js:174 scrollTo call from scrollY=2400 is gone after the fix.'
+  build_passed: true
+  build_command: cd packages/web && bunx tsc --noEmit
+  verified_at: '2026-08-05T12:12:19.697Z'
+completed: '2026-08-05T12:12:40.034Z'

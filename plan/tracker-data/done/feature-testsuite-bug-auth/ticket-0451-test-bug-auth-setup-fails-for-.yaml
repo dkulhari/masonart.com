@@ -1,0 +1,142 @@
+ticket_number: 451
+title: 'Test Bug: auth.setup fails for trade/admin/content-manager, blocking 90 E2E tests'
+description: |-
+  ## Symptom
+
+  A normal `npx playwright test` run dies in setup. Three of the four auth setups fail and **90 tests never run**:
+
+  ```
+  3 failed
+    [setup] › tests/e2e/auth.setup.ts › authenticate as trade
+    [setup] › tests/e2e/auth.setup.ts › authenticate as admin
+    [setup] › tests/e2e/auth.setup.ts › authenticate as content manager
+  90 did not run
+  1 passed (1.0m)
+  ```
+
+  Failure surfaces as `Login failed with unexpected error` thrown from `loginUser` (`tests/e2e/auth.setup.ts:94`).
+
+  The suite currently gives no coverage on an ordinary invocation. `--no-deps` is the workaround — `product-grid-alignment.spec.ts` passed 68/68 that way during #418.
+
+  ## Ruled out
+
+  - **Missing accounts.** All four exist with correct roles: `test-customer@example.com` (customer), `test-trade@interior.com` (trade), `test-admin@chobii.art` (admin), `test-content-manager@chobii.art` (content-manager).
+  - **Reseed side effect.** `seed.ts:1534-1536` deletes only `productVariants`, `products`, `frames`. Users are untouched.
+  - **Broken credentials or selectors.** The customer setup passes using the same `loginUser` helper, so the flow works at least once per run.
+
+  ## Leading hypothesis: auth rate limit
+
+  `authRateLimit` is **5 requests per 60 seconds** (`middleware/rate-limit.ts:102`) and is applied to sign-in at `index.ts:96`:
+
+  ```ts
+  app.post("/api/auth/sign-in/*", authRateLimit); // 5/min
+  ```
+
+  Four setups log in from the same host inside one minute, plus any Playwright retries. The first succeeds and the rest exceed the window.
+
+  What makes this fit rather than merely plausible: a 429 response renders **neither** of the two strings `loginUser` checks for at `auth.setup.ts:89-90` (`Sign in failed`, `Invalid email or password`), so the helper falls through to the generic `throw` at :94 — which is exactly the error observed. A genuine credential failure would have returned `false` instead.
+
+  Not yet confirmed by observing a 429 directly. Do that first.
+
+  ## Suggested approach
+
+  1. Capture the sign-in response status in the setup run to confirm the 429.
+  2. Then pick a fix: exempt the rate limiter in test env, raise the limit when `NODE_ENV=test`, key it per-account rather than per-IP, or serialise the setups with a delay.
+  3. Either way, teach `loginUser` to recognise a 429 and report it as such — the generic "unexpected error" cost real diagnosis time here and would again.
+
+  ## Related
+
+  Same class as #142 (customer login timeout) and #143 (admin login timeout), both closed. Recurrence suggests the earlier fixes treated the timeout symptom rather than the throttle.
+
+  Found while working #418; not caused by it.
+feature: testsuite-bug-auth
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T09:46:34.459Z'
+last_updated: '2026-08-05T11:45:17.880Z'
+time_spent_minutes: 7
+labels:
+  - tests
+  - e2e
+  - auth
+  - infrastructure
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T11:37:56.744Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T11:45:01.320Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `86471907` - fix(tests): auth setup survives the sign-in rate limiter
+
+      **Files Changed**:
+      - `packages/api/package.json` — dev script now sets `DISABLE_RATE_LIMIT=true` inline
+      - `tests/e2e/helpers/auth-diagnostics.ts` — new: `findRateLimitHit` / `loginFailureMessage`
+      - `tests/e2e/auth.setup.ts` — `loginUser` records auth responses, reports a 429 as a 429
+      - `tests/setup/auth-setup-rate-limit.test.ts` — new: 6 regression guards
+
+      **Root Cause**: The hypothesis in the description was right, and there was a second layer to it. The 5/60s auth limiter fires because all local traffic shares the "unknown" IP bucket. The #332 bypass already existed — but only in `playwright.config.ts`'s `webServer.env`. Locally `reuseExistingServer` is true and a dev server is almost always already running, so Playwright never spawns the server and that env never reaches the API. Ditto `SKIP_E2E_SERVER=true`. The bypass was declared in the one place it could not take effect, which is why #142/#143 "recurred".
+
+      **Location**: `playwright.config.ts:130` (`reuseExistingServer`), `packages/api/src/middleware/rate-limit.ts:54-59` (the bypass), `tests/e2e/auth.setup.ts:94` (old generic throw).
+
+      **Fix**: Move the guarantee onto the API dev entrypoint — `DISABLE_RATE_LIMIT=true` is set inline in `packages/api`'s `dev` script, so it holds regardless of who started the server and does not depend on turbo env passthrough. The middleware still refuses the bypass under `NODE_ENV=production`, and the production `start` script is untouched (guarded by a test). `loginUser` now attaches a response listener and, on a failed navigation, throws a message naming the status, the URL, the Retry-After window and the remedy.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/setup/auth-setup-rate-limit.test.ts tests/setup/workspaces.test.ts`
+      - Result: PASS (39 tests, 39 passing) — 6 new guards, 33 pre-existing workspace tests unaffected by the script edit
+      - Command: `cd packages/api && bunx vitest run tests/middleware/rate-limit.test.ts`
+      - Result: PASS (9 tests) — #332 bypass semantics unchanged
+
+      - Live probe, old API on :3000 (no bypass): `signin1=200 signin2=200 signin3=429 … signin7=429`, body `{"error":"Too Many Requests",…,"retryAfter":60}` — hypothesis confirmed by observation, as asked.
+      - Live probe, API started via the edited dev script on :3018: `signin1..8 = 200` — no throttle. Sign-up bucket likewise clean (422 "already exists", not 429).
+      - Real setup run against the *un-restarted* :3000 server, `SKIP_E2E_SERVER=true bunx playwright test --project=setup`: 2 passed / 2 failed, and the failures now read
+
+        > Error: Login for test-admin@chobii.art was rate limited: 429 Too Many Requests from http://localhost:3000/api/auth/sign-in/email (retry after 24s). The auth limiter allows 5 requests/60s per IP … Start the API with DISABLE_RATE_LIMIT=true (the packages/api dev script does this) and retry.
+
+        instead of "Login failed with unexpected error". That run is the pre-fix server by design — it proves the diagnostic on real traffic.
+
+      **Not verified**: a full 4/4 green setup run against a live server, because the API on :3000 is a 23h-old process owned by another concurrent session and restarting it would disrupt that work. The mechanism is proven on :3018 via the actual `bun run dev` script; the next API restart picks it up.
+
+      **Note**: `playwright.config.ts` carries a comment explaining why its env block alone is insufficient, but it was left OUT of this commit — the file has unrelated uncommitted changes from a parallel session (browser-matrix limits) and staging it would have swept that work.
+  - author: system
+    timestamp: '2026-08-05T11:45:05.919Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T11:37:57.684Z'
+    agent: claude-code
+    summary: 'Confirmed 429 on live dev API (429 on request 3/7). Found the #332 bypass only lived in playwright.config webServer.env, which reuseExistingServer skips. Moved DISABLE_RATE_LIMIT=true onto the packages/api dev script, added auth-diagnostics helper so loginUser reports 429s by name, 6 new regression guards. Commit 86471907, all tests pass.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T11:45:17.848Z'
+    duration: '00:07:20'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T11:37:56.744Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:07:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:07:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: 'bunx vitest run tests/setup/auth-setup-rate-limit.test.ts tests/setup/workspaces.test.ts; packages/api: bunx vitest run tests/middleware/rate-limit.test.ts'
+  test_output: '39 passed (6 new #451 guards + 33 workspaces) + 9 rate-limit middleware tests passed. Live probe: unbypassed API 429 on request 3/7; API started via new dev script 8/8 sign-ins 200.'
+  verified_at: '2026-08-05T11:44:43.656Z'
+completed: '2026-08-05T11:45:05.919Z'

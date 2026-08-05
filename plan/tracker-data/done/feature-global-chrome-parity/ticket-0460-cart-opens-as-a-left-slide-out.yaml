@@ -1,0 +1,398 @@
+ticket_number: 460
+title: Cart opens as a left slide-out drawer, not a page (mesonart parity)
+description: |-
+  ## Task
+  mesonart.com's cart is a slide-out drawer anchored to the **left** edge; ours navigates to a full `/cart` page. Make the header cart control open a left drawer, and auto-open it when an item is added.
+
+  Decisions taken at ticket creation:
+  - The drawer becomes the primary path. `/cart` **stays routable** (deep links, `tests/e2e/cart.spec.ts`) but the header no longer links to it.
+  - `addItem` auto-opens the drawer, so PDP and Quickview get the behaviour for free.
+
+  ## Context
+
+  **Dead code to reuse, not rewrite:** `packages/web/app/components/cart/CartSheet.tsx` already implements a slide-out cart (items list, subtotal, empty state, Escape, scroll lock) — but it is anchored `fixed right-0` + `slide-in-from-right`, and it is **imported nowhere**. Rename/retarget it rather than writing a third panel.
+
+  **Drawer pattern to mirror:** `packages/web/app/components/layout/SearchDrawer.tsx` — backdrop `z-40`, panel `z-50`, `role="dialog"` + `aria-modal`, Escape handler, `document.body.style.overflow` lock with restore on unmount.
+
+  **Today's header wiring:** `Header.tsx:230` (desktop) and `Header.tsx:253` (mobile) render `<Link to="/cart">` with the hydration-gated `displayCartCount` badge.
+
+  **Store:** `packages/web/app/stores/cart.ts` has no UI state. Its `persist` config already uses `partialize: (state) => ({ items: state.items })` (line ~360), so a new `isDrawerOpen` field will not leak into `localStorage` — do not widen that partialize.
+
+  **Tests that pin current behaviour and must move with the change:**
+  - `packages/web/tests/components/layout/Header.structure.test.tsx:58` and `chrome-tokens.test.ts:66` assert the source still contains `` 'Shopping cart${' `` (#248). The aria-label item count must survive the Link→button swap.
+  - `tests/e2e/layout.spec.ts:54` and `:178` assert `a[href="/cart"]` is visible in the header and navigates. Both must be rewritten against the drawer.
+
+  **Out of scope:** restyling the `/cart` page itself, checkout, and the sale/promotion row work tracked under `sale-promotions`.
+feature: global-chrome-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:16:43.263Z'
+last_updated: '2026-08-05T13:41:23.359Z'
+time_spent_minutes: 24
+labels:
+  - web
+  - cart
+  - mesonart-parity
+  - chrome
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T13:17:40.214Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T13:41:17.484Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commits**:
+      - `5d73a2ae` — feat(web): the cart slides out from the left, the way mesonart's does
+      - `3dadd0b9` — test(e2e): make the cart-drawer specs survive contact with the real page
+
+      **Files Changed**:
+      - `packages/web/app/components/cart/CartDrawer.tsx` — was CartSheet.tsx (dead code, anchored right). Now left-anchored, store-driven, no isOpen/onClose props.
+      - `packages/web/app/stores/cart.ts` — `isDrawerOpen` + open/close/toggle; `addItem` sets it true on both branches. `partialize` untouched, so UI state never persists. Dropped `selectActions` (dead since it was written).
+      - `packages/web/app/components/layout/Header.tsx` — desktop and mobile cart controls are buttons calling `openDrawer`.
+      - `packages/web/app/routes/__root.tsx` — `<CartDrawer />` mounted once, skipped on /admin.
+      - `packages/web/tests/stores/cart-drawer.test.ts`, `packages/web/tests/components/cart/CartDrawer.test.tsx` — new.
+      - `packages/web/tests/components/layout/Header.structure.test.tsx` — new #460 guard; the #248 aria-label assertion is unchanged.
+      - `tests/e2e/cart-drawer.spec.ts` — new; `tests/e2e/layout.spec.ts`, `tests/e2e/header-reveal.spec.ts` — re-pointed off `a[href="/cart"]`.
+
+      **Summary**:
+      The header cart control opens a left drawer instead of navigating; adding an item auto-opens it, which the PDP and quickview inherit for free because the behaviour sits in `addItem` rather than at the call sites. `/cart` stays routable — deep links, checkout's back-link, sitemap, and `tests/e2e/cart.spec.ts` all still work, and the drawer footer links to it.
+
+      **Verification**:
+      - `cd packages/web && npx vitest run tests/stores/ tests/components/cart/ tests/components/layout/` → PASS, 148 tests, 9 files
+      - `npx playwright test tests/e2e/cart-drawer.spec.ts --project=chromium --no-deps` → PASS, 9/9. The left anchor is pinned by bounding box (`box.x <= 1`), not by a class name.
+      - `npx playwright test tests/e2e/layout.spec.ts tests/e2e/header-reveal.spec.ts --project=chromium --no-deps` → 61 passed, 9 skipped (pre-existing `describe.skip`)
+      - `npx playwright test tests/e2e/cart.spec.ts --project=chromium --no-deps` → 78 passed, 1 failed
+      - `npx tsc --noEmit` → 22 errors, all pre-existing admin router search-param errors; none in touched files
+      - Live check at localhost:3001: clicking the header cart opens `dialog "Your Cart"` with the empty state.
+
+      **Two things worth a follow-up ticket, both pre-existing:**
+      1. `cart.spec.ts` "should display shipping line" fails on a strict-mode violation — `text=Shipping` now matches both the order summary label and the footer's "Shipping Info" link. A test-selector bug from the footer rebuild, not from this ticket.
+      2. `auth.setup.ts` still rate-limits when the API is already running without `DISABLE_RATE_LIMIT=true`, which blocks any `./scripts/run-tests.sh e2e` run (the #451 territory). These specs were run with `--no-deps` because they need no auth.
+
+      **Note on the session**: a concurrent agent restored `packages/web/` over my working tree mid-ticket (everything tracked there reverted; untracked new files survived). The source edits were re-applied and committed immediately.
+  - author: system
+    timestamp: '2026-08-05T13:41:21.288Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T13:17:41.314Z'
+    agent: claude-code
+    summary: 'Cart now opens as a left slide-out drawer: store-driven open state with auto-open on addItem, CartSheet retargeted to CartDrawer and mounted in __root, header cart controls became buttons. 148 unit tests + 9 new E2E green; /cart route preserved. Re-applied source edits after a concurrent agent restored packages/web mid-ticket.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T13:41:23.354Z'
+    duration: '00:23:42'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Store test: drawer open/close, addItem auto-opens, UI state never persisted'
+    file: packages/web/tests/stores/cart-drawer.test.ts
+    command: cd packages/web && npx vitest run tests/stores/cart-drawer.test.ts
+    expected_result: FAIL - isDrawerOpen/openDrawer/closeDrawer do not exist on the store
+    status: done
+    code: |-
+      import { describe, it, expect, beforeEach } from 'vitest'
+      import { useCartStore } from '~/stores/cart'
+
+      const sampleItem = {
+        productId: 'p1',
+        variantId: 'v1',
+        title: 'Test Poster',
+        variantName: '18x24',
+        unitPrice: 1999,
+        image: '/img.jpg',
+        quantity: 1,
+      }
+
+      describe('cart drawer state', () => {
+        beforeEach(() => {
+          useCartStore.setState({ items: [], isDrawerOpen: false })
+          localStorage.clear()
+        })
+
+        it('starts closed', () => {
+          expect(useCartStore.getState().isDrawerOpen).toBe(false)
+        })
+
+        it('opens and closes', () => {
+          useCartStore.getState().openDrawer()
+          expect(useCartStore.getState().isDrawerOpen).toBe(true)
+          useCartStore.getState().closeDrawer()
+          expect(useCartStore.getState().isDrawerOpen).toBe(false)
+        })
+
+        it('auto-opens when an item is added', () => {
+          useCartStore.getState().addItem(sampleItem)
+          expect(useCartStore.getState().isDrawerOpen).toBe(true)
+        })
+
+        it('does not persist drawer state to localStorage', () => {
+          useCartStore.getState().openDrawer()
+          const raw = localStorage.getItem('chobii-cart-storage') ?? '{}'
+          expect(raw).not.toContain('isDrawerOpen')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the store test fails before the store changes
+    command: cd packages/web && npx vitest run tests/stores/cart-drawer.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Add isDrawerOpen + openDrawer/closeDrawer/toggleDrawer to the cart store; addItem sets isDrawerOpen true. Leave partialize untouched so UI state stays out of localStorage.
+    file: packages/web/app/stores/cart.ts
+    status: done
+    code: |-
+      // In interface CartStore, alongside `items`:
+        isDrawerOpen: boolean;
+        openDrawer: () => void;
+        closeDrawer: () => void;
+        toggleDrawer: () => void;
+
+      // In the create() initializer, alongside `items: []`:
+            isDrawerOpen: false,
+            openDrawer: () => set({ isDrawerOpen: true }),
+            closeDrawer: () => set({ isDrawerOpen: false }),
+            toggleDrawer: () =>
+              set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
+
+      // Every return branch of addItem gains `isDrawerOpen: true`, e.g.
+      //   return { items: [...], isDrawerOpen: true };
+      // so PDP and Quickview inherit auto-open with no call-site change.
+
+      // Selectors, next to the existing ones:
+      export const useIsCartDrawerOpen = () =>
+        useCartStore((state) => state.isDrawerOpen);
+
+      // Extend selectActions with openDrawer / closeDrawer / toggleDrawer.
+  - id: 4
+    action: verify-pass
+    description: Store test green, and the existing cart store suite has not regressed
+    command: cd packages/web && npx vitest run tests/stores/
+    expected_result: PASS - cart-drawer.test.ts and cart.test.ts both green
+    status: done
+  - id: 5
+    action: write-test
+    description: 'Component test: drawer is left-anchored, closes on Escape and backdrop, renders items and empty state'
+    file: packages/web/tests/components/cart/CartDrawer.test.tsx
+    command: cd packages/web && npx vitest run tests/components/cart/CartDrawer.test.tsx
+    expected_result: FAIL - CartDrawer does not exist yet
+    status: done
+    code: |-
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import { render, screen, fireEvent } from '@testing-library/react'
+      import { CartDrawer } from '~/components/cart/CartDrawer'
+      import { useCartStore } from '~/stores/cart'
+
+      describe('CartDrawer', () => {
+        beforeEach(() => {
+          useCartStore.setState({ items: [], isDrawerOpen: true })
+        })
+
+        it('anchors the panel to the left edge', () => {
+          render(<CartDrawer />)
+          const panel = screen.getByRole('dialog')
+          expect(panel.className).toContain('left-0')
+          expect(panel.className).not.toContain('right-0')
+          expect(panel.className).toContain('slide-in-from-left')
+        })
+
+        it('renders nothing when the store says closed', () => {
+          useCartStore.setState({ isDrawerOpen: false })
+          render(<CartDrawer />)
+          expect(screen.queryByRole('dialog')).toBeNull()
+        })
+
+        it('closes on Escape', () => {
+          render(<CartDrawer />)
+          fireEvent.keyDown(document, { key: 'Escape' })
+          expect(useCartStore.getState().isDrawerOpen).toBe(false)
+        })
+
+        it('closes on backdrop click', () => {
+          render(<CartDrawer />)
+          fireEvent.click(screen.getByTestId('cart-drawer-backdrop'))
+          expect(useCartStore.getState().isDrawerOpen).toBe(false)
+        })
+
+        it('shows the empty state with a browse link', () => {
+          render(<CartDrawer />)
+          expect(screen.getByText(/your cart is empty/i)).toBeInTheDocument()
+        })
+
+        it('locks body scroll while open and restores on close', () => {
+          const { unmount } = render(<CartDrawer />)
+          expect(document.body.style.overflow).toBe('hidden')
+          unmount()
+          expect(document.body.style.overflow).not.toBe('hidden')
+        })
+      })
+  - id: 6
+    action: verify-fail
+    description: Confirm the component test fails
+    command: cd packages/web && npx vitest run tests/components/cart/CartDrawer.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 7
+    action: implement
+    description: Rename CartSheet.tsx to CartDrawer.tsx, flip the anchor to the left, and read open state from the store instead of props
+    file: packages/web/app/components/cart/CartDrawer.tsx
+    status: done
+    code: |-
+      // git mv app/components/cart/CartSheet.tsx app/components/cart/CartDrawer.tsx
+      // Component takes no isOpen/onClose props any more — it subscribes to the store,
+      // so any surface can open the cart without prop-drilling through __root.
+
+      export function CartDrawer({ className }: { className?: string }) {
+        const isOpen = useIsCartDrawerOpen()
+        const { closeDrawer } = useCartActions()
+        // ...items / subtotal / itemCount selectors unchanged from CartSheet
+
+        // Escape + scroll lock: keep the existing effect, swap onClose -> closeDrawer.
+
+        if (!isOpen) return null
+
+        return (
+          <>
+            <div
+              data-testid="cart-drawer-backdrop"
+              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity"
+              onClick={closeDrawer}
+              aria-hidden="true"
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cart-drawer-title"
+              className={cn(
+                'fixed left-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl',
+                'flex flex-col',
+                'animate-in slide-in-from-left duration-300',
+                className
+              )}
+            >
+              {/* header / items / footer bodies carry over from CartSheet unchanged */}
+            </div>
+          </>
+        )
+      }
+
+      // Drop the now-dead CartTrigger export — Header owns the trigger (step 9).
+      // Footer keeps both actions: primary Checkout, secondary "View Cart" -> /cart.
+  - id: 8
+    action: verify-pass
+    description: Drawer component test green
+    command: cd packages/web && npx vitest run tests/components/cart/CartDrawer.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 9
+    action: implement
+    description: Header cart Link becomes a drawer-opening button (both desktop and mobile); mount CartDrawer in __root next to Header, skipping admin routes
+    file: packages/web/app/components/layout/Header.tsx
+    status: done
+    code: |-
+      // Header.tsx — both call sites (was Link to="/cart" at :230 and :253).
+      // The aria-label template literal must stay byte-identical: Header.structure.test.tsx
+      // and chrome-tokens.test.ts grep the source for 'Shopping cart${' (#248).
+      const openDrawer = useCartStore((state) => state.openDrawer)
+
+      <button
+        type="button"
+        onClick={openDrawer}
+        className={/* unchanged classes from the old Link */}
+        aria-label={`Shopping cart${displayCartCount > 0 ? `, ${displayCartCount} items` : ''}`}
+      >
+        <ShoppingCart className="h-5 w-5" />
+        {displayCartCount > 0 && (
+          <span /* unchanged badge */>{displayCartCount > 99 ? '99+' : displayCartCount}</span>
+        )}
+      </button>
+
+      // __root.tsx, beside the existing `{!isAdminRoute && <Header />}` at :254
+      import { CartDrawer } from '~/components/cart/CartDrawer'
+      {!isAdminRoute && <CartDrawer />}
+  - id: 10
+    action: write-test
+    description: 'Update the header structure guards: cart control is a button that opens the drawer, item count still in the aria-label'
+    file: packages/web/tests/components/layout/Header.structure.test.tsx
+    status: done
+    code: |-
+      it('opens the cart drawer instead of linking to /cart', () => {
+        expect(src).toContain('openDrawer')
+        expect(src).not.toMatch(/to="\/cart"/)
+      })
+
+      // Keep the #248 assertion at :58 exactly as-is:
+      //   expect(src).toContain('Shopping cart${')
+      // chrome-tokens.test.ts:66 needs no edit — it greps the same string.
+  - id: 11
+    action: verify-pass
+    description: Layout guards and the whole web component suite stay green
+    command: cd packages/web && npx vitest run tests/components/layout/ tests/components/cart/
+    expected_result: PASS - no regression in Header.structure, chrome-tokens, or cart tests
+    status: done
+  - id: 12
+    action: implement
+    description: Re-point the E2E header-cart assertions at the drawer and add drawer coverage
+    file: tests/e2e/layout.spec.ts
+    status: done
+    code: |-
+      // layout.spec.ts:54 — was: page.locator('a[href="/cart"]')
+      const cartButton = page.getByRole('button', { name: /shopping cart/i })
+      await expect(cartButton).toBeVisible()
+
+      // layout.spec.ts:178 — was: click the link, expect URL /cart
+      await cartButton.click()
+      await expect(page.getByRole('dialog', { name: /cart/i })).toBeVisible()
+
+      // New tests/e2e/cart-drawer.spec.ts:
+      //   - drawer panel's bounding box starts at x=0 (left-anchored, not right)
+      //   - Escape and backdrop click both close it
+      //   - adding from a product Quickview auto-opens the drawer
+      //   - "View Cart" inside the drawer still lands on /cart
+      // tests/e2e/cart.spec.ts needs no change: /cart stays routable.
+  - id: 13
+    action: verify-pass
+    description: Scoped E2E run for the touched specs only (shared 8-core box — do not run the full suite)
+    command: ./scripts/run-tests.sh e2e --file=cart-drawer.spec.ts --workers=2 && ./scripts/run-tests.sh e2e --file=layout.spec.ts --workers=2
+    expected_result: PASS - both specs green; cart.spec.ts untouched and still passing
+    status: done
+  - id: 14
+    action: commit
+    description: Commit the drawer
+    command: 'git add packages/web/app/stores/cart.ts packages/web/app/components/cart/ packages/web/app/components/layout/Header.tsx packages/web/app/routes/__root.tsx packages/web/tests tests/e2e && git commit -m "feat(web): cart slides out from the left, the way mesonart''s does"'
+    status: done
+current_step: 14
+started: '2026-08-05T13:17:40.214Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:24:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:24:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/web && npx vitest run tests/stores/ tests/components/cart/ tests/components/layout/ ; npx playwright test tests/e2e/cart-drawer.spec.ts tests/e2e/layout.spec.ts tests/e2e/header-reveal.spec.ts tests/e2e/cart.spec.ts --project=chromium --no-deps
+  test_output: 'unit: 148 passed (9 files). e2e: cart-drawer 9 passed; layout+header-reveal 61 passed / 9 skipped (pre-existing describe.skip); cart.spec 78 passed, 1 pre-existing failure ("should display shipping line" — strict-mode violation between the order summary''s "Shipping" and the footer''s "Shipping Info", unrelated to this ticket). tsc --noEmit: 22 errors, all pre-existing admin router search-param errors, none in touched files.'
+  build_passed: true
+  build_command: cd packages/web && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T13:41:00.199Z'
+completed: '2026-08-05T13:41:21.288Z'

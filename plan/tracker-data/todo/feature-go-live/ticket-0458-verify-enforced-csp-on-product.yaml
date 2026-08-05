@@ -1,0 +1,72 @@
+ticket_number: 458
+title: Verify enforced CSP on production after deploy (post-#344 gate)
+description: |-
+  ## Task
+
+  #344 flipped the SSR `Content-Security-Policy` from Report-Only to **enforced** (commit `c124c13d`, `docker/docker-compose.prod.yml`, `chobii-web-headers` traefik middleware). That change is config-only and has NOT reached production — it lands on the next `make -C deploy deploy`.
+
+  The policy was derived by auditing the app source at HEAD, not by observing violation reports: production is still serving a pre-parity image, so the origins that would break under the old policy never appeared in a production console. That audit is thorough but it is static analysis. This ticket is the runtime confirmation, and it is a launch gate — an enforced CSP that is missing one source fails **silently to the user** (blank image, dead pay button) while the server still returns 200.
+
+  ## Prerequisite
+
+  The deploy carrying `c124c13d` must be live. Confirm first:
+
+  ```bash
+  curl -sSI https://chobii.art/ | grep -i '^content-security-policy'
+  ```
+
+  Expect `content-security-policy:` with NO `-report-only` suffix, and the value must contain `blob:`, `https://fonts.googleapis.com`, `https://fonts.gstatic.com` and `frame-ancestors 'none'`. If it still says `content-security-policy-report-only`, the deploy has not happened — stop here.
+
+  ## Scope — walk these three flows with the browser console open
+
+  Every step means: perform the action, then read the console for `Refused to ...` / `violates the following Content Security Policy directive`. Zero violations is the pass condition.
+
+  1. **Razorpay checkout** — add to cart, reach checkout, open the payment modal, confirm the iframe renders and the card form is interactive. Do NOT complete a real payment; Razorpay is on test keys, so a test-card run is fine if you want full coverage. Watches `script-src https://checkout.razorpay.com`, `frame-src`, `connect-src https://api.razorpay.com https://lumberjack.razorpay.com`.
+  2. **AI generator with a reference image** — upload a reference image and confirm the local preview thumbnail renders before generation, then generate. The preview is `URL.createObjectURL(file)`, which is exactly what `img-src blob:` was added for.
+  3. **Google sign-in** — sign in with Google end to end and confirm the account avatar renders. Watches `lh3.googleusercontent.com` in `img-src` and confirms `form-action 'self'` does not interfere with the redirect.
+
+  Also check on any page: **Poppins and Urbanist actually load** (not fallback). DevTools > Network, filter `fonts.gstatic.com`, expect 200s; or computed `font-family` on a heading.
+
+  ## If a violation appears
+
+  The fix is one line — add the source to the single CSP label in `docker/docker-compose.prod.yml` and redeploy. Do NOT relax a whole directive (no `'unsafe-eval'`, no wildcard host, no dropping back to Report-Only) to make a symptom go away. Add the specific origin, add a comment saying which code path needs it, and extend `packages/web/tests/security-headers.test.ts` so the gap cannot reappear.
+
+  ## Acceptance Criteria
+
+  - [ ] `curl -sSI https://chobii.art/` shows enforcing `content-security-policy` (no `-report-only`) with the #344 sources present
+  - [ ] Razorpay checkout modal opens and is interactive, zero CSP violations in console
+  - [ ] AI generator reference-image upload shows its preview and generates, zero CSP violations
+  - [ ] Google sign-in completes and the avatar renders, zero CSP violations
+  - [ ] Poppins + Urbanist load from `fonts.gstatic.com` (200s in Network), not fallback fonts
+  - [ ] Any source added as a result of this pass is committed to `docker/docker-compose.prod.yml` AND guarded in `packages/web/tests/security-headers.test.ts`
+
+  ## Context
+
+  - #344 — the change being verified (done). Full audit notes, including what was deliberately left OUT of the policy (`placehold.co`, Sentry ingest, CDN `connect-src`, `accounts.google.com`), are in its completion comment.
+  - #264 — the original security-header work this extends.
+  - The policy lives in exactly one place now; `packages/web/app/ssr.tsx` held a second, contradictory enforcing CSP and was deleted in #344.
+feature: go-live
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T12:08:43.564Z'
+last_updated: '2026-08-05T12:08:43.564Z'
+time_spent_minutes: 0
+labels:
+  - security
+  - web
+  - headers
+  - deployment
+  - manual-verification
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 344
+    feature: manual-testing-bugs-feb2026
+    description: 'Content-Security-Policy for SSR pages (deferred from #264)'
+blocks: []
+attachments: []

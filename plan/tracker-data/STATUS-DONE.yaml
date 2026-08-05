@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-08-05T11:20:28.813Z'
-total_tickets: 384
+last_updated: '2026-08-05T13:46:40.790Z'
+total_tickets: 390
 summary:
   critical: 21
-  high: 145
-  medium: 166
+  high: 149
+  medium: 168
   low: 52
 priorities:
   critical:
@@ -223,6 +223,10 @@ priorities:
           blocked_by: []
         - ticket_number: 332
           title: 'BUG: database unit tests DROP and recreate real dev-DB tables with stale schemas'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 459
+          title: Unscoped test runs from parallel agents saturate the 8-core box — cap workers and enforce scope
           assignee: unassigned
           blocked_by: []
     - feature: user-reviews
@@ -767,6 +771,10 @@ priorities:
           title: Chrome - centered wordmark, right action cluster, two-row nav
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 460
+          title: Cart opens as a left slide-out drawer, not a page (mesonart parity)
+          assignee: unassigned
+          blocked_by: []
     - feature: advanced-search
       tickets:
         - ticket_number: 403
@@ -807,6 +815,16 @@ priorities:
           blocked_by: []
         - ticket_number: 452
           title: Home category tiles link to style ids that no longer exist
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 457
+          title: 'Bug: infinite scroll on /posters jumps back to the top when page 2 appends'
+          assignee: unassigned
+          blocked_by: []
+    - feature: testsuite-bug-auth
+      tickets:
+        - ticket_number: 451
+          title: 'Test Bug: auth.setup fails for trade/admin/content-manager, blocking 90 E2E tests'
           assignee: unassigned
           blocked_by: []
   medium:
@@ -1270,6 +1288,10 @@ priorities:
           title: No rate limiting on authentication endpoints
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 344
+          title: 'Content-Security-Policy for SSR pages (deferred from #264)'
+          assignee: unassigned
+          blocked_by: []
         - ticket_number: 345
           title: Content-Security-Policy for SSR pages - deferred from 264
           assignee: unassigned
@@ -1627,6 +1649,10 @@ priorities:
           blocked_by: []
         - ticket_number: 454
           title: Active filter chips move into the toolbar row so they always show
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 455
+          title: Re-point home.spec.ts and layout.spec.ts at the rebranded pages
           assignee: unassigned
           blocked_by: []
   low:

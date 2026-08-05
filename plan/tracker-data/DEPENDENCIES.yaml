@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-05T11:20:29.092Z'
+  last_updated: '2026-08-05T13:46:41.498Z'
   features:
     chobi-external-services:
       - ticket_number: 315
@@ -645,6 +645,12 @@ dependencies:
             title: Set up external uptime monitoring for production
           - ticket_number: 283
             title: Document and configure database backup procedures
+      - ticket_number: 458
+        title: Verify enforced CSP on production after deploy (post-#344 gate)
+        blocks: []
+        blocked_by:
+          - ticket_number: 344
+            title: 'Content-Security-Policy for SSR pages (deferred from #264)'
     sale-promotions:
       - ticket_number: 425
         title: Schema - record the promotion and its discount on orders
