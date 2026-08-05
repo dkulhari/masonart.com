@@ -50,6 +50,7 @@ import {
   reviewsApp,
   protectedReviewsApp,
 } from "./routes/reviews";
+import reviewMediaApp from "./routes/review-media";
 import {
   startReviewMediaWorker,
   closeReviewMediaQueue,
@@ -146,6 +147,10 @@ app.route("/api/phone-auth", phoneAuthApp);
 app.route("/api/products/:productId/reviews", productReviewsApp);
 app.route("/api/reviews", reviewsApp);
 app.route("/api/reviews", protectedReviewsApp);
+// POST /api/reviews/:reviewId/media/presign|complete - direct-to-R2 uploads.
+// Separate router: uploads are a different concern from reading/moderating,
+// and routes/reviews.ts is already past 600 lines.
+app.route("/api/reviews", reviewMediaApp);
 
 // Shipping API - shipping options and cost estimation
 app.route("/api/shipping", shippingApp);
