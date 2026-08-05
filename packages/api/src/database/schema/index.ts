@@ -36,3 +36,6 @@ export * from "./notifications";
 
 // Production photo approvals for made-to-order items
 export * from "./approvals";
+
+// Curated collections and their manual membership
+export * from "./collections";
