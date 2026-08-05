@@ -845,6 +845,32 @@ test.describe('Product Listing - Pagination', () => {
       expect(isDisabled).toBeNull();
     }
   });
+
+  /**
+   * #457 — appending the next batch is a location change, so the router's
+   * scroll restoration used to restore that location's stored position (0)
+   * and throw the reader back to the first row mid-scroll.
+   */
+  test('should keep the scroll position when the next page appends', async ({ page }) => {
+    const heightBefore = await page.evaluate(() => document.body.scrollHeight);
+
+    // Far enough down that the sentinel's 400px rootMargin has fired
+    await page.mouse.move(640, 400);
+    await page.mouse.wheel(0, 2400);
+    await expect(page).toHaveURL(/page=2/, { timeout: 10000 });
+
+    // The batch has to have actually appended, or the rest asserts nothing
+    await expect
+      .poll(() => page.evaluate(() => document.body.scrollHeight), { timeout: 10000 })
+      .toBeGreaterThan(heightBefore);
+
+    // html has scroll-behavior: smooth, so a reset glides over ~750ms rather
+    // than jumping — read the position only once that could have finished.
+    await page.waitForTimeout(2500);
+
+    const scrollY = await page.evaluate(() => window.scrollY);
+    expect(scrollY).toBeGreaterThan(1000);
+  });
 });
 
 // ============================================================================

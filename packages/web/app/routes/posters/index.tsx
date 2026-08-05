@@ -572,6 +572,14 @@ function PostersPage() {
       to: '/posters',
       search: { ...search, page: pagination.page + 1 },
       replace: true,
+      /**
+       * Appending a batch is not a navigation the reader made. Without this the
+       * router's scroll restoration treats the widened URL as a fresh location
+       * and restores its stored position — 0 — mid-scroll (#457). `html` has
+       * `scroll-behavior: smooth`, so that reset glided back over ~750ms and
+       * read as the page fighting the reader.
+       */
+      resetScroll: false,
     })
   }, [hasMore, isLoadingMore, navigate, pagination.page, search])
 
