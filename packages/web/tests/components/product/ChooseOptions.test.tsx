@@ -141,6 +141,7 @@ const apiProduct = {
       description: 'Print only',
       color: 'N/A',
       priceAddition: '0.00',
+      thumbnailUrl: null,
     },
     {
       id: 'f-black',
@@ -149,6 +150,17 @@ const apiProduct = {
       description: 'Matte black wood',
       color: 'Matte Black',
       priceAddition: '499.00',
+      // What the seed actually ships today.
+      thumbnailUrl: 'https://placehold.co/100x100/1a1a1a/ffffff?text=Black',
+    },
+    {
+      id: 'f-oak',
+      type: 'oak',
+      name: 'Natural Oak',
+      description: 'Oak',
+      color: 'Natural Oak',
+      priceAddition: '599.00',
+      thumbnailUrl: '/frames/natural-oak.webp',
     },
   ],
 }
@@ -346,6 +358,59 @@ describe('choosing a frame', () => {
 
     expect(screen.getByRole('button', { name: 'No Frame' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Classic Black' })).toBeTruthy()
+  })
+
+  /**
+   * Theirs are photographs — a corner of each frame shot on white, circular
+   * cropped, ringed and shadowed. Ours have to be OUR photographs, so the
+   * swatch renders whatever the frame's own asset is and draws the corner
+   * itself when there is no usable one.
+   *
+   * The seed currently ships placehold.co URLs, which would put a grey
+   * "Black+Frame" placard on the panel — worse than the drawing.
+   */
+  it('uses the frame photograph when the data carries a real one', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    const swatch = screen.getByRole('button', { name: 'Natural Oak' })
+    expect(swatch.querySelector('img')?.getAttribute('src')).toBe(
+      '/frames/natural-oak.webp'
+    )
+  })
+
+  it('draws the corner when the asset is a placeholder', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    const swatch = screen.getByRole('button', { name: 'Classic Black' })
+    expect(swatch.querySelector('img')).toBeNull()
+    expect(swatch.querySelector('[data-testid="frame-corner"]')).not.toBeNull()
+  })
+
+  it('draws the bare sheet when there is no frame at all', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    const swatch = screen.getByRole('button', { name: 'No Frame' })
+    expect(swatch.querySelector('img')).toBeNull()
+    expect(swatch.querySelector('[data-testid="frame-corner"]')).not.toBeNull()
+  })
+
+  it('names each swatch in a pill, the way theirs does on hover', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    const swatch = screen.getByRole('button', { name: 'Natural Oak' })
+    const pill = swatch.querySelector('[data-testid="frame-name"]')
+
+    expect(pill?.textContent).toBe('Natural Oak')
+    // Decorative duplicate — the button already carries the name.
+    expect(pill?.getAttribute('aria-hidden')).toBe('true')
   })
 
   it('marks the chosen one as pressed and names it beside the label', async () => {

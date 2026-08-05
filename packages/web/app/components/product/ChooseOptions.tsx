@@ -76,6 +76,8 @@ interface ProductOptionsResponse {
     name: string
     color?: string
     priceAddition: string
+    imageUrl?: string | null
+    thumbnailUrl?: string | null
   }>
 }
 
@@ -94,6 +96,8 @@ interface QuickviewFrame {
   name: string
   /** Rupees, already converted off the API's string. */
   priceAddition: number
+  /** A real photograph of this frame, or null when we have none worth showing. */
+  photo: string | null
 }
 
 interface ProductOptions {
@@ -107,22 +111,78 @@ export interface ChooseOptionsProps {
 }
 
 /**
- * What each frame looks like, for a 60px swatch.
+ * The moulding for each frame type: the lit edge and the shaded one.
  *
- * The API ships `imageUrl`s that point at placehold.co, which would put a
- * grey "Black+Frame" placard on the panel; the `color` field beside them is
- * the real description ("Matte Black", "Weathered Brown"). These are the
- * physical colours, not palette tokens — a walnut frame is walnut whatever the
- * site's ink is.
+ * Two stops rather than one flat fill because theirs are photographs and a
+ * photographed moulding catches light on one side — a single colour reads as a
+ * sticker. These are the physical colours off the frame rows' own `color`
+ * field ("Matte Black", "Weathered Brown"), not palette tokens: a walnut frame
+ * is walnut whatever the site's ink is.
  */
-const FRAME_SWATCH: Record<string, string> = {
-  black: '#1a1a1a',
-  white: '#f4f2ee',
-  oak: '#c9a06a',
-  walnut: '#5a3a24',
-  gold: '#c9a227',
-  silver: '#b8bcc0',
-  wood: '#8a6a4a',
+const FRAME_SWATCH: Record<string, [string, string]> = {
+  black: ['#3d3d3d', '#101010'],
+  white: ['#ffffff', '#ddd8ce'],
+  oak: ['#dcb27f', '#b1834b'],
+  walnut: ['#7d5535', '#3f2618'],
+  gold: ['#e6c86a', '#a17a17'],
+  silver: ['#e3e7ea', '#959ba1'],
+  wood: ['#ac8862', '#684d33'],
+}
+
+/**
+ * Whether a frame asset is worth putting on a swatch.
+ *
+ * The seed ships placehold.co URLs — a grey placard reading "Black+Frame",
+ * which is worse on the panel than drawing the corner ourselves. The moment
+ * real photography lands in `frames.thumbnailUrl` these light up with no code
+ * change.
+ */
+function usablePhoto(
+  thumbnail?: string | null,
+  full?: string | null
+): string | null {
+  const candidate = thumbnail || full
+  if (!candidate) return null
+  return /placehold\.co|placeholder/i.test(candidate) ? null : candidate
+}
+
+/**
+ * A frame corner, drawn.
+ *
+ * mesonart's swatches are photographs — a corner of each moulding shot on
+ * white and circular-cropped. Ours are their own product's photography, so
+ * until we have that shot, this is the same READ: a square of moulding at an
+ * angle, catching a shadow, over the print's white.
+ */
+function FrameCorner({ type }: { type: string }) {
+  const moulding = FRAME_SWATCH[type]
+
+  return (
+    <span
+      data-testid="frame-corner"
+      aria-hidden="true"
+      className={cn(
+        'grid h-[34px] w-[34px] -rotate-[14deg] place-items-center rounded-[3px]',
+        'shadow-[0_3px_6px_rgba(23,23,23,0.28)]',
+        moulding
+          ? 'p-[7px]'
+          : // No moulding at all — the bare sheet, edged just enough to be
+            // seen against the white circle behind it.
+            'border border-foreground/25 bg-background'
+      )}
+      style={
+        moulding
+          ? {
+              backgroundImage: `linear-gradient(135deg, ${moulding[0]}, ${moulding[1]})`,
+            }
+          : undefined
+      }
+    >
+      {moulding && (
+        <span className="block h-full w-full bg-background shadow-[inset_0_1px_2px_rgba(23,23,23,0.4)]" />
+      )}
+    </span>
+  )
 }
 
 /** Below this, say how many are left. Above it, say nothing. */
@@ -148,6 +208,7 @@ function toOptions(response: ProductOptionsResponse | null): ProductOptions {
       type: f.type,
       name: f.name,
       priceAddition: parseFloat(f.priceAddition || '0'),
+      photo: usablePhoto(f.thumbnailUrl, f.imageUrl),
     })),
   }
 }
@@ -453,7 +514,9 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
                           {frame?.name ?? 'None'}
                         </span>
                       </p>
-                      {/* 60px circles on a 100px pitch, as measured. */}
+                      {/* 60px circles on a 100px pitch, as measured. Theirs
+                       * sit on white with a soft ring and a shadow, and the
+                       * chosen one takes a black ring. */}
                       <div className="flex flex-wrap gap-10">
                         {options.frames.map((option) => (
                           <button
@@ -461,19 +524,42 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
                             type="button"
                             onClick={() => setFrameId(option.id)}
                             aria-pressed={option.id === frame?.id}
-                            title={option.name}
                             className={cn(
-                              'h-[60px] w-[60px] rounded-full border border-foreground/15 transition-shadow',
+                              'group/swatch relative grid h-[60px] w-[60px] place-items-center rounded-full',
+                              'bg-background shadow-[0_2px_10px_rgba(23,23,23,0.18)] transition-shadow',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                               option.id === frame?.id &&
-                                'ring-2 ring-foreground ring-offset-4 ring-offset-background'
+                                'ring-2 ring-foreground ring-offset-2 ring-offset-background'
                             )}
-                            style={
-                              FRAME_SWATCH[option.type]
-                                ? { backgroundColor: FRAME_SWATCH[option.type] }
-                                : undefined
-                            }
                           >
                             <span className="sr-only">{option.name}</span>
+
+                            {option.photo ? (
+                              <img
+                                src={option.photo}
+                                alt=""
+                                aria-hidden="true"
+                                className="h-full w-full rounded-full object-cover"
+                              />
+                            ) : (
+                              <FrameCorner type={option.type} />
+                            )}
+
+                            {/* Their hover label: a small black pill above the
+                             * swatch. Decorative — the button is already named. */}
+                            <span
+                              data-testid="frame-name"
+                              aria-hidden="true"
+                              className={cn(
+                                'pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap',
+                                'rounded-pill bg-primary px-3 py-1 text-xs text-primary-foreground',
+                                'opacity-0 transition-opacity',
+                                EASE_FAST,
+                                'group-hover/swatch:opacity-100 group-focus-visible/swatch:opacity-100'
+                              )}
+                            >
+                              {option.name}
+                            </span>
                           </button>
                         ))}
                       </div>
