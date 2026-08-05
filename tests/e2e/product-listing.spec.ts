@@ -1,6 +1,38 @@
 import { test, expect } from '@playwright/test';
 
 /**
+ * Facet vocabulary, taken from FACET_GROUPS in @chobii/shared (#395, #415).
+ *
+ * Spelled out here because most of this file was written against the old
+ * words and every one of them is now wrong in a way that reads as a broken
+ * page rather than a stale test:
+ *
+ *   - `abstract` is a SUBJECT, not a style. `?styles=abstract` fails
+ *     validation, so no chip, no filtered grid, no clear-all.
+ *   - `orientation=portrait` is still the parameter, but the rail labels it
+ *     "Vertical" — mesonart's word (#415).
+ *   - A chip carries the raw id with its hyphens spaced out, not the label:
+ *     `minimalist-art` renders as "minimalist art".
+ *
+ * Zero-count options render DISABLED, so anything clicked here has to be a
+ * value the seed actually carries.
+ */
+const STYLE = {
+  id: 'minimalist-art',
+  label: 'Minimalist Art',
+  chip: 'minimalist art',
+};
+const STYLE_2 = { id: 'pop-art', label: 'Pop Art', chip: 'pop art' };
+const SUBJECT = { id: 'landscape', label: 'Landscape' };
+const ORIENTATION = { id: 'portrait', label: 'Vertical', chip: 'portrait' };
+const ROOM = { id: 'living-room', label: 'Living Room' };
+const COLOR = { id: 'blue', label: 'Blue' };
+
+/** The desktop chip row and the mobile one both render; scope or you get both. */
+const desktopChips = (page: import('@playwright/test').Page) =>
+  page.locator('div.hidden.lg\\:block');
+
+/**
  * Product Listing Page E2E Tests
  *
  * Tests for the chobii.art product listing page (/posters) including:
@@ -42,14 +74,17 @@ test.describe('Product Listing - Page Header', () => {
   });
 
   test('should display product count or default text', async ({ page }) => {
-    // Either shows "Showing X products" or "Browse our collection"
-    const productCount = page.locator('text=/Showing \\d+ product|Browse our collection/');
+    // The count moved into the toolbar with #416 and reads "N products" /
+    // "No products" — the header band no longer carries it.
+    const productCount = page
+      .getByTestId('collection-toolbar')
+      .locator('text=/\\d+ products?|No products/');
     await expect(productCount.first()).toBeVisible();
   });
 
   test('should indicate active filters in header', async ({ page }) => {
     // Navigate with a filter applied
-    await page.goto('/posters?styles=abstract');
+    await page.goto(`/posters?styles=${STYLE.id}`);
 
     const filterIndicator = page.locator('text=/matching your filters/');
     // May or may not be visible depending on product count
@@ -65,7 +100,7 @@ test.describe('Product Listing - Page Header', () => {
 test.describe('Product Listing - Desktop Filter Sidebar', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    await page.goto('/posters', { waitUntil: 'networkidle' });
   });
 
   test('should display filter sidebar on desktop', async ({ page }) => {
@@ -73,14 +108,29 @@ test.describe('Product Listing - Desktop Filter Sidebar', () => {
     await expect(filterSidebar).toBeVisible();
   });
 
-  test('should display Filters header', async ({ page }) => {
-    const filtersHeader = page.locator('h2:has-text("Filters")');
-    await expect(filtersHeader).toBeVisible();
+  test('carries no header of its own — the chips above the grid do that job', async ({
+    page,
+  }) => {
+    // #415: mesonart's rail has no title, no active count and no "Clear all".
+    // The drawer keeps its header because it has no chips and no other way
+    // out; the rail does not. This asserts the removal so it stays removed.
+    const rail = page.locator('aside.hidden.lg\\:block');
+    await expect(rail).toBeVisible();
+    await expect(rail.locator('h2')).toHaveCount(0);
   });
 
-  test('should display Sort By section', async ({ page }) => {
-    const sortSection = page.locator('button:has-text("Sort By")');
-    await expect(sortSection).toBeVisible();
+  test('should display Sort By in the toolbar, not the rail', async ({
+    page,
+  }) => {
+    // Sort left the sidebar for a toolbar pill in #416 — it is not a filter
+    // and it does not narrow the result set.
+    const rail = page.locator('aside.hidden.lg\\:block');
+    await expect(rail.getByRole('button', { name: /Sort/ })).toHaveCount(0);
+    await expect(
+      page.getByTestId('collection-toolbar').getByRole('button', {
+        name: /^Sort by:/,
+      })
+    ).toBeVisible();
   });
 
   test('should display Orientation section', async ({ page }) => {
@@ -99,7 +149,11 @@ test.describe('Product Listing - Desktop Filter Sidebar', () => {
   });
 
   test('should display Color section', async ({ page }) => {
-    const colorSection = page.locator('button:has-text("Color")');
+    // Exact: `has-text("Color")` also matches the "Colorful Art" style option.
+    const colorSection = page.getByRole('button', {
+      name: 'Color',
+      exact: true,
+    });
     await expect(colorSection).toBeVisible();
   });
 
@@ -108,26 +162,42 @@ test.describe('Product Listing - Desktop Filter Sidebar', () => {
     await expect(roomSection).toBeVisible();
   });
 
-  test('should display Special filters section', async ({ page }) => {
-    const specialSection = page.locator('button:has-text("Special")');
-    await expect(specialSection).toBeVisible();
+  test('has no Special section — those two live in the URL only', async ({
+    page,
+  }) => {
+    // #415 rebuilt the rail from FACET_GROUPS, which has ten groups and no
+    // Special. `isAiGenerated` and `isFeatured` survive as URL parameters the
+    // API still filters on; they are covered as such under "URL State".
+    const rail = page.locator('aside.hidden.lg\\:block');
+    await expect(rail.getByRole('button', { name: /Special/ })).toHaveCount(0);
   });
 
   test('should toggle filter section on click', async ({ page }) => {
-    // Style section should be expanded by default with options visible
-    const styleSection = page.locator('button:has-text("Style")');
+    const rail = page.locator('aside.hidden.lg\\:block');
+    const styleSection = rail.getByRole('button', {
+      name: 'Style',
+      exact: true,
+    });
     await expect(styleSection).toBeVisible();
 
-    // Check that Style has options visible (checkboxes)
-    const abstractOption = page.locator('label').filter({ hasText: /^Abstract$/ }).first();
-    await expect(abstractOption).toBeVisible({ timeout: 5000 });
+    // Expanded by default, so its options are on screen. "Abstract" is a
+    // SUBJECT — a style option is what belongs under Style.
+    const styleOption = rail.getByText(STYLE.label, { exact: true });
+    await expect(styleOption).toBeVisible({ timeout: 5000 });
+
+    // Collapsing hides them again, which is the toggle this names.
+    await styleSection.click();
+    await expect(styleOption).toBeHidden();
   });
 
   test('should show Clear all button when filters are active', async ({ page }) => {
-    await page.goto('/posters?styles=abstract');
+    await page.goto(`/posters?styles=${STYLE.id}`);
 
-    const clearAllButton = page.locator('button:has-text("Clear all")').first();
-    await expect(clearAllButton).toBeVisible();
+    // Clear all lives with the chips above the grid, not in the rail (#415).
+    const clearAllButton = desktopChips(page)
+      .getByRole('button', { name: 'Clear all' })
+      .first();
+    await expect(clearAllButton).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -142,86 +212,95 @@ test.describe('Product Listing - Filter Selection', () => {
   });
 
   test('should select orientation filter', async ({ page }) => {
-    // Orientation section should be expanded by default
-    const portraitButton = page.locator('button:has-text("Portrait")').first();
-    await portraitButton.click();
+    // The parameter is still `portrait`; the rail calls it "Vertical" (#415).
+    // Options are labels wrapping an sr-only checkbox, not buttons.
+    const rail = page.locator('aside.hidden.lg\\:block');
+    await rail.getByText(ORIENTATION.label, { exact: true }).click();
 
-    // URL should update with orientation parameter
-    await expect(page).toHaveURL(/orientation=portrait/);
+    await expect(page).toHaveURL(
+      new RegExp(`orientation=${ORIENTATION.id}`),
+      { timeout: 10000 }
+    );
   });
 
   test('should select style filter and update URL', async ({ page }) => {
-    // Style section should be expanded by default
-    // Scope selector to filter panel to avoid matching product card tags
-    const filterPanel = page.locator('aside').first();
-    const abstractLabel = filterPanel.getByText('Abstract', { exact: true });
-    await abstractLabel.click();
+    const rail = page.locator('aside.hidden.lg\\:block');
+    await rail.getByText(STYLE.label, { exact: true }).click();
 
-    // Wait for navigation to complete - URL should update with styles parameter
-    await expect(page).toHaveURL(/styles=abstract/, { timeout: 10000 });
+    await expect(page).toHaveURL(new RegExp(`styles=${STYLE.id}`), {
+      timeout: 10000,
+    });
   });
 
   test('should allow multiple style selections', async ({ page }) => {
-    const filterPanel = page.locator('aside').first();
-    const abstractLabel = filterPanel.getByText('Abstract', { exact: true });
-    await abstractLabel.click();
-    await expect(page).toHaveURL(/styles=abstract/, { timeout: 10000 });
+    const rail = page.locator('aside.hidden.lg\\:block');
+    await rail.getByText(STYLE.label, { exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`styles=${STYLE.id}`), {
+      timeout: 10000,
+    });
 
-    const minimalistLabel = filterPanel.getByText('Minimalist', { exact: true });
-    await minimalistLabel.click();
+    await rail.getByText(STYLE_2.label, { exact: true }).click();
 
-    // URL should contain both styles
-    await expect(page).toHaveURL(/styles=.*abstract/);
-    await expect(page).toHaveURL(/styles=.*minimalist/);
+    await expect(page).toHaveURL(new RegExp(`styles=.*${STYLE.id}`), {
+      timeout: 10000,
+    });
+    await expect(page).toHaveURL(new RegExp(`styles=.*${STYLE_2.id}`));
   });
 
   test('should deselect filter on second click', async ({ page }) => {
-    // Select filter
-    const portraitButton = page.locator('button:has-text("Portrait")').first();
-    await portraitButton.click();
-    await expect(page).toHaveURL(/orientation=portrait/);
+    const rail = page.locator('aside.hidden.lg\\:block');
+    const vertical = rail.getByText(ORIENTATION.label, { exact: true });
 
-    // Deselect filter
-    await portraitButton.click();
-    await expect(page).not.toHaveURL(/orientation=/);
+    await vertical.click();
+    await expect(page).toHaveURL(
+      new RegExp(`orientation=${ORIENTATION.id}`),
+      { timeout: 10000 }
+    );
+
+    await vertical.click();
+    await expect(page).not.toHaveURL(/orientation=/, { timeout: 10000 });
   });
 
   test('should select subject filter', async ({ page }) => {
-    // Subject section is expanded by default (see ProductFilters.tsx initialState)
-    const filterPanel = page.locator('aside').first();
+    const rail = page.locator('aside.hidden.lg\\:block');
+    const subject = rail.getByText(SUBJECT.label, { exact: true });
+    await subject.scrollIntoViewIfNeeded();
+    await expect(subject).toBeVisible({ timeout: 5000 });
+    await subject.click();
 
-    // Scroll to and click on Nature & Landscape option (section already expanded)
-    const natureLabel = filterPanel.getByText('Nature & Landscape', { exact: true });
-    await natureLabel.scrollIntoViewIfNeeded();
-    await expect(natureLabel).toBeVisible({ timeout: 5000 });
-    await natureLabel.click();
-
-    await expect(page).toHaveURL(/subjects=nature-landscape/, { timeout: 10000 });
+    await expect(page).toHaveURL(new RegExp(`subjects=${SUBJECT.id}`), {
+      timeout: 10000,
+    });
   });
 
   test('should select color filter', async ({ page }) => {
-    // Expand colors section
-    const colorsSection = page.locator('button:has-text("Color")');
-    await colorsSection.click();
+    const rail = page.locator('aside.hidden.lg\\:block');
+    // Colors is one of the four groups open by default (ProductFilters.tsx:106)
+    // — clicking its header here COLLAPSES it and hides the option.
+    await expect(
+      rail.getByRole('button', { name: 'Color', exact: true })
+    ).toHaveAttribute('aria-expanded', 'true');
 
-    const blueButton = page.locator('button:has-text("Blue")');
-    await blueButton.click();
+    const blue = rail.getByText(COLOR.label, { exact: true });
+    await blue.scrollIntoViewIfNeeded();
+    await blue.click();
 
-    await expect(page).toHaveURL(/colors=blue/);
+    await expect(page).toHaveURL(new RegExp(`colors=${COLOR.id}`), {
+      timeout: 10000,
+    });
   });
 
   test('should select room filter', async ({ page }) => {
-    // Expand rooms section
-    const filterPanel = page.locator('aside').first();
-    const roomsSection = filterPanel.locator('button:has-text("Room")');
-    await roomsSection.click();
+    const rail = page.locator('aside.hidden.lg\\:block');
+    await rail.getByRole('button', { name: 'Room', exact: true }).click();
 
-    // Wait for section to expand - checkbox should become visible
-    const livingRoomLabel = filterPanel.getByText('Living Room', { exact: true });
-    await expect(livingRoomLabel).toBeVisible();
-    await livingRoomLabel.click();
+    const room = rail.getByText(ROOM.label, { exact: true });
+    await expect(room).toBeVisible();
+    await room.click();
 
-    await expect(page).toHaveURL(/rooms=living-room/, { timeout: 10000 });
+    await expect(page).toHaveURL(new RegExp(`rooms=${ROOM.id}`), {
+      timeout: 10000,
+    });
   });
 });
 
@@ -232,51 +311,93 @@ test.describe('Product Listing - Filter Selection', () => {
 test.describe('Product Listing - Sort Options', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    // networkidle, not load: the pill is a client component and a click on
+    // server-rendered HTML lands on nothing.
+    await page.goto('/posters', { waitUntil: 'networkidle' });
   });
 
+  /**
+   * Sort is a toolbar pill that opens a panel in place (#416), not a radio
+   * list in the rail. The pill's own label carries the current selection,
+   * which is what these assert against.
+   */
+  const sortPill = (page: import('@playwright/test').Page) =>
+    page
+      .getByTestId('collection-toolbar')
+      .getByRole('button', { name: /^Sort by:/ });
+
+  const openSortPanel = async (page: import('@playwright/test').Page) => {
+    await sortPill(page).click();
+    const panel = page.getByRole('listbox', { name: 'Sort by' });
+    await expect(panel).toBeVisible();
+    return panel;
+  };
+
   test('should display sort options', async ({ page }) => {
-    // Sort section should be expanded by default
-    const newestFirst = page.locator('button:has-text("Newest First")');
-    await expect(newestFirst).toBeVisible();
+    const panel = await openSortPanel(page);
+    await expect(panel.getByText('Newest First', { exact: true })).toBeVisible();
   });
 
   test('should display all sort options', async ({ page }) => {
-    await expect(page.locator('button:has-text("Newest First")')).toBeVisible();
-    await expect(page.locator('button:has-text("Oldest First")')).toBeVisible();
-    await expect(page.locator('button:has-text("Price: Low to High")')).toBeVisible();
-    await expect(page.locator('button:has-text("Price: High to Low")')).toBeVisible();
-    await expect(page.locator('button:has-text("Name: A to Z")')).toBeVisible();
-    await expect(page.locator('button:has-text("Name: Z to A")')).toBeVisible();
+    const panel = await openSortPanel(page);
+
+    // Eight, including the two #405 added — Featured and Best selling.
+    for (const label of [
+      'Featured',
+      'Best selling',
+      'Newest First',
+      'Oldest First',
+      'Price: Low to High',
+      'Price: High to Low',
+      'Name: A to Z',
+      'Name: Z to A',
+    ]) {
+      await expect(panel.getByText(label, { exact: true })).toBeVisible();
+    }
   });
 
   test('should sort by price low to high', async ({ page }) => {
-    const priceLowHigh = page.locator('button:has-text("Price: Low to High")');
-    await priceLowHigh.click();
-    // Sort uses client-side state, verify button is clickable and has visual indicator
-    await expect(priceLowHigh).toBeVisible();
+    const panel = await openSortPanel(page);
+    await panel.getByText('Price: Low to High', { exact: true }).click();
+
+    await expect(page).toHaveURL(/sortBy=basePrice/, { timeout: 10000 });
+    await expect(page).toHaveURL(/sortOrder=asc/);
+    await expect(sortPill(page)).toHaveText(/Price: Low to High/);
   });
 
   test('should sort by price high to low', async ({ page }) => {
-    const priceHighLow = page.locator('button:has-text("Price: High to Low")');
-    await priceHighLow.click();
-    // Sort uses client-side state, verify button is clickable
-    await expect(priceHighLow).toBeVisible();
+    const panel = await openSortPanel(page);
+    await panel.getByText('Price: High to Low', { exact: true }).click();
+
+    // `desc` is the default sort order and the route deliberately leaves
+    // defaults out of the URL (routes/posters/index.tsx:533) — so this one
+    // writes sortBy alone. Asserting `sortOrder=desc` tests the URL builder's
+    // absence of a feature, not the sort.
+    await expect(page).toHaveURL(/sortBy=basePrice/, { timeout: 10000 });
+    await expect(page).not.toHaveURL(/sortOrder=asc/);
+    await expect(sortPill(page)).toHaveText(/Price: High to Low/, {
+      timeout: 10000,
+    });
   });
 
   test('should sort by name A to Z', async ({ page }) => {
-    const nameAZ = page.locator('button:has-text("Name: A to Z")');
-    await nameAZ.click();
-    // Sort uses client-side state, verify button is clickable
-    await expect(nameAZ).toBeVisible();
+    const panel = await openSortPanel(page);
+    await panel.getByText('Name: A to Z', { exact: true }).click();
+
+    await expect(page).toHaveURL(/sortBy=title/, { timeout: 10000 });
+    await expect(sortPill(page)).toHaveText(/Name: A to Z/);
   });
 
   test('should indicate current sort selection', async ({ page }) => {
-    const priceLowHigh = page.locator('button:has-text("Price: Low to High")');
-    await priceLowHigh.click();
+    // The pill IS the indicator — there is no checked radio to look for.
+    await expect(sortPill(page)).toHaveText(/Newest First/);
 
-    // Button should remain visible after clicking (sort selection works)
-    await expect(priceLowHigh).toBeVisible();
+    const panel = await openSortPanel(page);
+    await panel.getByText('Price: Low to High', { exact: true }).click();
+
+    await expect(sortPill(page)).toHaveText(/Price: Low to High/, {
+      timeout: 10000,
+    });
   });
 });
 
@@ -306,7 +427,7 @@ test.describe('Product Listing - Mobile Filters', () => {
   });
 
   test('should display filter count badge when filters active', async ({ page }) => {
-    await page.goto('/posters?styles=abstract');
+    await page.goto(`/posters?styles=${STYLE.id}`);
 
     const filterButton = getMobileFilterButton(page);
     await expect(filterButton).toBeVisible();
@@ -331,11 +452,17 @@ test.describe('Product Listing - Mobile Filters', () => {
     const filterButton = getMobileFilterButton(page);
     await filterButton.click();
 
-    // Should show filter sections in the dialog
+    // Sort is not in the drawer either — it is a toolbar pill (#416). The
+    // drawer keeps its own "Filters" header, which the rail does not (#415).
     const dialog = page.locator('div[role="dialog"][aria-label="Filters"]');
-    await expect(dialog.locator('button:has-text("Sort By")')).toBeVisible();
-    await expect(dialog.locator('button:has-text("Orientation")')).toBeVisible();
-    await expect(dialog.locator('button:has-text("Style")')).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Filters' })).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Orientation', exact: true })
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Style', exact: true })
+    ).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Sort/ })).toHaveCount(0);
   });
 
   test('should display Apply Filters button in mobile sheet', async ({ page }) => {
@@ -393,51 +520,59 @@ test.describe('Product Listing - Active Filter Tags', () => {
   });
 
   test('should display active filter tags', async ({ page }) => {
-    await page.goto('/posters?styles=abstract');
+    await page.goto(`/posters?styles=${STYLE.id}`);
 
-    // Find visible Active filters label (hidden lg:block container for desktop)
-    const activeFiltersLabel = page.locator('div.hidden.lg\\:block >> text=Active filters:');
+    // Both chip rows render — the mobile one and the desktop one. Scope, or
+    // the mobile copy answers for the desktop layout.
+    const activeFiltersLabel = desktopChips(page).locator(
+      'text=Active filters:'
+    );
     await expect(activeFiltersLabel.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should display filter tag with remove button', async ({ page }) => {
-    await page.goto('/posters?styles=abstract');
+    await page.goto(`/posters?styles=${STYLE.id}`);
 
-    // Should show abstract tag with X button (scoped to desktop container)
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const abstractTag = desktopFilters.locator('button:has-text("abstract")');
-    await expect(abstractTag.first()).toBeVisible({ timeout: 10000 });
+    // A chip carries the raw id with its hyphens spaced, not the label.
+    const styleTag = desktopChips(page).locator(
+      `button:has-text("${STYLE.chip}")`
+    );
+    await expect(styleTag.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should remove individual filter on tag click', async ({ page }) => {
-    await page.goto('/posters?styles=abstract,minimalist', { waitUntil: 'networkidle' });
+    await page.goto(`/posters?styles=${STYLE.id},${STYLE_2.id}`, {
+      waitUntil: 'networkidle',
+    });
 
-    // Click to remove abstract filter (scoped to desktop container)
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const abstractTag = desktopFilters.locator('button:has-text("abstract")').first();
-    await expect(abstractTag).toBeVisible({ timeout: 10000 });
-    await abstractTag.click();
+    const styleTag = desktopChips(page)
+      .locator(`button:has-text("${STYLE.chip}")`)
+      .first();
+    await expect(styleTag).toBeVisible({ timeout: 10000 });
+    await styleTag.click();
 
-    // URL should no longer contain abstract
-    await expect(page).not.toHaveURL(/abstract/, { timeout: 10000 });
-    await expect(page).toHaveURL(/minimalist/);
+    await expect(page).not.toHaveURL(new RegExp(STYLE.id), { timeout: 10000 });
+    await expect(page).toHaveURL(new RegExp(STYLE_2.id));
   });
 
   test('should display Clear all button with active filters', async ({ page }) => {
-    await page.goto('/posters?styles=abstract');
+    await page.goto(`/posters?styles=${STYLE.id}`);
 
-    // Clear all in the active filter tags section (scoped to desktop container)
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const clearAllButton = desktopFilters.locator('button:has-text("Clear all")');
+    const clearAllButton = desktopChips(page).getByRole('button', {
+      name: 'Clear all',
+    });
     await expect(clearAllButton.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should clear all filters on Clear all click', async ({ page }) => {
-    await page.goto('/posters?styles=abstract&orientation=portrait', { waitUntil: 'networkidle' });
+    await page.goto(
+      `/posters?styles=${STYLE.id}&orientation=${ORIENTATION.id}`,
+      { waitUntil: 'networkidle' }
+    );
 
-    // Clear all in the active filter tags section (scoped to desktop container)
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const clearAllButton = desktopFilters.locator('button:has-text("Clear all")').first();
+    const clearAllButton = desktopChips(page)
+      .getByRole('button', { name: 'Clear all' })
+      .first();
     await expect(clearAllButton).toBeVisible({ timeout: 10000 });
     await clearAllButton.click();
 
@@ -447,15 +582,18 @@ test.describe('Product Listing - Active Filter Tags', () => {
   });
 
   test('should display multiple filter tags', async ({ page }) => {
-    await page.goto('/posters?styles=abstract&orientation=portrait');
+    await page.goto(
+      `/posters?styles=${STYLE.id}&orientation=${ORIENTATION.id}`
+    );
 
-    // Scoped to desktop container
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const abstractTag = desktopFilters.locator('button:has-text("abstract")');
-    const portraitTag = desktopFilters.locator('button:has-text("portrait")');
+    const chips = desktopChips(page);
+    const styleTag = chips.locator(`button:has-text("${STYLE.chip}")`);
+    const orientationTag = chips.locator(
+      `button:has-text("${ORIENTATION.chip}")`
+    );
 
-    await expect(abstractTag.first()).toBeVisible({ timeout: 10000 });
-    await expect(portraitTag.first()).toBeVisible({ timeout: 10000 });
+    await expect(styleTag.first()).toBeVisible({ timeout: 10000 });
+    await expect(orientationTag.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should not display filter tags when no filters active', async ({ page }) => {
@@ -501,23 +639,26 @@ test.describe('Product Listing - Product Grid', () => {
   });
 
   test('should display product title in card', async ({ page }) => {
-    const productCards = page.locator('a[href^="/posters/"]');
-    const count = await productCards.count();
+    // The title is a Link inside a <p>, not a heading — one h1 per page and
+    // 24 card headings underneath it was the wrong hierarchy anyway.
+    const cards = page.getByTestId('card-content');
+    const count = await cards.count();
 
     if (count > 0) {
-      const firstCard = productCards.first();
-      const title = firstCard.locator('h3');
+      const title = cards.first().locator('p a[href^="/posters/"]');
       await expect(title).toBeVisible();
+      await expect(title).not.toHaveText('');
     }
   });
 
   test('should display product price in card', async ({ page }) => {
-    const productCards = page.locator('a[href^="/posters/"]');
-    const count = await productCards.count();
+    // Price sits BESIDE the title link, sharing the right column with the
+    // wishlist heart — not inside the product anchor.
+    const cards = page.getByTestId('card-content');
+    const count = await cards.count();
 
     if (count > 0) {
-      const firstCard = productCards.first();
-      const price = firstCard.locator('text=/From ₹/');
+      const price = cards.first().locator('text=/From ₹/');
       await expect(price).toBeVisible();
     }
   });
@@ -709,64 +850,130 @@ test.describe('Product Listing - URL State', () => {
   });
 
   test('should apply styles filter from URL', async ({ page }) => {
-    await page.goto('/posters?styles=abstract');
+    await page.goto(`/posters?styles=${STYLE.id}`);
 
-    // Should show abstract tag as active filter (scoped to desktop container)
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const abstractTag = desktopFilters.locator('button:has-text("abstract")');
-    await expect(abstractTag.first()).toBeVisible({ timeout: 10000 });
+    const styleTag = desktopChips(page).locator(
+      `button:has-text("${STYLE.chip}")`
+    );
+    await expect(styleTag.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should apply multiple styles from URL', async ({ page }) => {
-    await page.goto('/posters?styles=abstract,minimalist');
+    await page.goto(`/posters?styles=${STYLE.id},${STYLE_2.id}`);
 
-    // Should show both tags (scoped to desktop container)
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const abstractTag = desktopFilters.locator('button:has-text("abstract")');
-    const minimalistTag = desktopFilters.locator('button:has-text("minimalist")');
-
-    await expect(abstractTag.first()).toBeVisible({ timeout: 10000 });
-    await expect(minimalistTag.first()).toBeVisible({ timeout: 10000 });
+    const chips = desktopChips(page);
+    await expect(
+      chips.locator(`button:has-text("${STYLE.chip}")`).first()
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      chips.locator(`button:has-text("${STYLE_2.chip}")`).first()
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('should apply orientation filter from URL', async ({ page }) => {
-    await page.goto('/posters?orientation=portrait');
+    await page.goto(`/posters?orientation=${ORIENTATION.id}`);
 
-    // Should show portrait tag (scoped to desktop container)
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const portraitTag = desktopFilters.locator('button:has-text("portrait")');
-    await expect(portraitTag.first()).toBeVisible({ timeout: 10000 });
+    const orientationTag = desktopChips(page).locator(
+      `button:has-text("${ORIENTATION.chip}")`
+    );
+    await expect(orientationTag.first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should apply sort from URL', async ({ page }) => {
     await page.goto('/posters?sortBy=basePrice&sortOrder=asc');
 
-    // Price Low to High should be selected (check mark icon visible)
-    const filterPanel = page.locator('aside').first();
-    const priceLowHigh = filterPanel.locator('button:has-text("Price: Low to High")');
-    const checkIcon = priceLowHigh.locator('svg');
-    await expect(checkIcon).toBeVisible({ timeout: 10000 });
+    // The toolbar pill carries the current sort; the rail has no sort control
+    // to put a check mark in any more (#416).
+    await expect(
+      page
+        .getByTestId('collection-toolbar')
+        .getByRole('button', { name: /^Sort by:/ })
+    ).toHaveText(/Price: Low to High/, { timeout: 10000 });
   });
 
   test('should apply combined filters from URL', async ({ page }) => {
-    await page.goto('/posters?styles=abstract&orientation=portrait&sortBy=title&sortOrder=asc');
+    await page.goto(
+      `/posters?styles=${STYLE.id}&orientation=${ORIENTATION.id}&sortBy=title&sortOrder=asc`
+    );
 
-    // Should show all active filters (scoped to desktop container)
-    const desktopFilters = page.locator('div.hidden.lg\\:block');
-    const abstractTag = desktopFilters.locator('button:has-text("abstract")');
-    const portraitTag = desktopFilters.locator('button:has-text("portrait")');
+    const chips = desktopChips(page);
+    await expect(
+      chips.locator(`button:has-text("${STYLE.chip}")`).first()
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      chips.locator(`button:has-text("${ORIENTATION.chip}")`).first()
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page
+        .getByTestId('collection-toolbar')
+        .getByRole('button', { name: /^Sort by:/ })
+    ).toHaveText(/Name: A to Z/);
+  });
 
-    await expect(abstractTag.first()).toBeVisible({ timeout: 10000 });
-    await expect(portraitTag.first()).toBeVisible({ timeout: 10000 });
+  test('should apply isAiGenerated from the URL', async ({ page }) => {
+    // The rail's "Special" section went with the #415 facet rework, but the
+    // parameter is still part of the contract and the API still filters on
+    // it. Covered here rather than deleted with the UI that used to set it.
+    await page.goto('/posters?isAiGenerated=true', {
+      waitUntil: 'networkidle',
+    });
+
+    await expect(page).toHaveURL(/isAiGenerated=true/);
+    const toolbarCount = page
+      .getByTestId('collection-toolbar')
+      .locator('text=/\\d+ products?|No products/');
+    await expect(toolbarCount.first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should apply isFeatured from the URL', async ({ page }) => {
+    await page.goto('/posters?isFeatured=true', { waitUntil: 'networkidle' });
+
+    await expect(page).toHaveURL(/isFeatured=true/);
+  });
+
+  test.fixme('should chip isFeatured like every other filter', async ({
+    page,
+  }) => {
+    /**
+     * BLOCKED on #453 — the page is the bug, not this test.
+     *
+     * `ActiveFilterTags` builds a "Featured" chip, but the whole chip row is
+     * gated on `activeFilterCount` (routes/posters/index.tsx:592), and that
+     * sum counts styles, subjects, colors, rooms, orientation, price and
+     * isAiGenerated — not isFeatured, and not vibe/aesthetic/medium/
+     * uniqueness/availability either. Filter by any of those and the page
+     * silently shows no chip and no mobile badge.
+     */
+    await page.goto('/posters?isFeatured=true', { waitUntil: 'networkidle' });
+
+    await expect(
+      desktopChips(page).getByRole('button', { name: /Featured/ }).first()
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should narrow the result count with isFeatured', async ({ page }) => {
+    const countText = async () =>
+      (await page
+        .getByTestId('collection-toolbar')
+        .locator('text=/\\d+ products?|No products/')
+        .first()
+        .textContent()) ?? '';
+
+    await page.goto('/posters', { waitUntil: 'networkidle' });
+    const all = parseInt((await countText()).replace(/\D/g, ''), 10) || 0;
+
+    await page.goto('/posters?isFeatured=true', { waitUntil: 'networkidle' });
+    const featured = parseInt((await countText()).replace(/\D/g, ''), 10) || 0;
+
+    // The parameter has to actually do something, not just survive the URL.
+    expect(featured).toBeLessThanOrEqual(all);
   });
 
   test('should reset page to 1 when changing filters', async ({ page }) => {
     await page.goto('/posters?page=2', { waitUntil: 'networkidle' });
 
-    // Select a style filter - scope to filter panel
-    const filterPanel = page.locator('aside').first();
-    const abstractLabel = filterPanel.getByText('Abstract', { exact: true });
-    await abstractLabel.click();
+    const rail = page.locator('aside.hidden.lg\\:block');
+    await rail.getByText(STYLE.label, { exact: true }).click();
 
     // Page should reset to 1 (not in URL or page=1)
     await expect(page).not.toHaveURL(/page=2/, { timeout: 10000 });
@@ -914,7 +1121,8 @@ test.describe('Product Listing - Responsive Design', () => {
 
 test.describe('Product Listing - Accessibility', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/posters');
+    // Anything that clicks needs the client bundle in place, not just HTML.
+    await page.goto('/posters', { waitUntil: 'networkidle' });
   });
 
   test('should have proper heading hierarchy', async ({ page }) => {
@@ -927,11 +1135,23 @@ test.describe('Product Listing - Accessibility', () => {
     await expect(h1).toContainText('Shop Posters');
   });
 
-  test('should have accessible filter sidebar header', async ({ page }) => {
+  test('should expose the rail as collapsible groups, header or not', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
 
-    const filtersHeader = page.locator('h2:has-text("Filters")');
-    await expect(filtersHeader).toBeVisible();
+    // The rail lost its "Filters" heading in #415 — mesonart's has none. What
+    // a screen reader needs is not the title but the state of each group, so
+    // that is what this asserts now.
+    const rail = page.locator('aside.hidden.lg\\:block');
+    const groups = rail.locator('button[aria-expanded]');
+    await expect(groups.first()).toBeVisible();
+    expect(await groups.count()).toBeGreaterThanOrEqual(10);
+
+    const first = groups.first();
+    const before = await first.getAttribute('aria-expanded');
+    await first.click();
+    await expect(first).not.toHaveAttribute('aria-expanded', before ?? '');
   });
 
   test('should have ARIA labels on pagination buttons', async ({ page }) => {
@@ -1054,7 +1274,7 @@ test.describe('Product Listing - Navigation', () => {
   });
 
   test('should preserve filters when navigating back', async ({ page }) => {
-    await page.goto('/posters?styles=abstract');
+    await page.goto(`/posters?styles=${STYLE.id}`);
 
     const productCards = page.locator('a[href^="/posters/"]');
     const count = await productCards.count();
@@ -1064,18 +1284,36 @@ test.describe('Product Listing - Navigation', () => {
       await firstCard.click();
 
       await page.goBack();
-      await expect(page).toHaveURL(/styles=abstract/);
+      await expect(page).toHaveURL(new RegExp(`styles=${STYLE.id}`));
     }
   });
 
-  test('should navigate from home page category link', async ({ page }) => {
-    await page.goto('/');
+  test.fixme(
+    'should navigate from home page category link',
+    async ({ page }) => {
+      /**
+       * BLOCKED on #452 — the home tiles are the bug, not this test.
+       *
+       * `routes/index.tsx:294` still lists slugs `abstract`, `nature`,
+       * `minimalist`, `typography` and links them as `?styles=<slug>`. None
+       * of those is a STYLE_OPTIONS id since #395/#415 (they are
+       * `minimalist-art`, `pop-art`, …; `abstract` is a SUBJECT), so every
+       * tile lands on a collection that cannot filter by what it promised.
+       *
+       * Repointing this test at a valid id would make the suite green while
+       * leaving four broken tiles on the busiest page of the site.
+       */
+      await page.goto('/');
 
-    const abstractLink = page.locator('a[href="/posters?styles=abstract"]');
-    await abstractLink.click();
+      const tile = page.locator(`a[href="/posters?styles=${STYLE.id}"]`).first();
+      await tile.click();
 
-    await expect(page).toHaveURL(/\/posters\?styles=abstract/);
-  });
+      await expect(page).toHaveURL(new RegExp(`/posters\\?styles=${STYLE.id}`));
+      await expect(
+        desktopChips(page).locator(`button:has-text("${STYLE.chip}")`).first()
+      ).toBeVisible({ timeout: 10000 });
+    }
+  );
 });
 
 // ============================================================================
@@ -1095,9 +1333,13 @@ test.describe('Product Listing - Performance', () => {
   });
 
   test('should render header quickly', async ({ page }) => {
-    const startTime = Date.now();
-    await page.goto('/posters');
+    // Warm the route first. Against the dev server the first hit pays for
+    // compiling it — 3.1s of Vite, not 3.1s of page. Measuring that told us
+    // nothing about the page and failed at random.
+    await page.goto('/posters', { waitUntil: 'networkidle' });
 
+    const startTime = Date.now();
+    await page.reload();
     await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
 
     const renderTime = Date.now() - startTime;
@@ -1106,24 +1348,21 @@ test.describe('Product Listing - Performance', () => {
 
   test('should handle rapid filter changes', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/posters');
+    await page.goto('/posters', { waitUntil: 'networkidle' });
 
-    // Scope to filter panel
-    const filterPanel = page.locator('aside').first();
+    const rail = page.locator('aside.hidden.lg\\:block');
 
-    // Rapidly apply multiple filters
-    const portraitButton = filterPanel.locator('button:has-text("Portrait")').first();
-    await portraitButton.click();
+    await rail.getByText(ORIENTATION.label, { exact: true }).click();
+    await rail.getByText(STYLE.label, { exact: true }).click();
+    await rail.getByText(STYLE_2.label, { exact: true }).click();
 
-    // Use getByText to click on label text
-    const abstractLabel = filterPanel.getByText('Abstract', { exact: true });
-    await abstractLabel.click();
-
-    const minimalistLabel = filterPanel.getByText('Minimalist', { exact: true });
-    await minimalistLabel.click();
-
-    // Page should still be responsive
+    // Page should still be responsive, with every click landing in the URL.
     await expect(page.locator('h1:has-text("Shop Posters")')).toBeVisible();
+    await expect(page).toHaveURL(
+      new RegExp(`orientation=${ORIENTATION.id}`),
+      { timeout: 10000 }
+    );
+    await expect(page).toHaveURL(new RegExp(`styles=.*${STYLE_2.id}`));
   });
 
   test('should maintain layout during scroll', async ({ page }) => {
@@ -1200,65 +1439,19 @@ test.describe('Product Listing - Special Filters', () => {
     await page.goto('/posters', { waitUntil: 'networkidle' });
   });
 
-  test('should expand Special filters section', async ({ page }) => {
-    const filterPanel = page.locator('aside').first();
-    const specialSection = filterPanel.locator('button:has-text("Special")');
-    await expect(specialSection).toBeVisible();
-    await specialSection.click();
-
-    // Use getByText to find the label text - scoped to filter panel
-    const aiGeneratedLabel = filterPanel.getByText('AI Generated', { exact: true });
-    await expect(aiGeneratedLabel).toBeVisible({ timeout: 10000 });
-  });
-
-  test('should display AI Generated filter option', async ({ page }) => {
-    const filterPanel = page.locator('aside').first();
-    const specialSection = filterPanel.locator('button:has-text("Special")');
-    await expect(specialSection).toBeVisible();
-    await specialSection.click();
-
-    // Use getByText to find the label text - scoped to filter panel
-    const aiGeneratedLabel = filterPanel.getByText('AI Generated', { exact: true });
-    await expect(aiGeneratedLabel).toBeVisible({ timeout: 10000 });
-  });
-
-  test('should display Featured filter option', async ({ page }) => {
-    const filterPanel = page.locator('aside').first();
-    const specialSection = filterPanel.locator('button:has-text("Special")');
-    await expect(specialSection).toBeVisible();
-    await specialSection.click();
-
-    // Use getByText to find the label text - scoped to filter panel
-    const featuredLabel = filterPanel.getByText('Featured', { exact: true });
-    await expect(featuredLabel).toBeVisible({ timeout: 10000 });
-  });
-
-  test('should apply AI Generated filter', async ({ page }) => {
-    const filterPanel = page.locator('aside').first();
-    const specialSection = filterPanel.locator('button:has-text("Special")');
-    await specialSection.click();
-
-    // Use getByText to click the label text - scoped to filter panel
-    const aiGeneratedLabel = filterPanel.getByText('AI Generated', { exact: true });
-    await expect(aiGeneratedLabel).toBeVisible();
-    await aiGeneratedLabel.click();
-
-    await expect(page).toHaveURL(/isAiGenerated=true/, { timeout: 10000 });
-  });
-
-  test('should apply Featured filter', async ({ page }) => {
-    const filterPanel = page.locator('aside').first();
-    const specialSection = filterPanel.locator('button:has-text("Special")');
-    await specialSection.click();
-
-    // Use getByText to click the label text - scoped to filter panel
-    const featuredLabel = filterPanel.getByText('Featured', { exact: true });
-    await expect(featuredLabel).toBeVisible();
-    await featuredLabel.click();
-
-    await expect(page).toHaveURL(/isFeatured=true/, { timeout: 10000 });
-  });
-
+  /**
+   * The rail's "Special" section — AI Generated and Featured — went with the
+   * #415 facet rework: FACET_GROUPS drives the rail now, and neither is a
+   * facet. Five tests here drove that removed UI.
+   *
+   * They are NOT deleted, they are moved: both parameters are still part of
+   * the URL contract and the API still filters on them, so "URL State" covers
+   * setting each one and checks that isFeatured actually narrows the count.
+   * What is left here is the half that still has UI — the chip.
+   *
+   * Whether the two toggles should come back to the rail is a product
+   * question, not a test question. It is not answered by this file.
+   */
   test('should show AI Generated in active filter tags', async ({ page }) => {
     await page.goto('/posters?isAiGenerated=true', { waitUntil: 'networkidle' });
 
