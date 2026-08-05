@@ -6,6 +6,8 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
+    // Concurrent agent runs share one 8-core machine — see packages/web/vitest.config.ts
+    maxWorkers: Number(process.env.VITEST_MAX_WORKERS ?? 2),
     env: {
       NODE_ENV: 'test',
       // Respect externally-set URLs (alt ports, CI) instead of clobbering

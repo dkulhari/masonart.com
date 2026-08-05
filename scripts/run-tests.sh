@@ -25,7 +25,7 @@
 #   --file=<path>         Run specific test file (e.g., auth.spec.ts)
 #   --grep=<pattern>      Filter tests by pattern
 #   --max-failures=<N>    Stop after N test failures
-#   --workers=<N>         Parallel workers (default: 4)
+#   --workers=<N>         Parallel workers (default: 2, or $PW_WORKERS)
 #   --help                Show this help message
 #
 # Examples:
@@ -61,7 +61,9 @@ print_error() { echo -e "${RED}[FAIL]${NC} $1"; }
 COMMAND=""
 PROJECT="chromium"
 MAX_FAILURES=""
-WORKERS="4"
+# Concurrent agents share one 8-core machine — 4 workers each pegged it.
+# Pass --workers=N for a solo run.
+WORKERS="${PW_WORKERS:-2}"
 TEST_FILE=""
 GREP_PATTERN=""
 SEED_PRODUCTS=false

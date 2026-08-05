@@ -8,6 +8,8 @@ import { defineConfig, devices } from '@playwright/test';
  *   (use when running tests against an already running server)
  * - E2E_BASE_URL: Override the base URL (default: http://localhost:3001)
  * - CI: Set automatically in CI environments
+ * - PW_WORKERS: Local worker count (default: 2)
+ * - PW_ALL_BROWSERS: Set to 'true' for firefox/webkit/mobile projects locally
  *
  * Usage:
  * - Normal: npx playwright test
@@ -17,12 +19,19 @@ import { defineConfig, devices } from '@playwright/test';
  * Project Structure:
  * - 'setup': Creates authenticated sessions (runs first)
  * - 'chromium': Regular tests + tests using stored auth state
- * - 'firefox', 'webkit': Cross-browser testing
- * - 'Mobile Chrome', 'Mobile Safari': Mobile testing
+ * - 'firefox', 'webkit': Cross-browser testing (CI or PW_ALL_BROWSERS only)
+ * - 'Mobile Chrome', 'Mobile Safari': Mobile testing (CI or PW_ALL_BROWSERS only)
  */
 
 const skipServer = process.env.SKIP_E2E_SERVER === 'true';
 const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3001';
+
+// Several agents run e2e concurrently on one 8-core machine. Two defaults used
+// to let a single spec saturate it: workers defaulted to half the cores, and a
+// bare `playwright test <spec>` ran that spec against all five browser
+// projects. Locally we default to chromium only and a small worker pool; CI and
+// PW_ALL_BROWSERS=1 restore the full matrix. Raise the pool with PW_WORKERS.
+const crossBrowser = !!process.env.CI || process.env.PW_ALL_BROWSERS === 'true';
 
 // Auth storage paths
 const CUSTOMER_STORAGE = 'tests/.auth/customer.json';
@@ -33,7 +42,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : Number(process.env.PW_WORKERS ?? 2),
   reporter: 'html',
   use: {
     baseURL,
@@ -59,30 +68,36 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['setup'],
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-      dependencies: ['setup'],
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-      dependencies: ['setup'],
-    },
+    // The remaining browsers only exist under CI or PW_ALL_BROWSERS=1 — a
+    // local `playwright test <spec>` should cost one browser, not five.
+    ...(crossBrowser
+      ? [
+          {
+            name: 'firefox',
+            use: { ...devices['Desktop Firefox'] },
+            dependencies: ['setup'],
+          },
+          {
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
+            dependencies: ['setup'],
+          },
 
-    // =========================================================================
-    // Mobile Browser Projects
-    // =========================================================================
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-      dependencies: ['setup'],
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-      dependencies: ['setup'],
-    },
+          // =====================================================================
+          // Mobile Browser Projects
+          // =====================================================================
+          {
+            name: 'Mobile Chrome',
+            use: { ...devices['Pixel 5'] },
+            dependencies: ['setup'],
+          },
+          {
+            name: 'Mobile Safari',
+            use: { ...devices['iPhone 12'] },
+            dependencies: ['setup'],
+          },
+        ]
+      : []),
 
     // =========================================================================
     // Authenticated Test Projects (use stored auth state)
@@ -119,12 +134,6 @@ export default defineConfig({
           // shares one "unknown" IP bucket, so the sliding-window limiter
           // always trips. The bypass is inert under NODE_ENV=production —
           // see packages/api/src/middleware/rate-limit.ts (#332).
-          //
-          // This block alone is NOT enough (#451): reuseExistingServer is true
-          // locally and a dev server is usually already up, so Playwright
-          // never spawns one and this env never reaches the API. The real
-          // guarantee is on the packages/api dev script itself; this stays as
-          // belt and braces for the case where Playwright does start it.
           DISABLE_RATE_LIMIT: 'true',
         },
       },
