@@ -50,6 +50,10 @@ import {
   reviewsApp,
   protectedReviewsApp,
 } from "./routes/reviews";
+import {
+  startReviewMediaWorker,
+  closeReviewMediaQueue,
+} from "./queues/review-media";
 
 const app = new Hono();
 
@@ -328,6 +332,39 @@ app.onError((err, c) => {
     500
   );
 });
+
+// ============================================================================
+// Background Workers
+// ============================================================================
+
+// The AI generation worker starts itself at import time (queues/ai-generation,
+// pulled in by routes/ai). Review media transcoding is started explicitly here
+// instead: it shells out to ffmpeg, so it must not spin up inside test runs or
+// one-off scripts that merely import this module.
+if (process.env.NODE_ENV !== "test") {
+  startReviewMediaWorker();
+
+  let shuttingDown = false;
+
+  const shutdown = async (signal: NodeJS.Signals) => {
+    // Registering a handler overrides the default terminate behaviour, so this
+    // path owns the exit — without it Ctrl-C in dev would no longer stop the
+    // server.
+    if (shuttingDown) return;
+    shuttingDown = true;
+
+    logger.info({ signal }, "Shutting down: closing review media queue");
+    try {
+      await closeReviewMediaQueue();
+    } catch (err) {
+      logger.error({ err }, "Failed to close review media queue cleanly");
+    }
+    process.exit(0);
+  };
+
+  process.once("SIGTERM", (signal) => void shutdown(signal));
+  process.once("SIGINT", (signal) => void shutdown(signal));
+}
 
 // Export app for testing and type inference
 export { app };
