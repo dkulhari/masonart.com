@@ -44,7 +44,28 @@ const CDN_URL = process.env.CDN_URL || '';
 // ============================================================================
 
 /**
+ * Sanitize a single object-key segment.
+ *
+ * Customer-supplied filenames reach this from review uploads, so the result
+ * must never be able to escape its prefix: unsafe characters collapse to `_`,
+ * dot runs collapse to a single dot (killing `..` traversal), and leading
+ * dots/dashes are stripped.
+ */
+function sanitizeKeySegment(segment: string, fallback: string): string {
+  const cleaned = segment
+    .replace(/[^a-zA-Z0-9.-]/g, '_')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^[.-]+/, '');
+
+  return cleaned.length > 0 ? cleaned : fallback;
+}
+
+/**
  * Storage path prefixes for different content types
+ *
+ * String members are bare prefixes ending in `/`. `reviewMedia` is a key
+ * builder rather than a prefix because review media is partitioned per
+ * review id.
  */
 export const StoragePaths = {
   PRODUCTS: 'products/',
@@ -53,7 +74,21 @@ export const StoragePaths = {
   USER_UPLOADS: 'user-uploads/',
   AVATARS: 'avatars/',
   FRAMES: 'frames/',
+  REVIEW_MEDIA: 'reviews/',
   TEMP: 'temp/',
+
+  /**
+   * Build a stable object key for one review's media.
+   *
+   * Stable on purpose: the transcode worker writes derivatives (normalised
+   * mp4, poster frame) beside the original and has to be able to recompute
+   * the key from `(reviewId, filename)` alone.
+   */
+  reviewMedia(reviewId: string, filename: string): string {
+    const safeReviewId = sanitizeKeySegment(reviewId, 'unknown');
+    const safeFilename = sanitizeKeySegment(filename, 'file');
+    return `reviews/${safeReviewId}/media/${safeFilename}`;
+  },
 } as const;
 
 /**
@@ -520,6 +555,37 @@ export function isValidImageType(contentType: string): boolean {
   ];
   return validTypes.includes(contentType.toLowerCase());
 }
+
+/**
+ * Validate video file type
+ *
+ * Sibling of isValidImageType, deliberately not a widening of it: video has a
+ * different size cap, a duration cap, and a transcode step before it is
+ * servable. `video/quicktime` is here because iPhone uploads are HEVC .mov,
+ * which no desktop browser plays until the worker normalises it.
+ */
+export function isValidVideoType(contentType: string): boolean {
+  const validTypes = ['video/mp4', 'video/quicktime', 'video/webm'];
+  return validTypes.includes(contentType.toLowerCase());
+}
+
+/**
+ * Upload limits for review media.
+ *
+ * Videos are capped by duration as well as bytes — a 200MB cap alone still
+ * admits a ten-minute clip that costs minutes of transcode time per review.
+ */
+export const REVIEW_MEDIA_LIMITS = {
+  image: {
+    maxBytes: 10 * 1024 * 1024,
+    types: ['image/jpeg', 'image/png', 'image/webp'],
+  },
+  video: {
+    maxBytes: 200 * 1024 * 1024,
+    maxDurationSeconds: 60,
+    types: ['video/mp4', 'video/quicktime', 'video/webm'],
+  },
+} as const;
 
 /**
  * Get file extension from content type

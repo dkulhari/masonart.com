@@ -50,6 +50,13 @@ WORKDIR /app
 # Run as the image's built-in non-root `bun` user (uid 1000) — the slim
 # base no longer ships adduser/addgroup, so creating a custom user fails.
 
+# ffmpeg powers review video normalisation (packages/api/src/lib/video-processing.ts).
+# Customer phone uploads are HEVC .mov, which no desktop browser plays, so the
+# API stage cannot ship without it. Only this stage — the web stage never transcodes.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder --chown=bun:bun /app/packages/api/dist ./packages/api/dist
 COPY --from=builder --chown=bun:bun /app/packages/api/package.json ./packages/api/
 # Schema migrations ship in the image: the mini has no repo checkout, so

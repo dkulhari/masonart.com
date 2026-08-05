@@ -226,6 +226,7 @@ describe('StoragePaths Configuration', () => {
       'USER_UPLOADS',
       'AVATARS',
       'FRAMES',
+      'REVIEW_MEDIA',
       'TEMP',
     ];
 
@@ -235,7 +236,11 @@ describe('StoragePaths Configuration', () => {
   });
 
   it('should have string values ending with slash', () => {
+    // Prefix constants are strings ending in '/'. Key builders (reviewMedia)
+    // are functions because their keys are partitioned per entity id, and are
+    // covered in storage-video.test.ts.
     Object.values(StoragePaths).forEach((value) => {
+      if (typeof value === 'function') return;
       expect(typeof value).toBe('string');
       expect(value.endsWith('/')).toBe(true);
     });
