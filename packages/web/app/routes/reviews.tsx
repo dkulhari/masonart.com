@@ -3,44 +3,60 @@
  *
  * mesonart surfaces this page from the header nav, the footer and the sitemap,
  * and it is the only place a visitor can read the catalogue's reviews without
- * first picking a poster. Every row therefore carries its product: a review
- * shown away from its detail page is unreadable without one.
+ * first picking a poster. What it renders is Loox, almost nothing else: one
+ * compact header row — star row, "<N> Reviews" with a chevron, a "Write a
+ * review" pill — and then the masonry wall, ending in "Show more reviews"
+ * (docs/design/mesonart/mesonart-reviews-page-loox.png).
  *
- * Two things here are load-bearing and easy to break:
+ * There is NO beige score band here. The one this file used to open with was
+ * invented; the big aggregate treatment belongs to the home strip, which is a
+ * different surface and stays as it is.
+ *
+ * Three things are load-bearing and easy to break:
  *
  * 1. `validateSearch` COERCES. `app/routes/router.tsx` overrides TanStack's
  *    search serialisation, so every param arrives as a string — `?page=2` is
  *    the string '2'. A bare `z.number()` throws inside validateSearch and the
  *    route error-boundaries to a blank page. `.catch(1)` covers the rest: a
- *    stale or hand-edited URL must land on page 1, not on an error.
+ *    stale or hand-edited URL must land on page 1, not on an error. The grid
+ *    appends rather than pages now, so `page` no longer drives anything — it
+ *    stays because links shared while the numbered pager existed still have to
+ *    resolve to a working page rather than to a blank one.
  *
- * 2. The aggregate strip stays silent below MIN_REVIEWS_FOR_AGGREGATE, and
- *    honours `averageRating: null` rather than coalescing it to 0. Nine people
- *    are not a rating, and "0.0" reads as "rated badly" where absent reads as
- *    "not yet rated" — which is the truth.
+ * 2. The grid is UNFILTERED. `productId` is the only difference between this
+ *    deployment of ReviewGrid and the PDP's; passing one here would quietly
+ *    turn the catalogue wall into one poster's.
  *
- * Client-fetched rather than loader-fetched: the aggregate and the feed
+ * 3. Zero approved reviews is an empty state, not a header reading "0
+ *    Reviews" over an empty wall.
+ *
+ * Client-fetched rather than loader-fetched: the aggregate and the wall
  * describe the catalogue, not this URL, and the same reasoning already governs
  * the promo tile on /posters.
  */
 
+import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { ChevronDown } from 'lucide-react'
 import { z } from 'zod'
-import { SectionBand } from '~/components/ui/SectionBand'
-import { DisplayHeading } from '~/components/ui/DisplayHeading'
 import { StarRating } from '~/components/reviews/StarRating'
-import { useReviewFeed } from '~/hooks/useReviews'
-import { productsApi, type ReviewFeedItem } from '~/lib/api'
-import { cn, formatDate } from '~/lib/utils'
+import { ReviewGrid } from '~/components/reviews/ReviewGrid'
+import { productsApi } from '~/lib/api'
+import { cn } from '~/lib/utils'
 
 /**
- * How many approved reviews the catalogue needs before the aggregate is worth
- * printing. Below this the average is a sample of strangers, not a rating.
+ * How many approved reviews the catalogue needs before an *averaged* score is
+ * worth printing. Nothing on this page averages anything any more — the header
+ * shows a raw count and a star row, which is honest at any sample size — but
+ * the home strip's suppression rule is pinned to this constant, and its test
+ * asserts the two surfaces share one number. It lives here because this is
+ * where it was defined when both surfaces used it.
  */
 export const MIN_REVIEWS_FOR_AGGREGATE = 10
 
-const PAGE_SIZE = 20
+/** Cards per fetch, and the size of each "Show more reviews" step. */
+const PAGE_SIZE = 24
 
 /**
  * `z.coerce` because the param is a string by the time it gets here, `.catch`
@@ -69,145 +85,112 @@ export const Route = createFileRoute('/reviews')({
   component: ReviewsPage,
 })
 
+/** The thin outline pill both this page's controls wear. Matches the grid's. */
+const PILL =
+  'inline-flex items-center gap-2 rounded-full border border-border px-6 py-2 ' +
+  'text-sm text-foreground transition-colors hover:bg-muted'
+
 // ============================================================================
-// Aggregate strip
+// Header row
 // ============================================================================
 
-export interface ReviewsAggregateProps {
+export interface ReviewsHeaderProps {
   /** Null when there is nothing to average. NOT to be coalesced to 0. */
   averageRating: number | null
-  reviewCount: number
+  /** Null while the aggregate is still in flight — not the same as zero. */
+  reviewCount: number | null
 }
 
 /**
- * Score, stars and count — or nothing at all.
+ * Stars, a count and a way in — one row, the whole chrome of the page.
  *
- * Returns null on a thin sample rather than rendering a placeholder: an empty
- * band is quieter than a band announcing it has nothing to say.
+ * The count segment is absent rather than zeroed while the aggregate loads: a
+ * row that flashes "0 Reviews" before the real number arrives reads as a
+ * catalogue nobody has reviewed.
  */
-export function ReviewsAggregate({
+export function ReviewsHeader({
   averageRating,
   reviewCount,
-}: ReviewsAggregateProps) {
-  if (averageRating === null || reviewCount < MIN_REVIEWS_FOR_AGGREGATE) {
-    return null
-  }
+}: ReviewsHeaderProps) {
+  const [showAverage, setShowAverage] = useState(false)
+
+  const hasCount = reviewCount !== null && reviewCount > 0
 
   return (
     <div
-      data-testid="reviews-aggregate"
-      className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2"
+      data-testid="reviews-header"
+      className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4"
     >
-      <span className="font-heading text-4xl font-light leading-none text-foreground">
-        {averageRating.toFixed(1)}
-      </span>
-      <StarRating rating={averageRating} size="md" showHalfStars />
-      <span className="text-sm text-muted-foreground">
-        {reviewCount.toLocaleString('en-IN')} reviews
-      </span>
+      <div className="flex flex-wrap items-center gap-3">
+        {averageRating !== null && (
+          <StarRating rating={averageRating} size="sm" showHalfStars />
+        )}
+
+        {hasCount && (
+          <button
+            type="button"
+            data-testid="reviews-count-toggle"
+            aria-expanded={showAverage}
+            onClick={() => setShowAverage((open) => !open)}
+            className="inline-flex items-center gap-1 text-sm text-foreground"
+          >
+            {/* en-IN grouping: this is an Indian store and the count is read
+                by Indian customers. */}
+            {reviewCount.toLocaleString('en-IN')} Reviews
+            <ChevronDown
+              aria-hidden="true"
+              className={cn(
+                'h-4 w-4 transition-transform duration-300',
+                showAverage && 'rotate-180'
+              )}
+            />
+          </button>
+        )}
+
+        {/* The chevron discloses the figure the stars only approximate. It is
+            deliberately not a second score band — one line, on request. */}
+        {showAverage && averageRating !== null && (
+          <span
+            data-testid="reviews-average"
+            className="text-sm text-muted-foreground"
+          >
+            {averageRating.toFixed(1)} out of 5 across the catalogue
+          </span>
+        )}
+      </div>
+
+      {/* A review needs a purchase behind it — the API creates one against an
+          order item — so the CTA leads to the orders list, not to a form that
+          could not be submitted from here. */}
+      <Link to="/account/orders" data-testid="reviews-write" className={PILL}>
+        Write a review
+      </Link>
     </div>
   )
 }
 
 // ============================================================================
-// Feed
+// Empty catalogue
 // ============================================================================
 
-export interface ReviewFeedRowProps {
-  review: ReviewFeedItem
-  className?: string
-}
-
-/** One review, with the product it is about. */
-export function ReviewFeedRow({ review, className }: ReviewFeedRowProps) {
-  const { product, media } = review
-
+/**
+ * Nothing approved anywhere yet. Not "0 Reviews" over an empty wall — a count
+ * of zero with a star row above it reads as a broken page rather than a young
+ * one.
+ */
+export function ReviewsEmptyState() {
   return (
-    <article
-      data-testid="review-feed-row"
-      data-rating={review.rating}
-      className={cn(
-        'flex flex-col gap-4 border-b border-border py-8 sm:flex-row sm:gap-8',
-        className
-      )}
-    >
-      <div className="sm:w-56 sm:shrink-0">
-        <Link
-          to="/posters/$slug"
-          params={{ slug: product.slug }}
-          className="group flex items-center gap-3"
-        >
-          {product.imageUrl && (
-            <img
-              src={product.imageUrl}
-              alt=""
-              loading="lazy"
-              className="h-16 w-16 shrink-0 rounded-sm object-cover"
-            />
-          )}
-          <span className="text-sm text-foreground underline-offset-4 group-hover:underline">
-            {product.title}
-          </span>
-        </Link>
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <StarRating rating={review.rating} size="sm" showHalfStars={false} />
-
-        {review.title && (
-          <h3 className="mt-3 text-base text-foreground">{review.title}</h3>
-        )}
-
-        <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-          {review.content}
-        </p>
-
-        {media.length > 0 && (
-          <ul className="mt-4 flex flex-wrap gap-2">
-            {media.map((item) => (
-              <li key={item.id}>
-                <img
-                  src={item.thumbnailUrl ?? item.posterUrl ?? item.url}
-                  alt=""
-                  loading="lazy"
-                  className="h-20 w-20 rounded-sm object-cover"
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <p className="mt-4 text-xs text-muted-foreground">
-          {/* `author` is nullable — the review outlives a deleted account. */}
-          <span>{review.author?.name ?? 'Verified customer'}</span>
-          <span aria-hidden="true"> · </span>
-          <time dateTime={review.createdAt}>{formatDate(review.createdAt)}</time>
-        </p>
-      </div>
-    </article>
-  )
-}
-
-export interface ReviewFeedListProps {
-  reviews: ReviewFeedItem[]
-}
-
-/** The list, or the empty state. Kept separate so both are testable alone. */
-export function ReviewFeedList({ reviews }: ReviewFeedListProps) {
-  if (reviews.length === 0) {
-    return (
-      <p data-testid="reviews-empty" className="py-16 text-muted-foreground">
-        No reviews yet. Once customers start writing about their posters, their
-        words land here.
+    <div data-testid="reviews-empty" className="py-20 text-center">
+      <p className="font-heading text-2xl font-light text-foreground">
+        No reviews yet
       </p>
-    )
-  }
-
-  return (
-    <div data-testid="review-feed">
-      {reviews.map((review) => (
-        <ReviewFeedRow key={review.id} review={review} />
-      ))}
+      <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+        Once customers start writing about their posters, their words and photos
+        land here.
+      </p>
+      <Link to="/posters" className={cn(PILL, 'mt-8')}>
+        Browse posters
+      </Link>
     </div>
   )
 }
@@ -216,9 +199,7 @@ export function ReviewFeedList({ reviews }: ReviewFeedListProps) {
 // Page
 // ============================================================================
 
-function ReviewsPage() {
-  const { page } = Route.useSearch()
-
+export function ReviewsPage() {
   /**
    * The catalogue aggregate. Read through `productsApi` rather than the
    * relative-URL helpers in hooks/useReviews.ts: there is no Vite proxy for
@@ -230,77 +211,27 @@ function ReviewsPage() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: feed, isLoading, isError } = useReviewFeed(page, PAGE_SIZE)
-
-  const reviews = feed?.items ?? []
+  // Undefined is "not known yet"; zero is a fact about the catalogue.
+  const catalogueIsEmpty = stats !== undefined && stats.reviewCount === 0
 
   return (
-    <>
-      <SectionBand tone="beige" className="py-10 sm:py-14">
-        <DisplayHeading className="text-foreground">
-          Reviews &amp; Ratings
-        </DisplayHeading>
-        <p className="mt-4 max-w-2xl text-muted-foreground">
-          Every approved review across the catalogue, newest first — each one
-          linked back to the poster it is about.
-        </p>
-        <ReviewsAggregate
-          averageRating={stats?.averageRating ?? null}
-          reviewCount={stats?.reviewCount ?? 0}
-        />
-      </SectionBand>
+    <div className="container-wide py-8 lg:py-12">
+      {/* The reference page carries no visible title — the wall is the page.
+          The heading stays for the crawler and the screen reader. */}
+      <h1 className="sr-only">Reviews &amp; Ratings</h1>
 
-      <div className="container-wide py-8 lg:py-12">
-        {isLoading ? (
-          <p className="py-16 text-muted-foreground">Loading reviews…</p>
-        ) : isError ? (
-          <p className="py-16 text-muted-foreground">
-            Reviews could not be loaded right now. Please try again shortly.
-          </p>
-        ) : (
-          <>
-            <ReviewFeedList reviews={reviews} />
-
-            {feed && (feed.hasPreviousPage || feed.hasNextPage) && (
-              <nav
-                aria-label="Reviews pages"
-                data-testid="reviews-pagination"
-                className="flex items-center justify-between gap-4 pt-10"
-              >
-                {/* Real links, not buttons: the page is shareable and a
-                    crawler needs somewhere to go past page 1. */}
-                {feed.hasPreviousPage ? (
-                  <Link
-                    to="/reviews"
-                    search={{ page: page - 1 }}
-                    className="text-sm text-foreground underline-offset-4 hover:underline"
-                  >
-                    ← Previous
-                  </Link>
-                ) : (
-                  <span />
-                )}
-
-                <span className="text-sm text-muted-foreground">
-                  Page {feed.page} of {feed.totalPages}
-                </span>
-
-                {feed.hasNextPage ? (
-                  <Link
-                    to="/reviews"
-                    search={{ page: page + 1 }}
-                    className="text-sm text-foreground underline-offset-4 hover:underline"
-                  >
-                    Next →
-                  </Link>
-                ) : (
-                  <span />
-                )}
-              </nav>
-            )}
-          </>
-        )}
-      </div>
-    </>
+      {catalogueIsEmpty ? (
+        <ReviewsEmptyState />
+      ) : (
+        <>
+          <ReviewsHeader
+            averageRating={stats?.averageRating ?? null}
+            reviewCount={stats?.reviewCount ?? null}
+          />
+          {/* No `productId`: this is the catalogue wall, not a poster's. */}
+          <ReviewGrid pageSize={PAGE_SIZE} className="mt-6" />
+        </>
+      )}
+    </div>
   )
 }
