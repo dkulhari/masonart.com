@@ -15,21 +15,20 @@ import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
 import { readFile } from 'node:fs/promises';
 import { readdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { MAT_CANVAS, MAT_ART_INSET, MAT_COLOR } from '@chobii/shared';
 import { matToSquare } from '../../src/lib/image-processing';
+import { SEED_MEDIA_DIR } from '../../src/database/seed-images';
 
 const TARGET = MAT_CANVAS * MAT_ART_INSET;
 
 /**
- * Anchored to this file rather than reused from seed-images.ts, whose
- * SEED_MEDIA_DIR resolves off process.cwd() — correct when the seed runs from
- * the repo root, wrong under vitest, which runs from packages/api.
+ * Reused from seed-images.ts rather than re-derived here. It used to be
+ * re-derived because SEED_MEDIA_DIR resolved off process.cwd() and so pointed
+ * at packages/api under vitest; #450 anchored it to the repo root, which makes
+ * the shared constant correct from any cwd.
  */
-const MEDIA_DIR =
-  process.env.SEED_MEDIA_DIR ??
-  join(dirname(fileURLToPath(import.meta.url)), '../../../..', '.cache', 'seed-media');
+const MEDIA_DIR = SEED_MEDIA_DIR;
 
 const artworks = existsSync(MEDIA_DIR)
   ? readdirSync(MEDIA_DIR).filter((f) => f.endsWith('-main.webp')).sort()

@@ -18,11 +18,27 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ProductImage, ProductImageType } from "@chobii/shared";
 import { buildProductMedia } from "../lib/product-media";
 
-const CACHE_DIR = join(process.cwd(), ".cache", "seed-images");
+/**
+ * Repository root, anchored to this module rather than to process.cwd().
+ *
+ * Both caches below live at the root. Deriving them from the caller's cwd made
+ * the seed's own script wrong: `bun run seed` in packages/api runs with cwd at
+ * the package root, so SEED_MEDIA_DIR resolved to packages/api/.cache/seed-media,
+ * which does not exist, and the whole catalogue silently fell back to the
+ * declared stock URLs (#450).
+ *
+ * Four levels holds for both layouts — src/database/ under development and
+ * dist/database/ after `tsc`.
+ */
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../../..");
+
+/** Download cache for remote sources. A wrong path here only re-downloads. */
+export const SEED_IMAGE_CACHE_DIR = join(REPO_ROOT, ".cache", "seed-images");
 
 /**
  * Local reference imagery, gitignored and machine-local.
@@ -37,7 +53,7 @@ const CACHE_DIR = join(process.cwd(), ".cache", "seed-images");
  * seeds from the declared remote URLs exactly as it did before this existed.
  */
 export const SEED_MEDIA_DIR =
-  process.env.SEED_MEDIA_DIR ?? join(process.cwd(), ".cache", "seed-media");
+  process.env.SEED_MEDIA_DIR ?? join(REPO_ROOT, ".cache", "seed-media");
 
 /**
  * Fetch a remote image once, then serve it from disk.
@@ -46,9 +62,9 @@ export const SEED_MEDIA_DIR =
  * one never hits the network twice.
  */
 export async function fetchCached(url: string): Promise<Buffer> {
-  await mkdir(CACHE_DIR, { recursive: true });
+  await mkdir(SEED_IMAGE_CACHE_DIR, { recursive: true });
   const key = createHash("sha256").update(url).digest("hex").slice(0, 32);
-  const path = join(CACHE_DIR, key);
+  const path = join(SEED_IMAGE_CACHE_DIR, key);
 
   if (existsSync(path)) {
     return readFile(path);
@@ -126,6 +142,34 @@ export function localSeedMediaSet(
     { file: main, type: "main" },
     ...rooms.map((file) => ({ file, type: "room-mockup" as ProductImageType })),
   ];
+}
+
+/** How much of the reference set a run actually found. */
+export interface LocalSeedMediaSummary {
+  resolved: number;
+  total: number;
+  dir: string;
+}
+
+/**
+ * Count how many of the given prefixes resolve to local media.
+ *
+ * Falling back to declared URLs is legitimate — a fresh clone has no
+ * .cache/seed-media/ and must still seed. The problem this exists to solve is
+ * that a *wrong directory* looked identical to *a clone that never had the
+ * files*: both produce a successful run, and the only way to tell them apart
+ * was to count room-mockup rows in Postgres afterwards. The seed reports this
+ * up front so a zero is visible while the run is happening (#450).
+ */
+export function summarizeLocalSeedMedia(
+  prefixes: string[],
+  dir: string = SEED_MEDIA_DIR
+): LocalSeedMediaSummary {
+  const resolved = prefixes.filter(
+    (prefix) => localSeedMediaSet(prefix, dir).length > 0
+  ).length;
+
+  return { resolved, total: prefixes.length, dir };
 }
 
 /** Build a record from a file in SEED_MEDIA_DIR rather than a remote URL. */

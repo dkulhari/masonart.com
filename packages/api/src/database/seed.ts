@@ -6,6 +6,7 @@ import {
   buildSeedImageFromFile,
   buildSeedImageFromUrl,
   localSeedMediaSet,
+  summarizeLocalSeedMedia,
 } from "./seed-images";
 import { buildVariantsForOrientation } from "./seed-variants";
 import { facetsForProduct } from "./seed-facets";
@@ -1610,6 +1611,32 @@ const REFERENCE_MEDIA: Record<string, string> = {
   "mandala-garden": "bp094", // kilim diamonds, rose
 };
 
+/**
+ * Say up front how much of the reference set this run found.
+ *
+ * Both a clone without the fixtures and a run whose SEED_MEDIA_DIR is simply
+ * wrong produce the same successful seed against the declared stock URLs. The
+ * difference used to be invisible until you counted room-mockup rows in
+ * Postgres afterwards — which is how a degraded catalogue survived a whole
+ * afternoon of design-parity work (#450). Printing the directory alongside the
+ * count makes a wrong path self-evident.
+ */
+function reportReferenceMedia(): void {
+  const { resolved, total, dir } = summarizeLocalSeedMedia(
+    Object.values(REFERENCE_MEDIA)
+  );
+
+  if (resolved === total) {
+    console.log(`  Reference media: ${resolved}/${total} from ${dir}`);
+    return;
+  }
+
+  console.log(
+    `  Reference media: ${resolved}/${total} from ${dir} — ` +
+      `${total - resolved} product(s) falling back to declared stock URLs.`
+  );
+}
+
 /** A resolved image source: a local fixture file, or a remote URL. */
 interface SeedImageSource {
   local: boolean;
@@ -1697,6 +1724,7 @@ async function processProductImages(
  */
 async function seedProducts(): Promise<void> {
   console.log("Seeding products...");
+  reportReferenceMedia();
 
   for (const productData of sampleProducts) {
     // Download, mat and upload this product's imagery before inserting, so the
