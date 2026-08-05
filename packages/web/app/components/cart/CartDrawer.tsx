@@ -112,6 +112,10 @@ export function CartDrawer({ className }: CartDrawerProps) {
         className={cn(
           'fixed right-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl',
           'flex flex-col',
+          // Rounded on the page-facing edge only, square where it meets the
+          // viewport — their `34px 0 0 34px`. overflow-hidden so the items
+          // list cannot square the corners off as it scrolls under them.
+          'overflow-hidden rounded-l-[var(--drawer-radius)]',
           'animate-drawer-in-right',
           className
         )}
@@ -130,21 +134,18 @@ export function CartDrawer({ className }: CartDrawerProps) {
             )}
           </div>
           {/*
-            Theirs is `button button--secondary button--close`: the same button
-            as everywhere else on the site, in its borderless variant, 48px
-            square and round. Ours is the Button primitive so the next palette
-            decision reaches it too — `rounded-lg p-2` here was the last bespoke
-            button left in the drawer.
+            The Quickview's close button, exactly (#420): the outline pill's
+            wipe on a 48px circle. Two modal surfaces closing with two
+            different buttons is how a design system starts to drift.
           */}
           <Button
             ref={closeButtonRef}
-            variant="ghost"
-            size="icon"
+            variant="outline"
             onClick={closeDrawer}
-            className="h-12 w-12"
+            className="h-12 w-12 shrink-0 rounded-full p-0"
             aria-label="Close cart"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </Button>
         </div>
 

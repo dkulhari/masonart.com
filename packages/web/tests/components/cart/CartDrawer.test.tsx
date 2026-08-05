@@ -80,18 +80,27 @@ describe('CartDrawer', () => {
     expect(panel.className).not.toContain('animate-in')
   })
 
-  it('closes with the same button as the rest of the site', () => {
-    // Theirs is `button--secondary button--close`. A bespoke `rounded-lg p-2`
-    // here is how the old orange spread in the first place.
+  it('closes with the Quickview modal’s button (#420)', () => {
+    // Two modal surfaces must not close with two different buttons. This is
+    // the outline variant's wipe on a 48px circle, same as ChooseOptions.
     render(<CartDrawer />)
 
     const close = screen.getByRole('button', { name: /close cart/i })
-    // The Button primitive's base — text-button and the shared border width —
-    // rather than the shape, which size="icon" turns into their 48px circle.
     expect(close.className).toContain('text-button')
     expect(close.className).toContain('border-[length:var(--border-button)]')
+    // The outline wipe — the pseudo-element circle that scales in on hover.
+    expect(close.className).toContain('before:scale-0')
     expect(close.className).toContain('rounded-full')
     expect(close.className).not.toContain('rounded-lg')
+  })
+
+  it('rounds the page-facing edge only', () => {
+    render(<CartDrawer />)
+
+    const panel = screen.getByRole('dialog')
+    // Theirs is 34px 0 0 34px: square where it meets the viewport edge.
+    expect(panel.className).toContain('rounded-l-[var(--drawer-radius)]')
+    expect(panel.className).toContain('overflow-hidden')
   })
 
   it('renders nothing when the store says closed', () => {

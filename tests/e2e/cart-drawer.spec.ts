@@ -96,6 +96,16 @@ test.describe('Cart Drawer - opening', () => {
     expect(timing.easing).toBe('cubic-bezier(0.7, 0, 0.2, 1)');
   });
 
+  test('rounds only the page-facing edge, at their 34px', async ({ page }) => {
+    await cartButton(page).click();
+    await expect(drawer(page)).toBeVisible();
+
+    const radius = await drawer(page).evaluate(
+      (el) => getComputedStyle(el).borderRadius
+    );
+    expect(radius).toBe('34px 0px 0px 34px');
+  });
+
   test('closes on Escape', async ({ page }) => {
     await cartButton(page).click();
     await expect(drawer(page)).toBeVisible();

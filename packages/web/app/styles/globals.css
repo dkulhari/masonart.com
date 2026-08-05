@@ -145,6 +145,14 @@
     /* Fluid card corner: 10px -> 20px. Measured clamp. */
     --card-radius: clamp(0.625rem, 1.053vw, 1.25rem);
 
+    /*
+     * Drawer corner. Measured on their cart panel: `34px 0 0 34px` — rounded
+     * only on the edge that faces the page, square against the viewport edge
+     * it is flush with. Bigger than --card-radius because it is one corner on
+     * a full-height panel rather than four on a card.
+     */
+    --drawer-radius: 34px;
+
     /* --animation-primary / --animation-fast on mesonart */
     --ease-primary: cubic-bezier(.3, 1, .3, 1);
     --ease-fast: cubic-bezier(.7, 0, .3, 1);
