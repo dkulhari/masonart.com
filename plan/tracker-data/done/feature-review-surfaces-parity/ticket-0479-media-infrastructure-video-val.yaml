@@ -21,17 +21,53 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:12:30.590Z'
-last_updated: '2026-08-05T15:12:30.590Z'
+last_updated: '2026-08-05T16:33:22.204Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-05T16:33:19.827Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `67b440d4` - feat(api): ffmpeg video processing and review media storage limits
+
+      **Files Changed**:
+      - `packages/api/src/lib/storage.ts` - `isValidVideoType` (sibling of `isValidImageType`, not a widened allowlist), `REVIEW_MEDIA_LIMITS` (image 10MB; video 200MB / 60s), `StoragePaths.REVIEW_MEDIA` prefix + `StoragePaths.reviewMedia(reviewId, filename)` key builder
+      - `packages/api/src/lib/video-processing.ts` - NEW. `isFfmpegAvailable`, `assertFfmpegAvailable`, `probeVideo`, `transcodeToMp4`, `extractPosterFrame`, `VideoProcessingError`
+      - `packages/api/tests/lib/storage-video.test.ts` - NEW, 15 tests
+      - `packages/api/tests/lib/video-processing.test.ts` - NEW, 9 tests against the real binaries
+      - `packages/api/tests/lib/storage.test.ts` - existing StoragePaths invariant updated for the key builder
+      - `Dockerfile` - `apt-get install ffmpeg` in the `api` stage only
+
+      **Summary**:
+      Shells out to ffmpeg/ffprobe with `execFile` from `node:child_process` — no wrapper dependency added. Every function rejects with `VideoProcessingError` carrying the tail of ffmpeg's stderr (2000 chars), which the worker persists on `reviewMedia.processingError`. A missing binary produces an actionable message ("macOS: `brew install ffmpeg`") rather than a raw ENOENT stack trace.
+
+      Transcode is `libx264 -preset veryfast -crf 26 -vf scale='min(1280,iw)':-2 -c:a aac -b:a 128k -movflags +faststart`, plus `-pix_fmt yuv420p` since phone footage is sometimes 4:2:2 or 10-bit that Chrome will not decode.
+
+      **Decisions worth noting**:
+      1. The test fixture is generated at runtime by ffmpeg's own synthetic sources, so no binary blob is committed. It is deliberately **mpeg4 video + mp3 audio** rather than the plain `testsrc` in the ticket sketch: the sketch's video-only H.264 fixture would have made the "emits h264 + aac" assertion pass trivially (no audio stream to convert, and the source already h264). Encoding the fixture in codecs the normaliser must convert *away from* makes the assertion prove real work.
+      2. `StoragePaths.reviewMedia` is a function on an object whose other members are string prefixes, which broke the existing `storage.test.ts` invariant "all values are strings ending with /". That test now skips function members and the prefix invariant is preserved for the string constants; a `REVIEW_MEDIA: 'reviews/'` prefix was also added. No production code iterates `StoragePaths` (verified by grep).
+      3. Keys are sanitised so customer filenames cannot escape their prefix: unsafe chars collapse to `_`, dot runs collapse to a single dot (killing `..` traversal), leading dots/dashes stripped.
+      4. `extractPosterFrame` checks the output is non-empty — ffmpeg exits 0 while writing nothing when the `-ss 00:00:01` seek lands past the end of a very short clip.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/lib/storage-video.test.ts tests/lib/video-processing.test.ts tests/lib/storage.test.ts` (from `packages/api`)
+      - Result: PASS — Test Files 3 passed (3), Tests **136 passed (136)**, 0 skipped
+      - The video suite ran the real binaries (ffmpeg 8.1.1 at /opt/homebrew/bin) — it did **not** skip; 9 tests, ~495ms of actual transcode/probe work. Named passes include `isFfmpegAvailable > returns false when PATH is emptied`, `probeVideo > reports duration, dimensions and codecs`, `transcodeToMp4 > normalises to h264 + aac while preserving duration and dimensions`, `extractPosterFrame > writes a jpeg poster frame at the source dimensions`.
+      - Typecheck: `bunx tsc --noEmit` → 4 errors, all in `src/routes/reviews.ts` (another agent's concurrent in-flight work, untouched here). Zero errors in `storage.ts` or `video-processing.ts`.
+
+      **Scope note**: `packages/api/src/routes/reviews.ts` was deliberately not touched — concurrent agent owns it. Nothing wires these helpers into a route yet; that is downstream work.
+  - author: system
+    timestamp: '2026-08-05T16:33:22.204Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -47,7 +83,7 @@ implementation_steps:
     file: packages/api/tests/lib/storage-video.test.ts
     command: cd packages/api && bun run test -- storage-video
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // isValidVideoType accepts video/mp4, video/quicktime, video/webm
       // isValidVideoType rejects image/png, application/pdf, '' and mixed case junk
@@ -58,12 +94,12 @@ implementation_steps:
     description: Confirm the test fails - helpers not exported
     command: cd packages/api && bun run test -- storage-video
     expected_result: FAIL - isValidVideoType is not a function
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Add video validation, limits and review media paths to storage.ts
     file: packages/api/src/lib/storage.ts
-    status: pending
+    status: done
     code: |-
       // export const REVIEW_MEDIA_LIMITS = {
       //   image: { maxBytes: 10 * 1024 * 1024, types: ['image/jpeg','image/png','image/webp'] },
@@ -78,7 +114,7 @@ implementation_steps:
     file: packages/api/tests/lib/video-processing.test.ts
     command: cd packages/api && bun run test -- video-processing
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // Skip the whole suite when ffmpeg is absent (same shape as SKIP_DB_RUNTIME_TESTS).
       // Generate the fixture in beforeAll with ffmpeg's own testsrc so no binary is committed:
@@ -91,7 +127,7 @@ implementation_steps:
     action: implement
     description: Create the ffmpeg wrapper
     file: packages/api/src/lib/video-processing.ts
-    status: pending
+    status: done
     code: |-
       // Shell out with execFile from node:child_process (promisified). No new dependency.
       // export async function isFfmpegAvailable(): Promise<boolean>   // `ffmpeg -version`
@@ -108,7 +144,7 @@ implementation_steps:
     action: implement
     description: Install ffmpeg in the API image
     file: Dockerfile
-    status: pending
+    status: done
     code: |-
       # In the `api` stage (FROM oven/bun:1-slim AS api, ~line 47), before the app copy:
       RUN apt-get update \
@@ -120,10 +156,11 @@ implementation_steps:
     description: Confirm both suites pass
     command: cd packages/api && bun run test -- storage-video video-processing
     expected_result: PASS
-    status: pending
+    status: done
   - id: 8
     action: commit
     description: Commit the media infrastructure
     command: 'git add packages/api/src/lib/storage.ts packages/api/src/lib/video-processing.ts packages/api/tests/lib Dockerfile && git commit -m "feat(api): ffmpeg video processing and review media storage limits"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 8
+completed: '2026-08-05T16:33:22.204Z'

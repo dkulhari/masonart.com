@@ -18,17 +18,58 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:14:24.173Z'
-last_updated: '2026-08-05T15:14:24.173Z'
+last_updated: '2026-08-05T16:58:22.716Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T16:54:40.429Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T16:58:20.401Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `1c2ac016` - feat(web): review feed client functions and media upload helper
+
+      **Files Changed**:
+      - `packages/web/app/lib/api.ts` — new `reviewsApi` with `listAll(params?)` → `ReviewFeedResponse` and `mediaFeed({ productId })` → `ReviewMediaFeedItem[]`; exported types `ReviewMediaType`, `ReviewMediaProcessingStatus`, `ReviewMediaItem`, `ReviewMediaFeedItem`, `ReviewFeedItem`, `ReviewFeedResponse` (= `PaginatedResponse<ReviewFeedItem>`), `ReviewFeedParams`
+      - `packages/web/app/hooks/useReviews.ts` — `reviewKeys.feeds()/feed(page,pageSize)` and `reviewKeys.mediaFeeds()/mediaFeed(productId?)`; `useReviewFeed(page, pageSize = 20)`; `useReviewMediaFeed(productId?)`; `uploadReviewMedia(reviewId, file)`; `useCreateReview` now invalidates the two new prefix keys as well as the old ones
+      - `packages/web/tests/hooks/useReviewFeed.test.tsx` — 19 tests, `fetch` stubbed (not `~/lib/api`), so the URLs and the R2 PUT shape are actually asserted
+
+      **Naming note**: the step-1 test sketch named `reviewsApi.listAll` / `reviewsApi.mediaFeed` while the step-3 sketch named `listAllReviews` / `reviewMediaFeed`. Went with the test-sketch names — step 2's expected failure is literally "listAll is not a function", so that is the contract. Downstream #485-#489 import `reviewsApi.listAll` / `reviewsApi.mediaFeed`.
+
+      **Design decisions**:
+      - `mediaFeed` unwraps the `{ items, total }` envelope to a plain array: the API caps the feed at 60 and never paginates it, so `total` is only ever `items.length`
+      - `ReviewMediaItem` is the shape embedded in every review read; `ReviewMediaFeedItem extends` it with the `productId` / `rating` / `reviewCreatedAt` that only the flat feed's join carries. Review cards get the former, the media wall the latter
+      - `mediaFeed()` keys on `'all'` rather than `undefined` — an undefined tail serialises to the same key as a missing one, so the site-wide strip and a product wall would collide
+      - The R2 PUT sends `Content-Type` and nothing else, with no `credentials`. Two tests pin this (`expect(putInit.headers).toEqual({...})` exactly, `credentials` undefined) because an extra header or a cookie ride-along changes what R2 hashes and returns 403
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/hooks/useReviewFeed.test.tsx`
+      - Result: PASS (19 tests, 19 passing, 0 failing)
+      - Output:
+      ```
+       ✓ tests/hooks/useReviewFeed.test.tsx (19 tests) 237ms
+
+       Test Files  1 passed (1)
+            Tests  19 passed (19)
+      ```
+      - Red phase confirmed first: same command, 19 failed with `reviewsApi.listAll is not a function` / `reviewKeys.feeds is not a function`
+      - `bunx tsc --noEmit` in packages/web: zero errors in `app/lib/api.ts`, `app/hooks/useReviews.ts`, `tests/hooks/useReviewFeed.test.tsx` (remaining errors are the pre-existing TS6133 baseline in unrelated route files)
+      - `tests/components/product/ProductCard.tokens.test.ts`: 17 passed — no regression in the only other suite touching this area
+
+      **Not done (out of scope)**: the pre-existing product-scoped functions in useReviews.ts still fetch against the relative `API_BASE = '/api'`, which no Vite proxy resolves. All new code goes through `getApiUrl()`. Worth its own ticket.
+  - author: system
+    timestamp: '2026-08-05T16:58:22.716Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -47,7 +88,7 @@ implementation_steps:
     file: packages/web/tests/hooks/useReviewFeed.test.tsx
     command: cd packages/web && bun run test -- useReviewFeed
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // Mock fetch. Cover:
       //   reviewsApi.listAll({ page, pageSize }) hits /api/reviews with query params
@@ -62,12 +103,12 @@ implementation_steps:
     description: Confirm the tests fail
     command: cd packages/web && bun run test -- useReviewFeed
     expected_result: FAIL - listAll is not a function
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Add the site-wide review client functions
     file: packages/web/app/lib/api.ts
-    status: pending
+    status: done
     code: |-
       // Beside catalogueReviewStats (:291), which already documents why site-wide
       // review calls live here rather than in hooks/useReviews.ts:
@@ -79,7 +120,7 @@ implementation_steps:
     action: implement
     description: Add the feed hooks and the upload helper
     file: packages/web/app/hooks/useReviews.ts
-    status: pending
+    status: done
     code: |-
       // Extend reviewKeys (:27) with `all(page)` and `mediaFeed(productId)`.
       // export function useReviewFeed(page: number, pageSize = 20)
@@ -95,10 +136,12 @@ implementation_steps:
     description: Confirm hook tests pass
     command: cd packages/web && bun run test -- useReviewFeed
     expected_result: PASS
-    status: pending
+    status: done
   - id: 6
     action: commit
     description: Commit the client layer
     command: 'git add packages/web/app/lib/api.ts packages/web/app/hooks/useReviews.ts packages/web/tests/hooks/useReviewFeed.test.tsx && git commit -m "feat(web): review feed client functions and media upload helper"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 6
+started: '2026-08-05T16:54:40.429Z'
+completed: '2026-08-05T16:58:22.716Z'

@@ -20,17 +20,46 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:13:27.684Z'
-last_updated: '2026-08-05T15:13:27.684Z'
+last_updated: '2026-08-05T16:43:16.971Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T16:37:55.052Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T16:43:14.428Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4ebfb8e6` - feat(api): review media in the admin moderation queue
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/reviews.ts` — media embedded on the list and detail payloads; new `DELETE /:reviewId/media/:mediaId`
+      - `packages/api/tests/routes/admin/review-media.test.ts` — 20 new tests (new file)
+
+      **Summary**:
+      - `withAdminMedia()` attaches `media[]` to a page of reviews in one grouped `inArray` query — never one per review — with **no** `processingStatus` filter. Admins see `processing` and `failed` rows with their `processingError`; the public reads keep their `ready`-only filter. A test reads the rendered WHERE clause so a handler that quietly re-added the public filter fails rather than returning a plausible payload.
+      - Admin media payload adds `processingStatus`, `processingError`, `sizeBytes` and `createdAt` over the public shape.
+      - `DELETE /api/admin/reviews/:reviewId/media/:mediaId` — lookup scoped to the review in the path (a mediaId on another review is a 404, not a cross-review delete), joins `reviews` for the productId. R2 objects for url, thumbnailUrl and posterUrl go via `Promise.allSettled` so an already-missing object cannot leave a row pointing at a dead URL. Keys are only derived inside the `reviews/` prefix, so a malformed row cannot escalate into deleting product imagery. The parent review's status/moderator/notes are untouched, and the product/all/media review caches are invalidated (mirrors `invalidateProductReviewCaches` in routes/reviews.ts, v2 key included).
+
+      **Verification**:
+      - Command: `cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/routes/admin/reviews.test.ts tests/routes/admin/review-media.test.ts`
+      - Result: PASS — 2 files, 116 tests passing (20 new + 96 pre-existing admin review tests)
+      - Output: `✓ tests/routes/admin/review-media.test.ts (20 tests) 62ms` / `✓ tests/routes/admin/reviews.test.ts (96 tests) 2292ms` — the pre-existing file logged "Database connection available for runtime tests", so its DB-gated cases ran rather than skipping
+      - Also green: `tests/routes/review-feed.test.ts` (22 tests, #482 read side unaffected) and `bunx tsc --noEmit` on packages/api (clean, no output)
+
+      Known gap carried forward from the ticket: `services/ai-moderation.ts` is text-only, so this media stays unscreened until a human looks at it.
+  - author: system
+    timestamp: '2026-08-05T16:43:16.971Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -49,7 +78,7 @@ implementation_steps:
     file: packages/api/tests/routes/admin/review-media.test.ts
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- admin/review-media
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // GET /api/admin/reviews returns media[] on each item
       // admin payload includes 'processing' and 'failed' media, with processingError
@@ -62,12 +91,12 @@ implementation_steps:
     description: Confirm the tests fail
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- admin/review-media
     expected_result: FAIL - media is undefined on the admin payload
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Join media into the admin payloads and add the delete endpoint
     file: packages/api/src/routes/admin/reviews.ts
-    status: pending
+    status: done
     code: |-
       // Join reviewMedia with NO processingStatus filter (admins see everything).
       // DELETE /:reviewId/media/:mediaId:
@@ -79,10 +108,12 @@ implementation_steps:
     description: Confirm admin review tests pass
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- admin/review
     expected_result: PASS
-    status: pending
+    status: done
   - id: 5
     action: commit
     description: Commit the admin media support
     command: 'git add packages/api/src/routes/admin/reviews.ts packages/api/tests/routes/admin/review-media.test.ts && git commit -m "feat(api): review media in the admin moderation queue"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 5
+started: '2026-08-05T16:37:55.052Z'
+completed: '2026-08-05T16:43:16.971Z'

@@ -30,7 +30,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T13:16:43.263Z'
-last_updated: '2026-08-05T14:06:15.662Z'
+last_updated: '2026-08-05T16:54:49.252Z'
 time_spent_minutes: 24
 labels:
   - web
@@ -108,6 +108,51 @@ comments:
       1. Width left at `max-w-md` (448px); theirs is 576px. Not asked for, and it re-flows the whole panel — say the word and it is a one-line change.
       2. The `:3001` dev server another session owns holds a **stale Tailwind config** — it will not serve `animate-drawer-in-right` until that process restarts. The spec was verified against a fresh server on :3005, since killing another session's server was not mine to do.
       3. The `left` → `right` fix to Header.tsx's comment is uncommitted: that file is dirty with another session's AllArtMegaMenu work, so it will ride along with their commit rather than have me stage their in-flight changes.
+  - author: mcp-client
+    timestamp: '2026-08-05T16:45:57.960Z'
+    text: |-
+      🔁 **Follow-up 2** — `6c0312a3` (corners + close button) and `8bd49249` (empty state)
+
+      All three measured off their live drawer, then re-measured on ours after the change:
+
+      | | theirs | ours |
+      |---|---|---|
+      | corner | `34px 0 0 34px` + `overflow: hidden` | identical — `--drawer-radius`, `rounded-l-[…]` |
+      | close | outline pill's wipe, 48px circle | `<Button variant="outline" className="h-12 w-12 rounded-full p-0">` — ChooseOptions' exact close button (#420) |
+      | empty heading | "Your cart is currently empty.", Urbanist 300 / 32px | identical |
+      | empty chips | 12px radius, 12/20 padding, 16px, `rgba(23,23,23,0.024)` | identical |
+
+      **Corner:** rounded only on the page-facing edge, square where it meets the viewport. Bigger than `--card-radius` on purpose — one corner on a full-height panel is not four on a card. `overflow-hidden` with it, or the items list squares the corners off as it scrolls under them.
+
+      **Close button:** the drawer had picked up a `ghost` variant that exists nowhere else. Two modal surfaces closing with two different buttons is how a system drifts.
+
+      **Empty state:** ours was an 18px semibold line over a grey shopping-bag circle with one Browse Posters button — a button back to the catalogue the user was already looking at. Theirs offers collections instead, which is the better answer. Ours are Best Sellers, New In and All Art: the two sorts the header nav already carries (`salesCount-desc`, `createdAt-desc` — `SORT_OPTIONS` ids the collection route validates) plus the full list, so no destination is invented. The chip tint is the one the Quickview's inputs use.
+
+      **Verification**:
+      - `npx vitest run tests/components/cart/` → PASS, 12 tests
+      - `E2E_BASE_URL=http://localhost:3005 npx playwright test tests/e2e/cart-drawer.spec.ts --project=chromium --no-deps` → PASS, 11/11, including computed radius `34px 0px 0px 34px` and the Best Sellers chip landing on `/posters?sortBy=salesCount&sortOrder=desc`
+      - Live measurement of our drawer, side by side with the numbers above — every value identical
+
+      Note: `tests/e2e/cart.spec.ts`'s "Your cart is empty" / "Browse Posters" assertions are the **/cart page**, untouched by this.
+
+      Still open: width is `max-w-md` (448px) against their 576px.
+  - author: mcp-client
+    timestamp: '2026-08-05T16:54:49.251Z'
+    text: |-
+      🔁 **Follow-up 3** — `aae9ab89` feat(web): drawer at their 576px, with the X under the pointer
+
+      **Width**: `max-w-md` → `max-w-xl` (36rem = their measured 576px exactly).
+
+      **The pointer**: their overlay is `cursor: none` and carries a `<mouse-cursor>` element holding an X — fixed, `pointer-events-none`. The arrow is replaced by the close control while the pointer is outside the panel. Same treatment ChooseOptions got in #420, ported here: the whole backdrop closes the drawer, so the pointer should say so rather than leaving the shopper to guess that clicking outside works. The backdrop also drops `backdrop-blur-sm` and moves to their flat `rgba(23,23,23,0.7)`.
+
+      Two edges handled: the follower unmounts on the backdrop's `mouseleave`, which is what fires when the pointer crosses onto the panel, so the X never sits under the drawer; and the effect cleanup resets it, so reopening does not paint it at last session's coordinates. Escape and the panel's close button still cover touch and keyboard — this is a pointer affordance, never the only way out.
+
+      **Verification**:
+      - `npx vitest run tests/components/cart/` → PASS, 14 tests
+      - `E2E_BASE_URL=http://localhost:3005 npx playwright test tests/e2e/cart-drawer.spec.ts --project=chromium --no-deps` → PASS, 13/13
+      - Live measurement after the change: panel 576px, `rightGap: 0`, `34px 0px 0px 34px`; backdrop `rgba(23, 23, 23, 0.7)`, `cursor: none`, no filter; follower a 48px circle centred exactly on the pointer
+
+      The drawer now matches theirs on every value measured so far: side, width, radius, motion, backdrop, cursor, close button, and the empty state's type and chips.
 work_sessions:
   - start: '2026-08-05T13:17:41.314Z'
     agent: claude-code

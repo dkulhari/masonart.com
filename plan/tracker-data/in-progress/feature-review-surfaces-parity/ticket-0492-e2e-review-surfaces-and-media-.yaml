@@ -1,0 +1,164 @@
+ticket_number: 492
+title: E2E - review surfaces and media upload flows
+description: |-
+  ## Task
+
+  Feature-level Playwright coverage for everything this feature added: the `/reviews` page, the home strip, the PDP media wall and lightbox, the toast, and a signed-in review submission carrying a photo.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Seed and E2E
+  Depends on: every prior ticket
+
+  - `tests/e2e/`, following `wishlist.spec.ts` and `all-art-mega.spec.ts`
+  - `test.beforeEach` must `page.goto(path, { waitUntil: 'networkidle' })` — the established pattern in this suite
+  - **Scope every selector to the desktop or mobile tree.** The same test ids exist in both; `page.locator('div.hidden.lg\\:block')` is the idiom used here. Unscoped selectors are the standard false result in this repo
+  - **Confirm the app under test is the real one.** Port `:5173` serves a different app and makes these specs pass vacuously. Verify against a known chobii marker before trusting a green run
+  - Video upload is not worth an E2E — the transcode is async and the assertion would be a sleep. Cover photo upload end to end and leave video to the queue unit tests
+  - The toast has a deliberate initial delay; wait on its selector rather than adding a fixed timeout
+feature: review-surfaces-parity
+type: task
+priority: low
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:15:59.722Z'
+last_updated: '2026-08-05T17:48:41.089Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T17:27:29.940Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T17:48:41.088Z'
+    text: |-
+      ⚠️ **Partially complete — read surfaces shipped and green, upload flow blocked by #493**
+
+      **Commit**: `7f08bbd6` — test(e2e): review surfaces and media upload
+
+      **Files**
+      - `tests/e2e/review-surfaces.spec.ts` — 14 tests, all passing
+      - `tests/e2e/review-media-upload.spec.ts` — written and type-clean, `test.fixme()`'d against #493
+
+      **Verification**
+      - Command: `SKIP_E2E_SERVER=true PW_WORKERS=2 npx playwright test tests/e2e/review-surfaces.spec.ts tests/e2e/review-media-upload.spec.ts --project=chromium --no-deps --reporter=list`
+      - Result: **14 passed, 1 skipped** (23.3s), against the live app on :3001 / API on :3000
+
+      ```
+        -   1 review-media-upload.spec.ts:255 › submitting a review with a photo › carries the photo through and says it publishes after approval
+        ✓   2 review-surfaces.spec.ts:70  › the /reviews destination › is the chobii app, landed on page 1 (2.4s)
+        ✓   3 review-surfaces.spec.ts:85  › the /reviews destination › prints the catalogue aggregate above the feed (2.4s)
+        ✓   5 review-surfaces.spec.ts:96  › the /reviews destination › every row carries the poster it is about (1.7s)
+        ✓   4 review-surfaces.spec.ts:110 › the /reviews destination › page 2 renders the page rather than an error boundary (2.7s)
+        ✓   6 review-surfaces.spec.ts:149 › the home Customer Reviews strip › renders the score band over a rail of reviews (1.7s)
+        ✓   7 review-surfaces.spec.ts:163 › the home Customer Reviews strip › View All leads to the reviews destination (1.8s)
+        ✓   8 review-surfaces.spec.ts:174 › the home Customer Reviews strip › the desktop nav carries the same destination (1.6s)
+        ✓   9 review-surfaces.spec.ts:204 › the PDP customer media wall › renders a tile per upload, above the written reviews (1.7s)
+        ✓  10 review-surfaces.spec.ts:226 › the PDP customer media wall › a tile opens the lightbox and Escape closes it (1.8s)
+        ✓  11 review-surfaces.spec.ts:238 › the PDP customer media wall › the arrow keys walk the wall without closing it (1.8s)
+        ✓  12 review-surfaces.spec.ts:266 › the floating review toast › arrives in the bottom-left after its opening delay (5.3s)
+        ✓  13 review-surfaces.spec.ts:281 › the floating review toast › links through to the poster it is quoting (5.4s)
+        ✓  14 review-surfaces.spec.ts:290 › the floating review toast › dismissing it keeps it gone for the rest of the visit (6.1s)
+        ✓  15 review-surfaces.spec.ts:322 › the toast on /checkout › is suppressed before it can even fetch (6.3s)
+
+        1 skipped
+        14 passed (23.3s)
+      ```
+
+      Target confirmed as the real app, not the :5173 impostor: `toHaveTitle(/chobii\.art/)` is the first assertion in the file.
+
+      **Blocker — #493**
+
+      `/account/orders/$id` never renders. `app/routes/_authed/account/orders.tsx` is a leaf page that file-based routing has made the PARENT of `orders.$id.tsx`, and it renders no `<Outlet />`, so every child URL renders the order LIST. Verified in a browser:
+
+      ```
+      {"target":"/account/orders/CH-SEED-0006",                         "h1":"Order History","writeReview":0}
+      {"target":"/account/orders/b4a39113-cf0d-436f-b8d3-d7c115d09b8d", "h1":"Order History","writeReview":0}
+      ```
+
+      `orders.$id.tsx` is the only mount point of `ReviewModal` → `ReviewForm` → `ReviewMediaUpload`, so the photo upload shipped in #485 has no reachable entry point. Pre-existing on `main` (`git show main:...orders.tsx | grep -c Outlet` → 0). It stayed invisible because `tests/e2e/reviews.spec.ts` `test.skip()`s itself whenever the Write Review button is absent — exactly this symptom.
+
+      The spec is left whole rather than softened; dropping the `fixme` is the acceptance test for #493.
+
+      **Two design notes on the specs**
+
+      1. No exact review count is ever asserted. The surfaces encode a threshold (ten approved reviews before an average is printable), so the threshold is what is asserted — the suite survives the next review anybody writes.
+      2. Nothing waits on a clock for an absence. The toast's `/checkout` suppression is proved by the `/api/reviews` request the gated component never makes (matched on exact pathname, since `/media` and `/stats` share the prefix), which needs no window at all. Positive cases wait on the element, never on a timer.
+
+      **Incident during this ticket — seed data damaged and fully restored**
+
+      An early version of the upload spec's teardown deleted "whatever review is on the order item now" rather than the id it created. The order-detail API resolves an item's review by (productId, userId) and this customer owns two order items for the same poster, so the teardown removed a *different* seeded review — "Better in person" — and its 3 media rows cascaded with it. Restored via a one-off script that re-inserted the row verbatim from `SEED_ORDERS` and re-ran the idempotent `seedReviewMedia()`; the script was deleted afterwards. Verified back to baseline: `{"pending":2,"approved":12,"rejected":0,"total":14}` and `wabi-sabi-study` carrying 2 photos + 1 video again. The spec now captures `createdReviewId` off the POST response and deletes only that, with the reasoning written into the file so it cannot be re-introduced. A before/after check across the final run shows the database unchanged.
+
+      **Remaining for this ticket**: step 3 stays pending until #493 lands and the `fixme` comes off.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 485
+    feature: review-surfaces-parity
+    description: Frontend - photo and video upload in ReviewForm
+  - ticket: 486
+    feature: review-surfaces-parity
+    description: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+  - ticket: 487
+    feature: review-surfaces-parity
+    description: Frontend - home Customer Reviews strip with score band and carousel
+  - ticket: 488
+    feature: review-surfaces-parity
+    description: Frontend - PDP review media wall with lightbox and video playback
+  - ticket: 489
+    feature: review-surfaces-parity
+    description: Frontend - site-wide floating review toast
+  - ticket: 491
+    feature: review-surfaces-parity
+    description: Seed - attach photo and video media to approved reviews
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the E2E specs for the read surfaces
+    file: tests/e2e/review-surfaces.spec.ts
+    command: bun run test:e2e -- review-surfaces
+    expected_result: FAIL until the surfaces ship
+    status: done
+    code: |-
+      // /reviews: header band renders, list has rows, ?page=2 loads without a blank
+      //   error-boundary page, and a row links through to its product
+      // home: the reviews strip renders with a score and a View All link to /reviews
+      // PDP: the media wall renders tiles; clicking one opens the lightbox; Escape
+      //   closes it
+      // toast: appears bottom-left, dismisses, and stays gone after a reload in the
+      //   same session
+      // checkout: the toast does NOT appear
+  - id: 2
+    action: write-test
+    description: Write the signed-in review submission spec with a photo attachment
+    file: tests/e2e/review-media-upload.spec.ts
+    command: bun run test:e2e -- review-media-upload
+    expected_result: FAIL until upload ships
+    status: done
+    code: |-
+      // Use the storage state from auth.setup.ts.
+      // Open the review form on a delivered order item, fill rating and body, attach a
+      // generated PNG via setInputFiles, submit.
+      // Assert: a success confirmation, and copy telling the user the review and its
+      // photo publish after approval. Do not assert public visibility - the review is
+      // 'pending' by design and asserting otherwise bakes in a moderation bypass.
+  - id: 3
+    action: verify-pass
+    description: Run both specs against the real app
+    command: bun run test:e2e -- review-surfaces review-media-upload
+    expected_result: PASS - and confirm the target really is the chobii app, not the :5173 impostor
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit the E2E suite
+    command: 'git add tests/e2e/review-surfaces.spec.ts tests/e2e/review-media-upload.spec.ts && git commit -m "test(e2e): review surfaces and media upload"'
+    status: done
+current_step: 3
+started: '2026-08-05T17:27:29.940Z'

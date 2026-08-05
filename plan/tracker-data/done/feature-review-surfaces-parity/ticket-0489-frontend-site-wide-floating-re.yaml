@@ -1,0 +1,144 @@
+ticket_number: 489
+title: Frontend - site-wide floating review toast
+description: |-
+  ## Task
+
+  Mesonart runs a bottom-left toast that cycles recent reviews on every page. Ours does the same, mounted once in the root route, dismissible, and remembered for the session.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Frontend
+  Depends on: the client layer
+
+  - Mount in `packages/web/app/routes/__root.tsx` so it survives navigation and fetches once rather than per route
+  - **Suppressed on `/checkout`** and on any admin route — a social-proof popup over a payment form is a conversion and trust problem, not a feature
+  - Mobile: must sit **under** the cart drawer's z-index and clear of the sticky add-to-cart bar on the PDP. Check the drawer's z-index before picking one rather than guessing
+  - `sessionStorage`, not `localStorage` — dismissal lasts the session, not forever
+  - **`sessionStorage` needs a `vi.hoisted` stub in tests.** Node 25's inert `localStorage`/`sessionStorage` shadows jsdom's and throws `setItem is not a function`
+  - Respect `prefers-reduced-motion`: no slide-in animation when it is set
+feature: review-surfaces-parity
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:15:25.097Z'
+last_updated: '2026-08-05T17:16:42.133Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T17:12:14.291Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T17:16:38.762Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `947115d6` — feat(web): site-wide floating review toast
+
+      **Files Changed**:
+      - `packages/web/app/components/reviews/ReviewToast.tsx` (new) — the toast
+      - `packages/web/app/routes/__root.tsx` — mounted once, after the outlet, before the drawer
+      - `packages/web/tests/components/reviews/ReviewToast.test.tsx` (new) — 16 tests
+
+      **Summary**:
+
+      Bottom-left card, 4s opening delay, cycles every 8s over one page of `useReviewFeed(1, 10)`. Card is thumbnail (review media first, product image as fallback) + star row + one-line excerpt + author · product title + close button, linking to `/posters/$slug`.
+
+      The three constraints that were correctness rather than styling:
+
+      1. **Suppression before fetch.** `ReviewToast` reads the pathname, and `/checkout*` or `/admin*` returns null *before* `ReviewToastCard` — the component holding `useReviewFeed` — is rendered. That two-component split is the whole point: an early return inside one component cannot legally skip a hook, so a single-component version would still have fired the request. Tests assert `useReviewFeed` was **not called** on those routes, not merely that the DOM is empty. The same holds for an already-dismissed session.
+
+      2. **Z-index read, not guessed.** `CartDrawer.tsx` uses `z-40` (backdrop) / `z-50` (panel), so the toast is `z-30` and the drawer's scrim covers it. `bottom-24` on mobile to clear a PDP sticky add-to-cart bar (none exists in `routes/posters/$slug.tsx` today — the offset is there so adding one does not collide), `sm:bottom-6` above.
+
+      3. **`sessionStorage`, not `localStorage`** — key `chobii:review-toast-dismissed`, wrapped in try/catch for Safari private mode.
+
+      Reduced motion is read via `matchMedia` in JS rather than left to a `motion-reduce:` variant: the slide-in is a whole animation class, so the variant would have to override a keyframe mid-flight, and it would not be assertable. `animate-slide-in-from-left` is dropped entirely when the preference is set.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/components/reviews/ReviewToast.test.tsx`
+      - Result: PASS (16 tests, 16 passing, 0 failing)
+      ```
+       ✓ tests/components/reviews/ReviewToast.test.tsx (16 tests) 142ms
+       Test Files  1 passed (1)
+            Tests  16 passed (16)
+      ```
+      - **Mutation-checked**: replacing `isReviewToastSuppressed` with `return false` fails exactly the 3 suppression tests (13 passed / 3 failed), so those assertions bite rather than passing vacuously. Restored after.
+      - Regression: `bunx vitest run tests/components/reviews tests/routes/reviews.test.tsx` → 184 passed; the 7 suites that reference `__root.tsx` or grep style tokens (security-headers, build, storefront-token-compliance, cart-drawer, typography, chrome-tokens, Header.structure) → 197 passed.
+      - Types: `bunx tsc --noEmit` reports **zero** errors in the three files touched. `noUncheckedIndexedAccess` initially flagged `reviews[index % count]`; guarded with a real `if (!review) return null`, which also covers a refetch returning fewer rows than the current index. Remaining `app/routes/admin/**` errors are the pre-existing baseline, untouched.
+
+      **Note for the feature owner**: `components/reviews/index.ts` was deliberately not touched — another agent is working in that directory and `__root.tsx` imports the component by full path. Worth adding the barrel export in a later sweep.
+  - author: system
+    timestamp: '2026-08-05T17:16:42.133Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 484
+    feature: review-surfaces-parity
+    description: Frontend - API client functions and hooks for review feed and media
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the toast
+    file: packages/web/tests/components/reviews/ReviewToast.test.tsx
+    command: cd packages/web && bun run test -- ReviewToast
+    expected_result: FAIL
+    status: done
+    code: |-
+      // Stub storage in vi.hoisted ABOVE the imports - see the ticket note.
+      // renders a review after the initial delay and cycles to the next on an interval
+      // dismissing hides it and writes the sessionStorage flag
+      // a set flag suppresses it on mount, with no fetch at all
+      // renders nothing on /checkout and on /admin routes
+      // no slide animation class when prefers-reduced-motion matches
+      // clicking the toast navigates to that review's product
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bun run test -- ReviewToast
+    expected_result: FAIL - component not found
+    status: done
+  - id: 3
+    action: implement
+    description: Build the toast
+    file: packages/web/app/components/reviews/ReviewToast.tsx
+    status: done
+    code: |-
+      // Route check first, before any data fetch:
+      //   const { pathname } = useRouterState({ select: s => s.location })
+      //   if (pathname.startsWith('/checkout') || pathname.startsWith('/admin')) return null
+      // Then the sessionStorage dismissal flag, then useReviewFeed(1, 10).
+      // Cycle every ~8s; 4s initial delay. Card: thumbnail (media or product image),
+      //   star row, one-line excerpt, author, close button.
+      // Fixed bottom-left, z-index BELOW the cart drawer (read the drawer's value,
+      //   do not guess), and offset above the PDP sticky bar on small screens.
+  - id: 4
+    action: implement
+    description: Mount the toast in the root route
+    file: packages/web/app/routes/__root.tsx
+    status: done
+    code: |-
+      // Render <ReviewToast /> once inside the root layout, after the main outlet so
+      // it stacks above page content but below the drawer.
+  - id: 5
+    action: verify-pass
+    description: Confirm the toast tests pass
+    command: cd packages/web && bun run test -- ReviewToast
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the toast
+    command: 'git add packages/web/app/components/reviews/ReviewToast.tsx packages/web/app/routes/__root.tsx packages/web/tests/components/reviews/ReviewToast.test.tsx && git commit -m "feat(web): site-wide review toast"'
+    status: done
+current_step: 6
+started: '2026-08-05T17:12:14.291Z'
+completed: '2026-08-05T17:16:42.133Z'

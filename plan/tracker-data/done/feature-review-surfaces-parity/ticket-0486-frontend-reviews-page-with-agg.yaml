@@ -1,0 +1,164 @@
+ticket_number: 486
+title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+description: |-
+  ## Task
+
+  The destination page. Aggregate score band over a reverse-chronological list of every approved review, each linking back to the product it reviews. Linked from the header nav, the footer, and the sitemap — mesonart surfaces it in all three.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Frontend
+  Depends on: the client layer
+
+  - **`validateSearch` must coerce `page` to a number.** `packages/web/app/routes/router.tsx` overrides TanStack's search serialisation so every param arrives as a string; a bare `z.number()` throws and the route error-boundaries to a blank page
+  - Adding a route rewrites `packages/web/app/routeTree.gen.ts`, which is **tracked, not gitignored**. Stay in one checkout and `git add` by explicit path
+  - Aggregate header reuses the suppression rule: render nothing below 10 approved reviews rather than rounding a thin sample into a marketing number. `GET /api/reviews/stats` already returns `averageRating: null` for that case — honour the null, do not coalesce it to 0
+  - Follow `packages/web/app/routes/wishlist.tsx` for route-file shape and `SectionBand` / `DisplayHeading` for the beige header band
+  - Header nav links live in `packages/web/app/components/layout/Header.tsx` (desktop ~line 376 and mobile ~line 504 — both trees need the link); footer in `Footer.tsx`; sitemap in `packages/api/src/routes/sitemap.ts`
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:14:24.199Z'
+last_updated: '2026-08-05T17:09:10.524Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T17:04:21.799Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T17:09:07.966Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `49663f67` — feat(web): reviews page with aggregate header and nav links
+
+      **Files Changed**:
+      - `packages/web/app/routes/reviews.tsx` (new) — the /reviews route. Exports `Route`, `reviewsSearchSchema`, `MIN_REVIEWS_FOR_AGGREGATE`, `ReviewsAggregate`, `ReviewFeedRow`, `ReviewFeedList` so the pieces are testable without a live router
+      - `packages/web/app/routeTree.gen.ts` — regenerated (21 lines added) by running `vite dev` briefly rather than hand-editing, so the file stays byte-identical to what the plugin produces
+      - `packages/web/app/components/layout/Header.tsx` — Reviews link in BOTH nav trees: desktop `<NavLink to="/reviews">` and mobile `<MobileNavLink to="/reviews">`
+      - `packages/web/app/components/layout/Footer.tsx` — "Reviews & Ratings" in the Company column (this footer's customer-services column, alongside FAQs / Shipping / Returns)
+      - `packages/api/src/routes/sitemap.ts` — `/reviews` static entry, `changefreq: daily`, priority 0.6
+      - `packages/web/tests/routes/reviews.test.tsx` (new) — 15 tests
+
+      **Summary**:
+      Aggregate score band over a reverse-chronological feed of every approved review, each row linking back to `/posters/$slug`. Prev/next paging writes `?page=` through the router as real `<Link>`s. Reads go through `productsApi.catalogueReviewStats()` and `useReviewFeed(page, 20)` from the #484 client layer.
+
+      Two rules from the ticket are guarded by tests rather than by comments:
+
+      1. **`validateSearch` coerces.** `reviewsSearchSchema = z.object({ page: z.coerce.number().int().min(1).catch(1) })`, applied through an explicit function so the test can call `Route.options.validateSearch({ page: '2' })` and get `{ page: 2 }`. `.catch(1)` also lands `'nonsense'`, `'0'`, `'-4'` and `'2.5'` on page 1 instead of error-boundarying the route.
+
+      2. **Aggregate suppression.** `ReviewsAggregate` returns `null` when `averageRating === null` OR `reviewCount < 10` — asserted by `container.innerHTML === ''`, plus an explicit assertion that no `"0.0"` is printed for the null case.
+
+      Unlike the other suites in `tests/routes/` these are real rendering tests, not source greps — route modules import cleanly into jsdom here. Only the three entry-point assertions are source-level, since "a link exists in three separate files" is a wiring fact.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/routes/reviews.test.tsx`
+      - Result: PASS (15 tests, 15 passing, 0 failing)
+      - Output:
+      ```
+       ✓ /reviews validateSearch > coerces the string page the router hands it into a number
+       ✓ /reviews validateSearch > defaults to page 1 when there is no page param
+       ✓ /reviews validateSearch > falls back to page 1 rather than throwing on junk
+       ✓ the aggregate header > needs ten approved reviews before it says anything
+       ✓ the aggregate header > renders the score and the count once the sample is big enough
+       ✓ the aggregate header > renders nothing below ten reviews
+       ✓ the aggregate header > renders nothing when the average is null, however many reviews
+       ✓ the review list > shows the rating, title, body, author and date of a review
+       ✓ the review list > links every review back to the product it reviews
+       ✓ the review list > survives a review whose author account is gone
+       ✓ the review list > renders an empty state rather than throwing on no reviews
+       ✓ the ways in > is registered in the generated route tree
+       ✓ the ways in > appears in BOTH header nav trees, not just the desktop one
+       ✓ the ways in > is linked from the footer
+       ✓ the ways in > is in the sitemap so a crawler can find it
+       Test Files  1 passed (1)
+            Tests  15 passed (15)
+      ```
+
+      **No regressions**:
+      - `bunx vitest run tests/components/layout/Header.structure.test.tsx tests/components/layout/Footer.structure.test.tsx tests/components/layout/chrome-tokens.test.ts` → 50 passed (50)
+      - `packages/api`: `bunx vitest run tests/routes/sitemap-collections.test.ts` → 5 passed (5)
+      - `packages/web` `tsc --noEmit`: 22 errors, none in any file this ticket touched (unchanged pre-existing baseline)
+      - `packages/api` `tsc --noEmit`: 0 errors
+
+      **Note for #487/#490**: media thumbnails render inline in `ReviewFeedRow` from `review.media`, falling back `thumbnailUrl → posterUrl → url`. If the media components under `app/components/reviews/` land a dedicated tile, that block is the swap point.
+  - author: system
+    timestamp: '2026-08-05T17:09:10.524Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 484
+    feature: review-surfaces-parity
+    description: Frontend - API client functions and hooks for review feed and media
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the reviews page
+    file: packages/web/tests/routes/reviews.test.tsx
+    command: cd packages/web && bun run test -- routes/reviews
+    expected_result: FAIL
+    status: done
+    code: |-
+      // validateSearch coerces the string '2' to the number 2 and defaults to 1
+      // the aggregate header renders score and count when reviewCount >= 10
+      // the header renders nothing when averageRating is null or count < 10
+      // each row shows rating, title, body, author, date and a product link
+      // the empty state renders without throwing
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bun run test -- routes/reviews
+    expected_result: FAIL - route module does not exist
+    status: done
+  - id: 3
+    action: implement
+    description: Create the reviews route
+    file: packages/web/app/routes/reviews.tsx
+    status: done
+    code: |-
+      // export const Route = createFileRoute('/reviews')({
+      //   validateSearch: z.object({
+      //     page: z.coerce.number().int().min(1).catch(1),   // coerce, see ticket note
+      //   }),
+      //   component: ReviewsPage,
+      // })
+      // Beige SectionBand header: DisplayHeading "Reviews & Ratings" + the aggregate
+      // strip (score, star row, "N reviews") under the >= 10 suppression rule.
+      // Body: useReviewFeed(page) -> ReviewCard list, media thumbnails inline,
+      // prev/next paging that writes ?page= through the router.
+  - id: 4
+    action: implement
+    description: Add the nav, footer and sitemap links
+    file: packages/web/app/components/layout/Header.tsx
+    status: done
+    code: |-
+      // Header.tsx: add a Reviews link to BOTH the desktop nav (~:376) and the mobile
+      //   nav (~:504) - the same ids exist in both trees and only patching one is the
+      //   classic miss here.
+      // Footer.tsx: "Reviews & Ratings" under Customer Services, matching mesonart.
+      // packages/api/src/routes/sitemap.ts: add the /reviews URL entry.
+  - id: 5
+    action: verify-pass
+    description: Confirm tests pass and the route tree regenerated
+    command: cd packages/web && bun run test -- routes/reviews && git diff --stat packages/web/app/routeTree.gen.ts
+    expected_result: PASS, and routeTree.gen.ts shows the /reviews route added
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the reviews page and its links
+    command: 'git add packages/web/app/routes/reviews.tsx packages/web/app/routeTree.gen.ts packages/web/app/components/layout/Header.tsx packages/web/app/components/layout/Footer.tsx packages/api/src/routes/sitemap.ts packages/web/tests/routes/reviews.test.tsx && git commit -m "feat(web): reviews page with aggregate header and nav links"'
+    status: done
+current_step: 6
+started: '2026-08-05T17:04:21.799Z'
+completed: '2026-08-05T17:09:10.524Z'

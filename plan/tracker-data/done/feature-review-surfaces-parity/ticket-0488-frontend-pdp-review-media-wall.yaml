@@ -1,0 +1,167 @@
+ticket_number: 488
+title: Frontend - PDP review media wall with lightbox and video playback
+description: |-
+  ## Task
+
+  Mesonart's PDP runs a Loox photo-review wall below the tabbed content. Ours renders customer photos **and videos** from the same wall, opening into a lightbox that plays video inline and shows the review the media came from.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Frontend
+  Depends on: the media feed endpoint and client layer
+
+  - PDP is `packages/web/app/routes/posters/$slug.tsx`; the existing reviews block is `packages/web/app/components/product/ProductReviews.tsx` (section at :75, heading "Customer Reviews" at :85)
+  - Place the wall **above** `ProductReviews`, matching mesonart's order: media wall, then the written reviews
+  - Videos render `poster={posterUrl}` and only load on play — never `autoPlay`, never `preload="auto"`. A dozen autoplaying clips on a product page is a bandwidth and layout disaster on mobile
+  - The wall renders nothing when the feed is empty; it must not leave an empty heading behind
+  - Lightbox needs keyboard escape, arrow navigation, and focus trapping. Do not trigger a native dialog
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:15:25.087Z'
+last_updated: '2026-08-05T17:08:37.823Z'
+time_spent_minutes: 5
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T17:03:45.067Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T17:08:22.030Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T17:08:37.822Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `3419af3f` - feat(web): PDP review media wall with video lightbox
+
+      **Files Changed**:
+      - `packages/web/app/components/product/ReviewMediaWall.tsx` (new) - media grid + portal lightbox
+      - `packages/web/app/routes/posters/$slug.tsx` - mounts `<ReviewMediaWall>` directly above `<ProductReviews>`
+      - `packages/web/tests/components/product/ReviewMediaWall.test.tsx` (new) - 11 tests
+
+      **Summary**:
+      - Reads `useReviewMediaFeed(productId)` from the #484 client layer. Square-tile grid, 2 cols mobile / 3 sm / 6 desktop, images `loading="lazy"`.
+      - Video tiles: `poster` (posterUrl, falling back to thumbnailUrl), `preload="none"`, `muted`, `playsInline`, `controls={false}`, no `autoPlay`, with a play badge and a `0:12`-style duration chip. The lightbox video also keeps `preload="none"` so arrowing past a clip never fetches it — only pressing play does.
+      - Returns `null` when the feed is empty **or still loading**: no orphan heading, no skeleton that resolves to nothing (which would be a layout shift on most products).
+      - Lightbox is a `createPortal` overlay, not a native `<dialog>` — `showModal` puts the page in the top layer and blocks the e2e harness. Focus moves to the close button on open, Tab is trapped both directions, Escape closes and restores focus to the tile that opened it, ArrowLeft/ArrowRight walk the wall (wrapping), click-outside closes via an `aria-hidden` backdrop that is deliberately not a tab stop.
+      - Review title/body/author beside the media come from `useReviews(productId, { sortBy: 'newest', page: 1, limit: 10 })` — filters chosen to be byte-identical to `ProductReviews`' so both share one cache entry — and gated with `enabled: openIndex !== null`. On the PDP that means zero extra requests; the rating and date fall back to the feed item when a caption is not in cache.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/components/product/ReviewMediaWall.test.tsx`
+      - Result: PASS (11 tests, 11 passing, 0 failing)
+      - Output:
+      ```
+       ✓ renders one tile per media item for the product
+       ✓ renders photos as images and clips as posters with a play badge
+       ✓ never autoplays a tile and never preloads its bytes
+       ✓ renders nothing at all when the feed is empty
+       ✓ renders nothing while the feed is still loading
+       ✓ opens a lightbox on the clicked item showing its review
+       ✓ does not use a native dialog element
+       ✓ moves focus into the lightbox when it opens
+       ✓ advances and rewinds with the arrow keys
+       ✓ closes on Escape and returns focus to the tile that opened it
+       ✓ keeps Tab inside the lightbox
+       Test Files  1 passed (1)
+            Tests  11 passed (11)
+      ```
+      - Regression: `bunx vitest run tests/components/product tests/components/reviews` → 18 files, **396 tests passed**, 0 failing.
+      - Types: `bunx tsc --noEmit` → 0 errors in `ReviewMediaWall.tsx` and `posters/$slug.tsx` (unrelated pre-existing errors elsewhere untouched).
+work_sessions:
+  - start: '2026-08-05T17:03:48.177Z'
+    agent: claude-code
+    summary: Built ReviewMediaWall (grid + portal lightbox), mounted it above ProductReviews on the PDP, 11 new tests passing, committed 3419af3f
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T17:08:21.970Z'
+    duration: '00:04:33'
+related_tickets: []
+blocked_by:
+  - ticket: 484
+    feature: review-surfaces-parity
+    description: Frontend - API client functions and hooks for review feed and media
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the media wall and lightbox
+    file: packages/web/tests/components/product/ReviewMediaWall.test.tsx
+    command: cd packages/web && bun run test -- ReviewMediaWall
+    expected_result: FAIL
+    status: done
+    code: |-
+      // renders one tile per media item for the product
+      // image tiles render <img>, video tiles render <video> with a poster and a play badge
+      // no <video> carries autoPlay, and none preloads audio/video data
+      // renders null when the feed is empty - no orphan heading
+      // clicking a tile opens the lightbox showing that item plus its review text
+      // Escape closes; ArrowRight advances; focus returns to the trigger tile
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bun run test -- ReviewMediaWall
+    expected_result: FAIL - component not found
+    status: done
+  - id: 3
+    action: implement
+    description: Build the media wall and lightbox
+    file: packages/web/app/components/product/ReviewMediaWall.tsx
+    status: done
+    code: |-
+      // useReviewMediaFeed(productId); return null on an empty list.
+      // Grid of square tiles, 2 cols mobile / 4-6 desktop, lazy-loaded images.
+      // Video tiles: <video poster={posterUrl} preload="none" muted playsInline
+      //   controls={false}> with a play badge overlay and the duration.
+      // Lightbox: portal, focus trap, Escape and arrow handling, and the source
+      //   review's rating, title and body beside the media.
+  - id: 4
+    action: implement
+    description: Mount the wall on the product page
+    file: packages/web/app/routes/posters/$slug.tsx
+    status: done
+    code: // Directly above the existing <ProductReviews />, matching mesonart's order.
+  - id: 5
+    action: verify-pass
+    description: Confirm the wall and existing product review tests pass
+    command: cd packages/web && bun run test -- ReviewMediaWall ProductReviews
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the media wall
+    command: 'git add packages/web/app/components/product/ReviewMediaWall.tsx packages/web/app/routes/posters/\$slug.tsx packages/web/tests/components/product && git commit -m "feat(web): PDP review media wall with video lightbox"'
+    status: done
+current_step: 6
+started: '2026-08-05T17:03:45.067Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:05:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:05:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run tests/components/product tests/components/reviews
+  test_output: 18 files / 396 tests passed, including 11 new ReviewMediaWall tests. tsc --noEmit clean for ReviewMediaWall.tsx and posters/$slug.tsx.
+  build_passed: true
+  build_command: bunx tsc --noEmit -p tsconfig.json (0 errors in changed files)
+  verified_at: '2026-08-05T17:07:45.689Z'
+completed: '2026-08-05T17:08:22.030Z'

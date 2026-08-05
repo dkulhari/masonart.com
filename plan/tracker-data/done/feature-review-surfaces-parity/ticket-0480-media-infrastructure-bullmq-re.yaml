@@ -20,17 +20,52 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:12:30.611Z'
-last_updated: '2026-08-05T15:12:30.611Z'
+last_updated: '2026-08-05T16:42:56.121Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-05T16:42:49.640Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `de562ff0` - feat(api): async review media transcode queue
+
+      **Files Changed**:
+      - `packages/api/src/queues/review-media.ts` (new) - Queue, exported `processReviewMediaJob`, `startReviewMediaWorker`, `enqueueReviewMediaJob`, `closeReviewMediaQueue`
+      - `packages/api/src/index.ts` - starts the worker outside tests, closes the queue on SIGTERM/SIGINT
+      - `packages/api/tests/queues/review-media.test.ts` (new) - 10 tests
+
+      **Summary**:
+      getFile(sourceKey) -> temp dir -> probeVideo -> duration + dimension guard -> transcodeToMp4 + extractPosterFrame (poster taken off the normalised copy) -> two uploadFile calls (`<base>-web.mp4`, `<base>-poster.jpg`, never clobbering the original) -> row set to `ready` with url, posterUrl, thumbnailUrl, durationSeconds, width, height, sizeBytes.
+
+      Failure path marks only that media row `failed` with a collapsed/truncated processingError (ffmpeg stderr tail preferred) and never rethrows, so the review is untouched — asserted in the test by checking `db.update` is only ever called with the `reviewMedia` table. Scratch dir removed in `finally` on both paths, verified against the real filesystem (probe's input path -> `existsSync(dir) === false`).
+
+      Concurrency: `REVIEW_MEDIA_CONCURRENCY`, default 1, garbage/0/negative falls back to 1. `attempts: 1` — retrying ffmpeg on the same bad bytes only burns CPU.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/queues/review-media.test.ts`
+      - Result: PASS (10 tests, 10 passing, 0 failing)
+      - Output:
+      ```
+       ✓ tests/queues/review-media.test.ts (10 tests) 389ms
+       Test Files  1 passed (1)
+            Tests  10 passed (10)
+      ```
+      - `bunx tsc --noEmit` reports zero errors in `src/queues/review-media.ts` and `src/index.ts`
+      - `tests/server.test.ts` (imports index.ts) is unchanged against baseline: 21 failed / 52 passed on HEAD, same 21 failures with this change — pre-existing env failures (health 503, db/redis ports)
+
+      Note for the follow-up ticket that writes the upload path: call `enqueueReviewMediaJob({ mediaId, sourceKey })` after the original lands in storage. Images must not go through this queue.
+  - author: system
+    timestamp: '2026-08-05T16:42:56.121Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -49,7 +84,7 @@ implementation_steps:
     file: packages/api/tests/queues/review-media.test.ts
     command: cd packages/api && bun run test -- queues/review-media
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // Test the exported processor function directly; do not spin up a real Worker.
       // Mock ../lib/video-processing and ../lib/storage with vi.mock.
@@ -64,12 +99,12 @@ implementation_steps:
     description: Confirm the test fails - queue module missing
     command: cd packages/api && bun run test -- queues/review-media
     expected_result: FAIL - Cannot find module '../../src/queues/review-media'
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Create the review media queue, processor and worker
     file: packages/api/src/queues/review-media.ts
-    status: pending
+    status: done
     code: |-
       // export interface ReviewMediaJobData { mediaId: string; sourceKey: string }
       // export const reviewMediaQueue = new Queue<ReviewMediaJobData>('review-media', { connection: redisOptions })
@@ -91,17 +126,18 @@ implementation_steps:
     action: implement
     description: Start the worker alongside the AI generation worker and close it on shutdown
     file: packages/api/src/index.ts
-    status: pending
+    status: done
     code: // Mirror however startAIGenerationWorker / closeAIGenerationQueue are wired here.
   - id: 5
     action: verify-pass
     description: Confirm the queue tests pass
     command: cd packages/api && bun run test -- queues/review-media
     expected_result: PASS
-    status: pending
+    status: done
   - id: 6
     action: commit
     description: Commit the transcode queue
     command: 'git add packages/api/src/queues/review-media.ts packages/api/src/index.ts packages/api/tests/queues && git commit -m "feat(api): async review media transcode queue"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 6
+completed: '2026-08-05T16:42:56.121Z'

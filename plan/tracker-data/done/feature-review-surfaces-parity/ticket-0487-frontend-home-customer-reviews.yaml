@@ -18,17 +18,53 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:15:25.069Z'
-last_updated: '2026-08-05T15:15:25.069Z'
+last_updated: '2026-08-05T17:16:11.734Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-05T17:16:09.642Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4cbefbd2` — feat(web): home customer reviews strip
+
+      **Files Changed**:
+      - `packages/web/app/components/home/CustomerReviewsSection.tsx` — new. `CustomerReviewsStrip` (presentational, carries the suppression rule), `HomeReviewCard`, and the connected `CustomerReviewsSection`.
+      - `packages/web/app/routes/index.tsx` — mounts `<CustomerReviewsSection />` between `<ValuePropsSection />` and `<NewsletterSection />`.
+      - `packages/web/tests/components/home/CustomerReviewsSection.test.tsx` — new, 17 tests.
+
+      **Summary**:
+      - **Suppression rule**: the whole section returns `null` when `reviewCount < 10`, when `averageRating === null` however many reviews there are, and when the feed came back empty (a heading above an empty rail is worse than silence). No placeholder, no synthetic "0.0". `MIN_REVIEWS_FOR_HOME_STRIP` is restated locally rather than imported from the route module — so a home chunk does not drag in `/reviews` — and a test pins it to `MIN_REVIEWS_FOR_AGGREGATE`, so the two surfaces cannot drift into being two designs.
+      - **Score band**: same score / `StarRating` / count shape and copy as the `/reviews` aggregate header, inside the existing `SectionBand` (`tone="sand"`, so it does not collide with the beige newsletter that follows) with `DisplayHeading as="h2"`. No new band style.
+      - **Rail**: `overflow-x-auto snap-x snap-mandatory` with two `ChevronLeft`/`ChevronRight` buttons, the DiscoverChips shape. No carousel dependency. The arrows read the rail's own `scrollLeft`/`scrollWidth`/`clientWidth` via a scroll + resize listener and `disabled` at each end.
+      - **Data**: `useReviewFeed(1, 12)` plus `productsApi.catalogueReviewStats()` through `useQuery` — client-fetched, and via `productsApi` because there is no Vite `/api` proxy.
+      - **View All**: outline `buttonVariants` pill to `/reviews`. Plain `<a>`, matching every other link in `index.tsx`.
+      - Card body is CSS `line-clamp-5`, not a JS slice — full text stays in the DOM, no fabricated ellipsis. `author: null` falls back to "Verified customer".
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/components/home/CustomerReviewsSection.test.tsx tests/routes/reviews.test.tsx`
+      - Result: PASS (32 tests, 32 passing, 0 failing)
+      - Output:
+      ```
+       ✓ tests/routes/reviews.test.tsx (15 tests) 166ms
+       ✓ tests/components/home/CustomerReviewsSection.test.tsx (17 tests) 333ms
+
+       Test Files  2 passed (2)
+            Tests  32 passed (32)
+      ```
+      - RED first: the initial run failed with `Failed to resolve import "~/components/home/CustomerReviewsSection"` before the component existed.
+      - `bunx tsc --noEmit` reports 22 errors, all pre-existing in unrelated files (`routes/track/*`, etc.); zero in `CustomerReviewsSection.tsx` or `routes/index.tsx`.
+  - author: system
+    timestamp: '2026-08-05T17:16:11.735Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -47,7 +83,7 @@ implementation_steps:
     file: packages/web/tests/components/home/CustomerReviewsSection.test.tsx
     command: cd packages/web && bun run test -- CustomerReviewsSection
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // renders the score band and the count when reviewCount >= 10
       // renders null - not a placeholder, not a zero - when count < 10
@@ -60,12 +96,12 @@ implementation_steps:
     description: Confirm the test fails
     command: cd packages/web && bun run test -- CustomerReviewsSection
     expected_result: FAIL - component not found
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Build the section
     file: packages/web/app/components/home/CustomerReviewsSection.tsx
-    status: pending
+    status: done
     code: |-
       // Data: useReviewFeed(1, 12) + the catalogue aggregate from
       //   productsApi.catalogueReviewStats() (lib/api.ts:291).
@@ -78,17 +114,18 @@ implementation_steps:
     action: implement
     description: Mount the section on the home page
     file: packages/web/app/routes/index.tsx
-    status: pending
+    status: done
     code: // Inside HomePage (:138), between <ValuePropsSection /> and <NewsletterSection />.
   - id: 5
     action: verify-pass
     description: Confirm the section tests pass
     command: cd packages/web && bun run test -- CustomerReviewsSection
     expected_result: PASS
-    status: pending
+    status: done
   - id: 6
     action: commit
     description: Commit the home strip
     command: 'git add packages/web/app/components/home packages/web/app/routes/index.tsx packages/web/tests/components/home && git commit -m "feat(web): home customer reviews strip"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 6
+completed: '2026-08-05T17:16:11.734Z'

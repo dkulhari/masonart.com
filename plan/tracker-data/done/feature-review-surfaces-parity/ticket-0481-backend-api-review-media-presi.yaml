@@ -21,17 +21,59 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:13:27.641Z'
-last_updated: '2026-08-05T15:13:27.641Z'
+last_updated: '2026-08-05T16:51:38.847Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T16:47:20.163Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T16:51:35.776Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `62cfe2b3` — feat(api): presigned review media upload endpoints
+
+      **Files Changed**:
+      - `packages/api/src/routes/review-media.ts` (new) — presign + complete endpoints
+      - `packages/api/src/index.ts` — mounted `reviewMediaApp` at `/api/reviews`
+      - `packages/api/tests/routes/review-media.test.ts` (new) — 32 tests
+
+      **Summary**:
+      - `POST /api/reviews/:reviewId/media/presign` — requireAuth, exact author match (not `canAccess`: staff have no business attaching photos to a customer's review), review must still be `pending`. Resolves mime against `REVIEW_MEDIA_LIMITS` and applies the matching byte cap (10MB image / 200MB video), counts existing media and 409s at 5, then returns `{ uploadUrl, key, contentType, mediaType, maxBytes, expiresInSeconds }`. No row is created — an abandoned upload leaves only an unreferenced object.
+      - `POST /api/reviews/:reviewId/media/complete` — re-validates all of the above (the two calls are minutes apart), inserts the `reviewMedia` row, invalidates the `reviews:` cache keys, returns 201.
+        - image → `processingStatus: 'ready'`, `thumbnailUrl = url`, nothing enqueued
+        - video → `processingStatus: 'processing'`, `thumbnailUrl: null`, exactly one `reviewMediaQueue.add('transcode', { mediaId, sourceKey })`
+
+      **Decisions worth recording**:
+      - **Presign returns no `mediaId`.** The ticket's test sketch asked for one, but its own implementation sketch creates the row at `complete`. The row lifecycle won; presign returns `{ uploadUrl, key }` and the id comes back from `complete`.
+      - **Key ownership is enforced at `complete`.** `key` is client-supplied; without a prefix check against `StoragePaths.reviewMedia(reviewId, …)` a caller could point a media row at any object in the bucket, including another customer's upload. Two tests cover this (400).
+      - **Mime gate uses `REVIEW_MEDIA_LIMITS.*.types`, not `isValidImageType`.** The latter also admits `image/gif`, which the limits table deliberately excludes — an animated gif has no transcode path and would render as a still first frame on some clients.
+      - **Local extension map instead of `getExtensionFromContentType`.** That helper only knows images and falls back to `'jpg'`, which would key an `.mp4` as `.jpg`; the transcode worker recomputes derivative keys from the source key, so the mistake would follow the file to playback. `video/quicktime` keeps `.mov` (test asserts this).
+      - **Hono middleware scoping verified empirically** before mounting: a third `app.route('/api/reviews', …)` whose sub-app does `use('*', requireAuth)` does NOT leak onto the public `GET /api/reviews/:reviewId`. Confirmed with a standalone probe (anon GET → 200, anon POST presign → 401), then by the reviews suite still passing.
+      - **Test harness mocks db/auth/storage/redis/queue and imports the route directly**, following `tests/routes/wishlist.test.ts` rather than the try/catch-into-null pattern in `tests/routes/reviews.test.ts` — that pattern makes every assertion pass vacuously when the DB is unreachable, which is exactly the state a new route's first run is in. Mounting is asserted against `src/index.ts` source text so the suite never has to boot a pool.
+
+      **Verification**:
+      - Command: `cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/routes/review-media.test.ts`
+      - Result: PASS — 32/32
+      ```
+       ✓ tests/routes/review-media.test.ts (32 tests) 36ms
+       Test Files  1 passed (1)
+            Tests  32 passed (32)
+      ```
+      - Regression: `bunx vitest run tests/routes/reviews.test.ts` → 51/51 passed (index.ts mount did not disturb public review reads)
+      - Typecheck: `npx tsc --noEmit` → no errors in `review-media.ts` or its test
+  - author: system
+    timestamp: '2026-08-05T16:51:38.847Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -53,7 +95,7 @@ implementation_steps:
     file: packages/api/tests/routes/review-media.test.ts
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-media
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // Follow the app.request() harness in tests/routes/reviews.test.ts.
       // presign:
@@ -71,12 +113,12 @@ implementation_steps:
     description: Confirm the tests fail - routes not mounted
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-media
     expected_result: FAIL - 404 on every request
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Create the review media routes
     file: packages/api/src/routes/review-media.ts
-    status: pending
+    status: done
     code: |-
       // const reviewMediaApp = new Hono<{ Variables: AuthVariables }>()
       // reviewMediaApp.use('*', requireAuth)
@@ -98,7 +140,7 @@ implementation_steps:
     action: implement
     description: Mount the media routes
     file: packages/api/src/index.ts
-    status: pending
+    status: done
     code: |-
       // Beside the existing reviewsApp mount (~line 138):
       app.route("/api/reviews", reviewMediaApp);
@@ -107,10 +149,12 @@ implementation_steps:
     description: Confirm the route tests pass
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-media
     expected_result: PASS
-    status: pending
+    status: done
   - id: 6
     action: commit
     description: Commit the upload endpoints
     command: 'git add packages/api/src/routes/review-media.ts packages/api/src/index.ts packages/api/tests/routes/review-media.test.ts && git commit -m "feat(api): presigned review media upload endpoints"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 6
+started: '2026-08-05T16:47:20.163Z'
+completed: '2026-08-05T16:51:38.847Z'

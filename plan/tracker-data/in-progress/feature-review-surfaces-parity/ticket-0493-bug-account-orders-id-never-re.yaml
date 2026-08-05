@@ -1,0 +1,68 @@
+ticket_number: 493
+title: Bug - /account/orders/$id never renders; the order-list route swallows it
+description: |
+  ## What happens
+
+  Every URL under `/account/orders/<anything>` renders the **order history list**, never the order detail page. Verified in a real browser against the running app with the signed-in customer storage state:
+
+  ```
+  {"target":"/account/orders",                                       "url":".../account/orders?page=1",              "h1":"Order History","writeReview":0}
+  {"target":"/account/orders/CH-SEED-0006",                          "url":".../account/orders/CH-SEED-0006?page=1", "h1":"Order History","writeReview":0}
+  {"target":"/account/orders/b4a39113-cf0d-436f-b8d3-d7c115d09b8d",  "url":".../account/orders/b4a39...?page=1",     "h1":"Order History","writeReview":0}
+  ```
+
+  The `?page=1` appended to every one of them is the list route's own `validateSearch` running — the parent route is what rendered.
+
+  ## Root cause
+
+  `app/routes/_authed/account/orders.tsx` is a *leaf* page (`component: OrderHistoryPage`) but file-based routing makes it the **parent** of `orders.$id.tsx`. `routeTree.gen.ts` confirms it:
+
+  ```ts
+  const AuthedAccountOrdersIdRoute = AuthedAccountOrdersIdRouteImport.update({
+    getParentRoute: () => AuthedAccountOrdersRoute,
+  ```
+
+  `OrderHistoryPage` renders no `<Outlet />`, so the child's component is never mounted. The list is what you get at every child URL.
+
+  The likely fix is to move the list to `orders.index.tsx` and leave `orders.tsx` as a pass-through layout (`<Outlet />`), or add an `<Outlet />` to the current component. Route-shape change — wants its own verification pass, not a drive-by.
+
+  ## Blast radius
+
+  `orders.$id.tsx` is the **only** mount point of `ReviewModal` → `ReviewForm` → `ReviewMediaUpload`. So the entire customer-facing review-writing flow, including the photo/video attachment shipped in #485, has no reachable entry point in the app today. The API side is fine (`POST /api/orders/:orderId/items/:itemId/review`, presign, complete all work when called directly).
+
+  Also worth noting: the order list's own "View Details" links point at `/account/orders/CH-SEED-0006` — the **order number** — while `GET /api/orders/:id` 400s on anything that is not a UUID. So even once the `<Outlet />` lands, the link target needs checking.
+
+  ## Pre-existing, not introduced here
+
+  `main` has the same shape: `git show main:app/routes/_authed/account/orders.tsx | grep -c Outlet` → `0`, and `main`'s `routeTree.gen.ts` carries the same `getParentRoute: () => AuthedAccountOrdersRoute`.
+
+  It stayed invisible because every existing e2e test that touches the flow guards itself out — `tests/e2e/reviews.spec.ts` calls `test.skip()` when the "Write Review" button is not found, which is exactly the symptom.
+
+  ## How it was found
+
+  Writing the E2E for #492. `tests/e2e/review-media-upload.spec.ts` is written against the real flow and is currently `test.fixme()`'d against this ticket; dropping the annotation is the acceptance test for the fix.
+feature: review-surfaces-parity
+type: bug
+priority: high
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T17:39:53.616Z'
+last_updated: '2026-08-05T17:51:10.020Z'
+time_spent_minutes: 0
+labels:
+  - bug
+  - frontend
+  - routing
+  - orders
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T17:51:10.020Z'
+    text: Status changed from 'todo' to 'in-progress'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T17:51:10.020Z'

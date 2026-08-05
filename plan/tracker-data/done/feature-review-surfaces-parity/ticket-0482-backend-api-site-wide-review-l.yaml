@@ -23,17 +23,53 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:13:27.676Z'
-last_updated: '2026-08-05T15:13:27.676Z'
+last_updated: '2026-08-05T16:35:25.491Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T16:28:31.800Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T16:35:23.258Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `73dd3d59` — feat(api): site-wide review list and media feed endpoints
+
+      **Files Changed**:
+      - `packages/api/src/routes/reviews.ts` — two new read endpoints, shared media helper, media embedded on the two pre-existing reads, cache key bump
+      - `packages/api/tests/routes/review-feed.test.ts` — new, 22 tests
+
+      **Summary**:
+      - `GET /api/reviews` — all approved reviews, paginated, newest first, each with `product { id, title, slug, imageUrl }` (imageUrl via `mainImage()`, not `images[0]`) and `media[]`. Inner-joins products, so a review whose product is gone is not showable.
+      - `GET /api/reviews/media` — flat feed of ready media, each row carrying `reviewId`, `rating`, `productId`. `?productId=` filters; a malformed uuid is a 400 rather than a silently unfiltered feed. Capped at `MEDIA_FEED_LIMIT = 60` since neither consuming surface paginates.
+      - `media[]` embedded on `GET /api/products/:productId/reviews` and `GET /api/reviews/:reviewId`. On the single read it is fetched *after* the visibility gate.
+      - One shared `fetchMediaByReview()` backs all four paths: a single `inArray` query per page filtered to `processingStatus = 'ready'`, ordered by `sortOrder`. `processing`/`failed` are never public. A test asserts exactly 3 selects for a 3-review page, so an N+1 regression fails the suite.
+
+      **Decisions worth recording**:
+      - Cache key is `all:v1:${page}:${pageSize}:${sortBy}`, not the sketched `all:v1:${page}:${pageSize}`. `listReviewsQuerySchema` carries `sortBy`, so a key without it serves "highest" out of the "newest" entry.
+      - Bumping the product list key to `product:v2:` required moving `invalidateProductReviewCaches` with it — the old pattern `product:${id}:*` would have matched nothing and stale entries would have lived out the full TTL. That function now also clears the site-wide list, media feed and catalogue stats, which a review edit/deletion equally moves.
+      - Route order: `/stats` → `/media` → `/` → `/:reviewId`. Both literals have a test asserting they still resolve.
+      - Tests mock the db (reviews.order_item_id is NOT NULL behind an FK, so a real review needs a whole order chain) but assert the *rendered* WHERE clauses via `PgDialect().sqlToQuery()` — a handler that dropped the `approved` or `ready` filter would still return a plausible payload from a mock, so those two invisibility rules are read off the SQL rather than assumed.
+
+      **Verification**:
+      - Command: `DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/routes/review-feed.test.ts tests/routes/reviews.test.ts tests/routes/review-catalogue-stats.test.ts`
+      - Result: PASS — Test Files 3 passed (3), Tests 79 passed (79)
+      - `reviews.test.ts` logged "Database connection available for runtime tests", so its 51 runtime tests ran against the real DB rather than skipping.
+      - Regression check: `tests/routes/order-reviews.test.ts` — 39 passed, 7 skipped.
+      - `bunx tsc --noEmit` — clean.
+      - Smoke-tested against the dev database (mocked tests cannot catch bad SQL): `/api/reviews?page=1&pageSize=1` → 200 with a real item carrying `product` and `media: []`; `/api/reviews/media` → 200 `{"items":[],"total":0}`; `?productId=nope` → 400; `/api/reviews/stats` → 200 `{"averageRating":4.5,"reviewCount":12}`.
+  - author: system
+    timestamp: '2026-08-05T16:35:25.491Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -49,7 +85,7 @@ implementation_steps:
     file: packages/api/tests/routes/review-feed.test.ts
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-feed
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // GET /api/reviews
       //   returns only approved reviews - pending and rejected never appear
@@ -67,12 +103,12 @@ implementation_steps:
     description: Confirm the tests fail
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-feed
     expected_result: FAIL - 404 on GET /api/reviews
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Add the list-all and media feed handlers, and join media into existing reads
     file: packages/api/src/routes/reviews.ts
-    status: pending
+    status: done
     code: |-
       // Register in this order, ABOVE the existing reviewsApp.get('/:reviewId') at :425:
       //   reviewsApp.get('/stats', ...)      // already there at :380
@@ -92,10 +128,12 @@ implementation_steps:
     description: Confirm the new tests and the pre-existing review route tests both pass
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review
     expected_result: PASS - review-feed, review-media, reviews and review-catalogue-stats all green
-    status: pending
+    status: done
   - id: 5
     action: commit
     description: Commit the read endpoints
     command: 'git add packages/api/src/routes/reviews.ts packages/api/tests/routes/review-feed.test.ts && git commit -m "feat(api): site-wide review list and media feed endpoints"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 5
+started: '2026-08-05T16:28:31.800Z'
+completed: '2026-08-05T16:35:25.491Z'

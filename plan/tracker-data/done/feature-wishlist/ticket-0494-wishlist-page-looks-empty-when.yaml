@@ -1,0 +1,106 @@
+ticket_number: 494
+title: Wishlist page looks empty when every saved id has gone stale
+description: |-
+  ## Task
+
+  Reported from a real browser, signed out on :3001: the header badge shows the right number of saved items, but `/wishlist` renders nothing at all — no cards, and not the "Nothing saved yet" state either, so the page reads as broken.
+
+  The two numbers come from different places, and only one of them is filtered:
+
+  - the badge is `ids.length` straight off the store — for a guest, whatever is in localStorage;
+  - the page renders only the ids `POST /api/products/by-ids` returns, which filters `status = 'active'` and, more importantly, cannot return a product that no longer exists.
+
+  A guest's ids outlive the catalogue. The dev database gets reseeded and every product id changes; a product can also be deactivated or deleted after being saved. Every saved id then dangles, `products` is empty, `ids.length` is not zero, so `isEmpty` is false and `WishlistContents` renders an empty `ProductGrid` with no empty state and no explanation.
+
+  The `catch` in the fetch effect is silent for the same reason — a failed request also renders as a blank grid.
+
+  ## Context
+
+  `packages/web/app/components/wishlist/WishlistContents.tsx` — the resolved list is `ids.map((id) => known[id]).filter(Boolean)`, and `isEmpty` is `isHydrated && ids.length === 0`. Neither notices that every id resolved to nothing.
+
+  **Fix scope**:
+  1. Prune ids the catalogue did not return from the GUEST list, once they have actually been asked for and not found — a dangling id is dead weight in localStorage and it is what makes the badge disagree with the page. Do NOT prune for a signed-in user: the server already filters, and a transient failure must not delete an account's saves.
+  2. When the list resolves to nothing but ids were saved, say so, rather than rendering a bare grid.
+  3. Surface a fetch failure instead of swallowing it, with a retry.
+
+  The existing test `quietly drops an id whose product has left the catalogue` covers the partial case and must keep passing; the missing case is all of them dangling.
+feature: wishlist
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T18:31:05.352Z'
+last_updated: '2026-08-05T18:35:41.304Z'
+time_spent_minutes: 4
+labels:
+  - web
+  - wishlist
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T18:31:36.133Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T18:35:34.486Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `c2ef1792` - fix(web): explain an empty wishlist instead of showing the filter copy
+
+      **Root Cause**: the badge and the page count different things, and only one is filtered. The badge is `ids.length` off the store — for a guest, whatever localStorage holds. The page renders only what `POST /api/products/by-ids` returns. A guest's ids outlive the catalogue (a reseeded dev database changes every product id), so all of them can dangle at once: `products` is empty but `ids.length` is 3, `isEmpty` stays false, and `emptyState` was passed as `undefined` — so `ProductGrid` fell through to its own collection copy, "No products found. Try adjusting your filters", on a page with no filters. The screenshot showed exactly that.
+
+      **Location**: `packages/web/app/components/wishlist/WishlistContents.tsx`
+
+      **Fix**:
+      - Ids asked for and not returned are remembered (`gone`), so the effect stops re-asking, and dropped from a **guest** list via a new `dropMissing` store action — that is what stops the badge counting saves the page cannot show.
+      - **Never dropped for a signed-in user.** That list came from the server already filtered to live products, so an empty answer means the request failed; deleting an account's wishlist over a bad round-trip is unrecoverable. `dropMissing` enforces this itself rather than trusting callers.
+      - A failed lookup was silently swallowed and rendered as a blank grid; it now says "Could not load your saved items — they are still saved" with a **Try again** button.
+      - `emptyState` is now always supplied, so the collection copy cannot reappear here for any reason.
+
+      **Tests**: 3 component cases (all-stale explained + cleared, signed-in list untouched, retry after failure), 2 store cases for `dropMissing`, 1 E2E seeding a dead id into localStorage and asserting the filter copy is absent.
+
+      **Verification**:
+      - `bunx vitest run tests/stores/wishlist.test.ts tests/components/wishlist tests/routes/wishlist-page.test.ts` — PASS (43 tests)
+      - `bunx playwright test tests/e2e/wishlist.spec.ts --project=chromium --no-deps` — PASS (7)
+      - Browser, reproducing the reported state with three stale ids: page reads "Those posters are no longer available", the header badge drops back to no count, and the stored list is emptied.
+
+      **Note for the reporter**: your three saved ids no longer match anything in the dev catalogue, which is why they vanished — the database was reseeded after you saved them. Saving again now works; this fix makes the failure legible rather than silent.
+  - author: system
+    timestamp: '2026-08-05T18:35:34.748Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T18:31:37.585Z'
+    agent: claude-code
+    summary: Stale guest ids now explained and pruned; failed lookup gets a retry; emptyState always supplied so the collection filter copy cannot appear. Commit c2ef1792.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T18:35:41.300Z'
+    duration: '00:04:03'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-05T18:31:36.133Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/stores/wishlist.test.ts tests/components/wishlist tests/routes/wishlist-page.test.ts; bunx playwright test tests/e2e/wishlist.spec.ts --project=chromium --no-deps
+  test_output: '43 unit tests passed; 7 E2E passed. Browser repro of the reported state (3 stale ids): message shown, badge cleared, storage emptied.'
+  build_passed: true
+  build_command: tsc --noEmit -p packages/web/tsconfig.json — 0 errors in touched files
+  verified_at: '2026-08-05T18:35:23.633Z'
+completed: '2026-08-05T18:35:34.748Z'

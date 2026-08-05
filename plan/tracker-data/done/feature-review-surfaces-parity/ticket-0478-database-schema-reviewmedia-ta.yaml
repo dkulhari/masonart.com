@@ -21,18 +21,71 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:12:30.560Z'
-last_updated: '2026-08-05T15:12:30.560Z'
-time_spent_minutes: 0
+last_updated: '2026-08-05T16:26:04.097Z'
+time_spent_minutes: 4
 labels:
   - database
   - schema
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T16:21:59.874Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T16:26:01.481Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `cb405876` — feat(db): reviewMedia table for review photos and videos
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/review-media.ts` (new) — `reviewMediaTypeEnum` ['image','video'], `reviewMediaStatusEnum` ['processing','ready','failed'], `reviewMedia` pgTable, `reviewMediaRelations` (one → reviews), types `ReviewMedia`/`NewReviewMedia`/`ReviewMediaType`/`ReviewMediaStatus`
+      - `packages/api/src/database/schema/reviews.ts` — `reviewsRelations` now takes `{ one, many }` and declares `media: many(reviewMedia)`
+      - `packages/api/src/database/schema/index.ts` — barrel export below `./reviews`
+      - `packages/api/src/database/migrations/0006_common_venom.sql` (new) + `meta/0006_snapshot.json`, `meta/_journal.json` — generated and applied to the dev DB
+      - `packages/api/tests/database/review-media.test.ts` (new) — 19 tests
+
+      **Summary**:
+      Media-agnostic `review_media` table: `id`, `reviewId` (FK → reviews, ON DELETE CASCADE, notNull), `mediaType` notNull, `url` notNull, `thumbnailUrl`, `posterUrl`, `durationSeconds`, `width`, `height`, `sizeBytes` (all nullable), `sortOrder` default 0 notNull, `processingStatus` default 'ready' notNull, `processingError`, `createdAt`/`updatedAt` (`$onUpdate`). Indexes `review_media_review_id_idx` and composite `review_media_review_sort_idx` (reviewId, sortOrder). Media carries no moderation status — it inherits the parent review's `status`; `processingStatus` is transcode-pipeline only.
+
+      **Verification**:
+      - Command: `cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/database/review-media.test.ts`
+      - Result: PASS (19 tests, 19 passing, 0 failing) — DB connection established, so no vacuous skips
+      - Output:
+      ```
+      ✅ Database connection established for review_media schema tests
+       ✓ tests/database/review-media.test.ts (19 tests) 172ms
+       Test Files  1 passed (1)
+            Tests  19 passed (19)
+      ```
+      - RED evidence (step 2): `Error: Cannot find module '../../src/database/schema/review-media'` — 1 failed suite before the module existed
+      - Regression: `bunx vitest run tests/database/reviews.test.ts` → 15 passed (15)
+      - Build: `cd packages/api && bun run typecheck` → exit 0
+
+      **Notes**:
+      - Steps 1/2/6 were run as `bunx vitest run tests/database/review-media.test.ts` instead of the ticket's `bun run test -- review-media`: the repo's own `.claude/hooks/guard-test-scope.py` denies the latter as a pathless whole-package `vitest run`. Same file, same DATABASE_URL, scoped by path.
+      - `reviews.ts` ↔ `review-media.ts` is the schema dir's first circular import. Verified safe: drizzle's `relations()` stores the config callback lazily, and a live `db.query.reviews.findMany({ with: { media: true } })` against the dev DB returned rows with the `media` array populated.
+      - Test rows are cleaned up in `afterAll`; dev DB verified back to 14 reviews / 0 review_media after the run.
+  - author: system
+    timestamp: '2026-08-05T16:26:04.097Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T16:22:08.111Z'
+    agent: claude-code
+    summary: Implemented reviewMedia schema module, barrel export, reviewsRelations media link and migration 0006_common_venom.sql. 19 new schema tests passing against dev DB on 5440; reviews.test.ts regression green; api typecheck clean. Committed cb405876.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T16:25:45.458Z'
+    duration: '00:03:37'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -44,7 +97,7 @@ implementation_steps:
     file: packages/api/tests/database/review-media.test.ts
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- review-media
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // Follow the beforeAll/SKIP_DB_RUNTIME_TESTS harness in tests/database/reviews.test.ts.
       // Assert:
@@ -59,12 +112,12 @@ implementation_steps:
     description: Confirm the test fails because the module does not exist
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- review-media
     expected_result: FAIL - Cannot find module '../../src/database/schema/review-media'
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Create the reviewMedia schema module
     file: packages/api/src/database/schema/review-media.ts
-    status: pending
+    status: done
     code: |-
       // pgEnum reviewMediaTypeEnum ['image','video']
       // pgEnum reviewMediaStatusEnum ['processing','ready','failed']
@@ -90,7 +143,7 @@ implementation_steps:
     action: implement
     description: Export the new module from the schema barrel
     file: packages/api/src/database/schema/index.ts
-    status: pending
+    status: done
     code: |-
       // Below the existing `export * from "./reviews";` (line 26):
       // Customer photo/video attached to product reviews
@@ -100,16 +153,34 @@ implementation_steps:
     description: Generate and apply the Drizzle migration
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run db:generate && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run db:migrate
     expected_result: New 0006_*.sql written to src/database/migrations and applied
-    status: pending
+    status: done
   - id: 6
     action: verify-pass
     description: Confirm schema tests pass against the real database
     command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- review-media
     expected_result: PASS
-    status: pending
+    status: done
   - id: 7
     action: commit
     description: Commit the schema and migration
     command: 'git add packages/api/src/database/schema/review-media.ts packages/api/src/database/schema/index.ts packages/api/src/database/schema/reviews.ts packages/api/src/database/migrations packages/api/tests/database/review-media.test.ts && git commit -m "feat(db): reviewMedia table for review photos and videos"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 7
+started: '2026-08-05T16:21:59.874Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bunx vitest run tests/database/review-media.test.ts
+  test_output: 'Test Files 1 passed (1); Tests 19 passed (19). DB connection established (not skipped). Regression: tests/database/reviews.test.ts 15 passed. packages/api typecheck exit 0.'
+  build_passed: true
+  build_command: cd packages/api && bun run typecheck
+  verified_at: '2026-08-05T16:25:23.942Z'
+completed: '2026-08-05T16:26:04.097Z'

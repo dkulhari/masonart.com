@@ -19,17 +19,57 @@ description: |-
 feature: review-surfaces-parity
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T15:14:24.192Z'
-last_updated: '2026-08-05T15:14:24.192Z'
+last_updated: '2026-08-05T17:20:06.259Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T17:11:09.819Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T17:20:03.075Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `7971b361` - feat(web): photo and video upload in the review form
+
+      **Files Changed**:
+      - `packages/web/app/components/reviews/ReviewMediaUpload.tsx` (new) - controlled picker, previews, client-side gate, object-URL lifecycle
+      - `packages/web/app/components/reviews/ReviewForm.tsx` - two-phase submit, media-error state, retry
+      - `packages/web/app/components/reviews/ReviewModal.tsx` - returns the created review id so uploads have a target
+      - `packages/web/app/components/reviews/index.ts` - barrel exports
+      - `packages/web/tests/components/reviews/ReviewMediaUpload.test.tsx` (new) - 14 tests
+      - `packages/web/tests/components/reviews/ReviewForm.test.tsx` - +12 media tests, 34 total
+
+      **Summary**:
+      Client-side limits mirror `REVIEW_MEDIA_LIMITS` / `MAX_MEDIA_PER_REVIEW` exactly: images 10MB, video 200MB and 60s, 5 items per review. Duration is read from a detached `<video>` pointed at an object URL before any presign; an unreadable duration is allowed through and left to the server, which remains the real gate. Object URLs are revoked on item removal and on unmount (both tested).
+
+      Order of operations, the load-bearing behaviour: the review is created first via the existing `onSubmit`, which now resolves `{ id }`; only then does `uploadReviewMedia(reviewId, file)` run, serially. An upload failure can never lose a review — the form enters a distinct `media-error` state ("Your review was saved"), keeps every failed file listed with its error, and offers a per-item retry plus a "Try again" that re-uploads only failed items and never re-sends the review. Verified by test: after a failed upload `onSubmit` has been called exactly once, and after retry it is still once while `uploadReviewMedia` has run twice.
+
+      **Note for review**: `ReviewModal.tsx` was edited beyond the ticket's file list. It is the only mount point for ReviewForm and its submit handler discarded the response body, so without returning `{ id: body.review.id }` the picker would have had no upload target and the feature would be unreachable for #492's E2E. Change is 4 lines, no test file exists for that component, and no concurrent ticket owns it.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/components/reviews/ReviewMediaUpload.test.tsx tests/components/reviews/ReviewForm.test.tsx`
+      - Result: PASS (48 tests, 48 passing, 0 failing) — 14 new picker tests, 34 form tests of which all 22 pre-existing remain green
+      - Output:
+      ```
+       ✓ tests/components/reviews/ReviewMediaUpload.test.tsx (14 tests) 275ms
+       ✓ tests/components/reviews/ReviewForm.test.tsx (34 tests) 655ms
+       Test Files  2 passed (2)
+            Tests  48 passed (48)
+      ```
+      - Wider scope: `bunx vitest run tests/components/reviews/` → 7 files, 176 passed (no regression in ReviewCard, ReviewList, ReviewSummary, StarRating, or the concurrent ReviewToast suite)
+      - Typecheck: `bunx tsc --noEmit` → 0 errors package-wide
+  - author: system
+    timestamp: '2026-08-05T17:20:06.259Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -45,7 +85,7 @@ implementation_steps:
     file: packages/web/tests/components/reviews/ReviewMediaUpload.test.tsx
     command: cd packages/web && bun run test -- ReviewMediaUpload
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       // Testing Library. Cover:
       //   selecting 2 images renders 2 previews with removable thumbnails
@@ -59,12 +99,12 @@ implementation_steps:
     description: Confirm the test fails
     command: cd packages/web && bun run test -- ReviewMediaUpload
     expected_result: FAIL - cannot resolve ReviewMediaUpload
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Build the media upload component
     file: packages/web/app/components/reviews/ReviewMediaUpload.tsx
-    status: pending
+    status: done
     code: |-
       // Controlled: props { files, onChange, maxFiles = 5, disabled }
       // accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
@@ -75,7 +115,7 @@ implementation_steps:
     action: implement
     description: Wire the picker into the review form submit flow
     file: packages/web/app/components/reviews/ReviewForm.tsx
-    status: pending
+    status: done
     code: |-
       // Submit sequence:
       //   1. createReview(...) -> reviewId
@@ -89,10 +129,12 @@ implementation_steps:
     description: Confirm the upload and form tests pass
     command: cd packages/web && bun run test -- ReviewMediaUpload ReviewForm
     expected_result: PASS
-    status: pending
+    status: done
   - id: 6
     action: commit
     description: Commit the upload UI
     command: 'git add packages/web/app/components/reviews/ReviewMediaUpload.tsx packages/web/app/components/reviews/ReviewForm.tsx packages/web/tests/components/reviews && git commit -m "feat(web): photo and video upload in the review form"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 6
+started: '2026-08-05T17:11:09.819Z'
+completed: '2026-08-05T17:20:06.259Z'
