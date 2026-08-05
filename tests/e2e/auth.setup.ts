@@ -17,6 +17,11 @@ import { test as setup } from "@playwright/test";
 import path from "path";
 import { fileURLToPath } from "url";
 import { execFileSync } from "child_process";
+import {
+  findRateLimitHit,
+  loginFailureMessage,
+  type AuthResponseProbe,
+} from "./helpers/auth-diagnostics";
 
 // Get directory path for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -66,32 +71,53 @@ async function loginUser(
   await page.goto("/auth/login");
   await page.waitForLoadState("networkidle");
 
-  // Fill login form
-  await page.locator('input#email, input[name="email"]').fill(credentials.email);
-  await page.locator('input#password, input[name="password"]').fill(credentials.password);
-
-  // Submit the form
-  await page.locator('button[type="submit"]:has-text("Sign In")').click();
-
-  // Wait for navigation (success or error)
-  // Use 25s timeout to stay within 30s test timeout but allow slow redirects
-  try {
-    await page.waitForURL((url) => !url.pathname.includes("/auth/login"), {
-      timeout: 25000,
+  // Record auth responses so a throttled login reports as a throttle rather
+  // than as the generic "unexpected error" it used to (#451).
+  const probes: AuthResponseProbe[] = [];
+  const record = (response: import("@playwright/test").Response) => {
+    probes.push({
+      url: response.url(),
+      status: response.status(),
+      retryAfter: response.headers()["retry-after"] ?? null,
     });
-    return true;
-  } catch {
-    // Guard against browser being closed by test timeout
-    if (page.isClosed()) {
-      throw new Error("Login timed out - page was closed");
+  };
+  page.on("response", record);
+
+  try {
+    // Fill login form
+    await page.locator('input#email, input[name="email"]').fill(credentials.email);
+    await page.locator('input#password, input[name="password"]').fill(credentials.password);
+
+    // Submit the form
+    await page.locator('button[type="submit"]:has-text("Sign In")').click();
+
+    // Wait for navigation (success or error)
+    // Use 25s timeout to stay within 30s test timeout but allow slow redirects
+    try {
+      await page.waitForURL((url) => !url.pathname.includes("/auth/login"), {
+        timeout: 25000,
+      });
+      return true;
+    } catch {
+      // Guard against browser being closed by test timeout
+      if (page.isClosed()) {
+        throw new Error("Login timed out - page was closed");
+      }
+      // A 429 renders neither error string below, so check it first
+      const rateLimitHit = findRateLimitHit(probes);
+      if (rateLimitHit) {
+        throw new Error(loginFailureMessage(credentials.email, rateLimitHit));
+      }
+      // Check for error message
+      const errorVisible = await page.locator('text=Sign in failed').isVisible();
+      const invalidVisible = await page.locator('text=Invalid email or password').isVisible();
+      if (errorVisible || invalidVisible) {
+        return false;
+      }
+      throw new Error(loginFailureMessage(credentials.email, undefined));
     }
-    // Check for error message
-    const errorVisible = await page.locator('text=Sign in failed').isVisible();
-    const invalidVisible = await page.locator('text=Invalid email or password').isVisible();
-    if (errorVisible || invalidVisible) {
-      return false;
-    }
-    throw new Error("Login failed with unexpected error");
+  } finally {
+    page.off("response", record);
   }
 }
 

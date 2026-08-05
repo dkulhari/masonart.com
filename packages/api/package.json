@@ -16,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "dev": "bun run --env-file=../../.env --hot src/index.ts",
+    "dev": "DISABLE_RATE_LIMIT=true bun run --env-file=../../.env --hot src/index.ts",
     "build": "tsc",
     "start": "bun run dist/index.js",
     "typecheck": "tsc --noEmit",
