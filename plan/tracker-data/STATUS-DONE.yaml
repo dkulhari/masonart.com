@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-08-05T13:53:12.308Z'
-total_tickets: 390
+last_updated: '2026-08-05T14:37:09.134Z'
+total_tickets: 401
 summary:
   critical: 21
-  high: 149
-  medium: 168
+  high: 155
+  medium: 173
   low: 52
 priorities:
   critical:
@@ -721,6 +721,10 @@ priorities:
           title: Web - heart on ProductCard and ProductDetail, count badge in the header
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 477
+          title: Guest wishlist persists locally and merges into the account on sign-in
+          assignee: unassigned
+          blocked_by: []
     - feature: collection-page-parity
       tickets:
         - ticket_number: 390
@@ -775,6 +779,10 @@ priorities:
           title: Cart opens as a left slide-out drawer, not a page (mesonart parity)
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 476
+          title: Chrome - All Art opens the filter mega menu (mesonart parity)
+          assignee: unassigned
+          blocked_by: []
     - feature: advanced-search
       tickets:
         - ticket_number: 403
@@ -827,6 +835,32 @@ priorities:
           title: 'Test Bug: auth.setup fails for trade/admin/content-manager, blocking 90 E2E tests'
           assignee: unassigned
           blocked_by: []
+    - feature: curated-collections
+      tickets:
+        - ticket_number: 461
+          title: Shared - collection contracts, superseding the dead collectionSchema
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 462
+          title: Schema - collections and collection_products tables
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 461
+              title: Shared - collection contracts, superseding the dead collectionSchema
+        - ticket_number: 463
+          title: 'API - collection resolver: one collection to one product query'
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 461
+              title: Shared - collection contracts, superseding the dead collectionSchema
+            - ticket_number: 462
+              title: Schema - collections and collection_products tables
+        - ticket_number: 464
+          title: Seed - twelve style collections plus Latest Work and Best Sellers
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 462
+              title: Schema - collections and collection_products tables
   medium:
     - feature: admin-panel
       tickets:
@@ -1655,6 +1689,42 @@ priorities:
           title: Re-point home.spec.ts and layout.spec.ts at the rebranded pages
           assignee: unassigned
           blocked_by: []
+    - feature: wishlist
+      tickets:
+        - ticket_number: 417
+          title: Wishlist store fetches before it knows the session — six 401s per collection load
+          assignee: unassigned
+          blocked_by: []
+    - feature: curated-collections
+      tickets:
+        - ticket_number: 465
+          title: API - GET /api/collections for the Discover rail
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 463
+              title: 'API - collection resolver: one collection to one product query'
+            - ticket_number: 464
+              title: Seed - twelve style collections plus Latest Work and Best Sellers
+        - ticket_number: 466
+          title: API - GET /api/collections/:slug resolving a collection to products
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 463
+              title: 'API - collection resolver: one collection to one product query'
+        - ticket_number: 467
+          title: API - admin CRUD for collections
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 461
+              title: Shared - collection contracts, superseding the dead collectionSchema
+            - ticket_number: 462
+              title: Schema - collections and collection_products tables
+        - ticket_number: 468
+          title: API - manual membership and Discover ordering
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 467
+              title: API - admin CRUD for collections
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -2093,6 +2163,26 @@ blocked_tickets:
       - ticket_number: 407
         title: API - catalogue-wide review aggregate for the promo tile
     description: API - Best selling sort over real orders, plus NULLS LAST on Featured, API - catalogue-wide review aggregate for the promo tile
+  - ticket_number: 462
+    title: Schema - collections and collection_products tables
+    blocked_by:
+      - ticket_number: 461
+        title: Shared - collection contracts, superseding the dead collectionSchema
+    description: Shared - collection contracts, superseding the dead collectionSchema
+  - ticket_number: 463
+    title: 'API - collection resolver: one collection to one product query'
+    blocked_by:
+      - ticket_number: 461
+        title: Shared - collection contracts, superseding the dead collectionSchema
+      - ticket_number: 462
+        title: Schema - collections and collection_products tables
+    description: Shared - collection contracts, superseding the dead collectionSchema, Schema - collections and collection_products tables
+  - ticket_number: 464
+    title: Seed - twelve style collections plus Latest Work and Best Sellers
+    blocked_by:
+      - ticket_number: 462
+        title: Schema - collections and collection_products tables
+    description: Schema - collections and collection_products tables
   - ticket_number: 229
     title: Add addressesApi to web API client
     blocked_by:
@@ -2324,6 +2414,34 @@ blocked_tickets:
       - ticket_number: 414
         title: Seed - settled orders and approved reviews so the real signals have data
     description: API - catalogue-wide review aggregate for the promo tile, Seed - settled orders and approved reviews so the real signals have data
+  - ticket_number: 465
+    title: API - GET /api/collections for the Discover rail
+    blocked_by:
+      - ticket_number: 463
+        title: 'API - collection resolver: one collection to one product query'
+      - ticket_number: 464
+        title: Seed - twelve style collections plus Latest Work and Best Sellers
+    description: 'API - collection resolver: one collection to one product query, Seed - twelve style collections plus Latest Work and Best Sellers'
+  - ticket_number: 466
+    title: API - GET /api/collections/:slug resolving a collection to products
+    blocked_by:
+      - ticket_number: 463
+        title: 'API - collection resolver: one collection to one product query'
+    description: 'API - collection resolver: one collection to one product query'
+  - ticket_number: 467
+    title: API - admin CRUD for collections
+    blocked_by:
+      - ticket_number: 461
+        title: Shared - collection contracts, superseding the dead collectionSchema
+      - ticket_number: 462
+        title: Schema - collections and collection_products tables
+    description: Shared - collection contracts, superseding the dead collectionSchema, Schema - collections and collection_products tables
+  - ticket_number: 468
+    title: API - manual membership and Discover ordering
+    blocked_by:
+      - ticket_number: 467
+        title: API - admin CRUD for collections
+    description: API - admin CRUD for collections
   - ticket_number: 232
     title: Implement save-address-on-checkout
     blocked_by:

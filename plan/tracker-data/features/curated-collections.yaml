@@ -1,7 +1,7 @@
 name: curated-collections
 title: Curated Collections
 priority: high
-created: '2026-08-05T13:47:57.322Z'
+created: "2026-08-05T13:47:57.322Z"
 assignee: unassigned
 tags: []
 description: |-
@@ -98,44 +98,44 @@ objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo:
-    '461': Shared - collection contracts, superseding the dead collectionSchema
-    '462': Schema - collections and collection_products tables
-    '463': 'API - collection resolver: one collection to one product query'
-    '464': Seed - twelve style collections plus Latest Work and Best Sellers
-    '465': API - GET /api/collections for the Discover rail
-    '466': API - GET /api/collections/:slug resolving a collection to products
-    '467': API - admin CRUD for collections
-    '468': API - manual membership and Discover ordering
-    '469': Web - Discover chips become links to collections
-    '470': Web - /collections/$slug reusing the collection-page shell
-    '471': Web - collection SEO and sitemap entries
-    '472': Admin - collections list with discover reorder
-    '473': Admin - collection form with rule builder and manual picker
-    '474': Cleanup - retire GET /api/products/collections
-    '475': E2E - collection pages, the Discover rail and admin authoring
+    "469": Web - Discover chips become links to collections
+    "470": Web - /collections/$slug reusing the collection-page shell
+    "471": Web - collection SEO and sitemap entries
+    "472": Admin - collections list with discover reorder
+    "473": Admin - collection form with rule builder and manual picker
+    "474": Cleanup - retire GET /api/products/collections
+    "475": E2E - collection pages, the Discover rail and admin authoring
   in_progress: {}
-  done: {}
+  done:
+    "461": Shared - collection contracts, superseding the dead collectionSchema
+    "462": Schema - collections and collection_products tables
+    "463": "API - collection resolver: one collection to one product query"
+    "464": Seed - twelve style collections plus Latest Work and Best Sellers
+    "465": API - GET /api/collections for the Discover rail
+    "466": API - GET /api/collections/:slug resolving a collection to products
+    "467": API - admin CRUD for collections
+    "468": API - manual membership and Discover ordering
 total_tickets: 15
-completion_percentage: 0
+completion_percentage: 53
 is_completed: false
 design:
-  approach: 'One `collections` table with two membership kinds. `kind: ''rule''` stores the existing validated product-filter payload (facets + sort) as jsonb and resolves through the same query path `/api/products` already uses; `kind: ''manual''` resolves through a `collection_products` join carrying an explicit position. Storefront gets `/collections/$slug` reusing the collection-page shell built for /posters, with the collection''s rule as the base query and shopper facets narrowing within it. The Discover rail is re-pointed from STYLE_OPTIONS to the collections table and its chips become links rather than filter toggles. Admin gets full CRUD at /admin/collections with a rule builder over the shared facet vocabulary.'
+  approach: "One `collections` table with two membership kinds. `kind: 'rule'` stores the existing validated product-filter payload (facets + sort) as jsonb and resolves through the same query path `/api/products` already uses; `kind: 'manual'` resolves through a `collection_products` join carrying an explicit position. Storefront gets `/collections/$slug` reusing the collection-page shell built for /posters, with the collection's rule as the base query and shopper facets narrowing within it. The Discover rail is re-pointed from STYLE_OPTIONS to the collections table and its chips become links rather than filter toggles. Admin gets full CRUD at /admin/collections with a rule builder over the shared facet vocabulary."
   decisions:
-    - 'Rule AND manual membership, not one or the other. Measured against mesonart: a rule payload reproduces 16 of their 18 chips outright, and the two merchandising ones (Latest Work, Bestseller) are just a sort. Manual covers curation a rule cannot express; rule-only makes ''these six, in this order'' impossible, manual-only means re-picking as the catalogue grows.'
+    - "Rule AND manual membership, not one or the other. Measured against mesonart: a rule payload reproduces 16 of their 18 chips outright, and the two merchandising ones (Latest Work, Bestseller) are just a sort. Manual covers curation a rule cannot express; rule-only makes 'these six, in this order' impossible, manual-only means re-picking as the catalogue grows."
     - The rule IS the existing filter payload, not a new query language. It stores exactly the fields /api/products already validates, so a collection page is the product list with a pre-applied base filter. No second query planner, no second vocabulary.
-    - 'Chips become links, not toggles. Deliberate behaviour change on /posters: a chip that toggles `styles` structurally cannot express Bestseller or Set of 2/3. Counts and the empty-collection cull are kept.'
+    - "Chips become links, not toggles. Deliberate behaviour change on /posters: a chip that toggles `styles` structurally cannot express Bestseller or Set of 2/3. Counts and the empty-collection cull are kept."
     - Supersede the dead `collectionSchema` in packages/shared/src/schemas/product.ts rather than extend it. Its CollectionType is a closed six-value marketing enum that cannot express an admin-authored collection, and it is referenced only by its own test — the same dead-but-tested state styles.ts and the size ladders were in. Deprecate in place with a pointer; do not leave a second collection vocabulary alive.
     - Seed 12 style collections + Latest Work + Best Sellers so the rail cannot empty out on deploy, and today's twelve chips survive in link form.
     - Slugs are admin-authored and unique, not derived from a facet id — a collection may span facets or none.
     - chipArtScale() applies only to the representative-product fallback image. Product `main` images are matted at a fixed fraction of the longest side; an admin-uploaded image is not, so scaling it would crop into it wrongly.
     - Admin writes must bust the collections cache. The style-derived endpoint never had to, because its input was a constants file.
   approved: true
-  approved_at: '2026-08-05T13:48:11.068Z'
+  approved_at: "2026-08-05T13:48:11.068Z"
 plan:
   phases:
     - name: Foundations
@@ -177,4 +177,4 @@ plan:
       location: tests/e2e/collections.spec.ts
       tickets:
         - 475
-  generated_at: '2026-08-05T13:53:18.667Z'
+  generated_at: "2026-08-05T13:53:18.667Z"

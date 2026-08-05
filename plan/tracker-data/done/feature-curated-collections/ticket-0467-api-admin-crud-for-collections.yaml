@@ -1,0 +1,140 @@
+ticket_number: 467
+title: API - admin CRUD for collections
+description: |-
+  ## Task
+
+  `/api/admin/collections`, behind the same staff-role middleware as `/api/admin/products`:
+
+  - `GET /` — list with counts, including inactive ones
+  - `GET /:id` — full row for the edit form
+  - `POST /` — create, validated by `createCollectionSchema`
+  - `PATCH /:id` — update, validated by `updateCollectionSchema`
+  - `DELETE /:id` — delete, cascading its `collection_products` rows
+
+  Every write busts the public collections cache. The style-derived endpoint never had to, because its input was a constants file; this one's input is a table, and a stale rail after an admin edit is the obvious first bug.
+
+  Slug collisions return 409 with the offending slug, not a 500 from the unique index.
+
+  ## Context
+
+  Feature: curated-collections, Phase 4.
+
+  Follow `packages/api/src/routes/admin/reviews.ts` — Hono app, `zValidator`, `requireAuth` + `requireAdmin`, `deleteCached` for cache busting. Mount with `app.route('/api/admin/collections', adminCollectionsApp)` in `packages/api/src/index.ts` alongside the other admin mounts.
+feature: curated-collections
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:02.513Z'
+last_updated: '2026-08-05T14:34:34.517Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:29:57.090Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T14:34:16.465Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:34:34.516Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `7a4187d9` — feat(api): admin CRUD for collections
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/collections.ts` — new. GET `/`, GET `/:id`, POST `/`, PATCH `/:id`, DELETE `/:id`.
+      - `packages/api/src/index.ts` — mounted at `/api/admin/collections`.
+      - `packages/api/tests/routes/admin/collections.test.ts` — 23 tests.
+
+      **A bug a live probe caught that the tests could not**
+
+      The 409 mapping was wrong on the first pass. **Drizzle wraps the driver error**: the object it throws carries `{ query, params, cause, stack }` with `code: undefined` at the top level and the postgres code on `error.cause.code`. Checking `error.code === '23505'` matched nothing, so every slug collision would have surfaced as a 500.
+
+      Verified directly against the database:
+      ```
+      name: Error
+      own keys: query, params, cause, stack
+      cause.code: 23505
+      cause.constraint: collections_slug_unique
+      ```
+
+      The original test passed because its fixture rejected with `Object.assign(new Error(), { code: '23505' })` — the shape I had assumed, not the shape Drizzle produces. **A hand-written error fixture only tests the fixture.** The regression test now uses the wrapped shape, and `isUniqueViolation` checks both levels.
+
+      **Role gate**: `requireContentManager`, matching `/api/admin/products` rather than `requireAdmin`. A collection is catalogue content — a content-manager who can create products should be able to group them.
+
+      **Other decisions**
+      - The list applies **no `isActive` filter**, deliberately unlike the public endpoint. An admin who deactivated a collection still has to find it again.
+      - Counts come from `countCollection`, so the admin list and the storefront cannot disagree about what a rule resolves to. This is where a rule matching nothing should be noticed.
+      - PATCH writes only supplied keys, keeping `undefined` ("not changing") distinct from explicit `null` ("clear it"). Collapsing them means renaming a collection also wipes its image.
+      - DELETE relies on the FK cascade rather than a second statement that could fail after the parent is gone.
+
+      **Verification**
+      - Command: `cd packages/api && npx vitest run tests/routes/admin/collections.test.ts`
+      - Result: PASS — 23 tests, 0 failing
+      - Live auth gate: `GET /api/admin/collections` → **401**, `POST` → **401**
+      - Live database probe:
+        - duplicate slug → `cause.code 23505`, constraint `collections_slug_unique` → route returns 409
+        - manual collection delete → `collection_products` rows went **1 → 0**, cascade confirmed
+      - Build: `npx tsc --noEmit` — 0 errors in this module
+
+      **Not covered here**: an authenticated end-to-end CRUD round-trip over HTTP. It needs a staff session, and `tests/e2e/auth.setup.ts` is currently failing to log in as admin and trade (pre-existing, unrelated). #475 should pick that up.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 461
+    feature: curated-collections
+    description: Shared - collection contracts, superseding the dead collectionSchema
+  - ticket: 462
+    feature: curated-collections
+    description: Schema - collections and collection_products tables
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing admin CRUD tests
+    file: packages/api/tests/routes/admin/collections.test.ts
+    command: cd packages/api && npx vitest run tests/routes/admin/collections.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: unauthenticated 401 and non-staff 403 on every verb; create validates through createCollectionSchema and rejects kind=''rule'' with no rule; duplicate slug returns 409 naming the slug; patch updates only the supplied fields; delete cascades collection_products; every write busts the public cache; the list includes inactive collections.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && npx vitest run tests/routes/admin/collections.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Write the admin route and mount it
+    file: packages/api/src/routes/admin/collections.ts
+    status: pending
+    code: Catch the unique-violation and translate to 409 rather than letting it surface as a 500.
+  - id: 4
+    action: verify-pass
+    description: Confirm the admin tests pass
+    command: cd packages/api && npx vitest run tests/routes/admin/collections.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/admin/collections.ts packages/api/src/index.ts packages/api/tests/routes/admin && git commit -m "feat(api): admin CRUD for collections (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T14:29:57.090Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/routes/admin/collections.test.ts
+  test_output: '23 tests passing. Live checks: GET and POST both 401 unauthenticated; against the real database a duplicate slug raises cause.code 23505 (constraint collections_slug_unique) and deleting a manual collection cascaded its members from 1 to 0.'
+  build_passed: true
+  build_command: cd packages/api && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T14:34:12.370Z'
+completed: '2026-08-05T14:34:16.465Z'

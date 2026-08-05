@@ -1,0 +1,137 @@
+ticket_number: 466
+title: API - GET /api/collections/:slug resolving a collection to products
+description: |-
+  ## Task
+
+  The collection page's data endpoint.
+
+  `GET /api/collections/:slug` accepts the same query parameters `/api/products` does (facets, price, page, pageSize, sortBy, sortOrder) and returns:
+
+  - the collection itself — title, subtitle, description, seoTitle, seoDescription, imageUrl
+  - the resolved, paginated products
+  - facet counts scoped to the collection, not to the whole catalogue
+
+  The collection's rule is the base query; shopper facets narrow within it, per the resolver's intersection rule. The rule's sort is the default; an explicit `sortBy` wins.
+
+  404 on an unknown or inactive slug — an inactive collection must not be reachable by guessing the URL.
+
+  ## Context
+
+  Feature: curated-collections, Phase 3. Depends on the resolver.
+
+  Facet counts: reuse the path from #392 rather than issuing a per-facet count query. Scoping them to the collection is the part that differs — counts from the whole catalogue would offer a shopper filters that return nothing inside this collection.
+
+  Manual collections keep `position` as their default order, so paging must be stable across requests.
+feature: curated-collections
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:02.492Z'
+last_updated: '2026-08-05T14:29:51.948Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:25:53.676Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T14:29:32.970Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:29:51.948Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `b26a6360` — feat(api): GET /api/collections/:slug
+
+      **Files Changed**:
+      - `packages/api/src/routes/collections.ts` — added the `/:slug` handler, `collectionFacetCounts`, `publicCollection`, `emptyPage`, and the query schema.
+      - `packages/api/tests/routes/collection-detail.test.ts` — 12 tests.
+
+      **The intersection rule reaches production here**, and it short-circuits: when the merge returns `IMPOSSIBLE` the endpoint answers with an empty page **without issuing any product query**. A test asserts the call count (`does not even query for products when the answer is known`), because "returns nothing" and "returns nothing after asking" look identical from the response.
+
+      **Facet counts are scoped to the collection, and exclude the shopper's own facets.** Two distinct failures avoided:
+      - catalogue-wide counts would offer filters that return nothing inside this collection
+      - folding the shopper's current selection in would zero every sibling option the instant they tick one, so the sidebar collapses as it is used
+
+      Confirmed live: `/pop-art` reports **5** style facets (its 6 products carry other styles too), `/best-selling` reports **12** — the whole vocabulary, correctly, because that collection is the whole catalogue.
+
+      **Manual ordering** uses `array_position(ARRAY[...]::uuid[], products.id)` and applies only when the shopper has not chosen a sort. The admin's order is the one thing a rule cannot express, so it outranks a stored sort but not an explicit request.
+
+      **Live verification against the restarted API**
+
+      | request | result |
+      |---|---|
+      | `/pop-art` | 200, total 6, 5 style facets |
+      | `/pop-art?styles=ukiyo-e-art` | 200, **total 0** — the intersection rule |
+      | `/pop-art?styles=pop-art` | 200, total 6 — narrowing inside |
+      | `/best-selling` | 200, total 41, 24 items, 12 style facets |
+      | `/best-selling?styles=pop-art` | 200, total 6 |
+      | `/best-selling?page=2&pageSize=24` | 200, page 2, 17 items |
+      | `/pop-art?sortBy=basePrice&sortOrder=asc` | 200, leads with 899.00 |
+      | `/nope-not-real` | **404** |
+      | `/pop-art?styles=not-a-style` | **400** |
+
+      **One typecheck trap worth recording**: indexing the sort-column map with `sort.sortBy as keyof typeof products & string` produced ~40 errors, because it resolves against the *table* type rather than the map. Extracting the map to a `const` and indexing with `keyof typeof SORT_COLUMNS` fixes it.
+
+      **Verification**
+      - Command: `cd packages/api && npx vitest run tests/routes/collection-detail.test.ts tests/routes/collections.test.ts`
+      - Result: PASS — 20 tests, 0 failing
+      - Build: `npx tsc --noEmit -p tsconfig.json` — 0 errors in these modules
+
+      **Note**: the dev API on :3000 was restarted before this verification (it had been serving 26-hour-old module state, see #465). It now reflects the working tree.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 463
+    feature: curated-collections
+    description: 'API - collection resolver: one collection to one product query'
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing endpoint tests
+    file: packages/api/tests/routes/collection-detail.test.ts
+    command: cd packages/api && npx vitest run tests/routes/collection-detail.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: returns the collection and its products; unknown slug 404s; inactive slug 404s; a shopper facet narrows within the rule and never widens past it; facet counts are scoped to the collection; manual collections page in position order and the order is stable across page 1 and 2; the rule''s sort is the default and an explicit sortBy overrides it.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && npx vitest run tests/routes/collection-detail.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the detail handler
+    file: packages/api/src/routes/collections.ts
+    status: pending
+    code: GET /:slug. Registration order matters — a literal segment must be registered before /:slug, the same trap products.ts documents for /facets and /collections.
+  - id: 4
+    action: verify-pass
+    description: Confirm the detail tests pass
+    command: cd packages/api && npx vitest run tests/routes/collection-detail.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/collections.ts packages/api/tests/routes/collection-detail.test.ts && git commit -m "feat(api): GET /api/collections/:slug (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T14:25:53.676Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/routes/collection-detail.test.ts tests/routes/collections.test.ts
+  test_output: '20 tests passing (12 detail, 8 rail). Also exercised against the restarted live API: pop-art 6, pop-art?styles=ukiyo-e-art 0, best-selling 41 with 24 on page 1 and 17 on page 2, unknown slug 404, unknown facet value 400, sortBy=basePrice&sortOrder=asc leads with 899.00.'
+  build_passed: true
+  build_command: cd packages/api && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T14:29:28.829Z'
+completed: '2026-08-05T14:29:32.970Z'

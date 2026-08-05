@@ -31,19 +31,66 @@ description: |-
 feature: wishlist
 type: bug
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T06:55:38.631Z'
-last_updated: '2026-08-05T06:55:38.631Z'
-time_spent_minutes: 0
+last_updated: '2026-08-05T14:07:49.593Z'
+time_spent_minutes: 5
 labels:
   - web
   - wishlist
   - auth
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:03:15.955Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:07:38.137Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `bdcc03ea` - fix(web): gate the wishlist load on the session and dedupe it in flight
+
+      **Root Cause**: two independent defects.
+      1. `load()` guarded on `isLoaded` (`wishlist.ts:48`), which only flips *after* the await — every caller mounting in the same tick passed the guard and issued its own request.
+      2. The store fetched the auth-gated `/api/wishlist` without knowing the session and swallowed the 401.
+
+      **Fix**: tri-state `isAuthenticated: boolean | null` plus a shared in-flight promise.
+      - `null` (nobody reported yet) and `false` (guest) both make `load()` a no-op — this is what removes the guest 401s, since leaf effects run before the root effect.
+      - `setAuthenticated(false)` marks `{ ids: [], isLoaded: true }` so every heart renders its empty state instead of waiting.
+      - `setAuthenticated(true)` kicks the single load; concurrent callers await the same promise, which is cleared in a `finally` so a failed load does not wedge the store.
+      - `__root.tsx` reports the session it already has in `beforeLoad`. `Header` and `WishlistButton` keep their `load()` effects (harmless no-ops until auth is known), so `WishlistButton` still renders routerless in its own tests.
+
+      **Files Changed**:
+      - `packages/web/app/stores/wishlist.ts` — auth gate, in-flight dedupe, `setAuthenticated`
+      - `packages/web/app/routes/__root.tsx` — reports the session to the store
+      - `packages/web/tests/stores/wishlist.test.ts` — new `auth gate` describe, concurrent-dedupe and failed-load-recovery cases; `reset()` clears the two new fields; existing `load` cases authenticate first
+
+      **Verification**:
+      - Command: `bunx vitest run tests/stores/wishlist.test.ts tests/components/product/WishlistButton.test.tsx tests/components/layout/Header.structure.test.tsx`
+      - Result: PASS (3 files, 50 tests passing). Before the fix the same store file was 4 failed / 12 passed, including "expected 1 call, got 24".
+      - Browser: guest load of `/posters` against `vite dev` renders 24 hearts and makes **0** `/api/wishlist` requests (was ~6).
+      - Typecheck: `tsc --noEmit` — 0 errors in the touched files; 22 pre-existing admin-route search-param errors unchanged.
+
+      **Not verified in the browser**: the signed-in "exactly one request per page" half needs an authenticated session; it is covered by the concurrent-dedupe unit test rather than a live login.
+  - author: system
+    timestamp: '2026-08-05T14:07:38.406Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T14:03:17.360Z'
+    agent: claude-code
+    summary: 'Fixed both defects: tri-state auth gate + shared in-flight promise in the wishlist store, session reported from __root. 50 tests pass; guest /posters makes 0 /api/wishlist requests. Commit bdcc03ea.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T14:07:49.592Z'
+    duration: '00:04:32'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -55,7 +102,7 @@ implementation_steps:
     file: packages/web/tests/stores/wishlist.test.ts
     command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts
     expected_result: FAIL - concurrent load() makes 3 requests instead of 1, and load() with an unknown session still hits the network
-    status: pending
+    status: done
     code: |-
       // reset() gains the two new fields:
       const reset = () =>
@@ -124,12 +171,12 @@ implementation_steps:
     description: Confirm the new cases fail against the current store
     command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Add the tri-state auth flag and the shared in-flight promise to the store
     file: packages/web/app/stores/wishlist.ts
-    status: pending
+    status: done
     code: |-
       interface WishlistStore {
         /** Product ids the user has saved. */
@@ -206,7 +253,7 @@ implementation_steps:
     action: implement
     description: Report the session from the root route, the one place that already has it
     file: packages/web/app/routes/__root.tsx
-    status: pending
+    status: done
     code: |-
       import { useEffect } from 'react'
       import { useWishlistStore } from '~/stores/wishlist'
@@ -227,16 +274,34 @@ implementation_steps:
     description: Store, button and header tests all green
     command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts tests/components/product/WishlistButton.test.tsx tests/components/layout/Header.structure.test.tsx
     expected_result: PASS - no regression in the existing heart or header-badge cases
-    status: pending
+    status: done
   - id: 6
     action: verify-pass
     description: Confirm the request count in a real browser
     command: bun run dev
     expected_result: 'Manual verification — signed out, load /posters with the network panel filtered to ''wishlist'': zero requests (was six). Sign in, reload: exactly one GET /api/wishlist, 200. Hearts fill on click in both directions.'
-    status: pending
+    status: done
   - id: 7
     action: commit
     description: Commit the fix
     command: 'git add packages/web/app/stores/wishlist.ts packages/web/app/routes/__root.tsx packages/web/tests/stores/wishlist.test.ts && git commit -m "fix(web): wishlist waits for the session and shares one request (#417)"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 7
+started: '2026-08-05T14:03:15.955Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:05:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:05:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/stores/wishlist.test.ts tests/components/product/WishlistButton.test.tsx tests/components/layout/Header.structure.test.tsx
+  test_output: Test Files 3 passed (3), Tests 50 passed (50)
+  build_passed: true
+  build_command: bunx tsc --noEmit -p packages/web/tsconfig.json (0 errors in touched files; 22 pre-existing admin-route errors unchanged)
+  verified_at: '2026-08-05T14:07:24.798Z'
+completed: '2026-08-05T14:07:38.406Z'

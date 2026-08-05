@@ -38,20 +38,35 @@ description: |-
 feature: wishlist
 type: task
 priority: medium
-status: todo
+status: in-progress
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T07:48:20.093Z'
-last_updated: '2026-08-05T07:48:20.093Z'
+last_updated: '2026-08-05T14:29:45.853Z'
 time_spent_minutes: 0
 labels:
   - web
   - mesonart-parity
   - phase-f
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:29:44.918Z'
+    text: Status changed from 'todo' to 'in-progress'
+work_sessions:
+  - start: '2026-08-05T14:29:45.853Z'
+    agent: claude-code
+    summary: Starting the /wishlist page, guest-accessible
 related_tickets: []
-blocked_by: []
+blocked_by:
+  - ticket: 477
+    feature: wishlist
+    description: Guest wishlist persists locally and merges into the account on sign-in
 blocks: []
 attachments: []
+started: '2026-08-05T14:29:44.918Z'
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}

@@ -23,17 +23,60 @@ description: |-
 feature: curated-collections
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T13:49:55.428Z'
-last_updated: '2026-08-05T13:49:55.428Z'
+last_updated: '2026-08-05T14:04:56.766Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:01:38.506Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T14:04:38.622Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:04:56.766Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `84772755` — feat(api): collection resolver merging stored rules with shopper facets
+
+      **Files Changed**:
+      - `packages/api/src/lib/collection-resolver.ts` — new
+      - `packages/api/tests/lib/collection-resolver.test.ts` — 16 tests
+
+      **Exports**, for the tickets that consume this:
+
+      | Export | For |
+      |---|---|
+      | `mergeCollectionFilters(rule, shopper)` | #466 — returns filters or `IMPOSSIBLE` |
+      | `IMPOSSIBLE` | the sentinel; check identity, not truthiness |
+      | `resolveCollectionSort(rule, shopper)` | #466 |
+      | `buildProductConditions(filters)` | #465, #466 — drizzle conditions over active products |
+      | `resolveManualMembers(id)` | #466, #468 |
+      | `countCollection(collection)` | #465 chip counts |
+      | `findActiveCollectionBySlug(slug)` | #466 — already excludes inactive, so the 404 falls out |
+      | `listDiscoverCollections()` | #465 |
+
+      **Two decisions the ticket did not specify**
+
+      1. **The merge returns filters only; sort is a separate call.** Folding sort into the merged object would make a sort-only collection look like it carried a facet, and the two have different precedence rules — facets intersect, sort is winner-takes-all. `resolveCollectionSort` is the second function.
+      2. **`countCollection` counts active products for manual collections too**, not the raw member count. A product archived after an admin curated it is not buyable, and a chip promising a row the grid cannot render is the failure #406 avoided by culling empty chips in the first place.
+
+      **Carried over verbatim from `routes/products.ts`**: the parameterised `&& ARRAY[...]::text[]` form for array facets. The comment there is worth not rediscovering — binding the JS array as one parameter and casting it does not work, postgres.js sends it as a scalar and the server answers "malformed array literal".
+
+      **Verification**
+      - Command: `cd packages/api && npx vitest run tests/lib/collection-resolver.test.ts`
+      - Result: PASS — 16 tests, 0 failing
+      - Build: `npx tsc --noEmit -p tsconfig.json` — 0 errors in this module
+
+      The intersection direction is covered by a named test (`is IMPOSSIBLE when the overlap is empty — never the union`), because that is the one place where a plausible-looking implementation silently shows a shopper the wrong catalogue.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -78,3 +121,12 @@ implementation_steps:
     command: 'git add packages/api/src/lib/collection-resolver.ts packages/api/tests/lib && git commit -m "feat(api): collection resolver merging stored rules with shopper facets (#TICKET)"'
     status: pending
 current_step: 1
+started: '2026-08-05T14:01:38.506Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/lib/collection-resolver.test.ts
+  test_output: 16 tests passing. Covers intersection per multi-facet group, the empty-overlap IMPOSSIBLE case, scalar and boolean conflict, price-range intersection and inversion, sort precedence, and the empty rule meaning every product.
+  build_passed: true
+  build_command: cd packages/api && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T14:04:34.436Z'
+completed: '2026-08-05T14:04:38.622Z'

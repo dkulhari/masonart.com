@@ -30,7 +30,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T13:16:43.263Z'
-last_updated: '2026-08-05T13:41:23.359Z'
+last_updated: '2026-08-05T14:06:15.662Z'
 time_spent_minutes: 24
 labels:
   - web
@@ -79,6 +79,35 @@ comments:
   - author: system
     timestamp: '2026-08-05T13:41:21.288Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:06:15.662Z'
+    text: |-
+      🔁 **Follow-up correction** — `3a37188c` fix(web): the cart drawer opens right, at their weight, on their button
+
+      The first pass put the drawer on the left. Measured mesonart's live `cart-drawer` element and corrected all three points:
+
+      | | theirs (measured) | ours now |
+      |---|---|---|
+      | side | `drawer--end`, flush right | `right-0`, flush right |
+      | motion | `transform 0.6s cubic-bezier(.7, 0, .2, 1)` | `animate-drawer-in-right`, same curve as `--ease-drawer` |
+      | close | `button button--secondary button--close`, 48px round | `<Button variant="ghost" size="icon" className="h-12 w-12">` |
+
+      Their left-hand drawer is the **menu** (`drawer--start`) — that is what the original "opens in left" read on.
+
+      **Worth knowing:** the timing had to become a named animation in `tailwind.config.ts`. `animate-in slide-in-from-right duration-[600ms]` does not work — tailwindcss-animate's `.animate-in` sets `animation-duration: 150ms` itself and beats the duration utility sitting on the same element. The class looked correct and the drawer still slid at 0.15s. The E2E now asserts the **computed** `animationDuration` / `animationTimingFunction`, which is the only assertion that catches it.
+
+      Also moved the drawer's CTAs and the empty state's onto `buttonVariants` — same reasoning as the close button.
+
+      **Verification**:
+      - `cd packages/web && npx vitest run tests/components/cart/ tests/styles/` → PASS, 52 tests
+      - `E2E_BASE_URL=http://localhost:3005 npx playwright test tests/e2e/cart-drawer.spec.ts --project=chromium --no-deps` → PASS, 10/10, including computed `0.6s` / `cubic-bezier(0.7, 0, 0.2, 1)`
+      - Live measurement of our drawer: `rightGap: 0`, close button 48×48, `border-radius: 9999px`, transparent bg, `rgb(23,23,23)` — matches theirs
+      - `npx tsc --noEmit` → 22 errors, unchanged pre-existing baseline
+
+      **Two notes:**
+      1. Width left at `max-w-md` (448px); theirs is 576px. Not asked for, and it re-flows the whole panel — say the word and it is a one-line change.
+      2. The `:3001` dev server another session owns holds a **stale Tailwind config** — it will not serve `animate-drawer-in-right` until that process restarts. The spec was verified against a fresh server on :3005, since killing another session's server was not mine to do.
+      3. The `left` → `right` fix to Header.tsx's comment is uncommitted: that file is dirty with another session's AllArtMegaMenu work, so it will ride along with their commit rather than have me stage their in-flight changes.
 work_sessions:
   - start: '2026-08-05T13:17:41.314Z'
     agent: claude-code

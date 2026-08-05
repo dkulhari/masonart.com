@@ -1,0 +1,568 @@
+ticket_number: 476
+title: Chrome - All Art opens the filter mega menu (mesonart parity)
+description: |-
+  ## Task
+
+  Our styles row's **All Art** is a bare `<Link to="/posters">` (`Header.tsx:402-409`). Mesonart's is the entry point to a full-width mega panel that opens the site's whole filter vocabulary in one view.
+
+  Measured on mesonart.com/collections/artworks (2026-08-05, desktop 1566px):
+
+  **Mechanism**
+  - `<details>` whose `<summary>` carries `data-link="/collections/artworks"` — pointer **hover** sets `open`, a **click** still navigates to the collection.
+  - Panel is `.mega-menu` `position:absolute`, full viewport width, white; the inner `.mega-menu__container` starts `invisible` and animates open on `padding 0.5s cubic-bezier(0.6, 0, 0.4, 1)` — the sheet grows downward rather than sliding.
+  - Content is lazy: for the first ~400ms the panel shows five grey skeleton blocks where the columns land, then the real links swap in.
+  - The rest of the page dims behind the open panel; it closes on mouse-leave.
+
+  **Layout** — `.mega-menu__list` is `display:grid`, `grid-template-columns: 4fr 1fr`, `gap: 24px`, `padding: 12px <page-gutter> 56px`. The 4fr track holds five link columns; the 1fr track holds two promo image cards.
+
+  **Columns (theirs → ours)**
+  | # | mesonart heading | mesonart contents | our source |
+  |---|---|---|---|
+  | 1 | All Artworks › | 8 monthly drops (New Art-202607 …) + All Art | no drop entity here — use All Art / New In / Best Sellers, the row-1 destinations `Header.tsx` already defines |
+  | 2 | Style › | 11 styles | `STYLE_OPTIONS` → `?styles=<id>` |
+  | 3 | Subject | 13 subjects | `SUBJECT_OPTIONS` → `?subjects=<id>` |
+  | 4 | Orientation | 6 orientations | `ORIENTATION_OPTIONS` → `?orientation=<id>` (single, not a list) |
+  | 5 | Color | 14 colors | `COLOR_OPTIONS` → `?colors=<id>` |
+
+  Every axis is already accepted by `/posters` (`routes/posters/index.tsx:236-245`), so this is links over existing filters — no new API, no new route.
+
+  **Type** — headings 16px / weight 500 / black / `letter-spacing: -0.4px` / capitalize; headings 1 and 2 carry a chevron-right and are themselves links. Options 14px, `rgb(159,159,159)`, line-height 21px, 8px bottom padding, hover runs an underline wipe on `background-size 0.5s cubic-bezier(0.3, 1, 0.3, 1)`.
+
+  **Promo cards** — right-hand column, two image cards: a 4:3 card with a caption and a trailing arrow, then a square card. Feed both from `CATEGORY_TILES` (`app/lib/homeCategories.ts`), which already pairs a curated image with a real facet value and a group — no invented promotion, same rule that kept the sale strip out of this feature.
+
+  ## Context
+
+  **Decisions taken with the user (2026-08-05)**
+  1. **Hover opens it**, matching mesonart, and the trigger still navigates on click. This is a deliberate departure from #416, where hover-open was rejected for the sort pill. Accepted cost: no keyboard path to open the panel — the user asked for the mesonart behaviour without keyboard shortcuts. Every link inside stays a real `<a>`, so the panel is still reachable with a mouse and readable to a screen reader once open; keep Escape and outside-click closing it.
+  2. **Five columns, copied from mesonart**, promo cards included, same open animation and hover effects.
+  3. **Desktop only.** The mobile drawer's own All Art accordion is a follow-up ticket.
+
+  **Constraints**
+  - Options come from `@chobii/shared` — never a hardcoded list. Hardcoding is what #395 ended and what `Header.structure.test.tsx` pins.
+  - The panel must not be a child of `<header>`: the header sets `backdrop-blur`, which establishes a containing block and collapsed a fixed overlay to zero height in #348. It belongs in the nav-rows block, which is already a sibling.
+  - The nav rows are `sticky top-16` and publish `--chrome-offset` through `useChromeOffset` (#401 / #421). The panel is an overlay and must NOT enter that measurement, or the collection toolbar jumps down by the panel's height every time it opens.
+  - Column 1's `All Art` entry passes `search` wholesale so it clears any active facets, the same way row 1's entries do.
+
+  **Files**
+  - `packages/web/app/components/layout/Header.tsx:402-409` — the trigger
+  - `packages/web/app/components/layout/AllArtMegaMenu.tsx` — new
+  - `packages/shared/src/constants/facets.ts` — the four vocabularies
+  - `packages/web/app/lib/homeCategories.ts` — promo card source
+feature: global-chrome-parity
+type: story
+priority: high
+status: done
+completed: '2026-08-05T14:25:00.000Z'
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:55:59.525Z'
+last_updated: '2026-08-05T14:24:02.850Z'
+time_spent_minutes: 24
+labels:
+  - web
+  - chrome
+  - nav
+  - parity
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T13:58:18.571Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: claude-code
+    timestamp: '2026-08-05T14:25:00.000Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `2e29b27c` — feat(web): All Art opens the whole filter vocabulary, not a collection
+
+      **Files Changed**
+      - `packages/web/app/components/layout/AllArtMegaMenu.tsx` — new. Five columns generated from the shared vocabulary, promo column from `CATEGORY_TILES`, hover-open sheet on the measured curve.
+      - `packages/web/app/components/layout/Header.tsx` — trigger swapped in, styles row made a positioning context, scrim raised to header level, header opaque while the panel is open.
+      - `packages/web/tests/components/layout/AllArtMegaMenu.test.tsx` — new, 21 tests.
+      - `tests/e2e/all-art-mega.spec.ts` — new, 6 tests.
+
+      **Verification**
+      - Command: `cd packages/web && npx vitest run tests/components/layout`
+        Result: PASS — 94 tests across 6 files (21 new; `Header.structure.test.tsx` still 25/25).
+      - Command: `npx playwright test tests/e2e/all-art-mega.spec.ts tests/e2e/header-reveal.spec.ts --project=chromium --no-deps`
+        Result: PASS — 13 passed (23.4s), including the #401/#421 guards and a new assertion that opening the panel does not move the collection toolbar.
+      - Command: `cd packages/web && npx tsc --noEmit -p tsconfig.json`
+        Result: 22 errors, all pre-existing and in unrelated files (`app/routes/track/index.tsx`, …). None in either file this ticket touched.
+      - Visual: screenshotted at 1440×1100 against the dev server with the panel open — five columns, promo cards, page dimmed behind.
+
+      **Deviations from the plan, and why**
+
+      1. **The unit test renders the component rather than asserting on its source.** The drafted step was a `readFileSync` string test. `SearchDrawer.test.tsx` already shows the better pattern — stub `@tanstack/react-router`'s `Link` — and the stub here folds `search` into the `href`, so every column's destination is asserted for real (`?styles=`, `?subjects=`, `?orientation=`, `?colors=`). Source assertions are kept only for the measured values a DOM test cannot see: the two cubic-beziers, the 4fr/1fr split, reduced motion.
+
+      2. **The E2E spec lives at `tests/e2e/`, not `packages/web/tests/e2e/`.** The ticket named a directory that does not exist; the root Playwright config's `testDir` is `./tests/e2e`.
+
+      3. **The scrim is rendered by `Header`, not by the panel.** It cannot live in the component: the nav-rows block carries a transform for its reveal, and a transform establishes a containing block for fixed descendants — exactly the collapse-to-zero-height of #348. The component reports its state up through `onOpenChange`; the header renders the scrim as a sibling of `<header>`, where the mobile drawer's scrim already lives.
+
+      4. **The header goes opaque while the panel is open.** Unplanned, found by looking at it: the bar is `bg-background/60` with `backdrop-blur`, so the scrim showed through and the chrome read as dimmed. mesonart's header stays white over its own panel.
+
+      5. **No skeleton state.** Theirs shows five grey blocks for ~400ms because Shopify renders the section on demand. Our vocabulary is already in the bundle, so a skeleton would be a delay we manufacture. Skipped deliberately.
+
+      **Known, and left for the owner**
+
+      The Subject column renders all of `SUBJECT_OPTIONS`, including `typography`, which nothing in the catalogue carries — that one option lands on an empty grid. It matches the existing header precedent (the styles row already renders all of `STYLE_OPTIONS` ungated) but not #452's home-tile rule, which hides a category nothing is filed under. Gating the panel on facet counts would mean the header fetching counts on every page: a design call, not a fix to slip in here.
+
+      `tests/e2e/home.spec.ts › hides a category nothing is filed under` fails — **pre-existing**. Verified by stashing this ticket's `Header.tsx` and re-running that single test on the clean tree, where it fails identically (`h3:has-text("Typography")` resolved to 1). Not caused by this work.
+work_sessions:
+  - start: '2026-08-05T13:59:39.956Z'
+    agent: claude-code
+    summary: 'Built the All Art mega panel: five columns from the shared facet vocabulary plus a promo column, hover-open on mesonart''s measured curve, scrim raised to Header to dodge #348, panel absolute so --chrome-offset and the collection toolbar stay put. 94 unit + 13 E2E green. Commit 2e29b27c.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T14:24:02.845Z'
+    duration: '00:24:22'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Unit test for the mega menu: five columns from the shared vocabularies, correct search params per axis, closed until hovered, two promo cards from CATEGORY_TILES'
+    file: packages/web/tests/components/layout/AllArtMegaMenu.test.tsx
+    command: cd packages/web && npx vitest run tests/components/layout/AllArtMegaMenu.test.tsx
+    expected_result: FAIL - AllArtMegaMenu does not exist
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+      import {
+        STYLE_OPTIONS,
+        SUBJECT_OPTIONS,
+        ORIENTATION_OPTIONS,
+        COLOR_OPTIONS,
+      } from '@chobii/shared'
+      import { CATEGORY_TILES } from '~/lib/homeCategories'
+
+      const src = readFileSync(
+        join(process.cwd(), 'app/components/layout/AllArtMegaMenu.tsx'),
+        'utf8'
+      )
+
+      describe('column vocabulary', () => {
+        it('reads all four axes from the shared vocabulary, never a literal list', () => {
+          for (const name of [
+            'STYLE_OPTIONS',
+            'SUBJECT_OPTIONS',
+            'ORIENTATION_OPTIONS',
+            'COLOR_OPTIONS',
+          ]) {
+            expect(src).toContain(name)
+          }
+          // A hardcoded style label here restarts the drift #395 ended.
+          expect(src).not.toContain(STYLE_OPTIONS[1].label)
+        })
+
+        it('sends each axis to the parameter /posters actually accepts', () => {
+          expect(src).toMatch(/styles:\s*/)
+          expect(src).toMatch(/subjects:\s*/)
+          expect(src).toMatch(/colors:\s*/)
+          // Orientation is single-valued on the route, not a comma list.
+          expect(src).toMatch(/orientation:\s*/)
+        })
+
+        it('names all five column headings', () => {
+          for (const heading of [
+            'All Artwork',
+            'Style',
+            'Subject',
+            'Orientation',
+            'Color',
+          ]) {
+            expect(src).toContain(heading)
+          }
+        })
+
+        it('feeds the promo cards from the curated tiles, not invented promotions', () => {
+          expect(src).toContain('CATEGORY_TILES')
+          expect(src).not.toMatch(/% ?off|sale ends|hurry/i)
+        })
+
+        it('covers every option in each vocabulary by mapping, so counts cannot drift', () => {
+          expect(SUBJECT_OPTIONS.length).toBeGreaterThan(0)
+          expect(ORIENTATION_OPTIONS.length).toBeGreaterThan(0)
+          expect(COLOR_OPTIONS.length).toBeGreaterThan(0)
+          expect(CATEGORY_TILES.length).toBeGreaterThanOrEqual(2)
+          expect(src).toMatch(/\.map\(/)
+        })
+      })
+
+      describe('open behaviour', () => {
+        it('opens on pointer hover and closes on leave, Escape and outside click', () => {
+          expect(src).toMatch(/onMouseEnter|onPointerEnter/)
+          expect(src).toMatch(/onMouseLeave|onPointerLeave/)
+          expect(src).toContain('Escape')
+        })
+
+        it('keeps the trigger a real link to /posters - click navigates, hover opens', () => {
+          expect(src).toMatch(/to="\/posters"/)
+        })
+
+        it('animates the sheet open on the measured mesonart curve', () => {
+          expect(src).toContain('cubic-bezier(0.6, 0, 0.4, 1)')
+          expect(src).toMatch(/duration-500|500ms/)
+        })
+
+        it('dims the page behind the open panel', () => {
+          expect(src).toMatch(/scrim|bg-black\//)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the suite fails for the right reason - the component is missing
+    command: cd packages/web && npx vitest run tests/components/layout/AllArtMegaMenu.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Build AllArtMegaMenu - five columns generated from the shared vocabularies, two promo cards from CATEGORY_TILES, hover-open sheet on the measured curve
+    file: packages/web/app/components/layout/AllArtMegaMenu.tsx
+    status: done
+    code: |-
+      import { Link } from '@tanstack/react-router'
+      import { ChevronRight, ArrowRight } from 'lucide-react'
+      import { useEffect, useRef, useState } from 'react'
+      import {
+        STYLE_OPTIONS,
+        SUBJECT_OPTIONS,
+        ORIENTATION_OPTIONS,
+        COLOR_OPTIONS,
+      } from '@chobii/shared'
+      import { CATEGORY_TILES } from '~/lib/homeCategories'
+      import { cn } from '~/lib/utils'
+
+      /**
+       * The All Art mega panel (mesonart parity).
+       *
+       * Five columns of the site's own filter vocabulary, opened by hovering the
+       * first entry of the styles row. Measured from mesonart.com: a full-width
+       * white sheet that grows downward on `cubic-bezier(0.6, 0, 0.4, 1)` over
+       * 500ms, five link columns in a 4fr track, two promo cards in a 1fr track.
+       *
+       * Hover-open is a deliberate departure from #416, where the sort pill
+       * rejected it. Taken with the user for parity; the trigger stays a real link
+       * so a click still lands on /posters, and every option inside is an <a>.
+       *
+       * The panel is an OVERLAY. It renders `absolute` inside the nav-rows block
+       * (already a sibling of <header>, because the header's backdrop-blur
+       * collapses fixed descendants - #348) and is deliberately outside anything
+       * `useChromeOffset` measures: counted there, the collection toolbar would
+       * jump down by the panel's height on every hover (#401 / #421).
+       */
+
+      interface MegaColumn {
+        heading: string
+        /** Headings 1 and 2 are links themselves and carry a chevron, as theirs do. */
+        headingSearch?: Record<string, unknown>
+        links: Array<{ id: string; label: string; search: Record<string, unknown> }>
+      }
+
+      const BEST_SELLERS_SEARCH = { sortBy: 'salesCount', sortOrder: 'desc' }
+      const NEW_IN_SEARCH = { sortBy: 'createdAt', sortOrder: 'desc' }
+
+      /**
+       * Their column 1 lists monthly drops (New Art-202607 …). We have no timed
+       * collection entity, so it carries the row-1 destinations instead - the same
+       * three doors, named the same way, rather than eight invented ones.
+       */
+      const MEGA_COLUMNS: readonly MegaColumn[] = [
+        {
+          heading: 'All Artwork',
+          headingSearch: {},
+          links: [
+            { id: 'all', label: 'All Art', search: {} },
+            { id: 'new-in', label: 'New In', search: NEW_IN_SEARCH },
+            { id: 'best-sellers', label: 'Best Sellers', search: BEST_SELLERS_SEARCH },
+          ],
+        },
+        {
+          heading: 'Style',
+          headingSearch: {},
+          links: STYLE_OPTIONS.map((o) => ({
+            id: o.id,
+            label: o.label,
+            search: { styles: o.id },
+          })),
+        },
+        {
+          heading: 'Subject',
+          links: SUBJECT_OPTIONS.map((o) => ({
+            id: o.id,
+            label: o.label,
+            search: { subjects: o.id },
+          })),
+        },
+        {
+          // Single-valued on the route, unlike the comma lists above.
+          heading: 'Orientation',
+          links: ORIENTATION_OPTIONS.map((o) => ({
+            id: o.id,
+            label: o.label,
+            search: { orientation: o.id },
+          })),
+        },
+        {
+          heading: 'Color',
+          links: COLOR_OPTIONS.map((o) => ({
+            id: o.id,
+            label: o.label,
+            search: { colors: o.id },
+          })),
+        },
+      ]
+
+      /** Their two promo cards, fed from tiles that already pair a real image with a real facet value. */
+      const PROMO_CARDS = CATEGORY_TILES.slice(0, 2)
+
+      export function AllArtMegaMenu({ onNavigate }: { onNavigate?: () => void }) {
+        const [isOpen, setIsOpen] = useState(false)
+        const rootRef = useRef<HTMLDivElement>(null)
+
+        // Escape and outside-click close it. Hover-open has no keyboard path by
+        // decision, but a panel that cannot be dismissed without moving the mouse
+        // back through it is a trap.
+        useEffect(() => {
+          if (!isOpen) return
+          const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setIsOpen(false)
+          }
+          const onPointerDown = (e: PointerEvent) => {
+            if (!rootRef.current?.contains(e.target as Node)) setIsOpen(false)
+          }
+          document.addEventListener('keydown', onKeyDown)
+          document.addEventListener('pointerdown', onPointerDown)
+          return () => {
+            document.removeEventListener('keydown', onKeyDown)
+            document.removeEventListener('pointerdown', onPointerDown)
+          }
+        }, [isOpen])
+
+        const close = () => {
+          setIsOpen(false)
+          onNavigate?.()
+        }
+
+        return (
+          <div
+            ref={rootRef}
+            onMouseEnter={() => setIsOpen(true)}
+            onMouseLeave={() => setIsOpen(false)}
+            data-testid="all-art-mega"
+            data-open={isOpen}
+          >
+            {/* The trigger stays a link: click navigates, hover opens. Theirs does
+                the same through `data-link` on the <summary>. */}
+            <Link
+              to="/posters"
+              search={{}}
+              onClick={close}
+              aria-expanded={isOpen}
+              className="whitespace-nowrap text-nav text-muted-foreground transition-colors hover:text-foreground"
+            >
+              All Art
+            </Link>
+
+            {/* Scrim. Dims the page behind, the way theirs greys the announcement
+                bar and grid. Pointer-events off so leaving the panel still closes it. */}
+            <div
+              aria-hidden="true"
+              className={cn(
+                'pointer-events-none fixed inset-0 top-0 z-30 bg-black/30 transition-opacity duration-500 motion-reduce:transition-none',
+                isOpen ? 'opacity-100' : 'invisible opacity-0'
+              )}
+            />
+
+            {/* The sheet. Grid-rows 0fr/1fr grows it downward on their curve rather
+                than sliding it, which is what `padding 0.5s` does on their side. */}
+            <div
+              className={cn(
+                'absolute left-0 top-full z-40 grid w-full overflow-hidden bg-background transition-[grid-template-rows,opacity] duration-500 motion-reduce:transition-none',
+                isOpen
+                  ? 'grid-rows-[1fr] opacity-100'
+                  : 'invisible grid-rows-[0fr] opacity-0'
+              )}
+              style={{ transitionTimingFunction: 'cubic-bezier(0.6, 0, 0.4, 1)' }}
+            >
+              <div className="min-h-0">
+                <div className="container-wide grid grid-cols-[4fr_1fr] gap-6 pb-14 pt-3">
+                  <div className="grid grid-cols-5 gap-6">
+                    {MEGA_COLUMNS.map((column) => (
+                      <div key={column.heading}>
+                        {column.headingSearch ? (
+                          <Link
+                            to="/posters"
+                            search={column.headingSearch}
+                            onClick={close}
+                            className="mb-8 flex items-center gap-1 text-base font-medium capitalize tracking-[-0.4px] text-foreground"
+                          >
+                            {column.heading}
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        ) : (
+                          <p className="mb-8 text-base font-medium capitalize tracking-[-0.4px] text-foreground">
+                            {column.heading}
+                          </p>
+                        )}
+                        <ul>
+                          {column.links.map((link) => (
+                            <li key={link.id}>
+                              <Link
+                                to="/posters"
+                                search={link.search}
+                                onClick={close}
+                                className="block pb-2 text-sm leading-[21px] text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                {link.label}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Promo column. 4:3 card with a caption and trailing arrow, then
+                      a square one - their proportions. */}
+                  <div className="flex flex-col gap-6">
+                    {PROMO_CARDS.map((tile, index) => (
+                      <Link
+                        key={tile.id}
+                        to="/posters"
+                        search={{ [tile.group]: tile.id }}
+                        onClick={close}
+                        className="group block"
+                      >
+                        <img
+                          src={tile.image}
+                          alt={tile.name}
+                          loading="lazy"
+                          className={cn(
+                            'w-full rounded-sm object-cover',
+                            index === 0 ? 'aspect-[4/3]' : 'aspect-square'
+                          )}
+                        />
+                        {index === 0 && (
+                          <span className="mt-3 flex items-center justify-between text-xl tracking-tight text-foreground">
+                            {tile.description}
+                            <ArrowRight className="h-4 w-4" />
+                          </span>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+  - id: 4
+    action: implement
+    description: Swap the styles row's bare All Art link for the mega menu, and give the nav-rows block the positioning context the panel anchors to
+    file: packages/web/app/components/layout/Header.tsx
+    status: done
+    code: |-
+      // Header.tsx - styles nav, replacing the plain All Art <Link> at ~line 402.
+      //
+      // The <li> is `static` so the panel's `absolute left-0 top-full` resolves
+      // against the nav row (full width), not the list item.
+
+                    <li className="static">
+                      <AllArtMegaMenu onNavigate={closeMobileMenu} />
+                    </li>
+
+      // …and the <nav aria-label="Shop by style"> wrapper gains `relative` so
+      // top-full lands under the row rather than under the page:
+      //
+      //   className="relative transition-[transform,opacity] duration-200 motion-reduce:transition-none"
+      //
+      // Import alongside the existing SearchDrawer import:
+      //   import { AllArtMegaMenu } from './AllArtMegaMenu'
+  - id: 5
+    action: verify-pass
+    description: Component suite green, and the existing header structure test still passes
+    command: cd packages/web && npx vitest run tests/components/layout/AllArtMegaMenu.test.tsx tests/components/layout/Header.structure.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: write-test
+    description: 'E2E: hovering All Art opens the panel with five headings, a style link carries the filter through to a filtered grid, mouse-leave and Escape close it'
+    file: packages/web/tests/e2e/all-art-mega.spec.ts
+    command: npx playwright test tests/e2e/all-art-mega.spec.ts --project=chromium --no-deps
+    expected_result: PASS
+    status: done
+    code: |-
+      import { test, expect } from '@playwright/test'
+
+      test.beforeEach(async ({ page }) => {
+        await page.goto('/', { waitUntil: 'networkidle' })
+      })
+
+      const mega = (page) => page.getByTestId('all-art-mega')
+
+      test('hovering All Art opens the five filter columns', async ({ page }) => {
+        await expect(mega(page)).toHaveAttribute('data-open', 'false')
+        await mega(page).getByRole('link', { name: 'All Art', exact: true }).hover()
+        await expect(mega(page)).toHaveAttribute('data-open', 'true')
+
+        for (const heading of ['All Artwork', 'Style', 'Subject', 'Orientation', 'Color']) {
+          await expect(mega(page).getByText(heading, { exact: true })).toBeVisible()
+        }
+      })
+
+      test('a column link lands on the filtered collection', async ({ page }) => {
+        await mega(page).getByRole('link', { name: 'All Art', exact: true }).hover()
+        await mega(page).getByRole('link', { name: 'Minimalist Art' }).click()
+        await expect(page).toHaveURL(/\/posters\?.*styles=minimalist-art/)
+      })
+
+      test('Escape closes it', async ({ page }) => {
+        await mega(page).getByRole('link', { name: 'All Art', exact: true }).hover()
+        await expect(mega(page)).toHaveAttribute('data-open', 'true')
+        await page.keyboard.press('Escape')
+        await expect(mega(page)).toHaveAttribute('data-open', 'false')
+      })
+
+      test('the collection toolbar does not move when the panel opens', async ({ page }) => {
+        await page.goto('/posters', { waitUntil: 'networkidle' })
+        const toolbar = page.getByTestId('collection-toolbar')
+        const before = await toolbar.boundingBox()
+        await mega(page).getByRole('link', { name: 'All Art', exact: true }).hover()
+        await expect(mega(page)).toHaveAttribute('data-open', 'true')
+        const after = await toolbar.boundingBox()
+        expect(after?.y).toBeCloseTo(before?.y ?? 0, 0)
+      })
+  - id: 7
+    action: verify-pass
+    description: 'Full web layout suite and typecheck - the panel touches the sticky chrome that #401 and #421 pinned'
+    command: cd packages/web && npx vitest run tests/components/layout && npx tsc --noEmit -p tsconfig.json
+    expected_result: PASS - no regression in the chrome tests
+    status: done
+  - id: 8
+    action: commit
+    description: Commit the mega menu
+    command: 'git add packages/web/app/components/layout/AllArtMegaMenu.tsx packages/web/app/components/layout/Header.tsx packages/web/tests/components/layout/AllArtMegaMenu.test.tsx packages/web/tests/e2e/all-art-mega.spec.ts && git commit -m "feat(web): All Art opens the whole filter vocabulary as a mega panel"'
+    status: done
+current_step: 8
+started: '2026-08-05T13:59:39.956Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:24:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:24:00'
+      tokens: 0
+verification:
+  verified_at: '2026-08-05T14:22:32.806Z'

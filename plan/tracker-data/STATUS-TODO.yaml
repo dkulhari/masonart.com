@@ -1,10 +1,10 @@
 status: todo
-last_updated: '2026-08-05T13:53:12.222Z'
-total_tickets: 52
+last_updated: '2026-08-05T14:37:09.016Z'
+total_tickets: 42
 summary:
   critical: 1
-  high: 13
-  medium: 30
+  high: 9
+  medium: 24
   low: 8
 priorities:
   critical:
@@ -97,32 +97,6 @@ priorities:
           title: Schema - gallery membership columns and the session field
           assignee: unassigned
           blocked_by: []
-    - feature: curated-collections
-      tickets:
-        - ticket_number: 461
-          title: Shared - collection contracts, superseding the dead collectionSchema
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 462
-          title: Schema - collections and collection_products tables
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 461
-              title: Shared - collection contracts, superseding the dead collectionSchema
-        - ticket_number: 463
-          title: 'API - collection resolver: one collection to one product query'
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 461
-              title: Shared - collection contracts, superseding the dead collectionSchema
-            - ticket_number: 462
-              title: Schema - collections and collection_products tables
-        - ticket_number: 464
-          title: Seed - twelve style collections plus Latest Work and Best Sellers
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 462
-              title: Schema - collections and collection_products tables
   medium:
     - feature: go-to-production
       tickets:
@@ -145,16 +119,6 @@ priorities:
           blocked_by: []
         - ticket_number: 361
           title: 'DECISION: order numbers still use the masonart MA- prefix after the rebrand'
-          assignee: unassigned
-          blocked_by: []
-    - feature: wishlist
-      tickets:
-        - ticket_number: 417
-          title: Wishlist store fetches before it knows the session — six 401s per collection load
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 422
-          title: Web - wishlist page at /wishlist
           assignee: unassigned
           blocked_by: []
     - feature: sale-promotions
@@ -269,34 +233,6 @@ priorities:
               title: Web - dismissible sale banner with session and 7-day cooldown
     - feature: curated-collections
       tickets:
-        - ticket_number: 465
-          title: API - GET /api/collections for the Discover rail
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 463
-              title: 'API - collection resolver: one collection to one product query'
-            - ticket_number: 464
-              title: Seed - twelve style collections plus Latest Work and Best Sellers
-        - ticket_number: 466
-          title: API - GET /api/collections/:slug resolving a collection to products
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 463
-              title: 'API - collection resolver: one collection to one product query'
-        - ticket_number: 467
-          title: API - admin CRUD for collections
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 461
-              title: Shared - collection contracts, superseding the dead collectionSchema
-            - ticket_number: 462
-              title: Schema - collections and collection_products tables
-        - ticket_number: 468
-          title: API - manual membership and Discover ordering
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 467
-              title: API - admin CRUD for collections
         - ticket_number: 469
           title: Web - Discover chips become links to collections
           assignee: unassigned
@@ -470,26 +406,6 @@ blocked_tickets:
       - ticket_number: 344
         title: 'Content-Security-Policy for SSR pages (deferred from #264)'
     description: 'Content-Security-Policy for SSR pages (deferred from #264)'
-  - ticket_number: 462
-    title: Schema - collections and collection_products tables
-    blocked_by:
-      - ticket_number: 461
-        title: Shared - collection contracts, superseding the dead collectionSchema
-    description: Shared - collection contracts, superseding the dead collectionSchema
-  - ticket_number: 463
-    title: 'API - collection resolver: one collection to one product query'
-    blocked_by:
-      - ticket_number: 461
-        title: Shared - collection contracts, superseding the dead collectionSchema
-      - ticket_number: 462
-        title: Schema - collections and collection_products tables
-    description: Shared - collection contracts, superseding the dead collectionSchema, Schema - collections and collection_products tables
-  - ticket_number: 464
-    title: Seed - twelve style collections plus Latest Work and Best Sellers
-    blocked_by:
-      - ticket_number: 462
-        title: Schema - collections and collection_products tables
-    description: Schema - collections and collection_products tables
   - ticket_number: 278
     title: Set up external uptime monitoring for production
     blocked_by:
@@ -601,34 +517,6 @@ blocked_tickets:
       - ticket_number: 445
         title: Web - dismissible sale banner with session and 7-day cooldown
     description: Web - dismissible sale banner with session and 7-day cooldown
-  - ticket_number: 465
-    title: API - GET /api/collections for the Discover rail
-    blocked_by:
-      - ticket_number: 463
-        title: 'API - collection resolver: one collection to one product query'
-      - ticket_number: 464
-        title: Seed - twelve style collections plus Latest Work and Best Sellers
-    description: 'API - collection resolver: one collection to one product query, Seed - twelve style collections plus Latest Work and Best Sellers'
-  - ticket_number: 466
-    title: API - GET /api/collections/:slug resolving a collection to products
-    blocked_by:
-      - ticket_number: 463
-        title: 'API - collection resolver: one collection to one product query'
-    description: 'API - collection resolver: one collection to one product query'
-  - ticket_number: 467
-    title: API - admin CRUD for collections
-    blocked_by:
-      - ticket_number: 461
-        title: Shared - collection contracts, superseding the dead collectionSchema
-      - ticket_number: 462
-        title: Schema - collections and collection_products tables
-    description: Shared - collection contracts, superseding the dead collectionSchema, Schema - collections and collection_products tables
-  - ticket_number: 468
-    title: API - manual membership and Discover ordering
-    blocked_by:
-      - ticket_number: 467
-        title: API - admin CRUD for collections
-    description: API - admin CRUD for collections
   - ticket_number: 469
     title: Web - Discover chips become links to collections
     blocked_by:

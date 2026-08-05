@@ -1,0 +1,139 @@
+ticket_number: 464
+title: Seed - twelve style collections plus Latest Work and Best Sellers
+description: |-
+  ## Task
+
+  Seed fourteen collections so the Discover rail cannot empty out the moment it stops reading `STYLE_OPTIONS`:
+
+  - Twelve rule collections, one per `STYLE_OPTIONS` entry — slug from the style id, rule `{ styles: [id] }`, `showInDiscover: true`, `discoverOrder` following the vocabulary order.
+  - **Latest Work** — slug `new`, rule `{ sortBy: 'createdAt', sortOrder: 'desc' }`, no facets.
+  - **Best Sellers** — slug `best-selling`, rule `{ sortBy: 'salesCount', sortOrder: 'desc' }`, no facets.
+
+  Those last two are the whole point of the feature: they are the two mesonart chips that no facet vocabulary can express.
+
+  Idempotent on slug — re-running the seed must not duplicate or clobber an admin's later edits to title/image.
+
+  ## Context
+
+  Feature: curated-collections, Phase 2. Depends on the schema and the shared contracts.
+
+  Find the existing seed entry point under `packages/api/src` and follow its structure. #414 seeded settled orders and approved reviews; match that shape.
+
+  The twelve style collections preserve today's twelve chips in link form, so the storefront change is not also a content change.
+feature: curated-collections
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:49:55.457Z'
+last_updated: '2026-08-05T14:10:14.474Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - database
+  - seed
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:05:03.995Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T14:09:54.222Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:10:14.474Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4f046f15` — feat(api): seed style collections plus Latest Work and Best Sellers
+
+      **Files Changed**:
+      - `packages/api/src/database/seed-collections.ts` — new. `buildSeedCollections()` (pure, DB-free) and `seedCollections()` / `countCollections()`.
+      - `packages/api/src/database/seed.ts` — wired in after orders and reviews; summary now prints the collection count.
+      - `packages/api/tests/database/seed-collections.test.ts` — 12 tests.
+      - `packages/shared/src/index.ts` — see the gotcha below.
+
+      **A real bug this ticket surfaced, not a seed problem**
+
+      `packages/shared/src/index.ts` **enumerates schema modules** rather than re-exporting `schemas/index.ts`. #461 added the export to `schemas/index.ts` only, so `collectionRuleSchema` was unreachable through `@chobii/shared` — it imported as `undefined`, and nothing caught it because #461's own tests import from `../../src/schemas/collection` directly.
+
+      Two consequences worth carrying forward:
+      1. **Anything added under `src/schemas/` must be listed in `src/index.ts` as well.** The inner barrel is not in the resolution chain.
+      2. **`@chobii/shared` resolves through `dist/`, not `src/`.** The API and web suites read the built output, so after touching shared you must run `cd packages/shared && npx tsc -p tsconfig.json` or the consumer sees the old module. This cost two failing runs here.
+
+      **Verified against the real database, not just in unit tests**
+
+      Ran `seedCollections()` twice through bun with `.env` loaded:
+      ```
+      Collections seeded. 14 inserted, 0 already present.   run 1 inserted: 14 total: 14
+      Collections seeded. 0 inserted, 14 already present.   run 2 inserted: 0  total: 14
+      ```
+
+      Then read the rows back and resolved each through `countCollection()` from #463 — end-to-end proof that a sort-only rule resolves at all:
+
+      ```
+         9 wabi-sabi-art            5 plaster-and-texture-art    5 colorful-art
+         4 minimalist-art           5 pop-art                    6 surrealist-art
+         6 pollock-art              6 bohemian-art               5 expressionist-art
+         6 hyperrealism-art         8 graffiti-art              11 ukiyo-e-art
+        38 new                     38 best-selling
+      ```
+
+      The two sort-only collections resolve to all 38 active products, which is correct and is the case no facet-derived chip could ever produce.
+
+      **Note on running this**: do NOT use `pnpm --filter @chobii/api seed` to test it. That entry point calls `clearData()` first and truncates the catalogue, which on this shared dev database would take out every other session's work. Call `seedCollections()` directly.
+
+      **Verification**
+      - Command: `cd packages/api && npx vitest run tests/database/seed-collections.test.ts`
+      - Result: PASS — 12 tests, 0 failing
+      - Build: `cd packages/shared && npx tsc -p tsconfig.json` — clean
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 462
+    feature: curated-collections
+    description: Schema - collections and collection_products tables
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing seed tests
+    file: packages/api/tests/seed/collections-seed.test.ts
+    command: cd packages/api && npx vitest run tests/seed/collections-seed.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: produces 14 rows; one per STYLE_OPTIONS id plus ''new'' and ''best-selling''; every style rule names a style that exists in the vocabulary; the two merchandising rules carry a sort and no facets; running twice yields 14, not 28; a row whose title was edited is not reset by a second run.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && npx vitest run tests/seed/collections-seed.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Write the seed module and wire it into the seed entry point
+    status: pending
+    code: 'Derive the twelve from STYLE_OPTIONS rather than listing them — a hardcoded copy here is the drift #395 ended. Upsert on slug, only filling columns the admin has not set.'
+  - id: 4
+    action: verify-pass
+    description: Confirm the seed tests pass
+    command: cd packages/api && npx vitest run tests/seed/collections-seed.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src packages/api/tests/seed && git commit -m "feat(api): seed style collections plus Latest Work and Best Sellers (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T14:05:03.995Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/database/seed-collections.test.ts
+  test_output: '12 tests passing. Also run for real against the dev database: seedCollections() twice gave "14 inserted, 0 already present" then "0 inserted, 14 already present", total 14 both times.'
+  build_passed: true
+  build_command: cd packages/shared && npx tsc -p tsconfig.json
+  verified_at: '2026-08-05T14:09:49.999Z'
+completed: '2026-08-05T14:09:54.222Z'

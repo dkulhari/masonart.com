@@ -41,17 +41,55 @@ description: |-
 feature: curated-collections
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T13:49:55.380Z'
-last_updated: '2026-08-05T13:49:55.380Z'
+last_updated: '2026-08-05T14:01:33.672Z'
 time_spent_minutes: 0
 labels:
   - database
   - schema
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T13:57:59.979Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T14:01:19.106Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:01:33.672Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d33ad5a7` — feat(api): collections and collection_products tables
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/collections.ts` — new. `collectionKindEnum`, `collections`, `collectionProducts`, relations, inferred types.
+      - `packages/api/src/database/schema/index.ts` — barrel export.
+      - `packages/api/src/database/migrations/0005_dapper_hulk.sql` + snapshot + journal — generated, not hand-written.
+      - `packages/api/tests/database/collections.test.ts` — 28 tests.
+
+      **Summary**
+
+      Shape as designed. Two departures worth recording:
+
+      1. **`showInDiscover` and `discoverOrder` are separate columns**, not one nullable order. "In the rail" and "in position 3" are different facts, and collapsing them means an admin who toggles a collection out of the rail loses the position they picked. #468's reorder endpoint writes only the second.
+      2. **`collections_active_idx`** was added beyond the ticket's list. Every public read filters on `isActive`, including the #466 detail lookup that must 404 an inactive slug.
+
+      The generated migration touched nothing but the two new tables — no drift from other sessions' schema edits leaked in, which was the risk of generating on a shared checkout.
+
+      **Verification**
+      - Command: `cd packages/api && npx vitest run tests/database/collections.test.ts`
+      - Result: PASS — 28 tests, 0 failing
+      - Migration: `npx drizzle-kit generate` then `npx drizzle-kit migrate` with `.env` sourced. `drizzle.config.ts` does not load `.env` itself, so a bare `db:migrate` fails with `url: undefined` — source it first.
+      - Applied state read back from `information_schema` rather than trusted from the migrate output:
+        - `collections`: 16 columns, `rule` jsonb, `kind` USER-DEFINED (the enum)
+        - `collection_products`: collection_id, product_id, position
+        - indexes: `collections_pkey`, `collections_slug_unique`, `collections_discover_idx`, `collections_active_idx`, `collection_products_collection_id_product_id_pk`, `collection_products_order_idx`
+
+      **Note for #463 and #465**: the dev database is on host port **5440**. `.env` already has this right; it is `drizzle.config.ts` that needs the env sourced into the shell.
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -100,3 +138,12 @@ implementation_steps:
     command: 'git add packages/api/src/database packages/api/tests/database && git commit -m "feat(api): collections and collection_products tables (#TICKET)"'
     status: pending
 current_step: 1
+started: '2026-08-05T13:57:59.979Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/database/collections.test.ts
+  test_output: '28 tests passing. Schema-shape assertions, no live DB, per the pattern product-facet-columns.test.ts established after #387.'
+  build_passed: true
+  build_command: npx drizzle-kit generate && npx drizzle-kit migrate (migration 0005_dapper_hulk.sql), then verified against information_schema
+  verified_at: '2026-08-05T14:01:09.907Z'
+completed: '2026-08-05T14:01:19.106Z'

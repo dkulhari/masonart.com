@@ -1,0 +1,188 @@
+ticket_number: 477
+title: Guest wishlist persists locally and merges into the account on sign-in
+description: |-
+  ## Task
+
+  Saving a poster must not require an account. A signed-out visitor's hearts live in localStorage; when they sign in, that list merges into their account and the server becomes the source of truth.
+
+  This reverses one of the two deliberate decisions recorded at the top of `packages/web/app/stores/wishlist.ts` ("no `persist` middleware"). The reason it was written — a shared machine showing the *previous* user's hearts — still stands, so only the GUEST list is ever persisted; once `isAuthenticated === true` the persisted slice writes empty.
+
+  **Merge semantics**: union, never delete. Signing in adds the guest's ids to whatever the account already holds; it never removes an account id because the guest list lacked it. The local list is dropped after a successful merge — the server owns it from then on.
+
+  ## Context
+
+  #417 just landed the tri-state `isAuthenticated` (`null` = the root route has not reported yet) and the shared in-flight promise. This ticket builds on that hook rather than replacing it:
+
+  - `setAuthenticated(false)` → guest. Today it clears `ids`; it must instead keep the rehydrated local ids and mark loaded, still making zero requests.
+  - `setAuthenticated(true)` → merge the local ids, then take the server response as the id set.
+  - `toggle()` while a guest → local only, no request, no rollback path.
+
+  **API**: `POST /api/wishlist/merge` with `{ productIds: string[] }`, returning the same `{ items }` shape as `GET /` so the client merges and loads in one round trip. Do the union in SQL like the existing POST does (`packages/api/src/routes/wishlist.ts:145`) — read-modify-write races two tabs against each other. Existing shape:
+
+  ```sql
+  COALESCE(wishlist_product_ids,'{}') || ARRAY(
+    SELECT DISTINCT x FROM unnest($ids::text[]) AS x
+    WHERE NOT COALESCE(wishlist_product_ids,'{}') @> ARRAY[x]
+  )
+  ```
+
+  **Persist gotcha**: Node 25 exposes an inert `localStorage` global that shadows jsdom's, and zustand's persist captures the storage object at module init — the stub has to go in `vi.hoisted` above the store import. `packages/web/tests/stores/cart-drawer.test.ts:18` has the working pattern.
+
+  **Existing test to reverse**: `tests/stores/wishlist.test.ts` asserts the store does NOT write to localStorage. That assertion becomes "persists the guest list, and writes nothing once signed in".
+
+  Related files: `packages/web/app/stores/wishlist.ts`, `packages/web/app/lib/api.ts:2199`, `packages/api/src/routes/wishlist.ts`, `packages/api/tests/routes/wishlist.test.ts`, `packages/web/tests/stores/wishlist.test.ts`.
+feature: wishlist
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T14:12:03.235Z'
+last_updated: '2026-08-05T14:29:35.909Z'
+time_spent_minutes: 17
+labels:
+  - web
+  - api
+  - wishlist
+  - auth
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:12:18.740Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:29:33.690Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `3aea8d76` - feat(wishlist): save without an account, merge into it on sign-in
+
+      **Files Changed**:
+      - `packages/api/src/routes/wishlist.ts` — `POST /merge`, registered before `/:productId`; hydration extracted so merge and `GET /` return the identical shape
+      - `packages/api/tests/routes/wishlist.test.ts` — 8 merge cases
+      - `packages/web/app/lib/api.ts` — `wishlistApi.merge(productIds)`
+      - `packages/web/app/stores/wishlist.ts` — persist (guest-only), guest-local toggle, merge-on-sign-in
+      - `packages/web/tests/stores/wishlist.test.ts` — guest saving, merge, and the two ordering regressions
+      - `packages/web/tests/components/product/WishlistButton.test.tsx` — pins that SSR renders the heart unsaved
+      - `packages/web/tests/setup.ts` — working `localStorage` for every suite
+
+      **Two bugs the unit tests could not have found — both caught in a real browser, both now pinned by tests**:
+      1. `setAuthenticated(true)` flipped the flag before rehydration finished. `partialize` writes an empty list the moment the store counts as signed in, so the stored guest list was wiped while zustand was still reading it and the merge sent nothing. The flip now waits on `persist.onFinishHydration`.
+      2. A guest is marked `isLoaded` (nothing to wait for), which sent the merge straight into `load()`'s already-loaded guard. Signing in now clears `isLoaded`.
+
+      **Decisions**:
+      - Merge is a **union, never a delete** — one device's list cannot remove what the account holds.
+      - `returning()` on the update, so the response reflects the column rather than the payload a concurrent tab never saw.
+      - Payload capped at 500 ids; the union is built from bound parameters, not string concatenation.
+      - A guest toggle is local and final — no request, so no rollback path.
+
+      **Verification**:
+      - API: `bunx vitest run tests/routes/wishlist.test.ts` — PASS (28 tests)
+      - Web: `bunx vitest run tests/stores tests/components` — PASS (50 files, 1057 tests)
+      - Typecheck: 0 errors in touched files (web has 22 pre-existing admin-route errors, unchanged)
+      - Browser, live dev server + Postgres: guest saves 2 posters → **0** `/api/wishlist` requests, survives a reload, no hydration errors; registers → `POST /api/wishlist/merge` fires → both hearts come back filled from the account and localStorage is emptied.
+
+      **Note**: the API unit tests mock `db`, so the union SQL itself is only exercised by that browser run.
+  - author: system
+    timestamp: '2026-08-05T14:29:34.204Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T14:12:20.310Z'
+    agent: claude-code
+    summary: Guest wishlist in localStorage + POST /api/wishlist/merge on sign-in. Two ordering bugs found in the browser (premature flag flip wiping storage; guest isLoaded blocking the merge) fixed and pinned by tests. Commit 3aea8d76.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T14:29:35.906Z'
+    duration: '00:17:15'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'API: tests for POST /api/wishlist/merge — union with the existing account list, dedupe within the payload, idempotent on repeat, 401 for a guest, 400 for a malformed id'
+    file: packages/api/tests/routes/wishlist.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/wishlist.test.ts
+    expected_result: FAIL - route does not exist (404)
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm the merge cases fail against the current route
+    command: cd packages/api && bunx vitest run tests/routes/wishlist.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: 'Add the merge route: zod-validated body, SQL union, then the same hydration select GET / uses so the response is { items }'
+    file: packages/api/src/routes/wishlist.ts
+    status: done
+  - id: 4
+    action: verify-pass
+    description: API merge tests green
+    command: cd packages/api && bunx vitest run tests/routes/wishlist.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: write-test
+    description: 'Store tests: guest toggle persists and makes no request; rehydrated guest ids survive setAuthenticated(false); setAuthenticated(true) merges the local ids then takes the server list; the persisted slice is empty once signed in; merge failure leaves the local list intact'
+    file: packages/web/tests/stores/wishlist.test.ts
+    command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 6
+    action: verify-fail
+    description: Confirm the new store cases fail
+    command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 7
+    action: implement
+    description: Add wishlistApi.merge(productIds) alongside list/count/add/remove
+    file: packages/web/app/lib/api.ts
+    status: done
+  - id: 8
+    action: implement
+    description: 'Store: persist middleware with a partialize that writes ids only while not signed in; guest-local toggle; merge-on-sign-in in setAuthenticated(true)'
+    file: packages/web/app/stores/wishlist.ts
+    status: done
+  - id: 9
+    action: verify-pass
+    description: Store, button and header tests green
+    command: cd packages/web && bunx vitest run tests/stores/wishlist.test.ts tests/components/product/WishlistButton.test.tsx tests/components/layout/Header.structure.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 10
+    action: verify-pass
+    description: 'Browser: a guest hearts a poster, reloads, and the heart is still filled with zero /api/wishlist requests'
+    command: vite dev + a scripted chromium run counting /api/wishlist requests
+    expected_result: PASS - heart survives reload, 0 requests
+    status: done
+  - id: 11
+    action: commit
+    description: Commit the API endpoint, client and store together
+    status: done
+current_step: 11
+started: '2026-08-05T14:12:18.740Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:17:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:17:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: 'web: bunx vitest run tests/stores tests/components — 50 files, 1057 tests; api: bunx vitest run tests/routes/wishlist.test.ts — 28 tests'
+  test_output: 'All passing. Browser: guest saves 2 posters with 0 /api/wishlist requests, survives reload; sign-up fires POST /api/wishlist/merge and both hearts come back filled from the account.'
+  build_passed: true
+  build_command: tsc --noEmit (web + api) — 0 errors in touched files, 22 pre-existing admin-route errors in web
+  verified_at: '2026-08-05T14:29:20.005Z'
+completed: '2026-08-05T14:29:34.204Z'

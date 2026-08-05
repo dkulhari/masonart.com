@@ -24,18 +24,53 @@ description: |-
 feature: curated-collections
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T13:49:55.334Z'
-last_updated: '2026-08-05T13:49:55.334Z'
+last_updated: '2026-08-05T13:57:52.622Z'
 time_spent_minutes: 0
 labels:
   - database
   - schema
   - shared
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T13:54:19.346Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T13:57:35.921Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T13:57:52.621Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `050944ab` — feat(shared): collection contracts, superseding the orphan collectionSchema
+
+      **Files Changed**:
+      - `packages/shared/src/schemas/collection.ts` — new. collectionKindSchema, collectionRuleSchema, curatedCollectionSchema, createCollectionSchema, updateCollectionSchema, plus collectionMembersSchema and discoverOrderSchema for the admin write shapes #468 needs.
+      - `packages/shared/src/schemas/index.ts` — barrel export, after `./product` so the name collision reads in the right order.
+      - `packages/shared/src/schemas/product.ts` — `@deprecated` block over the orphan `collectionSchema`.
+      - `packages/shared/tests/schemas/collection.test.ts` — 18 tests.
+
+      **Summary**
+
+      The rule reuses the API's own vocabulary rather than inventing one: facet arrays validate through the zod enums already exported from `constants/facets.ts`, and `collectionSortFieldSchema` mirrors the sort enum in `packages/api/src/routes/products.ts:137`. A rule naming a style nothing can be tagged with now fails at authoring time instead of rendering an empty page, and a sort field the list query cannot order by fails at save time instead of 500-ing at request time.
+
+      `kind`/`rule` agreement is a `superRefine` shared by all three shapes. On the partial patch it tests `!== undefined` rather than truthiness, so "not being changed" and "explicitly cleared" stay distinguishable.
+
+      **Two things worth recording for the tickets downstream**
+
+      1. The empty rule `{}` is legal and means "every active product, default order". That is what makes a sort-only collection — Latest Work, Best Sellers — expressible at all, and it is the whole reason the feature is not just a facet id.
+      2. `imageUrl` being null vs set is not cosmetic. #465 has to report which one the chip got: product `main` images are matted at a fixed fraction of the longest side and `chipArtScale()` compensates, but an admin upload is not matted and the same factor crops into it. The doc comment on the field says so.
+
+      **Verification**
+      - Command: `cd packages/shared && npx vitest run tests/schemas/`
+      - Result: PASS — 5 files, 418 tests, 0 failing
+      - `tests/schemas/collection.test.ts (18 tests)`; product.test.ts still 152, so deprecating the old schema broke nothing
+      - Build: `npx tsc --noEmit -p tsconfig.json` clean
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -80,3 +115,12 @@ implementation_steps:
     command: 'git add packages/shared/src/schemas packages/shared/tests/schemas && git commit -m "feat(shared): collection contracts, superseding the orphan collectionSchema (#TICKET)"'
     status: pending
 current_step: 1
+started: '2026-08-05T13:54:19.346Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/shared && npx vitest run tests/schemas/
+  test_output: 5 test files, 418 tests passing. tests/schemas/collection.test.ts contributes 18 new ones; the existing 152 product tests, including the ones covering the now-deprecated collectionSchema, still pass.
+  build_passed: true
+  build_command: cd packages/shared && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T13:57:32.351Z'
+completed: '2026-08-05T13:57:35.921Z'

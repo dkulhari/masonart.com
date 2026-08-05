@@ -1,0 +1,144 @@
+ticket_number: 465
+title: API - GET /api/collections for the Discover rail
+description: |-
+  ## Task
+
+  Public list endpoint feeding the rail and anything else that needs the collection inventory.
+
+  `GET /api/collections?discover=true` returns active collections ordered by `discoverOrder`, each with:
+
+  - id, slug, title, subtitle
+  - `count` — resolved product count (rule or manual)
+  - `image` — `imageUrl` when the admin set one, else the main image of a representative product, else null
+  - `imageIsMatted` — true only for the product fallback
+
+  That last flag matters: `chipArtScale()` in `DiscoverChips.tsx` exists because product `main` images are matted at a fixed fraction of the longest side. An admin-uploaded image is not matted, and scaling it by the same factor crops into it wrongly. The API is where the two cases are distinguishable, so say so here rather than guessing in the component.
+
+  Drop collections that resolve to zero products — a chip leading to an empty grid is worse than no chip (the rule #406 already established).
+
+  Cache it the way `collections:v2` is cached today, under a new key.
+
+  ## Context
+
+  Feature: curated-collections, Phase 3.
+
+  This supersedes `GET /api/products/collections` (#406) at `packages/api/src/routes/products.ts:601`. Leave the old route in place for now; the web ticket removes its last caller and a later step deletes it.
+
+  Keep #406's representative-product assignment logic — it hands each product to at most one chip so the rail does not show the same picture three times.
+feature: curated-collections
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:49:55.492Z'
+last_updated: '2026-08-05T14:20:09.421Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:10:19.511Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T14:19:46.809Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:20:09.421Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `95dfbc22` — feat(api): GET /api/collections for the Discover rail
+
+      **Files Changed**:
+      - `packages/api/src/routes/collections.ts` — new. `GET /` with `?discover=true`.
+      - `packages/api/src/lib/collection-imagery.ts` — new. `assignRepresentatives` (pure), `representativesFor`, `candidateDepth`, `mainImagesByProductId` (for #466).
+      - `packages/api/src/lib/redis.ts` — added `CacheKeys.COLLECTION`.
+      - `packages/api/src/index.ts` — mounted at `/api/collections`.
+      - `packages/api/tests/routes/collections.test.ts` (8), `packages/api/tests/lib/collection-imagery.test.ts` (7).
+
+      **A real bug caught by reading the live endpoint, not by a test**
+
+      First live response served **12 distinct images across 14 chips** — `new`, `best-selling` and `bohemian-art` all showed the same artwork.
+
+      Cause: `CANDIDATES_PER_COLLECTION = 5`, inherited from #406 where twelve style chips drew on ~40 products. Latest Work and Best Sellers resolve to the *entire* catalogue, so their shortlists were identical to each other and overlapped every style collection's. Both exhausted their five and hit the `shortlist[0]` fallback, landing on a product `bohemian-art` had already claimed.
+
+      Fixed with `candidateDepth(cohortSize) = max(5, cohortSize)`. A collection can lose at most `cohort - 1` candidates to those picking before it, so a shortlist of `cohort` guarantees a free pick. Verified against the live database: **14 of 14 distinct**.
+
+      A regression test now covers the shape (`finds a free candidate when only the head of the shortlist is taken`). Worth noting the original test suite passed with the bug present — the pure assignment was correct all along; the shortlist feeding it was too short.
+
+      **⚠️ The running dev API on :3000 is serving stale code**
+
+      `bun run --hot src/index.ts`, up 26 hours, does not re-evaluate `src/lib/collection-imagery.ts`. It picked up the *new* route and mount fine, but keeps the old lib module:
+
+      | | distinct images |
+      |---|---|
+      | module invoked directly (bun, same DB) | **14 of 14** ✅ |
+      | HTTP `:3000` after cache bust + touch | 12 of 14 ❌ |
+
+      Not a code problem — the same inputs give the right answer off the filesystem. **#469 and #470 need this process restarted before any browser verification**, or they will be checking month-old module state. Left running rather than killed, because other sessions are using it.
+
+      **Design note carried into the payload**: `imageIsMatted` is on the wire because the client cannot infer it, and `orientation` is nulled when the admin supplied the image. Getting this wrong means scaling an unmatted upload by the mat-compensation factor and cropping into it.
+
+      **Verification**
+      - Command: `cd packages/api && npx vitest run tests/routes/collections.test.ts tests/lib/collection-imagery.test.ts`
+      - Result: PASS — 15 tests, 0 failing
+      - Wider run `tests/routes/collections.test.ts tests/routes/product-collections.test.ts tests/lib/`: 427/428. The one failure is `tests/lib/redis.test.ts > should set and get string value`, a live-Redis round-trip. **Pre-existing and flaky**: checked out `redis.ts` at HEAD and the same suite failed **5** tests; with this change it fails 1. My diff adds a constant to `CacheKeys` and cannot affect `setCached`/`getCached`.
+      - Build: `npx tsc --noEmit` — 0 errors in the new modules
+
+      **Repo hazard hit while working**: `packages/web/app/routeTree.gen.ts` was left `UU` (unmerged) by a concurrent session, which breaks `git stash` and any index write. Committed with `git commit -- <paths>` so the other session's staged files were not swept in.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 463
+    feature: curated-collections
+    description: 'API - collection resolver: one collection to one product query'
+  - ticket: 464
+    feature: curated-collections
+    description: Seed - twelve style collections plus Latest Work and Best Sellers
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing endpoint tests
+    file: packages/api/tests/routes/collections.test.ts
+    command: cd packages/api && npx vitest run tests/routes/collections.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: returns only active collections; discover=true filters and orders by discoverOrder; counts are right for both kinds; admin imageUrl wins over the product fallback and reports imageIsMatted false; the fallback reports true; zero-product collections are dropped; response is cached and the second call reports fromCache.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && npx vitest run tests/routes/collections.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the route and mount it
+    file: packages/api/src/routes/collections.ts
+    status: pending
+    code: Hono app; reuse the resolver for counts; lift the representative-product query from products.ts:601. Mount with app.route('/api/collections', collectionsApp) in packages/api/src/index.ts.
+  - id: 4
+    action: verify-pass
+    description: Confirm the endpoint tests pass
+    command: cd packages/api && npx vitest run tests/routes/collections.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/collections.ts packages/api/src/index.ts packages/api/tests/routes/collections.test.ts && git commit -m "feat(api): GET /api/collections for the Discover rail (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T14:10:19.511Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/routes/collections.test.ts tests/lib/collection-imagery.test.ts
+  test_output: '15 tests passing (8 route, 7 imagery). Also exercised against the live dev database: 14 chips, 14 distinct representative images after the shortlist-depth fix.'
+  build_passed: true
+  build_command: cd packages/api && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T14:19:39.187Z'
+completed: '2026-08-05T14:19:46.809Z'

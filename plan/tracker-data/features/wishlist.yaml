@@ -1,7 +1,7 @@
 name: wishlist
 title: Wishlist
 priority: high
-created: "2026-01-28T07:45:54.375Z"
+created: '2026-01-28T07:45:54.375Z'
 assignee: unassigned
 tags: []
 description: |-
@@ -45,21 +45,26 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 2
+  total_duration: '00:22:00'
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 2
+      duration: '00:22:00'
+      tokens: 0
 tickets:
-  todo:
-    "417": Wishlist store fetches before it knows the session — six 401s per collection load
-    "422": Web - wishlist page at /wishlist
-  in_progress: {}
+  todo: {}
+  in_progress:
+    '422': Web - wishlist page at /wishlist
   done:
-    "387": API - wishlist routes over the existing users column
-    "388": Web - wishlistApi client and a hydration-safe useWishlist store
-    "389": Web - heart on ProductCard and ProductDetail, count badge in the header
-total_tickets: 5
-completion_percentage: 60
+    '387': API - wishlist routes over the existing users column
+    '388': Web - wishlistApi client and a hydration-safe useWishlist store
+    '389': Web - heart on ProductCard and ProductDetail, count badge in the header
+    '417': Wishlist store fetches before it knows the session — six 401s per collection load
+    '477': Guest wishlist persists locally and merges into the account on sign-in
+total_tickets: 6
+completion_percentage: 83
 is_completed: false
 design:
   approach: Thin REST over the existing users.wishlistProductIds array column — no new table. Auth-required Hono sub-app following the notification-preferences pattern, a hydration-safe Zustand store, and an optimistic heart on ProductCard/ProductDetail plus a header count badge. Scoped to what mesonart parity needs; the wishlist page itself defers to Phase F.
@@ -67,9 +72,9 @@ design:
     - No new table — wishlistProductIds text[] already exists. A join table is the better model at scale (per-row timestamps, cheap per-product save counts for PDP social proof) but is not worth a migration for an affordance and a badge; revisit when Phase E wants real saves counters.
     - Toggle at the UI edge, two endpoints behind it — the heart is one control with two states.
     - Optimistic UI with rollback; a heart that waits on a round-trip feels broken.
-    - "Hydration-safe count mirroring useCartHydration — rendering a count before hydration is what caused the cart badge SSR mismatch in #498."
+    - 'Hydration-safe count mirroring useCartHydration — rendering a count before hydration is what caused the cart badge SSR mismatch in #498.'
     - Filled heart is text-foreground, not red — the storefront token guard forbids reaching outside the palette and --sale is reserved for sale prices.
     - Dangling ids from deleted products are dropped by the list endpoint rather than 404ing the whole request.
     - Wishlist page deferred to Phase F, where the analysis puts /apps/wishlist. Parity needs the affordance and the count, not the destination.
   approved: true
-  approved_at: "2026-08-04T07:08:52.329Z"
+  approved_at: '2026-08-04T07:08:52.329Z'
