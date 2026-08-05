@@ -257,14 +257,29 @@ export const productsApi = {
   async collections(): Promise<{
     collections: Array<{
       id: string;
-      label: string;
+      /** The URL segment — chips link at /collections/$slug. */
+      slug: string;
+      title: string;
+      subtitle: string | null;
       count: number;
       image: string | null;
+      /**
+       * Whether `image` is a matted product photo rather than one the admin
+       * uploaded. The client cannot infer this, and getting it wrong crops
+       * into an uploaded picture — see DiscoverChips.
+       */
+      imageIsMatted: boolean;
       /** Orientation of the product the image came from — drives the chip crop. */
       orientation: string | null;
     }>;
   }> {
-    const response = await fetch(`${getApiUrl()}/api/products/collections`, {
+    /**
+     * `/api/collections`, not `/api/products/collections`. The rail reads the
+     * collections table now, so it can carry subjects, orientations and the
+     * two sort-driven entries a style vocabulary could never name. #474
+     * retires the old endpoint.
+     */
+    const response = await fetch(`${getApiUrl()}/api/collections?discover=true`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
@@ -502,6 +517,83 @@ export const productsApi = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || "Failed to fetch products by IDs");
+    }
+
+    return response.json();
+  },
+};
+
+// ============================================================================
+// Collections API
+// ============================================================================
+
+export interface CollectionSummary {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  kind: "rule" | "manual";
+  seoTitle: string | null;
+  seoDescription: string | null;
+}
+
+/**
+ * A curated collection resolved to a page of products.
+ *
+ * Same page shape as GET /api/products, plus the collection itself and facet
+ * counts scoped to it. The scoping matters: catalogue-wide counts would offer
+ * a shopper filters that return nothing inside the collection they are
+ * standing in.
+ */
+export const collectionsApi = {
+  async detail(
+    slug: string,
+    params: ProductFilters = {}
+  ): Promise<{
+    collection: CollectionSummary;
+    /**
+     * The sort the API actually applied. A collection can BE a sort — Best
+     * Sellers is `salesCount desc` — and the rule is not in the public
+     * payload, so the toolbar cannot work this out for itself.
+     */
+    appliedSort: { sortBy: string; sortOrder: string };
+    items: Record<string, unknown>[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    facets: Record<string, Array<{ value: string; count: number }>>;
+  }> {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        query.set(key, String(value));
+      }
+    }
+
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    const response = await fetch(
+      `${getApiUrl()}/api/collections/${encodeURIComponent(slug)}${suffix}`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    if (!response.ok) {
+      /**
+       * 404 is a real answer here — an unknown or inactive slug — and the
+       * route turns it into a not-found page rather than an error boundary.
+       */
+      const error = new Error(
+        response.status === 404 ? "Collection not found" : "Failed to fetch collection"
+      ) as Error & { status?: number };
+      error.status = response.status;
+      throw error;
     }
 
     return response.json();

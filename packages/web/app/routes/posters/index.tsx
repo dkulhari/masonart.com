@@ -17,10 +17,8 @@ import {
   Link,
 } from '@tanstack/react-router'
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
 import { productsApi, type ProductFilters as ProductFiltersType } from '~/lib/api'
 import {
-  buildActiveFilterTags,
   countActiveFilters,
   type ActiveFilterKey,
 } from '~/lib/activeFilters'
@@ -42,6 +40,9 @@ import {
   type DiscoverCollection,
 } from '~/components/product/DiscoverChips'
 import { PromoTile } from '~/components/product/PromoTile'
+// Extracted in #470 so /collections/$slug shares them rather than copying.
+import { ActiveFilterTags } from '~/components/product/ActiveFilterTags'
+import { MobileFiltersSheet } from '~/components/product/MobileFiltersSheet'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
 import { Button } from '~/components/ui/Button'
@@ -674,23 +675,13 @@ function PostersPage() {
         Discover rail (analysis §1.3.2). Between the header band and the
         toolbar, where mesonart puts it.
 
-        Selection is folded into the existing filter handler rather than
-        navigated directly: router.tsx overrides TanStack's search
-        serialisation, so a hand-built search object skips the comma-joining
-        that validateSearch expects and error-boundaries the route.
+        The chips navigate to /collections/$slug rather than toggling a filter
+        here. No chip is ever marked current on this page — /posters is not a
+        collection, it is the whole catalogue.
       */}
       {collections.length > 0 && (
         <div className="container-wide pt-6">
-          <DiscoverChips
-            collections={collections}
-            activeStyle={filters.styles?.[0]}
-            onSelect={(styleId) =>
-              handleFiltersChange({
-                ...filters,
-                styles: styleId ? [styleId] : [],
-              })
-            }
-          />
+          <DiscoverChips collections={collections} />
         </div>
       )}
 
@@ -930,144 +921,5 @@ function PageHeader() {
         {COLLECTION_DESCRIPTION}
       </p>
     </SectionBand>
-  )
-}
-
-// ============================================================================
-// Active Filter Tags Component
-// ============================================================================
-
-interface ActiveFilterTagsProps {
-  filters: FilterState
-  onRemoveFilter: (key: ActiveFilterKey, value?: string) => void
-  onClearAll: () => void
-  /**
-   * `wrap` is the sheet's stacked block. `row` is the toolbar's single line
-   * (#454): it may not wrap, because the bar's height is the 5rem the rail's
-   * sticky offset is pinned against, and a second line puts the rail behind
-   * the bar. Overflow scrolls sideways instead — see CollectionToolbar.
-   */
-  variant?: 'wrap' | 'row'
-}
-
-function ActiveFilterTags({
-  filters,
-  onRemoveFilter,
-  onClearAll,
-  variant = 'wrap',
-}: ActiveFilterTagsProps) {
-  /**
-   * One derivation, shared with the badge (#453). Written out by hand here,
-   * this list covered four of the ten facet groups and neither of the two
-   * booleans — and the badge that gated it covered a different subset again.
-   */
-  const tags = buildActiveFilterTags(filters)
-
-  if (tags.length === 0) return null
-
-  const isRow = variant === 'row'
-
-  return (
-    <div
-      data-testid="active-filter-tags"
-      className={cn(
-        'flex items-center gap-2',
-        isRow ? 'flex-nowrap' : 'flex-wrap'
-      )}
-    >
-      <span
-        className={cn(
-          'text-sm text-muted-foreground',
-          isRow && 'shrink-0 whitespace-nowrap'
-        )}
-      >
-        Active filters:
-      </span>
-      {tags.map((tag, index) => (
-        <button
-          key={`${tag.key}-${tag.value}-${index}`}
-          type="button"
-          onClick={() => onRemoveFilter(tag.key, tag.value)}
-          className={cn(
-            'flex items-center gap-1 rounded-full border border-border bg-background px-3 py-1 text-sm capitalize transition-colors hover:bg-muted',
-            // A chip that shrinks to fit the row loses its label before it
-            // loses the row; the row scrolls instead.
-            isRow && 'shrink-0 whitespace-nowrap'
-          )}
-        >
-          {tag.label}
-          <X className="h-3.5 w-3.5" />
-        </button>
-      ))}
-      <button
-        type="button"
-        onClick={onClearAll}
-        className={cn(
-          'text-sm text-muted-foreground hover:text-foreground',
-          isRow && 'shrink-0 whitespace-nowrap'
-        )}
-      >
-        Clear all
-      </button>
-    </div>
-  )
-}
-
-// ============================================================================
-// Mobile Filters Sheet Component
-// ============================================================================
-
-interface MobileFiltersSheetProps {
-  isOpen: boolean
-  onClose: () => void
-  filters: FilterState
-  onFiltersChange: (filters: FilterState) => void
-}
-
-function MobileFiltersSheet({
-  isOpen,
-  onClose,
-  filters,
-  onFiltersChange,
-}: MobileFiltersSheetProps) {
-  // Prevent body scroll when sheet is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-
-    return () => {
-      document.body.style.overflow = ''
-    }
-  }, [isOpen])
-
-  if (!isOpen) return null
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50 bg-black/50 transition-opacity lg:hidden"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Sheet */}
-      <div
-        className="fixed inset-y-0 right-0 z-50 w-[85vw] max-w-sm bg-background shadow-xl transition-transform lg:hidden"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Filters"
-      >
-        <ProductFilters
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          isMobile
-          onClose={onClose}
-        />
-      </div>
-    </>
   )
 }

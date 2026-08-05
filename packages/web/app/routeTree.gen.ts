@@ -34,6 +34,7 @@ import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-passw
 import { Route as CartIndexRouteImport } from './routes/cart/index'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout/index'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout/success'
+import { Route as CollectionsSlugRouteImport } from './routes/collections/$slug'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as GalleryIndexRouteImport } from './routes/gallery/index'
 import { Route as PostersIndexRouteImport } from './routes/posters/index'
@@ -181,6 +182,11 @@ const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
   path: '/checkout/success',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CollectionsSlugRoute = CollectionsSlugRouteImport.update({
+  id: '/collections/$slug',
+  path: '/collections/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CreateIndexRoute = CreateIndexRouteImport.update({
   id: '/create/',
   path: '/create/',
@@ -317,6 +323,7 @@ export interface FileRoutesByFullPath {
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/collections/$slug': typeof CollectionsSlugRoute
   '/posters/$slug': typeof PostersSlugRoute
   '/track/$token': typeof TrackTokenRoute
   '/admin/': typeof AdminIndexRoute
@@ -364,6 +371,7 @@ export interface FileRoutesByTo {
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/collections/$slug': typeof CollectionsSlugRoute
   '/posters/$slug': typeof PostersSlugRoute
   '/track/$token': typeof TrackTokenRoute
   '/admin': typeof AdminIndexRoute
@@ -414,6 +422,7 @@ export interface FileRoutesById {
   '/auth/register': typeof AuthRegisterRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/collections/$slug': typeof CollectionsSlugRoute
   '/posters/$slug': typeof PostersSlugRoute
   '/track/$token': typeof TrackTokenRoute
   '/admin/': typeof AdminIndexRoute
@@ -464,6 +473,7 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/auth/reset-password'
     | '/checkout/success'
+    | '/collections/$slug'
     | '/posters/$slug'
     | '/track/$token'
     | '/admin/'
@@ -511,6 +521,7 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/auth/reset-password'
     | '/checkout/success'
+    | '/collections/$slug'
     | '/posters/$slug'
     | '/track/$token'
     | '/admin'
@@ -560,6 +571,7 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/auth/reset-password'
     | '/checkout/success'
+    | '/collections/$slug'
     | '/posters/$slug'
     | '/track/$token'
     | '/admin/'
@@ -606,6 +618,7 @@ export interface RootRouteChildren {
   AuthRegisterRoute: typeof AuthRegisterRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
+  CollectionsSlugRoute: typeof CollectionsSlugRoute
   PostersSlugRoute: typeof PostersSlugRoute
   TrackTokenRoute: typeof TrackTokenRoute
   CartIndexRoute: typeof CartIndexRoute
@@ -791,6 +804,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout/success'
       fullPath: '/checkout/success'
       preLoaderRoute: typeof CheckoutSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections/$slug': {
+      id: '/collections/$slug'
+      path: '/collections/$slug'
+      fullPath: '/collections/$slug'
+      preLoaderRoute: typeof CollectionsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/create/': {
@@ -1048,6 +1068,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRegisterRoute: AuthRegisterRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
+  CollectionsSlugRoute: CollectionsSlugRoute,
   PostersSlugRoute: PostersSlugRoute,
   TrackTokenRoute: TrackTokenRoute,
   CartIndexRoute: CartIndexRoute,

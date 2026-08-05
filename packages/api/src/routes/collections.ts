@@ -479,6 +479,15 @@ collectionsApp.get("/:slug", async (c) => {
 
     return c.json({
       collection: publicCollection(collection),
+      /**
+       * The sort actually applied, so the toolbar can name it.
+       *
+       * Not derivable on the client: the rule is not in the public payload, so
+       * a collection that IS a sort — Best Sellers — rendered "Newest First"
+       * over a list ordered by units sold. The label has to come from whoever
+       * resolved it.
+       */
+      appliedSort: sort,
       items,
       total,
       page: query.page,
