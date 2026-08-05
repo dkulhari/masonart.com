@@ -50,6 +50,13 @@
       "when": 1785947070744,
       "tag": "0006_common_venom",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785964581250,
+      "tag": "0007_marvelous_king_cobra",
+      "breakpoints": true
     }
   ]
 }

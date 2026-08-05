@@ -42,3 +42,6 @@ export * from "./approvals";
 
 // Curated collections and their manual membership
 export * from "./collections";
+
+// Sale promotions, their product scope and their exclusions
+export * from "./promotions";
