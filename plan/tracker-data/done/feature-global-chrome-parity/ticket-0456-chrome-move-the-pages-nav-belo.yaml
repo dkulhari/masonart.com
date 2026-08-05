@@ -1,0 +1,79 @@
+ticket_number: 456
+title: Chrome - move the pages nav below the wordmark line and add Best Sellers / New In
+description: |-
+  ## Problem
+
+  Nav row 1 shared the 64px bar with the wordmark and the cart. Mesonart stacks it BELOW that line (analysis §1.1: "Header row — centered wordmark + right cluster" then "Nav row 1 — pages"). Sharing the bar capped row 1 at four links, which is what blocks adding the rest of the §3.5 page inventory later.
+
+  ## Change
+
+  `packages/web/app/components/layout/Header.tsx`:
+
+  - Pulled `pages-nav` out of the compact bar. The bar is now wordmark + actions only, `md:justify-end` — the wordmark is absolutely centred at that width, so the actions cluster is the only child left in flow and `justify-between` alone stranded it at the left edge.
+  - New sticky wrapper below `<header>` holds row 1 (pages, centred) then row 2 (styles). Both stay OUTSIDE `<header>`: inside the sticky box they stand it ~140px tall and swallow the collection toolbar, which is the #401 regression.
+  - `useChromeOffset` now measures the wrapper rather than the styles row, so both rows count and a third row would need no new number. `stylesRowRef` -> `navRowsRef`.
+  - Row 1 scrolls (`overflow-x-auto`) and `NavLink` is `whitespace-nowrap`, so added links will not wrap to two lines.
+  - Added **Best Sellers** and **New In** to row 1 and to the mobile drawer. Neither needs a route: both are `/posters` under a sort the toolbar already offers.
+
+  ```ts
+  const BEST_SELLERS_SEARCH = { sortBy: 'salesCount', sortOrder: 'desc' }
+  const NEW_IN_SEARCH = { sortBy: 'createdAt', sortOrder: 'desc' }
+  ```
+
+  Both ids exist verbatim in `SORT_OPTIONS` (`components/product/CollectionToolbar.tsx`), and a test asserts the pairing — renaming a sort id now breaks the nav loudly instead of silently. `NavLink` gained a `search` prop; `MobileNavLink` already had one. Passing `search` wholesale also clears active facets, which is what a top-level nav entry should do.
+
+  Row 1 reads: Posters · Best Sellers · New In · Create · Gallery · About
+
+  ## Verification
+
+  Measured headless at 1440x900 on `/posters`:
+
+  | state | header | pages | styles | toolbar | --chrome-offset |
+  |---|---|---|---|---|---|
+  | top | y36 h65 | y101 | y138 | y632 | 138px |
+  | scrolled down | y0 h65 | hidden | hidden | y64 | 64px |
+  | scrolled up mid-page | y0 h65 | y64 | y101 | y138 | 138px |
+
+  Header never exceeds 65px; the toolbar always lands at or below the revealed chrome.
+
+  Link behaviour, clicked in-browser:
+
+  - Best Sellers -> `/posters?sortBy=salesCount&sortOrder=desc`, toolbar reads "Sort by: Best selling", API call `?page=1&pageSize=24&sortBy=salesCount&sortOrder=desc`
+  - New In -> `/posters?sortBy=createdAt&sortOrder=desc`, toolbar reads "Sort by: Newest First"
+
+  ## Known and deliberate
+
+  **New In never renders as the active link.** `createdAt-desc` is the collection default and the route strips default sort params from the URL, so the link's search is never a subset of the current search. Kept anyway: arriving from a filtered or differently-sorted view, it resets to newest rather than quietly keeping whatever sort was in play.
+
+  **The §3.5 pages are still not linked.** Artists index, artist detail, Reviews, Sale/promo, Trade, Commission art, Gift card, Blog and Wishlist have no routes in `packages/web/app/routes/`. Linking them now is nine 404s and a typed-route failure. This ticket makes the room; the pages have to land first.
+feature: global-chrome-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T11:20:14.970Z'
+last_updated: '2026-08-05T11:20:28.079Z'
+time_spent_minutes: 0
+labels:
+  - web
+  - header
+  - mesonart-parity
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T11:20:28.079Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+verification:
+  tests_passed: true
+  test_command: npx vitest run tests/components/layout/Header.structure.test.tsx (packages/web) && npx playwright test tests/e2e/header-reveal.spec.ts --project=chromium --no-deps
+  test_output: 'Header.structure.test.tsx: 24/24 passed (was 22; +2 for the sort-vocabulary pairing). header-reveal.spec.ts: 7/7 passed. Run with --no-deps: the auth setup project''s admin/trade login failures are pre-existing and unrelated.'
+  build_passed: true
+  build_command: npx tsc --noEmit -p packages/web/tsconfig.json
+  verified_at: '2026-08-05T11:20:23.542Z'
+completed: '2026-08-05T11:20:28.079Z'

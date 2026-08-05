@@ -46,6 +46,21 @@ import { SearchDrawer } from './SearchDrawer'
 export const HEADER_HEIGHT_CLASS = 'h-16'
 
 /**
+ * The two row-1 entries that are a sort, not a page.
+ *
+ * Both ids exist in `SORT_OPTIONS` (`salesCount-desc`, `createdAt-desc`) —
+ * these are the same contract split at the hyphen, so a nav entry and the sort
+ * dropdown always mean the same thing.
+ *
+ * `createdAt-desc` is also the collection's default, so New In and a bare
+ * `/posters` land on the same list. Naming it anyway is the point: arriving
+ * from a filtered or differently-sorted view, the link resets to newest rather
+ * than quietly keeping whatever sort was in play.
+ */
+const BEST_SELLERS_SEARCH = { sortBy: 'salesCount', sortOrder: 'desc' }
+const NEW_IN_SEARCH = { sortBy: 'createdAt', sortOrder: 'desc' }
+
+/**
  * Header component for the chobii.art e-commerce platform.
  * Provides main navigation, cart access, and user authentication links.
  * Responsive design with mobile hamburger menu.
@@ -63,11 +78,12 @@ export function Header() {
   // brings both nav rows back wherever the page happens to be (#421).
   const isNavRevealed = useNavReveal()
 
-  // The revealed styles row pushes everything sticky below it down, rather
+  // The revealed nav rows push everything sticky below them down, rather
   // than landing on top of it — the collection toolbar's Hide-filters button
-  // is the first casualty otherwise.
-  const stylesRowRef = useRef<HTMLElement>(null)
-  useChromeOffset(stylesRowRef, isNavRevealed)
+  // is the first casualty otherwise. Measured on the wrapper, so it covers
+  // both rows at once and nothing has to know how many rows there are.
+  const navRowsRef = useRef<HTMLDivElement>(null)
+  useChromeOffset(navRowsRef, isNavRevealed)
 
   // Session comes from the root route's beforeLoad; staff get an entry into
   // the staff area, labelled for what their role can actually reach (#362).
@@ -150,7 +166,12 @@ export function Header() {
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container-wide">
-        <div className="relative flex h-16 items-center justify-between">
+        {/* The compact bar. Wordmark + actions only — the pages row moved out
+            below it (mesonart puts nav under the wordmark line, not beside
+            it), which is also what frees this row to carry more links.
+            `md:justify-end` because the wordmark is absolute at that width, so
+            the actions cluster is the only child left in flow. */}
+        <div className="relative flex h-16 items-center justify-between md:justify-end">
           {/* Wordmark.
            *
            * Absolutely centred on desktop so it stays centred regardless of
@@ -169,36 +190,6 @@ export function Header() {
               chobii.art
             </span>
           </Link>
-
-          {/* Desktop Navigation — nav row 1.
-           *
-           * Hidden rather than unmounted while collapsed: the wordmark is
-           * absolutely centred and the actions cluster is justified right, so
-           * keeping this row's box in the layout is what stops the compact bar
-           * from reflowing on every reveal. `invisible` (not just opacity)
-           * takes the links out of the tab order too. */}
-          <nav
-            data-testid="pages-nav"
-            data-revealed={isNavRevealed}
-            className={cn(
-              'hidden transition-opacity duration-200 motion-reduce:transition-none md:flex md:items-center md:space-x-6',
-              isNavRevealed ? 'opacity-100' : 'invisible opacity-0'
-            )}
-          >
-            <NavLink to="/posters" onClick={closeMobileMenu}>
-              Posters
-            </NavLink>
-            <NavLink to="/create" onClick={closeMobileMenu}>
-              <Sparkles className="mr-1.5 h-4 w-4" />
-              Create
-            </NavLink>
-            <NavLink to="/gallery" onClick={closeMobileMenu}>
-              Gallery
-            </NavLink>
-            <NavLink to="/about" onClick={closeMobileMenu}>
-              About
-            </NavLink>
-          </nav>
 
           {/* Desktop Actions */}
           <div className="hidden md:flex md:items-center md:space-x-4">
@@ -297,38 +288,35 @@ export function Header() {
         onClose={() => setIsSearchOpen(false)}
       />
 
-      {/* Nav row 2 — styles.
+      {/* Nav rows 1 and 2 — pages, then styles.
        *
-       * Generated from STYLE_OPTIONS in @chobii/shared, the same list the
-       * schema, the API validation, the seed and the filter sidebar read.
-       * Twelve hardcoded links here would restart the drift #395 ended.
-       *
-       * Scrolls rather than wraps: twelve links overflow a laptop, and three
-       * wrapped lines of nav pushes the page content below the fold.
+       * Both live BELOW the wordmark line, the way mesonart stacks them, not
+       * beside it. Row 1 used to share the 64px bar with the wordmark and the
+       * cart, which capped it at four links; a row of its own is what makes
+       * room for the rest of the page inventory (§3.5 of the parity analysis).
        *
        * OUTSIDE <header> on purpose. The header is `sticky top-0` and the
-       * collection toolbar is `sticky top-16` — if this row were inside the
-       * sticky box the header would stand 101px tall and swallow the
-       * toolbar. Here it sticks on its own account and the sticky box stays
-       * one row.
+       * collection toolbar offsets against `HEADER_HEIGHT_CLASS` — if these
+       * rows were inside the sticky box the header would stand ~140px tall and
+       * swallow the toolbar (#401). Here they stick on their own account and
+       * the sticky box stays one row.
        *
        * `sticky top-16` rather than plain flow (#421): a row that has scrolled
        * away can only come back at the top of the page, and the whole point is
-       * that scrolling up returns it mid-grid. At scroll 0 its natural offset
+       * that scrolling up returns it mid-grid. At scroll 0 the natural offset
        * is already 64px, so pinning changes nothing there.
        *
-       * Collapsed it translates up behind the header (z-40 under the header's
-       * z-50) and goes `invisible`, which is also what drops its twelve links
-       * out of the tab order.
+       * Collapsed the block translates up behind the header (z-40 under the
+       * header's z-50) and goes `invisible`, which is what drops both rows'
+       * links out of the tab order.
        *
-       * Revealed it does not cover what is below it: its measured height goes
-       * out as `--chrome-offset` and the collection toolbar moves down by the
-       * same amount, in the same 200ms. */}
-      <nav
-        ref={stylesRowRef}
-        aria-label="Shop by style"
-        data-testid="styles-nav"
-        data-revealed={isNavRevealed}
+       * Revealed it does not cover what is below it: the wrapper's measured
+       * height — both rows, whatever they currently are — goes out as
+       * `--chrome-offset` and the collection toolbar moves down by the same
+       * amount, in the same 200ms. Measuring the wrapper rather than one row
+       * is what keeps a second row from needing a second number. */}
+      <div
+        ref={navRowsRef}
         className={cn(
           'sticky top-16 z-40 hidden border-b border-border bg-background transition-[transform,opacity] duration-200 motion-reduce:transition-none md:block',
           isNavRevealed
@@ -336,30 +324,104 @@ export function Header() {
             : 'invisible -translate-y-full opacity-0'
         )}
       >
-        <div className="container-wide">
-          <ul className="scrollbar-hide flex items-center gap-6 overflow-x-auto py-2">
-            <li>
-              <Link
-                to="/posters"
-                className="whitespace-nowrap text-nav text-muted-foreground transition-colors hover:text-foreground"
-              >
-                All Art
-              </Link>
-            </li>
-            {STYLE_OPTIONS.map((style) => (
-              <li key={style.id}>
+        {/* Nav row 1 — pages. Centred under the wordmark. */}
+        <nav
+          aria-label="Pages"
+          data-testid="pages-nav"
+          data-revealed={isNavRevealed}
+          className="border-b border-border/60"
+        >
+          <div className="container-wide">
+            <ul className="scrollbar-hide flex items-center justify-center gap-6 overflow-x-auto py-2">
+              <li>
+                <NavLink to="/posters" onClick={closeMobileMenu}>
+                  Posters
+                </NavLink>
+              </li>
+              {/* Best Sellers and New In are mesonart's own row-1 entries, and
+                  neither needs a page of its own: both are `/posters` under a
+                  sort the toolbar already offers, so the nav and the sort
+                  dropdown cannot disagree about what either word means.
+                  `SORT_OPTIONS` carries the same two ids.
+                  Passing `search` wholesale also clears any active facets,
+                  which is what a top-level nav entry should do. */}
+              <li>
+                <NavLink
+                  to="/posters"
+                  search={BEST_SELLERS_SEARCH}
+                  onClick={closeMobileMenu}
+                >
+                  Best Sellers
+                </NavLink>
+              </li>
+              <li>
+                <NavLink
+                  to="/posters"
+                  search={NEW_IN_SEARCH}
+                  onClick={closeMobileMenu}
+                >
+                  New In
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/create" onClick={closeMobileMenu}>
+                  <Sparkles className="mr-1.5 h-4 w-4" />
+                  Create
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/gallery" onClick={closeMobileMenu}>
+                  Gallery
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/about" onClick={closeMobileMenu}>
+                  About
+                </NavLink>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        {/* Nav row 2 — styles.
+         *
+         * Generated from STYLE_OPTIONS in @chobii/shared, the same list the
+         * schema, the API validation, the seed and the filter sidebar read.
+         * Twelve hardcoded links here would restart the drift #395 ended.
+         *
+         * Scrolls rather than wraps: twelve links overflow a laptop, and three
+         * wrapped lines of nav pushes the page content below the fold. */}
+        <nav
+          aria-label="Shop by style"
+          data-testid="styles-nav"
+          data-revealed={isNavRevealed}
+          className="transition-[transform,opacity] duration-200 motion-reduce:transition-none"
+        >
+          <div className="container-wide">
+            <ul className="scrollbar-hide flex items-center gap-6 overflow-x-auto py-2">
+              <li>
                 <Link
                   to="/posters"
-                  search={{ styles: style.id }}
                   className="whitespace-nowrap text-nav text-muted-foreground transition-colors hover:text-foreground"
                 >
-                  {style.label}
+                  All Art
                 </Link>
               </li>
-            ))}
-          </ul>
-        </div>
-      </nav>
+              {STYLE_OPTIONS.map((style) => (
+                <li key={style.id}>
+                  <Link
+                    to="/posters"
+                    search={{ styles: style.id }}
+                    className="whitespace-nowrap text-nav text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    {style.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </nav>
+      </div>
 
       {/* Mobile Navigation
        *
@@ -397,6 +459,20 @@ export function Header() {
               <div className="container-wide flex flex-col space-y-3">
               <MobileNavLink to="/posters" onClick={closeMobileMenu}>
                 Posters
+              </MobileNavLink>
+              <MobileNavLink
+                to="/posters"
+                search={BEST_SELLERS_SEARCH}
+                onClick={closeMobileMenu}
+              >
+                Best Sellers
+              </MobileNavLink>
+              <MobileNavLink
+                to="/posters"
+                search={NEW_IN_SEARCH}
+                onClick={closeMobileMenu}
+              >
+                New In
               </MobileNavLink>
               <MobileNavLink to="/create" onClick={closeMobileMenu}>
                 <Sparkles className="mr-2 h-4 w-4" />
@@ -436,18 +512,21 @@ export function Header() {
  */
 function NavLink({
   to,
+  search,
   children,
   onClick,
 }: {
   to: string
+  search?: Record<string, unknown>
   children: React.ReactNode
   onClick?: () => void
 }) {
   return (
     <Link
       to={to}
+      search={search}
       onClick={onClick}
-      className="flex items-center text-nav font-medium text-muted-foreground transition-colors hover:text-foreground"
+      className="flex items-center whitespace-nowrap text-nav font-medium text-muted-foreground transition-colors hover:text-foreground"
       activeProps={{
         className: 'text-foreground',
       }}
