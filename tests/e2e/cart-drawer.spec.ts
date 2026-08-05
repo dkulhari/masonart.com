@@ -168,13 +168,18 @@ test.describe('Cart Drawer - contents', () => {
 });
 
 test.describe('Cart Drawer - empty state', () => {
-  test('offers a way back into the catalogue', async ({ page }) => {
+  test('offers collections to start from', async ({ page }) => {
     await page.goto('/', { waitUntil: 'networkidle' });
     await cartButton(page).click();
 
-    await expect(drawer(page).getByText(/your cart is empty/i)).toBeVisible();
     await expect(
-      drawer(page).getByRole('link', { name: /browse posters/i })
-    ).toHaveAttribute('href', '/posters');
+      drawer(page).getByText(/your cart is currently empty/i)
+    ).toBeVisible();
+    await expect(drawer(page).getByText(/not sure where to start/i)).toBeVisible();
+
+    // The chips are the header's own sorts, so they land on a real list
+    // rather than a route invented for the empty state.
+    await drawer(page).getByRole('link', { name: 'Best Sellers' }).click();
+    await expect(page).toHaveURL(/\/posters\?sortBy=salesCount&sortOrder=desc/);
   });
 });

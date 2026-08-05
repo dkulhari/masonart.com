@@ -137,7 +137,26 @@ describe('CartDrawer', () => {
   it('shows the empty state when there is nothing in the cart', () => {
     render(<CartDrawer />)
 
-    expect(screen.getByText(/your cart is empty/i)).toBeInTheDocument()
+    expect(screen.getByText(/your cart is currently empty/i)).toBeInTheDocument()
+  })
+
+  it('offers collections rather than one Browse button when empty', () => {
+    // Theirs answers "empty cart" with somewhere to go. A single CTA back to
+    // /posters returns the user to where they already were.
+    render(<CartDrawer />)
+
+    expect(screen.getByText(/not sure where to start/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Best Sellers' })
+    ).toHaveAttribute('href', '/posters?sortBy=salesCount&sortOrder=desc')
+    expect(screen.getByRole('link', { name: 'New In' })).toHaveAttribute(
+      'href',
+      '/posters?sortBy=createdAt&sortOrder=desc'
+    )
+    expect(screen.getByRole('link', { name: 'All Art' })).toHaveAttribute(
+      'href',
+      '/posters'
+    )
   })
 
   it('lists the items and links on to checkout and the cart page', () => {

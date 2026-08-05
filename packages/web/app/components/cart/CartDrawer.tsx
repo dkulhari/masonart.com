@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useCallback, useRef } from 'react'
-import { X, ShoppingCart, ArrowRight, ShoppingBag } from 'lucide-react'
+import { X, ShoppingCart, ArrowRight } from 'lucide-react'
 import { Button, buttonVariants } from '~/components/ui/Button'
 import { cn, formatPrice } from '~/lib/utils'
 import {
@@ -217,26 +217,53 @@ export function CartDrawer({ className }: CartDrawerProps) {
 // Empty State
 // ============================================================================
 
+/**
+ * Where an empty cart sends you.
+ *
+ * Theirs offers collections rather than one Browse button, which is the better
+ * answer to "my cart is empty": a single CTA back to the full catalogue is
+ * where the user already was. Ours are the two sorts the header nav already
+ * names, so nothing here invents a destination — `salesCount-desc` and
+ * `createdAt-desc` are `SORT_OPTIONS` ids the collection route validates.
+ */
+const EMPTY_CART_COLLECTIONS = [
+  { label: 'Best Sellers', href: '/posters?sortBy=salesCount&sortOrder=desc' },
+  { label: 'New In', href: '/posters?sortBy=createdAt&sortOrder=desc' },
+  { label: 'All Art', href: '/posters' },
+]
+
 function EmptyCartState({ onClose }: { onClose: () => void }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-        <ShoppingBag className="h-8 w-8 text-muted-foreground" />
-      </div>
-      <h3 className="mb-2 text-lg font-semibold text-foreground">
-        Your cart is empty
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
+      {/*
+        Their copy and their type: "Your cart is currently empty." set in
+        Urbanist 300 at 32px. The old line was a 18px semibold sentence over a
+        grey shopping-bag circle — an icon theirs does not have, in a weight
+        the storefront retired.
+      */}
+      <h3 className="font-heading text-[2rem] font-light leading-tight text-foreground">
+        Your cart is currently empty.
       </h3>
-      <p className="mb-6 text-sm text-muted-foreground">
-        Discover our collection of premium posters and custom frames
+      <p className="text-base text-foreground">
+        Not sure where to start?
+        <br />
+        Try these collections:
       </p>
-      <a
-        href="/posters"
-        className={buttonVariants({ size: 'pill' })}
-        onClick={onClose}
-      >
-        Browse Posters
-        <ArrowRight className="h-4 w-4" />
-      </a>
+      <ul className="grid w-full max-w-[280px] gap-3">
+        {EMPTY_CART_COLLECTIONS.map((collection) => (
+          <li key={collection.href}>
+            <a
+              href={collection.href}
+              onClick={onClose}
+              // Their chip: 12px radius, 12/20 padding, and the same 2.4%
+              // near-black tint the Quickview's inputs use.
+              className="block rounded-xl bg-foreground/[0.024] px-5 py-3 text-base text-foreground transition-colors hover:bg-foreground/[0.06]"
+            >
+              {collection.label}
+            </a>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
