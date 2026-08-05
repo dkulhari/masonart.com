@@ -17,6 +17,7 @@ initSentry();
 import { auth } from "./auth";
 import { productsApp } from "./routes/products";
 import { collectionsApp } from "./routes/collections";
+import { adminCollectionsApp } from "./routes/admin/collections";
 import { cartApp } from "./routes/cart";
 import { ordersApp } from "./routes/orders";
 import { aiApp } from "./routes/ai";
@@ -179,6 +180,9 @@ app.route("/api/approvals", approvalsApp);
 
 // Admin Products API - CRUD for products
 app.route("/api/admin/products", adminProductsApp);
+
+// Admin Collections API - curated collection CRUD
+app.route("/api/admin/collections", adminCollectionsApp);
 
 // Admin Orders API - order management
 app.route("/api/admin/orders", adminOrdersApp);
