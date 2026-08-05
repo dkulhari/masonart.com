@@ -77,6 +77,52 @@ describe('the sticky offset contract', () => {
     // nothing moves, the toolbar hides behind it.
     expect(src).toContain('HEADER_HEIGHT_CLASS')
   })
+
+  it('keeps the sticky box one row tall even while revealing (#421)', () => {
+    // The reveal must not grow the sticky box: `h-16` is the number the
+    // toolbar pins against, and #401 is what happens when the two drift.
+    expect(src).toMatch(/HEADER_HEIGHT_CLASS = 'h-16'/)
+  })
+})
+
+describe('scroll reveal (#421)', () => {
+  it('drives the rows off scroll direction, not scroll position', () => {
+    // Position alone ("show under 100px") strands the nav until the user
+    // drags all the way back to the top.
+    expect(src).toContain('useNavReveal')
+    expect(src).toContain('isNavRevealed')
+  })
+
+  it('collapses and reveals both nav rows together', () => {
+    // The compact bar is wordmark + actions; the pages row goes with the
+    // styles row, not on its own schedule.
+    expect(src).toContain('data-testid="pages-nav"')
+    expect(src).toContain('data-testid="styles-nav"')
+    expect(src.match(/data-revealed=\{isNavRevealed\}/g) ?? []).toHaveLength(2)
+  })
+
+  it('sticks the styles row under the compact bar so it can return mid-page', () => {
+    // Left in normal flow it can only ever come back at the top of the page.
+    expect(src).toMatch(/sticky top-16/)
+  })
+
+  it('takes the collapsed rows out of the tab order', () => {
+    // A row translated out of sight is still focusable; `invisible` is what
+    // removes it from the tab order without deleting the animation.
+    expect(src).toContain('invisible')
+  })
+
+  it('respects prefers-reduced-motion', () => {
+    expect(src).toContain('motion-reduce:transition-none')
+  })
+
+  it('keeps the styles row OUTSIDE <header> (#401)', () => {
+    // Inside the sticky box it stands the header 101px tall and swallows the
+    // collection toolbar — the exact regression #401 fixed.
+    const headerClose = src.indexOf('</header>')
+    const stylesRow = src.indexOf('data-testid="styles-nav"')
+    expect(stylesRow).toBeGreaterThan(headerClose)
+  })
 })
 
 describe('vocabulary size', () => {

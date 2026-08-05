@@ -10,6 +10,8 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { cn } from '~/lib/utils'
+import { useNavReveal } from '~/hooks/useNavReveal'
 import { useCartItemCount, useCartHydration } from '~/stores/cart'
 import { useWishlistCount, useWishlistActions, useWishlistStore } from '~/stores/wishlist'
 import {
@@ -28,8 +30,14 @@ import { SearchDrawer } from './SearchDrawer'
  * them: grow the header without moving the toolbar and the toolbar hides
  * behind it.
  *
- * The styles row is deliberately NOT counted here. It scrolls away with the
- * page rather than sticking, so the sticky box stays one row tall.
+ * The styles row is deliberately NOT counted here. It sticks BELOW this box on
+ * its own (#421) rather than inside it, so the header stays one row tall and
+ * the toolbar's offset never moves — the reveal changes what is visible, not
+ * how tall the sticky box is. The revealed styles row therefore passes over
+ * the toolbar for as long as the user is scrolling up; that is the trade the
+ * ticket sanctioned ("pin the toolbar to the collapsed height") and it is far
+ * safer than a runtime-varying offset, which is what put the toolbar 37px
+ * behind the header in #401.
  */
 export const HEADER_HEIGHT_CLASS = 'h-16'
 
@@ -46,6 +54,10 @@ export function Header() {
   const wishlistCount = useWishlistCount()
   const { load: loadWishlist } = useWishlistActions()
   const isWishlistLoaded = useWishlistStore((state) => state.isLoaded)
+
+  // Scroll down leaves the compact bar — wordmark and actions; scroll up
+  // brings both nav rows back wherever the page happens to be (#421).
+  const isNavRevealed = useNavReveal()
 
   // Session comes from the root route's beforeLoad; staff get an entry into
   // the staff area, labelled for what their role can actually reach (#362).
@@ -148,8 +160,21 @@ export function Header() {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex md:items-center md:space-x-6">
+          {/* Desktop Navigation — nav row 1.
+           *
+           * Hidden rather than unmounted while collapsed: the wordmark is
+           * absolutely centred and the actions cluster is justified right, so
+           * keeping this row's box in the layout is what stops the compact bar
+           * from reflowing on every reveal. `invisible` (not just opacity)
+           * takes the links out of the tab order too. */}
+          <nav
+            data-testid="pages-nav"
+            data-revealed={isNavRevealed}
+            className={cn(
+              'hidden transition-opacity duration-200 motion-reduce:transition-none md:flex md:items-center md:space-x-6',
+              isNavRevealed ? 'opacity-100' : 'invisible opacity-0'
+            )}
+          >
             <NavLink to="/posters" onClick={closeMobileMenu}>
               Posters
             </NavLink>
@@ -274,10 +299,27 @@ export function Header() {
        * OUTSIDE <header> on purpose. The header is `sticky top-0` and the
        * collection toolbar is `sticky top-16` — if this row were inside the
        * sticky box the header would stand 101px tall and swallow the
-       * toolbar. Here it scrolls away and the sticky box stays one row. */}
+       * toolbar. Here it sticks on its own account and the sticky box stays
+       * one row.
+       *
+       * `sticky top-16` rather than plain flow (#421): a row that has scrolled
+       * away can only come back at the top of the page, and the whole point is
+       * that scrolling up returns it mid-grid. At scroll 0 its natural offset
+       * is already 64px, so pinning changes nothing there.
+       *
+       * Collapsed it translates up behind the header (z-40 under the header's
+       * z-50) and goes `invisible`, which is also what drops its twelve links
+       * out of the tab order. */}
       <nav
         aria-label="Shop by style"
-        className="hidden border-b border-border bg-background md:block"
+        data-testid="styles-nav"
+        data-revealed={isNavRevealed}
+        className={cn(
+          'sticky top-16 z-40 hidden border-b border-border bg-background transition-[transform,opacity] duration-200 motion-reduce:transition-none md:block',
+          isNavRevealed
+            ? 'translate-y-0 opacity-100'
+            : 'invisible -translate-y-full opacity-0'
+        )}
       >
         <div className="container-wide">
           <ul className="scrollbar-hide flex items-center gap-6 overflow-x-auto py-2">

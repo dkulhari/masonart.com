@@ -127,11 +127,11 @@ export function CollectionToolbar({
 
   return (
     <div
+      data-testid="collection-toolbar"
       className={cn(
         // The site header is `sticky top-0` at h-16 (4rem). Anything at top-0
-        // here would sit behind it.
-        // The site header is `sticky top-0` at h-16 (4rem). Anything at top-0
-        // here would sit behind it.
+        // here would sit behind it. The header keeps that height while its nav
+        // rows reveal and collapse (#421), so this offset stays a constant.
         //
         // No bottom rule: theirs has none, and the count reads as a caption to
         // the row above it once a line is drawn under it.
