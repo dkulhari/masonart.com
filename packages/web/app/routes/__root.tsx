@@ -16,6 +16,7 @@ import { AnnouncementBar } from '~/components/layout/AnnouncementBar'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
 import { CartDrawer } from '~/components/cart/CartDrawer'
+import { ReviewToast } from '~/components/reviews/ReviewToast'
 import { buttonVariants } from '~/components/ui/Button'
 import { cn } from '~/lib/utils'
 import { useWishlistStore } from '~/stores/wishlist'
@@ -274,6 +275,16 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         </div>
         {/* Mounted once at the root so any surface can open the cart (#460) */}
         {!isAdminRoute && <CartDrawer />}
+        {/**
+         * After the outlet, so it paints above page content, and before the
+         * drawer, which owns the higher z-index. Mounted once here rather than
+         * per route so it fetches one page for the whole visit and survives
+         * navigation. It suppresses ITSELF on /checkout and /admin — the check
+         * lives in the component, ahead of its data hook, so a suppressed route
+         * makes no request at all. Do not add a second gate here; one rule, one
+         * place, one test.
+         */}
+        <ReviewToast />
         <Scripts />
       </body>
     </html>
