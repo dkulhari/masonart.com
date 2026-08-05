@@ -16,6 +16,7 @@ import {
   type ProductDetailData,
 } from '~/components/product/ProductDetail'
 import { ProductReviews, ProductReviewsSkeleton } from '~/components/product/ProductReviews'
+import { ReviewMediaWall } from '~/components/product/ReviewMediaWall'
 import type { SizeVariant } from '~/components/product/SizeSelector'
 import type { FrameOptionData } from '~/components/product/FrameSelector'
 
@@ -299,6 +300,10 @@ function ProductPage() {
 
       {/* Main Product Detail */}
       <ProductDetail product={product} />
+
+      {/* Customer media, then the written reviews — mesonart's order. The wall
+          renders nothing at all when this product has no photos or clips. */}
+      <ReviewMediaWall productId={product.id} />
 
       {/* Customer Reviews Section */}
       <ProductReviews productId={product.id} />
