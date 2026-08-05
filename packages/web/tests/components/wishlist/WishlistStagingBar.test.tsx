@@ -107,10 +107,20 @@ describe('copying', () => {
   })
 })
 
+/**
+ * Creating now sits behind the destination chooser (#508): the wishlist can be
+ * saved as a NEW collection or over an existing one, and the choice is made at
+ * save time rather than carried from wherever the products were loaded.
+ */
+const openCreate = async () => {
+  fireEvent.click(screen.getByRole('button', { name: /Save as collection/i }))
+  fireEvent.click(await screen.findByRole('button', { name: /New collection/i }))
+}
+
 describe('creating a collection', () => {
   it('posts a manual collection, then its ordered membership', async () => {
     renderBar('admin')
-    fireEvent.click(screen.getByRole('button', { name: /Create collection/i }))
+    await openCreate()
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
 
@@ -127,7 +137,7 @@ describe('creating a collection', () => {
 
   it('lands on the new collection edit form so it can be named', async () => {
     renderBar('admin')
-    fireEvent.click(screen.getByRole('button', { name: /Create collection/i }))
+    await openCreate()
 
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith(
@@ -147,7 +157,7 @@ describe('creating a collection', () => {
     )
 
     renderBar('admin')
-    fireEvent.click(screen.getByRole('button', { name: /Create collection/i }))
+    await openCreate()
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy())
     expect(navigate).not.toHaveBeenCalled()
@@ -160,7 +170,7 @@ describe('an empty wishlist', () => {
 
     expect(screen.getByRole('button', { name: /Copy IDs/i })).toBeDisabled()
     expect(
-      screen.getByRole('button', { name: /Create collection/i })
+      screen.getByRole('button', { name: /Save as collection/i })
     ).toBeDisabled()
   })
 })
