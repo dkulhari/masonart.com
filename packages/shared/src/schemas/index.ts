@@ -28,3 +28,6 @@ export * from './user';
 
 // AI generation schemas
 export * from './ai';
+
+// Promotion schemas
+export * from './promotion';
