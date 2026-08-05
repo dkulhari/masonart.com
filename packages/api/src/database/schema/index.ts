@@ -25,6 +25,9 @@ export * from "./wallet";
 // Product reviews and ratings
 export * from "./reviews";
 
+// Customer photo/video attached to product reviews
+export * from "./review-media";
+
 // Shipping options and order shipments
 export * from "./shipping";
 

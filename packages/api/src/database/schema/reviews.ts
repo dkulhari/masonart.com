@@ -14,6 +14,7 @@ import { relations } from "drizzle-orm";
 import { products } from "./products";
 import { users } from "./users";
 import { orderItems } from "./orders";
+import { reviewMedia } from "./review-media";
 
 // ============================================================================
 // Enums
@@ -99,7 +100,7 @@ export const reviews = pgTable(
 /**
  * Reviews relations
  */
-export const reviewsRelations = relations(reviews, ({ one }) => ({
+export const reviewsRelations = relations(reviews, ({ one, many }) => ({
   product: one(products, {
     fields: [reviews.productId],
     references: [products.id],
@@ -118,6 +119,8 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
     fields: [reviews.orderItemId],
     references: [orderItems.id],
   }),
+  // Customer photos and videos attached to this review
+  media: many(reviewMedia),
 }));
 
 // ============================================================================
