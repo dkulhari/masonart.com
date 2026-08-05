@@ -125,6 +125,18 @@ describe('placement', () => {
     // hidden behind it.
     expect(root.className).toMatch(/top-1[0-9]|top-\[/)
   })
+
+  it('follows the revealed chrome rather than a fixed offset (#421)', () => {
+    // The header's nav rows reveal on scroll up. Pinned to the collapsed
+    // height, the revealed styles row lands on top of the Hide-filters button.
+    const { container } = render(<CollectionToolbar {...defaults} />)
+    const root = container.firstElementChild as HTMLElement
+
+    expect(root.className).toContain('top-[var(--chrome-offset)]')
+    // Moves with the reveal instead of jumping under it.
+    expect(root.className).toContain('transition-[top]')
+    expect(root.className).toContain('motion-reduce:transition-none')
+  })
 })
 
 /**

@@ -130,12 +130,19 @@ export function CollectionToolbar({
       data-testid="collection-toolbar"
       className={cn(
         // The site header is `sticky top-0` at h-16 (4rem). Anything at top-0
-        // here would sit behind it. The header keeps that height while its nav
-        // rows reveal and collapse (#421), so this offset stays a constant.
+        // here would sit behind it.
+        //
+        // `--chrome-offset` rather than a fixed `top-16` (#421): the header's
+        // styles row reveals on scroll up, and pinned to the collapsed height
+        // this row keeps its place while the revealed nav lands on top of the
+        // Hide-filters button. The variable is the bar plus whatever is
+        // currently revealed, measured by useChromeOffset; globals.css carries
+        // the 4rem fallback for the server-rendered pass.
         //
         // No bottom rule: theirs has none, and the count reads as a caption to
         // the row above it once a line is drawn under it.
-        'sticky top-16 z-30 flex items-center gap-4 bg-background/95 py-3 backdrop-blur',
+        'sticky top-[var(--chrome-offset)] z-30 flex items-center gap-4 bg-background/95 py-3 backdrop-blur',
+        'transition-[top] duration-200 motion-reduce:transition-none',
         className
       )}
     >

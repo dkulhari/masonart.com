@@ -101,6 +101,56 @@ test.describe('header nav reveal', () => {
       expect(headerBox!.height).toBeLessThanOrEqual(65);
     }
   });
+
+  test('pushes the toolbar down instead of covering it', async ({ page }) => {
+    const stylesNav = page.getByTestId('styles-nav');
+    const toolbar = page.getByTestId('collection-toolbar');
+
+    await scrollBy(page, 1600);
+    await scrollBy(page, -300);
+    await expect(stylesNav).toHaveAttribute('data-revealed', 'true');
+
+    const stylesBox = await stylesNav.boundingBox();
+    const toolbarBox = await toolbar.boundingBox();
+    expect(stylesBox).not.toBeNull();
+    expect(toolbarBox).not.toBeNull();
+
+    // Below the revealed row, not underneath it.
+    expect(toolbarBox!.y).toBeGreaterThanOrEqual(
+      stylesBox!.y + stylesBox!.height - 1
+    );
+  });
+
+  test('leaves the Hide filters button clickable while the nav is revealed', async ({
+    page,
+  }) => {
+    // The reported bug: the revealed row landed on the button.
+    const filtersToggle = page.getByRole('button', {
+      name: /Hide filters|Show filters/,
+    });
+
+    await scrollBy(page, 1600);
+    await scrollBy(page, -300);
+
+    await expect(filtersToggle).toBeVisible();
+
+    // Visible is not enough — something on top of it would still be "visible".
+    const ownsItsCentre = await filtersToggle.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        box.x + box.width / 2,
+        box.y + box.height / 2
+      );
+      return el.contains(hit) || el === hit;
+    });
+    expect(ownsItsCentre).toBe(true);
+
+    // And it still works.
+    await filtersToggle.click();
+    await expect(
+      page.getByRole('button', { name: /Show filters/ })
+    ).toBeVisible();
+  });
 });
 
 test.describe('header nav reveal, reduced motion', () => {

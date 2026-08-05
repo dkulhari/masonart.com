@@ -5,6 +5,18 @@
 /* CSS Variables for shadcn/ui theming */
 @layer base {
   :root {
+    /**
+     * How tall the sticky chrome is right now — the compact header bar plus
+     * whatever of the nav rows is revealed (#421).
+     *
+     * useChromeOffset measures and republishes this on every reveal; this
+     * value is the collapsed fallback, and it is what the server-rendered
+     * pass uses before any client code runs. Consumed by CollectionToolbar
+     * and the collection filter rail, which must sit below the chrome rather
+     * than under it.
+     */
+    --chrome-offset: 4rem;
+
     /* Base Colors */
     --background: 0 0% 100%;
     /* Measured mesonart foreground: rgb(23 23 23) == neutral-900 */

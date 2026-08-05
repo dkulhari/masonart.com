@@ -116,6 +116,13 @@ describe('scroll reveal (#421)', () => {
     expect(src).toContain('motion-reduce:transition-none')
   })
 
+  it('publishes the measured chrome height for what sticks below it', () => {
+    // Otherwise the revealed row lands on top of the collection toolbar and
+    // takes the Hide-filters button with it.
+    expect(src).toContain('useChromeOffset')
+    expect(src).toContain('stylesRowRef')
+  })
+
   it('keeps the styles row OUTSIDE <header> (#401)', () => {
     // Inside the sticky box it stands the header 101px tall and swallows the
     // collection toolbar — the exact regression #401 fixed.

@@ -9,9 +9,10 @@ import {
   X,
   Sparkles,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { useNavReveal } from '~/hooks/useNavReveal'
+import { useChromeOffset } from '~/hooks/useChromeOffset'
 import { useCartItemCount, useCartHydration } from '~/stores/cart'
 import { useWishlistCount, useWishlistActions, useWishlistStore } from '~/stores/wishlist'
 import {
@@ -31,13 +32,16 @@ import { SearchDrawer } from './SearchDrawer'
  * behind it.
  *
  * The styles row is deliberately NOT counted here. It sticks BELOW this box on
- * its own (#421) rather than inside it, so the header stays one row tall and
- * the toolbar's offset never moves — the reveal changes what is visible, not
- * how tall the sticky box is. The revealed styles row therefore passes over
- * the toolbar for as long as the user is scrolling up; that is the trade the
- * ticket sanctioned ("pin the toolbar to the collapsed height") and it is far
- * safer than a runtime-varying offset, which is what put the toolbar 37px
- * behind the header in #401.
+ * its own (#421) rather than inside it, so the sticky box itself stays one row
+ * tall whatever the reveal is doing.
+ *
+ * What the toolbar offsets against is therefore not this constant alone but
+ * `--chrome-offset` — this bar plus whatever of the styles row is currently
+ * revealed, measured and published by `useChromeOffset`. Pinning the toolbar
+ * to the collapsed height instead is what buried the Hide-filters button under
+ * the revealed row; hardcoding a second number here is what put the toolbar
+ * 37px behind the header in #401. Measure, publish, and let one number drive
+ * both.
  */
 export const HEADER_HEIGHT_CLASS = 'h-16'
 
@@ -58,6 +62,12 @@ export function Header() {
   // Scroll down leaves the compact bar — wordmark and actions; scroll up
   // brings both nav rows back wherever the page happens to be (#421).
   const isNavRevealed = useNavReveal()
+
+  // The revealed styles row pushes everything sticky below it down, rather
+  // than landing on top of it — the collection toolbar's Hide-filters button
+  // is the first casualty otherwise.
+  const stylesRowRef = useRef<HTMLElement>(null)
+  useChromeOffset(stylesRowRef, isNavRevealed)
 
   // Session comes from the root route's beforeLoad; staff get an entry into
   // the staff area, labelled for what their role can actually reach (#362).
@@ -309,8 +319,13 @@ export function Header() {
        *
        * Collapsed it translates up behind the header (z-40 under the header's
        * z-50) and goes `invisible`, which is also what drops its twelve links
-       * out of the tab order. */}
+       * out of the tab order.
+       *
+       * Revealed it does not cover what is below it: its measured height goes
+       * out as `--chrome-offset` and the collection toolbar moves down by the
+       * same amount, in the same 200ms. */}
       <nav
+        ref={stylesRowRef}
         aria-label="Shop by style"
         data-testid="styles-nav"
         data-revealed={isNavRevealed}
