@@ -34,15 +34,15 @@
  * seeded review than the one setup cleared. That mistake cost the seed a
  * review and three media rows once; it is why `createdReviewId` exists.
  *
- * ## Why it is currently fixme'd
+ * ## It was fixme'd until #493
  *
- * #493. `/account/orders/$id` never renders — `orders.tsx` is a leaf page that
- * file-based routing has made the PARENT of `orders.$id.tsx`, and it has no
- * `<Outlet />`, so every child URL renders the order LIST instead. That route
- * is the only mount point of ReviewModal, so the flow below has no reachable
- * entry point in the app. Nothing here is weakened to accommodate that: the
- * spec is the acceptance test for #493, and removing the `fixme` is what
- * closes it.
+ * `/account/orders/$id` never rendered — `orders.tsx` was a leaf page that
+ * file-based routing had made the PARENT of `orders.$id.tsx`, and it had no
+ * `<Outlet />`, so every child URL rendered the order LIST instead. That route
+ * is the only mount point of ReviewModal, so this flow had no reachable entry
+ * point in the app. Nothing was ever weakened to accommodate that; the spec is
+ * the acceptance test for #493, and the routing guard below is the assertion
+ * that keeps it honest.
  */
 
 import { test, expect, request as apiRequest } from '@playwright/test'
@@ -62,6 +62,22 @@ const ADMIN_AUTH = path.join(__dirname, '..', '.auth', 'admin.json')
 const API_URL = process.env.E2E_API_URL || 'http://localhost:3000'
 
 test.use({ storageState: CUSTOMER_AUTH })
+
+/**
+ * Serial, and not for ordering — for the hooks.
+ *
+ * The config is `fullyParallel`, so with more than one test in this file
+ * Playwright hands them to different workers, and `beforeAll`/`afterAll` run
+ * once PER WORKER. Two workers means two setups clearing the same seeded
+ * review and two teardowns re-creating it, which leaves the customer holding
+ * two reviews for one product. The next run's setup then frees only the one
+ * the order API reports and the "Write Review" button never appears — the seed
+ * quietly rots, one duplicate per run.
+ *
+ * Serial pins every test here to one worker, so the setup/teardown pair that
+ * borrows a seeded review runs exactly once.
+ */
+test.describe.configure({ mode: 'serial' })
 
 /** A 1x1 red PNG. Images are recorded straight through; nothing decodes it. */
 const PNG_BYTES = Buffer.from(
@@ -152,11 +168,37 @@ test.beforeAll(async () => {
       return
     }
 
-    // Nothing free. Clear one — preferring a review with no photos on it, so
-    // the media wall the read-surfaces spec looks at keeps its tiles.
+    /**
+     * Nothing free. Clear one — but only one that clearing actually frees.
+     *
+     * The seed writes a review per delivered ORDER ITEM while the order API
+     * resolves an item's review by (productId, userId), so a poster this
+     * customer bought twice carries TWO reviews behind a single reported id.
+     * Deleting that id just promotes its twin: the item still shows "Edit
+     * Review" and there is no form to open. A review reported against exactly
+     * one candidate is the one with no twin behind it.
+     *
+     * Among those, still prefer no photos, so the media wall the
+     * read-surfaces spec looks at keeps its tiles — and so teardown, which can
+     * restore a review's text but not its uploads, has nothing to lose.
+     */
+    const timesReported = new Map<string, number>()
+    for (const candidate of candidates) {
+      const id = candidate.reviewId!
+      timesReported.set(id, (timesReported.get(id) ?? 0) + 1)
+    }
+    const borrowable = candidates.filter(
+      (candidate) => timesReported.get(candidate.reviewId!) === 1
+    )
+    expect(
+      borrowable.length,
+      'every delivered item shares its product with another, so no review can ' +
+        'be borrowed without a duplicate taking its place'
+    ).toBeGreaterThan(0)
+
     let fallback: (typeof candidates)[number] | null = null
 
-    for (const candidate of candidates) {
+    for (const candidate of borrowable) {
       const reviewResponse = await customer.get(
         `/api/reviews/${candidate.reviewId}`
       )
@@ -256,17 +298,6 @@ test.afterAll(async () => {
 // ============================================================================
 
 test.describe('submitting a review with a photo', () => {
-  /**
-   * Blocked by #493 — the order detail route never renders, so there is no
-   * "Write Review" button to press. `fixme` rather than a softened assertion:
-   * the flow below is what the feature claims to ship, and a spec that passed
-   * against a page that cannot be reached would be worse than no spec at all.
-   */
-  test.fixme(
-    true,
-    '#493 — /account/orders/$id renders the order list, so the review form is unreachable'
-  )
-
   test.beforeEach(async ({ page }) => {
     expect(target, 'setup must have found a reviewable order item').not.toBeNull()
 
@@ -291,9 +322,50 @@ test.describe('submitting a review with a photo', () => {
     })
   })
 
+  /**
+   * The #493 guard. The upload test below would also fail if the route
+   * regressed, but it would fail on a missing "Write Review" button and read
+   * like a review bug. This one names the actual failure: the LIST rendered
+   * where the DETAIL should have.
+   *
+   * The `?page=1` check is the sharpest tell there is — that param is the list
+   * route's own `validateSearch` defaulting, so its presence on a detail URL
+   * means the list route is what matched.
+   */
+  test('renders the order detail page, not the order history list', async ({
+    page,
+  }) => {
+    // Detail and list carry different titles — this alone separates them.
+    await expect(page).toHaveTitle('Order Details | chobii.art')
+
+    // The list route's search defaulting must not have run on this URL.
+    expect(page.url()).not.toContain('page=1')
+    expect(page.url()).toContain(`/account/orders/${target!.orderId}`)
+
+    // Detail content is present — the detail h1 is `Order <orderNumber>`...
+    await expect(
+      page.getByRole('heading', { level: 1, name: /^Order \S+$/ })
+    ).toBeVisible()
+    // ...and the list's own h1 is not.
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Order History' })
+    ).toHaveCount(0)
+
+    // The mount point #493 made unreachable.
+    await expect(
+      page.getByRole('button', { name: 'Write Review' }).first()
+    ).toBeVisible()
+  })
+
   test('carries the photo through and says it publishes after approval', async ({
     page,
   }) => {
+    // The default 30s covers a page load and a form fill, not those plus a
+    // presign, a PUT at object storage and the complete call — this test was
+    // timing out mid-upload on a loaded machine while the flow itself was
+    // working. Nothing below is relaxed; only the clock.
+    test.slow()
+
     // Port 5173 in this environment serves a different application. Identity
     // first, before anything green means anything.
     await expect(page).toHaveTitle(/chobii\.art/)

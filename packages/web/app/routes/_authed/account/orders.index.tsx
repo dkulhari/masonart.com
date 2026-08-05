@@ -31,7 +31,7 @@ const searchParamsSchema = z.object({
   status: z.string().optional(),
 })
 
-export const Route = createFileRoute('/_authed/account/orders')({
+export const Route = createFileRoute('/_authed/account/orders/')({
   validateSearch: searchParamsSchema,
   head: () => ({
     meta: [
@@ -87,7 +87,7 @@ const PAGE_SIZE = 10
 
 function OrderHistoryPage() {
   const navigate = useNavigate()
-  const search = useSearch({ from: '/_authed/account/orders' })
+  const search = useSearch({ from: '/_authed/account/orders/' })
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [orders, setOrders] = useState<Order[]>([])

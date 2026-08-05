@@ -31,7 +31,7 @@ import {
   Star,
   PenLine,
 } from 'lucide-react'
-import { cn, formatPrice, formatDate } from '~/lib/utils'
+import { cn, formatPrice, formatDate, getApiUrl } from '~/lib/utils'
 import { authApi, ordersApi } from '~/lib/api'
 import { OrderTrackingCard } from '~/components/order'
 import { ReviewModal } from '~/components/reviews'
@@ -40,7 +40,7 @@ import { ReviewModal } from '~/components/reviews'
 // Route Definition
 // ============================================================================
 
-export const Route = createFileRoute('/_authed/account/orders/$id')({
+export const Route = createFileRoute('/_authed/account/orders/$id/')({
   head: () => ({
     meta: [
       { title: 'Order Details | chobii.art' },
@@ -422,10 +422,21 @@ function OrderDetailPage() {
   }, [navigate, id])
 
   // Fetch order
-  const fetchOrder = useCallback(async () => {
+  /**
+   * `background: true` refreshes the order without flipping the page into its
+   * loading skeleton.
+   *
+   * The distinction matters because the skeleton `return`s above the
+   * `ReviewModal`, so a foreground refetch unmounts the modal outright. That is
+   * what happened on review submit: the confirmation panel ("Thank you for your
+   * review!") was mounted and then torn out from under itself the same tick,
+   * and the customer saw the dialog simply vanish.
+   */
+  const fetchOrder = useCallback(
+    async (options?: { background?: boolean }) => {
     if (!isAuthenticated) return
 
-    setIsLoading(true)
+    if (!options?.background) setIsLoading(true)
     setError(null)
 
     try {
@@ -438,9 +449,11 @@ function OrderDetailPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load order')
     } finally {
-      setIsLoading(false)
+      if (!options?.background) setIsLoading(false)
     }
-  }, [isAuthenticated, id])
+    },
+    [isAuthenticated, id]
+  )
 
   useEffect(() => {
     fetchOrder()
@@ -461,7 +474,10 @@ function OrderDetailPage() {
     if (!item.review) return
     // Fetch the review to get full content
     try {
-      const res = await fetch(`/api/reviews/${item.review.id}`, { credentials: 'include' })
+      // Absolute — the API is a separate origin in dev with no `/api` proxy.
+      const res = await fetch(`${getApiUrl()}/api/reviews/${item.review.id}`, {
+        credentials: 'include',
+      })
       if (res.ok) {
         const data = await res.json()
         setReviewModalState({
@@ -485,7 +501,8 @@ function OrderDetailPage() {
 
   const handleCloseReviewModal = () => setReviewModalState(null)
 
-  const handleReviewSuccess = () => fetchOrder()
+  // Background, so the confirmation panel survives long enough to be read.
+  const handleReviewSuccess = () => fetchOrder({ background: true })
 
   // Loading state while checking auth
   if (isAuthenticated === null) {

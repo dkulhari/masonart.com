@@ -46,7 +46,6 @@ import { Route as AuthedAccountIndexRouteImport } from './routes/_authed/account
 import { Route as AuthedAccountAddressesRouteImport } from './routes/_authed/account/addresses'
 import { Route as AuthedAccountAiCreationsRouteImport } from './routes/_authed/account/ai-creations'
 import { Route as AuthedAccountNotificationsRouteImport } from './routes/_authed/account/notifications'
-import { Route as AuthedAccountOrdersRouteImport } from './routes/_authed/account/orders'
 import { Route as AuthedAccountSettingsRouteImport } from './routes/_authed/account/settings'
 import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
 import { Route as AdminApprovalsIndexRouteImport } from './routes/admin/approvals/index'
@@ -59,7 +58,8 @@ import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
 import { Route as AdminProductsIdRouteImport } from './routes/admin/products/$id'
 import { Route as AdminProductsNewRouteImport } from './routes/admin/products/new'
-import { Route as AuthedAccountOrdersIdRouteImport } from './routes/_authed/account/orders.$id'
+import { Route as AuthedAccountOrdersIndexRouteImport } from './routes/_authed/account/orders.index'
+import { Route as AuthedAccountOrdersIdIndexRouteImport } from './routes/_authed/account/orders.$id.index'
 import { Route as AuthedAccountOrdersIdReturnRouteImport } from './routes/_authed/account/orders.$id.return'
 
 const IndexRoute = IndexRouteImport.update({
@@ -248,11 +248,6 @@ const AuthedAccountNotificationsRoute =
     path: '/account/notifications',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedAccountOrdersRoute = AuthedAccountOrdersRouteImport.update({
-  id: '/account/orders',
-  path: '/account/orders',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedAccountSettingsRoute = AuthedAccountSettingsRouteImport.update({
   id: '/account/settings',
   path: '/account/settings',
@@ -313,16 +308,23 @@ const AdminProductsNewRoute = AdminProductsNewRouteImport.update({
   path: '/products/new',
   getParentRoute: () => AdminRoute,
 } as any)
-const AuthedAccountOrdersIdRoute = AuthedAccountOrdersIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthedAccountOrdersRoute,
-} as any)
+const AuthedAccountOrdersIndexRoute =
+  AuthedAccountOrdersIndexRouteImport.update({
+    id: '/account/orders/',
+    path: '/account/orders/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedAccountOrdersIdIndexRoute =
+  AuthedAccountOrdersIdIndexRouteImport.update({
+    id: '/account/orders/$id/',
+    path: '/account/orders/$id/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedAccountOrdersIdReturnRoute =
   AuthedAccountOrdersIdReturnRouteImport.update({
-    id: '/return',
-    path: '/return',
-    getParentRoute: () => AuthedAccountOrdersIdRoute,
+    id: '/account/orders/$id/return',
+    path: '/account/orders/$id/return',
+    getParentRoute: () => AuthedRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -361,7 +363,6 @@ export interface FileRoutesByFullPath {
   '/account/addresses': typeof AuthedAccountAddressesRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
-  '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/account/settings': typeof AuthedAccountSettingsRoute
   '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
@@ -375,8 +376,9 @@ export interface FileRoutesByFullPath {
   '/admin/collections/': typeof AdminCollectionsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
-  '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
+  '/account/orders/': typeof AuthedAccountOrdersIndexRoute
   '/account/orders/$id/return': typeof AuthedAccountOrdersIdReturnRoute
+  '/account/orders/$id/': typeof AuthedAccountOrdersIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -413,7 +415,6 @@ export interface FileRoutesByTo {
   '/account/addresses': typeof AuthedAccountAddressesRoute
   '/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/account/notifications': typeof AuthedAccountNotificationsRoute
-  '/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/account/settings': typeof AuthedAccountSettingsRoute
   '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
@@ -427,8 +428,9 @@ export interface FileRoutesByTo {
   '/admin/collections': typeof AdminCollectionsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
-  '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
+  '/account/orders': typeof AuthedAccountOrdersIndexRoute
   '/account/orders/$id/return': typeof AuthedAccountOrdersIdReturnRoute
+  '/account/orders/$id': typeof AuthedAccountOrdersIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -468,7 +470,6 @@ export interface FileRoutesById {
   '/_authed/account/addresses': typeof AuthedAccountAddressesRoute
   '/_authed/account/ai-creations': typeof AuthedAccountAiCreationsRoute
   '/_authed/account/notifications': typeof AuthedAccountNotificationsRoute
-  '/_authed/account/orders': typeof AuthedAccountOrdersRouteWithChildren
   '/_authed/account/settings': typeof AuthedAccountSettingsRoute
   '/_authed/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
@@ -482,8 +483,9 @@ export interface FileRoutesById {
   '/admin/collections/': typeof AdminCollectionsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
-  '/_authed/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
+  '/_authed/account/orders/': typeof AuthedAccountOrdersIndexRoute
   '/_authed/account/orders/$id/return': typeof AuthedAccountOrdersIdReturnRoute
+  '/_authed/account/orders/$id/': typeof AuthedAccountOrdersIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -523,7 +525,6 @@ export interface FileRouteTypes {
     | '/account/addresses'
     | '/account/ai-creations'
     | '/account/notifications'
-    | '/account/orders'
     | '/account/settings'
     | '/account/wallet'
     | '/admin/approvals/$id'
@@ -537,8 +538,9 @@ export interface FileRouteTypes {
     | '/admin/collections/'
     | '/admin/orders/'
     | '/admin/products/'
-    | '/account/orders/$id'
+    | '/account/orders/'
     | '/account/orders/$id/return'
+    | '/account/orders/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -575,7 +577,6 @@ export interface FileRouteTypes {
     | '/account/addresses'
     | '/account/ai-creations'
     | '/account/notifications'
-    | '/account/orders'
     | '/account/settings'
     | '/account/wallet'
     | '/admin/approvals/$id'
@@ -589,8 +590,9 @@ export interface FileRouteTypes {
     | '/admin/collections'
     | '/admin/orders'
     | '/admin/products'
-    | '/account/orders/$id'
+    | '/account/orders'
     | '/account/orders/$id/return'
+    | '/account/orders/$id'
   id:
     | '__root__'
     | '/'
@@ -629,7 +631,6 @@ export interface FileRouteTypes {
     | '/_authed/account/addresses'
     | '/_authed/account/ai-creations'
     | '/_authed/account/notifications'
-    | '/_authed/account/orders'
     | '/_authed/account/settings'
     | '/_authed/account/wallet'
     | '/admin/approvals/$id'
@@ -643,8 +644,9 @@ export interface FileRouteTypes {
     | '/admin/collections/'
     | '/admin/orders/'
     | '/admin/products/'
-    | '/_authed/account/orders/$id'
+    | '/_authed/account/orders/'
     | '/_authed/account/orders/$id/return'
+    | '/_authed/account/orders/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -939,13 +941,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAccountNotificationsRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/account/orders': {
-      id: '/_authed/account/orders'
-      path: '/account/orders'
-      fullPath: '/account/orders'
-      preLoaderRoute: typeof AuthedAccountOrdersRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/account/settings': {
       id: '/_authed/account/settings'
       path: '/account/settings'
@@ -1030,65 +1025,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProductsNewRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/_authed/account/orders/$id': {
-      id: '/_authed/account/orders/$id'
-      path: '/$id'
-      fullPath: '/account/orders/$id'
-      preLoaderRoute: typeof AuthedAccountOrdersIdRouteImport
-      parentRoute: typeof AuthedAccountOrdersRoute
+    '/_authed/account/orders/': {
+      id: '/_authed/account/orders/'
+      path: '/account/orders'
+      fullPath: '/account/orders/'
+      preLoaderRoute: typeof AuthedAccountOrdersIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/account/orders/$id/': {
+      id: '/_authed/account/orders/$id/'
+      path: '/account/orders/$id'
+      fullPath: '/account/orders/$id/'
+      preLoaderRoute: typeof AuthedAccountOrdersIdIndexRouteImport
+      parentRoute: typeof AuthedRoute
     }
     '/_authed/account/orders/$id/return': {
       id: '/_authed/account/orders/$id/return'
-      path: '/return'
+      path: '/account/orders/$id/return'
       fullPath: '/account/orders/$id/return'
       preLoaderRoute: typeof AuthedAccountOrdersIdReturnRouteImport
-      parentRoute: typeof AuthedAccountOrdersIdRoute
+      parentRoute: typeof AuthedRoute
     }
   }
 }
-
-interface AuthedAccountOrdersIdRouteChildren {
-  AuthedAccountOrdersIdReturnRoute: typeof AuthedAccountOrdersIdReturnRoute
-}
-
-const AuthedAccountOrdersIdRouteChildren: AuthedAccountOrdersIdRouteChildren = {
-  AuthedAccountOrdersIdReturnRoute: AuthedAccountOrdersIdReturnRoute,
-}
-
-const AuthedAccountOrdersIdRouteWithChildren =
-  AuthedAccountOrdersIdRoute._addFileChildren(
-    AuthedAccountOrdersIdRouteChildren,
-  )
-
-interface AuthedAccountOrdersRouteChildren {
-  AuthedAccountOrdersIdRoute: typeof AuthedAccountOrdersIdRouteWithChildren
-}
-
-const AuthedAccountOrdersRouteChildren: AuthedAccountOrdersRouteChildren = {
-  AuthedAccountOrdersIdRoute: AuthedAccountOrdersIdRouteWithChildren,
-}
-
-const AuthedAccountOrdersRouteWithChildren =
-  AuthedAccountOrdersRoute._addFileChildren(AuthedAccountOrdersRouteChildren)
 
 interface AuthedRouteChildren {
   AuthedAccountAddressesRoute: typeof AuthedAccountAddressesRoute
   AuthedAccountAiCreationsRoute: typeof AuthedAccountAiCreationsRoute
   AuthedAccountNotificationsRoute: typeof AuthedAccountNotificationsRoute
-  AuthedAccountOrdersRoute: typeof AuthedAccountOrdersRouteWithChildren
   AuthedAccountSettingsRoute: typeof AuthedAccountSettingsRoute
   AuthedAccountWalletRoute: typeof AuthedAccountWalletRoute
   AuthedAccountIndexRoute: typeof AuthedAccountIndexRoute
+  AuthedAccountOrdersIndexRoute: typeof AuthedAccountOrdersIndexRoute
+  AuthedAccountOrdersIdReturnRoute: typeof AuthedAccountOrdersIdReturnRoute
+  AuthedAccountOrdersIdIndexRoute: typeof AuthedAccountOrdersIdIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAccountAddressesRoute: AuthedAccountAddressesRoute,
   AuthedAccountAiCreationsRoute: AuthedAccountAiCreationsRoute,
   AuthedAccountNotificationsRoute: AuthedAccountNotificationsRoute,
-  AuthedAccountOrdersRoute: AuthedAccountOrdersRouteWithChildren,
   AuthedAccountSettingsRoute: AuthedAccountSettingsRoute,
   AuthedAccountWalletRoute: AuthedAccountWalletRoute,
   AuthedAccountIndexRoute: AuthedAccountIndexRoute,
+  AuthedAccountOrdersIndexRoute: AuthedAccountOrdersIndexRoute,
+  AuthedAccountOrdersIdReturnRoute: AuthedAccountOrdersIdReturnRoute,
+  AuthedAccountOrdersIdIndexRoute: AuthedAccountOrdersIdIndexRoute,
 }
 
 const AuthedRouteWithChildren =

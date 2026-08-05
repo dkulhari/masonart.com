@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect } from 'react'
 import { X } from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { cn, getApiUrl } from '~/lib/utils'
 import { ReviewForm, type ReviewFormData } from './ReviewForm'
 
 // ============================================================================
@@ -120,9 +120,13 @@ export function ReviewModal({
   // Handle form submission - routes to appropriate API endpoint
   const handleSubmit = useCallback(
     async (data: ReviewFormData) => {
+      // Absolute, via getApiUrl(): the API is a separate origin in dev and
+      // there is no `/api` proxy on the web server, so a relative URL posts
+      // the review at the web app and 404s. getApiUrl() returns '' in the
+      // production image, where same-origin is correct.
       const url = existingReview
-        ? `/api/reviews/${existingReview.id}`
-        : `/api/orders/${orderId}/items/${orderItemId}/review`
+        ? `${getApiUrl()}/api/reviews/${existingReview.id}`
+        : `${getApiUrl()}/api/orders/${orderId}/items/${orderItemId}/review`
 
       const method = existingReview ? 'PATCH' : 'POST'
 
