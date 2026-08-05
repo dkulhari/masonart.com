@@ -659,10 +659,10 @@ describe('Web Package Build (TanStack Start)', () => {
       expect(content).toContain("'./app/**/*.{js,ts,jsx,tsx,mdx}'");
     });
 
-    it('tailwind.config.ts should have dark mode configured', () => {
+    it('tailwind.config.ts should not configure dark mode (#449 — light only)', () => {
       const tailwindConfigPath = join(packageDir, 'tailwind.config.ts');
       const content = readFileSync(tailwindConfigPath, 'utf-8');
-      expect(content).toContain('darkMode');
+      expect(content).not.toContain('darkMode');
     });
 
     it('tailwind.config.ts should extend theme colors', () => {

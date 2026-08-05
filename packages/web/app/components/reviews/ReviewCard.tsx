@@ -242,9 +242,9 @@ export function ReviewCard({
             className={cn(
               'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
               review.status === 'pending' &&
-                'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+                'bg-amber-100 text-amber-800',
               review.status === 'rejected' &&
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                'bg-red-100 text-red-800'
             )}
           >
             {review.status === 'pending' ? 'Pending Review' : 'Rejected'}

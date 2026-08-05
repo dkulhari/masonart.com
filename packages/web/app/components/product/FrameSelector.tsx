@@ -261,10 +261,10 @@ function FrameOptionCard({
 function getFramePreviewColor(frameType: string): string {
   const colorMap: Record<string, string> = {
     'poster-only': 'bg-muted',
-    'stretched-canvas': 'bg-amber-100 dark:bg-amber-900/30',
+    'stretched-canvas': 'bg-amber-100',
     'black-frame': 'bg-zinc-900 text-zinc-100',
     'white-frame': 'bg-white border text-zinc-800',
-    'natural-wood-frame': 'bg-amber-200 dark:bg-amber-800/50 text-amber-900',
+    'natural-wood-frame': 'bg-amber-200 text-amber-900',
     'dark-wood-frame': 'bg-amber-900 text-amber-100',
     'gold-frame': 'bg-yellow-500 text-yellow-950',
     'silver-frame': 'bg-zinc-300 text-zinc-700',

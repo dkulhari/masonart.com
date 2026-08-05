@@ -145,7 +145,7 @@ export function PromptSuggestions({
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 clickedId === suggestion.id && 'scale-95 bg-primary/10',
                 suggestion.isPopular
-                  ? 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950'
+                  ? 'border-amber-300 bg-amber-50'
                   : 'border-border bg-background'
               )}
             >

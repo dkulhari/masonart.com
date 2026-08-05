@@ -167,11 +167,11 @@ async function addComment(approvalId: string, comment: string): Promise<void> {
 
 function StatusBadge({ status }: { status: string }) {
   const statusColors: Record<string, string> = {
-    pending_upload: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-    pending_approval: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    changes_requested: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-    approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    expired: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+    pending_upload: 'bg-yellow-100 text-yellow-800',
+    pending_approval: 'bg-blue-100 text-blue-800',
+    changes_requested: 'bg-orange-100 text-orange-800',
+    approved: 'bg-green-100 text-green-800',
+    expired: 'bg-gray-100 text-gray-800',
   }
 
   const statusLabels: Record<string, string> = {
@@ -267,8 +267,8 @@ function PhotoUploadSection({
   const canUpload = approval.status === 'pending_upload' || approval.status === 'changes_requested'
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+    <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
         <Camera className="h-5 w-5" />
         Production Photos
       </h2>
@@ -280,7 +280,7 @@ function PhotoUploadSection({
             {approval.photos.map((photo) => (
               <div
                 key={photo.id}
-                className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
+                className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200"
               >
                 <img
                   src={photo.url}
@@ -302,7 +302,7 @@ function PhotoUploadSection({
             <button
               onClick={handleDelete}
               disabled={deleting || loading}
-              className="mt-4 flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
+              className="mt-4 flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
             >
               <Trash2 className="h-4 w-4" />
               {deleting ? 'Deleting...' : 'Delete All & Re-upload'}
@@ -314,7 +314,7 @@ function PhotoUploadSection({
       {/* Upload Form */}
       {canUpload && approval.photos.length === 0 && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-gray-600">
             Enter the URLs of the production photos to upload.
           </p>
 
@@ -325,12 +325,12 @@ function PhotoUploadSection({
                 value={url}
                 onChange={(e) => handleUrlChange(index, e.target.value)}
                 placeholder="https://example.com/photo.jpg"
-                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
               {urls.length > 1 && (
                 <button
                   onClick={() => handleRemoveUrl(index)}
-                  className="rounded-lg border border-gray-300 p-2 text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+                  className="rounded-lg border border-gray-300 p-2 text-gray-500 hover:bg-gray-100"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -340,7 +340,7 @@ function PhotoUploadSection({
 
           <button
             onClick={handleAddUrl}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+            className="text-sm font-medium text-blue-600 hover:text-blue-700"
           >
             + Add another photo
           </button>
@@ -353,7 +353,7 @@ function PhotoUploadSection({
               onChange={(e) => setSendNotification(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            <label htmlFor="sendNotification" className="text-sm text-gray-600 dark:text-gray-400">
+            <label htmlFor="sendNotification" className="text-sm text-gray-600">
               Send notification email to customer
             </label>
           </div>
@@ -371,7 +371,7 @@ function PhotoUploadSection({
 
       {/* Upload not allowed message */}
       {!canUpload && approval.photos.length === 0 && (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-gray-500">
           Photos cannot be uploaded in the current status.
         </p>
       )}
@@ -422,8 +422,8 @@ function CommentsSection({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+    <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
         <MessageSquare className="h-5 w-5" />
         Comments
       </h2>
@@ -431,7 +431,7 @@ function CommentsSection({
       {/* Comments Timeline */}
       <div className="mb-6 space-y-4">
         {approval.comments.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-sm text-gray-500">
             No comments yet.
           </p>
         ) : (
@@ -441,8 +441,8 @@ function CommentsSection({
               className={cn(
                 'rounded-lg p-4',
                 c.authorType === 'admin'
-                  ? 'bg-blue-50 dark:bg-blue-900/20'
-                  : 'bg-gray-50 dark:bg-gray-700/50'
+                  ? 'bg-blue-50'
+                  : 'bg-gray-50'
               )}
             >
               <div className="mb-2 flex items-center gap-2">
@@ -450,17 +450,17 @@ function CommentsSection({
                   className={cn(
                     'rounded-full px-2 py-0.5 text-xs font-medium',
                     c.authorType === 'admin'
-                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
-                      : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-gray-200 text-gray-700'
                   )}
                 >
                   {c.authorType === 'admin' ? 'Admin' : 'Customer'}
                 </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="text-xs text-gray-500">
                   {formatDate(c.createdAt)}
                 </span>
               </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">
                 {c.comment}
               </p>
             </div>
@@ -475,7 +475,7 @@ function CommentsSection({
           onChange={(e) => setComment(e.target.value)}
           placeholder="Add a response to the customer..."
           rows={3}
-          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
         <button
           type="submit"
@@ -572,23 +572,23 @@ function AdminApprovalDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <a
               href="/admin/approvals"
-              className="rounded-lg border border-gray-300 p-2 text-gray-500 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+              className="rounded-lg border border-gray-300 p-2 text-gray-500 hover:bg-gray-100"
             >
               <ArrowLeft className="h-5 w-5" />
             </a>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl font-bold text-gray-900">
                 Approval Details
               </h1>
               {approval?.order && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-gray-500">
                   Order #{approval.order.orderNumber}
                 </p>
               )}
@@ -597,7 +597,7 @@ function AdminApprovalDetailPage() {
           <button
             onClick={loadApproval}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             Refresh
@@ -606,8 +606,8 @@ function AdminApprovalDetailPage() {
 
         {/* Error State */}
         {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-900/20">
-            <div className="flex items-center gap-2 text-red-800 dark:text-red-400">
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+            <div className="flex items-center gap-2 text-red-800">
               <AlertCircle className="h-5 w-5" />
               <span>{error}</span>
             </div>
@@ -622,7 +622,7 @@ function AdminApprovalDetailPage() {
         ) : approval ? (
           <div className="space-y-6">
             {/* Status & Info Card */}
-            <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+            <div className="rounded-lg border border-gray-200 bg-white p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <StatusBadge status={approval.status} />
@@ -633,7 +633,7 @@ function AdminApprovalDetailPage() {
                     </p>
                   )}
                 </div>
-                <div className="text-right text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-right text-sm text-gray-500">
                   <p>Created: {formatDate(approval.createdAt)}</p>
                   {approval.approvedAt && (
                     <p className="text-green-600">Approved: {formatDate(approval.approvedAt)}</p>
@@ -643,18 +643,18 @@ function AdminApprovalDetailPage() {
 
               {/* Item Info */}
               {approval.order && (
-                <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-700">
+                <div className="mt-4 border-t border-gray-100 pt-4">
                   <div className="flex items-start gap-4">
                     <Package className="h-5 w-5 text-gray-400" />
                     <div>
                       <a
                         href={`/admin/orders/${approval.order.id}`}
-                        className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                        className="font-medium text-blue-600 hover:underline"
                       >
                         Order #{approval.order.orderNumber}
                       </a>
                       {approval.order.shippingAddress?.fullName && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <p className="text-sm text-gray-600">
                           {approval.order.shippingAddress.fullName}
                         </p>
                       )}

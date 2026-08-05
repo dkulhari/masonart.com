@@ -150,7 +150,7 @@ function StatusTabs({
               'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
               isActive
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             )}
           >
             <Icon className="h-4 w-4" />
@@ -160,7 +160,7 @@ function StatusTabs({
                 'rounded-full px-2 py-0.5 text-xs',
                 isActive
                   ? 'bg-white/20 text-white'
-                  : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                  : 'bg-gray-200 text-gray-600'
               )}>
                 {count}
               </span>
@@ -178,11 +178,11 @@ function StatusTabs({
 
 function ApprovalCard({ approval }: { approval: Approval }) {
   const statusColors: Record<string, string> = {
-    pending_upload: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-    pending_approval: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    changes_requested: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-    approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    expired: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+    pending_upload: 'bg-yellow-100 text-yellow-800',
+    pending_approval: 'bg-blue-100 text-blue-800',
+    changes_requested: 'bg-orange-100 text-orange-800',
+    approved: 'bg-green-100 text-green-800',
+    expired: 'bg-gray-100 text-gray-800',
   }
 
   const statusLabels: Record<string, string> = {
@@ -219,7 +219,7 @@ function ApprovalCard({ approval }: { approval: Approval }) {
   const deadlineStatus = getDeadlineStatus()
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -238,14 +238,14 @@ function ApprovalCard({ approval }: { approval: Approval }) {
             {approval.order && (
               <a
                 href={`/admin/orders/${approval.order.id}`}
-                className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
               >
                 Order #{approval.order.orderNumber}
                 <ExternalLink className="h-3 w-3" />
               </a>
             )}
             {approval.orderItem?.snapshot?.title && (
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              <p className="mt-1 text-sm text-gray-600">
                 {approval.orderItem.snapshot.title}
                 {approval.orderItem.snapshot.sizeLabel && (
                   <span className="ml-1 text-gray-500">({approval.orderItem.snapshot.sizeLabel})</span>
@@ -254,7 +254,7 @@ function ApprovalCard({ approval }: { approval: Approval }) {
             )}
           </div>
 
-          <div className="mt-3 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
             <span className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
               Created {formatDate(approval.createdAt)}
@@ -274,7 +274,7 @@ function ApprovalCard({ approval }: { approval: Approval }) {
             {approval.photos.slice(0, 3).map((photo, index) => (
               <div
                 key={photo.id}
-                className="h-12 w-12 overflow-hidden rounded-lg border-2 border-white shadow-sm dark:border-gray-800"
+                className="h-12 w-12 overflow-hidden rounded-lg border-2 border-white shadow-sm"
                 style={{ zIndex: 3 - index }}
               >
                 <img
@@ -285,7 +285,7 @@ function ApprovalCard({ approval }: { approval: Approval }) {
               </div>
             ))}
             {approval.photos.length > 3 && (
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-white bg-gray-100 text-xs font-medium text-gray-600 shadow-sm dark:border-gray-800 dark:bg-gray-700 dark:text-gray-400">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-white bg-gray-100 text-xs font-medium text-gray-600 shadow-sm">
                 +{approval.photos.length - 3}
               </div>
             )}
@@ -294,7 +294,7 @@ function ApprovalCard({ approval }: { approval: Approval }) {
       </div>
 
       {/* Actions */}
-      <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-700">
+      <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4">
         <a
           href={`/admin/approvals/${approval.id}`}
           className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
@@ -404,22 +404,22 @@ function AdminApprovalsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-2xl font-bold text-gray-900">
               Photo Approvals
             </h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-sm text-gray-500">
               Manage production photo approvals for made-to-order items
             </p>
           </div>
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             Refresh
@@ -480,8 +480,8 @@ function AdminApprovalsPage() {
 
         {/* Error State */}
         {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-900/20">
-            <div className="flex items-center gap-2 text-red-800 dark:text-red-400">
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4">
+            <div className="flex items-center gap-2 text-red-800">
               <AlertCircle className="h-5 w-5" />
               <span>{error}</span>
             </div>
@@ -495,12 +495,12 @@ function AdminApprovalsPage() {
               <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
             </div>
           ) : approvals.length === 0 ? (
-            <div className="rounded-lg border border-gray-200 bg-white p-12 text-center dark:border-gray-700 dark:bg-gray-800">
+            <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
               <Package className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+              <h3 className="mt-4 text-lg font-medium text-gray-900">
                 No approvals found
               </h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-2 text-sm text-gray-500">
                 {search.status
                   ? `No approvals with "${statusTabs.find(t => t.value === search.status)?.label}" status`
                   : 'No approvals in the system yet'}
@@ -516,8 +516,8 @@ function AdminApprovalsPage() {
 
               {/* Pagination */}
               {pagination && pagination.totalPages > 1 && (
-                <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-6 dark:border-gray-700">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-6">
+                  <p className="text-sm text-gray-500">
                     Showing {((pagination.page - 1) * pagination.pageSize) + 1} to{' '}
                     {Math.min(pagination.page * pagination.pageSize, pagination.total)} of{' '}
                     {pagination.total} approvals
@@ -530,7 +530,7 @@ function AdminApprovalsPage() {
                         window.location.href = url.toString()
                       }}
                       disabled={pagination.page <= 1}
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                     >
                       Previous
                     </button>
@@ -541,7 +541,7 @@ function AdminApprovalsPage() {
                         window.location.href = url.toString()
                       }}
                       disabled={pagination.page >= pagination.totalPages}
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                     >
                       Next
                     </button>

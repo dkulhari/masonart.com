@@ -110,11 +110,12 @@ describe('preserved tokens', () => {
     expect(css).toMatch(/--mat:\s*0\s+0%\s+98%/)
   })
 
-  it('inverts primary in dark mode so the pill survives', () => {
-    const dark = css.slice(css.indexOf('.dark'))
-    const m = dark.match(/--primary:\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/)
-    expect(m).not.toBeNull()
-    expect(Number(m![3])).toBeGreaterThan(90)
+  // #449 removed dark mode: primary is declared once, near-black, and never inverted.
+  it('declares primary exactly once, with no dark override', () => {
+    expect(css).not.toContain('.dark')
+    const matches = css.match(/--primary:\s*[\d.]+\s+[\d.]+%\s+[\d.]+%/g) ?? []
+    expect(matches).toHaveLength(1)
+    expect(matches[0]).toMatch(/--primary:\s*0\s+0%\s+9%/)
   })
 })
 

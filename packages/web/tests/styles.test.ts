@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -7,7 +7,7 @@ import { join } from 'path';
  *
  * This test suite validates:
  * - Configuration file existence and structure
- * - Tailwind CSS configuration (dark mode, content paths, theme, plugins)
+ * - Tailwind CSS configuration (content paths, theme, plugins, no dark mode)
  * - PostCSS configuration (plugins: tailwindcss, autoprefixer)
  * - Global styles (CSS custom properties, layers, utilities)
  * - Dependencies verification
@@ -36,8 +36,19 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
   let postcssConfig: string;
   let globalsCss: string;
   let packageJson: Record<string, unknown>;
+  let sourceFiles: string[];
+
+  // Every .ts/.tsx/.css under app/, so a source-wide assertion can be made
+  // without shelling out to grep.
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return /\.(ts|tsx|css)$/.test(entry.name) ? [full] : [];
+    });
 
   beforeAll(() => {
+    sourceFiles = existsSync(appDir) ? walk(appDir) : [];
     if (existsSync(tailwindConfigPath)) {
       tailwindConfig = readFileSync(tailwindConfigPath, 'utf-8');
     }
@@ -90,13 +101,11 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
     });
   });
 
-  describe('Tailwind Dark Mode Configuration', () => {
-    it('should have dark mode configured', () => {
-      expect(tailwindConfig).toContain('darkMode');
-    });
-
-    it('should use class-based dark mode strategy', () => {
-      expect(tailwindConfig).toContain("darkMode: ['class']");
+  // Dark mode was removed on 2026-08-05 (#449). mesonart is light-only, and the
+  // .dark palette was unreachable anyway — nothing ever set the class on the root.
+  describe('Tailwind Dark Mode Removal', () => {
+    it('should not configure dark mode at all', () => {
+      expect(tailwindConfig).not.toContain('darkMode');
     });
   });
 
@@ -711,40 +720,22 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
     });
   });
 
-  describe('Global Styles - Dark Mode Variables', () => {
-    it('should have .dark selector for dark mode', () => {
-      expect(globalsCss).toContain('.dark {');
+  describe('Global Styles - Dark Mode Removal', () => {
+    it('should have no .dark selector', () => {
+      expect(globalsCss).not.toContain('.dark');
     });
 
-    it('should override --background in dark mode', () => {
-      // Match dark mode section
-      const darkModeSection = globalsCss.substring(globalsCss.indexOf('.dark {'));
-      expect(darkModeSection).toContain('--background:');
-    });
-
-    it('should override --foreground in dark mode', () => {
-      const darkModeSection = globalsCss.substring(globalsCss.indexOf('.dark {'));
-      expect(darkModeSection).toContain('--foreground:');
-    });
-
-    it('should override --primary in dark mode', () => {
-      const darkModeSection = globalsCss.substring(globalsCss.indexOf('.dark {'));
-      expect(darkModeSection).toContain('--primary:');
-    });
-
-    it('should override --brand in dark mode', () => {
-      const darkModeSection = globalsCss.substring(globalsCss.indexOf('.dark {'));
-      expect(darkModeSection).toContain('--brand:');
-    });
-
-    it('should override chart colors in dark mode', () => {
-      const darkModeSection = globalsCss.substring(globalsCss.indexOf('.dark {'));
-      expect(darkModeSection).toContain('--chart-1:');
-    });
-
-    it('should override sidebar colors in dark mode', () => {
-      const darkModeSection = globalsCss.substring(globalsCss.indexOf('.dark {'));
-      expect(darkModeSection).toContain('--sidebar-background:');
+    it('should still define the light tokens the .dark block used to override', () => {
+      // The overrides are gone; the tokens themselves are load-bearing in :root.
+      const tokens = [
+        '--background:',
+        '--foreground:',
+        '--primary:',
+        '--brand:',
+        '--chart-1:',
+        '--sidebar-background:',
+      ];
+      tokens.forEach(token => expect(globalsCss).toContain(token));
     });
   });
 
@@ -1036,9 +1027,14 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
       });
     });
 
-    it('should have dark mode support via class', () => {
-      expect(tailwindConfig).toContain("darkMode: ['class']");
-      expect(globalsCss).toContain('.dark {');
+    it('should be light-only — shadcn tokens without a dark counterpart', () => {
+      expect(tailwindConfig).not.toContain('darkMode');
+      expect(globalsCss).not.toContain('.dark');
+    });
+
+    it('should have no dark: utility variants in app source', () => {
+      const offenders = sourceFiles.filter(file => /\bdark:/.test(readFileSync(file, 'utf-8')));
+      expect(offenders.map(f => f.replace(appDir, 'app'))).toEqual([]);
     });
   });
 
