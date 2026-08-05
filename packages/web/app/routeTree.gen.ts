@@ -50,6 +50,9 @@ import { Route as AuthedAccountSettingsRouteImport } from './routes/_authed/acco
 import { Route as AuthedAccountWalletRouteImport } from './routes/_authed/account/wallet'
 import { Route as AdminApprovalsIndexRouteImport } from './routes/admin/approvals/index'
 import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$id'
+import { Route as AdminCollectionsIndexRouteImport } from './routes/admin/collections/index'
+import { Route as AdminCollectionsIdRouteImport } from './routes/admin/collections/$id'
+import { Route as AdminCollectionsNewRouteImport } from './routes/admin/collections/new'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
 import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
@@ -264,6 +267,21 @@ const AdminApprovalsIdRoute = AdminApprovalsIdRouteImport.update({
   path: '/approvals/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCollectionsIndexRoute = AdminCollectionsIndexRouteImport.update({
+  id: '/collections/',
+  path: '/collections/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCollectionsIdRoute = AdminCollectionsIdRouteImport.update({
+  id: '/collections/$id',
+  path: '/collections/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCollectionsNewRoute = AdminCollectionsNewRouteImport.update({
+  id: '/collections/new',
+  path: '/collections/new',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
   id: '/orders/',
   path: '/orders/',
@@ -340,11 +358,14 @@ export interface FileRoutesByFullPath {
   '/account/settings': typeof AuthedAccountSettingsRoute
   '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
+  '/admin/collections/$id': typeof AdminCollectionsIdRoute
+  '/admin/collections/new': typeof AdminCollectionsNewRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
+  '/admin/collections/': typeof AdminCollectionsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
@@ -388,11 +409,14 @@ export interface FileRoutesByTo {
   '/account/settings': typeof AuthedAccountSettingsRoute
   '/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
+  '/admin/collections/$id': typeof AdminCollectionsIdRoute
+  '/admin/collections/new': typeof AdminCollectionsNewRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/account': typeof AuthedAccountIndexRoute
   '/admin/approvals': typeof AdminApprovalsIndexRoute
+  '/admin/collections': typeof AdminCollectionsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
   '/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
@@ -439,11 +463,14 @@ export interface FileRoutesById {
   '/_authed/account/settings': typeof AuthedAccountSettingsRoute
   '/_authed/account/wallet': typeof AuthedAccountWalletRoute
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
+  '/admin/collections/$id': typeof AdminCollectionsIdRoute
+  '/admin/collections/new': typeof AdminCollectionsNewRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
+  '/admin/collections/': typeof AdminCollectionsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/_authed/account/orders/$id': typeof AuthedAccountOrdersIdRouteWithChildren
@@ -490,11 +517,14 @@ export interface FileRouteTypes {
     | '/account/settings'
     | '/account/wallet'
     | '/admin/approvals/$id'
+    | '/admin/collections/$id'
+    | '/admin/collections/new'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/account/'
     | '/admin/approvals/'
+    | '/admin/collections/'
     | '/admin/orders/'
     | '/admin/products/'
     | '/account/orders/$id'
@@ -538,11 +568,14 @@ export interface FileRouteTypes {
     | '/account/settings'
     | '/account/wallet'
     | '/admin/approvals/$id'
+    | '/admin/collections/$id'
+    | '/admin/collections/new'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/account'
     | '/admin/approvals'
+    | '/admin/collections'
     | '/admin/orders'
     | '/admin/products'
     | '/account/orders/$id'
@@ -588,11 +621,14 @@ export interface FileRouteTypes {
     | '/_authed/account/settings'
     | '/_authed/account/wallet'
     | '/admin/approvals/$id'
+    | '/admin/collections/$id'
+    | '/admin/collections/new'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
     | '/_authed/account/'
     | '/admin/approvals/'
+    | '/admin/collections/'
     | '/admin/orders/'
     | '/admin/products/'
     | '/_authed/account/orders/$id'
@@ -918,6 +954,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminApprovalsIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/collections/': {
+      id: '/admin/collections/'
+      path: '/collections'
+      fullPath: '/admin/collections/'
+      preLoaderRoute: typeof AdminCollectionsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/collections/$id': {
+      id: '/admin/collections/$id'
+      path: '/collections/$id'
+      fullPath: '/admin/collections/$id'
+      preLoaderRoute: typeof AdminCollectionsIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/collections/new': {
+      id: '/admin/collections/new'
+      path: '/collections/new'
+      fullPath: '/admin/collections/new'
+      preLoaderRoute: typeof AdminCollectionsNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/orders/': {
       id: '/admin/orders/'
       path: '/orders'
@@ -1024,10 +1081,13 @@ interface AdminRouteChildren {
   AdminReviewsRoute: typeof AdminReviewsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminApprovalsIdRoute: typeof AdminApprovalsIdRoute
+  AdminCollectionsIdRoute: typeof AdminCollectionsIdRoute
+  AdminCollectionsNewRoute: typeof AdminCollectionsNewRoute
   AdminOrdersIdRoute: typeof AdminOrdersIdRoute
   AdminProductsIdRoute: typeof AdminProductsIdRoute
   AdminProductsNewRoute: typeof AdminProductsNewRoute
   AdminApprovalsIndexRoute: typeof AdminApprovalsIndexRoute
+  AdminCollectionsIndexRoute: typeof AdminCollectionsIndexRoute
   AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
   AdminProductsIndexRoute: typeof AdminProductsIndexRoute
 }
@@ -1039,10 +1099,13 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminReviewsRoute: AdminReviewsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminApprovalsIdRoute: AdminApprovalsIdRoute,
+  AdminCollectionsIdRoute: AdminCollectionsIdRoute,
+  AdminCollectionsNewRoute: AdminCollectionsNewRoute,
   AdminOrdersIdRoute: AdminOrdersIdRoute,
   AdminProductsIdRoute: AdminProductsIdRoute,
   AdminProductsNewRoute: AdminProductsNewRoute,
   AdminApprovalsIndexRoute: AdminApprovalsIndexRoute,
+  AdminCollectionsIndexRoute: AdminCollectionsIndexRoute,
   AdminOrdersIndexRoute: AdminOrdersIndexRoute,
   AdminProductsIndexRoute: AdminProductsIndexRoute,
 }
