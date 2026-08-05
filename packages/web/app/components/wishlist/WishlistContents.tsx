@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { productsApi } from '~/lib/api'
+import { ReorderableWishlistGrid } from './ReorderableWishlistGrid'
 import {
   useWishlistHydration,
   useWishlistIds,
@@ -37,6 +38,7 @@ function chunk<T>(items: T[], size: number): T[][] {
 export function WishlistContents() {
   const ids = useWishlistIds()
   const dropMissing = useWishlistStore((state) => state.dropMissing)
+  const reorder = useWishlistStore((state) => state.reorder)
   // The server cannot know a guest's list, so the first paint is the empty
   // one either way — same reason the header count waits (#498).
   const isHydrated = useWishlistHydration()
@@ -120,6 +122,27 @@ export function WishlistContents() {
   const products = ids
     .map((id) => known[id])
     .filter((product): product is ProductCardData => Boolean(product))
+
+  /**
+   * Reordering is over the STORE's indices, not the rendered ones.
+   *
+   * They diverge whenever a saved product has left the catalogue: `products`
+   * drops it, `ids` keeps it. Reordering by rendered position would then move
+   * the wrong entry, and the further down the list the worse it gets.
+   */
+  const handleReorder = (from: number, to: number) => {
+    const movedId = products[from]?.id
+    const targetId = products[to]?.id
+    if (!movedId || !targetId) return
+
+    reorder(ids.indexOf(movedId), ids.indexOf(targetId))
+  }
+
+  if (products.length > 0) {
+    return (
+      <ReorderableWishlistGrid products={products} onReorder={handleReorder} />
+    )
+  }
 
   return (
     <ProductGrid

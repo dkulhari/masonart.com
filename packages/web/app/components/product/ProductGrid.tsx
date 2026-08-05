@@ -48,8 +48,13 @@ export interface ProductGridProps {
   className?: string
 }
 
-/** Measured from mesonart: 2 / md:3 / xl:4, gap 20px row and 13.5px column. */
-const GRID_CLASSES =
+/**
+ * Measured from mesonart: 2 / md:3 / xl:4, gap 20px row and 13.5px column.
+ *
+ * Exported so the reorderable wishlist grid matches without copying the
+ * values — two grids that drift by a gap size look like a rendering bug.
+ */
+export const GRID_CLASSES =
   'grid list-none grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-[13.5px] gap-y-5'
 
 export function ProductGrid({
