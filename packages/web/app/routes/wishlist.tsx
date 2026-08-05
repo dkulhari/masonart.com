@@ -11,10 +11,12 @@
  * `noindex`: the content is per-visitor and empty for a crawler.
  */
 
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouteContext } from '@tanstack/react-router'
 import { SectionBand } from '~/components/ui/SectionBand'
 import { DisplayHeading } from '~/components/ui/DisplayHeading'
 import { WishlistContents } from '~/components/wishlist/WishlistContents'
+import { WishlistStagingBar } from '~/components/wishlist/WishlistStagingBar'
+import { useWishlistIds } from '~/stores/wishlist'
 
 export const Route = createFileRoute('/wishlist')({
   head: () => ({
@@ -32,6 +34,15 @@ export const Route = createFileRoute('/wishlist')({
 })
 
 function WishlistPage() {
+  /**
+   * Session comes from the root route's beforeLoad, the same way the header
+   * reads it for the staff entry.
+   */
+  const { session } = useRouteContext({ from: '__root__' }) as {
+    session?: { user?: { role?: string } } | null
+  }
+  const productIds = useWishlistIds()
+
   return (
     <>
       <SectionBand tone="beige" className="py-10 sm:py-14">
@@ -45,6 +56,11 @@ function WishlistPage() {
       </SectionBand>
 
       <div className="container-wide py-8 lg:py-12">
+        {/* Staff only — renders null for everyone else. */}
+        <WishlistStagingBar
+          role={session?.user?.role ?? null}
+          productIds={productIds}
+        />
         <WishlistContents />
       </div>
     </>

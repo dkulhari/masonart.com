@@ -56,7 +56,15 @@ function EditCollectionPage() {
           showInDiscover: c.showInDiscover,
           seoTitle: c.seoTitle ?? '',
           seoDescription: c.seoDescription ?? '',
-          productIds: [],
+          /**
+           * The EXISTING members, not an empty array.
+           *
+           * The form replaces the member list on save, so loading without them
+           * posts `[]` and wipes the curation. That is not hypothetical — it
+           * deleted a collection's members the first time one was staged from
+           * the wishlist.
+           */
+          productIds: c.productIds ?? [],
         })
       })
       .catch((loadError) => {

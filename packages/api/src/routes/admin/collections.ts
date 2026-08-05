@@ -35,7 +35,10 @@ import {
   collectionProducts,
 } from "../../database/schema/collections";
 import { products } from "../../database/schema/products";
-import { countCollection } from "../../lib/collection-resolver";
+import {
+  countCollection,
+  resolveManualMembers,
+} from "../../lib/collection-resolver";
 import {
   requireAuth,
   requireContentManager,
@@ -283,7 +286,20 @@ adminCollectionsApp.get("/:id", async (c) => {
 
     if (!row) return c.json({ error: "Collection not found" }, 404);
 
-    return c.json({ collection: { ...row, count: await countCollection(row) } });
+    /**
+     * Manual membership travels WITH the row.
+     *
+     * The edit form replaces the member list on save, so a form that loaded
+     * without it would post an empty array and wipe the curation — which is
+     * exactly what happened the first time a collection was staged from the
+     * wishlist. Reading it here is what makes the round trip non-destructive.
+     */
+    const productIds =
+      row.kind === "manual" ? await resolveManualMembers(row.id) : [];
+
+    return c.json({
+      collection: { ...row, count: await countCollection(row), productIds },
+    });
   } catch (error) {
     console.error("Error fetching collection:", error);
     return c.json({ error: "Failed to fetch collection" }, 500);
