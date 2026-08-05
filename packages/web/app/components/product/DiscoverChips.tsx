@@ -2,35 +2,44 @@
  * DiscoverChips — the collection rail mesonart runs between the page header
  * and the grid (analysis §1.3.2).
  *
- * Ours had no equivalent: before this, the only "discover" on /posters was a
- * word in the SEO paragraph.
+ * ## These are links, not filter toggles
+ *
+ * Measured on mesonart 2026-08-05: their chips are `<a href="/collections/…">`
+ * — destinations, one hand-curated list identical on every collection page,
+ * spanning style, subject, orientation, and two entries (`Latest Work`,
+ * `Bestseller`) that are a date window and a sort.
+ *
+ * Ours toggled `styles` on the current grid, with the payload typed to a style
+ * id. That could never carry Bestseller or Set of 2/3 — not for want of
+ * plumbing, but because a facet id cannot name a sort. Hence the collections
+ * table, and hence a chip that navigates.
+ *
+ * The comment that stood here explained why selection went through the route's
+ * filter handler: router.tsx overrides TanStack's search serialisation, so a
+ * hand-built search object error-boundaries the route. That reasoning is gone
+ * with the toggle — a link to a path carries no search at all.
  *
  * ## Presentational
  *
- * It receives collections and reports a selection upward. Fetching stays in
- * the route — a self-fetching rail refires on every filter change, and the
- * collection list does not depend on the filters.
- *
- * ## Selection goes through the route's filter handler
- *
- * The chips call `onSelect` with a style id or `undefined`; the route folds
- * that into `handleFiltersChange`. They must not navigate directly:
- * router.tsx overrides TanStack's search serialisation, so `styles` travels
- * as a comma-joined string that `validateSearch` splits back apart. A
- * hand-built search object skips that and error-boundaries the route to a
- * blank page.
+ * It receives collections and renders links. Fetching stays in the route — a
+ * self-fetching rail refires on every filter change, and the collection list
+ * does not depend on the filters.
  *
  * ## Imagery
  *
- * There are no per-collection assets. Each chip carries the main image of a
- * representative product in that style, supplied by
- * GET /api/products/collections. When a collection has none, the chip shows
- * its initial on the mat colour rather than an empty `<img>`, which renders
- * as the browser's broken-file icon.
+ * A collection may carry its own image, or borrow the main image of a
+ * representative product (#410). The two are NOT interchangeable: product
+ * images are matted, an admin upload is not, and `imageIsMatted` from the API
+ * is what decides whether the mat-compensation scale applies. Guessing here
+ * crops into an uploaded picture.
+ *
+ * With neither, the chip shows its initial on the mat colour rather than an
+ * empty `<img>`, which renders as the browser's broken-file icon.
  */
 
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRef } from 'react'
+import { Link } from '@tanstack/react-router'
 import { cn } from '~/lib/utils'
 import { buttonVariants } from '~/components/ui/Button'
 
@@ -82,26 +91,32 @@ export function chipArtScale(orientation: string | null | undefined): number {
 
 export interface DiscoverCollection {
   id: string
-  label: string
+  /** The URL segment. `/collections/$slug`. */
+  slug: string
+  title: string
+  subtitle?: string | null
   count: number
   image: string | null
+  /**
+   * Whether `image` is a matted product photo rather than one the admin
+   * uploaded. Decides whether the crop scale applies at all — see the module
+   * comment.
+   */
+  imageIsMatted: boolean
   /** Orientation of the product the image came from — drives the crop depth. */
   orientation?: string | null
 }
 
 export interface DiscoverChipsProps {
   collections: DiscoverCollection[]
-  /** The style currently filtering the grid, if any. */
-  activeStyle: string | undefined
-  /** Called with a style id, or `undefined` to clear the filter. */
-  onSelect: (styleId: string | undefined) => void
+  /** Slug of the collection currently being viewed, if this is a collection page. */
+  activeSlug?: string
   className?: string
 }
 
 export function DiscoverChips({
   collections,
-  activeStyle,
-  onSelect,
+  activeSlug,
   className,
 }: DiscoverChipsProps) {
   const railRef = useRef<HTMLUListElement>(null)
@@ -132,19 +147,19 @@ export function DiscoverChips({
         className="flex flex-1 snap-x snap-mandatory list-none gap-5 overflow-x-auto scroll-smooth py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {collections.map((collection) => {
-          const isActive = collection.id === activeStyle
+          const isActive = collection.slug === activeSlug
 
           return (
             <li key={collection.id} className="snap-start">
-              <button
-                type="button"
+              <Link
+                to="/collections/$slug"
+                params={{ slug: collection.slug }}
                 /**
-                 * A toggle, not a link: clicking the active chip clears the
-                 * filter. aria-pressed says so; aria-current would claim this
-                 * is the page you are on.
+                 * A destination, not a toggle. `aria-current="page"` is the
+                 * truthful attribute now — `aria-pressed` described a button
+                 * that could be un-pressed, and these navigate.
                  */
-                aria-pressed={isActive}
-                onClick={() => onSelect(isActive ? undefined : collection.id)}
+                aria-current={isActive ? 'page' : undefined}
                 className="flex w-24 flex-col items-center gap-2 text-center"
               >
                 <span
@@ -161,28 +176,35 @@ export function DiscoverChips({
                       alt=""
                       loading="lazy"
                       /**
-                       * Enlarged and centre-cropped, never shrunk to fit —
-                       * see chipArtScale. The round parent clips it.
+                       * Matted product images are enlarged and centre-cropped
+                       * so the circle cuts INSIDE the artwork — see
+                       * chipArtScale. An admin's own image has no mat, so it
+                       * is left alone; scaling it would crop into the picture
+                       * they chose.
                        */
-                      style={{
-                        transform: `scale(${chipArtScale(collection.orientation)})`,
-                      }}
+                      style={
+                        collection.imageIsMatted
+                          ? {
+                              transform: `scale(${chipArtScale(collection.orientation)})`,
+                            }
+                          : undefined
+                      }
                       className="h-full w-full object-cover object-center"
                     />
                   ) : (
                     <span className="text-xl text-muted-foreground">
-                      {collection.label.charAt(0)}
+                      {collection.title.charAt(0)}
                     </span>
                   )}
                 </span>
 
                 <span className="flex flex-col leading-tight">
                   <span className={cn('text-sm', isActive && 'font-medium')}>
-                    {collection.label}
+                    {collection.title}
                   </span>
                   <span className="text-xs text-muted-foreground">{collection.count}</span>
                 </span>
-              </button>
+              </Link>
             </li>
           )
         })}
