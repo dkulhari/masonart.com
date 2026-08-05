@@ -17,7 +17,16 @@ const PRODUCT_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const PRODUCT_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 
 const reset = () =>
-  useWishlistStore.setState({ ids: [], isLoaded: false, isPending: false })
+  useWishlistStore.setState({
+    ids: [],
+    isLoaded: false,
+    isPending: false,
+    // `null` is "the root route has not reported yet", which is the state a
+    // leaf effect sees on first paint — clearing it to `true` here would hide
+    // the very thing the guest cases assert (#417).
+    isAuthenticated: null,
+    inFlight: null,
+  })
 
 beforeEach(() => {
   reset()
@@ -38,7 +47,51 @@ function stubFetch(body: unknown, ok = true) {
   return spy
 }
 
+/** Signed in, as far as the store is concerned. */
+const authenticate = () => useWishlistStore.setState({ isAuthenticated: true })
+
+describe('auth gate', () => {
+  it('makes no request while the session is still unknown', async () => {
+    // Leaf effects (one per heart) run before the root route reports the
+    // session. A guest loading a 24-card grid used to fire a request per card,
+    // all 401 (#417).
+    const spy = stubFetch({ items: [] })
+
+    await useWishlistStore.getState().load()
+
+    expect(spy).not.toHaveBeenCalled()
+    expect(useWishlistStore.getState().isLoaded).toBe(false)
+  })
+
+  it('marks a guest loaded and empty without asking the server', async () => {
+    const spy = stubFetch({ items: [] })
+
+    useWishlistStore.getState().setAuthenticated(false)
+
+    expect(spy).not.toHaveBeenCalled()
+    expect(useWishlistStore.getState().ids).toEqual([])
+    // Loaded, so every heart renders its empty state instead of waiting.
+    expect(useWishlistStore.getState().isLoaded).toBe(true)
+
+    // And a late-mounting card's load() still does not reach the server.
+    await useWishlistStore.getState().load()
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('loads exactly once when the session arrives', async () => {
+    const spy = stubFetch({ items: [{ id: PRODUCT_A }] })
+
+    useWishlistStore.getState().setAuthenticated(true)
+    await useWishlistStore.getState().load()
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(useWishlistStore.getState().ids).toEqual([PRODUCT_A])
+  })
+})
+
 describe('load', () => {
+  beforeEach(authenticate)
+
   it('populates ids from the server', async () => {
     stubFetch({ items: [{ id: PRODUCT_A }, { id: PRODUCT_B }] })
 
@@ -67,6 +120,33 @@ describe('load', () => {
     await useWishlistStore.getState().load()
 
     expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('fetches once when every card calls load in the same tick', async () => {
+    // The sequential case above passed all along: `isLoaded` flips before the
+    // second call. Real cards mount together and all clear the guard before
+    // any request resolves, which is the actual defect (#417).
+    const spy = stubFetch({ items: [{ id: PRODUCT_A }] })
+
+    const { load } = useWishlistStore.getState()
+    await Promise.all(Array.from({ length: 24 }, () => load()))
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(useWishlistStore.getState().ids).toEqual([PRODUCT_A])
+  })
+
+  it('lets a later load run after an in-flight one fails', async () => {
+    // The in-flight promise must be cleared on the failure path too, or the
+    // store is wedged for the rest of the session.
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    await useWishlistStore.getState().load()
+
+    useWishlistStore.setState({ isLoaded: false })
+    const spy = stubFetch({ items: [{ id: PRODUCT_B }] })
+    await useWishlistStore.getState().load()
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(useWishlistStore.getState().ids).toEqual([PRODUCT_B])
   })
 })
 

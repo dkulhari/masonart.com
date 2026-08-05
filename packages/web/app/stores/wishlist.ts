@@ -10,9 +10,11 @@
  *    server-owned and auth-gated — persisting it would show a signed-out
  *    visitor, or the next user on a shared machine, the previous user's hearts.
  *
- * 2. **One fetch, not one per card.** The grid renders up to 24 cards. Each
- *    asking the server "am I saved?" is 24 requests; instead the ids load once
- *    and every card reads the set.
+ * 2. **One fetch, not one per card — and none at all for a guest.** The grid
+ *    renders up to 24 cards. Each asking the server "am I saved?" is 24
+ *    requests; instead the ids load once, behind a shared in-flight promise,
+ *    and every card reads the set. The load waits on `setAuthenticated` from
+ *    the root route, so a signed-out visitor spends zero requests (#417).
  *
  * The toggle is optimistic with rollback: a heart that waits on a round-trip
  * before filling in reads as broken.
@@ -34,8 +36,21 @@ interface WishlistStore {
   isLoaded: boolean;
   /** A toggle request is in flight. */
   isPending: boolean;
+  /**
+   * Tri-state, and the middle state is the point.
+   *
+   * `null` — nobody has reported yet. Leaf effects run before the root route's,
+   * so this is what a heart sees on first paint; `load()` waits rather than
+   * guessing.
+   * `false` — guest. Never ask the server.
+   * `true` — signed in. One load.
+   */
+  isAuthenticated: boolean | null;
+  /** The single in-flight `load()`, shared by every caller in the same tick. */
+  inFlight: Promise<void> | null;
 
   load: () => Promise<void>;
+  setAuthenticated: (isAuthenticated: boolean) => void;
   toggle: (productId: string) => Promise<void>;
 }
 
@@ -43,21 +58,59 @@ export const useWishlistStore = create<WishlistStore>()((set, get) => ({
   ids: [],
   isLoaded: false,
   isPending: false,
+  isAuthenticated: null,
+  inFlight: null,
 
   async load() {
+    // Unknown session or a known guest: `/api/wishlist` is auth-gated, so the
+    // only possible answer is a 401 nobody acts on (#417).
+    if (get().isAuthenticated !== true) return;
     if (get().isLoaded) return;
 
-    try {
-      const { items } = await wishlistApi.list();
-      set({ ids: items.map((item) => item.id), isLoaded: true });
-    } catch {
-      /**
-       * A 401 is the ordinary case for a guest, not an error worth surfacing.
-       * Mark loaded either way so the UI stops waiting and every heart renders
-       * in its empty state.
-       */
-      set({ ids: [], isLoaded: true });
+    // `isLoaded` only flips after the await, so it cannot dedupe callers that
+    // arrive in the same tick — a 24-card grid cleared the guard 24 times.
+    // The promise itself is the lock.
+    const existing = get().inFlight;
+    if (existing) return existing;
+
+    const request = (async () => {
+      try {
+        const { items } = await wishlistApi.list();
+        set({ ids: items.map((item) => item.id), isLoaded: true });
+      } catch {
+        /**
+         * A session can lapse between the root route reading it and this
+         * request; mark loaded either way so the UI stops waiting and every
+         * heart renders in its empty state.
+         */
+        set({ ids: [], isLoaded: true });
+      } finally {
+        // Cleared on both paths — leaving a settled promise here wedges the
+        // store for the rest of the session.
+        set({ inFlight: null });
+      }
+    })();
+
+    set({ inFlight: request });
+    return request;
+  },
+
+  /**
+   * Called from the root route, the one place that already has the session.
+   * Keeping it out of the leaf components is deliberate: `WishlistButton` is
+   * rendered bare in its own tests, with no router to read a context from.
+   */
+  setAuthenticated(isAuthenticated: boolean) {
+    if (get().isAuthenticated === isAuthenticated) return;
+
+    if (!isAuthenticated) {
+      // A guest is "loaded" — there is nothing to fetch and nothing to wait for.
+      set({ isAuthenticated: false, ids: [], isLoaded: true, inFlight: null });
+      return;
     }
+
+    set({ isAuthenticated: true });
+    void get().load();
   },
 
   async toggle(productId: string) {

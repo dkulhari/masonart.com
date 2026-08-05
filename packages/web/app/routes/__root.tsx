@@ -10,6 +10,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BRAND_NAME, BRAND_TAGLINE } from '@chobii/shared'
+import { useEffect } from 'react'
 import type * as React from 'react'
 import { AnnouncementBar } from '~/components/layout/AnnouncementBar'
 import { Header } from '~/components/layout/Header'
@@ -17,6 +18,7 @@ import { Footer } from '~/components/layout/Footer'
 import { CartDrawer } from '~/components/cart/CartDrawer'
 import { buttonVariants } from '~/components/ui/Button'
 import { cn } from '~/lib/utils'
+import { useWishlistStore } from '~/stores/wishlist'
 import globalsCss from '~/styles/globals.css?url'
 import type { Session } from '~/lib/auth-client'
 
@@ -216,6 +218,18 @@ export const Route = createRootRouteWithContext<RouterContext>()({
  */
 function RootComponent() {
   const queryClient = getQueryClient()
+
+  // The root route is the only place that already knows the session, so it is
+  // the only place that should tell the wishlist store. Without this the store
+  // fetched an auth-gated endpoint blind — six 401s per guest page load (#417).
+  const { session } = Route.useRouteContext()
+  const setWishlistAuthenticated = useWishlistStore(
+    (state) => state.setAuthenticated
+  )
+
+  useEffect(() => {
+    setWishlistAuthenticated(Boolean(session?.user))
+  }, [session, setWishlistAuthenticated])
 
   return (
     <QueryClientProvider client={queryClient}>
