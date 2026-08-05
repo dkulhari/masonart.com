@@ -167,6 +167,60 @@ export async function getImageMetadata(input: Buffer) {
 // avatars and AI generations, where forcing a square would be wrong.
 
 /**
+ * How far a border tone may sit from the corner tone and still count as border.
+ *
+ * Sized to span the gap between our own mat and the light fields real sources
+ * arrive on — the reference artwork measured rgb(240,240,240) against our
+ * rgb(250,250,250), so anything tighter than 10 leaves both visible. 24 carries
+ * that plus room for the compression noise a lossy source has along the edge.
+ */
+const BORDER_TRIM_THRESHOLD = 24;
+
+/**
+ * Smallest share of the longest side a trim may leave behind.
+ *
+ * A piece composed AS a light field — a small mark on white — is artwork, not a
+ * bordered source. Trimming to the mark and then blowing it up to fill 88% of
+ * the canvas would destroy it, so a trim that aggressive is refused and the
+ * source is matted as it came.
+ */
+const BORDER_TRIM_MIN_RETAINED = 0.5;
+
+/**
+ * Remove a uniform border the source already carries, if it has one.
+ *
+ * Sources are not raw art. Anything captured from another storefront arrives
+ * sitting on that storefront's own background, and anything that has already
+ * been through this function arrives sitting on ours. Matting either without
+ * stripping first stacks a second mat on the first, with a visible tone step
+ * between them — and shrinks the art to MAT_ART_INSET squared. #418.
+ *
+ * Returns the input untouched when there is no border to find, when the trim
+ * would take more than BORDER_TRIM_MIN_RETAINED, or when sharp cannot trim at
+ * all — an unhelpful trim must never fail an upload.
+ */
+async function stripUniformBorder(
+  input: Buffer
+): Promise<{ art: Buffer; sourceLongest: number }> {
+  const { width = 0, height = 0 } = await sharp(input).metadata();
+  const sourceLongest = Math.max(width, height);
+  if (!width || !height) return { art: input, sourceLongest: 0 };
+
+  try {
+    const { data, info } = await sharp(input)
+      .trim({ threshold: BORDER_TRIM_THRESHOLD })
+      .toBuffer({ resolveWithObject: true });
+
+    const retained = Math.max(info.width, info.height) / sourceLongest;
+    return retained < BORDER_TRIM_MIN_RETAINED
+      ? { art: input, sourceLongest }
+      : { art: data, sourceLongest };
+  } catch {
+    return { art: input, sourceLongest };
+  }
+}
+
+/**
  * Composite artwork of ANY aspect ratio onto an opaque square mat.
  *
  * The art is contained — never cropped — at MAT_ART_INSET of the longest side.
@@ -174,14 +228,24 @@ export async function getImageMetadata(input: Buffer) {
  * every product, so square art does not bleed to the card edge while portrait
  * art floats — which would read as inconsistent across a grid row.
  *
+ * Any border the source brought with it is stripped first, so exactly one mat
+ * is visible and the function is idempotent on its own output.
+ *
  * Small sources are NOT upscaled: they sit smaller on the mat rather than being
- * interpolated. Fake resolution is worse than a wider mat.
+ * interpolated. Fake resolution is worse than a wider mat. Stripping a border
+ * does not weaken that rule — the art may grow back into the room the border
+ * was taking up, but never past the longest side the source actually delivered.
+ * Without that allowance a padded 1500px source would land its art at ~72% of
+ * the canvas while an unpadded one landed at 88%, and the mat would visibly
+ * change width from card to card along a grid row.
  */
 export async function matToSquare(input: Buffer): Promise<Buffer> {
   const inner = Math.round(MAT_CANVAS * MAT_ART_INSET);
+  const { art: source, sourceLongest } = await stripUniformBorder(input);
+  const target = sourceLongest ? Math.min(inner, sourceLongest) : inner;
 
-  const art = await sharp(input)
-    .resize(inner, inner, { fit: "inside", withoutEnlargement: true })
+  const art = await sharp(source)
+    .resize(target, target, { fit: "inside", withoutEnlargement: false })
     .toBuffer();
 
   return sharp({
