@@ -29,6 +29,7 @@ import { Palette, Sparkles } from 'lucide-react'
 import type { ProductImage } from '@chobii/shared'
 import { cn, formatPrice } from '~/lib/utils'
 import { ProductCardMedia } from './ProductCardMedia'
+import { ChooseOptions } from './ChooseOptions'
 import { WishlistButton } from './WishlistButton'
 import { ProductRating } from './ProductRating'
 import { MEDIA_RATIO } from './productCardTokens'
@@ -110,6 +111,10 @@ export function ProductCard({
             </span>
           )}
         </div>
+
+        {/* Sibling of the media link, never a child of it (#420): a button
+            inside an anchor is invalid, and clicking it would navigate. */}
+        {hasMedia && <ChooseOptions product={product} />}
       </div>
 
       {/* Rating row — mesonart puts stars and the review count left, the

@@ -162,6 +162,38 @@ describe('ProductCard — rendering', () => {
   })
 })
 
+/**
+ * #420 — the card gets a labelled purchase control beside the decorative eye.
+ *
+ * The decision on that ticket was to keep the eye as decoration on a media box
+ * that already navigates to the product page, and add a named button for the
+ * other destination.
+ */
+describe('ProductCard — Choose options', () => {
+  it('offers exactly one labelled trigger per card', () => {
+    render(<ProductCard product={product} />)
+    expect(
+      screen.getAllByRole('button', { name: /choose options/i })
+    ).toHaveLength(1)
+  })
+
+  it('keeps it outside the media link, so the two do not nest', () => {
+    const { container } = render(<ProductCard product={product} />)
+    const media = container.querySelector('[data-testid="media-box"]')!
+    const trigger = screen.getByRole('button', { name: /choose options/i })
+
+    expect(media.contains(trigger)).toBe(false)
+  })
+
+  it('leaves the eye decorative', () => {
+    const { container } = render(<ProductCard product={product} />)
+    const eye = container.querySelector('[data-testid="quick-view"]')!
+
+    expect(eye.getAttribute('aria-hidden')).toBe('true')
+    expect(eye.className).toContain('pointer-events-none')
+  })
+})
+
 describe('ProductCardSkeleton — D3', () => {
   it('reserves the same ratio as the real card', () => {
     const { container } = render(<ProductCardSkeleton />)
