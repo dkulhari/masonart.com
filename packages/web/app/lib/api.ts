@@ -524,6 +524,168 @@ export const productsApi = {
 };
 
 // ============================================================================
+// Reviews API (site-wide)
+// ============================================================================
+
+/**
+ * These two reads live here rather than in hooks/useReviews.ts for the same
+ * reason `catalogueReviewStats` above does: they are not product-scoped, and
+ * that module fetches against a relative `API_BASE = '/api'`. There is no Vite
+ * proxy for `/api` in this repo, so a relative request from the dev server
+ * never reaches the API at all. Everything in this module goes through
+ * getApiUrl().
+ */
+
+/** `review_media_type` on the API side. */
+export type ReviewMediaType = "image" | "video";
+
+/**
+ * Transcode pipeline state — NOT moderation, which the parent review carries.
+ * Only `ready` rows are ever returned by the public reads; the value is here
+ * because `complete` hands back a freshly-inserted row, and a video's is
+ * `processing`.
+ */
+export type ReviewMediaProcessingStatus = "processing" | "ready" | "failed";
+
+/**
+ * One photo or video attached to a review.
+ *
+ * The shape embedded in every public review read. The media wall, the upload
+ * toast and the review card all render this.
+ */
+export interface ReviewMediaItem {
+  id: string;
+  reviewId: string;
+  mediaType: ReviewMediaType;
+  url: string;
+  /** Null on a video until the transcode worker has cut a poster frame. */
+  thumbnailUrl: string | null;
+  posterUrl: string | null;
+  durationSeconds: number | null;
+  width: number | null;
+  height: number | null;
+  sortOrder: number;
+}
+
+/**
+ * A tile from GET /api/reviews/media.
+ *
+ * Flat rather than grouped by review, because both consumers render a tile per
+ * photo. It carries its parent review's context so a tile shown away from that
+ * review can still link somewhere and show a rating.
+ */
+export interface ReviewMediaFeedItem extends ReviewMediaItem {
+  productId: string;
+  rating: number;
+  reviewCreatedAt: string;
+}
+
+/**
+ * One review from GET /api/reviews.
+ *
+ * Unlike the product-scoped list, this one embeds the product: a review shown
+ * away from its detail page is unreadable without one.
+ */
+export interface ReviewFeedItem {
+  id: string;
+  productId: string;
+  rating: number;
+  title: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Null when the author's account is gone — the review survives them. */
+  author: { id: string; name: string | null } | null;
+  product: {
+    id: string;
+    title: string;
+    slug: string;
+    /** Already resolved to a single url by the API — not the image array. */
+    imageUrl: string | null;
+  };
+  media: ReviewMediaItem[];
+}
+
+export type ReviewFeedResponse = PaginatedResponse<ReviewFeedItem>;
+
+export interface ReviewFeedParams {
+  page?: number;
+  pageSize?: number;
+  sortBy?: "newest" | "highest" | "lowest";
+}
+
+export const reviewsApi = {
+  /**
+   * Every approved review across the catalogue, paginated.
+   *
+   * The product-scoped list answers "what do people say about this poster".
+   * This answers "what do people say", which is what the /reviews page and the
+   * home strip need.
+   */
+  async listAll(params?: ReviewFeedParams): Promise<ReviewFeedResponse> {
+    const queryParams: Record<string, string> = {};
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams[key] = String(value);
+        }
+      });
+    }
+
+    const queryString = new URLSearchParams(queryParams).toString();
+    const url = queryString ? `/api/reviews?${queryString}` : "/api/reviews";
+
+    const response = await fetch(`${getApiUrl()}${url}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to fetch reviews");
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Flat feed of ready customer media — the PDP wall passes a productId, the
+   * site-wide strip does not.
+   *
+   * Unwraps the `{ items, total }` envelope: the feed is capped server-side and
+   * does not paginate, so `total` is only ever `items.length` and every caller
+   * would immediately reach past it.
+   */
+  async mediaFeed(params?: {
+    productId?: string;
+  }): Promise<ReviewMediaFeedItem[]> {
+    const queryString = params?.productId
+      ? new URLSearchParams({ productId: params.productId }).toString()
+      : "";
+    const url = queryString
+      ? `/api/reviews/media?${queryString}`
+      : "/api/reviews/media";
+
+    const response = await fetch(`${getApiUrl()}${url}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || "Failed to fetch review media");
+    }
+
+    const payload = (await response.json()) as {
+      items?: ReviewMediaFeedItem[];
+    };
+
+    return payload.items ?? [];
+  },
+};
+
+// ============================================================================
 // Collections API
 // ============================================================================
 
