@@ -23,6 +23,12 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { productsApi, toFeaturedProducts } from '~/lib/api'
+import {
+  categoryHref,
+  visibleCategories,
+  type CategoryTile,
+  type FacetCounts,
+} from '~/lib/homeCategories'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ProductGrid } from '~/components/product/ProductGrid'
 import { OrganizationJsonLd } from '~/components/seo/ProductJsonLd'
@@ -37,6 +43,12 @@ import { DisplayHeading } from '~/components/ui/DisplayHeading'
 
 export interface HomePageData {
   featuredProducts: ProductCardData[]
+  /**
+   * Which categories the catalogue can actually fill (#452). Undefined means
+   * the facets call failed — see visibleCategories for why that shows nothing
+   * rather than everything.
+   */
+  categoryCounts?: FacetCounts
 }
 
 // ============================================================================
@@ -50,15 +62,32 @@ export interface HomePageData {
 const getHomePageData = createServerFn({ method: 'GET' }).handler(
   async (): Promise<HomePageData> => {
     try {
-      // Fetch featured products from API. The envelope key is `items` — see
-      // toFeaturedProducts, which is the only place that name is spelled out.
-      const featuredResponse = await productsApi.featured<ProductCardData>({
-        limit: 8,
-      })
+      /**
+       * Two independent calls, so one failing does not cost the other:
+       * featured products for the grid, facet counts to decide which category
+       * tiles have anything behind them (#452).
+       */
+      const [featured, facets] = await Promise.allSettled([
+        // The envelope key is `items` — see toFeaturedProducts, which is the
+        // only place that name is spelled out.
+        productsApi.featured<ProductCardData>({ limit: 8 }),
+        productsApi.facets(),
+      ])
+
       return {
-        featuredProducts: toFeaturedProducts(featuredResponse),
+        featuredProducts:
+          featured.status === 'fulfilled'
+            ? toFeaturedProducts(featured.value)
+            : [],
+        categoryCounts:
+          facets.status === 'fulfilled'
+            ? {
+                styles: facets.value.styles,
+                subjects: facets.value.subjects,
+              }
+            : undefined,
       }
-    } catch (error) {
+    } catch {
       // Return empty data on error to allow graceful fallback
       return {
         featuredProducts: [],
@@ -107,7 +136,8 @@ export const Route = createFileRoute('/')({
 // ============================================================================
 
 function HomePage() {
-  const { featuredProducts } = Route.useLoaderData()
+  const { featuredProducts, categoryCounts } = Route.useLoaderData()
+  const categories = visibleCategories(categoryCounts)
 
   return (
     <div className="flex flex-col">
@@ -120,8 +150,8 @@ function HomePage() {
       {/* Featured Products Section */}
       <FeaturedProductsSection products={featuredProducts} />
 
-      {/* Categories Section */}
-      <CategoriesSection />
+      {/* Categories Section — only the ones the catalogue can fill (#452) */}
+      <CategoriesSection categories={categories} />
 
       {/* AI Generator Promo Section */}
       <AIGeneratorSection />
@@ -291,41 +321,15 @@ function ProductsPlaceholder() {
 // Categories Section
 // ============================================================================
 
-const categories = [
-  {
-    name: 'Abstract',
-    slug: 'abstract',
-    description: 'Bold, expressive art pieces',
-    image: '/images/categories/abstract.jpg',
-    color: 'from-purple-600/70 to-pink-600/70',
-  },
-  {
-    name: 'Nature',
-    slug: 'nature',
-    description: 'Serene landscapes & botanicals',
-    image: '/images/categories/nature.jpg',
-    color: 'from-green-600/70 to-teal-600/70',
-  },
-  {
-    name: 'Minimalist',
-    slug: 'minimalist',
-    description: 'Clean lines, simple beauty',
-    image: '/images/categories/minimalist.jpg',
-    // Deeper than the original gray-600/slate-600: a desaturated wash over a
-    // deliberately light minimalist photo left white text with almost nothing
-    // to sit against (#357).
-    color: 'from-slate-700/80 to-slate-900/70',
-  },
-  {
-    name: 'Typography',
-    slug: 'typography',
-    description: 'Words that inspire',
-    image: '/images/categories/typography.jpg',
-    color: 'from-amber-600/70 to-orange-600/70',
-  },
-]
+/**
+ * The tiles themselves live in `~/lib/homeCategories` — they carry the facet
+ * group as well as the value, and they are filtered by what the catalogue
+ * actually holds before they get here (#452).
+ */
+function CategoriesSection({ categories }: { categories: CategoryTile[] }) {
+  // Nothing to shop by: no heading promising a section that is not there.
+  if (categories.length === 0) return null
 
-function CategoriesSection() {
   return (
     // Beige rather than the old `bg-muted/30`: that was a cool blue-gray, and
     // it is the one band tone mesonart never uses.
@@ -344,8 +348,10 @@ function CategoriesSection() {
       <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
           {categories.map((category) => (
             <a
-              key={category.slug}
-              href={`/posters?styles=${category.slug}`}
+              key={`${category.group}-${category.id}`}
+              // `?styles=` for everything is what sent Abstract — a subject —
+              // at a filter that rejects it (#452).
+              href={categoryHref(category)}
               className="group relative aspect-square overflow-hidden rounded-xl"
             >
               {/* Category Image (with gradient fallback) */}

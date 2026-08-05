@@ -29,7 +29,11 @@ import {
 describe('vocabulary sizes match the measured §1.3 lists', () => {
   const cases: Array<[string, readonly unknown[], number]> = [
     ['Style', STYLE_OPTIONS, 12],
-    ['Subject', SUBJECT_OPTIONS, 17],
+    // 17 measured on mesonart + `typography`, which is ours (#452). The home
+    // page has carried a Typography category tile since before the facet
+    // rework and there was nothing in the vocabulary for it to mean, so the
+    // tile linked to a filter the API rejects.
+    ['Subject', SUBJECT_OPTIONS, 18],
     ['Orientation', ORIENTATION_OPTIONS, 6],
     ['Vibe', VIBE_OPTIONS, 4],
     ['Room', ROOM_OPTIONS, 12],
@@ -42,6 +46,13 @@ describe('vocabulary sizes match the measured §1.3 lists', () => {
       expect(options).toHaveLength(expected);
     });
   }
+
+  it('carries typography, which mesonart does not (#452)', () => {
+    // Deliberately ours. The home page offers a Typography category; a tile
+    // is only allowed to link at a value the vocabulary knows, and the tile
+    // stays hidden until a product actually carries it.
+    expect(SUBJECT_OPTIONS.map((option) => option.id)).toContain('typography');
+  });
 
   it('Color has 13, not the 14 they list — Gray and Grey are one colour', () => {
     // Carrying both would let a shopper tick two options that can never

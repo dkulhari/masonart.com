@@ -290,31 +290,45 @@ test.describe('Home Page - Categories Section', () => {
     await expect(minimalistDesc).toBeVisible();
   });
 
-  test('should display Typography category', async ({ page }) => {
-    const typography = page.locator('h3:has-text("Typography")');
-    await expect(typography).toBeVisible();
-
-    const typographyDesc = page.locator('text=Words that inspire');
-    await expect(typographyDesc).toBeVisible();
+  test('hides a category nothing is filed under', async ({ page }) => {
+    // #452: Typography stays in the vocabulary so new art can be tagged with
+    // it, and off the page until something is. A tile onto an empty grid is
+    // worse than no tile.
+    await expect(page.locator('h3:has-text("Typography")')).toHaveCount(0);
+    await expect(
+      page.locator('a[href="/posters?subjects=typography"]')
+    ).toHaveCount(0);
   });
 
   test('should have category links with correct hrefs', async ({ page }) => {
-    // Check each category link
-    const abstractLink = page.locator('a[href="/posters?styles=abstract"]');
-    const natureLink = page.locator('a[href="/posters?styles=nature"]');
-    const minimalistLink = page.locator('a[href="/posters?styles=minimalist"]');
-    const typographyLink = page.locator('a[href="/posters?styles=typography"]');
+    // Each tile filters by the group its value actually belongs to (#452).
+    // `?styles=` for all four is what sent Abstract — a subject — at a filter
+    // the API rejects.
+    //
+    // Scoped to the section: the header's styles nav and the footer link at
+    // some of these same values, so an unscoped locator resolves to several.
+    const categories = page.locator(
+      'section:has(h2:has-text("Shop by Style"))'
+    );
 
-    await expect(abstractLink).toBeVisible();
-    await expect(natureLink).toBeVisible();
-    await expect(minimalistLink).toBeVisible();
-    await expect(typographyLink).toBeVisible();
+    await expect(
+      categories.locator('a[href="/posters?subjects=abstract"]')
+    ).toBeVisible();
+    await expect(
+      categories.locator('a[href="/posters?subjects=landscape"]')
+    ).toBeVisible();
+    await expect(
+      categories.locator('a[href="/posters?styles=minimalist-art"]')
+    ).toBeVisible();
   });
 
   test('should navigate to filtered posters when clicking category', async ({ page }) => {
-    const abstractLink = page.locator('a[href="/posters?styles=abstract"]');
+    // Scoped: the footer links the same value (#452).
+    const abstractLink = page
+      .locator('section:has(h2:has-text("Shop by Style"))')
+      .locator('a[href="/posters?subjects=abstract"]');
     await abstractLink.click();
-    await expect(page).toHaveURL(/\/posters\?styles=abstract/);
+    await expect(page).toHaveURL(/\/posters\?subjects=abstract/);
   });
 
   test('should display categories in grid layout', async ({ page }) => {
@@ -327,7 +341,9 @@ test.describe('Home Page - Categories Section', () => {
     // Set desktop viewport for hover test
     await page.setViewportSize({ width: 1280, height: 720 });
 
-    const categoryLink = page.locator('a[href="/posters?styles=abstract"]');
+    const categoryLink = page
+      .locator('section:has(h2:has-text("Shop by Style"))')
+      .locator('a[href="/posters?subjects=abstract"]');
 
     // Before hover, Explore text should be hidden (opacity-0)
     const exploreText = categoryLink.locator('text=Explore');
@@ -839,12 +855,15 @@ test.describe('Home Page - Navigation', () => {
   });
 
   test('should navigate correctly from category links', async ({ page }) => {
-    // Test navigation from category card
-    const abstractLink = page.locator('a[href="/posters?styles=abstract"]');
+    // Abstract is a subject, and the tile says so now (#452). Scoped to the
+    // section — the footer carries the same link.
+    const abstractLink = page
+      .locator('section:has(h2:has-text("Shop by Style"))')
+      .locator('a[href="/posters?subjects=abstract"]');
     await abstractLink.click();
 
     // Should navigate to filtered posters page
-    await expect(page).toHaveURL(/\/posters\?styles=abstract/);
+    await expect(page).toHaveURL(/\/posters\?subjects=abstract/);
 
     // Go back to home
     await page.goBack();
@@ -904,12 +923,26 @@ test.describe('Home Page - Content', () => {
     expect(priceCount).toBeGreaterThanOrEqual(1);
   });
 
-  test('should display correct number of categories', async ({ page }) => {
-    // Should have 4 category cards
-    const categoryLinks = page.locator('a[href^="/posters?styles="]');
-    const count = await categoryLinks.count();
+  test('shows one tile per category the catalogue can fill', async ({ page }) => {
+    // Four are defined; the row shows the ones some artwork actually carries
+    // (#452), so this counts the tiles rather than asserting a fixed four.
+    // Scoped: the discover rail and the styles nav link `?styles=` too.
+    const categorySection = page.locator(
+      'section:has(h2:has-text("Shop by Style"))'
+    );
+    const tiles = categorySection.locator(
+      'a[href^="/posters?styles="], a[href^="/posters?subjects="]'
+    );
 
-    expect(count).toBe(4); // Abstract, Nature, Minimalist, Typography
+    const count = await tiles.count();
+    expect(count).toBeGreaterThan(0);
+    expect(count).toBeLessThanOrEqual(4);
+
+    // Whatever renders, every one of them filters by a real facet parameter.
+    for (let i = 0; i < count; i += 1) {
+      const href = await tiles.nth(i).getAttribute('href');
+      expect(href).toMatch(/^\/posters\?(styles|subjects)=[a-z-]+$/);
+    }
   });
 
   test('should display correct number of value propositions', async ({ page }) => {

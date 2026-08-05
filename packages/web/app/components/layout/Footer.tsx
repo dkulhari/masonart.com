@@ -88,14 +88,20 @@ export function Footer() {
               <li>
                 <FooterLink to="/posters">All Posters</FooterLink>
               </li>
+              {/* Same defect as the home tiles (#452): these named
+                  `abstract`, `botanical` and `minimalist` as STYLES. None is
+                  a style id — `abstract` and `flowers` are subjects,
+                  `minimalist-art` is the style — so all three landed on an
+                  unfiltered grid. "Botanical" is now labelled by what it
+                  actually filters. */}
               <li>
-                <FooterLink to="/posters?styles=abstract">Abstract Art</FooterLink>
+                <FooterLink to="/posters?subjects=abstract">Abstract Art</FooterLink>
               </li>
               <li>
-                <FooterLink to="/posters?styles=botanical">Botanical</FooterLink>
+                <FooterLink to="/posters?subjects=flowers">Flowers</FooterLink>
               </li>
               <li>
-                <FooterLink to="/posters?styles=minimalist">Minimalist</FooterLink>
+                <FooterLink to="/posters?styles=minimalist-art">Minimalist</FooterLink>
               </li>
               <li>
                 <FooterLink to="/create">Create with AI</FooterLink>

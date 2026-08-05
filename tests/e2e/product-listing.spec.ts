@@ -1300,32 +1300,36 @@ test.describe('Product Listing - Navigation', () => {
     }
   });
 
-  test.fixme(
-    'should navigate from home page category link',
-    async ({ page }) => {
-      /**
-       * BLOCKED on #452 — the home tiles are the bug, not this test.
-       *
-       * `routes/index.tsx:294` still lists slugs `abstract`, `nature`,
-       * `minimalist`, `typography` and links them as `?styles=<slug>`. None
-       * of those is a STYLE_OPTIONS id since #395/#415 (they are
-       * `minimalist-art`, `pop-art`, …; `abstract` is a SUBJECT), so every
-       * tile lands on a collection that cannot filter by what it promised.
-       *
-       * Repointing this test at a valid id would make the suite green while
-       * leaving four broken tiles on the busiest page of the site.
-       */
-      await page.goto('/');
+  test('should navigate from home page category link', async ({ page }) => {
+    // Was fixme against #452. The tiles carried loose slugs linked as
+    // `?styles=<slug>`; Abstract is a SUBJECT, so it now goes out as one.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/', { waitUntil: 'networkidle' });
 
-      const tile = page.locator(`a[href="/posters?styles=${STYLE.id}"]`).first();
-      await tile.click();
+    // Scoped: the footer links the same value (#452).
+    const tile = page
+      .locator('section:has(h2:has-text("Shop by Style"))')
+      .locator('a[href="/posters?subjects=abstract"]');
+    await expect(tile).toBeVisible();
+    await tile.click();
 
-      await expect(page).toHaveURL(new RegExp(`/posters\\?styles=${STYLE.id}`));
-      await expect(
-        desktopChips(page).locator(`button:has-text("${STYLE.chip}")`).first()
-      ).toBeVisible({ timeout: 10000 });
-    }
-  );
+    await expect(page).toHaveURL(/\/posters\?subjects=abstract/);
+    // Landing on a collection that is genuinely filtered is the point.
+    await expect(
+      desktopChips(page).locator('button:has-text("abstract")').first()
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test('offers no category tile the catalogue cannot fill', async ({ page }) => {
+    // Typography is in the vocabulary so new art can be filed under it, and
+    // nothing carries it yet — so no tile, rather than a tile onto an empty
+    // grid (#452).
+    await page.goto('/', { waitUntil: 'networkidle' });
+
+    await expect(
+      page.locator('a[href="/posters?subjects=typography"]')
+    ).toHaveCount(0);
+  });
 });
 
 // ============================================================================

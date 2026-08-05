@@ -78,6 +78,16 @@ export const SUBJECT_OPTIONS: readonly FacetOption[] = [
   option('portraits', 'Portraits'),
   option('sea-and-beach', 'Sea & Beach'),
   option('still-life', 'Still Life'),
+  /**
+   * OURS, not measured on mesonart (#452).
+   *
+   * The home page has offered a Typography category since long before this
+   * vocabulary existed, and it linked at `?styles=typography` — a value
+   * nothing knew, so the tile landed on an unfiltered grid. A category the
+   * storefront advertises has to be a category art can be filed under; the
+   * tile stays hidden until something is.
+   */
+  option('typography', 'Typography'),
 ];
 
 /**
