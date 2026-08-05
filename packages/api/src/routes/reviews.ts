@@ -28,6 +28,7 @@ import {
   type ReviewMediaType,
 } from "../database/schema/review-media";
 import { products } from "../database/schema/products";
+import { orderItems, type OrderItemSnapshot } from "../database/schema/orders";
 import { users } from "../database/schema/users";
 import {
   requireAuth,
@@ -195,6 +196,135 @@ async function withMedia<T extends { id: string }>(
   return rows.map((row) => ({ ...row, media: byReview.get(row.id) ?? [] }));
 }
 
+// ============================================================================
+// Review card shape
+// ============================================================================
+
+/**
+ * The variant the reviewer actually bought — the "Item type:" line on a card.
+ *
+ * Returned as parts rather than a composed string. "40''H x 30''W /
+ * Stretch+Gold Frame" is presentation: the separator, the ordering and whether
+ * a frameless purchase says anything at all are the card's call, and a string
+ * baked here would have to be parsed back apart the first time one surface
+ * wanted it differently.
+ *
+ * Every part is nullable. A frameless poster is a real purchase, not a missing
+ * value.
+ */
+interface ReviewItemTypePayload {
+  sizeLabel: string | null;
+  frameName: string | null;
+  frameType: string | null;
+}
+
+/**
+ * The product chip on a review card: enough to render a thumbnail, a title and
+ * a link, plus the sku the badge shows.
+ */
+interface ReviewProductPayload {
+  id: string;
+  title: string;
+  slug: string;
+  sku: string;
+  imageUrl: string | null;
+}
+
+/**
+ * Columns every read selects for the product chip. One definition, three
+ * reads — the same reasoning as `reviewMediaColumns` above.
+ *
+ * `images` is selected but never returned: the chip carries one url, chosen
+ * the same way the product cards choose it, and the caller has no use for the
+ * whole array.
+ */
+const reviewProductColumns = {
+  id: products.id,
+  title: products.title,
+  slug: products.slug,
+  sku: products.sku,
+  images: products.images,
+};
+
+type ReviewProductRow = {
+  id: string;
+  title: string;
+  slug: string;
+  sku: string;
+  images: unknown;
+};
+
+/**
+ * Columns every read selects from the order item behind the review.
+ *
+ * One join on `reviews.order_item_id`, never a lookup per row — the whole
+ * point of the shared definition next door. The size and frame live inside the
+ * purchase-time `snapshot`, so this is one jsonb column rather than three.
+ */
+const reviewOrderItemColumns = {
+  itemSnapshot: orderItems.snapshot,
+};
+
+function toItemType(
+  snapshot: OrderItemSnapshot | null | undefined
+): ReviewItemTypePayload | null {
+  if (!snapshot) return null;
+
+  const itemType = {
+    sizeLabel: snapshot.sizeLabel ?? null,
+    frameName: snapshot.frameName ?? null,
+    frameType: snapshot.frameType ?? null,
+  };
+
+  // A snapshot with none of the three is no better than no snapshot; null lets
+  // the card drop the line rather than render "Item type:" followed by nothing.
+  return itemType.sizeLabel || itemType.frameName || itemType.frameType
+    ? itemType
+    : null;
+}
+
+function toProductChip(
+  product: ReviewProductRow | null | undefined
+): ReviewProductPayload | null {
+  if (!product?.id) return null;
+
+  return {
+    id: product.id,
+    title: product.title,
+    slug: product.slug,
+    sku: product.sku,
+    imageUrl: mainImage(product.images as ProductImage[] | null)?.url ?? null,
+  };
+}
+
+/**
+ * Turn one selected review row into the public card shape.
+ *
+ * `verified` is derived, not stored. `reviews.order_item_id` is NOT NULL
+ * behind an FK, so a row in this table *is* a purchase — a column would only
+ * be a second, driftable copy of that fact.
+ *
+ * The product is passed in rather than read off the row because the two list
+ * reads get it from different places: the site-wide list joins it per row,
+ * while the product-scoped list already looked the one product up to decide
+ * whether to 404 and has no reason to join it again.
+ */
+function toReviewCard<T extends { itemSnapshot?: OrderItemSnapshot | null }>(
+  row: T,
+  product: ReviewProductRow | null | undefined
+) {
+  // `itemSnapshot` is the raw purchase record and never leaves the API; a row
+  // that also carries a joined `product` has it replaced by the chip below.
+  const { itemSnapshot, ...rest } = row;
+
+  return {
+    ...rest,
+    verified: true as const,
+    itemType: toItemType(itemSnapshot),
+    product: toProductChip(product),
+  };
+}
+
 /**
  * Rating summary for a product. Mirrors ReviewStatsResponse in
  * packages/web/app/hooks/useReviews.ts — keep the two in step.
@@ -260,15 +390,16 @@ export function buildReviewStats(
  * lists survived edits and deletions for the full 5-minute TTL.
  */
 async function invalidateProductReviewCaches(productId: string): Promise<void> {
-  // Keep this prefix in step with the key the product list writes. It was
-  // bumped to v2 when media was embedded; a pattern still pointing at the v1
-  // shape deletes nothing and the stale entries live out their full TTL.
-  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:v2:${productId}:*`);
+  // Keep these prefixes in step with the keys the reads write. They were
+  // bumped to v2 when media was embedded and again when the card fields
+  // landed; a pattern still pointing at an older shape deletes nothing and the
+  // stale entries live out their full TTL.
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:v3:${productId}:*`);
   await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}stats:${productId}`);
 
   // A review edit or deletion also moves the site-wide surfaces: the /reviews
   // page, the home strip and the media wall all read the same rows.
-  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}all:v1:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}all:v2:*`);
   await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}media:v1:*`);
   await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}stats:catalogue:v1`);
 }
@@ -360,11 +491,12 @@ productReviewsApp.get(
 
     // Build cache key.
     //
-    // v2 because the payload gained `media` on every item. Without the bump,
-    // nodes with a warm cache keep serving the media-less v1 shape for the
-    // full TTL after deploy, and the gallery renders empty on exactly the
-    // products that have photos.
-    const cacheKey = `${REVIEW_CACHE_PREFIX}product:v2:${productId}:${page}:${pageSize}:${sortBy}`;
+    // v2 added `media` on every item; v3 adds `verified`, `itemType` and the
+    // product chip. Same reason both times: nodes with a warm cache keep
+    // serving the older shape for the full TTL after deploy, so the cards that
+    // land on those nodes render without the badge or the item type while the
+    // ones next to them render with it.
+    const cacheKey = `${REVIEW_CACHE_PREFIX}product:v3:${productId}:${page}:${pageSize}:${sortBy}`;
 
     // Try cache first (only for non-authenticated requests)
     if (!user) {
@@ -383,9 +515,15 @@ productReviewsApp.get(
     }
 
     try {
-      // Check if product exists
+      // Check if product exists.
+      //
+      // Selects the chip columns rather than just the id: every review on this
+      // page is about this one product, so the lookup that already decides the
+      // 404 is also the cheapest possible source for the chip. Joining
+      // `products` per row would repeat the same values down the page for no
+      // extra information.
       const product = await db
-        .select({ id: products.id })
+        .select(reviewProductColumns)
         .from(products)
         .where(eq(products.id, productId))
         .limit(1);
@@ -393,6 +531,8 @@ productReviewsApp.get(
       if (!product.length) {
         return c.json({ error: "Product not found" }, 404);
       }
+
+      const productChip = product[0] as ReviewProductRow;
 
       // Build sort order
       const orderBy = {
@@ -433,9 +573,14 @@ productReviewsApp.get(
             id: users.id,
             name: users.name,
           },
+          ...reviewOrderItemColumns,
         })
         .from(reviews)
         .leftJoin(users, eq(reviews.userId, users.id))
+        // One join for the whole page's item types. left, not inner: an order
+        // item that has gone missing costs the review its "Item type:" line,
+        // not its place on the page.
+        .leftJoin(orderItems, eq(reviews.orderItemId, orderItems.id))
         .where(baseCondition)
         .orderBy(orderBy)
         .limit(pageSize)
@@ -458,9 +603,11 @@ productReviewsApp.get(
               id: users.id,
               name: users.name,
             },
+            ...reviewOrderItemColumns,
           })
           .from(reviews)
           .leftJoin(users, eq(reviews.userId, users.id))
+          .leftJoin(orderItems, eq(reviews.orderItemId, orderItems.id))
           .where(
             and(
               eq(reviews.productId, productId),
@@ -472,8 +619,14 @@ productReviewsApp.get(
 
       // Embed each review's ready media. Two grouped queries at most, never
       // one per review.
-      const items = await withMedia(reviewList);
-      const pendingWithMedia = user ? await withMedia(userPendingReviews) : [];
+      const items = (await withMedia(reviewList)).map((row) =>
+        toReviewCard(row, productChip)
+      );
+      const pendingWithMedia = user
+        ? (await withMedia(userPendingReviews)).map((row) =>
+            toReviewCard(row, productChip)
+          )
+        : [];
 
       const result = {
         items,
@@ -648,7 +801,10 @@ reviewsApp.get(
     // sortBy is part of the key, not just the query: two orderings share a
     // page number, and a key without it serves "highest" from the "newest"
     // entry.
-    const cacheKey = `${REVIEW_CACHE_PREFIX}all:v1:${page}:${pageSize}:${sortBy}`;
+    //
+    // v2 since the item gained `verified`, `itemType` and the sku on its chip;
+    // a warm node on v1 would serve cards the grid renders half-empty.
+    const cacheKey = `${REVIEW_CACHE_PREFIX}all:v2:${page}:${pageSize}:${sortBy}`;
 
     const cached = await getCached<Record<string, unknown>>(cacheKey);
     if (cached) {
@@ -684,36 +840,23 @@ reviewsApp.get(
             id: users.id,
             name: users.name,
           },
-          product: {
-            id: products.id,
-            title: products.title,
-            slug: products.slug,
-            images: products.images,
-          },
+          product: reviewProductColumns,
+          ...reviewOrderItemColumns,
         })
         .from(reviews)
         // inner join: a review whose product has been deleted has nowhere to
         // link to, so it is not showable on a site-wide surface.
         .innerJoin(products, eq(reviews.productId, products.id))
         .leftJoin(users, eq(reviews.userId, users.id))
+        // One join for the whole page's item types, never a lookup per row.
+        .leftJoin(orderItems, eq(reviews.orderItemId, orderItems.id))
         .where(baseCondition)
         .orderBy(orderBy)
         .limit(pageSize)
         .offset((page - 1) * pageSize);
 
-      const items = (await withMedia(reviewList)).map(
-        ({ product, ...review }) => ({
-          ...review,
-          product: {
-            id: product.id,
-            title: product.title,
-            slug: product.slug,
-            // One url, chosen the same way the cards choose it — the caller
-            // renders a thumbnail and has no use for the whole image array.
-            imageUrl:
-              mainImage(product.images as ProductImage[] | null)?.url ?? null,
-          },
-        })
+      const items = (await withMedia(reviewList)).map((row) =>
+        toReviewCard(row, row.product)
       );
 
       const payload = {
@@ -764,9 +907,15 @@ reviewsApp.get("/:reviewId", async (c) => {
           id: users.id,
           name: users.name,
         },
+        product: reviewProductColumns,
+        ...reviewOrderItemColumns,
       })
       .from(reviews)
       .leftJoin(users, eq(reviews.userId, users.id))
+      // Both joins on the one query the route already made: a single review is
+      // still a card, and a card needs its chip and its item type.
+      .leftJoin(products, eq(reviews.productId, products.id))
+      .leftJoin(orderItems, eq(reviews.orderItemId, orderItems.id))
       .where(eq(reviews.id, reviewId))
       .limit(1);
 
@@ -788,7 +937,9 @@ reviewsApp.get("/:reviewId", async (c) => {
     // query for media we are about to throw away.
     const media = (await fetchMediaByReview([review.id])).get(review.id) ?? [];
 
-    return c.json({ review: { ...review, media } });
+    return c.json({
+      review: { ...toReviewCard(review, review.product), media },
+    });
   } catch (error) {
     console.error("Error fetching review:", error);
     return c.json({ error: "Failed to fetch review" }, 500);

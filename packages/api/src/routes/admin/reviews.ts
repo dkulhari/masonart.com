@@ -178,11 +178,13 @@ function reviewMediaKeyFromUrl(url: string | null): string | null {
  * Drop every cached read a review's media appears in.
  *
  * Mirrors invalidateProductReviewCaches() in routes/reviews.ts — keep the two
- * in step, including the `v2` product-list bump that came with media.
+ * in step, including the product-list version bumps that came with media (v2)
+ * and with the card fields (v3). A pattern left on an older version matches
+ * nothing, and moderation silently stops busting the lists.
  */
 async function invalidateReviewMediaCaches(productId: string): Promise<void> {
-  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:v2:${productId}:*`);
-  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}all:v1:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:v3:${productId}:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}all:v2:*`);
   await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}media:v1:*`);
 }
 

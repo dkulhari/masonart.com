@@ -228,9 +228,9 @@ async function countMedia(reviewId: string): Promise<number> {
  * changes the PDP wall, the /reviews page and the home strip alike.
  */
 async function invalidateReviewCaches(productId: string): Promise<void> {
-  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:v2:${productId}:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:v3:${productId}:*`);
   await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}stats:${productId}`);
-  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}all:v1:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}all:v2:*`);
   await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}media:v1:*`);
 }
 

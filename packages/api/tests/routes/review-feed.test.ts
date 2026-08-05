@@ -276,7 +276,8 @@ describe('GET /api/reviews', () => {
     await app.request('/api/reviews')
 
     const key = setCachedMock.mock.calls[0]?.[0] as string
-    expect(key).toContain('all:v1:')
+    // v2 since the card fields landed (#495)
+    expect(key).toContain('all:v2:')
   })
 
   it('reports 500 rather than an empty list when the query fails', async () => {
@@ -401,7 +402,8 @@ describe('GET /api/products/:productId/reviews', () => {
     await app.request(`/api/products/${PRODUCT_ID}/reviews`)
 
     const key = setCachedMock.mock.calls[0]?.[0] as string
-    expect(key).toContain('product:v2:')
+    // v3 since the card fields landed (#495)
+    expect(key).toContain('product:v3:')
   })
 
   it('still restricts media to ready', async () => {
