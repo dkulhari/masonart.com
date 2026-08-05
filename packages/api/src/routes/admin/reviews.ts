@@ -7,6 +7,7 @@
  * - GET /api/admin/reviews/:reviewId - Get full review details
  * - PATCH /api/admin/reviews/:reviewId - Moderate review (approve/reject)
  * - DELETE /api/admin/reviews/:reviewId - Delete any review
+ * - DELETE /api/admin/reviews/:reviewId/media/:mediaId - Delete one attachment
  *
  * All endpoints require admin authentication.
  * Following patterns from docs/poster-app-tech-stack.md
@@ -15,10 +16,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, asc, sql, gte } from "drizzle-orm";
+import { eq, and, desc, asc, sql, gte, inArray } from "drizzle-orm";
 
 import { db } from "../../database";
 import { reviews, type ReviewStatus } from "../../database/schema/reviews";
+import { reviewMedia } from "../../database/schema/review-media";
 import { products } from "../../database/schema/products";
 import { users } from "../../database/schema/users";
 import {
@@ -26,7 +28,8 @@ import {
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
-import { deleteCached } from "../../lib/redis";
+import { deleteCached, deleteCachedPattern } from "../../lib/redis";
+import { deleteFile } from "../../lib/storage";
 
 // ============================================================================
 // Constants
@@ -35,6 +38,14 @@ import { deleteCached } from "../../lib/redis";
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 const REVIEW_CACHE_PREFIX = "reviews:";
+
+/**
+ * Every review-media object key starts here — see StoragePaths.reviewMedia().
+ */
+const REVIEW_MEDIA_KEY_PREFIX = "reviews/";
+
+/** Loose UUID shape, matching the ids Postgres hands back. */
+const UUID_PATTERN = /^[0-9a-f-]{36}$/i;
 
 // ============================================================================
 // Validation Schemas
@@ -59,6 +70,121 @@ const moderateReviewSchema = z.object({
   status: z.enum(["approved", "rejected"]),
   moderatorNotes: z.string().max(1000).optional(),
 });
+
+// ============================================================================
+// Review media
+// ============================================================================
+
+/**
+ * One attachment, as the moderation screens see it.
+ *
+ * Unlike the public payload in routes/reviews.ts this carries
+ * `processingStatus` and `processingError`: a transcode that is still running
+ * or that failed outright has to be visible to the person deciding whether the
+ * review is publishable, not silently missing from their screen.
+ */
+interface AdminReviewMediaPayload {
+  id: string;
+  reviewId: string;
+  mediaType: string;
+  url: string;
+  thumbnailUrl: string | null;
+  posterUrl: string | null;
+  durationSeconds: number | null;
+  width: number | null;
+  height: number | null;
+  sizeBytes: number | null;
+  sortOrder: number;
+  processingStatus: string;
+  processingError: string | null;
+  createdAt: Date;
+}
+
+/** Columns every admin read of review media selects. */
+const adminReviewMediaColumns = {
+  id: reviewMedia.id,
+  reviewId: reviewMedia.reviewId,
+  mediaType: reviewMedia.mediaType,
+  url: reviewMedia.url,
+  thumbnailUrl: reviewMedia.thumbnailUrl,
+  posterUrl: reviewMedia.posterUrl,
+  durationSeconds: reviewMedia.durationSeconds,
+  width: reviewMedia.width,
+  height: reviewMedia.height,
+  sizeBytes: reviewMedia.sizeBytes,
+  sortOrder: reviewMedia.sortOrder,
+  processingStatus: reviewMedia.processingStatus,
+  processingError: reviewMedia.processingError,
+  createdAt: reviewMedia.createdAt,
+};
+
+/**
+ * Attach `media` to a page of review rows, preserving their order.
+ *
+ * Deliberately NO `processingStatus` filter. The public reads restrict
+ * themselves to `ready` because a half-transcoded tile looks like a broken
+ * store; the moderation queue is the one screen where a stuck or failed
+ * pipeline needs to be visible, so it takes every row.
+ *
+ * One `inArray` query for the whole page — never one per review.
+ */
+async function withAdminMedia<T extends { id: string }>(
+  rows: T[]
+): Promise<Array<T & { media: AdminReviewMediaPayload[] }>> {
+  if (rows.length === 0) return [];
+
+  const mediaRows = await db
+    .select(adminReviewMediaColumns)
+    .from(reviewMedia)
+    .where(
+      inArray(
+        reviewMedia.reviewId,
+        rows.map((row) => row.id)
+      )
+    )
+    .orderBy(asc(reviewMedia.sortOrder), asc(reviewMedia.createdAt));
+
+  const byReview = new Map<string, AdminReviewMediaPayload[]>();
+  for (const row of mediaRows) {
+    const existing = byReview.get(row.reviewId);
+    if (existing) {
+      existing.push(row);
+    } else {
+      byReview.set(row.reviewId, [row]);
+    }
+  }
+
+  return rows.map((row) => ({ ...row, media: byReview.get(row.id) ?? [] }));
+}
+
+/**
+ * The R2 object key behind a stored media URL, or null.
+ *
+ * The URL is stored rather than derived, so this refuses to return anything
+ * outside the `reviews/` prefix: a malformed or hand-edited row must never be
+ * able to turn a media deletion into a deletion of product imagery.
+ */
+function reviewMediaKeyFromUrl(url: string | null): string | null {
+  if (!url) return null;
+
+  const marker = url.indexOf(`/${REVIEW_MEDIA_KEY_PREFIX}`);
+  if (marker === -1) return null;
+
+  const key = url.slice(marker + 1).split("?")[0] ?? "";
+  return key.length > REVIEW_MEDIA_KEY_PREFIX.length ? key : null;
+}
+
+/**
+ * Drop every cached read a review's media appears in.
+ *
+ * Mirrors invalidateProductReviewCaches() in routes/reviews.ts — keep the two
+ * in step, including the `v2` product-list bump that came with media.
+ */
+async function invalidateReviewMediaCaches(productId: string): Promise<void> {
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:v2:${productId}:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}all:v1:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}media:v1:*`);
+}
 
 // ============================================================================
 // Route Handler
@@ -169,8 +295,12 @@ adminReviewsApp.get(
         product: productMap[review.productId] || null,
       }));
 
+      // Attach every attachment, at any processing status — the queue is
+      // where a stuck transcode has to surface.
+      const items = await withAdminMedia(reviewsWithProduct);
+
       return c.json({
-        items: reviewsWithProduct,
+        items,
         total,
         page,
         pageSize,
@@ -310,8 +440,11 @@ adminReviewsApp.get("/:reviewId", async (c) => {
       moderator = moderatorResult[0] || null;
     }
 
+    // Same rule as the list: every attachment, whatever the pipeline did to it
+    const [reviewWithMedia] = await withAdminMedia([review]);
+
     return c.json({
-      ...review,
+      ...reviewWithMedia,
       product: productResult[0] || null,
       moderator,
     });
@@ -435,6 +568,89 @@ adminReviewsApp.delete("/:reviewId", async (c) => {
   } catch (error) {
     console.error("Error deleting review:", error);
     return c.json({ error: "Failed to delete review" }, 500);
+  }
+});
+
+// ============================================================================
+// DELETE /api/admin/reviews/:reviewId/media/:mediaId - Delete One Attachment
+// ============================================================================
+
+/**
+ * Strip a single photo or video from a review.
+ *
+ * There is no separate media moderation queue: media inherits its parent
+ * review's status. This is the escape hatch for the case that rule cannot
+ * express — one bad file on an otherwise good review, where rejecting the
+ * whole review would punish a legitimate customer for one photo.
+ *
+ * The parent review is deliberately left untouched: status, moderator and
+ * notes all stay as they were.
+ */
+adminReviewsApp.delete("/:reviewId/media/:mediaId", async (c) => {
+  const reviewId = c.req.param("reviewId");
+  const mediaId = c.req.param("mediaId");
+
+  if (!reviewId || !UUID_PATTERN.test(reviewId)) {
+    return c.json({ error: "Invalid review ID" }, 400);
+  }
+
+  if (!mediaId || !UUID_PATTERN.test(mediaId)) {
+    return c.json({ error: "Invalid media ID" }, 400);
+  }
+
+  try {
+    // Scoped to the review in the path, so a mediaId belonging to a different
+    // review is a 404 rather than a cross-review deletion. The join carries
+    // productId, which the cache invalidation below needs.
+    const mediaResult = await db
+      .select({
+        id: reviewMedia.id,
+        reviewId: reviewMedia.reviewId,
+        url: reviewMedia.url,
+        thumbnailUrl: reviewMedia.thumbnailUrl,
+        posterUrl: reviewMedia.posterUrl,
+        productId: reviews.productId,
+      })
+      .from(reviewMedia)
+      .innerJoin(reviews, eq(reviewMedia.reviewId, reviews.id))
+      .where(and(eq(reviewMedia.id, mediaId), eq(reviewMedia.reviewId, reviewId)))
+      .limit(1);
+
+    const media = mediaResult[0];
+
+    if (!media) {
+      return c.json({ error: "Media not found" }, 404);
+    }
+
+    // The rendition, its thumbnail and (for video) the poster frame.
+    const keys = [media.url, media.thumbnailUrl, media.posterUrl]
+      .map(reviewMediaKeyFromUrl)
+      .filter((key): key is string => key !== null);
+
+    // allSettled, not all: an object that is already gone must not leave the
+    // row behind, which would put a dead URL back on the storefront.
+    const results = await Promise.allSettled(keys.map((key) => deleteFile(key)));
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected") {
+        console.error(
+          `Failed to delete review media object ${keys[index]}:`,
+          result.reason
+        );
+      }
+    }
+
+    await db.delete(reviewMedia).where(eq(reviewMedia.id, mediaId));
+
+    await invalidateReviewMediaCaches(media.productId);
+
+    return c.json({
+      message: "Review media deleted successfully",
+      reviewId,
+      mediaId,
+    });
+  } catch (error) {
+    console.error("Error deleting review media:", error);
+    return c.json({ error: "Failed to delete review media" }, 500);
   }
 });
 
