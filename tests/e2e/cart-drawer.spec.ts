@@ -65,17 +65,35 @@ test.describe('Cart Drawer - opening', () => {
     await expect(page).toHaveURL('/');
   });
 
-  test('slides in from the LEFT edge', async ({ page }) => {
+  test('slides in from the RIGHT edge', async ({ page }) => {
     await cartButton(page).click();
     await expect(drawer(page)).toBeVisible();
 
-    // The whole point of #460: the panel is flush against x=0, not against the
-    // right edge the way the old CartSheet was.
+    // The point of #460: the panel is flush against the right edge, the way
+    // their `drawer--end` is, and does not reach the left one.
     const box = await drawer(page).boundingBox();
     const viewport = page.viewportSize();
     expect(box).not.toBeNull();
-    expect(box!.x).toBeLessThanOrEqual(1);
-    expect(box!.x + box!.width).toBeLessThan(viewport!.width);
+    expect(viewport!.width - (box!.x + box!.width)).toBeLessThanOrEqual(1);
+    expect(box!.x).toBeGreaterThan(0);
+  });
+
+  test('slides at their measured 0.6s, not a stock 150ms', async ({ page }) => {
+    await cartButton(page).click();
+    await expect(drawer(page)).toBeVisible();
+
+    // A class assertion cannot catch this: `.animate-in` sets its own 150ms
+    // duration and beat the duration utility sitting next to it. Only the
+    // computed value proves the drawer actually slows down.
+    const timing = await drawer(page).evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return {
+        duration: cs.animationDuration,
+        easing: cs.animationTimingFunction,
+      };
+    });
+    expect(timing.duration).toBe('0.6s');
+    expect(timing.easing).toBe('cubic-bezier(0.7, 0, 0.2, 1)');
   });
 
   test('closes on Escape', async ({ page }) => {
@@ -92,11 +110,10 @@ test.describe('Cart Drawer - opening', () => {
     await expect(drawer(page)).toBeVisible();
 
     // The backdrop is inset-0, so it sits UNDER the panel too — the position is
-    // element-relative, and anything inside the first 448px (max-w-md) hits the
-    // drawer instead. Click well clear of it, on the right.
-    const viewport = page.viewportSize();
+    // element-relative, and anything within 448px (max-w-md) of the right edge
+    // hits the drawer instead. Click well clear of it, on the left.
     await page.getByTestId('cart-drawer-backdrop').click({
-      position: { x: viewport!.width - 100, y: 300 },
+      position: { x: 100, y: 300 },
     });
 
     await expect(drawer(page)).toBeHidden();

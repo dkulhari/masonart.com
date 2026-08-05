@@ -1,8 +1,14 @@
 /**
  * CartDrawer Component
  *
- * Slide-out cart panel anchored to the LEFT edge, matching mesonart.com (#460).
+ * Slide-out cart panel anchored to the RIGHT edge, matching mesonart.com (#460).
  * The header cart control opens it; `/cart` stays routable for deep links.
+ *
+ * Measured off their `cart-drawer` element: the panel is `drawer--end` (right;
+ * their menu drawer is the `drawer--start` one), flush against the edge, and
+ * moves on `transform 0.6s cubic-bezier(.7, 0, .2, 1)` — twice the length of a
+ * default Tailwind slide, which is what stops a full-height panel from
+ * snapping. That curve is `--ease-drawer`.
  *
  * Open state lives on the cart store rather than in props, so the header, the
  * PDP and the quickview can all open the cart without prop-drilling through
@@ -12,6 +18,7 @@
 
 import { useEffect, useCallback, useRef } from 'react'
 import { X, ShoppingCart, ArrowRight, ShoppingBag } from 'lucide-react'
+import { Button, buttonVariants } from '~/components/ui/Button'
 import { cn, formatPrice } from '~/lib/utils'
 import {
   useCartItems,
@@ -91,7 +98,7 @@ export function CartDrawer({ className }: CartDrawerProps) {
       {/* Backdrop */}
       <div
         data-testid="cart-drawer-backdrop"
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm animate-drawer-backdrop-in"
         onClick={closeDrawer}
         aria-hidden="true"
       />
@@ -103,9 +110,9 @@ export function CartDrawer({ className }: CartDrawerProps) {
         aria-modal="true"
         aria-labelledby="cart-drawer-title"
         className={cn(
-          'fixed left-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl',
+          'fixed right-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl',
           'flex flex-col',
-          'animate-in slide-in-from-left duration-300',
+          'animate-drawer-in-right',
           className
         )}
       >
@@ -122,15 +129,23 @@ export function CartDrawer({ className }: CartDrawerProps) {
               </span>
             )}
           </div>
-          <button
+          {/*
+            Theirs is `button button--secondary button--close`: the same button
+            as everywhere else on the site, in its borderless variant, 48px
+            square and round. Ours is the Button primitive so the next palette
+            decision reaches it too — `rounded-lg p-2` here was the last bespoke
+            button left in the drawer.
+          */}
+          <Button
             ref={closeButtonRef}
-            type="button"
+            variant="ghost"
+            size="icon"
             onClick={closeDrawer}
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="h-12 w-12"
             aria-label="Close cart"
           >
             <X className="h-5 w-5" />
-          </button>
+          </Button>
         </div>
 
         {/* Cart Content */}
@@ -169,9 +184,10 @@ export function CartDrawer({ className }: CartDrawerProps) {
 
               {/* Action Buttons */}
               <div className="space-y-2">
+                {/* Anchors cannot be <Button>, so they take its classes. */}
                 <a
                   href="/checkout"
-                  className="flex w-full items-center justify-center gap-2 rounded-pill bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
+                  className={cn(buttonVariants({ size: 'pill' }), 'w-full')}
                   onClick={closeDrawer}
                 >
                   Checkout
@@ -179,7 +195,10 @@ export function CartDrawer({ className }: CartDrawerProps) {
                 </a>
                 <a
                   href="/cart"
-                  className="flex w-full items-center justify-center gap-2 rounded-pill border border-border bg-background px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                  className={cn(
+                    buttonVariants({ variant: 'outline', size: 'pill' }),
+                    'w-full'
+                  )}
                   onClick={closeDrawer}
                 >
                   View Cart
@@ -211,7 +230,7 @@ function EmptyCartState({ onClose }: { onClose: () => void }) {
       </p>
       <a
         href="/posters"
-        className="inline-flex items-center gap-2 rounded-pill bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
+        className={buttonVariants({ size: 'pill' })}
         onClick={onClose}
       >
         Browse Posters

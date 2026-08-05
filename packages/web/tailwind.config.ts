@@ -195,6 +195,18 @@ const config: Config = {
         'slide-in-from-bottom': 'slide-in-from-bottom 0.3s ease-out',
         'slide-in-from-left': 'slide-in-from-left 0.3s ease-out',
         'slide-in-from-right': 'slide-in-from-right 0.3s ease-out',
+        /**
+         * The cart drawer, measured off mesonart's own panel:
+         * `transform 0.6s cubic-bezier(.7, 0, .2, 1)`.
+         *
+         * Declared as a whole animation rather than
+         * `animate-in slide-in-from-right duration-[600ms]`, because
+         * tailwindcss-animate's `.animate-in` sets `animation-duration: 150ms`
+         * itself and wins — the drawer kept sliding at 0.15s with the longer
+         * duration class right there on the element.
+         */
+        'drawer-in-right': 'slide-in-from-right 0.6s var(--ease-drawer) both',
+        'drawer-backdrop-in': 'fade-in 0.6s var(--ease-drawer) both',
         shimmer: 'shimmer 2s infinite',
         pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         spin: 'spin 1s linear infinite',

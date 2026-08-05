@@ -1,9 +1,11 @@
 /**
  * CartDrawer Tests (#460)
  *
- * mesonart's cart slides in from the LEFT edge. Ours used to be a route
- * (`/cart`); the drawer is now the primary surface, and the panel's anchor is
- * the whole point of the ticket — hence the explicit left/right assertions.
+ * mesonart's cart slides in from the RIGHT edge (their `drawer--end`; the menu
+ * drawer is the `drawer--start` one). Ours used to be a route (`/cart`); the
+ * drawer is now the primary surface, and the panel's anchor and its timing are
+ * the point of the ticket — hence the explicit right/left and duration
+ * assertions.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -59,13 +61,37 @@ describe('CartDrawer', () => {
     useCartStore.setState({ items: [], isDrawerOpen: false })
   })
 
-  it('anchors the panel to the left edge', () => {
+  it('anchors the panel to the right edge', () => {
     render(<CartDrawer />)
 
     const panel = screen.getByRole('dialog')
-    expect(panel.className).toContain('left-0')
-    expect(panel.className).not.toContain('right-0')
-    expect(panel.className).toContain('slide-in-from-left')
+    expect(panel.className).toContain('right-0')
+    expect(panel.className).not.toContain('left-0')
+  })
+
+  it('slides on the drawer animation, not a stock 150ms enter', () => {
+    // tailwindcss-animate's `.animate-in` hardcodes animation-duration: 150ms
+    // and beats a duration utility next to it, so the timing lives in one
+    // named animation. cart-drawer.spec.ts asserts the computed 0.6s.
+    render(<CartDrawer />)
+
+    const panel = screen.getByRole('dialog')
+    expect(panel.className).toContain('animate-drawer-in-right')
+    expect(panel.className).not.toContain('animate-in')
+  })
+
+  it('closes with the same button as the rest of the site', () => {
+    // Theirs is `button--secondary button--close`. A bespoke `rounded-lg p-2`
+    // here is how the old orange spread in the first place.
+    render(<CartDrawer />)
+
+    const close = screen.getByRole('button', { name: /close cart/i })
+    // The Button primitive's base — text-button and the shared border width —
+    // rather than the shape, which size="icon" turns into their 48px circle.
+    expect(close.className).toContain('text-button')
+    expect(close.className).toContain('border-[length:var(--border-button)]')
+    expect(close.className).toContain('rounded-full')
+    expect(close.className).not.toContain('rounded-lg')
   })
 
   it('renders nothing when the store says closed', () => {
