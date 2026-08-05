@@ -16,11 +16,17 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
+import { mainImage, type ProductImage } from "@chobii/shared";
 
 import { db } from "../database";
 import { reviews, type ReviewStatus } from "../database/schema/reviews";
+import {
+  reviewMedia,
+  type ReviewMediaStatus,
+  type ReviewMediaType,
+} from "../database/schema/review-media";
 import { products } from "../database/schema/products";
 import { users } from "../database/schema/users";
 import {
@@ -39,6 +45,15 @@ import { getCached, setCached, deleteCachedPattern } from "../lib/redis";
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
 const CACHE_TTL_REVIEWS = 300; // 5 minutes
+
+/**
+ * Hard ceiling on the flat media feed.
+ *
+ * The PDP media wall and the home strip both render a bounded number of
+ * tiles, and neither paginates. Without a cap this is an unbounded read that
+ * grows with the review table forever.
+ */
+const MEDIA_FEED_LIMIT = 60;
 
 // Add reviews cache key to CacheKeys if not already defined
 const REVIEW_CACHE_PREFIX = "reviews:";
@@ -73,6 +88,112 @@ const listReviewsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   sortBy: z.enum(["newest", "highest", "lowest"]).default("newest"),
 });
+
+/**
+ * Query parameters for the flat media feed.
+ *
+ * `productId` is optional — the PDP wall passes it, the home strip does not.
+ * A malformed one is a 400 rather than a silently unfiltered feed, which
+ * would show one product's page another product's customer photos.
+ */
+const mediaFeedQuerySchema = z.object({
+  productId: z.string().uuid().optional(),
+});
+
+// ============================================================================
+// Review media
+// ============================================================================
+
+/**
+ * The public shape of one piece of review media.
+ *
+ * `processingStatus` and `processingError` are deliberately absent: the
+ * pipeline's state is not the customer's business, and the only rows that
+ * reach here are `ready` ones anyway.
+ */
+interface ReviewMediaPayload {
+  id: string;
+  reviewId: string;
+  mediaType: ReviewMediaType;
+  url: string;
+  thumbnailUrl: string | null;
+  posterUrl: string | null;
+  durationSeconds: number | null;
+  width: number | null;
+  height: number | null;
+  sortOrder: number;
+}
+
+/** Columns every read of review media selects. One definition, four callers. */
+const reviewMediaColumns = {
+  id: reviewMedia.id,
+  reviewId: reviewMedia.reviewId,
+  mediaType: reviewMedia.mediaType,
+  url: reviewMedia.url,
+  thumbnailUrl: reviewMedia.thumbnailUrl,
+  posterUrl: reviewMedia.posterUrl,
+  durationSeconds: reviewMedia.durationSeconds,
+  width: reviewMedia.width,
+  height: reviewMedia.height,
+  sortOrder: reviewMedia.sortOrder,
+};
+
+/**
+ * Ready media for a set of reviews, grouped by review id.
+ *
+ * One `inArray` query for the whole page — the four read paths that embed
+ * media all go through here, so none of them can regress into an N+1.
+ *
+ * `processing` and `failed` rows are invisible to the public. A half-
+ * transcoded video renders as a broken tile, and a failed one never renders
+ * at all; both look like a bug in the store rather than a pipeline that is
+ * still working.
+ */
+async function fetchMediaByReview(
+  reviewIds: string[]
+): Promise<Map<string, ReviewMediaPayload[]>> {
+  const byReview = new Map<string, ReviewMediaPayload[]>();
+
+  // No reviews on this page: skip the round trip entirely. `inArray` with an
+  // empty list is also a query drizzle has to special-case.
+  if (reviewIds.length === 0) return byReview;
+
+  const rows = await db
+    .select(reviewMediaColumns)
+    .from(reviewMedia)
+    .where(
+      and(
+        inArray(reviewMedia.reviewId, reviewIds),
+        eq(reviewMedia.processingStatus, "ready" as ReviewMediaStatus)
+      )
+    )
+    .orderBy(asc(reviewMedia.sortOrder), asc(reviewMedia.createdAt));
+
+  for (const row of rows) {
+    const existing = byReview.get(row.reviewId);
+    if (existing) {
+      existing.push(row);
+    } else {
+      byReview.set(row.reviewId, [row]);
+    }
+  }
+
+  return byReview;
+}
+
+/**
+ * Attach `media` to a list of review rows, preserving their order.
+ *
+ * Every review gets a `media` array, empty ones included — a missing key and
+ * an empty array are the same thing to a renderer right up until the first
+ * `.map()` on undefined.
+ */
+async function withMedia<T extends { id: string }>(
+  rows: T[]
+): Promise<Array<T & { media: ReviewMediaPayload[] }>> {
+  const byReview = await fetchMediaByReview(rows.map((row) => row.id));
+  return rows.map((row) => ({ ...row, media: byReview.get(row.id) ?? [] }));
+}
 
 /**
  * Rating summary for a product. Mirrors ReviewStatsResponse in
@@ -139,8 +260,17 @@ export function buildReviewStats(
  * lists survived edits and deletions for the full 5-minute TTL.
  */
 async function invalidateProductReviewCaches(productId: string): Promise<void> {
-  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:${productId}:*`);
+  // Keep this prefix in step with the key the product list writes. It was
+  // bumped to v2 when media was embedded; a pattern still pointing at the v1
+  // shape deletes nothing and the stale entries live out their full TTL.
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}product:v2:${productId}:*`);
   await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}stats:${productId}`);
+
+  // A review edit or deletion also moves the site-wide surfaces: the /reviews
+  // page, the home strip and the media wall all read the same rows.
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}all:v1:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}media:v1:*`);
+  await deleteCachedPattern(`${REVIEW_CACHE_PREFIX}stats:catalogue:v1`);
 }
 
 // ============================================================================
@@ -228,8 +358,13 @@ productReviewsApp.get(
       return c.json({ error: "Invalid product ID" }, 400);
     }
 
-    // Build cache key
-    const cacheKey = `${REVIEW_CACHE_PREFIX}product:${productId}:${page}:${pageSize}:${sortBy}`;
+    // Build cache key.
+    //
+    // v2 because the payload gained `media` on every item. Without the bump,
+    // nodes with a warm cache keep serving the media-less v1 shape for the
+    // full TTL after deploy, and the gallery renders empty on exactly the
+    // products that have photos.
+    const cacheKey = `${REVIEW_CACHE_PREFIX}product:v2:${productId}:${page}:${pageSize}:${sortBy}`;
 
     // Try cache first (only for non-authenticated requests)
     if (!user) {
@@ -335,9 +470,14 @@ productReviewsApp.get(
           );
       }
 
+      // Embed each review's ready media. Two grouped queries at most, never
+      // one per review.
+      const items = await withMedia(reviewList);
+      const pendingWithMedia = user ? await withMedia(userPendingReviews) : [];
+
       const result = {
-        items: reviewList,
-        userPendingReviews: user ? userPendingReviews : undefined,
+        items,
+        userPendingReviews: user ? pendingWithMedia : undefined,
         total,
         page,
         pageSize,
@@ -348,7 +488,7 @@ productReviewsApp.get(
 
       // Cache the result (only for non-authenticated requests)
       if (!user) {
-        await setCached(cacheKey, { items: reviewList, total }, CACHE_TTL_REVIEWS);
+        await setCached(cacheKey, { items, total }, CACHE_TTL_REVIEWS);
       }
 
       return c.json(result);
@@ -420,6 +560,183 @@ reviewsApp.get("/stats", async (c) => {
 });
 
 /**
+ * GET /api/reviews/media - flat feed of ready customer media
+ *
+ * Feeds the PDP media wall (`?productId=`) and the site-wide strip (no
+ * filter). Flat rather than grouped by review because both surfaces render a
+ * tile per photo, not a card per review; grouping here would only be undone
+ * by the caller.
+ *
+ * Registered BEFORE `/:reviewId` — the same trap as `/stats` above. Behind
+ * that route, "media" is a review id, and a malformed one at that, so the
+ * whole wall would 400.
+ */
+reviewsApp.get(
+  "/media",
+  zValidator("query", mediaFeedQuerySchema),
+  async (c) => {
+    const { productId } = c.req.valid("query");
+
+    const cacheKey = `${REVIEW_CACHE_PREFIX}media:v1:${productId ?? "all"}`;
+
+    const cached = await getCached<{
+      items: unknown[];
+      total: number;
+    }>(cacheKey);
+    if (cached) {
+      return c.json({ ...cached, fromCache: true });
+    }
+
+    try {
+      // Media inherits its parent review's moderation state, so an approved
+      // review is a precondition for showing any of its photos — a rejected
+      // review's images must not survive the rejection as anonymous tiles.
+      const conditions = [
+        eq(reviewMedia.processingStatus, "ready" as ReviewMediaStatus),
+        eq(reviews.status, "approved" as ReviewStatus),
+      ];
+
+      if (productId) {
+        conditions.push(eq(reviews.productId, productId));
+      }
+
+      const rows = await db
+        .select({
+          ...reviewMediaColumns,
+          productId: reviews.productId,
+          rating: reviews.rating,
+          reviewCreatedAt: reviews.createdAt,
+        })
+        .from(reviewMedia)
+        .innerJoin(reviews, eq(reviewMedia.reviewId, reviews.id))
+        .where(and(...conditions))
+        .orderBy(desc(reviews.createdAt), asc(reviewMedia.sortOrder))
+        .limit(MEDIA_FEED_LIMIT);
+
+      const payload = { items: rows, total: rows.length };
+
+      await setCached(cacheKey, payload, CACHE_TTL_REVIEWS);
+
+      return c.json(payload);
+    } catch (error) {
+      console.error("Error fetching review media feed:", error);
+      return c.json({ error: "Failed to fetch review media" }, 500);
+    }
+  }
+);
+
+/**
+ * GET /api/reviews - every approved review across the catalogue
+ *
+ * The product-scoped list above answers "what do people say about this
+ * poster". This answers "what do people say", which is what the /reviews page
+ * and the home strip need and what nothing exposed before.
+ *
+ * Each item carries the product it is about — a review shown away from its
+ * product detail page is unreadable without one — and its ready media.
+ *
+ * Registered BEFORE `/:reviewId`. `/` and `/:reviewId` do not actually
+ * collide, but keeping every literal above the wildcard is the rule this file
+ * is easiest to get wrong on.
+ */
+reviewsApp.get(
+  "/",
+  zValidator("query", listReviewsQuerySchema),
+  async (c) => {
+    const { page, pageSize, sortBy } = c.req.valid("query");
+
+    // sortBy is part of the key, not just the query: two orderings share a
+    // page number, and a key without it serves "highest" from the "newest"
+    // entry.
+    const cacheKey = `${REVIEW_CACHE_PREFIX}all:v1:${page}:${pageSize}:${sortBy}`;
+
+    const cached = await getCached<Record<string, unknown>>(cacheKey);
+    if (cached) {
+      return c.json({ ...cached, fromCache: true });
+    }
+
+    try {
+      const baseCondition = eq(reviews.status, "approved" as ReviewStatus);
+
+      const countResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(reviews)
+        .where(baseCondition);
+
+      const total = countResult[0]?.count ?? 0;
+
+      const orderBy = {
+        newest: desc(reviews.createdAt),
+        highest: desc(reviews.rating),
+        lowest: asc(reviews.rating),
+      }[sortBy];
+
+      const reviewList = await db
+        .select({
+          id: reviews.id,
+          productId: reviews.productId,
+          rating: reviews.rating,
+          title: reviews.title,
+          content: reviews.content,
+          createdAt: reviews.createdAt,
+          updatedAt: reviews.updatedAt,
+          author: {
+            id: users.id,
+            name: users.name,
+          },
+          product: {
+            id: products.id,
+            title: products.title,
+            slug: products.slug,
+            images: products.images,
+          },
+        })
+        .from(reviews)
+        // inner join: a review whose product has been deleted has nowhere to
+        // link to, so it is not showable on a site-wide surface.
+        .innerJoin(products, eq(reviews.productId, products.id))
+        .leftJoin(users, eq(reviews.userId, users.id))
+        .where(baseCondition)
+        .orderBy(orderBy)
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+
+      const items = (await withMedia(reviewList)).map(
+        ({ product, ...review }) => ({
+          ...review,
+          product: {
+            id: product.id,
+            title: product.title,
+            slug: product.slug,
+            // One url, chosen the same way the cards choose it — the caller
+            // renders a thumbnail and has no use for the whole image array.
+            imageUrl:
+              mainImage(product.images as ProductImage[] | null)?.url ?? null,
+          },
+        })
+      );
+
+      const payload = {
+        items,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+        hasNextPage: page * pageSize < total,
+        hasPreviousPage: page > 1,
+      };
+
+      await setCached(cacheKey, payload, CACHE_TTL_REVIEWS);
+
+      return c.json(payload);
+    } catch (error) {
+      console.error("Error fetching site-wide reviews:", error);
+      return c.json({ error: "Failed to fetch reviews" }, 500);
+    }
+  }
+);
+
+/**
  * GET /api/reviews/:reviewId - Get a single review
  */
 reviewsApp.get("/:reviewId", async (c) => {
@@ -466,7 +783,12 @@ reviewsApp.get("/:reviewId", async (c) => {
       }
     }
 
-    return c.json({ review });
+    // Fetched after the visibility gate, not before: a caller who may not see
+    // the review may not see its photos either, and there is no reason to
+    // query for media we are about to throw away.
+    const media = (await fetchMediaByReview([review.id])).get(review.id) ?? [];
+
+    return c.json({ review: { ...review, media } });
   } catch (error) {
     console.error("Error fetching review:", error);
     return c.json({ error: "Failed to fetch review" }, 500);
