@@ -141,7 +141,8 @@ const apiProduct = {
       description: 'Shipped in a tube',
       color: 'N/A',
       priceAddition: '0.00',
-      thumbnailUrl: null,
+      priceModifier: '1.00',
+      thumbnailUrl: '/frames/rolled.png',
     },
     {
       id: 'f-frameless',
@@ -149,7 +150,8 @@ const apiProduct = {
       name: 'Frameless',
       description: 'Stretched, no moulding',
       color: 'N/A',
-      priceAddition: '499.00',
+      priceAddition: '0.00',
+      priceModifier: '1.33',
       thumbnailUrl: null,
     },
     {
@@ -158,7 +160,8 @@ const apiProduct = {
       name: 'Stretch + Black Frame',
       description: 'Matte black',
       color: 'Matte Black',
-      priceAddition: '499.00',
+      priceAddition: '0.00',
+      priceModifier: '1.40',
       // A placeholder is what the seed used to ship; it must not reach a swatch.
       thumbnailUrl: 'https://placehold.co/100x100/1a1a1a/ffffff?text=Black',
     },
@@ -168,7 +171,8 @@ const apiProduct = {
       name: 'Stretch + Gold Frame',
       description: 'Antique gold',
       color: 'Antique Gold',
-      priceAddition: '599.00',
+      priceAddition: '0.00',
+      priceModifier: '1.40',
       thumbnailUrl: '/frames/gold.webp',
     },
   ],
@@ -424,14 +428,27 @@ describe('choosing a frame', () => {
     expect(swatch.querySelector('[data-testid="frame-corner"]')).not.toBeNull()
   })
 
-  it('draws the roll for the tube option', async () => {
+  it('draws the format when there is no photograph of it', async () => {
     render(<ChooseOptions product={product} />)
     await open()
     await ready()
 
-    const swatch = screen.getByRole('button', { name: 'Rolled Canvas' })
+    const swatch = screen.getByRole('button', { name: 'Frameless' })
     expect(swatch.querySelector('img')).toBeNull()
     expect(swatch.querySelector('[data-testid="frame-corner"]')).not.toBeNull()
+  })
+
+  it('uses the photograph for the tube option', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    expect(
+      screen
+        .getByRole('button', { name: 'Rolled Canvas' })
+        .querySelector('img')
+        ?.getAttribute('src')
+    ).toBe('/frames/rolled.png')
   })
 
   it('names each swatch in a pill, the way theirs does on hover', async () => {
@@ -472,7 +489,49 @@ describe('the price on the button', () => {
     expect(cta.textContent).toContain('1,999')
 
     fireEvent.click(screen.getByRole('button', { name: 'Stretch + Black Frame' }))
-    await waitFor(() => expect(cta.textContent).toContain('2,498'))
+    await waitFor(() => expect(cta.textContent).toContain('2,799'))
+  })
+
+  /**
+   * A moulding for a 12x16 and one for a 60x80 are not the same amount of
+   * timber. Theirs scale hard — measured across three sizes of one piece:
+   *
+   *   24x24  $260 rolled  $460 frameless (+77%)  $480 framed (+85%)
+   *   40x40  $585         $990           (+69%)  $1,030      (+76%)
+   *   72x72  $1,625       $3,020         (+86%)  $3,100      (+91%)
+   *
+   * So the frame is a multiplier on the piece, not a flat fee. Ours keeps that
+   * shape at our own magnitude: +33% stretched, +40% framed.
+   */
+  it('scales the frame with the size, rather than charging a flat fee', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stretch + Black Frame' }))
+    const cta = screen.getByRole('button', { name: /add to cart/i })
+
+    // 1999 + 40%
+    await waitFor(() => expect(cta.textContent).toContain('2,799'))
+
+    fireEvent.change(screen.getByLabelText('Size'), {
+      target: { value: 'v-24x36' },
+    })
+
+    // 3499 + 40% — the addition grew with the piece, it did not stay at 800.
+    await waitFor(() => expect(cta.textContent).toContain('4,899'))
+  })
+
+  it('charges the stretched format less than the framed one', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+    await ready()
+
+    const cta = screen.getByRole('button', { name: /add to cart/i })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Frameless' }))
+    // 1999 + 33%
+    await waitFor(() => expect(cta.textContent).toContain('2,659'))
   })
 
   it('multiplies by the quantity', async () => {
@@ -519,7 +578,7 @@ describe('adding to cart', () => {
     expect(item.frameId).toBe('f-black')
     expect(item.productSlug).toBe('blush-hour')
     expect(item.unitPrice).toBe(3499)
-    expect(item.framePrice).toBe(499)
+    expect(item.framePrice).toBe(1400)
     expect(item.quantity).toBe(2)
     expect(item.sizeLabel).toBe('24" x 36"')
   })
@@ -549,6 +608,41 @@ describe('adding to cart', () => {
 })
 
 describe('getting out', () => {
+  it('gives the close button the same wipe the toolbar pills have', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+
+    // Not a hover tint — the circle-wipe off the `outline` variant, so it goes
+    // black under the cursor exactly like Hide filters and Sort by.
+    const close = screen.getByRole('button', { name: /close/i })
+    expect(close.className).toContain('before:scale-0')
+    expect(close.className).toContain('hover:before:scale-100')
+    expect(close.className).toContain('hover:text-primary-foreground')
+  })
+
+  it('turns the pointer into a close control outside the panel', async () => {
+    render(<ChooseOptions product={product} />)
+    await open()
+
+    // Theirs hides the native cursor over the backdrop and follows the pointer
+    // with a round X. Anywhere off the panel IS the close button.
+    const backdrop = screen.getByTestId('quickview-backdrop')
+    expect(backdrop.className).toContain('cursor-none')
+
+    fireEvent.mouseMove(backdrop, { clientX: 120, clientY: 240 })
+    expect(screen.getByTestId('quickview-cursor')).toBeTruthy()
+  })
+
+  it('closes when the backdrop is clicked, and restores focus', async () => {
+    render(<ChooseOptions product={product} />)
+    const trigger = await open()
+
+    fireEvent.click(screen.getByTestId('quickview-backdrop'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(document.activeElement).toBe(trigger)
+  })
+
   it('closes on Escape and restores focus', async () => {
     render(<ChooseOptions product={product} />)
     const trigger = await open()

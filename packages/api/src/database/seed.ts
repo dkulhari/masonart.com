@@ -28,6 +28,7 @@ const LADDERED_ORIENTATIONS = new Set([
 import { sql } from "drizzle-orm";
 import { db, closeDatabase } from "./index";
 import { sampleFrames } from "./seed-frames";
+import { redis, CacheKeys } from "../lib/redis";
 import {
   products,
   productVariants,
@@ -1413,7 +1414,32 @@ async function clearData(): Promise<void> {
   await db.delete(productVariants);
   await db.delete(products);
   await db.delete(frames);
+  await clearProductCache();
   console.log("Data cleared successfully.");
+}
+
+/**
+ * Drop the Redis copies of everything we just replaced.
+ *
+ * GET /api/products/:slug caches its whole payload, frames included, for
+ * CACHE_TTL_PRODUCT_DETAIL. Without this a reseed leaves the API serving the
+ * PREVIOUS run's prices and assets from cache while /api/products/frames — which
+ * does not cache — serves the new ones, so the two endpoints disagree and the
+ * storefront looks like it ignored the seed. Cost an afternoon once (#420).
+ */
+async function clearProductCache(): Promise<void> {
+  try {
+    const keys = await redis.keys(`${CacheKeys.PRODUCT}*`);
+    const listKeys = await redis.keys(`${CacheKeys.PRODUCT_LIST}*`);
+    const all = [...keys, ...listKeys];
+    if (all.length > 0) await redis.del(...all);
+    console.log(`  Cleared ${all.length} cached product payload(s)`);
+  } catch (error) {
+    // A dev box without Redis up should still be able to seed.
+    console.warn(
+      `  Could not clear the product cache: ${(error as Error).message}`
+    );
+  }
 }
 
 /**

@@ -268,16 +268,25 @@ describe('Database Seeding Tests', () => {
         expect(framesContent).toContain('sortOrder:');
       });
 
+      it('charges a proportion of the piece, never a flat fee', () => {
+        // A moulding for a 12x16 and one for a 60x80 are not the same amount
+        // of timber. Measured on mesonart across three sizes of one piece, the
+        // framed option ran +85%, +76% and +91% of the rolled price. A row
+        // that reverts to `priceAddition` silently undercharges every large
+        // piece, so the flat field stays zero everywhere.
+        expect(framesContent.match(/priceAddition: "0\.00"/g)).toHaveLength(7);
+        expect(framesContent).not.toMatch(/priceAddition: "(?!0\.00)/);
+      });
+
       it('leads with the option that adds nothing', () => {
-        expect(framesContent).toContain('priceAddition: "0.00"');
+        expect(framesContent).toContain('priceModifier: "1.00"');
       });
 
       it('prices every framed option the same, as theirs does', () => {
-        // Measured on mesonart: $260 rolled, $460 frameless, $480 for any
-        // Stretch+Frame. One step up to stretched, a smaller one to framed,
-        // and no premium between mouldings.
-        expect(framesContent).toContain('priceAddition: "499.00"');
-        expect(framesContent.match(/priceAddition: "599\.00"/g)).toHaveLength(5);
+        // One step up to stretched, a smaller one to framed, and no premium
+        // between mouldings.
+        expect(framesContent).toContain('priceModifier: "1.33"');
+        expect(framesContent.match(/priceModifier: "1\.40"/g)).toHaveLength(5);
       });
     });
 

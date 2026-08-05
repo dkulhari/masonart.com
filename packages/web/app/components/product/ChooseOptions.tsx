@@ -76,6 +76,7 @@ interface ProductOptionsResponse {
     name: string
     color?: string
     priceAddition: string
+    priceModifier?: string | null
     imageUrl?: string | null
     thumbnailUrl?: string | null
   }>
@@ -94,7 +95,17 @@ interface QuickviewFrame {
   id: string
   type: string
   name: string
-  /** Rupees, already converted off the API's string. */
+  /**
+   * Fraction of the piece this format adds — 0.4 for +40%.
+   *
+   * A moulding for a 12x16 and one for a 60x80 are not the same amount of
+   * timber, and theirs price accordingly: measured across three sizes of one
+   * piece, the framed option ran +85%, +76% and +91% of the rolled price
+   * rather than a fixed sum. A flat `priceAddition` would undercharge every
+   * large piece and overcharge every small one.
+   */
+  priceRate: number
+  /** Flat rupees, for any row still priced that way. */
   priceAddition: number
   /** A real photograph of this frame, or null when we have none worth showing. */
   photo: string | null
@@ -242,6 +253,8 @@ function toOptions(response: ProductOptionsResponse | null): ProductOptions {
       id: f.id,
       type: f.type,
       name: f.name,
+      // `1.40` on the row means "the piece plus 40%".
+      priceRate: Math.max(0, parseFloat(f.priceModifier || '1') - 1),
       priceAddition: parseFloat(f.priceAddition || '0'),
       photo: usablePhoto(f.thumbnailUrl, f.imageUrl),
     })),
@@ -258,6 +271,8 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
   const [frameId, setFrameId] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [slide, setSlide] = useState(0)
+  /** Where the backdrop's drawn cursor sits, or null when it is off it. */
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null)
 
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -277,7 +292,11 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
   const frame = options?.frames.find((f) => f.id === frameId) ?? null
 
   const unitPrice = variant ? variant.price : parseFloat(product.basePrice)
-  const framePrice = frame?.priceAddition ?? 0
+  // Rounded to the rupee here rather than at display time, so the number the
+  // CTA quotes is the number that reaches the cart.
+  const framePrice = frame
+    ? Math.round(unitPrice * frame.priceRate) + frame.priceAddition
+    : 0
   const total = (unitPrice + framePrice) * quantity
 
   /** Close and hand the keyboard back where it came from. */
@@ -415,12 +434,39 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8">
-          {/* Theirs: rgba(23,23,23,0.7), flat — no blur. */}
+          {/*
+            Theirs: rgba(23,23,23,0.7), flat — no blur — and `cursor: none`,
+            with a round X drawn under the pointer. The whole backdrop IS the
+            close control, so the pointer says so rather than leaving the
+            shopper to guess that clicking outside works.
+
+            Escape and the close button cover everyone this does not: the
+            follower is a pointer affordance and never the only way out.
+          */}
           <div
-            className="absolute inset-0 bg-foreground/70"
+            data-testid="quickview-backdrop"
+            className="absolute inset-0 cursor-none bg-foreground/70"
             onClick={close}
+            onMouseMove={(event) =>
+              setPointer({ x: event.clientX, y: event.clientY })
+            }
+            onMouseLeave={() => setPointer(null)}
             aria-hidden="true"
           />
+
+          {pointer && (
+            <span
+              data-testid="quickview-cursor"
+              aria-hidden="true"
+              style={{ left: pointer.x, top: pointer.y }}
+              className={cn(
+                'pointer-events-none fixed z-50 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2',
+                'place-items-center rounded-full bg-background text-foreground shadow-[0_2px_10px_rgba(23,23,23,0.25)]'
+              )}
+            >
+              <X className="h-4 w-4" />
+            </span>
+          )}
 
           <div
             ref={panelRef}
@@ -489,11 +535,17 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
                   {formatPrice(unitPrice)}
                 </span>
 
+                {/* The toolbar pills' wipe, on a 48px circle: it fills black
+                 * under the cursor rather than picking up a hover tint, so it
+                 * behaves like every other outline control on the storefront. */}
                 <button
                   type="button"
                   onClick={close}
                   aria-label="Close"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-foreground/10 text-foreground transition-colors hover:bg-accent"
+                  className={cn(
+                    buttonVariants({ variant: 'outline' }),
+                    'h-12 w-12 shrink-0 rounded-full p-0'
+                  )}
                 >
                   <X className="h-4 w-4" />
                 </button>

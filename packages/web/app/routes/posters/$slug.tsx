@@ -51,6 +51,7 @@ interface ProductApiResponse {
     imageUrl?: string
     priceModifier: string
     priceAddition: string
+    thumbnailUrl?: string | null
   }>
   orientation: 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
   styles?: string[]
@@ -116,10 +117,19 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
         name: f.name,
         description: f.description,
         material: f.material,
-        imageUrl: f.imageUrl,
-        // API returns priceAddition as string in rupees, component expects fixed price in paise
-        priceModifierType: 'fixed',
-        priceModifierValue: parseFloat(f.priceAddition || '0') * 100,
+        imageUrl: f.thumbnailUrl || f.imageUrl,
+        /**
+         * A percentage of the piece, not a flat fee (#420). A moulding for a
+         * 12x16 and one for a 60x80 are not the same amount of timber, so the
+         * frames carry `priceModifier` — 1.40 meaning "the piece plus 40%" —
+         * and `priceAddition` is 0. Reading the flat field here would have
+         * quoted every frame at zero while the quickview charged correctly.
+         */
+        priceModifierType: 'percentage',
+        priceModifierValue: Math.max(
+          0,
+          (parseFloat(f.priceModifier || '1') - 1) * 100
+        ),
         isAvailable: true,
       })),
       orientation: response.orientation,
