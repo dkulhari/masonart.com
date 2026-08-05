@@ -54,8 +54,11 @@ vi.mock('../../../src/lib/redis', () => ({
   CacheKeys: { PRODUCT: 'product:', COLLECTION: 'collection:' },
 }));
 
+const resolveManualMembers = vi.fn().mockResolvedValue([]);
+
 vi.mock('../../../src/lib/collection-resolver', () => ({
   countCollection: vi.fn().mockResolvedValue(7),
+  resolveManualMembers: (...args: unknown[]) => resolveManualMembers(...args),
 }));
 
 import { adminCollectionsApp } from '../../../src/routes/admin/collections';
@@ -113,6 +116,7 @@ const validCreate = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resolveManualMembers.mockResolvedValue([]);
   selectMock.mockImplementation(() => chainReturning([collectionRow]));
   insertMock.mockImplementation(() => chainReturning([collectionRow]));
   updateMock.mockImplementation(() => chainReturning([collectionRow]));
@@ -164,6 +168,49 @@ describe('GET /', () => {
     // No isActive filter is applied — asserted by the handler not narrowing.
     const body = (await res.json()) as { collections: unknown[] };
     expect(body.collections).toHaveLength(1);
+  });
+});
+
+describe('GET /:id', () => {
+  it('returns the manual members, so the edit form does not wipe them', async () => {
+    /**
+     * Load-bearing against data loss, not a convenience.
+     *
+     * CollectionForm REPLACES the member list on save. A form that loaded
+     * without the members would post an empty array, so opening a curated
+     * collection and fixing a typo in its title would silently delete every
+     * product in it. That happened for real the first time a collection was
+     * staged from the wishlist (#503).
+     */
+    selectMock.mockImplementation(() =>
+      chainReturning([{ ...collectionRow, kind: 'manual', rule: null }])
+    );
+    // Position order comes from the resolver, which orders by `position`.
+    resolveManualMembers.mockResolvedValue(['p3', 'p1']);
+
+    const res = await asStaff('/api/admin/collections/c1');
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { collection: { productIds: string[] } };
+    // In position order — the order IS the curation.
+    expect(body.collection.productIds).toEqual(['p3', 'p1']);
+  });
+
+  it('returns no members for a rule collection', async () => {
+    // A rule collection has no explicit list, and inventing an empty one here
+    // would be a fact the form could act on.
+    selectMock.mockImplementation(() => chainReturning([collectionRow]));
+
+    const res = await asStaff('/api/admin/collections/c2');
+    const body = (await res.json()) as { collection: { productIds: string[] } };
+
+    expect(body.collection.productIds).toEqual([]);
+  });
+
+  it('404s an unknown id', async () => {
+    selectMock.mockImplementation(() => chainReturning([]));
+    const res = await asStaff('/api/admin/collections/nope');
+    expect(res.status).toBe(404);
   });
 });
 
