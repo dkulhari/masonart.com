@@ -21,14 +21,20 @@
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import {
   createCollectionSchema,
   updateCollectionSchema,
+  collectionMembersSchema,
+  discoverOrderSchema,
 } from "@chobii/shared";
 
 import { db } from "../../database";
-import { collections } from "../../database/schema/collections";
+import {
+  collections,
+  collectionProducts,
+} from "../../database/schema/collections";
+import { products } from "../../database/schema/products";
 import { countCollection } from "../../lib/collection-resolver";
 import {
   requireAuth,
@@ -112,6 +118,156 @@ adminCollectionsApp.get("/", async (c) => {
     return c.json({ error: "Failed to list collections" }, 500);
   }
 });
+
+// ============================================================================
+// PUT /discover-order — rewrite the rail's order
+// ============================================================================
+
+/**
+ * Registered BEFORE `/:id`. `discover-order` is a literal segment, and Hono
+ * matches in registration order — below `/:id` it would be read as a
+ * collection id. Same trap `products.ts` documents for `/facets`.
+ */
+adminCollectionsApp.put(
+  "/discover-order",
+  zValidator("json", discoverOrderSchema),
+  async (c) => {
+    const { collectionIds } = c.req.valid("json");
+
+    if (new Set(collectionIds).size !== collectionIds.length) {
+      return c.json({ error: "Duplicate collection ids" }, 400);
+    }
+
+    try {
+      /**
+       * Every id checked up front, so a bad one fails before any write rather
+       * than partway through the reorder.
+       */
+      if (collectionIds.length > 0) {
+        const found = await db
+          .select({ id: collections.id })
+          .from(collections)
+          .where(inArray(collections.id, collectionIds));
+
+        const known = new Set(found.map((row) => row.id));
+        const unknown = collectionIds.filter((id) => !known.has(id));
+        if (unknown.length > 0) {
+          return c.json({ error: "Unknown collection ids", unknown }, 400);
+        }
+      }
+
+      /**
+       * One transaction, not a loop of updates.
+       *
+       * A per-row loop that fails halfway leaves the rail in an order that
+       * never existed and that nobody chose — worse than either the old order
+       * or the new one.
+       */
+      await db.transaction(async (tx) => {
+        for (const [index, id] of collectionIds.entries()) {
+          await tx
+            .update(collections)
+            .set({ discoverOrder: index, updatedAt: new Date() })
+            .where(eq(collections.id, id));
+        }
+      });
+
+      await bustCollectionCache();
+
+      return c.json({ success: true, ordered: collectionIds.length });
+    } catch (error) {
+      console.error("Error reordering collections:", error);
+      return c.json({ error: "Failed to reorder collections" }, 500);
+    }
+  }
+);
+
+// ============================================================================
+// PUT /:id/products — replace manual membership
+// ============================================================================
+
+/**
+ * Whole-list replace, not per-row add and remove.
+ *
+ * The position is the only thing distinguishing a curated list from a set, and
+ * incremental edits make position arithmetic the client's problem — every
+ * caller would have to renumber, and they would each do it slightly wrong.
+ */
+adminCollectionsApp.put(
+  "/:id/products",
+  zValidator("json", collectionMembersSchema),
+  async (c) => {
+    const { productIds } = c.req.valid("json");
+    const id = c.req.param("id");
+
+    if (new Set(productIds).size !== productIds.length) {
+      return c.json({ error: "Duplicate product ids" }, 400);
+    }
+
+    try {
+      const [collection] = await db
+        .select()
+        .from(collections)
+        .where(eq(collections.id, id))
+        .limit(1);
+
+      if (!collection) return c.json({ error: "Collection not found" }, 404);
+
+      /**
+       * A rule collection already has a membership rule. Giving it an explicit
+       * list too is the same "two sources of membership" the shared schema
+       * refuses on kind/rule — whichever the resolver honours, the other is a
+       * lie the admin can still see and edit.
+       */
+      if (collection.kind !== "manual") {
+        return c.json(
+          { error: "Only a manual collection can have an explicit member list" },
+          400
+        );
+      }
+
+      if (productIds.length > 0) {
+        const found = await db
+          .select({ id: products.id })
+          .from(products)
+          .where(inArray(products.id, productIds));
+
+        const known = new Set(found.map((row) => row.id));
+        const unknown = productIds.filter((pid) => !known.has(pid));
+        if (unknown.length > 0) {
+          return c.json({ error: "Unknown product ids", unknown }, 400);
+        }
+      }
+
+      /**
+       * Clear and re-insert inside one transaction. A collection must never be
+       * observable as empty midway through a reorder.
+       */
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(collectionProducts)
+          .where(eq(collectionProducts.collectionId, id));
+
+        if (productIds.length > 0) {
+          await tx.insert(collectionProducts).values(
+            productIds.map((productId, position) => ({
+              collectionId: id,
+              productId,
+              position,
+            }))
+          );
+        }
+      });
+
+      await bustCollectionCache(collection.slug);
+
+      return c.json({ success: true, members: productIds.length });
+    } catch (error) {
+      console.error("Error setting collection members:", error);
+      return c.json({ error: "Failed to set collection members" }, 500);
+    }
+  }
+);
 
 // ============================================================================
 // GET /:id — one row for the edit form
