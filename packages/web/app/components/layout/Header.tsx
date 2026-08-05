@@ -78,7 +78,7 @@ export function Header() {
   const [isAllArtOpen, setIsAllArtOpen] = useState(false)
   const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
-  // The cart is a left slide-out drawer, not a page (#460). CartDrawer is
+  // The cart is a right slide-out drawer, not a page (#460). CartDrawer is
   // mounted in __root and reads its own open state off the store.
   const openCartDrawer = useCartStore((state) => state.openDrawer)
   const wishlistCount = useWishlistCount()
@@ -233,11 +233,10 @@ export function Header() {
             >
               <Search className="h-5 w-5" />
             </button>
-            {/* Wishlist. The destination is the account area until Phase F
-                builds the wishlist page proper — the parity work needs the
-                affordance and the count, not the page. */}
+            {/* Wishlist. Public, like the list itself — a guest's saves are
+                real and live in localStorage until they sign in (#477). */}
             <Link
-              to="/account"
+              to="/wishlist"
               className="relative flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               aria-label={`Wishlist${displayWishlistCount > 0 ? `, ${displayWishlistCount} items` : ''}`}
             >
@@ -540,6 +539,10 @@ export function Header() {
                   {staffLabel}
                 </MobileNavLink>
               )}
+                <MobileNavLink to="/wishlist" onClick={closeMobileMenu}>
+                  <Heart className="mr-2 inline h-4 w-4" />
+                  Wishlist
+                </MobileNavLink>
                 <MobileNavLink to="/account" onClick={closeMobileMenu}>
                   <User className="mr-2 h-4 w-4" />
                   Account

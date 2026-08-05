@@ -71,6 +71,12 @@ describe('behaviour a restructure must not delete', () => {
     expect(src).toContain('staffAreaHref')
   })
 
+  it('points the heart at the wishlist page, not the account area (#422)', () => {
+    // The heart pointed at /account while the destination was unbuilt. The
+    // page is public, so this link works signed out too.
+    expect(src).toMatch(/to="\/wishlist"/)
+  })
+
   it('keeps both badges hydration-gated (#389 / #498)', () => {
     expect(src).toContain('displayCartCount')
     expect(src).toContain('displayWishlistCount')

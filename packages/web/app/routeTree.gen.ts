@@ -20,6 +20,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ReturnsRouteImport } from './routes/returns'
 import { Route as ShippingRouteImport } from './routes/shipping'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAiModerationRouteImport } from './routes/admin/ai-moderation'
 import { Route as AdminCustomersRouteImport } from './routes/admin/customers'
@@ -108,6 +109,11 @@ const ShippingRoute = ShippingRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WishlistRoute = WishlistRouteImport.update({
+  id: '/wishlist',
+  path: '/wishlist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -300,6 +306,7 @@ export interface FileRoutesByFullPath {
   '/returns': typeof ReturnsRoute
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
+  '/wishlist': typeof WishlistRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
@@ -346,6 +353,7 @@ export interface FileRoutesByTo {
   '/returns': typeof ReturnsRoute
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
+  '/wishlist': typeof WishlistRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
@@ -395,6 +403,7 @@ export interface FileRoutesById {
   '/returns': typeof ReturnsRoute
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
+  '/wishlist': typeof WishlistRoute
   '/admin/ai-moderation': typeof AdminAiModerationRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
@@ -444,6 +453,7 @@ export interface FileRouteTypes {
     | '/returns'
     | '/shipping'
     | '/terms'
+    | '/wishlist'
     | '/admin/ai-moderation'
     | '/admin/customers'
     | '/admin/returns'
@@ -490,6 +500,7 @@ export interface FileRouteTypes {
     | '/returns'
     | '/shipping'
     | '/terms'
+    | '/wishlist'
     | '/admin/ai-moderation'
     | '/admin/customers'
     | '/admin/returns'
@@ -538,6 +549,7 @@ export interface FileRouteTypes {
     | '/returns'
     | '/shipping'
     | '/terms'
+    | '/wishlist'
     | '/admin/ai-moderation'
     | '/admin/customers'
     | '/admin/returns'
@@ -587,6 +599,7 @@ export interface RootRouteChildren {
   ReturnsRoute: typeof ReturnsRoute
   ShippingRoute: typeof ShippingRoute
   TermsRoute: typeof TermsRoute
+  WishlistRoute: typeof WishlistRoute
   ApproveTokenRoute: typeof ApproveTokenRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -680,6 +693,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wishlist': {
+      id: '/wishlist'
+      path: '/wishlist'
+      fullPath: '/wishlist'
+      preLoaderRoute: typeof WishlistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -1021,6 +1041,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReturnsRoute: ReturnsRoute,
   ShippingRoute: ShippingRoute,
   TermsRoute: TermsRoute,
+  WishlistRoute: WishlistRoute,
   ApproveTokenRoute: ApproveTokenRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthLoginRoute: AuthLoginRoute,
