@@ -438,8 +438,13 @@ export function Header() {
          * schema, the API validation, the seed and the filter sidebar read.
          * Twelve hardcoded links here would restart the drift #395 ended.
          *
-         * Scrolls rather than wraps: twelve links overflow a laptop, and three
-         * wrapped lines of nav pushes the page content below the fold. */}
+         * Wraps rather than scrolls. A sideways-scrolling row hides its own
+         * tail: on a narrow window the last styles are simply off-screen with
+         * nothing to say so, and `scrollbar-hide` removed even the scrollbar
+         * that would have hinted at them. Wrapped, every style stays reachable
+         * at every width, and the rows the reveal pushes down are measured by
+         * useChromeOffset rather than assumed — so a second line moves the
+         * collection toolbar with it instead of landing on top of it (#401). */}
         <nav
           aria-label="Shop by style"
           data-testid="styles-nav"
@@ -449,7 +454,7 @@ export function Header() {
           className="relative transition-[transform,opacity] duration-200 motion-reduce:transition-none"
         >
           <div className="container-wide">
-            <ul className="scrollbar-hide flex items-center gap-6 overflow-x-auto py-2">
+            <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 py-2">
               {/* Not a link any more but a door: All Art opens the whole
                   filter vocabulary as a panel, the way mesonart's does
                   (#476). `static` so the panel measures against the row

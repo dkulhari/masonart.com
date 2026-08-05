@@ -34,9 +34,18 @@ describe('three-row structure', () => {
     expect(src).toMatch(/styles:/)
   })
 
-  it('scrolls the styles row rather than wrapping it to three lines', () => {
-    // Twelve links overflow a laptop.
-    expect(src).toMatch(/overflow-x-auto|scrollbar-hide/)
+  it('wraps the styles row rather than scrolling it off-screen', () => {
+    // Twelve links overflow a laptop. Scrolled sideways they hide their own
+    // tail — with scrollbar-hide there was not even a scrollbar to hint that
+    // more existed. Wrapped, every style stays reachable at every width.
+    //
+    // Scoped to this row: the pages row above it still scrolls, which is a
+    // separate call about a six-link list.
+    const start = src.indexOf('data-testid="styles-nav"')
+    const stylesRow = src.slice(start, src.indexOf('</nav>', start))
+
+    expect(stylesRow).toMatch(/flex-wrap/)
+    expect(stylesRow).not.toMatch(/overflow-x-auto|scrollbar-hide/)
   })
 })
 
