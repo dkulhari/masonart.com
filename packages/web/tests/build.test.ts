@@ -428,9 +428,11 @@ describe('Web Package Build (TanStack Start)', () => {
       expect(existsSync(clientPath)).toBe(true);
     });
 
-    it('should have ssr.tsx for server entry', () => {
-      const ssrPath = join(appDir, 'ssr.tsx');
-      expect(existsSync(ssrPath)).toBe(true);
+    // #344: app/ssr.tsx was a second createServerEntry that never reached the
+    // build — server.tsx is the entry — and it carried a stale CSP. Deleted.
+    it('should have server.tsx for server entry', () => {
+      const serverPath = join(appDir, 'server.tsx');
+      expect(existsSync(serverPath)).toBe(true);
     });
 
     it('should have routeTree.gen.ts (auto-generated)', () => {

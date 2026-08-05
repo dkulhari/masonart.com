@@ -170,26 +170,49 @@ services:
       traefik.http.routers.chobii-web.entrypoints: web
       traefik.http.services.chobii-web.loadbalancer.server.port: "3001"
       # Security headers for SSR pages (#264). The api sets its own via Hono
-      # secureHeaders; the RR7 SSR server sets none, so traefik adds them at
-      # the edge for every web response. CSP deliberately deferred — needs a
-      # policy compatible with SSR hydration inline scripts (scope recorded
-      # in ticket #264's comments; roll out Report-Only before enforcing).
+      # secureHeaders; the TanStack Start server entry (packages/web/app/
+      # server.tsx) sets none, so traefik adds them at the edge for every web
+      # response. This block is the ONLY place the web CSP is defined —
+      # packages/web/tests/security-headers.test.ts pins that.
       traefik.http.routers.chobii-web.middlewares: chobii-web-headers
       traefik.http.middlewares.chobii-web-headers.headers.stsSeconds: "15552000"
       traefik.http.middlewares.chobii-web-headers.headers.stsIncludeSubdomains: "true"
       # TLS terminates at the Cloudflare edge, so traefik sees plain HTTP and
       # would suppress STS without this
       traefik.http.middlewares.chobii-web-headers.headers.forceSTSHeader: "true"
-      traefik.http.middlewares.chobii-web-headers.headers.customFrameOptionsValue: SAMEORIGIN
+      # Nothing frames chobii.art, not even chobii.art — no <iframe> exists in
+      # packages/web/app. Razorpay's checkout iframe is an outbound frame
+      # (frame-src), not an inbound one, so DENY costs nothing. Kept in step
+      # with the CSP's frame-ancestors 'none' below.
+      traefik.http.middlewares.chobii-web-headers.headers.customFrameOptionsValue: DENY
       traefik.http.middlewares.chobii-web-headers.headers.contentTypeNosniff: "true"
       traefik.http.middlewares.chobii-web-headers.headers.referrerPolicy: strict-origin-when-cross-origin
       traefik.http.middlewares.chobii-web-headers.headers.customResponseHeaders.Permissions-Policy: "camera=(), microphone=(), geolocation=()"
-      # CSP in REPORT-ONLY mode (#344): observe violations in browser consoles
-      # before enforcing. 'unsafe-inline' script-src is required by TanStack
-      # Start SSR hydration (no nonce path through a static traefik header);
-      # Razorpay checkout needs its script + frame + API origins; product
-      # images come from the CDN pair (+ unsplash seed data).
-      traefik.http.middlewares.chobii-web-headers.headers.customResponseHeaders.Content-Security-Policy-Report-Only: "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.chobii.art https://chobii-cdn.xtoms.xyz https://images.unsplash.com https://lh3.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+      # CSP ENFORCED (#344). Phase 1 shipped this same policy as
+      # Content-Security-Policy-Report-Only on 2026-07-27 (commit 5cefed33);
+      # phase 2 audited the app source for every origin it actually reaches,
+      # widened the policy for the three it was missing, and dropped
+      # -Report-Only. Each non-obvious source, and why it is here:
+      #
+      #   script-src 'unsafe-inline' — TanStack Start streams an inline
+      #     hydration script and a static traefik header cannot carry a
+      #     per-response nonce. 'unsafe-eval' is deliberately absent.
+      #   script/frame/connect razorpay — checkout.js is injected by
+      #     PaymentButton / AddFundsButton / account/wallet; the modal is an
+      #     iframe from api.razorpay.com; lumberjack is its telemetry sink.
+      #   style-src + font-src fonts.googleapis.com / fonts.gstatic.com —
+      #     Poppins + Urbanist, linked from app/routes/__root.tsx.
+      #   img-src blob: — URL.createObjectURL previews in the AI generator's
+      #     ReferenceImageUploader, admin ProductForm and lib/product-images.
+      #   img-src CDN pair — cdn.chobii.art plus the pre-cutover host still
+      #     present in older product rows; unsplash is seed data and
+      #     lh3.googleusercontent.com is the Google sign-in avatar.
+      #   connect-src 'self' — the browser talks to the API same-origin
+      #     (the image is built with VITE_API_URL=""), so no host needed.
+      #
+      # Adding a third-party origin to the app without adding it here blocks
+      # the resource in production; the guard test fails first instead.
+      traefik.http.middlewares.chobii-web-headers.headers.customResponseHeaders.Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://cdn.chobii.art https://chobii-cdn.xtoms.xyz https://images.unsplash.com https://lh3.googleusercontent.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
 
   # ── PostgreSQL — default network only, never on `platform` ───────────
   postgres:
