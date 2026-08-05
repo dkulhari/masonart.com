@@ -1,0 +1,130 @@
+ticket_number: 475
+title: E2E - collection pages, the Discover rail and admin authoring
+description: |-
+  ## Task
+
+  One feature-level spec at `tests/e2e/collections.spec.ts`.
+
+  Storefront:
+
+  - the rail on /posters renders chips and a chip navigates to `/collections/<slug>`
+  - the collection page shows the collection's own H1 and description
+  - a facet applied inside a collection narrows within it and never escapes it — the assertion that proves the intersection rule end to end
+  - Best Sellers and Latest Work reach a populated grid, which no style facet could have expressed
+  - an unknown slug 404s
+
+  Admin:
+
+  - create a rule collection, see the count preview, save it, and find it on the storefront
+  - toggle show-in-discover and watch the chip appear in the rail
+
+  ## Context
+
+  Feature: curated-collections, final phase.
+
+  Use `waitUntil: 'networkidle'` in `beforeEach`, per the repo convention in CLAUDE.md. Scope selectors for mobile vs desktop — the same test ids exist in both trees.
+
+  Run with `--project=chromium --no-deps`; the auth setup project's admin/trade login is failing for unrelated reasons and blocks the whole run otherwise. The admin cases need a staff storage state, so check what `tests/e2e/auth.setup.ts` provides before writing them.
+feature: curated-collections
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:59.889Z'
+last_updated: '2026-08-05T16:18:52.231Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T16:05:30.691Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T16:18:32.849Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T16:18:52.231Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `a05977c0` — test(e2e): collection pages, the Discover rail and admin authoring
+
+      **Files Changed**:
+      - `tests/e2e/collections.spec.ts` — 16 tests, chromium
+      - `tests/e2e/collections.admin.spec.ts` — 11 tests, `chromium-admin` (stored staff session)
+
+      **The "broken auth setup" was not broken — it was rate limiting, and partly my fault**
+
+      I recorded on #467 and #472 that `auth.setup.ts` could not log in as admin or trade, treating it as pre-existing and unrelated. The real error says exactly what is wrong:
+
+      > `Login for test-admin@chobii.art was rate limited: 429 Too Many Requests … The auth limiter allows 5 requests/60s per IP and all local traffic shares one bucket, so four role setups exceed it. Start the API with DISABLE_RATE_LIMIT=true (the packages/api dev script does this) and retry.`
+
+      `packages/api` has `"dev": "DISABLE_RATE_LIMIT=true bun run --env-file=../../.env --hot src/index.ts"`. I had restarted the API by hand with the bare `bun run` line and dropped the flag. Restarting via `npm run dev` fixed it: **all 4 setup projects pass**, which unblocked the authenticated admin spec this ticket needed. The correction matters for #467/#472, whose comments say an authenticated pass was impossible — it was not.
+
+      **What the tests actually pin**
+
+      The two regressions worth catching, each a named test:
+      - `marks nothing current on /posters — it is not a collection` and `renders chips as links` — chips reverting to filter toggles
+      - `a facet OUTSIDE the collection empties it, never widens it` — union instead of intersection, which would show ukiyo-e work under the Pop Art heading
+
+      Plus the case no facet vocabulary can express: Best Sellers reaching a populated grid **and** its toolbar reading "Best selling" — which was a live bug until the API started returning `appliedSort`.
+
+      The admin spec closes the loop: create a collection, confirm it in the admin table, then load `/collections/<slug>` and assert the `<h1>`. Also the inverse — a collection left out of the rail is reachable directly but absent from the chips.
+
+      **Two locator mistakes, both mine not the code's**
+      - `getByLabel('Title')` matched three fields ("Title", "Subtitle", "SEO title"); `{ exact: true }` fixes it.
+      - The membership control is a radio, not a checkbox — `.check()` reported "Clicking the checkbox did not change its state".
+      - `div.hidden.lg\:block` did not identify the desktop sidebar; `#collection-filters` (FILTER_SIDEBAR_ID) does, and is genuinely absent from the mobile tree.
+
+      **Verification**
+      - `npx playwright test tests/e2e/collections.spec.ts --project=chromium` → **16 passed**
+      - `npx playwright test tests/e2e/collections.admin.spec.ts --project=chromium-admin` → **11 passed**
+      - `npx playwright test --project=setup` → 4 passed
+
+      **Cleanup**: the admin tests create real collections with stamped slugs. Two probe rows were deleted afterwards; the table is back to the seeded 14. The stamping means a re-run cannot collide on the unique slug, but the rows do accumulate — a fixture-level teardown would be better than my manual delete.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 470
+    feature: curated-collections
+    description: Web - /collections/$slug reusing the collection-page shell
+  - ticket: 472
+    feature: curated-collections
+    description: Admin - collections list with discover reorder
+  - ticket: 473
+    feature: curated-collections
+    description: Admin - collection form with rule builder and manual picker
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the E2E spec
+    file: tests/e2e/collections.spec.ts
+    command: npx playwright test tests/e2e/collections.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: FAIL until the feature is wired end to end
+    status: pending
+  - id: 2
+    action: verify-pass
+    description: Run it green against the built feature
+    command: npx playwright test tests/e2e/collections.spec.ts --project=chromium --no-deps --reporter=line
+    expected_result: PASS
+    status: pending
+  - id: 3
+    action: commit
+    description: Commit
+    command: 'git add tests/e2e/collections.spec.ts && git commit -m "test(e2e): collection pages, discover rail and admin authoring (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T16:05:30.691Z'
+verification:
+  tests_passed: true
+  test_command: npx playwright test tests/e2e/collections.spec.ts --project=chromium && npx playwright test tests/e2e/collections.admin.spec.ts --project=chromium-admin
+  test_output: '27 E2E passing: 16 storefront on chromium, 11 admin on chromium-admin. Includes the full round trip — create a collection in the admin, then load it on the storefront under its own heading. All 4 auth setup projects pass.'
+  build_passed: true
+  build_command: n/a — E2E only
+  verified_at: '2026-08-05T16:18:29.120Z'
+completed: '2026-08-05T16:18:32.849Z'

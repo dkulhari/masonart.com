@@ -1,0 +1,160 @@
+name: review-surfaces-parity
+title: Review Surfaces Parity
+priority: high
+created: '2026-08-05T15:09:36.960Z'
+assignee: unassigned
+tags: []
+description: |-
+  ## Overview
+  ## Overview
+
+  Builds the customer-facing review **surfaces** mesonart.com runs, on top of the review system chobii already has, and adds customer media (photo + video) to reviews.
+
+  Not rebuilt here — both complete:
+  - `user-reviews` (#28–#35) — schema, submission, moderation, PDP display
+  - `verified-purchase-reviews` (#169–#180) — order-gated submission
+
+  The placeholder feature `reviews-page` (0 tickets) folds into this one and should be closed.
+
+  Source: `docs/design/mesonart/mesonart-parity-analysis.md` — home section 10 (`customer_review` ×2, "9000+ Score 4.9/5.0" strip + card carousel + View All), PDP below-fold (Loox photo reviews, floating review-popup toast bottom-left), §1.5 `/pages/reviews` linked from both nav rows and the footer.
+
+  ## Goals
+
+  - `/reviews` destination page, linked from header nav + footer
+  - Home Customer Reviews strip — aggregate score band + review-card carousel + View All
+  - PDP media wall (photo + video) below the tabbed content
+  - Site-wide floating review toast
+  - Customers attach photos and videos to reviews; both moderated with the parent review
+
+  ## Scope
+
+  **In scope**
+  - `reviewMedia` table — `mediaType` enum `image|video`, url, posterUrl, durationSeconds, width/height, sortOrder, processingStatus
+  - Direct-to-R2 presigned upload from `ReviewForm` (`packages/api/src/lib/storage.ts:410` exists, currently unused)
+  - ffmpeg in the API Docker image; BullMQ `review-transcode` queue modelled on `packages/api/src/queues/ai-generation.ts` — normalise to H.264/AAC MP4, extract poster frame, cap duration and resolution
+  - API: `GET /api/reviews` (list-all, paginated), media presign endpoint, media-wall feed, media included on the existing product-scoped list
+  - Admin: media thumbnails + video playback in the existing moderation queue
+  - Web: `/reviews` route, `CustomerReviewsSection` (home), `ReviewMediaWall` (PDP), `ReviewToast` (`__root.tsx`), media upload in `ReviewForm`
+  - Seed media onto some of the 12 approved reviews (#414) so the surfaces render truthfully
+
+  **Out of scope**
+  - Rewriting submission or moderation flows — done in the two prior features
+  - Per-media moderation status — media inherits the parent review's
+  - HLS / adaptive bitrate — single MP4 rendition
+  - Review replies, helpful votes, per-artist or per-collection filtering
+  - Multi-language reviews
+
+  ## Design
+
+  **Approach**: extend the existing review system in place. One media table, one moderation status, existing Redis cache keys and stats reused. (Rejected: a separate `social-proof` module — duplicate caching/aggregate logic and a second admin queue; a materialised `review_feed` table — refresh machinery and staleness bugs for a 12-row dataset.)
+
+  **Key decisions**
+
+  1. **Media inherits review moderation status.** Approving a review publishes its media. Avoids a second admin queue; cost is all-or-nothing per review.
+  2. **`reviewMedia`, not `reviewPhotos`.** `mediaType` enum from day one so video is not a migration later. Otherwise mirrors `approvalPhotos` (`packages/api/src/database/schema/approvals.ts:112`).
+  3. **Direct-to-R2 presigned upload.** Video payloads cannot route through Hono; images take the same path so there is one code path.
+  4. **Transcode is async; the review is never blocked.** Review submits immediately at `pending` with media at `processing`. A failed transcode drops the media, not the review.
+  5. **ffmpeg via apt in the Dockerfile** — `oven/bun:1-slim` is Debian. No vendor, no new API key.
+  6. **Aggregate suppression rule reused.** Home strip and the `/reviews` header render null below ten approved reviews, matching `PromoTile` and `reviewsApp.get("/stats")` (`packages/api/src/routes/reviews.ts:380`). No synthetic "4.9/5" from a thin sample.
+  7. **Toast is site-wide but sessionStorage-dismissible**, mounted in `__root.tsx`, suppressed on `/checkout`, kept under the cart drawer z-index on mobile.
+
+  ## Technical Considerations
+
+  - **ffmpeg on this box.** 13+ concurrent agent sessions on 8 cores. Transcode concurrency must be 1 in dev with a CPU cap, or it starves every other session. Real hazard, not theoretical.
+  - **`routeTree.gen.ts` is tracked, not gitignored** — adding `/reviews` writes it. Stay in one checkout, stage by explicit path.
+  - **Search params are strings.** `router.tsx` overrides TanStack serialisation, so `/reviews` `validateSearch` must coerce `page` to a number or the route error-boundaries to a blank page.
+  - **`packages/api/src/routes/reviews.ts` is 612 lines** and will clear 900; media endpoints likely want their own `routes/review-media.ts` mounted alongside.
+  - **`isValidImageType` (`storage.ts:513`) needs a video sibling**, not a widened allowlist — different size caps, different downstream path.
+  - **Moderation gap:** `services/ai-moderation.ts` scores text prompts only. Review media reaches admins unscreened. Acceptable because every review is human-moderated before publish, but stated explicitly.
+  - **Sitemap:** `packages/api/src/routes/sitemap.ts` should list `/reviews`.
+
+  ## Objectives
+  - `reviewMedia` schema + migration, media-agnostic from day one
+  - Presigned direct-to-R2 upload path for review media
+  - ffmpeg transcode queue producing H.264/AAC MP4 + poster frame
+  - `GET /api/reviews` list-all and media-wall feed endpoints
+  - `/reviews` page with aggregate header, nav + footer + sitemap links
+  - Home Customer Reviews strip with score band and card carousel
+  - PDP review media wall
+  - Site-wide dismissible review toast
+  - Admin moderation queue renders and plays review media
+  - Seed media onto existing approved reviews
+
+
+  ## Objectives
+  - TBD
+objectives:
+  - TBD
+work_session_summary:
+  total_sessions: 0
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents: {}
+tickets:
+  todo:
+    '478': Database Schema - reviewMedia table, enums, relations and migration
+    '479': Media Infrastructure - video validation, ffmpeg processing and Docker image
+    '480': Media Infrastructure - BullMQ review-media transcode queue and worker
+    '481': Backend API - review media presign and complete upload endpoints
+    '482': Backend API - site-wide review list, media feed, and media on existing reads
+    '483': Backend API - review media in the admin moderation queue
+    '484': Frontend - API client functions and hooks for review feed and media
+    '485': Frontend - photo and video upload in ReviewForm
+    '486': Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+    '487': Frontend - home Customer Reviews strip with score band and carousel
+    '488': Frontend - PDP review media wall with lightbox and video playback
+    '489': Frontend - site-wide floating review toast
+    '490': Frontend - review media in the admin moderation UI
+    '491': Seed - attach photo and video media to approved reviews
+    '492': E2E - review surfaces and media upload flows
+  in_progress: {}
+  done: {}
+total_tickets: 15
+completion_percentage: 0
+is_completed: false
+design:
+  approach: 'Extend the existing review system in place. One `reviewMedia` table (media-agnostic: image + video) hanging off `reviews`, media inheriting the parent review''s moderation status. New endpoints added to the already-mounted `reviewsApp` plus a `review-media` route. New web surfaces (/reviews page, home strip, PDP media wall, site-wide toast) compose the existing `packages/web/app/components/reviews/*`. Video handled with self-hosted ffmpeg in the API Docker image driven by a BullMQ transcode queue modelled on `queues/ai-generation.ts`. Rejected alternatives: a separate `social-proof` module (duplicate caching/aggregate logic, second admin queue) and a materialised `review_feed` table (refresh machinery and staleness bugs for a 12-row dataset).'
+  decisions:
+    - Media inherits the parent review's moderation status — approving a review publishes its media. Avoids a second admin queue; cost is all-or-nothing per review.
+    - '`reviewMedia` with a `mediaType` enum (image|video) rather than `reviewPhotos`, so video is additive later instead of a migration. Otherwise mirrors `approvalPhotos` at schema/approvals.ts:112.'
+    - Direct-to-R2 presigned upload (storage.ts:410, currently unused). Video payloads cannot route through Hono; images take the same path so there is one code path.
+    - Transcode is async and never blocks the review. Review submits at `pending` with media at `processing`; a failed transcode drops the media, not the review.
+    - 'ffmpeg installed via apt in the Dockerfile — oven/bun:1-slim is Debian. No vendor, no new API key. Concurrency must be 1 in dev: 13+ agent sessions share 8 cores.'
+    - Aggregate suppression reused from PromoTile / reviewsApp.get('/stats') (routes/reviews.ts:380) — home strip and /reviews header render null below ten approved reviews rather than rounding a thin sample into a synthetic 4.9/5.
+    - Review toast is site-wide, mounted in __root.tsx, sessionStorage-dismissible, suppressed on /checkout and kept under the cart drawer z-index on mobile.
+    - Review media reaches admins unscreened — services/ai-moderation.ts is text-only. Accepted because every review is human-moderated before publish.
+  approved: true
+  approved_at: '2026-08-05T15:09:49.220Z'
+plan:
+  phases:
+    - name: Database Schema
+      location: packages/api/src/database/schema
+      tickets:
+        - 478
+    - name: Media Infrastructure
+      location: packages/api/src/lib, packages/api/src/queues, Dockerfile
+      tickets:
+        - 479
+        - 480
+    - name: Backend API
+      location: packages/api/src/routes
+      tickets:
+        - 481
+        - 482
+        - 483
+    - name: Frontend
+      location: packages/web/app
+      tickets:
+        - 484
+        - 485
+        - 486
+        - 487
+        - 488
+        - 489
+        - 490
+    - name: Seed and E2E
+      location: packages/api/src/database, tests/e2e
+      tickets:
+        - 491
+        - 492
+  generated_at: '2026-08-05T15:16:43.281Z'

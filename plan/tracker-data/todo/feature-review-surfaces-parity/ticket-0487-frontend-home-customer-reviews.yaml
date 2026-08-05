@@ -1,0 +1,94 @@
+ticket_number: 487
+title: Frontend - home Customer Reviews strip with score band and carousel
+description: |-
+  ## Task
+
+  Mesonart's home section 10 (`customer_review` ×2): a score strip over a horizontally scrollable rail of review cards, with a View All pill to `/reviews`. Currently the home page has no review presence at all.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Frontend
+  Depends on: the client layer, the /reviews route
+
+  - `packages/web/app/routes/index.tsx` — existing sections are `HeroSection` (:182), `FeaturedProductsSection` (:251), `CategoriesSection` (:329), `AIGeneratorSection` (:417), `ValuePropsSection` (:498), `NewsletterSection` (:536). Mesonart places reviews late in the stack, after the merchandising rails and before the brand story — mount it between `ValuePropsSection` and `NewsletterSection`
+  - **The whole section renders `null` below 10 approved reviews.** Same rule as `PromoTile`. Today there are 12 approved across 9 products, so it will render — but barely, and a seed reset must not produce a fake "4.9/5"
+  - Reuse `SectionBand` and `DisplayHeading`; do not invent a new band style
+  - The rail is CSS scroll-snap with arrow buttons, matching the collection Discover carousel. No carousel dependency
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:15:25.069Z'
+last_updated: '2026-08-05T15:15:25.069Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 484
+    feature: review-surfaces-parity
+    description: Frontend - API client functions and hooks for review feed and media
+  - ticket: 486
+    feature: review-surfaces-parity
+    description: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the home reviews section
+    file: packages/web/tests/components/home/CustomerReviewsSection.test.tsx
+    command: cd packages/web && bun run test -- CustomerReviewsSection
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // renders the score band and the count when reviewCount >= 10
+      // renders null - not a placeholder, not a zero - when count < 10
+      // renders null when averageRating is null even if count is high
+      // renders one card per review with rating, excerpt and author
+      // the View All link points at /reviews
+      // arrow buttons scroll the rail and disable at each end
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bun run test -- CustomerReviewsSection
+    expected_result: FAIL - component not found
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the section
+    file: packages/web/app/components/home/CustomerReviewsSection.tsx
+    status: pending
+    code: |-
+      // Data: useReviewFeed(1, 12) + the catalogue aggregate from
+      //   productsApi.catalogueReviewStats() (lib/api.ts:291).
+      // Guard first: if (!stats?.averageRating || stats.reviewCount < 10) return null
+      // Band: score "4.9" + star row + "N Reviews", mesonart's "9000+ Score 4.9/5.0"
+      //   shape but with our real numbers.
+      // Rail: overflow-x-auto snap-x snap-mandatory, one ReviewCard per item, arrows.
+      // Footer: outline pill "View All" -> /reviews.
+  - id: 4
+    action: implement
+    description: Mount the section on the home page
+    file: packages/web/app/routes/index.tsx
+    status: pending
+    code: // Inside HomePage (:138), between <ValuePropsSection /> and <NewsletterSection />.
+  - id: 5
+    action: verify-pass
+    description: Confirm the section tests pass
+    command: cd packages/web && bun run test -- CustomerReviewsSection
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the home strip
+    command: 'git add packages/web/app/components/home packages/web/app/routes/index.tsx packages/web/tests/components/home && git commit -m "feat(web): home customer reviews strip"'
+    status: pending
+current_step: 1

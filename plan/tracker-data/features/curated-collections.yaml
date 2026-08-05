@@ -102,14 +102,7 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo:
-    "469": Web - Discover chips become links to collections
-    "470": Web - /collections/$slug reusing the collection-page shell
-    "471": Web - collection SEO and sitemap entries
-    "472": Admin - collections list with discover reorder
-    "473": Admin - collection form with rule builder and manual picker
-    "474": Cleanup - retire GET /api/products/collections
-    "475": E2E - collection pages, the Discover rail and admin authoring
+  todo: {}
   in_progress: {}
   done:
     "461": Shared - collection contracts, superseding the dead collectionSchema
@@ -120,9 +113,16 @@ tickets:
     "466": API - GET /api/collections/:slug resolving a collection to products
     "467": API - admin CRUD for collections
     "468": API - manual membership and Discover ordering
+    "469": Web - Discover chips become links to collections
+    "470": Web - /collections/$slug reusing the collection-page shell
+    "471": Web - collection SEO and sitemap entries
+    "472": Admin - collections list with discover reorder
+    "473": Admin - collection form with rule builder and manual picker
+    "474": Cleanup - retire GET /api/products/collections
+    "475": E2E - collection pages, the Discover rail and admin authoring
 total_tickets: 15
-completion_percentage: 53
-is_completed: false
+completion_percentage: 100
+is_completed: true
 design:
   approach: "One `collections` table with two membership kinds. `kind: 'rule'` stores the existing validated product-filter payload (facets + sort) as jsonb and resolves through the same query path `/api/products` already uses; `kind: 'manual'` resolves through a `collection_products` join carrying an explicit position. Storefront gets `/collections/$slug` reusing the collection-page shell built for /posters, with the collection's rule as the base query and shopper facets narrowing within it. The Discover rail is re-pointed from STYLE_OPTIONS to the collections table and its chips become links rather than filter toggles. Admin gets full CRUD at /admin/collections with a rule builder over the shared facet vocabulary."
   decisions:

@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-05T14:41:43.708Z'
+  last_updated: '2026-08-05T16:18:33.510Z'
   features:
     chobi-external-services:
       - ticket_number: 315
@@ -759,6 +759,115 @@ dependencies:
         blocked_by:
           - ticket_number: 344
             title: 'Content-Security-Policy for SSR pages (deferred from #264)'
+    review-surfaces-parity:
+      - ticket_number: 479
+        title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+        blocks: []
+        blocked_by:
+          - ticket_number: 478
+            title: Database Schema - reviewMedia table, enums, relations and migration
+      - ticket_number: 480
+        title: Media Infrastructure - BullMQ review-media transcode queue and worker
+        blocks: []
+        blocked_by:
+          - ticket_number: 478
+            title: Database Schema - reviewMedia table, enums, relations and migration
+          - ticket_number: 479
+            title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+      - ticket_number: 481
+        title: Backend API - review media presign and complete upload endpoints
+        blocks: []
+        blocked_by:
+          - ticket_number: 478
+            title: Database Schema - reviewMedia table, enums, relations and migration
+          - ticket_number: 479
+            title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+          - ticket_number: 480
+            title: Media Infrastructure - BullMQ review-media transcode queue and worker
+      - ticket_number: 482
+        title: Backend API - site-wide review list, media feed, and media on existing reads
+        blocks: []
+        blocked_by:
+          - ticket_number: 478
+            title: Database Schema - reviewMedia table, enums, relations and migration
+      - ticket_number: 483
+        title: Backend API - review media in the admin moderation queue
+        blocks: []
+        blocked_by:
+          - ticket_number: 478
+            title: Database Schema - reviewMedia table, enums, relations and migration
+          - ticket_number: 482
+            title: Backend API - site-wide review list, media feed, and media on existing reads
+      - ticket_number: 484
+        title: Frontend - API client functions and hooks for review feed and media
+        blocks: []
+        blocked_by:
+          - ticket_number: 481
+            title: Backend API - review media presign and complete upload endpoints
+          - ticket_number: 482
+            title: Backend API - site-wide review list, media feed, and media on existing reads
+      - ticket_number: 485
+        title: Frontend - photo and video upload in ReviewForm
+        blocks: []
+        blocked_by:
+          - ticket_number: 484
+            title: Frontend - API client functions and hooks for review feed and media
+      - ticket_number: 486
+        title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+        blocks: []
+        blocked_by:
+          - ticket_number: 484
+            title: Frontend - API client functions and hooks for review feed and media
+      - ticket_number: 487
+        title: Frontend - home Customer Reviews strip with score band and carousel
+        blocks: []
+        blocked_by:
+          - ticket_number: 484
+            title: Frontend - API client functions and hooks for review feed and media
+          - ticket_number: 486
+            title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+      - ticket_number: 488
+        title: Frontend - PDP review media wall with lightbox and video playback
+        blocks: []
+        blocked_by:
+          - ticket_number: 484
+            title: Frontend - API client functions and hooks for review feed and media
+      - ticket_number: 489
+        title: Frontend - site-wide floating review toast
+        blocks: []
+        blocked_by:
+          - ticket_number: 484
+            title: Frontend - API client functions and hooks for review feed and media
+      - ticket_number: 490
+        title: Frontend - review media in the admin moderation UI
+        blocks: []
+        blocked_by:
+          - ticket_number: 483
+            title: Backend API - review media in the admin moderation queue
+      - ticket_number: 491
+        title: Seed - attach photo and video media to approved reviews
+        blocks: []
+        blocked_by:
+          - ticket_number: 478
+            title: Database Schema - reviewMedia table, enums, relations and migration
+          - ticket_number: 479
+            title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+      - ticket_number: 492
+        title: E2E - review surfaces and media upload flows
+        blocks: []
+        blocked_by:
+          - ticket_number: 485
+            title: Frontend - photo and video upload in ReviewForm
+          - ticket_number: 486
+            title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+          - ticket_number: 487
+            title: Frontend - home Customer Reviews strip with score band and carousel
+          - ticket_number: 488
+            title: Frontend - PDP review media wall with lightbox and video playback
+          - ticket_number: 489
+            title: Frontend - site-wide floating review toast
+          - ticket_number: 491
+            title: Seed - attach photo and video media to approved reviews
     sale-promotions:
       - ticket_number: 425
         title: Schema - record the promotion and its discount on orders

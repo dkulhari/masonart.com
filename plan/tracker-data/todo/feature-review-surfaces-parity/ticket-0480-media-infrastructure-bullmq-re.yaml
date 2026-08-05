@@ -1,0 +1,107 @@
+ticket_number: 480
+title: Media Infrastructure - BullMQ review-media transcode queue and worker
+description: |-
+  ## Task
+
+  Async transcode so submitting a review is never blocked on ffmpeg. The review saves immediately at `pending` with its media at `processing`; the worker normalises the video, uploads the MP4 and poster frame, and flips the row to `ready`.
+
+  A failed transcode marks that media row `failed` and drops it from every read surface. It must never fail the review.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Media Infrastructure
+  Depends on: reviewMedia schema, ffmpeg wrapper
+
+  - Model on `packages/api/src/queues/ai-generation.ts` — Queue + Worker + QueueEvents, `createRedisConnection()` for the worker per BullMQ guidance (`lib/redis.ts:39`)
+  - **Worker concurrency must be 1.** This box runs 13+ concurrent agent sessions on 8 cores; an unbounded transcode pool starves every other session. Make the concurrency an env var defaulting to 1
+  - Images skip the queue entirely — `uploadOptimizedImage` (`storage.ts:170`) already handles them synchronously
+  - Clean up temp files in a `finally`, including on the failure path
+feature: review-surfaces-parity
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:12:30.611Z'
+last_updated: '2026-08-05T15:12:30.611Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 478
+    feature: review-surfaces-parity
+    description: Database Schema - reviewMedia table, enums, relations and migration
+  - ticket: 479
+    feature: review-surfaces-parity
+    description: Media Infrastructure - video validation, ffmpeg processing and Docker image
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the transcode job processor
+    file: packages/api/tests/queues/review-media.test.ts
+    command: cd packages/api && bun run test -- queues/review-media
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // Test the exported processor function directly; do not spin up a real Worker.
+      // Mock ../lib/video-processing and ../lib/storage with vi.mock.
+      // - happy path: probe -> transcode -> poster -> two uploads -> row updated to
+      //   'ready' with url, posterUrl, durationSeconds, width, height
+      // - a clip over REVIEW_MEDIA_LIMITS.video.maxDurationSeconds is rejected before
+      //   transcode and the row goes 'failed' with a human-readable processingError
+      // - transcodeToMp4 throwing leaves the row 'failed' and does NOT touch the review
+      // - temp files are unlinked on both paths
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails - queue module missing
+    command: cd packages/api && bun run test -- queues/review-media
+    expected_result: FAIL - Cannot find module '../../src/queues/review-media'
+    status: pending
+  - id: 3
+    action: implement
+    description: Create the review media queue, processor and worker
+    file: packages/api/src/queues/review-media.ts
+    status: pending
+    code: |-
+      // export interface ReviewMediaJobData { mediaId: string; sourceKey: string }
+      // export const reviewMediaQueue = new Queue<ReviewMediaJobData>('review-media', { connection: redisOptions })
+      // export async function processReviewMediaJob(job): Promise<void>
+      //    getFile(sourceKey) -> tmp -> probeVideo -> duration/dimension guard
+      //    -> transcodeToMp4 + extractPosterFrame -> uploadFile(mp4) + uploadImage(poster)
+      //    -> db.update(reviewMedia).set({ url, posterUrl, durationSeconds, width, height,
+      //                                    processingStatus: 'ready' })
+      //    catch -> processingStatus 'failed' + processingError (stderr tail, truncated)
+      //    finally -> unlink temps
+      // export function startReviewMediaWorker() {
+      //   return new Worker('review-media', processReviewMediaJob, {
+      //     connection: createRedisConnection(),
+      //     concurrency: Number(process.env.REVIEW_MEDIA_CONCURRENCY ?? 1),  // see ticket note
+      //   })
+      // }
+      // export async function closeReviewMediaQueue(): Promise<void>
+  - id: 4
+    action: implement
+    description: Start the worker alongside the AI generation worker and close it on shutdown
+    file: packages/api/src/index.ts
+    status: pending
+    code: // Mirror however startAIGenerationWorker / closeAIGenerationQueue are wired here.
+  - id: 5
+    action: verify-pass
+    description: Confirm the queue tests pass
+    command: cd packages/api && bun run test -- queues/review-media
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the transcode queue
+    command: 'git add packages/api/src/queues/review-media.ts packages/api/src/index.ts packages/api/tests/queues && git commit -m "feat(api): async review media transcode queue"'
+    status: pending
+current_step: 1

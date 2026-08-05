@@ -1,0 +1,131 @@
+ticket_number: 471
+title: Web - collection SEO and sitemap entries
+description: |-
+  ## Task
+
+  Make collection pages findable.
+
+  - Per-collection `head()`: title from `seoTitle` falling back to `title`, description from `seoDescription` falling back to `description`, canonical at `/collections/<slug>`, OpenGraph image from `imageUrl` or the representative product.
+  - Add active collections to `packages/api/src/routes/sitemap.ts`.
+
+  Inactive collections must appear in neither. They 404, and a sitemap entry pointing at a 404 is worse than no entry.
+
+  ## Context
+
+  Feature: curated-collections, Phase 5. Depends on the route.
+
+  Follow the `head()` block in `routes/posters/index.tsx` — it already builds a canonical URL and the twitter/og tag set.
+feature: curated-collections
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:59.800Z'
+last_updated: '2026-08-05T15:51:35.205Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - backend
+  - seo
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T15:49:19.635Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T15:51:21.579Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T15:51:35.205Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `3c268bfc` — feat(web): collection SEO and sitemap entries
+
+      **Files Changed**:
+      - `packages/api/src/routes/sitemap.ts` — active collections queried and emitted.
+      - `packages/web/app/routes/collections/$slug.tsx` — `og:image` added to the head (title/description/canonical landed with #470).
+      - `packages/api/tests/routes/sitemap-collections.test.ts` — 5 tests.
+
+      **Decisions**
+      - **Separate query, not a join.** Joining collections to products would tie a collection's presence in the sitemap to its products', so deactivating one collection would drag its products out with it. A test asserts two selects rather than one.
+      - **`isActive` is the whole filter.** An inactive collection 404s (#466), and an entry pointing at a 404 is worse than no entry — search engines read it as a signal about the site, not about the one URL.
+      - **Priority 0.85**: above products (0.8), below `/posters` (0.9). A collection is a curated entry point into the catalogue, not the catalogue.
+      - **`og:image` prefers the admin's image, falls back to the first piece on the page.** A collection with neither is unreachable anyway — `GET /api/collections` drops collections that resolve to nothing.
+
+      **Live verification**
+
+      Sitemap — 14 collection URLs present:
+      ```
+      https://chobii.art/collections/wabi-sabi-art
+      https://chobii.art/collections/plaster-and-texture-art
+      https://chobii.art/collections/colorful-art
+      …
+      ```
+
+      Rendered head:
+
+      | | `/collections/pop-art` | `/collections/best-selling` |
+      |---|---|---|
+      | title | Pop Art \| chobii.art | Best Sellers \| chobii.art |
+      | description | the collection's own copy | the collection's own copy |
+      | canonical | `https://chobii.art/collections/pop-art` | `…/best-selling` |
+      | og:image | `…digital-cosmos-0.webp` | `…synthetic-nature-0.webp` |
+
+      The descriptions come from the seeded rows, so Best Sellers reads "Ranked by units actually sold on settled orders, not by editorial pick" rather than boilerplate — which is both true and the thing worth ranking on.
+
+      **Verification**
+      - Command: `cd packages/api && npx vitest run tests/routes/sitemap-collections.test.ts`
+      - Result: PASS — 5 tests, 0 failing
+      - Build: `cd packages/web && npx tsc --noEmit -p tsconfig.json` — clean
+      - The existing fallback contract still holds: a failing query returns the static sitemap with `X-Sitemap-Error: true` rather than a 500, and there is a test for it.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 470
+    feature: curated-collections
+    description: Web - /collections/$slug reusing the collection-page shell
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing SEO and sitemap tests
+    file: packages/api/tests/routes/sitemap-collections.test.ts
+    command: cd packages/api && npx vitest run tests/routes/sitemap-collections.test.ts
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: the sitemap lists every active collection at /collections/<slug>; inactive ones are absent; the route''s head() prefers seoTitle over title and emits a canonical.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/api && npx vitest run tests/routes/sitemap-collections.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add head() to the route and collections to the sitemap
+    status: pending
+    code: packages/web/app/routes/collections/$slug.tsx head(); packages/api/src/routes/sitemap.ts query for active collections.
+  - id: 4
+    action: verify-pass
+    description: Confirm they pass
+    command: cd packages/api && npx vitest run tests/routes/sitemap-collections.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/sitemap.ts packages/web/app/routes/collections packages/api/tests/routes && git commit -m "feat(web): collection SEO and sitemap entries (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T15:49:19.635Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/routes/sitemap-collections.test.ts
+  test_output: 5 tests passing. Live sitemap.xml carries all 14 collection URLs; the rendered pages expose per-collection title, description, canonical and og:image.
+  build_passed: true
+  build_command: cd packages/web && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T15:51:17.086Z'
+completed: '2026-08-05T15:51:21.579Z'

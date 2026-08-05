@@ -1,0 +1,144 @@
+ticket_number: 470
+title: Web - /collections/$slug reusing the collection-page shell
+description: |-
+  ## Task
+
+  A real, crawlable page per collection at `/collections/$slug`.
+
+  It reuses what /posters already has — beige header band with breadcrumbs and display H1, Discover rail, sticky toolbar with count and sort, facet rail, product grid, lazy paging — fed by `GET /api/collections/:slug` instead of `/api/products`.
+
+  Differences from /posters:
+
+  - H1, description and breadcrumb trail come from the collection row
+  - facet counts are scoped to the collection
+  - the rail marks this collection as current
+  - unknown or inactive slug renders the 404, not an empty grid
+
+  ## Context
+
+  Feature: curated-collections, Phase 5. Depends on the detail endpoint and the chips ticket.
+
+  Lift the shared shell out of `routes/posters/index.tsx` rather than copying it — a second 700-line copy of the collection page is how the two drift. Extract the common part into a component both routes render.
+
+  `validateSearch` must coerce numbers and split comma-joined arrays. router.tsx overrides TanStack's search serialisation; a schema that assumes typed values error-boundaries the route to a blank page — the trap `posters/index.tsx` already documents.
+feature: curated-collections
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:02.549Z'
+last_updated: '2026-08-05T15:49:15.182Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T15:35:23.894Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T15:48:54.910Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T15:49:15.182Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `b79bfe3d` — feat(web): /collections/$slug, on the shell /posters already runs
+
+      **Files Changed**:
+      - `packages/web/app/routes/collections/$slug.tsx` — new. Route, `parseCollectionSearch`, `toApiParams`, `toFilterState`, `toSearch`.
+      - `packages/web/app/components/product/ActiveFilterTags.tsx` — extracted from the posters route.
+      - `packages/web/app/components/product/MobileFiltersSheet.tsx` — extracted from the posters route.
+      - `packages/web/app/routes/posters/index.tsx` — imports both instead of defining them; 1063 → 927 lines.
+      - `packages/web/app/lib/api.ts` — `collectionsApi.detail()`.
+      - `packages/api/src/routes/collections.ts` — `appliedSort` on the response (see below).
+      - `packages/web/tests/routes/collection-slug.test.ts` — 13 tests.
+
+      **On "lift the shell rather than copy it"** — I extracted the two page-local **components**, not one monolithic shell component. The layout JSX in the two routes is similar, but everything inside it is already a shared component (`CollectionToolbar`, `ProductFilters`, `ProductGrid`, `PromoTile`, `DiscoverChips`, and now these two). Collapsing the outer JSX into a single component would have meant a ~15-prop wrapper and reshaping a 1000-line file that another session is actively editing. The parts that would actually drift — the chip semantics, the scroll lock, the facet-tag derivation — are shared. Flagging the judgement call rather than claiming the ticket's exact wording.
+
+      **A bug the browser caught that no test would have.** `/collections/best-selling` displayed **"Sort by: Newest First"** over a list ordered by units sold. The toolbar derived its label from the search params, but the collection's rule *is* the sort and the rule is not in the public payload — so the client had no way to know. Fixed by returning `appliedSort` from `GET /api/collections/:slug` and labelling from that.
+
+      ```
+      /collections/best-selling    Sort by: Best selling   ✅
+      /collections/new             Sort by: Newest First   ✅
+      /collections/pop-art         Sort by: Newest First   ✅
+      ```
+
+      **Browser verification** (1440×900):
+
+      | request | result |
+      |---|---|
+      | `/collections/pop-art` | 200, h1 "Pop Art", 6 cards, facets 2+3+1 = 6 |
+      | `/collections/best-selling` | 200, h1 "Best Sellers", 41 total / 24 rendered |
+      | `/collections/pop-art?styles=ukiyo-e-art` | **"No products"** + active-filter chip — the intersection rule, visible |
+      | `/collections/pop-art?styles=pop-art` | 6 cards |
+      | `/collections/nope-not-real` | **404** |
+      | `/posters` | unchanged, 24 cards |
+
+      Facet counts are demonstrably scoped: the sidebar on Pop Art reads Square (2), Vertical (3), Horizontal (1) — its six products, not the catalogue's 41.
+
+      **Verification**
+      - Command: `cd packages/web && npx vitest run tests/routes/collection-slug.test.ts tests/components/product/`
+      - Result: PASS — 259 tests, 13 files, 0 failing
+      - Build: `npx tsc --noEmit -p tsconfig.json` — clean
+      - API: `npx vitest run tests/routes/collection-detail.test.ts` still 12/12 after adding `appliedSort`
+
+      **Two environment notes**
+      1. `routeTree.gen.ts` is generated by the **dev server**, not a script. Typecheck fails with a confusing path-union error until `npm run dev` has run in `packages/web`.
+      2. The API crashed mid-verification with `ReferenceError: discoverOrderSchema is not defined` — `bun --hot` holding a pre-rebuild copy of `@chobii/shared`. Restarting fixed it. Rebuild shared → restart the API.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 466
+    feature: curated-collections
+    description: API - GET /api/collections/:slug resolving a collection to products
+  - ticket: 469
+    feature: curated-collections
+    description: Web - Discover chips become links to collections
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing route tests
+    file: packages/web/tests/routes/collection-slug.test.tsx
+    command: cd packages/web && npx vitest run tests/routes/collection-slug.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: validateSearch coerces page to a number and splits comma-joined facet arrays; the loader calls /api/collections/<slug>; header band reads title and description off the collection; breadcrumbs end at the collection title.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && npx vitest run tests/routes/collection-slug.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Extract the shell, then build the route on it
+    file: packages/web/app/routes/collections/$slug.tsx
+    status: pending
+    code: First extract the shared collection-page shell from routes/posters/index.tsx into a component; re-point /posters at it and confirm its existing tests still pass BEFORE adding the new route. Then add the route.
+  - id: 4
+    action: verify-pass
+    description: Confirm both routes' tests pass
+    command: cd packages/web && npx vitest run tests/routes/ && npx tsc --noEmit -p tsconfig.json
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app/routes packages/web/app/components packages/web/tests/routes && git commit -m "feat(web): /collections/$slug on the shared collection-page shell (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T15:35:23.894Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/web && npx vitest run tests/routes/collection-slug.test.ts tests/components/product/
+  test_output: '259 tests across 13 files, including 13 new route tests. Browser: /collections/pop-art renders 6 products with scoped facet counts (2+3+1), /collections/best-selling 41 with 24 on the page, an unknown slug 404s, and pop-art?styles=ukiyo-e-art renders "No products".'
+  build_passed: true
+  build_command: cd packages/web && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T15:48:49.900Z'
+completed: '2026-08-05T15:48:54.910Z'

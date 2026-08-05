@@ -1,0 +1,89 @@
+ticket_number: 491
+title: Seed - attach photo and video media to approved reviews
+description: |-
+  ## Task
+
+  Give the new surfaces something true to render. Seed media onto the existing approved reviews so the PDP wall, the home strip and the toast are exercised against real rows rather than empty states.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Seed and E2E
+  Depends on: reviewMedia schema
+
+  - `packages/api/src/database/seed-orders-reviews.ts` created the 12 approved reviews across 9 products (#414), with the settled orders that authorise them. Extend that script; do not write a new one
+  - Reuse the room-mockup images the seed pipeline already generates (`seed-images.ts`, `lib/product-media.ts`) as review photos. Do not commit new binaries
+  - At least one **video** row so the wall, the lightbox and the admin queue all get exercised. Generate it with ffmpeg's own `testsrc` at seed time rather than committing an MP4
+  - Idempotent, like the rest of the seeds: re-running must not duplicate media
+  - Tests follow `packages/api/tests/database/seed-orders-reviews.test.ts`
+feature: review-surfaces-parity
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:15:59.708Z'
+last_updated: '2026-08-05T15:15:59.708Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - testing
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 478
+    feature: review-surfaces-parity
+    description: Database Schema - reviewMedia table, enums, relations and migration
+  - ticket: 479
+    feature: review-surfaces-parity
+    description: Media Infrastructure - video validation, ffmpeg processing and Docker image
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for review media seeding
+    file: packages/api/tests/database/seed-review-media.test.ts
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- seed-review-media
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // seeding attaches media to a subset of approved reviews, not all of them
+      // every seeded row is processingStatus 'ready' with a resolvable url
+      // at least one row is mediaType 'video' with a posterUrl and a duration
+      // running the seed twice leaves the media count unchanged
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- seed-review-media
+    expected_result: FAIL - seedReviewMedia is not exported
+    status: pending
+  - id: 3
+    action: implement
+    description: Extend the seed script
+    file: packages/api/src/database/seed-orders-reviews.ts
+    status: pending
+    code: |-
+      // export async function seedReviewMedia()
+      //   For ~5 of the approved reviews, insert 1-2 image rows pointing at the
+      //   product's existing room-mockup renditions.
+      //   For 1 review, generate a short clip with ffmpeg testsrc, run it through
+      //   transcodeToMp4 + extractPosterFrame, upload both, and insert a 'video' row.
+      //   Skip the video half with a logged warning when ffmpeg is unavailable, so the
+      //   seed still completes on a machine without it.
+      //   Guard on an existing count per review for idempotency.
+      // Call it at the end of the existing seed flow.
+  - id: 4
+    action: verify-pass
+    description: Confirm the seed tests pass
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- seed-review-media seed-orders-reviews
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the seed extension
+    command: 'git add packages/api/src/database/seed-orders-reviews.ts packages/api/tests/database/seed-review-media.test.ts && git commit -m "feat(db): seed photo and video media onto approved reviews"'
+    status: pending
+current_step: 1

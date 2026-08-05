@@ -1,0 +1,104 @@
+ticket_number: 474
+title: Cleanup - retire GET /api/products/collections
+description: |-
+  ## Task
+
+  Delete the style-derived chips endpoint at `packages/api/src/routes/products.ts:601` and its tests once `/api/collections` has taken over every caller.
+
+  Grep for remaining callers first. Leaving it is how a second collection vocabulary stays alive — which is exactly the state this feature exists to end, and exactly what the `styles.ts` deprecation block warns about.
+
+  Also retire the `collections:v2` cache key so a stale entry cannot outlive the deploy.
+
+  ## Context
+
+  Feature: curated-collections, Phase 7. Depends on the web chips ticket removing the last caller.
+
+  Do not delete this before the web side has moved — verify with grep, not with memory.
+feature: curated-collections
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:59.875Z'
+last_updated: '2026-08-05T16:05:25.359Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - cleanup
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T15:58:32.397Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T16:05:09.874Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T16:05:25.359Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `eb097941` — refactor(api): retire the style-derived collections endpoint
+
+      **Files Changed**:
+      - `packages/api/src/routes/products.ts` — handler removed (181 lines), plus `CANDIDATES_PER_COLLECTION` and the now-unused `STYLE_OPTIONS` import. 1185 → 992 lines.
+      - `packages/api/tests/routes/product-collections.test.ts` — deleted.
+
+      **Callers checked before deleting, not assumed.** `grep -rn "products/collections"` over `packages/` and `tests/` returned only the endpoint's own test and two doc comments naming what superseded it.
+
+      **The 55 "failures" in the full route suite are not failures**
+
+      `npx vitest run tests/routes/` reports 7 files / 55 tests failing. Both counts are **identical with `products.ts` at HEAD and with the removal applied**, and every implicated suite passes in isolation — `admin/reviews.test.ts` is 96/96 alone, 0/96 in the combined run. It is parallel-suite interference, the hazard already recorded for this repo. Worth its own ticket; nothing to do with this change.
+
+      **Verification**
+      - `products.test.ts`: **77/77 before and after** — the removal touched nothing else in that file
+      - `collections.test.ts` + `collection-detail.test.ts` + `products.test.ts`: 97 passing
+      - All five collections suites together: 61 passing
+      - `npx tsc --noEmit` — clean
+      - Stale `product:collections*` keys dropped from the running Redis (none were present — the key had already aged out)
+
+      **A process note worth recording.** While baselining, I swapped `products.ts` for the HEAD copy to compare failure counts, and the shell's cwd had drifted into `packages/api` — so an earlier relative-path write had landed at `packages/api/packages/api/src/routes/products.ts`. The result: my edit was sitting in a stray nested tree while the real file had been restored to HEAD. Caught by diffing both against HEAD and comparing line counts (992 vs 1185) before committing. The stray tree is removed. **After any file swap for baselining, verify the working file is the one you think it is** — `git status` alone showed ` M`, which looked correct.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 469
+    feature: curated-collections
+    description: Web - Discover chips become links to collections
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: verify-pass
+    description: Confirm nothing still calls the old endpoint
+    command: grep -rn "products/collections" packages/ tests/ --include=*.ts --include=*.tsx
+    expected_result: PASS - no callers outside the route and its own test
+    status: pending
+  - id: 2
+    action: implement
+    description: Delete the handler, its tests and the cache key
+    file: packages/api/src/routes/products.ts
+    status: pending
+    code: Remove the /collections handler and packages/api/tests/routes/product-collections.test.ts.
+  - id: 3
+    action: verify-pass
+    description: Confirm the API suite still passes
+    command: cd packages/api && npx vitest run tests/routes/
+    expected_result: PASS
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/products.ts packages/api/tests/routes && git commit -m "refactor(api): retire the style-derived collections endpoint (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T15:58:32.397Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/api && npx vitest run tests/routes/products.test.ts tests/routes/collections.test.ts tests/routes/collection-detail.test.ts
+  test_output: 97 tests passing. products.test.ts is 77/77 both before and after the removal. The full tests/routes/ run reports an identical 7 files / 55 tests failing with products.ts at HEAD and with the removal applied — suite interference, unrelated and unchanged.
+  build_passed: true
+  build_command: cd packages/api && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T16:05:04.282Z'
+completed: '2026-08-05T16:05:09.874Z'

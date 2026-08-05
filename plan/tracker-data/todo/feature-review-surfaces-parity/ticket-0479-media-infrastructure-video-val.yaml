@@ -1,0 +1,129 @@
+ticket_number: 479
+title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+description: |-
+  ## Task
+
+  Teach the storage layer about video and add an ffmpeg wrapper that can probe a customer upload, normalise it to a web-playable H.264/AAC MP4, and extract a poster frame.
+
+  Customer phone uploads are HEVC `.mov`, which Chrome and Firefox will not play — normalising is not optional.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Media Infrastructure
+
+  - `packages/api/src/lib/storage.ts:513` `isValidImageType` is the pattern; video needs a **sibling**, not a widened allowlist — different size caps and a different downstream path
+  - `StoragePaths` at `storage.ts:49`; presign helper already exists at `storage.ts:410` (currently unused)
+  - `packages/api/src/lib/image-processing.ts` is `sharp` and cannot touch video
+  - Dockerfile api stage is `oven/bun:1-slim` (line 47) — Debian, so `apt-get install -y ffmpeg` works
+  - **Local dev on macOS needs `brew install ffmpeg`.** Provide a clear startup error, not a stack trace, when the binary is absent
+  - Shell out to `ffmpeg`/`ffprobe` via `node:child_process`; do not add a wrapper dependency
+feature: review-surfaces-parity
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:12:30.590Z'
+last_updated: '2026-08-05T15:12:30.590Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 478
+    feature: review-surfaces-parity
+    description: Database Schema - reviewMedia table, enums, relations and migration
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for video mime validation and storage paths
+    file: packages/api/tests/lib/storage-video.test.ts
+    command: cd packages/api && bun run test -- storage-video
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // isValidVideoType accepts video/mp4, video/quicktime, video/webm
+      // isValidVideoType rejects image/png, application/pdf, '' and mixed case junk
+      // REVIEW_MEDIA_LIMITS caps: image 10MB, video 200MB, video duration 60s
+      // StoragePaths.reviewMedia(reviewId, filename) yields a stable prefixed key
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails - helpers not exported
+    command: cd packages/api && bun run test -- storage-video
+    expected_result: FAIL - isValidVideoType is not a function
+    status: pending
+  - id: 3
+    action: implement
+    description: Add video validation, limits and review media paths to storage.ts
+    file: packages/api/src/lib/storage.ts
+    status: pending
+    code: |-
+      // export const REVIEW_MEDIA_LIMITS = {
+      //   image: { maxBytes: 10 * 1024 * 1024, types: ['image/jpeg','image/png','image/webp'] },
+      //   video: { maxBytes: 200 * 1024 * 1024, maxDurationSeconds: 60,
+      //            types: ['video/mp4','video/quicktime','video/webm'] },
+      // } as const
+      // export function isValidVideoType(contentType: string): boolean  // mirrors isValidImageType at :513
+      // Add reviewMedia to StoragePaths (:49): `reviews/${reviewId}/media`
+  - id: 4
+    action: write-test
+    description: Write failing tests for the ffmpeg wrapper against a tiny fixture clip
+    file: packages/api/tests/lib/video-processing.test.ts
+    command: cd packages/api && bun run test -- video-processing
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // Skip the whole suite when ffmpeg is absent (same shape as SKIP_DB_RUNTIME_TESTS).
+      // Generate the fixture in beforeAll with ffmpeg's own testsrc so no binary is committed:
+      //   ffmpeg -f lavfi -i testsrc=duration=2:size=320x240:rate=10 -pix_fmt yuv420p <tmp>/fixture.mp4
+      // probeVideo() returns { durationSeconds ~2, width 320, height 240, videoCodec }
+      // transcodeToMp4() emits an h264 + aac mp4 that probes back with the same duration
+      // extractPosterFrame() emits a jpeg whose sharp metadata reports 320x240
+      // isFfmpegAvailable() returns false when PATH is emptied
+  - id: 5
+    action: implement
+    description: Create the ffmpeg wrapper
+    file: packages/api/src/lib/video-processing.ts
+    status: pending
+    code: |-
+      // Shell out with execFile from node:child_process (promisified). No new dependency.
+      // export async function isFfmpegAvailable(): Promise<boolean>   // `ffmpeg -version`
+      // export async function probeVideo(path: string): Promise<VideoMetadata>
+      //   ffprobe -v error -print_format json -show_format -show_streams <path>
+      // export async function transcodeToMp4(inputPath, outputPath): Promise<void>
+      //   ffmpeg -i in -c:v libx264 -preset veryfast -crf 26 -vf scale='min(1280,iw)':-2
+      //          -c:a aac -b:a 128k -movflags +faststart -y out
+      // export async function extractPosterFrame(inputPath, outputPath): Promise<void>
+      //   ffmpeg -i in -ss 00:00:01 -frames:v 1 -q:v 3 -y out
+      // Every function rejects with a typed error carrying ffmpeg's stderr tail — the
+      // worker records that on reviewMedia.processingError.
+  - id: 6
+    action: implement
+    description: Install ffmpeg in the API image
+    file: Dockerfile
+    status: pending
+    code: |-
+      # In the `api` stage (FROM oven/bun:1-slim AS api, ~line 47), before the app copy:
+      RUN apt-get update \
+       && apt-get install -y --no-install-recommends ffmpeg \
+       && rm -rf /var/lib/apt/lists/*
+      # Only the api stage. The web stage does not transcode.
+  - id: 7
+    action: verify-pass
+    description: Confirm both suites pass
+    command: cd packages/api && bun run test -- storage-video video-processing
+    expected_result: PASS
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the media infrastructure
+    command: 'git add packages/api/src/lib/storage.ts packages/api/src/lib/video-processing.ts packages/api/tests/lib Dockerfile && git commit -m "feat(api): ffmpeg video processing and review media storage limits"'
+    status: pending
+current_step: 1

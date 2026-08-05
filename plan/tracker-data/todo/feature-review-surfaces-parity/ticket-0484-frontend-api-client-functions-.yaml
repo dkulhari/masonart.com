@@ -1,0 +1,104 @@
+ticket_number: 484
+title: Frontend - API client functions and hooks for review feed and media
+description: |-
+  ## Task
+
+  Client layer every new surface sits on: fetch functions for the site-wide review list and the media feed, the two-step media upload (presign then PUT to R2), and TanStack Query hooks with keys that invalidate correctly.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Frontend
+  Depends on: backend read and upload endpoints
+
+  - `packages/web/app/lib/api.ts` — `catalogueReviewStats` at :291 is the existing precedent for a review call that lives here rather than in the hook file, because it is not product-scoped. The new site-wide calls belong here for the same reason
+  - `packages/web/app/hooks/useReviews.ts` — `reviewKeys` at :27, existing hooks `useReviews` (:149), `useReviewStats` (:165), `useCreateReview` (:184)
+  - The presigned PUT goes **straight to R2**, not through `getApiUrl()`. Do not attach auth headers to it — the signature is the auth, and an extra header breaks it
+  - There is no Vite `/api` proxy in this repo; calls need the absolute `getApiUrl()` base
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:14:24.173Z'
+last_updated: '2026-08-05T15:14:24.173Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 481
+    feature: review-surfaces-parity
+    description: Backend API - review media presign and complete upload endpoints
+  - ticket: 482
+    feature: review-surfaces-parity
+    description: Backend API - site-wide review list, media feed, and media on existing reads
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the new client functions and hooks
+    file: packages/web/tests/hooks/useReviewFeed.test.tsx
+    command: cd packages/web && bun run test -- useReviewFeed
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // Mock fetch. Cover:
+      //   reviewsApi.listAll({ page, pageSize }) hits /api/reviews with query params
+      //   reviewsApi.mediaFeed({ productId }) hits /api/reviews/media
+      //   uploadReviewMedia(): presign -> PUT to the returned uploadUrl with the raw
+      //     File as the body and NO auth header -> complete
+      //   a non-2xx at any of the three steps rejects with a readable message
+      //   reviewKeys.all / reviewKeys.mediaFeed(productId) are stable and distinct
+      //   useReviewFeed returns items and total from the payload
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bun run test -- useReviewFeed
+    expected_result: FAIL - listAll is not a function
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the site-wide review client functions
+    file: packages/web/app/lib/api.ts
+    status: pending
+    code: |-
+      // Beside catalogueReviewStats (:291), which already documents why site-wide
+      // review calls live here rather than in hooks/useReviews.ts:
+      //   async listAllReviews({ page, pageSize }): Promise<ReviewFeedResponse>
+      //   async reviewMediaFeed(productId?: string): Promise<ReviewMediaItem[]>
+      // Export the ReviewMediaItem type - the media wall, the toast and the review
+      // card all render it.
+  - id: 4
+    action: implement
+    description: Add the feed hooks and the upload helper
+    file: packages/web/app/hooks/useReviews.ts
+    status: pending
+    code: |-
+      // Extend reviewKeys (:27) with `all(page)` and `mediaFeed(productId)`.
+      // export function useReviewFeed(page: number, pageSize = 20)
+      // export function useReviewMediaFeed(productId?: string)
+      // export async function uploadReviewMedia(reviewId: string, file: File):
+      //   1. POST /api/reviews/:id/media/presign { contentType, sizeBytes, filename }
+      //   2. fetch(uploadUrl, { method: 'PUT', body: file,
+      //        headers: { 'Content-Type': file.type } })   // no credentials, no auth
+      //   3. POST /api/reviews/:id/media/complete { key, contentType }
+      // Have useCreateReview (:184) invalidate the new keys as well as the old ones.
+  - id: 5
+    action: verify-pass
+    description: Confirm hook tests pass
+    command: cd packages/web && bun run test -- useReviewFeed
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the client layer
+    command: 'git add packages/web/app/lib/api.ts packages/web/app/hooks/useReviews.ts packages/web/tests/hooks/useReviewFeed.test.tsx && git commit -m "feat(web): review feed client functions and media upload helper"'
+    status: pending
+current_step: 1

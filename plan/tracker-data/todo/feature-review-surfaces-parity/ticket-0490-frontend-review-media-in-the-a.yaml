@@ -1,0 +1,81 @@
+ticket_number: 490
+title: Frontend - review media in the admin moderation UI
+description: |-
+  ## Task
+
+  Admins cannot moderate media they cannot see. Render each pending review's photos and videos in the moderation queue, with playback, per-item delete, and a visible transcode state.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Frontend
+  Depends on: the admin API changes
+
+  - `packages/web/app/routes/admin/reviews.tsx`
+  - Admins see **every** `processingStatus`, unlike the public surfaces. `processing` shows a spinner, `failed` shows the `processingError`. A transcode stuck for hours should be obvious in this queue, not silent
+  - Per-item delete calls `DELETE /api/admin/reviews/:reviewId/media/:mediaId` and must not change the parent review's status
+  - Deletion is destructive and removes the R2 objects. Use an inline confirm affordance — **not** `window.confirm`, which blocks the automation harness
+feature: review-surfaces-parity
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:15:25.105Z'
+last_updated: '2026-08-05T15:15:25.105Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 483
+    feature: review-surfaces-parity
+    description: Backend API - review media in the admin moderation queue
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for admin media rendering
+    file: packages/web/tests/routes/admin/review-media.test.tsx
+    command: cd packages/web && bun run test -- admin/review-media
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // each queued review renders its media thumbnails
+      // a 'processing' item shows a spinner and no play control
+      // a 'failed' item shows its processingError text
+      // delete asks for inline confirmation, then calls the endpoint - and never
+      //   window.confirm
+      // deleting does not change the review's moderation status in the UI
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bun run test -- admin/review-media
+    expected_result: FAIL - no media rendered in the queue
+    status: pending
+  - id: 3
+    action: implement
+    description: Render media in the moderation queue
+    file: packages/web/app/routes/admin/reviews.tsx
+    status: pending
+    code: |-
+      // Media strip per review row: thumbnails, <video controls> for ready video,
+      // a spinner for 'processing', the error text for 'failed', and a delete control
+      // gated behind a two-step inline confirm.
+  - id: 4
+    action: verify-pass
+    description: Confirm the admin tests pass
+    command: cd packages/web && bun run test -- admin/review
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the admin UI
+    command: 'git add packages/web/app/routes/admin/reviews.tsx packages/web/tests/routes/admin && git commit -m "feat(web): review media in the admin moderation queue"'
+    status: pending
+current_step: 1

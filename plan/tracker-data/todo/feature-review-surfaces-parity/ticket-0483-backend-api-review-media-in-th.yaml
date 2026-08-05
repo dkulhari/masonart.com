@@ -1,0 +1,88 @@
+ticket_number: 483
+title: Backend API - review media in the admin moderation queue
+description: |-
+  ## Task
+
+  Admins moderate media by moderating the review that carries it — there is deliberately no second queue. For that to be safe, the moderation payload has to actually show them what they are approving.
+
+  Add media to the admin review list and detail payloads, plus a delete-media endpoint so an admin can strip one bad photo without rejecting an otherwise good review.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Backend API
+  Depends on: reviewMedia schema, read helpers
+
+  - `packages/api/src/routes/admin/reviews.ts` and its tests at `packages/api/tests/routes/admin/reviews.test.ts`
+  - Admins see media at **every** `processingStatus`, including `processing` and `failed` — unlike the public reads. A stuck transcode should be visible in the queue, not invisible
+  - Deleting media removes the R2 objects too (`deleteFile` at `storage.ts:351`) — both the rendition and the poster frame
+  - Note the known gap: `services/ai-moderation.ts` is text-only, so this media is unscreened until a human looks at it
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:13:27.684Z'
+last_updated: '2026-08-05T15:13:27.684Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 478
+    feature: review-surfaces-parity
+    description: Database Schema - reviewMedia table, enums, relations and migration
+  - ticket: 482
+    feature: review-surfaces-parity
+    description: Backend API - site-wide review list, media feed, and media on existing reads
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for admin media visibility and deletion
+    file: packages/api/tests/routes/admin/review-media.test.ts
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- admin/review-media
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // GET /api/admin/reviews returns media[] on each item
+      // admin payload includes 'processing' and 'failed' media, with processingError
+      // DELETE /api/admin/reviews/:reviewId/media/:mediaId
+      //   removes the row, calls deleteFile for url and posterUrl, returns 200
+      //   403 for a non-admin caller, 404 for an unknown mediaId
+      //   leaves the parent review's status untouched
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- admin/review-media
+    expected_result: FAIL - media is undefined on the admin payload
+    status: pending
+  - id: 3
+    action: implement
+    description: Join media into the admin payloads and add the delete endpoint
+    file: packages/api/src/routes/admin/reviews.ts
+    status: pending
+    code: |-
+      // Join reviewMedia with NO processingStatus filter (admins see everything).
+      // DELETE /:reviewId/media/:mediaId:
+      //   load the row, derive the R2 keys from url and posterUrl,
+      //   await Promise.allSettled([deleteFile(k) ...]) so a missing object does not
+      //   block the DB delete, then delete the row and invalidate REVIEW_CACHE_PREFIX.
+  - id: 4
+    action: verify-pass
+    description: Confirm admin review tests pass
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- admin/review
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the admin media support
+    command: 'git add packages/api/src/routes/admin/reviews.ts packages/api/tests/routes/admin/review-media.test.ts && git commit -m "feat(api): review media in the admin moderation queue"'
+    status: pending
+current_step: 1

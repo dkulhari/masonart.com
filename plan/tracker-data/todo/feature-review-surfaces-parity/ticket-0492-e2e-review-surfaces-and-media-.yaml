@@ -1,0 +1,99 @@
+ticket_number: 492
+title: E2E - review surfaces and media upload flows
+description: |-
+  ## Task
+
+  Feature-level Playwright coverage for everything this feature added: the `/reviews` page, the home strip, the PDP media wall and lightbox, the toast, and a signed-in review submission carrying a photo.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Seed and E2E
+  Depends on: every prior ticket
+
+  - `tests/e2e/`, following `wishlist.spec.ts` and `all-art-mega.spec.ts`
+  - `test.beforeEach` must `page.goto(path, { waitUntil: 'networkidle' })` — the established pattern in this suite
+  - **Scope every selector to the desktop or mobile tree.** The same test ids exist in both; `page.locator('div.hidden.lg\\:block')` is the idiom used here. Unscoped selectors are the standard false result in this repo
+  - **Confirm the app under test is the real one.** Port `:5173` serves a different app and makes these specs pass vacuously. Verify against a known chobii marker before trusting a green run
+  - Video upload is not worth an E2E — the transcode is async and the assertion would be a sleep. Cover photo upload end to end and leave video to the queue unit tests
+  - The toast has a deliberate initial delay; wait on its selector rather than adding a fixed timeout
+feature: review-surfaces-parity
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:15:59.722Z'
+last_updated: '2026-08-05T15:15:59.722Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 485
+    feature: review-surfaces-parity
+    description: Frontend - photo and video upload in ReviewForm
+  - ticket: 486
+    feature: review-surfaces-parity
+    description: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+  - ticket: 487
+    feature: review-surfaces-parity
+    description: Frontend - home Customer Reviews strip with score band and carousel
+  - ticket: 488
+    feature: review-surfaces-parity
+    description: Frontend - PDP review media wall with lightbox and video playback
+  - ticket: 489
+    feature: review-surfaces-parity
+    description: Frontend - site-wide floating review toast
+  - ticket: 491
+    feature: review-surfaces-parity
+    description: Seed - attach photo and video media to approved reviews
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the E2E specs for the read surfaces
+    file: tests/e2e/review-surfaces.spec.ts
+    command: bun run test:e2e -- review-surfaces
+    expected_result: FAIL until the surfaces ship
+    status: pending
+    code: |-
+      // /reviews: header band renders, list has rows, ?page=2 loads without a blank
+      //   error-boundary page, and a row links through to its product
+      // home: the reviews strip renders with a score and a View All link to /reviews
+      // PDP: the media wall renders tiles; clicking one opens the lightbox; Escape
+      //   closes it
+      // toast: appears bottom-left, dismisses, and stays gone after a reload in the
+      //   same session
+      // checkout: the toast does NOT appear
+  - id: 2
+    action: write-test
+    description: Write the signed-in review submission spec with a photo attachment
+    file: tests/e2e/review-media-upload.spec.ts
+    command: bun run test:e2e -- review-media-upload
+    expected_result: FAIL until upload ships
+    status: pending
+    code: |-
+      // Use the storage state from auth.setup.ts.
+      // Open the review form on a delivered order item, fill rating and body, attach a
+      // generated PNG via setInputFiles, submit.
+      // Assert: a success confirmation, and copy telling the user the review and its
+      // photo publish after approval. Do not assert public visibility - the review is
+      // 'pending' by design and asserting otherwise bakes in a moderation bypass.
+  - id: 3
+    action: verify-pass
+    description: Run both specs against the real app
+    command: bun run test:e2e -- review-surfaces review-media-upload
+    expected_result: PASS - and confirm the target really is the chobii app, not the :5173 impostor
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit the E2E suite
+    command: 'git add tests/e2e/review-surfaces.spec.ts tests/e2e/review-media-upload.spec.ts && git commit -m "test(e2e): review surfaces and media upload"'
+    status: pending
+current_step: 1

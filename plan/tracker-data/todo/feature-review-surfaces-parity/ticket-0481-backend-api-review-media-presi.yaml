@@ -1,0 +1,116 @@
+ticket_number: 481
+title: Backend API - review media presign and complete upload endpoints
+description: |-
+  ## Task
+
+  Two endpoints that let a review author attach media. Uploads go **direct to R2** via a presigned PUT — 200MB video cannot route through Hono.
+
+  `POST /api/reviews/:reviewId/media/presign` validates ownership, mime and declared size, then returns a presigned URL plus the object key. `POST /api/reviews/:reviewId/media/complete` records the `reviewMedia` row; images land `ready`, videos land `processing` and enqueue a transcode job.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Backend API
+  Depends on: reviewMedia schema, storage limits, transcode queue
+
+  - `packages/api/src/routes/reviews.ts` is already 612 lines. Put media endpoints in a new `packages/api/src/routes/review-media.ts` and mount it alongside `reviewsApp` in `packages/api/src/index.ts` (reviewsApp is mounted at index.ts:138)
+  - `getPresignedUploadUrl` already exists at `packages/api/src/lib/storage.ts:410`
+  - Auth: `requireAuth`; only the review's own author may attach media, and only while the review is still `pending`
+  - Cap media per review at 5. Hard-fail the 6th rather than silently dropping it
+  - Follow the Hono + zValidator + `c.json` error shape used throughout `routes/reviews.ts`
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:13:27.641Z'
+last_updated: '2026-08-05T15:13:27.641Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 478
+    feature: review-surfaces-parity
+    description: Database Schema - reviewMedia table, enums, relations and migration
+  - ticket: 479
+    feature: review-surfaces-parity
+    description: Media Infrastructure - video validation, ffmpeg processing and Docker image
+  - ticket: 480
+    feature: review-surfaces-parity
+    description: Media Infrastructure - BullMQ review-media transcode queue and worker
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing route tests for presign and complete
+    file: packages/api/tests/routes/review-media.test.ts
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-media
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // Follow the app.request() harness in tests/routes/reviews.test.ts.
+      // presign:
+      //   401 unauthenticated
+      //   403 when the caller is not the review author
+      //   400 on a disallowed mime (application/pdf) and on oversize declared bytes
+      //   409 on the 6th media for one review
+      //   200 returns { uploadUrl, key, mediaId } for image/jpeg and for video/mp4
+      // complete:
+      //   image -> row processingStatus 'ready', no job enqueued
+      //   video -> row processingStatus 'processing', reviewMediaQueue.add called once
+      //   404 for an unknown mediaId; 403 for someone else's
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail - routes not mounted
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-media
+    expected_result: FAIL - 404 on every request
+    status: pending
+  - id: 3
+    action: implement
+    description: Create the review media routes
+    file: packages/api/src/routes/review-media.ts
+    status: pending
+    code: |-
+      // const reviewMediaApp = new Hono<{ Variables: AuthVariables }>()
+      // reviewMediaApp.use('*', requireAuth)
+      // POST /:reviewId/media/presign
+      //   zValidator json: { contentType: string, sizeBytes: number, filename: string }
+      //   assert review exists, belongs to c.get('user'), status === 'pending'
+      //   pick the limit set by isValidImageType / isValidVideoType; 400 otherwise
+      //   count existing media, 409 at >= 5
+      //   key = `${StoragePaths.reviewMedia(reviewId)}/${crypto.randomUUID()}.${ext}`
+      //   return { uploadUrl: await getPresignedUploadUrl(key, contentType), key }
+      // POST /:reviewId/media/complete
+      //   zValidator json: { key: string, contentType: string, sortOrder?: number }
+      //   images  -> insert row processingStatus 'ready', url = getPublicUrl(key)
+      //   videos  -> insert row 'processing', then reviewMediaQueue.add('transcode',
+      //              { mediaId, sourceKey: key })
+      //   invalidate the product's review cache keys (REVIEW_CACHE_PREFIX)
+      // export default reviewMediaApp
+  - id: 4
+    action: implement
+    description: Mount the media routes
+    file: packages/api/src/index.ts
+    status: pending
+    code: |-
+      // Beside the existing reviewsApp mount (~line 138):
+      app.route("/api/reviews", reviewMediaApp);
+  - id: 5
+    action: verify-pass
+    description: Confirm the route tests pass
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-media
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the upload endpoints
+    command: 'git add packages/api/src/routes/review-media.ts packages/api/src/index.ts packages/api/tests/routes/review-media.test.ts && git commit -m "feat(api): presigned review media upload endpoints"'
+    status: pending
+current_step: 1

@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-05T14:41:43.475Z'
-total_tickets: 42
+last_updated: '2026-08-05T16:18:33.265Z'
+total_tickets: 50
 summary:
   critical: 1
-  high: 9
-  medium: 24
-  low: 8
+  high: 12
+  medium: 28
+  low: 9
 priorities:
   critical:
     - feature: go-live
@@ -97,6 +97,26 @@ priorities:
           title: Schema - gallery membership columns and the session field
           assignee: unassigned
           blocked_by: []
+    - feature: review-surfaces-parity
+      tickets:
+        - ticket_number: 478
+          title: Database Schema - reviewMedia table, enums, relations and migration
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 479
+          title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 478
+              title: Database Schema - reviewMedia table, enums, relations and migration
+        - ticket_number: 480
+          title: Media Infrastructure - BullMQ review-media transcode queue and worker
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 478
+              title: Database Schema - reviewMedia table, enums, relations and migration
+            - ticket_number: 479
+              title: Media Infrastructure - video validation, ffmpeg processing and Docker image
   medium:
     - feature: go-to-production
       tickets:
@@ -231,38 +251,66 @@ priorities:
           blocked_by:
             - ticket_number: 445
               title: Web - dismissible sale banner with session and 7-day cooldown
-    - feature: curated-collections
+    - feature: review-surfaces-parity
       tickets:
-        - ticket_number: 469
-          title: Web - Discover chips become links to collections
+        - ticket_number: 481
+          title: Backend API - review media presign and complete upload endpoints
           assignee: unassigned
           blocked_by:
-            - ticket_number: 465
-              title: API - GET /api/collections for the Discover rail
-        - ticket_number: 470
-          title: Web - /collections/$slug reusing the collection-page shell
+            - ticket_number: 478
+              title: Database Schema - reviewMedia table, enums, relations and migration
+            - ticket_number: 479
+              title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+            - ticket_number: 480
+              title: Media Infrastructure - BullMQ review-media transcode queue and worker
+        - ticket_number: 482
+          title: Backend API - site-wide review list, media feed, and media on existing reads
           assignee: unassigned
           blocked_by:
-            - ticket_number: 466
-              title: API - GET /api/collections/:slug resolving a collection to products
-            - ticket_number: 469
-              title: Web - Discover chips become links to collections
-        - ticket_number: 472
-          title: Admin - collections list with discover reorder
+            - ticket_number: 478
+              title: Database Schema - reviewMedia table, enums, relations and migration
+        - ticket_number: 483
+          title: Backend API - review media in the admin moderation queue
           assignee: unassigned
           blocked_by:
-            - ticket_number: 467
-              title: API - admin CRUD for collections
-            - ticket_number: 468
-              title: API - manual membership and Discover ordering
-        - ticket_number: 473
-          title: Admin - collection form with rule builder and manual picker
+            - ticket_number: 478
+              title: Database Schema - reviewMedia table, enums, relations and migration
+            - ticket_number: 482
+              title: Backend API - site-wide review list, media feed, and media on existing reads
+        - ticket_number: 484
+          title: Frontend - API client functions and hooks for review feed and media
           assignee: unassigned
           blocked_by:
-            - ticket_number: 467
-              title: API - admin CRUD for collections
-            - ticket_number: 468
-              title: API - manual membership and Discover ordering
+            - ticket_number: 481
+              title: Backend API - review media presign and complete upload endpoints
+            - ticket_number: 482
+              title: Backend API - site-wide review list, media feed, and media on existing reads
+        - ticket_number: 485
+          title: Frontend - photo and video upload in ReviewForm
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 484
+              title: Frontend - API client functions and hooks for review feed and media
+        - ticket_number: 486
+          title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 484
+              title: Frontend - API client functions and hooks for review feed and media
+        - ticket_number: 487
+          title: Frontend - home Customer Reviews strip with score band and carousel
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 484
+              title: Frontend - API client functions and hooks for review feed and media
+            - ticket_number: 486
+              title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+        - ticket_number: 488
+          title: Frontend - PDP review media wall with lightbox and video playback
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 484
+              title: Frontend - API client functions and hooks for review feed and media
   low:
     - feature: go-to-production
       tickets:
@@ -317,30 +365,44 @@ priorities:
               title: Web - black vertical rail tab on the right edge
             - ticket_number: 438
               title: E2E - sale lifecycle from no promotion to expiry
-    - feature: curated-collections
+    - feature: review-surfaces-parity
       tickets:
-        - ticket_number: 471
-          title: Web - collection SEO and sitemap entries
+        - ticket_number: 489
+          title: Frontend - site-wide floating review toast
           assignee: unassigned
           blocked_by:
-            - ticket_number: 470
-              title: Web - /collections/$slug reusing the collection-page shell
-        - ticket_number: 474
-          title: Cleanup - retire GET /api/products/collections
+            - ticket_number: 484
+              title: Frontend - API client functions and hooks for review feed and media
+        - ticket_number: 490
+          title: Frontend - review media in the admin moderation UI
           assignee: unassigned
           blocked_by:
-            - ticket_number: 469
-              title: Web - Discover chips become links to collections
-        - ticket_number: 475
-          title: E2E - collection pages, the Discover rail and admin authoring
+            - ticket_number: 483
+              title: Backend API - review media in the admin moderation queue
+        - ticket_number: 491
+          title: Seed - attach photo and video media to approved reviews
           assignee: unassigned
           blocked_by:
-            - ticket_number: 470
-              title: Web - /collections/$slug reusing the collection-page shell
-            - ticket_number: 472
-              title: Admin - collections list with discover reorder
-            - ticket_number: 473
-              title: Admin - collection form with rule builder and manual picker
+            - ticket_number: 478
+              title: Database Schema - reviewMedia table, enums, relations and migration
+            - ticket_number: 479
+              title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+        - ticket_number: 492
+          title: E2E - review surfaces and media upload flows
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 485
+              title: Frontend - photo and video upload in ReviewForm
+            - ticket_number: 486
+              title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+            - ticket_number: 487
+              title: Frontend - home Customer Reviews strip with score band and carousel
+            - ticket_number: 488
+              title: Frontend - PDP review media wall with lightbox and video playback
+            - ticket_number: 489
+              title: Frontend - site-wide floating review toast
+            - ticket_number: 491
+              title: Seed - attach photo and video media to approved reviews
 blocked_tickets:
   - ticket_number: 294
     title: 'Gate: external LTE walkthrough + suites x2 + flip GO-LIVE-PLAN to LIVE'
@@ -406,6 +468,20 @@ blocked_tickets:
       - ticket_number: 344
         title: 'Content-Security-Policy for SSR pages (deferred from #264)'
     description: 'Content-Security-Policy for SSR pages (deferred from #264)'
+  - ticket_number: 479
+    title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+    blocked_by:
+      - ticket_number: 478
+        title: Database Schema - reviewMedia table, enums, relations and migration
+    description: Database Schema - reviewMedia table, enums, relations and migration
+  - ticket_number: 480
+    title: Media Infrastructure - BullMQ review-media transcode queue and worker
+    blocked_by:
+      - ticket_number: 478
+        title: Database Schema - reviewMedia table, enums, relations and migration
+      - ticket_number: 479
+        title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+    description: Database Schema - reviewMedia table, enums, relations and migration, Media Infrastructure - video validation, ffmpeg processing and Docker image
   - ticket_number: 278
     title: Set up external uptime monitoring for production
     blocked_by:
@@ -517,36 +593,64 @@ blocked_tickets:
       - ticket_number: 445
         title: Web - dismissible sale banner with session and 7-day cooldown
     description: Web - dismissible sale banner with session and 7-day cooldown
-  - ticket_number: 469
-    title: Web - Discover chips become links to collections
+  - ticket_number: 481
+    title: Backend API - review media presign and complete upload endpoints
     blocked_by:
-      - ticket_number: 465
-        title: API - GET /api/collections for the Discover rail
-    description: API - GET /api/collections for the Discover rail
-  - ticket_number: 470
-    title: Web - /collections/$slug reusing the collection-page shell
+      - ticket_number: 478
+        title: Database Schema - reviewMedia table, enums, relations and migration
+      - ticket_number: 479
+        title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+      - ticket_number: 480
+        title: Media Infrastructure - BullMQ review-media transcode queue and worker
+    description: Database Schema - reviewMedia table, enums, relations and migration, Media Infrastructure - video validation, ffmpeg processing and Docker image, Media Infrastructure - BullMQ review-media transcode queue and worker
+  - ticket_number: 482
+    title: Backend API - site-wide review list, media feed, and media on existing reads
     blocked_by:
-      - ticket_number: 466
-        title: API - GET /api/collections/:slug resolving a collection to products
-      - ticket_number: 469
-        title: Web - Discover chips become links to collections
-    description: API - GET /api/collections/:slug resolving a collection to products, Web - Discover chips become links to collections
-  - ticket_number: 472
-    title: Admin - collections list with discover reorder
+      - ticket_number: 478
+        title: Database Schema - reviewMedia table, enums, relations and migration
+    description: Database Schema - reviewMedia table, enums, relations and migration
+  - ticket_number: 483
+    title: Backend API - review media in the admin moderation queue
     blocked_by:
-      - ticket_number: 467
-        title: API - admin CRUD for collections
-      - ticket_number: 468
-        title: API - manual membership and Discover ordering
-    description: API - admin CRUD for collections, API - manual membership and Discover ordering
-  - ticket_number: 473
-    title: Admin - collection form with rule builder and manual picker
+      - ticket_number: 478
+        title: Database Schema - reviewMedia table, enums, relations and migration
+      - ticket_number: 482
+        title: Backend API - site-wide review list, media feed, and media on existing reads
+    description: Database Schema - reviewMedia table, enums, relations and migration, Backend API - site-wide review list, media feed, and media on existing reads
+  - ticket_number: 484
+    title: Frontend - API client functions and hooks for review feed and media
     blocked_by:
-      - ticket_number: 467
-        title: API - admin CRUD for collections
-      - ticket_number: 468
-        title: API - manual membership and Discover ordering
-    description: API - admin CRUD for collections, API - manual membership and Discover ordering
+      - ticket_number: 481
+        title: Backend API - review media presign and complete upload endpoints
+      - ticket_number: 482
+        title: Backend API - site-wide review list, media feed, and media on existing reads
+    description: Backend API - review media presign and complete upload endpoints, Backend API - site-wide review list, media feed, and media on existing reads
+  - ticket_number: 485
+    title: Frontend - photo and video upload in ReviewForm
+    blocked_by:
+      - ticket_number: 484
+        title: Frontend - API client functions and hooks for review feed and media
+    description: Frontend - API client functions and hooks for review feed and media
+  - ticket_number: 486
+    title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+    blocked_by:
+      - ticket_number: 484
+        title: Frontend - API client functions and hooks for review feed and media
+    description: Frontend - API client functions and hooks for review feed and media
+  - ticket_number: 487
+    title: Frontend - home Customer Reviews strip with score band and carousel
+    blocked_by:
+      - ticket_number: 484
+        title: Frontend - API client functions and hooks for review feed and media
+      - ticket_number: 486
+        title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+    description: Frontend - API client functions and hooks for review feed and media, Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+  - ticket_number: 488
+    title: Frontend - PDP review media wall with lightbox and video playback
+    blocked_by:
+      - ticket_number: 484
+        title: Frontend - API client functions and hooks for review feed and media
+    description: Frontend - API client functions and hooks for review feed and media
   - ticket_number: 283
     title: Document and configure database backup procedures
     blocked_by:
@@ -588,25 +692,39 @@ blocked_tickets:
       - ticket_number: 438
         title: E2E - sale lifecycle from no promotion to expiry
     description: API - registration opt-in and post-auth auto-join from the join intent, Web - join modal, one field, Web - dismissible sale banner with session and 7-day cooldown, Web - black vertical rail tab on the right edge, E2E - sale lifecycle from no promotion to expiry
-  - ticket_number: 471
-    title: Web - collection SEO and sitemap entries
+  - ticket_number: 489
+    title: Frontend - site-wide floating review toast
     blocked_by:
-      - ticket_number: 470
-        title: Web - /collections/$slug reusing the collection-page shell
-    description: Web - /collections/$slug reusing the collection-page shell
-  - ticket_number: 474
-    title: Cleanup - retire GET /api/products/collections
+      - ticket_number: 484
+        title: Frontend - API client functions and hooks for review feed and media
+    description: Frontend - API client functions and hooks for review feed and media
+  - ticket_number: 490
+    title: Frontend - review media in the admin moderation UI
     blocked_by:
-      - ticket_number: 469
-        title: Web - Discover chips become links to collections
-    description: Web - Discover chips become links to collections
-  - ticket_number: 475
-    title: E2E - collection pages, the Discover rail and admin authoring
+      - ticket_number: 483
+        title: Backend API - review media in the admin moderation queue
+    description: Backend API - review media in the admin moderation queue
+  - ticket_number: 491
+    title: Seed - attach photo and video media to approved reviews
     blocked_by:
-      - ticket_number: 470
-        title: Web - /collections/$slug reusing the collection-page shell
-      - ticket_number: 472
-        title: Admin - collections list with discover reorder
-      - ticket_number: 473
-        title: Admin - collection form with rule builder and manual picker
-    description: Web - /collections/$slug reusing the collection-page shell, Admin - collections list with discover reorder, Admin - collection form with rule builder and manual picker
+      - ticket_number: 478
+        title: Database Schema - reviewMedia table, enums, relations and migration
+      - ticket_number: 479
+        title: Media Infrastructure - video validation, ffmpeg processing and Docker image
+    description: Database Schema - reviewMedia table, enums, relations and migration, Media Infrastructure - video validation, ffmpeg processing and Docker image
+  - ticket_number: 492
+    title: E2E - review surfaces and media upload flows
+    blocked_by:
+      - ticket_number: 485
+        title: Frontend - photo and video upload in ReviewForm
+      - ticket_number: 486
+        title: Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links
+      - ticket_number: 487
+        title: Frontend - home Customer Reviews strip with score band and carousel
+      - ticket_number: 488
+        title: Frontend - PDP review media wall with lightbox and video playback
+      - ticket_number: 489
+        title: Frontend - site-wide floating review toast
+      - ticket_number: 491
+        title: Seed - attach photo and video media to approved reviews
+    description: Frontend - photo and video upload in ReviewForm, Frontend - /reviews page with aggregate header, plus nav, footer and sitemap links, Frontend - home Customer Reviews strip with score band and carousel, Frontend - PDP review media wall with lightbox and video playback, Frontend - site-wide floating review toast, Seed - attach photo and video media to approved reviews

@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-08-05T14:41:43.546Z'
-total_tickets: 402
+last_updated: '2026-08-05T16:18:33.361Z'
+total_tickets: 409
 summary:
   critical: 21
   high: 155
-  medium: 174
-  low: 52
+  medium: 178
+  low: 55
 priorities:
   critical:
     - feature: qa-testing
@@ -1731,6 +1731,36 @@ priorities:
           blocked_by:
             - ticket_number: 467
               title: API - admin CRUD for collections
+        - ticket_number: 469
+          title: Web - Discover chips become links to collections
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 465
+              title: API - GET /api/collections for the Discover rail
+        - ticket_number: 470
+          title: Web - /collections/$slug reusing the collection-page shell
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 466
+              title: API - GET /api/collections/:slug resolving a collection to products
+            - ticket_number: 469
+              title: Web - Discover chips become links to collections
+        - ticket_number: 472
+          title: Admin - collections list with discover reorder
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 467
+              title: API - admin CRUD for collections
+            - ticket_number: 468
+              title: API - manual membership and Discover ordering
+        - ticket_number: 473
+          title: Admin - collection form with rule builder and manual picker
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 467
+              title: API - admin CRUD for collections
+            - ticket_number: 468
+              title: API - manual membership and Discover ordering
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -2010,6 +2040,30 @@ priorities:
               title: Web - Discover chip carousel on the collection page
             - ticket_number: 411
               title: Web - promo tile occupying a grid cell
+    - feature: curated-collections
+      tickets:
+        - ticket_number: 471
+          title: Web - collection SEO and sitemap entries
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 470
+              title: Web - /collections/$slug reusing the collection-page shell
+        - ticket_number: 474
+          title: Cleanup - retire GET /api/products/collections
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 469
+              title: Web - Discover chips become links to collections
+        - ticket_number: 475
+          title: E2E - collection pages, the Discover rail and admin authoring
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 470
+              title: Web - /collections/$slug reusing the collection-page shell
+            - ticket_number: 472
+              title: Admin - collections list with discover reorder
+            - ticket_number: 473
+              title: Admin - collection form with rule builder and manual picker
 blocked_tickets:
   - ticket_number: 29
     title: API Routes - Public Review Endpoints
@@ -2454,6 +2508,36 @@ blocked_tickets:
       - ticket_number: 467
         title: API - admin CRUD for collections
     description: API - admin CRUD for collections
+  - ticket_number: 469
+    title: Web - Discover chips become links to collections
+    blocked_by:
+      - ticket_number: 465
+        title: API - GET /api/collections for the Discover rail
+    description: API - GET /api/collections for the Discover rail
+  - ticket_number: 470
+    title: Web - /collections/$slug reusing the collection-page shell
+    blocked_by:
+      - ticket_number: 466
+        title: API - GET /api/collections/:slug resolving a collection to products
+      - ticket_number: 469
+        title: Web - Discover chips become links to collections
+    description: API - GET /api/collections/:slug resolving a collection to products, Web - Discover chips become links to collections
+  - ticket_number: 472
+    title: Admin - collections list with discover reorder
+    blocked_by:
+      - ticket_number: 467
+        title: API - admin CRUD for collections
+      - ticket_number: 468
+        title: API - manual membership and Discover ordering
+    description: API - admin CRUD for collections, API - manual membership and Discover ordering
+  - ticket_number: 473
+    title: Admin - collection form with rule builder and manual picker
+    blocked_by:
+      - ticket_number: 467
+        title: API - admin CRUD for collections
+      - ticket_number: 468
+        title: API - manual membership and Discover ordering
+    description: API - admin CRUD for collections, API - manual membership and Discover ordering
   - ticket_number: 232
     title: Implement save-address-on-checkout
     blocked_by:
@@ -2542,3 +2626,25 @@ blocked_tickets:
       - ticket_number: 411
         title: Web - promo tile occupying a grid cell
     description: Web - sort options 6 to 8 (Featured, Best selling), Web - Discover chip carousel on the collection page, Web - promo tile occupying a grid cell
+  - ticket_number: 471
+    title: Web - collection SEO and sitemap entries
+    blocked_by:
+      - ticket_number: 470
+        title: Web - /collections/$slug reusing the collection-page shell
+    description: Web - /collections/$slug reusing the collection-page shell
+  - ticket_number: 474
+    title: Cleanup - retire GET /api/products/collections
+    blocked_by:
+      - ticket_number: 469
+        title: Web - Discover chips become links to collections
+    description: Web - Discover chips become links to collections
+  - ticket_number: 475
+    title: E2E - collection pages, the Discover rail and admin authoring
+    blocked_by:
+      - ticket_number: 470
+        title: Web - /collections/$slug reusing the collection-page shell
+      - ticket_number: 472
+        title: Admin - collections list with discover reorder
+      - ticket_number: 473
+        title: Admin - collection form with rule builder and manual picker
+    description: Web - /collections/$slug reusing the collection-page shell, Admin - collections list with discover reorder, Admin - collection form with rule builder and manual picker

@@ -1,0 +1,134 @@
+ticket_number: 473
+title: Admin - collection form with rule builder and manual picker
+description: |-
+  ## Task
+
+  `/admin/collections/new` and `/admin/collections/$id` — one form, both modes.
+
+  Fields: title, slug (suggested from the title, editable, checked for collision before submit), subtitle, description, image URL, active, show-in-discover, SEO title and description.
+
+  Kind switch:
+
+  - **Rule** — a builder over the shared facet vocabulary: multi-select per facet group, price range, the AI/featured flags, and a default sort from `SORT_OPTIONS`. Every option comes from `@chobii/shared`; a hardcoded list here is the drift #395 ended.
+  - **Manual** — a product search-and-pick list with drag ordering. Order is the data.
+
+  Live count preview so the admin sees what a rule resolves to before saving — a rule that matches nothing is the failure mode worth catching at authoring time.
+
+  Switching kind after products or a rule exist warns that the other side's data will be dropped, and does not drop it until save.
+
+  ## Context
+
+  Feature: curated-collections, Phase 6. Depends on the admin API tickets.
+
+  Follow `packages/web/app/components/admin/ProductForm.tsx` for form idiom, validation surfacing and the create/edit split.
+
+  The rule builder emits exactly `collectionRuleSchema`. Validate client-side with the same schema the API validates with, so the two cannot disagree.
+feature: curated-collections
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T13:51:59.859Z'
+last_updated: '2026-08-05T15:58:26.716Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - admin
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T15:53:24.547Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-05T15:58:08.642Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-05T15:58:26.716Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `1735003b` — feat(web): admin collection form with rule builder and manual picker
+
+      **Files Changed**:
+      - `packages/web/app/components/admin/CollectionForm.tsx` — new. One form, both modes.
+      - `packages/web/app/routes/admin/collections/new.tsx`, `$id.tsx` — thin wrappers.
+      - `packages/web/tests/components/admin/CollectionForm.test.tsx` — 15 tests.
+
+      **An accessibility bug the tests exposed, and the fix was in the component**
+
+      Three slug tests failed with `Unable to find a label with the text of: /^Slug$/`. The cause was real: the `Field` helper nested the hint **inside** the `<label>`, so the accessible name became *"Slug The URL: /collections/…"*. A screen-reader user hears the whole sentence on every focus, and the field cannot be found by its actual name.
+
+      Fixed properly — `htmlFor`/`id` pairing with the hint moved to `aria-describedby` — rather than loosening the test to match the broken markup. The failing test was right.
+
+      **A test assumption that was wrong, not the code**
+
+      `getByRole('button', { name: 'Colorful Art' })` threw on multiple matches. `colorful-art` is deliberately in **both** the Style and Subject vocabularies — mesonart's taxonomy overlaps there and `facets.ts` documents keeping it. Changed to `getAllByRole`, with a comment recording why, since the next person will hit it too.
+
+      **Decisions**
+      - **`FACET_GROUPS` drives the builder**, so the form cannot offer a facet the API would reject. A test asserts every group renders.
+      - **The default-sort control is what makes Best Sellers authorable** — a rule that is a sort with no facets. Without it the form could only express what a facet id can, which is the limitation the whole feature exists to remove.
+      - **Live count preview**, run against `/api/products` rather than the collection endpoint, because when creating a collection there is nothing to query yet and the rule is the same filter payload either way. Zero is called out in red.
+      - **Switching kind warns but does not discard until save.** The other side's data stays in state, so a misclick is recoverable.
+      - **409 is surfaced as the colliding slug**, not a generic failure — the admin needs to know which field to change.
+
+      **Verification**
+      - Command: `cd packages/web && npx vitest run tests/components/admin/CollectionForm.test.tsx`
+      - Result: PASS — 15 tests, 0 failing
+      - Build: `npx tsc --noEmit -p tsconfig.json` — clean
+
+      **Known limitation, deliberately scoped**: the manual picker is a textarea of product IDs, one per line, not a search-and-drag interface. The ordering contract and the endpoint are fully wired — `PUT /:id/products` gets the array in order — but picking products by ID is not a usable authoring experience. A real picker needs a product search component that does not exist yet. Worth its own ticket; called out rather than left to be discovered.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 467
+    feature: curated-collections
+    description: API - admin CRUD for collections
+  - ticket: 468
+    feature: curated-collections
+    description: API - manual membership and Discover ordering
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing form tests
+    file: packages/web/tests/components/admin/CollectionForm.test.tsx
+    command: cd packages/web && npx vitest run tests/components/admin/CollectionForm.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: 'Cases: kind=rule shows the builder and hides the picker, and vice versa; facet options come from the shared vocabularies; the emitted payload parses under collectionRuleSchema; slug is suggested from the title but stays editable; a colliding slug surfaces the 409 rather than a generic error; switching kind warns before discarding; the count preview refetches when the rule changes.'
+  - id: 2
+    action: verify-fail
+    description: Confirm failure
+    command: cd packages/web && npx vitest run tests/components/admin/CollectionForm.test.tsx
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the form and both routes
+    file: packages/web/app/components/admin/CollectionForm.tsx
+    status: pending
+    code: CollectionForm plus routes/admin/collections/new.tsx and $id.tsx.
+  - id: 4
+    action: verify-pass
+    description: Confirm they pass and typecheck is clean
+    command: cd packages/web && npx vitest run tests/components/admin/CollectionForm.test.tsx && npx tsc --noEmit -p tsconfig.json
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git add packages/web/app/components/admin/CollectionForm.tsx packages/web/app/routes/admin/collections packages/web/tests/components/admin && git commit -m "feat(web): admin collection form with rule builder and manual picker (#TICKET)"'
+    status: pending
+current_step: 1
+started: '2026-08-05T15:53:24.547Z'
+verification:
+  tests_passed: true
+  test_command: cd packages/web && npx vitest run tests/components/admin/CollectionForm.test.tsx
+  test_output: 15 tests passing. Covers slug suggestion and the point it stops following the title, the facet groups coming from the shared vocabulary, the default-sort control, the live count preview including the zero case, the kind-switch warning, and a 409 surfacing as the colliding slug.
+  build_passed: true
+  build_command: cd packages/web && npx tsc --noEmit -p tsconfig.json
+  verified_at: '2026-08-05T15:58:03.166Z'
+completed: '2026-08-05T15:58:08.642Z'

@@ -1,0 +1,98 @@
+ticket_number: 485
+title: Frontend - photo and video upload in ReviewForm
+description: |-
+  ## Task
+
+  Let a customer attach up to 5 photos or videos when writing a review. Client-side validation rejects the obvious failures before burning a presign round trip; video uploads show that processing continues after submit rather than pretending the media is live.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Frontend
+  Depends on: the upload helper
+
+  - `packages/web/app/components/reviews/ReviewForm.tsx`, tests at `packages/web/tests/components/reviews/ReviewForm.test.tsx`
+  - Limits must match `REVIEW_MEDIA_LIMITS` on the server: images 10MB, video 200MB and 60s, 5 items total
+  - Duration cannot be checked client-side without decoding — read `videoElement.duration` from an object URL and reject over 60s before upload, but treat the server as the real gate
+  - Order matters: the review is created first (`useCreateReview`), then media uploads against the returned review id. A failed upload must leave the already-created review intact and surface a retry, not a lost review
+  - Revoke every object URL on unmount
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:14:24.192Z'
+last_updated: '2026-08-05T15:14:24.192Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 484
+    feature: review-surfaces-parity
+    description: Frontend - API client functions and hooks for review feed and media
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing component tests for the media picker
+    file: packages/web/tests/components/reviews/ReviewMediaUpload.test.tsx
+    command: cd packages/web && bun run test -- ReviewMediaUpload
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // Testing Library. Cover:
+      //   selecting 2 images renders 2 previews with removable thumbnails
+      //   a 6th selection is refused with a visible message
+      //   a 20MB image is refused before any fetch happens
+      //   a video preview renders a <video> element, not an <img>
+      //   upload failure shows a retry affordance and keeps the item in the list
+      //   object URLs are revoked on unmount
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bun run test -- ReviewMediaUpload
+    expected_result: FAIL - cannot resolve ReviewMediaUpload
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the media upload component
+    file: packages/web/app/components/reviews/ReviewMediaUpload.tsx
+    status: pending
+    code: |-
+      // Controlled: props { files, onChange, maxFiles = 5, disabled }
+      // accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+      // Validate type, size, and (for video) duration via an object-URL <video> probe.
+      // Render a thumbnail grid with per-item remove buttons and per-item progress.
+      // Videos carry a small badge reading "Processing after you submit".
+  - id: 4
+    action: implement
+    description: Wire the picker into the review form submit flow
+    file: packages/web/app/components/reviews/ReviewForm.tsx
+    status: pending
+    code: |-
+      // Submit sequence:
+      //   1. createReview(...) -> reviewId
+      //   2. for each staged file, await uploadReviewMedia(reviewId, file), updating
+      //      that item's progress
+      //   3. on any upload failure keep the review, mark that item failed, offer retry
+      // Confirmation copy notes that photos and videos publish once the review is
+      // approved, so the state after submit is not mistaken for a bug.
+  - id: 5
+    action: verify-pass
+    description: Confirm the upload and form tests pass
+    command: cd packages/web && bun run test -- ReviewMediaUpload ReviewForm
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the upload UI
+    command: 'git add packages/web/app/components/reviews/ReviewMediaUpload.tsx packages/web/app/components/reviews/ReviewForm.tsx packages/web/tests/components/reviews && git commit -m "feat(web): photo and video upload in the review form"'
+    status: pending
+current_step: 1

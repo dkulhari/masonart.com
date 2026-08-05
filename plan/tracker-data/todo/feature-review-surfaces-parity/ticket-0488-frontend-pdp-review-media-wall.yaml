@@ -1,0 +1,91 @@
+ticket_number: 488
+title: Frontend - PDP review media wall with lightbox and video playback
+description: |-
+  ## Task
+
+  Mesonart's PDP runs a Loox photo-review wall below the tabbed content. Ours renders customer photos **and videos** from the same wall, opening into a lightbox that plays video inline and shows the review the media came from.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Frontend
+  Depends on: the media feed endpoint and client layer
+
+  - PDP is `packages/web/app/routes/posters/$slug.tsx`; the existing reviews block is `packages/web/app/components/product/ProductReviews.tsx` (section at :75, heading "Customer Reviews" at :85)
+  - Place the wall **above** `ProductReviews`, matching mesonart's order: media wall, then the written reviews
+  - Videos render `poster={posterUrl}` and only load on play — never `autoPlay`, never `preload="auto"`. A dozen autoplaying clips on a product page is a bandwidth and layout disaster on mobile
+  - The wall renders nothing when the feed is empty; it must not leave an empty heading behind
+  - Lightbox needs keyboard escape, arrow navigation, and focus trapping. Do not trigger a native dialog
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:15:25.087Z'
+last_updated: '2026-08-05T15:15:25.087Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 484
+    feature: review-surfaces-parity
+    description: Frontend - API client functions and hooks for review feed and media
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the media wall and lightbox
+    file: packages/web/tests/components/product/ReviewMediaWall.test.tsx
+    command: cd packages/web && bun run test -- ReviewMediaWall
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // renders one tile per media item for the product
+      // image tiles render <img>, video tiles render <video> with a poster and a play badge
+      // no <video> carries autoPlay, and none preloads audio/video data
+      // renders null when the feed is empty - no orphan heading
+      // clicking a tile opens the lightbox showing that item plus its review text
+      // Escape closes; ArrowRight advances; focus returns to the trigger tile
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/web && bun run test -- ReviewMediaWall
+    expected_result: FAIL - component not found
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the media wall and lightbox
+    file: packages/web/app/components/product/ReviewMediaWall.tsx
+    status: pending
+    code: |-
+      // useReviewMediaFeed(productId); return null on an empty list.
+      // Grid of square tiles, 2 cols mobile / 4-6 desktop, lazy-loaded images.
+      // Video tiles: <video poster={posterUrl} preload="none" muted playsInline
+      //   controls={false}> with a play badge overlay and the duration.
+      // Lightbox: portal, focus trap, Escape and arrow handling, and the source
+      //   review's rating, title and body beside the media.
+  - id: 4
+    action: implement
+    description: Mount the wall on the product page
+    file: packages/web/app/routes/posters/$slug.tsx
+    status: pending
+    code: // Directly above the existing <ProductReviews />, matching mesonart's order.
+  - id: 5
+    action: verify-pass
+    description: Confirm the wall and existing product review tests pass
+    command: cd packages/web && bun run test -- ReviewMediaWall ProductReviews
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the media wall
+    command: 'git add packages/web/app/components/product/ReviewMediaWall.tsx packages/web/app/routes/posters/\$slug.tsx packages/web/tests/components/product && git commit -m "feat(web): PDP review media wall with video lightbox"'
+    status: pending
+current_step: 1

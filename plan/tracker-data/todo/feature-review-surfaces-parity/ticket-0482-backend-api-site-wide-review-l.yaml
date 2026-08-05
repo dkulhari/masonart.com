@@ -1,0 +1,101 @@
+ticket_number: 482
+title: Backend API - site-wide review list, media feed, and media on existing reads
+description: |-
+  ## Task
+
+  The read side every new surface depends on:
+
+  - `GET /api/reviews` — all approved reviews, paginated, newest first, each with its product (title, slug, image) and its ready media. This is the gap the `/reviews` page and the home strip both need.
+  - `GET /api/reviews/media` — flat feed of ready media for the PDP wall, optionally filtered by `productId`.
+  - Media embedded on the existing product-scoped list and single-review reads.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Backend API
+  Depends on: reviewMedia schema
+
+  - `packages/api/src/routes/reviews.ts`: `reviewsApp.get("/stats")` at :380 must stay registered **before** any `/:reviewId` route or "stats" parses as a review id. The same trap applies to a new literal `/media` segment — register it before `/:reviewId`
+  - Reuse `REVIEW_CACHE_PREFIX` + `getCached`/`setCached` + `CACHE_TTL_REVIEWS`
+  - **Bump the cache key version** on the product-scoped list, or deployed nodes serve media-less payloads from warm cache
+  - Only `processingStatus = 'ready'` media is ever returned. `processing` and `failed` are invisible to the public
+  - Reuse the existing `listReviewsQuerySchema` page/pageSize shape
+feature: review-surfaces-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:13:27.676Z'
+last_updated: '2026-08-05T15:13:27.676Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 478
+    feature: review-surfaces-parity
+    description: Database Schema - reviewMedia table, enums, relations and migration
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for list-all, the media feed, and media on existing reads
+    file: packages/api/tests/routes/review-feed.test.ts
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-feed
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // GET /api/reviews
+      //   returns only approved reviews - pending and rejected never appear
+      //   newest first; page/pageSize honoured; total is the approved count
+      //   each item carries product { id, title, slug, imageUrl } and media[]
+      //   media excludes rows whose processingStatus is 'processing' or 'failed'
+      // GET /api/reviews/media
+      //   flat list of ready media, each with its reviewId, rating and productId
+      //   ?productId=<uuid> filters; a bad uuid is a 400
+      // GET /api/products/:id/reviews now includes media[] on each item
+      // GET /api/reviews/:reviewId includes media[]
+      // GET /api/reviews/stats still resolves as stats, not as a review id
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review-feed
+    expected_result: FAIL - 404 on GET /api/reviews
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the list-all and media feed handlers, and join media into existing reads
+    file: packages/api/src/routes/reviews.ts
+    status: pending
+    code: |-
+      // Register in this order, ABOVE the existing reviewsApp.get('/:reviewId') at :425:
+      //   reviewsApp.get('/stats', ...)      // already there at :380
+      //   reviewsApp.get('/media', ...)      // NEW - literal, must precede /:reviewId
+      //   reviewsApp.get('/', zValidator('query', listReviewsQuerySchema), ...)  // NEW
+      //
+      // Shared helper so all four read paths agree on the media shape:
+      //   async function attachMedia(reviewRows) -> one `inArray(reviewMedia.reviewId, ids)`
+      //   query filtered to processingStatus 'ready', ordered by sortOrder, grouped by
+      //   reviewId. Never N+1.
+      //
+      // Cache keys: `${REVIEW_CACHE_PREFIX}all:v1:${page}:${pageSize}` and
+      //             `${REVIEW_CACHE_PREFIX}media:v1:${productId ?? 'all'}`
+      // Bump the product list key from `product:` to `product:v2:` in the same change.
+  - id: 4
+    action: verify-pass
+    description: Confirm the new tests and the pre-existing review route tests both pass
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- routes/review
+    expected_result: PASS - review-feed, review-media, reviews and review-catalogue-stats all green
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the read endpoints
+    command: 'git add packages/api/src/routes/reviews.ts packages/api/tests/routes/review-feed.test.ts && git commit -m "feat(api): site-wide review list and media feed endpoints"'
+    status: pending
+current_step: 1

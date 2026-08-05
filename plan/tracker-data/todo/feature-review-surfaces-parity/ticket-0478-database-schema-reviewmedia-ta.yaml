@@ -1,0 +1,115 @@
+ticket_number: 478
+title: Database Schema - reviewMedia table, enums, relations and migration
+description: |-
+  ## Task
+
+  Add a media-agnostic `reviewMedia` table so reviews can carry customer photos AND videos. `mediaType` enum from day one means video is additive later rather than a migration rewrite.
+
+  Media has no moderation status of its own — it inherits the parent review's `status`. `processingStatus` tracks the transcode pipeline only (`processing` | `ready` | `failed`), not moderation.
+
+  ## Context
+
+  Part of feature: review-surfaces-parity
+  Phase: Database Schema
+
+  - Mirror `approvalPhotos` at `packages/api/src/database/schema/approvals.ts:112` — same url/thumbnailUrl/sortOrder shape
+  - Parent table: `packages/api/src/database/schema/reviews.ts`
+  - Drizzle config writes migrations to `packages/api/src/database/migrations/` (last is `0005_dapper_hulk.sql`)
+  - Schema barrel is `packages/api/src/database/schema/index.ts`; reviews is exported at line 26
+  - DB tests skip gracefully when `SKIP_DB_RUNTIME_TESTS=true`; follow `packages/api/tests/database/reviews.test.ts`
+  - The dev DB is on port **5440**, not the 5433 default baked into the test files
+feature: review-surfaces-parity
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T15:12:30.560Z'
+last_updated: '2026-08-05T15:12:30.560Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing schema test for reviewMedia columns, enums and cascade delete
+    file: packages/api/tests/database/review-media.test.ts
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- review-media
+    expected_result: FAIL
+    status: pending
+    code: |-
+      // Follow the beforeAll/SKIP_DB_RUNTIME_TESTS harness in tests/database/reviews.test.ts.
+      // Assert:
+      //   reviewMediaTypeEnum.enumValues === ['image','video']
+      //   reviewMediaStatusEnum.enumValues === ['processing','ready','failed']
+      //   inserting a row with reviewId + mediaType 'image' + url succeeds
+      //   inserting mediaType 'video' with posterUrl + durationSeconds succeeds
+      //   deleting the parent review cascades the media row away
+      //   posterUrl / durationSeconds / width / height are nullable
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails because the module does not exist
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- review-media
+    expected_result: FAIL - Cannot find module '../../src/database/schema/review-media'
+    status: pending
+  - id: 3
+    action: implement
+    description: Create the reviewMedia schema module
+    file: packages/api/src/database/schema/review-media.ts
+    status: pending
+    code: |-
+      // pgEnum reviewMediaTypeEnum ['image','video']
+      // pgEnum reviewMediaStatusEnum ['processing','ready','failed']
+      // pgTable reviewMedia:
+      //   id uuid pk defaultRandom
+      //   reviewId uuid -> reviews.id, onDelete cascade, notNull
+      //   mediaType reviewMediaTypeEnum notNull
+      //   url text notNull                    // playable/displayable rendition
+      //   thumbnailUrl text                   // grid thumb (images: webp variant)
+      //   posterUrl text                      // video poster frame, null for images
+      //   durationSeconds integer             // video only
+      //   width integer, height integer
+      //   sizeBytes integer
+      //   sortOrder integer default 0 notNull
+      //   processingStatus reviewMediaStatusEnum default 'ready' notNull
+      //   processingError text
+      //   createdAt / updatedAt timestamps ($onUpdate like reviews.ts)
+      // indexes: reviewIdIdx, and a composite (reviewId, sortOrder)
+      // relations: one(reviews)
+      // also add `media: many(reviewMedia)` to reviewsRelations in reviews.ts
+      // export types ReviewMedia / NewReviewMedia / ReviewMediaType / ReviewMediaStatus
+  - id: 4
+    action: implement
+    description: Export the new module from the schema barrel
+    file: packages/api/src/database/schema/index.ts
+    status: pending
+    code: |-
+      // Below the existing `export * from "./reviews";` (line 26):
+      // Customer photo/video attached to product reviews
+      export * from "./review-media";
+  - id: 5
+    action: implement
+    description: Generate and apply the Drizzle migration
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run db:generate && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run db:migrate
+    expected_result: New 0006_*.sql written to src/database/migrations and applied
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Confirm schema tests pass against the real database
+    command: cd packages/api && DATABASE_URL=postgresql://poster_app:dev_password@localhost:5440/poster_app_dev bun run test -- review-media
+    expected_result: PASS
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the schema and migration
+    command: 'git add packages/api/src/database/schema/review-media.ts packages/api/src/database/schema/index.ts packages/api/src/database/schema/reviews.ts packages/api/src/database/migrations packages/api/tests/database/review-media.test.ts && git commit -m "feat(db): reviewMedia table for review photos and videos"'
+    status: pending
+current_step: 1
