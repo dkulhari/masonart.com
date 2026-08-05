@@ -28,6 +28,9 @@ import {
   MoreHorizontal,
   Search,
   Filter,
+  Loader2,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { getApiUrl } from '~/lib/utils'
@@ -74,6 +77,31 @@ interface ReviewProduct {
   slug: string
 }
 
+/**
+ * One attachment, as `GET /api/admin/reviews` returns it (#483).
+ *
+ * `processingStatus` and `processingError` are admin-only: the public review
+ * payload filters to `ready`, because a half-transcoded tile looks like a
+ * broken store. The moderation queue is the one screen where a stuck or failed
+ * pipeline has to be visible.
+ */
+export interface AdminReviewMedia {
+  id: string
+  reviewId: string
+  mediaType: string
+  url: string
+  thumbnailUrl: string | null
+  posterUrl: string | null
+  durationSeconds: number | null
+  width: number | null
+  height: number | null
+  sizeBytes: number | null
+  sortOrder: number
+  processingStatus: string
+  processingError: string | null
+  createdAt: string
+}
+
 interface AdminReview {
   id: string
   productId: string
@@ -88,6 +116,7 @@ interface AdminReview {
   updatedAt: string
   author: ReviewAuthor | null
   product: ReviewProduct | null
+  media?: AdminReviewMedia[]
 }
 
 interface ReviewStats {
@@ -193,6 +222,218 @@ async function deleteReview(reviewId: string): Promise<void> {
   if (!response.ok) {
     throw new Error('Failed to delete review')
   }
+}
+
+/**
+ * Delete one attachment, leaving the parent review untouched.
+ *
+ * Deliberately NOT a moderation call: the endpoint removes the row and its R2
+ * objects, and the review keeps whatever pending/approved/rejected state it
+ * already had. Media has no separate moderation queue — it inherits its
+ * parent's status — so removing a photo must never look like a verdict.
+ */
+async function deleteReviewMedia(
+  reviewId: string,
+  mediaId: string
+): Promise<void> {
+  const response = await fetch(
+    `${getApiUrl()}/api/admin/reviews/${reviewId}/media/${mediaId}`,
+    {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error('Failed to delete review media')
+  }
+}
+
+// ============================================================================
+// Review Media Strip
+// ============================================================================
+
+interface ReviewMediaStripProps {
+  reviewId: string
+  media: AdminReviewMedia[]
+  /** Called after a successful delete, so the page can drop it from its copy. */
+  onDeleted?: (mediaId: string) => void
+}
+
+/**
+ * A review's attachments, at every processing status.
+ *
+ * Deletion is two-step and entirely inline. `window.confirm` is off limits
+ * here: a native dialog blocks the browser automation harness outright, and
+ * this action is destructive enough that it genuinely needs a confirm step.
+ */
+export function ReviewMediaStrip({
+  reviewId,
+  media,
+  onDeleted,
+}: ReviewMediaStripProps) {
+  const [items, setItems] = useState(media)
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [errorId, setErrorId] = useState<string | null>(null)
+
+  // The page owns the payload; re-syncing keeps a refetch from being ignored.
+  useEffect(() => {
+    setItems(media)
+  }, [media])
+
+  if (items.length === 0) {
+    return null
+  }
+
+  const handleConfirmDelete = async (mediaId: string) => {
+    setDeletingId(mediaId)
+    setErrorId(null)
+    try {
+      await deleteReviewMedia(reviewId, mediaId)
+      setItems((current) => current.filter((item) => item.id !== mediaId))
+      setConfirmingId(null)
+      onDeleted?.(mediaId)
+    } catch {
+      // No optimistic removal — the object may well still be in R2, and a tile
+      // that vanishes on a failed delete lies about what was actually cleaned.
+      setErrorId(mediaId)
+      setConfirmingId(null)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div
+      data-testid="review-media-strip"
+      className="mt-2 flex flex-wrap items-start gap-2"
+    >
+      {items.map((item) => {
+        const isConfirming = confirmingId === item.id
+        const isDeleting = deletingId === item.id
+        const isVideo = item.mediaType === 'video'
+        const isReady = item.processingStatus === 'ready'
+        const isFailed = item.processingStatus === 'failed'
+
+        return (
+          <div
+            key={item.id}
+            data-testid={`review-media-item-${item.id}`}
+            data-media-id={item.id}
+            data-processing-status={item.processingStatus}
+            className="relative w-28 overflow-hidden rounded-lg border border-border bg-muted/40"
+          >
+            {/* Preview */}
+            <div className="flex h-20 w-full items-center justify-center overflow-hidden bg-muted">
+              {isReady ? (
+                isVideo ? (
+                  <video
+                    data-testid="review-media-player"
+                    src={item.url}
+                    poster={item.posterUrl ?? item.thumbnailUrl ?? undefined}
+                    controls
+                    preload="metadata"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src={item.thumbnailUrl ?? item.url}
+                    alt="Review attachment"
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                )
+              ) : isFailed ? (
+                <AlertTriangle
+                  className="h-6 w-6 text-red-600"
+                  aria-hidden="true"
+                />
+              ) : (
+                // No playable rendition exists yet, so no play control at all.
+                <Loader2
+                  data-testid="review-media-spinner"
+                  role="status"
+                  aria-label="Processing"
+                  className="h-5 w-5 animate-spin text-muted-foreground"
+                />
+              )}
+            </div>
+
+            {/* Status line */}
+            <div className="px-1.5 py-1">
+              {isFailed ? (
+                <p className="text-[10px] leading-tight text-red-600">
+                  {/* Verbatim: "something went wrong" tells a moderator nothing. */}
+                  {item.processingError || 'Processing failed'}
+                </p>
+              ) : isReady ? (
+                <p className="truncate text-[10px] text-muted-foreground">
+                  {isVideo
+                    ? `Video${item.durationSeconds ? ` · ${item.durationSeconds}s` : ''}`
+                    : 'Photo'}
+                </p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground">Processing…</p>
+              )}
+
+              {errorId === item.id && (
+                <p
+                  data-testid="review-media-error"
+                  className="mt-0.5 text-[10px] leading-tight text-red-600"
+                >
+                  Delete failed. Try again.
+                </p>
+              )}
+            </div>
+
+            {/* Two-step inline delete */}
+            <div className="flex items-center gap-1 border-t border-border px-1.5 py-1">
+              {isConfirming ? (
+                <>
+                  <button
+                    type="button"
+                    data-testid="review-media-confirm-delete"
+                    onClick={() => handleConfirmDelete(item.id)}
+                    disabled={isDeleting}
+                    className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting…' : 'Confirm'}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="review-media-cancel-delete"
+                    onClick={() => setConfirmingId(null)}
+                    disabled={isDeleting}
+                    className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="review-media-delete"
+                  onClick={() => {
+                    setErrorId(null)
+                    setConfirmingId(item.id)
+                  }}
+                  title="Delete attachment"
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 // ============================================================================
@@ -325,6 +566,26 @@ function AdminReviewsPage() {
     } catch {
       setError('Failed to delete review. Please try again.')
     }
+  }
+
+  /**
+   * Drop a deleted attachment from the page's copy of the review.
+   *
+   * Local state only — no refetch and no moderation call. Reloading the queue
+   * here would reorder or re-page the row out from under the moderator
+   * mid-decision, and the review's own status is not what changed.
+   */
+  const handleMediaDeleted = (reviewId: string, mediaId: string) => {
+    setReviews((current) =>
+      current.map((review) =>
+        review.id === reviewId
+          ? {
+              ...review,
+              media: (review.media ?? []).filter((item) => item.id !== mediaId),
+            }
+          : review
+      )
+    )
   }
 
   // Handle bulk approve
@@ -598,6 +859,9 @@ function AdminReviewsPage() {
                   onApprove={() => handleApprove(review.id)}
                   onReject={(notes) => handleReject(review.id, notes)}
                   onDelete={() => handleDelete(review.id)}
+                  onMediaDeleted={(mediaId) =>
+                    handleMediaDeleted(review.id, mediaId)
+                  }
                 />
               ))}
             </tbody>
@@ -649,6 +913,7 @@ interface ReviewRowProps {
   onApprove: () => void
   onReject: (notes?: string) => void
   onDelete: () => void
+  onMediaDeleted: (mediaId: string) => void
 }
 
 function ReviewRow({
@@ -660,6 +925,7 @@ function ReviewRow({
   onApprove,
   onReject,
   onDelete,
+  onMediaDeleted,
 }: ReviewRowProps) {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectNotes, setRejectNotes] = useState('')
@@ -746,6 +1012,13 @@ function ReviewRow({
           <p className="truncate text-sm text-muted-foreground">
             {review.title || review.content || 'No content'}
           </p>
+          {/* Attachments sit in the row itself, not behind an expand: a photo
+              nobody looked at is a photo that ships on approval. */}
+          <ReviewMediaStrip
+            reviewId={review.id}
+            media={review.media ?? []}
+            onDeleted={onMediaDeleted}
+          />
         </td>
         <td className="px-4 py-3">
           <span
