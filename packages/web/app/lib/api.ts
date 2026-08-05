@@ -2468,6 +2468,33 @@ export const wishlistApi = {
   },
 
   /**
+   * Rewrite the saved order.
+   *
+   * Sends the WHOLE list. The endpoint accepts only a permutation of what it
+   * has stored and answers 409 otherwise, so a stale tab cannot silently drop
+   * an item saved on another device.
+   */
+  async reorder(productIds: string[]): Promise<{ productIds: string[] }> {
+    const response = await fetch(`${getApiUrl()}/api/wishlist`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productIds }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const failure = new Error(
+        error.error || "Failed to reorder wishlist"
+      ) as Error & { status?: number };
+      failure.status = response.status;
+      throw failure;
+    }
+
+    return response.json();
+  },
+
+  /**
    * Just the count, for the header badge — deliberately separate from list()
    * so the header does not pull a product join on every page.
    */

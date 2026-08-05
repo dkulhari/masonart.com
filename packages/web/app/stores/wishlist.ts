@@ -56,6 +56,14 @@ interface WishlistStore {
   load: () => Promise<void>;
   setAuthenticated: (isAuthenticated: boolean) => void;
   toggle: (productId: string) => Promise<void>;
+  /**
+   * Move the id at `from` to `to`. Optimistic; persists when signed in.
+   *
+   * Indices rather than ids because both callers — the drag handler and the
+   * move buttons — already know the positions, and an id-based API would make
+   * them look it up only for this to look it up again.
+   */
+  reorder: (from: number, to: number) => Promise<void>;
   /** Forget ids the catalogue no longer has. Guest lists only — see below. */
   dropMissing: (productIds: string[]) => void;
 }
@@ -209,6 +217,66 @@ export const useWishlistStore = create<WishlistStore>()(
         const dead = new Set(productIds);
         const remaining = get().ids.filter((id) => !dead.has(id));
         if (remaining.length !== get().ids.length) set({ ids: remaining });
+      },
+
+      /**
+       * Reorder.
+       *
+       * Applies locally first — dragging that waits for a round trip does not
+       * feel like dragging.
+       *
+       * The failure path differs from `toggle`'s on purpose. `toggle` rolls
+       * back to the previous array, which is right when the server refused one
+       * item. A reorder is refused when the list CHANGED underneath (the
+       * endpoint's 409), so the previous array is stale too — reloading is the
+       * only answer that leaves the client correct.
+       */
+      async reorder(from: number, to: number) {
+        const previous = get().ids;
+
+        // A drop outside the list, or onto the card's own position, is an
+        // ordinary event rather than a caller bug.
+        if (
+          from === to ||
+          from < 0 ||
+          to < 0 ||
+          from >= previous.length ||
+          to >= previous.length
+        ) {
+          return;
+        }
+
+        const next = [...previous];
+        const [moved] = next.splice(from, 1);
+        if (moved === undefined) return;
+        next.splice(to, 0, moved);
+
+        // A guest's list is local and authoritative — the persist middleware
+        // writes localStorage and there is nothing that can fail.
+        if (get().isAuthenticated !== true) {
+          set({ ids: next });
+          return;
+        }
+
+        set({ ids: next, isPending: true });
+
+        try {
+          await wishlistApi.reorder(next);
+        } catch {
+          /**
+           * Re-read rather than roll back. Swallowed because there is nothing
+           * the shopper can do about it and the list on screen stays usable
+           * either way.
+           */
+          try {
+            const { items } = await wishlistApi.list();
+            set({ ids: items.map((item) => item.id) });
+          } catch {
+            set({ ids: previous });
+          }
+        } finally {
+          set({ isPending: false });
+        }
       },
 
       async toggle(productId: string) {
