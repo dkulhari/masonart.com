@@ -119,6 +119,12 @@ export default defineConfig({
           // shares one "unknown" IP bucket, so the sliding-window limiter
           // always trips. The bypass is inert under NODE_ENV=production —
           // see packages/api/src/middleware/rate-limit.ts (#332).
+          //
+          // This block alone is NOT enough (#451): reuseExistingServer is true
+          // locally and a dev server is usually already up, so Playwright
+          // never spawns one and this env never reaches the API. The real
+          // guarantee is on the packages/api dev script itself; this stays as
+          // belt and braces for the case where Playwright does start it.
           DISABLE_RATE_LIMIT: 'true',
         },
       },
