@@ -16,7 +16,7 @@
  * SearchDrawer.
  */
 
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { X, ShoppingCart, ArrowRight } from 'lucide-react'
 import { Button, buttonVariants } from '~/components/ui/Button'
 import { cn, formatPrice } from '~/lib/utils'
@@ -62,6 +62,11 @@ export function CartDrawer({ className }: CartDrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 
+  // Where to draw the X that stands in for the pointer over the backdrop.
+  // Null whenever the pointer is not on the backdrop — including on the panel,
+  // which the backdrop's own mouseleave covers.
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null)
+
   // Handle escape key
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -88,6 +93,8 @@ export function CartDrawer({ className }: CartDrawerProps) {
     return () => {
       document.body.style.overflow = originalOverflow
       document.removeEventListener('keydown', handleKeyDown)
+      // Reopening must not paint the follower at last session's coordinates.
+      setPointer(null)
     }
   }, [isOpen, handleKeyDown])
 
@@ -95,13 +102,40 @@ export function CartDrawer({ className }: CartDrawerProps) {
 
   return (
     <>
-      {/* Backdrop */}
+      {/*
+        Backdrop. Theirs is flat rgba(23,23,23,0.7) with `cursor: none`, and a
+        round X drawn under the pointer instead — the same treatment the
+        Quickview got in #420, and for the same reason: the whole backdrop is
+        the close control, so the pointer should say so rather than leaving the
+        shopper to guess that clicking outside works.
+
+        Escape and the panel's own close button cover everyone this does not.
+        The follower is a pointer affordance, never the only way out.
+      */}
       <div
         data-testid="cart-drawer-backdrop"
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm animate-drawer-backdrop-in"
+        className="fixed inset-0 z-40 cursor-none bg-foreground/70 animate-drawer-backdrop-in"
         onClick={closeDrawer}
+        onMouseMove={(event) =>
+          setPointer({ x: event.clientX, y: event.clientY })
+        }
+        onMouseLeave={() => setPointer(null)}
         aria-hidden="true"
       />
+
+      {pointer && (
+        <span
+          data-testid="cart-drawer-cursor"
+          aria-hidden="true"
+          style={{ left: pointer.x, top: pointer.y }}
+          className={cn(
+            'pointer-events-none fixed z-50 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2',
+            'place-items-center rounded-full bg-background text-foreground shadow-[0_2px_10px_rgba(23,23,23,0.25)]'
+          )}
+        >
+          <X className="h-4 w-4" />
+        </span>
+      )}
 
       {/* Drawer Panel */}
       <div
@@ -110,7 +144,8 @@ export function CartDrawer({ className }: CartDrawerProps) {
         aria-modal="true"
         aria-labelledby="cart-drawer-title"
         className={cn(
-          'fixed right-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-2xl',
+          // max-w-xl is 36rem — their measured 576px exactly.
+          'fixed right-0 top-0 z-50 h-full w-full max-w-xl bg-background shadow-2xl',
           'flex flex-col',
           // Rounded on the page-facing edge only, square where it meets the
           // viewport — their `34px 0 0 34px`. overflow-hidden so the items

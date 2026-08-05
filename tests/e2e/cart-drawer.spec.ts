@@ -106,6 +106,32 @@ test.describe('Cart Drawer - opening', () => {
     expect(radius).toBe('34px 0px 0px 34px');
   });
 
+  test('is their 576px wide', async ({ page }) => {
+    await cartButton(page).click();
+    await expect(drawer(page)).toBeVisible();
+
+    const box = await drawer(page).boundingBox();
+    expect(Math.round(box!.width)).toBe(576);
+  });
+
+  test('replaces the pointer with an X over the backdrop (#420)', async ({
+    page,
+  }) => {
+    await cartButton(page).click();
+    await expect(drawer(page)).toBeVisible();
+
+    const follower = page.getByTestId('cart-drawer-cursor');
+    await expect(follower).toBeHidden();
+
+    // Well clear of the 576px panel on the right.
+    await page.mouse.move(200, 300);
+
+    await expect(follower).toBeVisible();
+    const box = await follower.boundingBox();
+    expect(Math.round(box!.x + box!.width / 2)).toBe(200);
+    expect(Math.round(box!.y + box!.height / 2)).toBe(300);
+  });
+
   test('closes on Escape', async ({ page }) => {
     await cartButton(page).click();
     await expect(drawer(page)).toBeVisible();

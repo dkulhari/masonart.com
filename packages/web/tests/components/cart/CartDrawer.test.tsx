@@ -94,6 +94,32 @@ describe('CartDrawer', () => {
     expect(close.className).not.toContain('rounded-lg')
   })
 
+  it('draws the X under the pointer while it is over the backdrop (#420)', () => {
+    render(<CartDrawer />)
+
+    const backdrop = screen.getByTestId('cart-drawer-backdrop')
+    // The backdrop IS the close control, so it hides the arrow and says so.
+    expect(backdrop.className).toContain('cursor-none')
+    expect(screen.queryByTestId('cart-drawer-cursor')).toBeNull()
+
+    fireEvent.mouseMove(backdrop, { clientX: 240, clientY: 360 })
+
+    const follower = screen.getByTestId('cart-drawer-cursor')
+    expect(follower.style.left).toBe('240px')
+    expect(follower.style.top).toBe('360px')
+
+    // Moving onto the panel leaves the backdrop, which takes the X with it.
+    fireEvent.mouseLeave(backdrop)
+    expect(screen.queryByTestId('cart-drawer-cursor')).toBeNull()
+  })
+
+  it('is their 576px wide', () => {
+    render(<CartDrawer />)
+
+    // max-w-xl is 36rem. max-w-md (448px) was ours, not theirs.
+    expect(screen.getByRole('dialog').className).toContain('max-w-xl')
+  })
+
   it('rounds the page-facing edge only', () => {
     render(<CartDrawer />)
 
