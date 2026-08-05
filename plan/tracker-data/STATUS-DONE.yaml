@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-08-05T14:37:09.134Z'
-total_tickets: 401
+last_updated: '2026-08-05T14:41:43.546Z'
+total_tickets: 402
 summary:
   critical: 21
   high: 155
-  medium: 173
+  medium: 174
   low: 52
 priorities:
   critical:
@@ -1695,6 +1695,12 @@ priorities:
           title: Wishlist store fetches before it knows the session — six 401s per collection load
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 422
+          title: Web - wishlist page at /wishlist
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 477
+              title: Guest wishlist persists locally and merges into the account on sign-in
     - feature: curated-collections
       tickets:
         - ticket_number: 465
@@ -2414,6 +2420,12 @@ blocked_tickets:
       - ticket_number: 414
         title: Seed - settled orders and approved reviews so the real signals have data
     description: API - catalogue-wide review aggregate for the promo tile, Seed - settled orders and approved reviews so the real signals have data
+  - ticket_number: 422
+    title: Web - wishlist page at /wishlist
+    blocked_by:
+      - ticket_number: 477
+        title: Guest wishlist persists locally and merges into the account on sign-in
+    description: Guest wishlist persists locally and merges into the account on sign-in
   - ticket_number: 465
     title: API - GET /api/collections for the Discover rail
     blocked_by:

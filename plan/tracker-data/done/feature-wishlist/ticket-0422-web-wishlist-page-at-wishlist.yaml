@@ -1,0 +1,125 @@
+ticket_number: 422
+title: Web - wishlist page at /wishlist
+description: |-
+  ## Overview
+
+  Build the wishlist destination page. Analysis §3.5 lists Wishlist among the pages we don't have; mesonart routes theirs at `/apps/wishlist`.
+
+  This un-defers what the feature scope deliberately pushed to Phase F ("the parity work needs the affordance and the count, not the destination"). The affordance and count shipped with #387–#389; the destination is what's left.
+
+  ## Why it's cheap now
+
+  Backend and client are already complete — this is a UI-only ticket:
+
+  - `packages/api/src/routes/wishlist.ts` — `GET /` (:68), `GET /count` (:113), `POST /:productId` (:145), `DELETE /:productId` (:181)
+  - `packages/web/app/lib/api.ts:2199` — `wishlistApi`, all four methods
+  - `packages/web/app/stores/wishlist.ts` — hydration-safe store, 131 lines
+  - `WishlistButton`, header count badge — live
+
+  Nothing new needed in `packages/api`.
+
+  ## Rough scope
+
+  - New route (auth-gated; `routes/_authed/` is the existing pattern for account pages)
+  - Reuse `ProductGrid` / `ProductCard` rather than inventing a card
+  - Empty state
+  - Header/account nav entry point
+
+  ## Open questions — decide when planning
+
+  - `/wishlist` top-level vs `_authed/account/wishlist` (all other authed pages live under `account/`)
+  - Signed-out behaviour: sign-in prompt vs redirect
+  - Whether the list endpoint's dangling-id drop needs surfacing ("2 items no longer available") or stays silent
+
+  ## Notes
+
+  - Both this and the reviews page add routes, so both write `packages/web/app/routeTree.gen.ts` — tracked, not gitignored. If worked in parallel, stay in one checkout and stage by explicit path.
+  - Details to be planned at work time; this is a placeholder with the groundwork recorded.
+feature: wishlist
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T07:48:20.093Z'
+last_updated: '2026-08-05T14:41:48.810Z'
+time_spent_minutes: 12
+labels:
+  - web
+  - mesonart-parity
+  - phase-f
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T14:29:44.918Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T14:41:43.027Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commits**: `1bb591c2` - feat(web): wishlist page at /wishlist · `e7da9edb` - test(e2e): wishlist, signed out end to end
+
+      **The three open questions, answered**:
+      1. **`/wishlist` top-level, not `_authed/account/wishlist`** — the feature changed under this ticket: saving no longer requires an account (#477), so an auth guard would bounce a guest to login and hide the list they had just built.
+      2. **Signed-out behaviour: it is their page too.** No sign-in prompt, no redirect. The store holds ids either way — localStorage for a guest, the account for a signed-in user — and the page hydrates them through the **public** `POST /api/products/by-ids`, so one code path serves both. Going through `/api/wishlist` would 401 every guest.
+      3. **Dangling ids stay silent.** The API already drops them and `/count` counts live products, so the badge and the list agree; a deleted product is one fewer card, not a broken one or a "2 items no longer available" notice.
+
+      **Files Changed**:
+      - `packages/web/app/routes/wishlist.tsx` — public route, beige header band, `noindex` (per-visitor content)
+      - `packages/web/app/components/wishlist/WishlistContents.tsx` — the behaviour, outside the route module so jsdom can render it
+      - `packages/web/app/components/layout/Header.tsx` — heart now points at `/wishlist` instead of `/account`; mobile menu gains a Wishlist entry
+      - `packages/web/app/routeTree.gen.ts` — regenerated
+      - `packages/web/tests/components/wishlist/WishlistContents.test.tsx` (6), `tests/routes/wishlist-page.test.ts` (5), `tests/components/layout/Header.structure.test.tsx` (+1)
+      - `tests/e2e/wishlist.spec.ts` — 6 signed-out specs
+
+      **Implementation notes**:
+      - Products are cached by id, so unsaving one card does not re-fetch the rest, and the effect keys on the *missing* ids — a dangling id never resolves, and that is what stops it looping.
+      - Requests are batched at 50; the by-ids endpoint 400s past that, which would blank the page for a long list.
+      - `ProductGrid` / `ProductCard` reused as the ticket asked; no new card.
+
+      **Verification**:
+      - Unit: `bunx vitest run tests/components tests/routes tests/stores` — 1108 passed. One pre-existing unrelated failure: `tests/routes/home-tokens.test.ts` expects `from-slate-700/80` in `app/routes/index.tsx`, removed by commit `089ffa41`; that file is untouched here.
+      - E2E: `bunx playwright test tests/e2e/wishlist.spec.ts --project=chromium --no-deps` — 6 passed. `--no-deps` because the shared `auth.setup.ts` currently fails to log in as trade/admin/content-manager, blocking every dependent project.
+      - Browser: empty state → save two → both cards render → unsave one → card drops → reload keeps the rest, no console errors; after registering, the merged account list renders on the same page.
+  - author: system
+    timestamp: '2026-08-05T14:41:43.228Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-05T14:29:45.853Z'
+    agent: claude-code
+    summary: Public /wishlist page, guest and signed-in on one code path via the public by-ids endpoint; header heart repointed; 12 unit tests + 6 E2E specs. Commits 1bb591c2, e7da9edb.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-05T14:41:48.809Z'
+    duration: '00:12:02'
+related_tickets: []
+blocked_by:
+  - ticket: 477
+    feature: wishlist
+    description: Guest wishlist persists locally and merges into the account on sign-in
+blocks: []
+attachments: []
+started: '2026-08-05T14:29:44.918Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:12:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:12:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/components tests/routes tests/stores; bunx playwright test tests/e2e/wishlist.spec.ts --project=chromium --no-deps
+  test_output: 'Unit: 1108 passed, 1 pre-existing unrelated failure (home-tokens.test.ts vs commit 089ffa41). E2E: 6 passed.'
+  build_passed: true
+  build_command: tsc --noEmit -p packages/web/tsconfig.json — 0 errors in touched files
+  verified_at: '2026-08-05T14:41:30.206Z'
+completed: '2026-08-05T14:41:43.228Z'

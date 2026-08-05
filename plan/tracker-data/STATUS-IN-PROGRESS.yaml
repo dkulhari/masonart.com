@@ -1,25 +1,10 @@
 status: in-progress
-last_updated: '2026-08-05T14:37:09.019Z'
-total_tickets: 1
+last_updated: '2026-08-05T14:41:43.478Z'
+total_tickets: 0
 summary:
   critical: 0
   high: 0
-  medium: 1
+  medium: 0
   low: 0
-priorities:
-  medium:
-    - feature: wishlist
-      tickets:
-        - ticket_number: 422
-          title: Web - wishlist page at /wishlist
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 477
-              title: Guest wishlist persists locally and merges into the account on sign-in
-blocked_tickets:
-  - ticket_number: 422
-    title: Web - wishlist page at /wishlist
-    blocked_by:
-      - ticket_number: 477
-        title: Guest wishlist persists locally and merges into the account on sign-in
-    description: Guest wishlist persists locally and merges into the account on sign-in
+priorities: {}
+blocked_tickets: []
