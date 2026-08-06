@@ -22,44 +22,16 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T08:14:23.293Z'
-last_updated: '2026-08-06T06:13:44.098Z'
+last_updated: '2026-08-06T06:06:00.360Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
 comments:
-  - author: mcp-client
-    timestamp: '2026-08-06T06:13:39.246Z'
-    text: |-
-      ✅ **Completed**
-
-      **Commits**: `e9cadeaf` feat(api): registration opt-in and post-auth auto-join from the join intent · `d60372b0` test(web): flush the Google click through act instead of waiting on it
-
-      **Files Changed**:
-      - `packages/api/src/services/gallery-membership.ts` (new) — #440's join write extracted so BOTH paths share it; the intent cookie name/value/lifetime; `hasJoinIntent`; `consumeJoinIntent`
-      - `packages/api/src/routes/gallery.ts` — delegates to `joinGallery`, response shapes unchanged
-      - `packages/api/src/auth/index.ts` — `databaseHooks.session.create.after` honours the intent
-      - `packages/web/app/lib/joinIntent.ts` (new) — the short-lived cookie, SSR-safe, names matched to the API
-      - `packages/web/app/routes/auth/register.tsx` — `parseRegisterSearch` (carries `join`/`email`/`redirect`), the opt-in checkbox, the unlock panel, email prefill
-      - tests: `packages/api/tests/routes/gallery-join-intent.test.ts`, `packages/web/tests/routes/register-join-intent.test.tsx`
-
-      **Summary**:
-      `/auth/register` validated `{ redirect }` alone, so the `?join=gallery&email=` #444 sends was stripped on arrival. `parseRegisterSearch` is hand-written rather than a Zod object because router.tsx overrides TanStack's search serialisation — everything arrives as a string, and a throw inside `validateSearch` blank-pages the route.
-
-      The opt-in is UNCHECKED by default; `?join=gallery` pre-checks it and shows what joining unlocks (no discount written down — the depth belongs to #432). The intent rides a 30-minute cookie written on arrival, so it survives the OAuth round trip and the "Sign in" link; unticking clears it. On the far side better-auth's `session.create.after` reads the cookie and joins with `joinSource: 'registration'` — session rather than user creation because email signup auto-signs-in while production requires verification first, and both end in a session. No cookie means no read and no write, so an ordinary sign-in costs nothing.
-
-      An existing member arriving with a stale intent is reported, not re-joined: `marketingConsentAt` is never re-stamped. That guarantee now lives in one routine instead of one route handler, which is what the test suite asserts directly.
-
-      **Verification**:
-      - Command: `cd packages/api && bunx vitest run tests/routes/gallery-join-intent.test.ts tests/routes/gallery.test.ts`
-      - Result: PASS (42 tests — 23 new, 19 of #440's unchanged by the extraction)
-      - Command: `cd packages/web && bunx vitest run tests/routes/register-join-intent.test.tsx tests/components/promo/JoinGalleryModal.test.tsx tests/hooks/useGalleryMembership.test.ts`
-      - Result: PASS (66 tests — 25 new, #443/#444 unaffected), 6 consecutive clean runs after the flake fix
-      - Type-check: `bunx tsc --noEmit` — 0 errors in packages/api; no new errors in packages/web (43-line pre-existing baseline untouched)
   - author: system
-    timestamp: '2026-08-06T06:13:44.098Z'
-    text: Status changed from 'todo' to 'done'
+    timestamp: '2026-08-06T05:59:42.151Z'
+    text: Status changed from 'todo' to 'in-progress'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -75,7 +47,7 @@ implementation_steps:
     file: packages/api/tests/routes/gallery-join-intent.test.ts
     command: cd packages/api && bunx vitest run tests/routes/gallery-join-intent.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       import { describe, it, expect } from 'vitest'
 
@@ -100,12 +72,12 @@ implementation_steps:
     description: Confirm the tests fail
     command: cd packages/api && bunx vitest run tests/routes/gallery-join-intent.test.ts
     expected_result: FAIL - intent is not honoured
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Honour the join intent on the post-signup path and accept the registration opt-in
     file: packages/api/src/auth/index.ts
-    status: pending
+    status: done
     code: |-
       // On the post-signup / first-session hook: read the join-intent cookie (or
       // the callback URL parameter), and if present call the same join routine the
@@ -115,7 +87,7 @@ implementation_steps:
     action: implement
     description: Add the opt-in checkbox to registration and set the intent cookie from the offer surfaces
     file: packages/web/app/routes/auth/register.tsx
-    status: pending
+    status: done
     code: |-
       // Unchecked by default. Submitting checked sets the join intent so the API
       // joins on first session with joinSource 'registration'.
@@ -125,11 +97,12 @@ implementation_steps:
     description: Confirm the tests pass
     command: cd packages/api && bunx vitest run tests/routes/gallery-join-intent.test.ts
     expected_result: PASS
-    status: done
+    status: pending
   - id: 6
     action: commit
     description: Commit the opt-in and intent handling
     command: 'git add packages/api/src/auth/index.ts packages/web/app/routes/auth/register.tsx packages/api/tests/routes/gallery-join-intent.test.ts && git commit -m "feat(auth): registration opt-in and post-auth gallery auto-join"'
-    status: done
-current_step: 1
-completed: '2026-08-06T06:13:44.098Z'
+    status: pending
+current_step: 5
+started: '2026-08-06T05:59:42.150Z'
+completed: '2026-08-06T19:20:14.000Z'
