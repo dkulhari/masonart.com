@@ -71,6 +71,13 @@
       "when": 1785994214470,
       "tag": "0009_violet_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786004310430,
+      "tag": "0010_romantic_santa_claus",
+      "breakpoints": true
     }
   ]
 }

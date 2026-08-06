@@ -45,3 +45,6 @@ export * from "./collections";
 
 // Sale promotions, their product scope and their exclusions
 export * from "./promotions";
+
+// Gift cards, their ledger, and what each card paid on an order
+export * from "./gift-cards";
