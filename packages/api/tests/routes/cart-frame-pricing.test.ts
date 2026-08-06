@@ -247,7 +247,16 @@ describe('POST /api/cart/items — framed lines', () => {
       .mockReturnValueOnce(chain([blackFrameRow()]))
       .mockReturnValueOnce(chain([cartRow()]))
       .mockReturnValueOnce(
-        chain([{ id: ITEM_ID, quantity: 1, cartId: CART_ID }])
+        chain([
+          {
+            id: ITEM_ID,
+            quantity: 1,
+            cartId: CART_ID,
+            unitPrice: '2000.00',
+            framePrice: '800.00',
+            lineTotal: '2800.00',
+          },
+        ])
       )
       .mockReturnValue(chain([{ itemCount: 2, subtotal: '5600.00' }]));
 
@@ -256,7 +265,63 @@ describe('POST /api/cart/items — framed lines', () => {
     expect(response.status).toBe(201);
     // The dedupe branch writes through `.set(...)`, not `.values(...)`, and it
     // recomputes the line total from the same frame price — 2 x 2,800.
-    expect(setCalls[0]).toMatchObject({ quantity: 2, lineTotal: '5600.00' });
+    expect(setCalls[0]).toMatchObject({
+      quantity: 2,
+      unitPrice: '2000.00',
+      framePrice: '800.00',
+      lineTotal: '5600.00',
+    });
+  });
+
+  it('prices a re-add off the row\'s own stored unit price, not a variant price that moved since', async () => {
+    // The line was added at 2,000. The catalogue has since moved the variant
+    // to 2,500. Re-adding the same product+variant+frame must price off what
+    // is on the row — the way PATCH already does at cart.ts:936 — not off the
+    // variant's current price, or the written lineTotal stops being a number
+    // its own stored unitPrice/framePrice can produce.
+    selectMock
+      .mockReturnValueOnce(chain([{ id: PRODUCT_ID, status: 'active' }]))
+      .mockReturnValueOnce(
+        chain([
+          { id: VARIANT_ID, price: '2500.00', isInStock: true, stockQuantity: 10 },
+        ])
+      )
+      .mockReturnValueOnce(chain([blackFrameRow()]))
+      .mockReturnValueOnce(chain([cartRow()]))
+      .mockReturnValueOnce(
+        chain([
+          {
+            id: ITEM_ID,
+            quantity: 1,
+            cartId: CART_ID,
+            unitPrice: '2000.00',
+            framePrice: '800.00',
+            lineTotal: '2800.00',
+          },
+        ])
+      )
+      .mockReturnValue(chain([{ itemCount: 2, subtotal: '5600.00' }]));
+
+    const response = await addItem({ frameId: FRAME_ID });
+
+    expect(response.status).toBe(201);
+    const written = setCalls[0];
+    const unitPrice = parseFloat(written.unitPrice as string);
+    const framePrice = parseFloat(written.framePrice as string);
+    const quantity = written.quantity as number;
+    // The invariant: whatever ends up on the row, lineTotal has to be
+    // reproducible from the row's own other columns.
+    expect(parseFloat(written.lineTotal as string)).toBeCloseTo(
+      (unitPrice + framePrice) * quantity
+    );
+    // Pinned: the row keeps the 2,000 + 800 it was added at, not a reprice
+    // to the 2,500 variant that's current now.
+    expect(written).toMatchObject({
+      quantity: 2,
+      unitPrice: '2000.00',
+      framePrice: '800.00',
+      lineTotal: '5600.00',
+    });
   });
 });
 

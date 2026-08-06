@@ -710,6 +710,10 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
 
     // Validate frame if provided
     let framePrice = "0.00";
+    let frameRecord: {
+      priceModifier: string | null;
+      priceAddition: string | null;
+    } | null = null;
     if (input.frameId) {
       const frame = await db
         .select({
@@ -726,6 +730,7 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
         return c.json({ error: "Frame not found or unavailable" }, 404);
       }
 
+      frameRecord = frame[0];
       framePrice = resolveFramePrice(variant[0].price, frame[0]);
     }
 
@@ -778,11 +783,22 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
     let cartItem;
 
     if (existingItems[0]) {
-      // Update quantity of existing item
+      // Update quantity of existing item.
+      //
+      // Priced off the row's own stored unit price, not the variant's
+      // current one — matching the PATCH path (cart.ts:936): the frame is a
+      // percentage OF THIS LINE, and re-reading the variant would silently
+      // reprice a line that has been sitting since the catalogue moved.
+      // Both `unitPrice` and `framePrice` are written alongside `lineTotal`
+      // so the row stays reproducible from its own stored components.
       const newQuantity = existingItems[0].quantity + input.quantity;
+      const dedupeUnitPrice = existingItems[0].unitPrice;
+      const dedupeFramePrice = frameRecord
+        ? resolveFramePrice(dedupeUnitPrice, frameRecord)
+        : "0.00";
       const lineTotal = calculateLineTotal(
-        variant[0].price,
-        framePrice,
+        dedupeUnitPrice,
+        dedupeFramePrice,
         newQuantity
       );
 
@@ -790,6 +806,8 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
         .update(cartItems)
         .set({
           quantity: newQuantity,
+          unitPrice: dedupeUnitPrice,
+          framePrice: dedupeFramePrice,
           lineTotal,
           customizations:
             (input.customizations as CartItemCustomizations) || null,
