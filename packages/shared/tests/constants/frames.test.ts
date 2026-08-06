@@ -11,6 +11,8 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  // The one frame-pricing formula
+  frameAddition,
   // Individual frame options
   POSTER_ONLY_FRAME,
   STRETCHED_CANVAS_FRAME,
@@ -1016,5 +1018,68 @@ describe('GlassOptionConfig type structure', () => {
       expect(typeof glass.hasUVProtection).toBe('boolean');
       expect(typeof glass.isAntiReflective).toBe('boolean');
     });
+  });
+});
+
+// ============================================================================
+// frameAddition — the one frame-pricing formula (#511)
+// ============================================================================
+
+/**
+ * Three surfaces have to produce the same number to the paisa: the buy panel
+ * that quotes it, `POST /api/cart/items` that stores it, and `POST /api/orders`
+ * that charges what was stored. They disagreed — the cart route read the flat
+ * `priceAddition` column, which every seeded frame sets to "0.00", so every
+ * framed line was stored at a frame price of zero and every framed order
+ * undercharged by the whole markup while the button promised the higher figure.
+ *
+ * These pin the arithmetic at its source. `packages/api/tests/routes/
+ * cart-frame-pricing.test.ts` pins that the route actually uses it.
+ */
+describe('frameAddition', () => {
+  it('takes the percentage the modifier names off the unit price', () => {
+    // "1.40" means the piece plus 40%. A 2,000 poster in that frame is 2,800.
+    expect(frameAddition(2000, { priceModifier: '1.40', priceAddition: '0.00' })).toBe(800);
+  });
+
+  it('scales with the piece rather than charging a flat fee', () => {
+    const frame = { priceModifier: '1.40', priceAddition: '0.00' };
+    expect(frameAddition(1000, frame)).toBe(400);
+    expect(frameAddition(8000, frame)).toBe(3200);
+  });
+
+  it('rounds to the rupee', () => {
+    // 2,499 at +33% is 824.67 — quoted, stored and charged as 825.
+    expect(frameAddition(2499, { priceModifier: '1.33' })).toBe(825);
+  });
+
+  it('adds any flat component on top of the percentage', () => {
+    expect(
+      frameAddition(2000, { priceModifier: '1.40', priceAddition: '150.00' })
+    ).toBe(950);
+  });
+
+  it('charges nothing for a frame that does not mark the piece up', () => {
+    expect(frameAddition(2000, { priceModifier: '1.00', priceAddition: '0.00' })).toBe(0);
+  });
+
+  it('clamps a modifier below par rather than discounting the piece', () => {
+    // Frames do not make artwork cheaper, and a bad row must not sell at a loss.
+    expect(frameAddition(2000, { priceModifier: '0.50' })).toBe(0);
+  });
+
+  it('treats a missing or unreadable modifier as no markup', () => {
+    expect(frameAddition(2000, {})).toBe(0);
+    expect(frameAddition(2000, { priceModifier: null })).toBe(0);
+    expect(frameAddition(2000, { priceModifier: 'not a number' })).toBe(0);
+  });
+
+  it('charges nothing when there is no frame', () => {
+    expect(frameAddition(2000, null)).toBe(0);
+    expect(frameAddition(2000, undefined)).toBe(0);
+  });
+
+  it('accepts already-parsed numbers as well as the decimal strings', () => {
+    expect(frameAddition(2000, { priceModifier: 1.4, priceAddition: 0 })).toBe(800);
   });
 });
