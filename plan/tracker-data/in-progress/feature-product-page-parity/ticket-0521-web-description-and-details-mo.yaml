@@ -1,0 +1,40 @@
+ticket_number: 521
+title: 'web: description and details move into a tab bar'
+description: 'Reference groups the long-form content into four tabs with an underline marking the active one: About The Artwork, Details And Customization, Shipping And Returns, Review. Ours renders flat stacked sections (Description at ProductDetail.tsx:520-528, Perfect For at :531-545) plus a separate reviews wall. Build the tab bar and route the existing content and the existing ProductReviewSection into it without breaking the #reviews anchor or the review deep links.'
+feature: product-page-parity
+type: task
+priority: high
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.356Z'
+last_updated: '2026-08-06T07:30:54.023Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - content
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.984Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:30:54.023Z'
+    text: |-
+      Built. New ProductTabs.tsx — four tabs (About The Artwork / Details And Customization / Shipping And Returns / Review) with real tablist semantics, arrow-key + Home/End navigation with wraparound, and aria-controls/labelledby wiring. 22 tests pass.
+
+      #reviews anchor: the component self-manages the hash in uncontrolled mode. On mount it checks for #reviews and opens the Review tab; a hashchange listener catches a later click on the existing buybox-reviews-link and then calls scrollIntoView itself, because the native browser jump is a no-op against a tabpanel that was not mounted at click time. The reviewPanel ReactNode is rendered as-is so ProductReviewSection keeps its own id="reviews" and data-testid="product-reviews". Caveat for the integrator: driving it in controlled mode disables the hash-sync effects by design, and the integrator then owns hash syncing.
+
+      Shipping And Returns copy sourced from our own routes, NOT from mesonart: app/routes/shipping.tsx (free over ₹999, 2-4 day production + 3-7 day delivery, tracking via /track) and app/routes/returns.tsx (30-day window from delivery, /account/orders or support@chobii.art, 48-hour damaged-item exception, 5-7 business day refunds). Tabs link out to /shipping and /returns for full text.
+
+      Details tab is driven by fields we actually have: sku, orientation, styles, subjects, primaryColor, per-variant sizeLabel, and frame name/material. Fields the reference shows that we have no column for and therefore omitted rather than invented: print medium and paper stock, print technology, item weight, care instructions, indoor/outdoor rating. Worth considering as a schema follow-up.
+
+      Knock-on for integration: tests/e2e/product-detail.spec.ts:843 and :878 assert `h2:has-text("Description")` and `h2:has-text("Perfect For")` as top-level headings. Those move inside the About tabpanel once wired.
+
+      Still needs a blind critic verdict before this is done.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:27:02.984Z'

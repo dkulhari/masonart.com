@@ -1,0 +1,27 @@
+ticket_number: 513
+title: 'web: image gallery becomes a vertical thumbnail rail beside a square main image'
+description: Reference puts 8 square 58x58 thumbnails in a vertical rail to the LEFT of a 658x658 main image, with a circular expand/fullscreen button pinned top-right of the main image and no card chrome around it. Ours wraps the image in a bordered padded card, overlays a 'Featured' badge and big circular prev/next arrows, and puts thumbnails in a row underneath. Rework ProductDetail.tsx:248-322. Keep keyboard access to prev/next.
+feature: product-page-parity
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:34.739Z'
+last_updated: '2026-08-06T07:54:19.237Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - gallery
+  - desktop
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:54:19.237Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-08-06T07:54:19.237Z'

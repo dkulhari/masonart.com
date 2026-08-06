@@ -171,9 +171,12 @@ test.describe('Product Detail - Image Gallery', () => {
 
       if (await nextButton.isVisible()) {
         await nextButton.click();
-        // Should still see the main image area
-        const mainImage = page.locator('.aspect-square');
-        await expect(mainImage).toBeVisible();
+        // Should still see the main image area. Scoped to the gallery:
+        // `.aspect-square` also matches the mega-menu category tiles and every
+        // card in the similar-artworks row, so a bare locator is a strict-mode
+        // violation rather than an assertion about this page's artwork.
+        const mainImage = page.getByTestId('pdp-gallery').locator('.aspect-square');
+        await expect(mainImage.first()).toBeVisible();
       }
     }
   });
@@ -184,11 +187,16 @@ test.describe('Product Detail - Image Gallery', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      // Thumbnails container
-      const thumbnails = page.locator('.flex.gap-2.overflow-x-auto button');
+      // The rail is now a vertical list on desktop with a stable testid, not
+      // an anonymous `.flex.gap-2.overflow-x-auto button` — that class trio no
+      // longer exists on the page, so the old locator matched nothing and this
+      // assertion passed without ever seeing a thumbnail.
+      const thumbnails = page.getByTestId('pdp-thumbnail');
       const thumbnailCount = await thumbnails.count();
-      // May or may not have thumbnails
-      expect(thumbnailCount).toBeGreaterThanOrEqual(0);
+      // Single-image products legitimately render no rail at all.
+      if (thumbnailCount > 0) {
+        await expect(thumbnails.first()).toBeVisible();
+      }
     }
   });
 
@@ -198,10 +206,14 @@ test.describe('Product Detail - Image Gallery', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const selectedThumbnail = page.locator('.flex.gap-2 button.border-brand-500');
-      const selectedCount = await selectedThumbnail.count();
-      // May have a selected thumbnail
-      expect(selectedCount).toBeGreaterThanOrEqual(0);
+      // Selection is `aria-current="true"` plus a `border-foreground` ring;
+      // `.border-brand-500` was the old style and matches nothing now.
+      const thumbnails = page.getByTestId('pdp-thumbnail');
+      if ((await thumbnails.count()) > 0) {
+        const selected = page.locator('[data-testid="pdp-thumbnail"][aria-current="true"]');
+        await expect(selected).toHaveCount(1);
+        await expect(thumbnails.first()).toHaveAttribute('aria-current', 'true');
+      }
     }
   });
 
@@ -211,39 +223,43 @@ test.describe('Product Detail - Image Gallery', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const thumbnails = page.locator('.flex.gap-2.overflow-x-auto button');
+      // The rail is interactive, so this one has to wait for hydration — a
+      // click landing on server HTML changes nothing.
+      await page.waitForLoadState('networkidle');
+      const thumbnails = page.getByTestId('pdp-thumbnail');
       const thumbnailCount = await thumbnails.count();
 
       if (thumbnailCount > 1) {
         await thumbnails.nth(1).click();
-        // The second thumbnail should now be selected
-        const selectedThumbnail = page.locator('.flex.gap-2 button.border-brand-500');
-        await expect(selectedThumbnail).toBeVisible();
+        // Selection moves with the click: the second thumbnail becomes the
+        // current one and the first stops being it.
+        await expect(thumbnails.nth(1)).toHaveAttribute('aria-current', 'true');
+        await expect(thumbnails.first()).not.toHaveAttribute('aria-current', 'true');
       }
     }
   });
 
-  test('should display Featured badge on featured products', async ({ page }) => {
+  // Removed: 'should display Featured badge on featured products'. The
+  // Featured overlay no longer exists anywhere on the PDP — the reference
+  // paints no chrome over the artwork, so the badge was deleted rather than
+  // restyled (#513). There is no new shape to retarget to.
+
+  test('should disclose AI generation on AI products', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const featuredBadge = page.locator('.bg-brand-500:has-text("Featured")');
-      const badgeCount = await featuredBadge.count();
-      expect(badgeCount).toBeGreaterThanOrEqual(0);
-    }
-  });
-
-  test('should display AI Generated badge on AI products', async ({ page }) => {
-    const productLinks = page.locator('a[href^="/posters/"]');
-    const count = await productLinks.count();
-
-    if (count > 0) {
-      await productLinks.first().click();
-      const aiBadge = page.locator('.bg-purple-500:has-text("AI Generated")');
-      const badgeCount = await aiBadge.count();
-      expect(badgeCount).toBeGreaterThanOrEqual(0);
+      // The disclosure moved off the image and into the buy panel's byline
+      // as plain text (`.bg-purple-500` overlay is gone). Still optional:
+      // only AI-generated posters carry it.
+      const aiDisclosure = page
+        .getByTestId('buy-panel')
+        .locator('text=AI Generated');
+      const disclosureCount = await aiDisclosure.count();
+      if (disclosureCount > 0) {
+        await expect(aiDisclosure.first()).toBeVisible();
+      }
     }
   });
 });
@@ -268,18 +284,11 @@ test.describe('Product Detail - Product Information', () => {
     }
   });
 
-  test('should display style tags if available', async ({ page }) => {
-    const productLinks = page.locator('a[href^="/posters/"]');
-    const count = await productLinks.count();
-
-    if (count > 0) {
-      await productLinks.first().click();
-      // Style tags are optional
-      const styleTags = page.locator('.rounded-full.bg-muted.px-2\\.5.text-xs.capitalize');
-      const tagCount = await styleTags.count();
-      expect(tagCount).toBeGreaterThanOrEqual(0);
-    }
-  });
+  // Removed: 'should display style tags if available'. The style chips that
+  // sat above the H1 are gone — the reference has nothing between the social
+  // proof row and the title (#514). Styles are still surfaced, but as a
+  // `Style` row in the Details And Customization tab, which is asserted by the
+  // tab tests below rather than by a chip selector.
 
   test('should display artist name if available', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
@@ -313,8 +322,10 @@ test.describe('Product Detail - Product Information', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const sku = page.locator('text=/SKU: /');
-      await expect(sku).toBeVisible();
+      // The SKU is no longer its own `SKU: FIX-001` line — it is inline in the
+      // H1 as `<title> #FIX-001` (parity reference, "H1").
+      const sku = page.locator('h1 >> text=/#\\S+/');
+      await expect(sku.first()).toBeVisible();
     }
   });
 });
@@ -334,7 +345,9 @@ test.describe('Product Detail - Price Display', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const priceSection = page.locator('.rounded-lg.border.border-border.bg-muted\\/30.p-4');
+      // The grey rounded price card is gone (#514) — the price is now a bare
+      // red figure, printed by SalePrice with a stable testid.
+      const priceSection = page.getByTestId('buy-panel').getByTestId('price-current');
       await expect(priceSection.first()).toBeVisible();
     }
   });
@@ -377,8 +390,11 @@ test.describe('Product Detail - Size Selector', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const sizeSection = page.locator('text=Select Size');
-      await expect(sizeSection).toBeVisible();
+      // The "Select Size" heading above a stack of size cards is gone: the
+      // selector is one native <select> whose accessible name is `Size`
+      // (#515), with `Select a Size` as its placeholder option.
+      const sizeSelect = page.locator('select[aria-label="Size"]');
+      await expect(sizeSelect).toBeVisible();
     }
   });
 
@@ -388,10 +404,12 @@ test.describe('Product Detail - Size Selector', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      // Size options should be present
-      const sizeOptions = page.locator('[data-size-option], .rounded-lg.border');
+      // Options live inside the <select>, not as separate cards. One of them
+      // is the disabled `Select a Size` placeholder, so a real product has
+      // more than one.
+      const sizeOptions = page.locator('select[aria-label="Size"]').locator('option');
       const optionCount = await sizeOptions.count();
-      expect(optionCount).toBeGreaterThan(0);
+      expect(optionCount).toBeGreaterThan(1);
     }
   });
 
@@ -401,10 +419,10 @@ test.describe('Product Detail - Size Selector', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      // Selected size has different styling
-      const selectedSize = page.locator('.border-brand-500');
-      const selectedCount = await selectedSize.count();
-      expect(selectedCount).toBeGreaterThanOrEqual(0);
+      // Default selection is now the <select>'s value, not a
+      // `.border-brand-500` card. It must not be the empty placeholder.
+      const selected = await page.locator('select[aria-label="Size"]').inputValue();
+      expect(selected).not.toBe('');
     }
   });
 
@@ -415,19 +433,33 @@ test.describe('Product Detail - Size Selector', () => {
     if (count > 0) {
       await productLinks.first().click();
 
-      // Get initial price
-      const priceElement = page.locator('.text-3xl.font-bold').first();
-      const initialPrice = await priceElement.textContent();
+      // `.text-3xl.font-bold` never matched the price (it was font-medium even
+      // before this redesign) — the live figure is `price-current` in the buy
+      // panel.
+      const priceElement = page
+        .getByTestId('buy-panel')
+        .getByTestId('price-current')
+        .first();
+      await expect(priceElement).toBeVisible();
 
-      // Click a different size if available
-      const sizeOptions = page.locator('[data-size-option], button:has(.text-sm.font-medium)');
-      const optionCount = await sizeOptions.count();
+      const sizeSelect = page.locator('select[aria-label="Size"]');
+      const values = await sizeSelect
+        .locator('option:not([disabled])')
+        .evaluateAll((options) =>
+          options.map((option) => (option as HTMLOptionElement).value)
+        );
 
-      if (optionCount > 1) {
-        await sizeOptions.nth(1).click();
-        // Price may change (or may be the same)
-        const newPrice = await priceElement.textContent();
-        expect(newPrice).toBeTruthy();
+      if (values.length > 1) {
+        const current = await sizeSelect.inputValue();
+        const next = values.find((value) => value !== current);
+        if (next) {
+          await sizeSelect.selectOption(next);
+          await expect(sizeSelect).toHaveValue(next);
+          // The price may be the same across sizes; what matters is that the
+          // panel still prints one.
+          await expect(priceElement).toBeVisible();
+          expect(await priceElement.textContent()).toBeTruthy();
+        }
       }
     }
   });
@@ -438,10 +470,14 @@ test.describe('Product Detail - Size Selector', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      // Size dimensions with x notation
-      const dimensions = page.locator('text=/\\d+.*x.*\\d+/');
-      const dimensionCount = await dimensions.count();
-      expect(dimensionCount).toBeGreaterThan(0);
+      // Option labels carry inches and cm in one string, e.g.
+      // `24"H x 20"W/ 61H x 51W CM`.
+      const labels = await page
+        .getByLabel('Size')
+        .locator('option:not([value=""])')
+        .allTextContents();
+      expect(labels.length).toBeGreaterThan(0);
+      expect(labels.some((label) => /\d+.*x.*\d+/i.test(label))).toBe(true);
     }
   });
 
@@ -451,10 +487,15 @@ test.describe('Product Detail - Size Selector', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      // Out of stock sizes may have opacity or line-through
-      const unavailableSizes = page.locator('.line-through, .opacity-50');
-      const unavailableCount = await unavailableSizes.count();
-      expect(unavailableCount).toBeGreaterThanOrEqual(0);
+      // Out-of-stock variants are `disabled` options tagged "Out of stock",
+      // not line-through cards. Optional: a fully stocked product has none.
+      const disabledOptions = page
+        .getByLabel('Size')
+        .locator('option[disabled]:not([value=""])');
+      const disabledCount = await disabledOptions.count();
+      if (disabledCount > 0) {
+        expect(await disabledOptions.first().textContent()).toContain('Out of stock');
+      }
     }
   });
 });
@@ -512,20 +553,27 @@ test.describe('Product Detail - Frame Selector', () => {
 
     if (count > 0) {
       await productLinks.first().click();
+      await page.waitForLoadState('networkidle');
 
-      // Get initial price
-      const priceElement = page.locator('.text-3xl.font-bold').first();
-      const initialPrice = await priceElement.textContent();
+      // `.text-3xl.font-bold` never matched anything here — the price was
+      // `font-medium` even before the redesign, so this locator timed out
+      // rather than reading a price. The live figure is `price-current`.
+      const priceElement = page
+        .getByTestId('buy-panel')
+        .getByTestId('price-current')
+        .first();
+      await expect(priceElement).toBeVisible();
 
-      // Click a frame option if available
+      // Click a frame option if available. The swatches print no price, but
+      // their accessible name still carries the modifier.
       const frameOptions = page.locator('button:has-text("+₹")');
       const frameCount = await frameOptions.count();
 
       if (frameCount > 0) {
         await frameOptions.first().click();
         // Price should update to include frame
-        const newPrice = await priceElement.textContent();
-        expect(newPrice).toBeTruthy();
+        await expect(priceElement).toBeVisible();
+        expect(await priceElement.textContent()).toBeTruthy();
       }
     }
   });
@@ -701,15 +749,18 @@ test.describe('Product Detail - Add to Cart', () => {
     }
   });
 
-  test('should display cart icon in button', async ({ page }) => {
+  test('should carry the price in the button label', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
+      // The CTA is text-only now — no ShoppingCart glyph (#518). What it does
+      // carry instead is the price, `Add to cart - ₹21,200`, which is the
+      // thing the reference button is distinguished by.
       const addToCartButton = page.locator('button:has-text("Add to Cart")');
-      const cartIcon = addToCartButton.locator('svg');
-      await expect(cartIcon).toBeVisible();
+      await expect(addToCartButton.locator('svg')).toHaveCount(0);
+      await expect(addToCartButton).toHaveText(/Add to cart - ₹[\d,]+/);
     }
   });
 
@@ -743,19 +794,26 @@ test.describe('Product Detail - Action Buttons', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const wishlistButton = page.locator('button[aria-label="Add to wishlist"]');
+      // Scoped to the buy panel: every card in the similar-artworks row below
+      // carries the identical label, so a page-wide locator is ambiguous.
+      const wishlistButton = page
+        .getByTestId('buy-panel')
+        .locator('button[aria-label="Add to wishlist"]');
       await expect(wishlistButton).toBeVisible();
     }
   });
 
-  test('should display share button', async ({ page }) => {
+  test('should display share row', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const shareButton = page.locator('button[aria-label="Share product"]');
-      await expect(shareButton).toBeVisible();
+      // The old `aria-label="Share product"` button had no onClick at all. It
+      // is now a row of real share controls (#520) — the native/Web Share
+      // trigger is labelled `Share`, with a copy-link button beside it.
+      await expect(page.locator('button[aria-label="Share"]')).toBeVisible();
+      await expect(page.locator('button[aria-label="Copy link"]')).toBeVisible();
     }
   });
 });
@@ -764,40 +822,51 @@ test.describe('Product Detail - Action Buttons', () => {
 // Trust Badges Tests
 // ============================================================================
 
-test.describe('Product Detail - Trust Badges', () => {
+test.describe('Product Detail - Trust List', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/posters');
   });
 
-  test('should display Free Shipping badge', async ({ page }) => {
+  // The three centred badges became four stacked rows (#519). Same claims,
+  // new copy — every assertion below is retargeted to the wording TrustList
+  // actually renders, scoped to the buy panel so the footer's own shipping
+  // copy cannot answer for it.
+
+  test('should display the free shipping row', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const freeShipping = page.locator('text=Free Shipping');
+      const freeShipping = page
+        .getByTestId('buy-panel')
+        .locator('text=Free Shipping Over ₹999');
       await expect(freeShipping).toBeVisible();
     }
   });
 
-  test('should display Secure Payment badge', async ({ page }) => {
+  test('should display the payment safety row', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const securePayment = page.locator('text=Secure Payment');
-      await expect(securePayment).toBeVisible();
+      // Was "Secure Payment / 100% Protected"; now "Safe Payment Options"
+      // with the real Razorpay sub-line.
+      const payment = page.getByTestId('buy-panel').locator('text=Safe Payment Options');
+      await expect(payment).toBeVisible();
     }
   });
 
-  test('should display Easy Returns badge', async ({ page }) => {
+  test('should display the returns row', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const easyReturns = page.locator('text=Easy Returns');
+      const easyReturns = page
+        .getByTestId('buy-panel')
+        .locator('text=30 Days Easy Returns');
       await expect(easyReturns).toBeVisible();
     }
   });
@@ -808,8 +877,10 @@ test.describe('Product Detail - Trust Badges', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const shippingThreshold = page.locator('text=Orders over ₹999');
-      await expect(shippingThreshold).toBeVisible();
+      const shippingThreshold = page
+        .getByTestId('buy-panel')
+        .locator('text=orders over ₹999');
+      await expect(shippingThreshold.first()).toBeVisible();
     }
   });
 
@@ -819,8 +890,35 @@ test.describe('Product Detail - Trust Badges', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const returnPolicy = page.locator('text=30-day policy');
-      await expect(returnPolicy).toBeVisible();
+      // "30-day policy" became the row title "30 Days Easy Returns"; the
+      // window is still stated on the page, which is what this test is for.
+      const returnPolicy = page.getByTestId('buy-panel').locator('text=/30 Days/i');
+      await expect(returnPolicy.first()).toBeVisible();
+    }
+  });
+
+  test('should display the made-to-order row', async ({ page }) => {
+    const productLinks = page.locator('a[href^="/posters/"]');
+    const count = await productLinks.count();
+
+    if (count > 0) {
+      await productLinks.first().click();
+      // The fourth row, which the old three-badge strip had no equivalent for.
+      const madeToOrder = page.getByTestId('buy-panel').locator('text=Made Just For You');
+      await expect(madeToOrder).toBeVisible();
+    }
+  });
+
+  test('should display the delivery estimate line', async ({ page }) => {
+    const productLinks = page.locator('a[href^="/posters/"]');
+    const count = await productLinks.count();
+
+    if (count > 0) {
+      await productLinks.first().click();
+      // #517 — under the frame swatches, above the CTA.
+      const delivery = page.getByTestId('buy-panel').locator('text=Arrives soon!');
+      await expect(delivery).toBeVisible();
+      await expect(delivery).toContainText('if you order today');
     }
   });
 });
@@ -834,16 +932,20 @@ test.describe('Product Detail - Description', () => {
     await page.goto('/posters');
   });
 
-  test('should display Description section', async ({ page }) => {
+  // Description is no longer a top-level `<h2>Description</h2>` section in the
+  // buy column — it is the body of the "About The Artwork" tabpanel (#521),
+  // which is the tab the page opens on.
+
+  test('should display Description in the About tab', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const descriptionHeader = page.locator('h2:has-text("Description")');
-      const headerCount = await descriptionHeader.count();
-      // Description is optional
-      expect(headerCount).toBeGreaterThanOrEqual(0);
+      const aboutTab = page.getByRole('tab', { name: 'About The Artwork' });
+      await expect(aboutTab).toBeVisible();
+      // Open by default.
+      await expect(aboutTab).toHaveAttribute('aria-selected', 'true');
     }
   });
 
@@ -853,9 +955,13 @@ test.describe('Product Detail - Description', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const descriptionContent = page.locator('.prose.prose-sm');
+      const panel = page.getByRole('tabpanel');
+      const descriptionContent = panel.locator('.prose.prose-sm');
       const contentCount = await descriptionContent.count();
+      // Description is optional per-product; when present it is inside the
+      // panel, not loose in the buy column.
       expect(contentCount).toBeGreaterThanOrEqual(0);
+      await expect(page.getByTestId('buy-panel').locator('.prose.prose-sm')).toHaveCount(0);
     }
   });
 });
@@ -869,16 +975,21 @@ test.describe('Product Detail - Room Suggestions', () => {
     await page.goto('/posters');
   });
 
-  test('should display Perfect For section when room suggestions available', async ({ page }) => {
+  test('should display Perfect For inside the About tab when available', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const perfectFor = page.locator('h2:has-text("Perfect For")');
+      // Demoted from a page-level `<h2>` to an `<h3>` inside the About
+      // tabpanel — still optional, since not every poster carries rooms.
+      const perfectFor = page.getByRole('tabpanel').locator('h3:has-text("Perfect For")');
       const perfectForCount = await perfectFor.count();
-      // Room suggestions are optional
       expect(perfectForCount).toBeGreaterThanOrEqual(0);
+      // What must NOT still be true: a second copy left behind in the buy panel.
+      await expect(
+        page.getByTestId('buy-panel').locator(':text("Perfect For")')
+      ).toHaveCount(0);
     }
   });
 
@@ -888,14 +999,117 @@ test.describe('Product Detail - Room Suggestions', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const perfectFor = page.locator('h2:has-text("Perfect For")');
+      const panel = page.getByRole('tabpanel');
+      const perfectFor = panel.locator('h3:has-text("Perfect For")');
       const perfectForCount = await perfectFor.count();
 
       if (perfectForCount > 0) {
-        const roomTags = page.locator('.rounded-full.border.border-border.bg-background.px-3');
+        const roomTags = panel.locator('.rounded-full.border.border-border.bg-background.px-3');
         const tagCount = await roomTags.count();
         expect(tagCount).toBeGreaterThan(0);
       }
+    }
+  });
+});
+
+// ============================================================================
+// Product Tabs Tests (#521)
+// ============================================================================
+
+test.describe('Product Detail - Tabs', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/posters');
+  });
+
+  test('should display all four tabs', async ({ page }) => {
+    const productLinks = page.locator('a[href^="/posters/"]');
+    const count = await productLinks.count();
+
+    if (count > 0) {
+      await productLinks.first().click();
+      const tablist = page.getByRole('tablist', { name: 'Product details' });
+      await expect(tablist).toBeVisible();
+      await expect(tablist.getByRole('tab')).toHaveCount(4);
+      for (const label of [
+        'About The Artwork',
+        'Details And Customization',
+        'Shipping And Returns',
+        'Review',
+      ]) {
+        await expect(tablist.getByRole('tab', { name: label })).toBeVisible();
+      }
+    }
+  });
+
+  test('should show the spec table on the Details tab', async ({ page }) => {
+    const productLinks = page.locator('a[href^="/posters/"]');
+    const count = await productLinks.count();
+
+    if (count > 0) {
+      await productLinks.first().click();
+      // Tabs are client state: wait for hydration or the click is a no-op.
+      await page.waitForLoadState('networkidle');
+      await page.getByRole('tab', { name: 'Details And Customization' }).click();
+      const panel = page.getByRole('tabpanel');
+      await expect(panel.locator('dt:has-text("SKU")')).toBeVisible();
+      await expect(panel.locator('dt:has-text("Orientation")')).toBeVisible();
+    }
+  });
+
+  test('should show policy copy on the Shipping tab', async ({ page }) => {
+    const productLinks = page.locator('a[href^="/posters/"]');
+    const count = await productLinks.count();
+
+    if (count > 0) {
+      await productLinks.first().click();
+      await page.waitForLoadState('networkidle');
+      await page.getByRole('tab', { name: 'Shipping And Returns' }).click();
+      const panel = page.getByRole('tabpanel');
+      await expect(panel.locator('h3:has-text("Shipping")')).toBeVisible();
+      await expect(panel.locator('h3:has-text("Returns")')).toBeVisible();
+    }
+  });
+
+  test('should reach the review wall from the buybox reviews link', async ({ page }) => {
+    const productLinks = page.locator('a[href^="/posters/"]');
+    const count = await productLinks.count();
+
+    if (count > 0) {
+      await productLinks.first().click();
+      await page.waitForLoadState('networkidle');
+
+      const reviewsLink = page.getByTestId('buybox-reviews-link');
+      // Only rated posters carry the link at all.
+      if ((await reviewsLink.count()) === 0) return;
+
+      // Before the click the review wall is behind an unselected tab.
+      await expect(page.getByTestId('product-reviews')).toHaveCount(0);
+
+      await reviewsLink.click();
+
+      await expect(page.getByRole('tab', { name: 'Review' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      await expect(page.getByTestId('product-reviews')).toBeVisible();
+      await expect(page.getByTestId('product-reviews')).toHaveAttribute('id', 'reviews');
+    }
+  });
+
+  test('should open on the Review tab when loaded with a #reviews hash', async ({ page }) => {
+    const productLinks = page.locator('a[href^="/posters/"]');
+    const count = await productLinks.count();
+
+    if (count > 0) {
+      const href = await productLinks.first().getAttribute('href');
+      if (!href) return;
+      await page.goto(`${href}#reviews`);
+
+      await expect(page.getByRole('tab', { name: 'Review' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      await expect(page.getByTestId('product-reviews')).toBeVisible();
     }
   });
 });
@@ -909,25 +1123,52 @@ test.describe('Product Detail - Related Products', () => {
     await page.goto('/posters');
   });
 
-  test('should display You May Also Like section', async ({ page }) => {
+  test('should display Visually Similar Artworks section', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const relatedSection = page.locator('h2:has-text("You May Also Like")');
+      // "You May Also Like" is now "Visually Similar Artworks" (#522).
+      const relatedSection = page.locator('h2:has-text("Visually Similar Artworks")');
       await expect(relatedSection).toBeVisible();
     }
   });
 
-  test('should display related products grid', async ({ page }) => {
+  test('should display the related products carousel', async ({ page }) => {
     const productLinks = page.locator('a[href^="/posters/"]');
     const count = await productLinks.count();
 
     if (count > 0) {
       await productLinks.first().click();
-      const relatedGrid = page.locator('.grid.grid-cols-2.gap-4');
-      await expect(relatedGrid.last()).toBeVisible();
+      // A scroll track with prev/next arrows, not `.grid.grid-cols-2.gap-4`.
+      const track = page.locator('ul:has(> [data-testid="product-card"])').last();
+      await expect(track).toBeVisible();
+      await expect(
+        page.locator('button[aria-label="Next Visually Similar Artworks item"]')
+      ).toBeVisible();
+      await expect(track.getByTestId('product-card').first()).toBeVisible();
+    }
+  });
+
+  test('should sit above the tab bar', async ({ page }) => {
+    const productLinks = page.locator('a[href^="/posters/"]');
+    const count = await productLinks.count();
+
+    if (count > 0) {
+      await productLinks.first().click();
+      // Reference order below the buy panel: carousel first, then the tabs.
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('h2:has-text("Visually Similar Artworks")')).toBeVisible();
+      const carouselBox = await page
+        .locator('h2:has-text("Visually Similar Artworks")')
+        .boundingBox();
+      const tablistBox = await page
+        .getByRole('tablist', { name: 'Product details' })
+        .boundingBox();
+      expect(carouselBox).not.toBeNull();
+      expect(tablistBox).not.toBeNull();
+      expect(carouselBox!.y).toBeLessThan(tablistBox!.y);
     }
   });
 });
@@ -1162,9 +1403,17 @@ test.describe('Product Detail - Responsive Design', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      // Grid should stack on mobile
-      const mainGrid = page.locator('.grid.gap-8.lg\\:grid-cols-2');
-      await expect(mainGrid.first()).toBeVisible();
+      // The symmetric `lg:grid-cols-2` grid no longer exists — the columns are
+      // an asymmetric `728px / 485px` pair (#512). Stacking is asserted on the
+      // real thing: on a 375px viewport the gallery sits above the buy panel.
+      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('pdp-gallery')).toBeVisible();
+      await expect(page.getByTestId('buy-panel')).toBeVisible();
+      const galleryBox = await page.getByTestId('pdp-gallery').boundingBox();
+      const panelBox = await page.getByTestId('buy-panel').boundingBox();
+      expect(galleryBox).not.toBeNull();
+      expect(panelBox).not.toBeNull();
+      expect(panelBox!.y).toBeGreaterThan(galleryBox!.y);
     }
   });
 
@@ -1191,8 +1440,19 @@ test.describe('Product Detail - Responsive Design', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const mainGrid = page.locator('.grid.gap-8.lg\\:grid-cols-2');
-      await expect(mainGrid.first()).toBeVisible();
+      // Same as above: the two columns are asymmetric now, so "two column" is
+      // asserted geometrically — the buy panel sits beside the gallery, not
+      // under it, and is the narrower of the pair. The waits matter: a
+      // bounding box read before layout settles is a coin flip.
+      await page.waitForLoadState('networkidle');
+      await expect(page.getByTestId('pdp-gallery')).toBeVisible();
+      await expect(page.getByTestId('buy-panel')).toBeVisible();
+      const galleryBox = await page.getByTestId('pdp-gallery').boundingBox();
+      const panelBox = await page.getByTestId('buy-panel').boundingBox();
+      expect(galleryBox).not.toBeNull();
+      expect(panelBox).not.toBeNull();
+      expect(panelBox!.x).toBeGreaterThan(galleryBox!.x + galleryBox!.width - 1);
+      expect(panelBox!.width).toBeLessThan(galleryBox!.width);
     }
   });
 
@@ -1205,12 +1465,12 @@ test.describe('Product Detail - Responsive Design', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const mainImage = page.locator('.aspect-square');
+      const mainImage = page.getByTestId('pdp-gallery').locator('.aspect-square');
       await expect(mainImage.first()).toBeVisible();
     }
   });
 
-  test('should adjust trust badges layout on mobile', async ({ page }) => {
+  test('should keep the trust list readable on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/posters');
 
@@ -1219,9 +1479,21 @@ test.describe('Product Detail - Responsive Design', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const trustBadges = page.locator('.grid.grid-cols-3');
-      const badgesCount = await trustBadges.count();
-      expect(badgesCount).toBeGreaterThan(0);
+      // The `.grid.grid-cols-3` badge strip is gone; the trust list is four
+      // stacked rows at every width, so "adjusts on mobile" is now "all four
+      // rows are still there and still stacked".
+      const panel = page.getByTestId('buy-panel');
+      for (const title of [
+        'Made Just For You',
+        'Free Shipping Over ₹999',
+        '30 Days Easy Returns',
+        'Safe Payment Options',
+      ]) {
+        await expect(panel.locator(`text=${title}`)).toBeVisible();
+      }
+      const first = await panel.locator('text=Made Just For You').boundingBox();
+      const second = await panel.locator('text=Free Shipping Over ₹999').boundingBox();
+      expect(second!.y).toBeGreaterThan(first!.y);
     }
   });
 });
@@ -1268,8 +1540,14 @@ test.describe('Product Detail - Accessibility', () => {
 
     if (count > 0) {
       await productLinks.first().click();
-      const wishlistButton = page.locator('button[aria-label="Add to wishlist"]');
-      const shareButton = page.locator('button[aria-label="Share product"]');
+      // Scoped for the same reason as above — the related row repeats the label.
+      const wishlistButton = page
+        .getByTestId('buy-panel')
+        .locator('button[aria-label="Add to wishlist"]');
+      // The dead `Share product` button was replaced by ShareRow, whose
+      // triggers are labelled per destination (`Share`, `Share on Facebook`,
+      // `Copy link`, …).
+      const shareButton = page.locator('button[aria-label="Share"]');
 
       await expect(wishlistButton).toBeVisible();
       await expect(shareButton).toBeVisible();

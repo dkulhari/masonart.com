@@ -65,10 +65,11 @@
  * The grid leg depends on `ProductCard`'s sale integration. If that is ever
  * reverted, only `grid cards print the struck sale price` fails; the PDP,
  * strip, nav and `/sale` legs stand on their own. That test deliberately reads
- * the "You May Also Like" row and not `/posters` or `/sale`: those two routes
- * rebuild `ProductCardData` field by field and neither mapper copies `sale`,
- * so their cards print base prices mid-sale. `/sale` is still asserted to list
- * exactly the right *products* — only its per-card pricing is out of reach.
+ * the "Visually Similar Artworks" row and not `/posters` or `/sale`: those
+ * two routes rebuild `ProductCardData` field by field and neither mapper
+ * copies `sale`, so their cards print base prices mid-sale. `/sale` is still
+ * asserted to list exactly the right *products* — only its per-card pricing
+ * is out of reach.
  */
 
 import { test, expect, request as playwrightRequest, type Page } from '@playwright/test'
@@ -378,7 +379,7 @@ test.describe('with a promotion running', () => {
 
   test('grid cards print the struck sale price', async ({ page }) => {
     /**
-     * Grid coverage rides on the "You May Also Like" row rather than on
+     * Grid coverage rides on the "Visually Similar Artworks" row rather than on
      * `/posters` or `/sale`.
      *
      * `ProductCard` renders a sale through `SalePrice` the moment its data
@@ -404,7 +405,9 @@ test.describe('with a promotion running', () => {
     await page.setViewportSize(DESKTOP)
     await page.goto(`/posters/${discounted.slug}`, { waitUntil: 'networkidle' })
 
-    const row = page.locator('section:has(h2:text-is("You May Also Like"))')
+    // The related row is headed "Visually Similar Artworks" since #522 — it
+    // was "You May Also Like" before the PDP parity work.
+    const row = page.locator('section:has(h2:text-is("Visually Similar Artworks"))')
     await expect(row.getByTestId('product-card').first()).toBeVisible()
 
     // Exactly the cards the API discounts, no more and no fewer.

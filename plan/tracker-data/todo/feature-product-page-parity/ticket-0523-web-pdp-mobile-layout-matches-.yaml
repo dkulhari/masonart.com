@@ -1,0 +1,23 @@
+ticket_number: 523
+title: 'web: PDP mobile layout matches the reference at 390px'
+description: At 390px the reference gives the main image a rounded card with ~16px side padding, moves the thumbnails to a horizontal scroll strip of ~72px squares directly beneath it, keeps the expand button pinned top-right, then stacks the social-proof line, H1 and sold-count line. Bring our PDP to that at 390x844, and keep the desktop result from regressing.
+feature: product-page-parity
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.487Z'
+last_updated: '2026-08-06T07:21:35.487Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - mobile
+  - responsive
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -2,12 +2,21 @@
  * FrameSelector Component
  *
  * Allows users to select a frame option for their poster.
- * Displays frame previews, materials, and price modifiers.
  *
- * Following patterns from docs/poster-app-tech-stack.md
+ * PARITY WITH THE PDP (#516): mesonart's frame axis is
+ * "Rolled Canvas/Frameless/Framed" — a label line reading
+ * `<group>:  <selected value>` — followed by circular photographic swatches,
+ * ~92px, wrapping onto rows as needed. No price is printed on a swatch; the
+ * price still has to reach the cart, so `calculateFramePrice` /
+ * `formatPriceModifier` stay exported and unchanged, just not rendered here.
+ *
+ * This mirrors the swatch ChooseOptions.tsx already built for the Quickview
+ * panel (#420) — same ring treatment, same "real photo, or draw one" rule —
+ * because it is the same frame data and the same measured pattern, just on
+ * the full product page instead of the grid's modal.
  */
 
-import { Check, Info } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
 
 // ============================================================================
@@ -68,9 +77,13 @@ export function calculateFramePrice(
 }
 
 /**
- * Format the price modifier for display
+ * Format the price modifier for display.
+ *
+ * Not rendered on the swatch itself (the measured spec carries no price
+ * there), but kept exported: it still backs the accessible name announced to
+ * screen readers, and other call sites price the same modifier the same way.
  */
-function formatPriceModifier(
+export function formatPriceModifier(
   basePrice: number,
   modifierType: 'percentage' | 'fixed',
   modifierValue: number
@@ -81,6 +94,48 @@ function formatPriceModifier(
 
   const addition = calculateFramePrice(basePrice, modifierType, modifierValue)
   return `+${formatPrice(addition)}`
+}
+
+/**
+ * Whether a frame image is worth putting on a swatch.
+ *
+ * Seed data has shipped placehold.co placards in the past ("Black+Frame" on
+ * a grey square) — worse on a circular swatch than the drawn fallback. Real
+ * photography under `/frames/*` always passes.
+ */
+function usableFrameImage(imageUrl?: string): string | null {
+  if (!imageUrl) return null
+  return /placehold\.co|placeholder/i.test(imageUrl) ? null : imageUrl
+}
+
+/**
+ * Which rung of the format axis a frame type belongs to.
+ *
+ * `rolled` and `frameless` are formats, not mouldings (see
+ * packages/api/.../schema/products.ts) — everything else is a moulding
+ * around the stretched canvas, so it folds into "Framed".
+ */
+function frameCategoryLabel(type: string): string {
+  if (type === 'rolled') return 'Rolled Canvas'
+  if (type === 'frameless') return 'Frameless'
+  return 'Framed'
+}
+
+/**
+ * Collapses the flat frame list into mesonart's axis label —
+ * "Rolled Canvas/Frameless/Framed" — in the order each category first
+ * appears, deduplicated. Degrades gracefully for any other catalogue: a
+ * frame list that is all mouldings just reads "Framed".
+ */
+function frameGroupLabel(frames: FrameOptionData[]): string {
+  const categories: string[] = []
+  for (const frame of frames) {
+    const label = frameCategoryLabel(frame.type)
+    if (!categories.includes(label)) {
+      categories.push(label)
+    }
+  }
+  return categories.join('/')
 }
 
 // ============================================================================
@@ -116,21 +171,28 @@ export function FrameSelector({
     )
   }
 
+  const selectedFrame =
+    availableFrames.find((f) => f.id === selectedFrameId) ?? null
+
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground">Select Frame</h3>
-        <button
-          type="button"
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          aria-label="Frame information"
-        >
-          <Info className="h-3 w-3" />
-          Frame guide
-        </button>
-      </div>
+      {/* Their label/value pair: group name, colon, then the chosen option —
+       * "Rolled Canvas/Frameless/Framed:  Rolled Canvas". The value sits
+       * outside any <label>/<select> pairing here since the swatches below
+       * are buttons, not a native control. */}
+      <p
+        data-testid="frame-selector-label"
+        className="flex flex-wrap items-center gap-2 text-sm text-foreground"
+      >
+        <span>{frameGroupLabel(availableFrames)}:</span>
+        <span data-testid="frame-selector-value" className="font-medium">
+          {selectedFrame?.name ?? 'None'}
+        </span>
+      </p>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      {/* Circular photographic swatches, wrapping onto as many rows as the
+       * option count needs — 92px, matching the measured spec. */}
+      <div className="flex flex-wrap gap-4">
         {availableFrames.map((frame) => {
           const isSelected = frame.id === selectedFrameId
           const priceDisplay = formatPriceModifier(
@@ -171,82 +233,62 @@ function FrameOptionCard({
   priceDisplay,
   onClick,
 }: FrameOptionCardProps) {
-  // Get background color based on frame type for preview
   const previewBgColor = getFramePreviewColor(frame.type)
+  const photo = usableFrameImage(frame.imageUrl)
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        'relative flex gap-3 rounded-lg border p-3 text-left transition-all',
-        isSelected
-          ? 'border-primary bg-accent ring-1 ring-primary'
-          : 'border-border bg-card hover:border-foreground/30 hover:bg-muted/50'
-      )}
-      aria-label={`Select ${frame.name}`}
       aria-pressed={isSelected}
+      className={cn(
+        'group/frame relative grid h-[92px] w-[92px] shrink-0 place-items-center rounded-full',
+        'bg-background transition-shadow',
+        'ring-2 ring-offset-2 ring-offset-background',
+        // Selected gets a solid dark ring, the rest a light grey one — but the
+        // ring alone is not the whole selection story, see the check badge
+        // below: colour is never the only cue.
+        isSelected
+          ? 'ring-foreground'
+          : 'ring-border hover:ring-foreground/40',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+      )}
     >
-      {/* Frame Preview */}
-      <div
-        className={cn(
-          'flex h-12 w-12 shrink-0 items-center justify-center rounded',
-          previewBgColor
-        )}
-        aria-hidden="true"
-      >
-        {frame.imageUrl ? (
-          <img
-            src={frame.imageUrl}
-            alt=""
-            className="h-full w-full rounded object-cover"
-          />
-        ) : (
-          <div className="h-8 w-8 rounded border-2 border-current opacity-60" />
-        )}
-      </div>
+      {/* The button's accessible name. Screen readers still hear the price
+       * even though the swatch itself never prints one. */}
+      <span className="sr-only">
+        {frame.name} — {priceDisplay}
+      </span>
 
-      {/* Frame Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <span className={cn(
-              'block text-sm font-medium leading-tight',
-              isSelected ? 'text-foreground' : 'text-foreground'
-            )}>
-              {frame.name}
-            </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
-              {frame.description}
-            </span>
-          </div>
-
-          {/* Selection Indicator */}
-          {isSelected && (
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <Check className="h-3 w-3" />
-            </div>
+      {photo ? (
+        <img
+          src={photo}
+          alt=""
+          aria-hidden="true"
+          className="h-full w-full rounded-full object-cover"
+        />
+      ) : (
+        <div
+          className={cn(
+            'flex h-full w-full items-center justify-center rounded-full',
+            previewBgColor
           )}
+          aria-hidden="true"
+        >
+          <div className="h-9 w-9 rounded border-2 border-current opacity-60" />
         </div>
+      )}
 
-        {/* Price & Material */}
-        <div className="mt-1 flex items-center gap-2">
-          <span className={cn(
-            'text-xs font-semibold',
-            isSelected ? 'text-foreground' : 'text-foreground'
-          )}>
-            {priceDisplay}
-          </span>
-          {frame.material && (
-            <>
-              <span className="text-muted-foreground">•</span>
-              <span className="text-xs text-muted-foreground truncate">
-                {frame.material}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Non-colour selection cue — a ring colour alone fails for anyone who
+       * can't distinguish "dark" from "light grey" by hue. */}
+      {isSelected && (
+        <span
+          aria-hidden="true"
+          className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-foreground text-background"
+        >
+          <Check className="h-3.5 w-3.5" />
+        </span>
+      )}
     </button>
   )
 }
@@ -256,7 +298,13 @@ function FrameOptionCard({
 // ============================================================================
 
 /**
- * Get preview background color based on frame type
+ * Get preview background color based on frame type.
+ *
+ * Two taxonomies land here: the legacy `-frame` suffixed keys from
+ * `packages/shared`'s FrameType, and the `frame_type` enum actually seeded
+ * today (`rolled`, `frameless`, `black`, `white`, `wood`, `gold`, `silver` —
+ * see packages/api/.../schema/products.ts). Both stay mapped so the fallback
+ * swatch is never just grey for a real catalogue row.
  */
 function getFramePreviewColor(frameType: string): string {
   const colorMap: Record<string, string> = {
@@ -269,6 +317,13 @@ function getFramePreviewColor(frameType: string): string {
     'gold-frame': 'bg-yellow-500 text-yellow-950',
     'silver-frame': 'bg-zinc-300 text-zinc-700',
     'floating-frame': 'bg-zinc-800 text-zinc-200',
+    rolled: 'bg-amber-50 text-amber-900',
+    frameless: 'bg-background border text-foreground',
+    black: 'bg-zinc-900 text-zinc-100',
+    white: 'bg-white border text-zinc-800',
+    wood: 'bg-amber-800 text-amber-100',
+    gold: 'bg-yellow-500 text-yellow-950',
+    silver: 'bg-zinc-300 text-zinc-700',
   }
 
   return colorMap[frameType] || 'bg-muted'
@@ -319,23 +374,13 @@ export function FrameSelectorCompact({
 export function FrameSelectorSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn('space-y-3 animate-pulse', className)}>
-      <div className="flex items-center justify-between">
-        <div className="h-4 w-24 rounded bg-muted" />
-        <div className="h-3 w-20 rounded bg-muted" />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="h-4 w-48 rounded bg-muted" />
+      <div className="flex flex-wrap gap-4">
+        {[1, 2, 3, 4, 5, 6, 7].map((i) => (
           <div
             key={i}
-            className="flex gap-3 rounded-lg border border-border bg-card p-3"
-          >
-            <div className="h-12 w-12 shrink-0 rounded bg-muted" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-20 rounded bg-muted" />
-              <div className="h-3 w-full rounded bg-muted" />
-              <div className="h-3 w-16 rounded bg-muted" />
-            </div>
-          </div>
+            className="h-[92px] w-[92px] shrink-0 rounded-full bg-muted"
+          />
         ))}
       </div>
     </div>

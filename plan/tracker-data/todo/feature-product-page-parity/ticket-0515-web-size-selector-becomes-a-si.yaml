@@ -1,0 +1,34 @@
+ticket_number: 515
+title: 'web: size selector becomes a single 52px dropdown instead of a stacked price list'
+description: 'Reference uses one native-styled `<select>`: height 52px, radius 6px, background rgba(23,23,23,0.024), padding 0 26px, Poppins 16px/300, full column width, placeholder first option ''Select a Size'', option labels carrying both units — `24\"H x 20\"W/ 61H x 51W CM` — and no prices. Ours renders every variant as a full-width card with its own price, which fills the whole viewport. Rework SizeSelector.tsx. Preserve the existing selection callback contract, availability/out-of-stock handling and aria semantics, and either wire up or remove the dead inches/cm toggle at SizeSelector.tsx:98.'
+feature: product-page-parity
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:34.966Z'
+last_updated: '2026-08-06T07:29:02.255Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - selectors
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T07:29:02.254Z'
+    text: |-
+      Built. SizeSelector.tsx rewritten as a single native <select>; live computed styles match the measured reference exactly (height 52px, radius 6px, bg rgba(23,23,23,0.024), padding 0 26px, Poppins 16px/300). Placeholder option "Select a Size"; option labels carry both units and no price, e.g. `16"H x 12"W/ 41H x 30W CM`. Out-of-stock variants stay listed but disabled. The dead inches/cm toggle was removed rather than wired up — the label now always carries both units, so the toggle had nothing to switch.
+
+      New test file: 21 tests. `bunx vitest run tests/components/product/` → 297 passed.
+
+      Two knock-ons for integration, NOT fixed here (outside this ticket's file ownership):
+      - The control renders 676px wide because the buy column is still the old symmetric grid. #512 owns that.
+      - `tests/e2e/product-detail.spec.ts:380` and `tests/e2e/flows/catalog.spec.ts:242` both assert `text=Select Size`, which no longer exists. The control's accessible name is now `aria-label="Size"` on the select. Those selectors must be updated deliberately.
+
+      Still needs a blind critic verdict before this is done.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

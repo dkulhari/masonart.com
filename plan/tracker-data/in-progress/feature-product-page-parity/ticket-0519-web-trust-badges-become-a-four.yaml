@@ -1,0 +1,41 @@
+ticket_number: 519
+title: 'web: trust badges become a four-row list with sub-lines'
+description: 'Reference stacks four rows under the buy button, each an icon, a bold title with a small `?` tooltip circle, and a muted sub-line: Ship After You Are Satisfied / Each piece is made just for you!; Free Shipping on All Orders / 5-7 days fast free shipping worldwide; 30 Days Easy Returns / Learn more.; Safe Payment Options / 100% money back guarantee. Ours has three inline badges in a row (ProductDetail.tsx:501-517). Copy has to stay truthful to our actual shipping and returns policy rather than being copied verbatim.'
+feature: product-page-parity
+type: task
+priority: medium
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.288Z'
+last_updated: '2026-08-06T07:32:12.948Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - buy-panel
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.971Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:32:12.948Z'
+    text: |-
+      Built. New TrustList.tsx — four rows, icon + bold title + `?` tooltip + muted sub-line.
+
+      Copy is CORRECTED against our real policy, not copied from the reference. Every claim cited:
+      - "Made Just For You" / "Every piece is printed to order — production takes 2-4 business days" (app/routes/shipping.tsx). The reference's "Ship After You Are Satisfied" maps to our photo-approval workflow, but packages/api/src/services/approval.ts shows that only fires for isAiGenerated order items, not the whole catalogue — so it is a tooltip aside, not a blanket headline claim.
+      - "Free Shipping Over ₹999" / "Free on orders over ₹999 — smaller orders see the cost at checkout" (app/routes/shipping.tsx). Deliberately NOT the reference's "on All Orders", which is false for us.
+      - "30 Days Easy Returns" with a real Learn more. link to /returns (app/routes/returns.tsx).
+      - "Safe Payment Options" / "Secure checkout via Razorpay — cards, UPI, netbanking & wallets" (app/routes/faq.tsx).
+      Corroboration: Footer.tsx's existing USP strip had independently made the same corrections, which confirms the reading.
+
+      The `?` is a real button with aria-describedby/aria-expanded, opening on hover, focus or click (click covers touch) and closing on blur, second click or Escape. 6 dedicated tests.
+
+      Still needs a blind critic verdict before this is done.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:27:02.971Z'

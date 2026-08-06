@@ -1,14 +1,24 @@
 /**
  * SizeSelector Component
  *
- * Allows users to select a product size variant with visual feedback.
- * Displays dimensions, prices, and availability status for each size option.
+ * A single native `<select>` for choosing a product's size variant (#515).
+ *
+ * mesonart's control is one dropdown, not a stacked list of bordered price
+ * cards: 52px tall, 6px radius, a barely-there `rgba(23,23,23,0.024)` fill,
+ * `0 26px` padding, and options that read `24"H x 20"W/ 61H x 51W CM` — both
+ * units folded into one string, no price. A native `<select>` gets keyboard
+ * navigation and screen-reader semantics for free, so this reaches for one
+ * rather than building a custom listbox.
+ *
+ * There used to be an inches/cm toggle here with a no-op `onClick`. It is
+ * gone rather than wired up: the option label now always carries both units,
+ * so there is nothing left for a toggle to switch between.
  *
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { Check } from 'lucide-react'
-import { cn, formatPrice, formatDimension } from '~/lib/utils'
+import type { ChangeEvent } from 'react'
+import { cn } from '~/lib/utils'
 
 // ============================================================================
 // Types
@@ -42,12 +52,27 @@ export interface SizeSelectorProps {
   selectedVariantId: string | null
   /** Callback when a variant is selected */
   onVariantSelect: (variant: SizeVariant) => void
-  /** Display unit preference */
-  displayUnit?: 'inches' | 'cm'
-  /** Whether to show out of stock variants */
+  /** Whether to show out of stock variants (disabled, not omitted) */
   showOutOfStock?: boolean
   /** Optional className for styling */
   className?: string
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const isOutOfStock = (variant: SizeVariant): boolean =>
+  !variant.isAvailable || variant.stockQuantity === 0
+
+/**
+ * `24"H x 20"W/ 61H x 51W CM` — mesonart's option label. Height first on
+ * both sides of the slash, inches then centimetres, no price.
+ */
+function sizeOptionLabel(variant: SizeVariant): string {
+  const heightCm = Math.round(variant.heightInches * 2.54)
+  const widthCm = Math.round(variant.widthInches * 2.54)
+  return `${variant.heightInches}"H x ${variant.widthInches}"W/ ${heightCm}H x ${widthCm}W CM`
 }
 
 // ============================================================================
@@ -55,7 +80,7 @@ export interface SizeSelectorProps {
 // ============================================================================
 
 /**
- * SizeSelector - Displays available sizes for product selection
+ * SizeSelector - a single dropdown listing the product's size variants.
  *
  * @example
  * <SizeSelector
@@ -68,11 +93,9 @@ export function SizeSelector({
   variants,
   selectedVariantId,
   onVariantSelect,
-  displayUnit = 'inches',
   showOutOfStock = true,
   className,
 }: SizeSelectorProps) {
-  // Filter variants if not showing out of stock
   const displayedVariants = showOutOfStock
     ? variants
     : variants.filter((v) => v.isAvailable)
@@ -85,82 +108,36 @@ export function SizeSelector({
     )
   }
 
+  const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const next = displayedVariants.find((v) => v.id === event.target.value)
+    if (next) onVariantSelect(next)
+  }
+
   return (
-    <div className={cn('space-y-3', className)}>
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground">Select Size</h3>
-        <button
-          type="button"
-          className="text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => {
-            // Toggle between inches and cm - this would typically be managed by parent
-          }}
-        >
-          {displayUnit === 'inches' ? 'Show in cm' : 'Show in inches'}
-        </button>
-      </div>
-
-      <div className="grid gap-2">
-        {displayedVariants.map((variant) => {
-          const isSelected = variant.id === selectedVariantId
-          const isOutOfStock = !variant.isAvailable || variant.stockQuantity === 0
-          const price = typeof variant.price === 'string'
-            ? parseFloat(variant.price)
-            : variant.price
-
-          return (
-            <button
-              key={variant.id}
-              type="button"
-              onClick={() => !isOutOfStock && onVariantSelect(variant)}
-              disabled={isOutOfStock}
-              className={cn(
-                'relative flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-all',
-                isSelected
-                  ? 'border-primary bg-accent ring-1 ring-primary'
-                  : 'border-border bg-card hover:border-foreground/30 hover:bg-muted/50',
-                isOutOfStock && 'cursor-not-allowed opacity-50'
-              )}
-              aria-label={`Select size ${formatDimension(variant.widthInches, variant.heightInches, displayUnit)}`}
-              aria-pressed={isSelected}
-            >
-              {/* Size Info */}
-              <div className="flex flex-col">
-                <span className={cn(
-                  'text-sm font-medium',
-                  isSelected ? 'text-foreground' : 'text-foreground'
-                )}>
-                  {formatDimension(variant.widthInches, variant.heightInches, displayUnit)}
-                </span>
-                {variant.sizeLabel && variant.sizeLabel !== formatDimension(variant.widthInches, variant.heightInches, displayUnit) && (
-                  <span className="text-xs text-muted-foreground">
-                    {variant.sizeLabel}
-                  </span>
-                )}
-                {isOutOfStock && (
-                  <span className="text-xs text-destructive">Out of stock</span>
-                )}
-              </div>
-
-              {/* Price */}
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  'text-sm font-semibold',
-                  isSelected ? 'text-foreground' : 'text-foreground'
-                )}>
-                  {formatPrice(price)}
-                </span>
-                {isSelected && (
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <Check className="h-3 w-3" />
-                  </div>
-                )}
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </div>
+    <select
+      aria-label="Size"
+      value={selectedVariantId ?? ''}
+      onChange={handleChange}
+      className={cn(
+        'h-[52px] w-full rounded-md border-none bg-foreground/[0.024] px-[26px]',
+        'font-sans text-base font-light text-foreground outline-none',
+        'focus-visible:ring-2 focus-visible:ring-ring',
+        className
+      )}
+    >
+      <option value="" disabled>
+        Select a Size
+      </option>
+      {displayedVariants.map((variant) => {
+        const outOfStock = isOutOfStock(variant)
+        return (
+          <option key={variant.id} value={variant.id} disabled={outOfStock}>
+            {sizeOptionLabel(variant)}
+            {outOfStock ? ' — Out of stock' : ''}
+          </option>
+        )
+      })}
+    </select>
   )
 }
 
@@ -171,7 +148,6 @@ export function SizeSelectorCompact({
   variants,
   selectedVariantId,
   onVariantSelect,
-  displayUnit = 'inches',
   className,
 }: Omit<SizeSelectorProps, 'showOutOfStock'>) {
   const availableVariants = variants.filter((v) => v.isAvailable)
@@ -188,6 +164,7 @@ export function SizeSelectorCompact({
               key={variant.id}
               type="button"
               onClick={() => onVariantSelect(variant)}
+              aria-pressed={isSelected}
               className={cn(
                 'rounded-md border px-3 py-1.5 text-sm transition-all',
                 isSelected
@@ -195,7 +172,7 @@ export function SizeSelectorCompact({
                   : 'border-border bg-background hover:border-foreground/30'
               )}
             >
-              {formatDimension(variant.widthInches, variant.heightInches, displayUnit)}
+              {variant.widthInches}&quot; x {variant.heightInches}&quot;
             </button>
           )
         })}
@@ -206,29 +183,17 @@ export function SizeSelectorCompact({
 
 /**
  * Size selector skeleton for loading states
+ *
+ * Shaped like the real control now: one 52px bar, not three stacked cards.
  */
 export function SizeSelectorSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('space-y-3 animate-pulse', className)}>
-      <div className="flex items-center justify-between">
-        <div className="h-4 w-20 rounded bg-muted" />
-        <div className="h-3 w-16 rounded bg-muted" />
-      </div>
-      <div className="grid gap-2">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3"
-          >
-            <div className="space-y-1">
-              <div className="h-4 w-24 rounded bg-muted" />
-              <div className="h-3 w-16 rounded bg-muted" />
-            </div>
-            <div className="h-4 w-16 rounded bg-muted" />
-          </div>
-        ))}
-      </div>
-    </div>
+    <div
+      className={cn(
+        'h-[52px] w-full animate-pulse rounded-md bg-muted',
+        className
+      )}
+    />
   )
 }
 

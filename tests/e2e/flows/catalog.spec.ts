@@ -238,8 +238,10 @@ test.describe('Catalog Flow - Browse and View Products', () => {
       await expect(page).toHaveURL(firstProductUrl!);
       await expect(page.locator('h1')).toBeVisible();
 
-      // Should see product details
-      await expect(page.locator('text=Select Size')).toBeVisible();
+      // Should see product details. The "Select Size" heading is gone — the
+      // size picker is one native <select> whose accessible name is `Size`
+      // (#515).
+      await expect(page.locator('select[aria-label="Size"]')).toBeVisible();
       await expect(page.locator('button:has-text("Add to Cart")')).toBeVisible();
     }
   });

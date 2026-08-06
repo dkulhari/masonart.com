@@ -1,0 +1,38 @@
+ticket_number: 522
+title: 'web: related products become a Visually Similar Artworks carousel'
+description: Reference shows 'Visually Similar Artworks' as a horizontal carousel with circular prev/next arrows and 5 visible cards, each image + title + 'from Rs. X' + '#SKU'. Ours is a static 'You May Also Like' grid (routes/posters/$slug.tsx:527-540) using ProductGrid. Build the carousel, keep it keyboard and screen-reader navigable.
+feature: product-page-parity
+type: task
+priority: high
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.466Z'
+last_updated: '2026-08-06T07:29:07.463Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - related
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.995Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:29:07.463Z'
+    text: |-
+      Built. New ProductCarousel.tsx — heading taken as a prop so it serves both "Visually Similar Artworks" and "More to Love". Reuses the existing ProductCard rather than reimplementing a card; 2 cards visible at mobile, 3 at sm, 5 at lg against a 20px gap track.
+
+      Accessibility: arrows are real buttons carrying the heading in their accessible name (so two carousels on one page stay distinguishable), and they use the `disabled` attribute at true start/end rather than dead-clicking. The track itself is a tab stop with its own ArrowLeft/ArrowRight handler, since native horizontal-scroll-on-focus is inconsistent across browsers. prefers-reduced-motion is handled both in the programmatic scrollBy behaviour and via motion-reduce:scroll-auto for wheel scrolling.
+
+      No new dependency — built on the repo's existing scroll-snap utilities and buttonVariants, following the DiscoverChips rail pattern.
+
+      19 tests pass. tsc clean for this file.
+
+      Not yet wired into routes/posters/$slug.tsx — the integrator replaces RelatedProductsSection. Still needs a blind critic verdict before this is done.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:27:02.995Z'

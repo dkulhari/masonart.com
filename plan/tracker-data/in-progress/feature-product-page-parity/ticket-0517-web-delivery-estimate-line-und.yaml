@@ -1,0 +1,38 @@
+ticket_number: 517
+title: 'web: delivery estimate line under the selectors'
+description: 'Reference shows one line beneath the frame swatches: a check glyph then ''Arrives soon! Get it by **Aug 13-Aug 21** if you order today'', date range bold, surrounding text muted. We have no equivalent. Add it, deriving the window from the current date plus the existing shipping lead time rather than hardcoding dates.'
+feature: product-page-parity
+type: task
+priority: medium
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.135Z'
+last_updated: '2026-08-06T07:32:17.957Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - buy-panel
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.934Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:32:17.957Z'
+    text: |-
+      Built. New DeliveryEstimate.tsx — check glyph, "Arrives soon! Get it by <bold range> if you order today".
+
+      No exported lead-time constant existed. The real figure lives as prose, duplicated in app/routes/shipping.tsx and app/routes/faq.tsx: production 2-4 business days, delivery a further 3-7. That gives DEFAULT_LEAD_TIME_DAYS = { min: 5, max: 11 }, exposed as an overridable prop rather than hardcoded dates. The window is computed from the current date with Sat/Sun skipping, reusing the same business-day algorithm ShippingSelector.tsx already uses. An injectable `now` prop keeps the tests deterministic.
+
+      Date formatting uses en-US rather than the site's usual en-IN, because the reference format is month-first ("Aug 13") and en-IN renders "13 Aug". Worth a second look at integration — en-IN may be the more correct choice for our actual customers even though it diverges from the reference.
+
+      Worth noting as a follow-up: the lead time being prose in two route files rather than one exported constant means it can drift. A shared constant would be the better home.
+
+      Still needs a blind critic verdict before this is done.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:27:02.934Z'

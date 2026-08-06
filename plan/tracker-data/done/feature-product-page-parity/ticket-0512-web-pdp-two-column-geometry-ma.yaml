@@ -1,0 +1,39 @@
+ticket_number: 512
+title: 'web: PDP two-column geometry matches the reference (727px gallery / 485px buy panel)'
+description: 'Our PDP grid is a symmetric `607px 607px` at a 1302px container. The reference splits it asymmetrically: thumbnail rail at x=21 w=58, main image at x=90 w=658 (square), buy panel at x=796 w=485. Rework the `grid lg:grid-cols-2` in ProductDetail.tsx:244 to that asymmetry and set the vertical rhythm of the sections beneath to match. Judged blind at 1440x900 against the reference.'
+feature: product-page-parity
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:34.667Z'
+last_updated: '2026-08-06T07:54:18.920Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - layout
+  - desktop
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T07:52:47.620Z'
+    text: |-
+      ROUND 1 BLIND VERDICT: ours won, "CLOSE: no".
+
+      The hero pair (1440x900, scroll 0) was captured with labels stripped and the order coin-flipped; the critic had fresh context and never saw the key. It picked ours. Its criticisms all landed on the reference: the reference's buy panel is entirely absent from the first screen (a Klarna card, a tariff line, a countdown and a promo tile sit between the price and where the size control should be), its header eats roughly the top third of the viewport, and its red "99 saves / In 11 carts now" badges "read as dropshipping-template urgency and undercut the impression that the business will actually ship a large framed artwork."
+
+      That last point independently validates the call made in #514 to omit the social-proof counters rather than fabricate them.
+
+      Measured geometry: buy panel x=796 w=485 against the reference's x=796 w=485; zero horizontal document overflow at 390/768/1024/1440.
+
+      A second critic with a distinct credibility lens is running to confirm before this is marked done — one verdict is thin evidence for closing four tickets.
+  - author: system
+    timestamp: '2026-08-06T07:54:18.924Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-08-06T07:54:18.920Z'

@@ -22,8 +22,17 @@ import { test, expect } from '@playwright/test';
 // ============================================================================
 
 /**
- * Navigate to a product detail page via the listing page
- * Returns the product URL if a product was found
+ * Navigate to a product detail page via the listing page, with the review
+ * wall open.
+ *
+ * The wall is no longer a section stacked below the buy panel — it is the
+ * "Review" tabpanel of ProductTabs (#521), so it is only in the DOM while that
+ * tab is selected. Landing on `#reviews` is how the rest of the site reaches
+ * it (the buy box's rating link does exactly this), and ProductTabs opens on
+ * the Review tab for that hash. Every assertion below is unchanged; only the
+ * way the wall is reached is.
+ *
+ * Returns the product URL if a product was found.
  */
 async function navigateToProductPage(page: typeof test.page): Promise<string | null> {
   await page.goto('/posters');
@@ -37,7 +46,7 @@ async function navigateToProductPage(page: typeof test.page): Promise<string | n
   if (count > 0) {
     const href = await productLinks.first().getAttribute('href');
     if (href && href !== '/posters') {
-      await page.goto(href);
+      await page.goto(`${href}#reviews`);
       return href;
     }
   }
@@ -666,11 +675,23 @@ test.describe('Reviews Section - Loading States', () => {
     const responsePromise = page.waitForResponse(resp =>
       resp.url().includes('/reviews') || resp.url().includes(href)
     );
-    await page.goto(href);
+    // `#reviews` so the review tabpanel is the one mounted — see the helper
+    // at the top of this file.
+    await page.goto(`${href}#reviews`);
 
-    // Either skeleton or loaded content should be visible
+    // Either skeleton or loaded content should be visible.
+    //
+    // Read after a settle rather than in the same tick as the navigation: the
+    // wall is a tabpanel now (#521), and the tab that mounts it is opened by
+    // an effect, so an instant read races hydration and sees neither the
+    // skeleton nor the section. The assertion is unchanged — one of the two
+    // must show up.
     const skeleton = page.locator('[class*="skeleton"], [class*="animate-pulse"]');
-    const reviewsSection = page.locator('#reviews, section:has-text("Customer Reviews")');
+    const reviewsSection = page.locator('#reviews');
+
+    await page
+      .waitForSelector('#reviews, [class*="animate-pulse"]', { timeout: 10000 })
+      .catch(() => null);
 
     const hasSkeleton = await skeleton.first().isVisible().catch(() => false);
     const hasSection = await reviewsSection.isVisible().catch(() => false);

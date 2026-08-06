@@ -9,7 +9,8 @@ import { createFileRoute, notFound } from '@tanstack/react-router'
 import { productsApi, toFeaturedProducts } from '~/lib/api'
 import { mainImage, type ProductImage } from '@chobii/shared'
 import type { ProductCardData } from '~/components/product/ProductCard'
-import { ProductGrid } from '~/components/product/ProductGrid'
+import { ProductCarousel } from '~/components/product/ProductCarousel'
+import { ProductTabs } from '~/components/product/ProductTabs'
 import {
   ProductDetail,
   ProductDetailSkeleton,
@@ -351,18 +352,46 @@ function ProductPage() {
       {/* Main Product Detail */}
       <ProductDetail product={product} />
 
-      {/* ONE review surface, not two. mesonart runs the same Loox grid here
-          that it runs on /reviews, filtered to this poster — photos, clips and
-          prose in a single masonry, never a media wall stacked on a list. The
-          aggregate is the one the loader already fetched. */}
-      <ProductReviewSection
-        productId={product.id}
-        averageRating={product.rating?.averageRating ?? null}
-        reviewCount={product.rating?.reviewCount ?? null}
-      />
-
-      {/* Related Products Section (placeholder) */}
+      {/* Below the buy panel the reference runs the similar-artworks carousel
+          FIRST and the tab bar after it (docs/design/pdp-parity-reference.md,
+          "Below the buy panel, in order"). */}
       <RelatedProductsSection products={related} />
+
+      {/* The long-form content, behind one tab bar.
+       *
+       * UNCONTROLLED on purpose: ProductTabs only self-manages the `#reviews`
+       * hash while it owns its own selection (see its file header). The buy
+       * panel's `buybox-reviews-link` is a plain `href="#reviews"` anchor, so
+       * taking `activeTabId` here would move hash-syncing onto this route for
+       * no gain.
+       *
+       * `<ProductReviewSection>` is handed through as the review panel
+       * unwrapped and unrenamed — it keeps its own `id="reviews"` and
+       * `data-testid="product-reviews"`, which is exactly what that anchor and
+       * the tabs' scroll-into-view both aim at. ONE review surface still, not
+       * two: it simply lives behind the Review tab now. */}
+      <div className="container-wide pb-16">
+        <ProductTabs
+          descriptionHtml={product.description}
+          roomSuggestions={product.roomSuggestions}
+          spec={{
+            sku: product.sku,
+            orientation: product.orientation,
+            styles: product.styles,
+            subjects: product.subjects,
+            primaryColor: product.primaryColor,
+            variants: product.variants,
+            frames: product.frames,
+          }}
+          reviewPanel={
+            <ProductReviewSection
+              productId={product.id}
+              averageRating={product.rating?.averageRating ?? null}
+              reviewCount={product.rating?.reviewCount ?? null}
+            />
+          }
+        />
+      </div>
     </>
   )
 }
@@ -521,8 +550,15 @@ function ProductJsonLd({ product }: { product: ProductDetailData }) {
  * state to render — previously this section showed five permanently pulsing
  * skeletons because it was a placeholder that never got implemented (#352).
  *
- * Renders nothing when there is nothing to recommend, rather than an empty
- * shell.
+ * A horizontal carousel now, not a grid, and headed "Visually Similar
+ * Artworks" rather than "You May Also Like" (#522, parity reference "Below the
+ * buy panel"). The cards are the same `ProductCard`s the grid rendered, so
+ * sale pricing on this row is unchanged — `toFeaturedProducts` still passes
+ * the API's `sale` block straight through.
+ *
+ * ProductCarousel renders nothing for an empty list on its own; the `<section>`
+ * wrapper is kept out of the way for the same reason, so an empty related row
+ * leaves no bordered strip behind.
  */
 function RelatedProductsSection({ products }: { products: ProductCardData[] }) {
   if (products.length === 0) {
@@ -532,8 +568,7 @@ function RelatedProductsSection({ products }: { products: ProductCardData[] }) {
   return (
     <section className="border-t border-border bg-muted/30">
       <div className="container-wide py-12">
-        <h2 className="mb-6 text-xl text-foreground">You May Also Like</h2>
-        <ProductGrid products={products} />
+        <ProductCarousel heading="Visually Similar Artworks" products={products} />
       </div>
     </section>
   )

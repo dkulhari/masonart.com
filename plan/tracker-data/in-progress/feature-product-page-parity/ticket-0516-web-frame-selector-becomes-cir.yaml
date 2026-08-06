@@ -1,0 +1,40 @@
+ticket_number: 516
+title: 'web: frame selector becomes circular photographic swatches with a selected-value label'
+description: 'Reference shows frame options as ~92px circular swatches with a photographic corner crop of the material, wrapping across rows, selected one ringed in solid dark and the rest in light grey, no prices on the swatches, under a label of the form `<group>:  <selected value>` (e.g. ''Rolled Canvas/Frameless/Framed:  Rolled Canvas''). Ours is a two-column grid of text cards. Rework FrameSelector.tsx. Keep calculateFramePrice and the deselect-on-reclick behaviour; frame price still has to reach the total.'
+feature: product-page-parity
+type: task
+priority: high
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.020Z'
+last_updated: '2026-08-06T07:31:48.139Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - selectors
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.916Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:31:48.139Z'
+    text: |-
+      Built. FrameSelector.tsx rewritten as 92px circular swatches in a wrapping flex row, under a label line of the form "<group>:  <selected>" derived by folding each frame's type into Rolled Canvas / Frameless / Framed. 20 new tests pass; verified live at 1440px — 7 seeded frames wrap to a second row.
+
+      Selection indicator is a solid dark ring PLUS a check badge, since ring colour alone is not an accessible cue. aria-pressed toggles; each swatch's accessible name is the frame name, with the price carried in an sr-only span so screen readers still get it even though nothing is printed visually.
+
+      Real frame photos used via object-cover with the getFramePreviewColor swatch as fallback, and placehold.co/placeholder URLs filtered out so a placeholder placard never reaches a swatch — same convention ChooseOptions.tsx already used. getFramePreviewColor's colour map was extended to cover the real seeded frame_type enum values (rolled, frameless, black, white, wood, gold, silver) alongside the legacy -frame-suffixed keys, so the fallback is not just grey for the frames actually in the database.
+
+      calculateFramePrice unchanged and still exported; formatPriceModifier now exported too. Deselect-on-reclick preserved. The old "Select Frame" heading and "Frame guide" button were removed — no counterpart in the measured reference, replaced by the label line.
+
+      Harness bug this surfaced and I have now fixed in scripts/pdp-shot.mjs: our own JoinGalleryModal carries role="dialog" with no class matching the overlay sweep, so captures of our page could have been screenshots of a modal. The sweep now also covers [role=dialog], [role=alertdialog] and testid-based modal/toast nodes. Verified: zero visible dialogs in a fresh capture.
+
+      Still needs a blind critic verdict before this is done.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:27:02.916Z'

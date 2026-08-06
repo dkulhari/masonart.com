@@ -1,0 +1,41 @@
+ticket_number: 514
+title: 'web: buy panel header — 42px H1 with inline SKU, red 24px price, no price card'
+description: 'Reference: H1 Urbanist 42px/300 rgb(29,29,29) with the SKU inline in the title; price Poppins 24px/500 in red rgb(187,0,0) with no card, border or background. Ours: 30px H1, style-chip pills above it, a star-rating row, a separate ''SKU: FIX-001'' line, and the price inside a grey rounded panel at 36px black. Rework ProductDetail.tsx:330-420. Keep the reviews anchor link working (buybox-reviews-link) and keep SalePrice as the price component.'
+feature: product-page-parity
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:34.921Z'
+last_updated: '2026-08-06T07:54:19.571Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - buy-panel
+  - typography
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:54:19.571Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:54:25.773Z'
+    text: |-
+      ROUND 1 CONFIRMED — two independent blind critics, different lenses, both picked ours, both "CLOSE: no".
+
+      Critic 2 (credibility lens, fresh context, never saw the key) on the reference: "a panel whose loudest elements are a cart-count, a units-sold ticker, and a second copy of the same countdown reads as a conversion template rather than a gallery that will crate and ship the piece properly."
+
+      It also noted the reference's own H1 is set large enough that "# PAC347" orphans onto a second line, burning ~85px of the buy column. Ours fits "#FIX-001" inline on one line at the same measured 42px, so we match the reference's type spec without inheriting its wrapping defect.
+
+      Both critics independently praised the "Price varies by size and frame selection" line as making the headline number honest, and both marked the reference's unqualified red price down for not saying whether it is the price or a starting price. Keeping that line — it is a deliberate divergence from the reference and it is winning.
+
+      Decision on the social-proof counters is now settled and evidence-backed: omitting them was correct. ProductDetail.layout.test.tsx asserts the strings "saves" / "carts now" / "sold in last" do not appear, so they cannot creep back in hardcoded.
+
+      NOTE ON TICKET NUMBERING: this comment was originally filed by the MCP tool onto feature-gift-cards ticket #514, because the tracker has duplicate ticket numbers — a concurrent session created gift-cards #511-515 from the same counter. Removed from there and placed here by hand. Ticket numbers are NOT unique in this tracker; address tickets in this feature by file path, not number alone.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-08-06T07:54:19.571Z'

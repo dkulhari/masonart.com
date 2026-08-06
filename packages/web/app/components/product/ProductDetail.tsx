@@ -4,27 +4,43 @@
  * Main product detail display with image gallery, size/frame selectors,
  * pricing, and add-to-cart functionality.
  *
- * Following patterns from docs/poster-app-tech-stack.md
+ * ## Geometry (#512)
+ *
+ * The two columns are deliberately ASYMMETRIC and deliberately not fluid.
+ * Measured off the reference at 1440 (docs/design/pdp-parity-reference.md):
+ * thumbnail rail 58px, 12px gutter, 658px square image — a 728px gallery
+ * block — then a 48px gap, then a 485px buy column that starts at x=796.
+ * A symmetric `lg:grid-cols-2` cannot produce that at any gap, which is why
+ * the tracks carry the measured maxima instead.
+ *
+ * `minmax(0, …)` rather than a flat `728px 485px`: between `lg` and 1440 the
+ * fixed pair overflows the container and the whole page gains a horizontal
+ * scrollbar. With a floor of 0 the track-sizing algorithm hands the buy
+ * column its 485px first and lets the gallery take what is left, so the
+ * layout degrades by narrowing the artwork rather than by escaping the page.
+ * Above 1440 the tracks stop growing and the slack sits on the right, which
+ * is what the reference does too.
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
-  Share2,
-  ShoppingCart,
+  Expand,
   Star,
   Sparkles,
-  Truck,
-  Shield,
-  RotateCcw,
   Palette,
+  X,
 } from 'lucide-react'
-import { cn } from '~/lib/utils'
+import { cn, formatPrice } from '~/lib/utils'
+import { Button } from '~/components/ui/Button'
 import { WishlistButton } from './WishlistButton'
 import { useCartStore } from '~/stores/cart'
 import { SizeSelector, type SizeVariant } from './SizeSelector'
 import { FrameSelector, calculateFramePrice, type FrameOptionData } from './FrameSelector'
+import { DeliveryEstimate } from './DeliveryEstimate'
+import { ShareRow } from './ShareRow'
+import { TrustList } from './TrustList'
 import { SalePrice, type SalePricing } from './SalePrice'
 import { useGalleryMembership } from '~/hooks/useGalleryMembership'
 import {
@@ -112,6 +128,23 @@ export interface ProductDetailProps {
 }
 
 // ============================================================================
+// Measured literals
+// ============================================================================
+
+/**
+ * Two colours from the parity measurement that have no token yet.
+ *
+ * `--foreground` is rgb(23 23 23) and `--sale` is rose-600; the reference's
+ * H1 is rgb(29 29 29) and its price is rgb(187 0 0). Both are close enough to
+ * an existing token to be tempting and far enough to be visible side by side
+ * in a diff of the two pages, so they are spelled out here rather than
+ * rounded onto a token that means something else. Promoting them to
+ * globals.css is a separate change — this file does not own that file.
+ */
+const TITLE_COLOR = 'text-[rgb(29,29,29)]'
+const PRICE_COLOR = 'text-[rgb(187,0,0)]'
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -126,6 +159,7 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
   const [selectedFrame, setSelectedFrame] = useState<FrameOptionData | null>(null)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [quantity, setQuantity] = useState(1)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   /**
    * The one shared membership signal (#443), not a second read of the session.
@@ -184,6 +218,27 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
     return total
   }, [selectedVariant, selectedFrame])
 
+  /**
+   * The figure the CTA carries (#518).
+   *
+   * The reference's button reads `Add to cart - Rs. 21,200.00`, so the label
+   * has to name a price — and the only defensible price to name is the one
+   * printed directly above it. This therefore mirrors SalePrice rather than
+   * re-deriving anything: the sale figure when a sale is running, the
+   * size-plus-frame total otherwise.
+   *
+   * The one deliberate divergence is a members-only price the viewer has not
+   * unlocked. SalePrice still shows it, tagged `Members`, because that tag is
+   * the offer; a button promising the same number would be promising a charge
+   * checkout will decline to make, so the button quotes what this visitor
+   * actually pays.
+   */
+  const ctaPrice = useMemo(() => {
+    const locked = Boolean(product.sale?.locked) && !isMember
+    if (product.sale && !locked) return product.sale.salePrice
+    return totalPrice
+  }, [product.sale, isMember, totalPrice])
+
   // Handle add to cart
   const handleAddToCart = useCallback(() => {
     if (!selectedVariant) return
@@ -238,146 +293,215 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
   // Get primary image
   const currentImage = product.images[currentImageIndex] || product.images[0]
 
+  // Escape closes the expanded view. Registered only while it is open so the
+  // page is not carrying a document-level listener for a closed overlay.
+  useEffect(() => {
+    if (!isExpanded) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsExpanded(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isExpanded])
+
   return (
     <div className={cn('', className)}>
       <div className="container-wide py-6 lg:py-10">
-        <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-          {/* Left Column - Image Gallery */}
-          <div className="space-y-4">
-            {/* Main Image */}
-            <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-muted">
-              {currentImage?.url ? (
-                <img
-                  src={currentImage.url}
-                  alt={currentImage.altText || product.title}
-                  className="h-full w-full object-contain"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <Palette className="h-24 w-24 text-muted-foreground/30" />
-                </div>
-              )}
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,728px)_minmax(0,485px)] lg:items-start lg:gap-x-12">
+          {/* ----------------------------------------------------------------
+              Left column — gallery (#513)
 
-              {/* Image Navigation Arrows */}
+              Sticky, as on the reference: the artwork holds still while the
+              buy panel scrolls past it. `lg:self-start` is what makes that
+              work — a stretched grid item is exactly as tall as its row and
+              has nothing to stick within.
+
+              `lg:z-0` is not decoration either. A sticky element with
+              `z-index: auto` has no declared place in the stack, and both the
+              site chrome (z-30/z-40) and the parity screenshot harness treat
+              "sticky, z-index undeclared, large" as something to lift or hide
+              — the harness blanked the whole gallery out of every capture.
+              Pinning it to the bottom of the stack says what is true: the
+              artwork sticks under the header, never over it.
+             ---------------------------------------------------------------- */}
+          <div
+            data-testid="pdp-gallery"
+            className="lg:sticky lg:top-[calc(var(--chrome-offset)+1.5rem)] lg:z-0 lg:self-start"
+          >
+            {/* DOM order is image-then-rail so the artwork is what a screen
+                reader and a mobile viewport reach first; `lg:flex-row-reverse`
+                puts the rail back on the left for the desktop measurement. */}
+            <div className="flex flex-col gap-3 lg:flex-row-reverse">
+              {/* Main image. No border, no padding, no card — the reference
+                  has no chrome around the artwork at all. */}
+              <div className="group relative aspect-square min-w-0 flex-1 overflow-hidden rounded-lg lg:rounded-none">
+                {currentImage?.url ? (
+                  <img
+                    src={currentImage.url}
+                    alt={currentImage.altText || product.title}
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-muted">
+                    <Palette className="h-24 w-24 text-muted-foreground/30" />
+                  </div>
+                )}
+
+                {/* Expand — circular, pinned inside the top-right corner. */}
+                {currentImage?.url && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(true)}
+                    className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label="Expand image"
+                  >
+                    <Expand className="h-4 w-4" />
+                  </button>
+                )}
+
+                {/* Prev / next.
+                    The reference paints no arrows over the artwork, so these
+                    fade in on hover — but they stay real, focusable buttons
+                    with their labels intact, because fading a control out is
+                    not the same as taking the keyboard route away. Opacity
+                    rather than `hidden`: a hidden button cannot be tabbed to,
+                    and `focus-visible:opacity-100` is what brings it back for
+                    the person who needs it. */}
+                {product.images.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePrevImage}
+                      className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-background/85 opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-background focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+                      aria-label="Previous image"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextImage}
+                      className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-background/85 opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-background focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+                      aria-label="Next image"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Thumbnail rail — vertical and 58px wide on desktop, a
+                  horizontal scroll strip under the image on mobile. */}
               {product.images.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handlePrevImage}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-2 shadow-md backdrop-blur-sm transition-all hover:bg-background"
-                    aria-label="Previous image"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextImage}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-background/80 p-2 shadow-md backdrop-blur-sm transition-all hover:bg-background"
-                    aria-label="Next image"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </>
+                <ul className="flex gap-3 overflow-x-auto pb-1 lg:w-[58px] lg:shrink-0 lg:flex-col lg:overflow-x-visible lg:pb-0">
+                  {product.images.map((image, index) => {
+                    const isCurrent = index === currentImageIndex
+                    return (
+                      <li key={image.id} className="shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentImageIndex(index)}
+                          aria-label={`Show image ${index + 1} of ${product.images.length}`}
+                          aria-current={isCurrent ? 'true' : undefined}
+                          data-testid="pdp-thumbnail"
+                          className={cn(
+                            'block h-[72px] w-[72px] overflow-hidden border transition-colors lg:h-[58px] lg:w-[58px]',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                            isCurrent
+                              ? 'border-foreground'
+                              : 'border-border hover:border-foreground/40'
+                          )}
+                        >
+                          <img
+                            src={image.url}
+                            alt={image.altText || `${product.title} view ${index + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
-
-              {/* Badges */}
-              <div className="absolute left-3 top-3 flex flex-col gap-2">
-                {product.isFeatured && (
-                  <span className="rounded-full bg-foreground px-2.5 py-1 text-xs font-medium text-background">
-                    Featured
-                  </span>
-                )}
-                {product.isAiGenerated && (
-                  <span className="flex items-center gap-1 rounded-full border border-foreground/15 bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground">
-                    <Sparkles className="h-3 w-3" />
-                    AI Generated
-                  </span>
-                )}
-              </div>
             </div>
-
-            {/* Thumbnail Gallery */}
-            {product.images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {product.images.map((image, index) => (
-                  <button
-                    key={image.id}
-                    type="button"
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={cn(
-                      'relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-all',
-                      index === currentImageIndex
-                        ? 'border-foreground'
-                        : 'border-transparent hover:border-foreground/30'
-                    )}
-                  >
-                    <img
-                      src={image.url}
-                      alt={image.altText || `Product image ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Right Column - Product Info */}
-          <div className="space-y-6">
+          {/* ----------------------------------------------------------------
+              Right column — buy panel (#514, #518)
+             ---------------------------------------------------------------- */}
+          <div data-testid="buy-panel" className="space-y-6">
             {/* Header */}
             <div>
-              {/* Styles */}
-              {product.styles && product.styles.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-2">
-                  {product.styles.map((style) => (
-                    <span
-                      key={style}
-                      className="rounded-full bg-muted px-2.5 py-0.5 text-xs capitalize text-muted-foreground"
-                    >
-                      {style.replace(/-/g, ' ')}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <h1 className="text-2xl tracking-tight text-foreground sm:text-3xl">
-                {product.title}
-              </h1>
-
-              {/* Artist */}
-              {product.artist && (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  by <span className="font-medium text-foreground">{product.artist.name}</span>
-                </p>
-              )}
-
-              {/* Rating — and the way down to the reviews.
-                  mesonart hangs the buy box's count off the wall below it: the
-                  "(104)" is a jump to the review section, not a label. The
-                  `#reviews` anchor is owned by ProductReviewSection, which
-                  carries the scroll margin that keeps the landing clear of the
-                  sticky header. A plain anchor rather than a <Link>: this is a
-                  move within the document, not a route change. */}
-              {product.rating && product.rating.reviewCount > 0 && (
-                <a
-                  href="#reviews"
-                  data-testid="buybox-reviews-link"
-                  className="mt-2 flex w-fit items-center gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span className="flex items-center gap-1">
+              {/* The reference's social-proof row: `● 89 saves · In 7 carts
+                  now` on the left, the wishlist heart on the right.
+                  We hold no saves counter, no live cart counter and no
+                  sold-in-the-last-N-hours counter, and inventing them would
+                  be inventing evidence, so the row carries the one piece of
+                  real social proof we do have — the review score, which is
+                  also the way down to the wall. The heart keeps its measured
+                  position. */}
+              <div className="flex items-center justify-between gap-4">
+                {product.rating && product.rating.reviewCount > 0 ? (
+                  <a
+                    href="#reviews"
+                    data-testid="buybox-reviews-link"
+                    className="flex items-center gap-2 rounded-sm text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
                     <Star className="h-4 w-4 fill-rating text-rating" />
-                    <span className="text-sm font-medium">
+                    <span className="font-medium text-foreground">
                       {product.rating.averageRating.toFixed(1)}
                     </span>
-                  </span>
-                  <span className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-                    ({product.rating.reviewCount} reviews)
-                  </span>
-                </a>
-              )}
+                    <span className="text-muted-foreground underline-offset-4 hover:underline">
+                      ({product.rating.reviewCount} reviews)
+                    </span>
+                  </a>
+                ) : (
+                  <span aria-hidden="true" />
+                )}
+                <WishlistButton
+                  productId={product.id}
+                  variant="card"
+                  className="h-9 w-9 shrink-0"
+                />
+              </div>
 
-              {/* SKU */}
-              <p className="mt-2 text-xs text-muted-foreground">SKU: {product.sku}</p>
+              {/* H1 — Urbanist 300 at 42px, SKU inline in the title text.
+                  Stepped down on small screens: 42px of Urbanist across a
+                  390px viewport is four words a line. */}
+              <h1
+                className={cn(
+                  'mt-3 font-heading text-[30px] font-light leading-[1.15] lg:text-[42px]',
+                  TITLE_COLOR
+                )}
+              >
+                {product.title}{' '}
+                <span className="whitespace-nowrap">#{product.sku}</span>
+              </h1>
+
+              {/* The slot the reference fills with `3 sold in last 84 hours`.
+                  We have no such counter; attribution and the AI disclosure
+                  are real and belong close to the title, so they take the
+                  line rather than leaving a gap in the rhythm. */}
+              {(product.artist || product.isAiGenerated) && (
+                <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                  {product.artist && (
+                    <span>
+                      by{' '}
+                      <span className="font-medium text-foreground">
+                        {product.artist.name}
+                      </span>
+                    </span>
+                  )}
+                  {product.artist && product.isAiGenerated && (
+                    <span aria-hidden="true">·</span>
+                  )}
+                  {product.isAiGenerated && (
+                    <span className="inline-flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      AI Generated
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
 
             {/* Price Display.
@@ -392,14 +516,19 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
              * `priceCartLine` adds the frame back at full price, so quoting a
              * frame-inclusive discount here would promise a saving the cart
              * then declines to give. The variance note below already says the
-             * figure moves with the selection. */}
-            <div className="rounded-lg border border-border bg-muted/30 p-4">
-              <div className="flex items-baseline gap-2">
+             * figure moves with the selection.
+             *
+             * No card, no border, no background (#514): the grey rounded panel
+             * this used to sit in is the loudest thing our page had and the
+             * reference has nothing there at all. Poppins 500 at 24px, red.
+             */}
+            <div>
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <SalePrice
                   sale={product.sale ?? null}
                   basePrice={totalPrice}
                   isMember={isMember}
-                  className="text-3xl font-medium text-foreground"
+                  className={cn('font-sans text-[24px] font-medium', PRICE_COLOR)}
                 />
                 {selectedFrame && !product.sale && (
                   <span className="text-sm text-muted-foreground">
@@ -407,7 +536,7 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Price varies by size and frame selection
               </p>
 
@@ -440,112 +569,109 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
               />
             )}
 
-            {/* Quantity and Add to Cart */}
-            <div className="space-y-4">
-              {/* Quantity Selector */}
-              <div className="flex items-center gap-4">
-                <label className="text-sm font-medium text-foreground">Quantity</label>
-                <div className="flex items-center rounded-lg border border-border">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    className="px-3 py-2 text-foreground hover:bg-muted disabled:opacity-50"
-                    disabled={quantity <= 1}
-                    aria-label="Decrease quantity"
-                  >
-                    -
-                  </button>
-                  <span className="min-w-[3rem] text-center text-sm font-medium">
-                    {quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity((q) => q + 1)}
-                    className="px-3 py-2 text-foreground hover:bg-muted"
-                    aria-label="Increase quantity"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
+            {/* Delivery estimate (#517) — the line the reference puts directly
+                under the swatches. Rendered unconditionally, unlike the frame
+                block above it: the "printed to order, then shipped" promise is
+                true of every poster, framed or not, so it is not the frame
+                selector's dependent. */}
+            <DeliveryEstimate />
 
-              {/* Action Buttons */}
-              <div className="flex gap-3">
+            {/* Quantity and Add to Cart — ONE row (#518).
+                130 + 12 + 343 = 485, which is the measured button width
+                inside the measured column. The stepper is fixed and the
+                button takes the remainder, so the pair keeps that ratio as
+                the column narrows instead of the button collapsing first.
+
+                `flex-wrap` plus a 240px basis rather than `flex-1`: the label
+                carries a price and cannot wrap mid-word, so on a 350px mobile
+                column an unwrappable row sets a min-content wider than the
+                page and the whole document gains a horizontal scrollbar —
+                which it did. Wrapping lets the button drop to its own line
+                exactly when it stops fitting, and the basis is low enough
+                that every column from 468px up still keeps it on the row. */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex h-[60px] w-[130px] shrink-0 items-center justify-between rounded-pill border border-border px-1">
+                {/* The reference labels this stepper with nothing but its
+                    arrows. Sighted users read `‹ 1 ›`; everyone else needs
+                    the noun, so it is said once, out of the layout. */}
+                <span className="sr-only">Quantity</span>
                 <button
                   type="button"
-                  onClick={handleAddToCart}
-                  disabled={!selectedVariant}
-                  className={cn(
-                    'flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-semibold transition-all',
-                    selectedVariant
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/85'
-                      : 'cursor-not-allowed bg-muted text-muted-foreground'
-                  )}
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+                  disabled={quantity <= 1}
+                  aria-label="Decrease quantity"
                 >
-                  <ShoppingCart className="h-5 w-5" />
-                  Add to Cart
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-                {/* Was a button with this aria-label and no handler. */}
-                <WishlistButton productId={product.id} variant="detail" />
+                <span className="min-w-[3rem] text-center text-base tabular-nums text-foreground">
+                  {quantity}
+                </span>
                 <button
                   type="button"
-                  className="flex items-center justify-center rounded-lg border border-border p-3 transition-colors hover:bg-muted"
-                  aria-label="Share product"
+                  onClick={() => setQuantity((q) => q + 1)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+                  aria-label="Increase quantity"
                 >
-                  <Share2 className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
+
+              <Button
+                variant="solid"
+                size="pill"
+                onClick={handleAddToCart}
+                disabled={!selectedVariant}
+                className="h-[60px] min-w-0 grow basis-[240px] text-[16px]"
+              >
+                {selectedVariant
+                  ? `Add to cart - ${formatPrice(ctaPrice)}`
+                  : 'Add to cart'}
+              </Button>
             </div>
 
-            {/* Trust Badges */}
-            <div className="grid grid-cols-3 gap-4 border-t border-border pt-6">
-              <div className="flex flex-col items-center text-center">
-                <Truck className="mb-2 h-6 w-6 text-foreground" />
-                <span className="text-xs font-medium text-foreground">Free Shipping</span>
-                <span className="text-xs text-muted-foreground">Orders over ₹999</span>
-              </div>
-              <div className="flex flex-col items-center text-center">
-                <Shield className="mb-2 h-6 w-6 text-foreground" />
-                <span className="text-xs font-medium text-foreground">Secure Payment</span>
-                <span className="text-xs text-muted-foreground">100% Protected</span>
-              </div>
-              <div className="flex flex-col items-center text-center">
-                <RotateCcw className="mb-2 h-6 w-6 text-foreground" />
-                <span className="text-xs font-medium text-foreground">Easy Returns</span>
-                <span className="text-xs text-muted-foreground">30-day policy</span>
-              </div>
-            </div>
+            {/* Share (#520). The button that used to sit here had an
+                aria-label and no onClick — this row actually shares. */}
+            <ShareRow title={product.title} />
 
-            {/* Description */}
-            {product.description && (
-              <div className="border-t border-border pt-6">
-                <h2 className="mb-3 text-lg font-semibold text-foreground">Description</h2>
-                <div
-                  className="prose prose-sm max-w-none text-muted-foreground"
-                  dangerouslySetInnerHTML={{ __html: product.description }}
-                />
-              </div>
-            )}
+            {/* Trust list (#519) — four stacked rows, replacing the three
+                centred badges. */}
+            <TrustList className="border-t border-border pt-6" />
 
-            {/* Room Suggestions */}
-            {product.roomSuggestions && product.roomSuggestions.length > 0 && (
-              <div className="border-t border-border pt-6">
-                <h2 className="mb-3 text-lg font-semibold text-foreground">Perfect For</h2>
-                <div className="flex flex-wrap gap-2">
-                  {product.roomSuggestions.map((room) => (
-                    <span
-                      key={room}
-                      className="rounded-full border border-border bg-background px-3 py-1 text-sm capitalize text-foreground"
-                    >
-                      {room.replace(/-/g, ' ')}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Description and Perfect For used to live here as two flat
+                sections. They are now the About The Artwork panel of
+                ProductTabs, which routes/posters/$slug.tsx renders below the
+                buy panel — the reference puts that long-form copy under the
+                page, not inside the 485px buy column. */}
           </div>
         </div>
       </div>
+
+      {/* Expanded view. The expand affordance is on the reference, and a
+          button that does nothing is worse than no button — so it opens the
+          artwork over the page and Escape closes it again. */}
+      {isExpanded && currentImage?.url && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${product.title} — full size`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 p-6 backdrop-blur-sm"
+        >
+          <img
+            src={currentImage.url}
+            alt={currentImage.altText || product.title}
+            className="max-h-full max-w-full object-contain"
+          />
+          <button
+            type="button"
+            onClick={() => setIsExpanded(false)}
+            className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Close expanded image"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -590,51 +716,54 @@ function SaleCountdownEcho({
 }
 
 /**
- * ProductDetail skeleton for loading states
+ * ProductDetail skeleton for loading states.
+ *
+ * Tracks the real layout, including the asymmetric columns — a skeleton on a
+ * different grid from the page it stands in for reads as a jump on every
+ * load, which is the one thing a skeleton exists to prevent.
  */
 export function ProductDetailSkeleton() {
   return (
     <div className="container-wide py-6 lg:py-10">
-      <div className="grid animate-pulse gap-8 lg:grid-cols-2 lg:gap-12">
-        {/* Left Column */}
-        <div className="space-y-4">
-          <div className="aspect-square rounded-lg bg-muted" />
-          <div className="flex gap-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-16 w-16 rounded-md bg-muted" />
+      <div className="grid animate-pulse gap-8 lg:grid-cols-[minmax(0,728px)_minmax(0,485px)] lg:items-start lg:gap-x-12">
+        {/* Gallery: square artwork with the rail beside it on desktop. */}
+        <div className="flex flex-col gap-3 lg:flex-row-reverse">
+          <div className="aspect-square min-w-0 flex-1 rounded-lg bg-muted lg:rounded-none" />
+          <div className="flex gap-3 lg:w-[58px] lg:shrink-0 lg:flex-col">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className="h-[72px] w-[72px] shrink-0 bg-muted lg:h-[58px] lg:w-[58px]"
+              />
             ))}
           </div>
         </div>
 
-        {/* Right Column */}
+        {/* Buy panel */}
         <div className="space-y-6">
-          <div className="space-y-2">
-            <div className="h-4 w-24 rounded bg-muted" />
-            <div className="h-8 w-3/4 rounded bg-muted" />
-            <div className="h-4 w-32 rounded bg-muted" />
-          </div>
-
-          <div className="h-20 rounded-lg bg-muted" />
-
           <div className="space-y-3">
-            <div className="h-4 w-20 rounded bg-muted" />
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-14 rounded-lg bg-muted" />
-              ))}
+            <div className="flex items-center justify-between">
+              <div className="h-4 w-32 rounded bg-muted" />
+              <div className="h-9 w-9 rounded-full bg-muted" />
             </div>
+            <div className="h-12 w-3/4 rounded bg-muted" />
+            <div className="h-4 w-40 rounded bg-muted" />
           </div>
 
-          <div className="space-y-3">
-            <div className="h-4 w-24 rounded bg-muted" />
-            <div className="grid grid-cols-2 gap-3">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-20 rounded-lg bg-muted" />
-              ))}
-            </div>
+          <div className="h-7 w-36 rounded bg-muted" />
+
+          <div className="h-[52px] rounded-md bg-muted" />
+
+          <div className="flex flex-wrap gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-[92px] w-[92px] rounded-full bg-muted" />
+            ))}
           </div>
 
-          <div className="h-12 rounded-lg bg-muted" />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="h-[60px] w-[130px] rounded-pill bg-muted" />
+            <div className="h-[60px] grow basis-[240px] rounded-pill bg-muted" />
+          </div>
         </div>
       </div>
     </div>

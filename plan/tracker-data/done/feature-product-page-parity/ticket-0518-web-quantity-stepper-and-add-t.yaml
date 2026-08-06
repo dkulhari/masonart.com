@@ -1,0 +1,31 @@
+ticket_number: 518
+title: 'web: quantity stepper and add-to-cart share one row, with the price inside the button'
+description: 'Reference puts a bordered pill quantity stepper (`< 1 >`, ~200px) and the add-to-cart button on a single row. The button is a black pill: rgb(23,23,23), radius 60px, height 60px, padding 18px 26px, 16px/400 white, labelled with the price — ''Add to cart - Rs. 21,200.00''. Ours stacks a labelled quantity block above a full-width button with no price in it. Rework ProductDetail.tsx:445-487. Skip the Shopify ''Buy with Shop'' button — we use Razorpay.'
+feature: product-page-parity
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.204Z'
+last_updated: '2026-08-06T07:54:19.802Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - buy-panel
+  - cart
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.953Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-06T07:54:19.802Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:27:02.953Z'
+completed: '2026-08-06T07:54:19.802Z'

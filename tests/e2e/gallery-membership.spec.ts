@@ -373,8 +373,9 @@ test.describe('a visitor who is not a member', () => {
     await page.setViewportSize(DESKTOP)
     await page.goto(`/posters/${poster.slug}`, { waitUntil: 'networkidle' })
 
-    // Scoped to the buy panel: the "You May Also Like" row below carries the
-    // very same testids, so a page-wide read would pass on a neighbour's price.
+    // Scoped to the buy panel: the "Visually Similar Artworks" row below carries
+    // the very same testids, so a page-wide read would pass on a neighbour's
+    // price.
     const panel = page.getByTestId('buy-panel')
     const salePrice = panel.getByTestId('sale-price')
 
