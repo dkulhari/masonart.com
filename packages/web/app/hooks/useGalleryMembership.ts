@@ -17,6 +17,25 @@
  * additional field (#439); the root route just fetches the session early
  * enough for SSR to see it.
  *
+ * ## Why the optimistic flip is a module signal and not component state
+ *
+ * The router context keeps the value it was loaded with until the next
+ * navigation revalidates it, so a successful `join()` has to be remembered on
+ * the client or the price the viewer just unlocked stays locked. That memory
+ * used to be `useState` inside the hook, which made it *per instance*: the
+ * modal that ran the join flipped, and every other consumer on the page — the
+ * banner, the rail (#446), the cart — went on reading `isMember === false`
+ * until the next navigation. The rail's version of that was visible: it
+ * appeared offering a 40% discount to somebody who had just become a member.
+ *
+ * One signal, every reader. `useSyncExternalStore` is what makes the other
+ * instances re-render when one of them joins.
+ *
+ * It is pinned to the identity that joined, so it can only ever unlock the
+ * account that earned it: a sign-out (or a different user) drops back to
+ * whatever the session says. And it only turns membership *on* — it cannot
+ * mask a session that already says the viewer is a member.
+ *
  * ## What this hook does NOT do
  *
  * It decides whether a saving reads as *locked*. It never decides what the
@@ -24,7 +43,7 @@
  * calculation living on the client would be a second source of truth.
  */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useSyncExternalStore } from 'react'
 import { useRouteContext } from '@tanstack/react-router'
 
 import { getApiUrl } from '~/lib/utils'
@@ -59,25 +78,90 @@ export interface GalleryMembership {
 }
 
 interface SessionShape {
-  user?: { galleryMember?: boolean | null } | null
+  user?: { id?: string | null; galleryMember?: boolean | null } | null
 }
+
+// ============================================================================
+// The shared optimistic signal — see the header
+// ============================================================================
+
+/**
+ * Stands in for a user id when the session carries a user but no id. Any stable
+ * value works: the point is that a signed-out session gets `null` instead, so
+ * the flip can never survive a sign-out.
+ */
+const SIGNED_IN = 'signed-in-without-id'
+
+/** Who the client believes joined, pending the next context revalidation. */
+let joinedIdentity: string | null = null
+const listeners = new Set<() => void>()
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+function getJoinedIdentity(): string | null {
+  return joinedIdentity
+}
+
+/**
+ * The server has no optimistic state to report — nobody has joined during a
+ * render that has not been sent yet. Returning a constant also keeps the SSR
+ * snapshot stable, which `useSyncExternalStore` compares by identity.
+ */
+function getServerJoinedIdentity(): string | null {
+  return null
+}
+
+function markJoined(identity: string | null): void {
+  if (identity === null || joinedIdentity === identity) return
+
+  joinedIdentity = identity
+  for (const listener of listeners) listener()
+}
+
+/**
+ * Drop the optimistic flip.
+ *
+ * Exists for tests, which share one module instance across cases where a real
+ * page load would throw it away. Production never needs it: the signal is
+ * pinned to an identity, so a sign-out already stops it applying.
+ */
+export function resetGalleryMembershipSignal(): void {
+  joinedIdentity = null
+  for (const listener of listeners) listener()
+}
+
+/** The identity the optimistic flip is pinned to; null when nobody is signed in. */
+function identityOf(session: SessionShape | null | undefined): string | null {
+  const user = session?.user
+  if (!user) return null
+  return user.id ?? SIGNED_IN
+}
+
+// ============================================================================
+// Hook
+// ============================================================================
 
 export function useGalleryMembership(): GalleryMembership {
   const { session } = useRouteContext({ from: '__root__' }) as {
     session?: SessionShape | null
   }
 
-  /**
-   * Optimistic flip. The router context keeps the value it was loaded with
-   * until the next navigation revalidates it, so without this the price the
-   * viewer just unlocked would stay locked on the page they unlocked it from.
-   * It only ever turns membership on — it cannot mask a session that already
-   * says the viewer is a member.
-   */
-  const [joined, setJoined] = useState(false)
+  const identity = identityOf(session)
+  const joinedId = useSyncExternalStore(
+    subscribe,
+    getJoinedIdentity,
+    getServerJoinedIdentity,
+  )
   const [isJoining, setIsJoining] = useState(false)
 
-  const isMember = Boolean(session?.user?.galleryMember) || joined
+  const isMember =
+    Boolean(session?.user?.galleryMember) ||
+    (identity !== null && joinedId === identity)
 
   const join = useCallback(async (source: JoinSource) => {
     setIsJoining(true)
@@ -102,7 +186,10 @@ export function useGalleryMembership(): GalleryMembership {
         .catch(() => null)) as { galleryMember?: boolean } | null
       const member = result?.galleryMember ?? true
 
-      if (member) setJoined(true)
+      // Published to every consumer, not just this one. The surface that ran
+      // the join is rarely the only one on screen that owes the viewer a
+      // different answer a moment later.
+      if (member) markJoined(identity)
       return member
     } catch {
       // Offline, aborted, CORS. The viewer stays where they were; the caller
@@ -111,7 +198,7 @@ export function useGalleryMembership(): GalleryMembership {
     } finally {
       setIsJoining(false)
     }
-  }, [])
+  }, [identity])
 
   return { isMember, isLoading: isJoining, join }
 }

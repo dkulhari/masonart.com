@@ -19,6 +19,7 @@ import { Footer } from '~/components/layout/Footer'
 import { CartDrawer } from '~/components/cart/CartDrawer'
 import { ReviewToast } from '~/components/reviews/ReviewToast'
 import { SaleBanner } from '~/components/promo/SaleBanner'
+import { OfferRail } from '~/components/promo/OfferRail'
 import { buttonVariants } from '~/components/ui/Button'
 import { cn } from '~/lib/utils'
 import { useWishlistStore } from '~/stores/wishlist'
@@ -300,6 +301,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
          * here.
          */}
         {!isAdminRoute && <SaleBanner />}
+        {/**
+         * The way back to a dismissed offer (#446). Mounted here rather than
+         * per route because it is the recovery path for the whole visit — a
+         * per-page mount would reset it on every navigation. It reads the same
+         * store the banner writes and decides nothing itself, so there is no
+         * gate to add here beyond the admin one.
+         */}
+        {!isAdminRoute && <OfferRail />}
         <Scripts />
       </body>
     </html>

@@ -64,7 +64,10 @@ import {
   JoinGalleryModal,
   type ActivePromotion,
 } from '~/components/promo/JoinGalleryModal'
-import { useGalleryMembership } from '~/hooks/useGalleryMembership'
+import {
+  useGalleryMembership,
+  type JoinSource,
+} from '~/hooks/useGalleryMembership'
 import { getApiUrl } from '~/lib/utils'
 
 // ============================================================================
@@ -106,6 +109,16 @@ export interface SaleOffer {
   /** The active promotion, or null. The rail labels itself from this. */
   promotion: ActivePromotion | null
   stage: SaleOfferStage
+  /**
+   * The surface the open modal was opened from, recorded as the member's
+   * `joinSource`.
+   *
+   * There is one modal and the banner owns it, so without this every join
+   * would be filed as `banner` — including the ones the rail recovered, which
+   * are the whole reason the rail exists. A funnel that cannot see them
+   * measures the dismissal as a loss.
+   */
+  source: JoinSource
   /** Close the modal: records the refusal and hands the offer to the rail. */
   dismiss: () => void
   /** Reopen the modal from the rail. Does not clear the cooldown. */
@@ -115,6 +128,7 @@ export interface SaleOffer {
 interface StoreState {
   promotion: ActivePromotion | null
   stage: SaleOfferStage
+  source: JoinSource
 }
 
 // ============================================================================
@@ -188,7 +202,7 @@ function recordDismissal(promotionId: string): void {
  * The pre-decision state, and the whole of what the server ever renders.
  * A stable reference: `useSyncExternalStore` compares snapshots by identity.
  */
-const IDLE: StoreState = { promotion: null, stage: 'hidden' }
+const IDLE: StoreState = { promotion: null, stage: 'hidden', source: 'banner' }
 
 let state: StoreState = IDLE
 let resolving: Promise<void> | null = null
@@ -239,7 +253,7 @@ function ensureResolved(): Promise<void> {
     // still open.
     if (!suppressed) markSeenThisSession(promotion.promotionId)
 
-    setState({ promotion, stage: suppressed ? 'rail' : 'banner' })
+    setState({ promotion, stage: suppressed ? 'rail' : 'banner', source: 'banner' })
   })()
 
   return resolving
@@ -268,7 +282,7 @@ function dismissOffer(): void {
   if (!promotion) return
 
   recordDismissal(promotion.promotionId)
-  setState({ promotion, stage: 'rail' })
+  setState({ promotion, stage: 'rail', source: state.source })
 }
 
 function reopenOffer(): void {
@@ -276,8 +290,9 @@ function reopenOffer(): void {
   if (!promotion) return
 
   // The cooldown stays on disk. Reopening is the visitor asking again, not the
-  // site deciding their refusal expired.
-  setState({ promotion, stage: 'banner' })
+  // site deciding their refusal expired. `source` moves with it: from here on
+  // the modal on screen is the rail's, and a join through it is a rail join.
+  setState({ promotion, stage: 'banner', source: 'rail' })
 }
 
 /**
@@ -331,6 +346,7 @@ export function useSaleOffer(): SaleOffer {
   return {
     promotion: snapshot.promotion,
     stage: !mounted || isMember ? 'hidden' : snapshot.stage,
+    source: snapshot.source,
     dismiss,
     reopen,
   }
@@ -346,7 +362,7 @@ export function useSaleOffer(): SaleOffer {
  * rather than wrapping it in a shell of its own.
  */
 export function SaleBanner() {
-  const { promotion, stage, dismiss } = useSaleOffer()
+  const { promotion, stage, source, dismiss } = useSaleOffer()
 
   return (
     <JoinGalleryModal
@@ -359,7 +375,12 @@ export function SaleBanner() {
        * offer.
        */
       onClose={dismiss}
-      source="banner"
+      /**
+       * Which surface the visitor is answering from, not which component
+       * renders the dialog — the rail reopens this same modal, and a rail join
+       * filed as `banner` would hide the recovery the rail exists to provide.
+       */
+      source={source}
       // Handed in rather than left to the modal's own lookup: the store already
       // fetched it, and a second round trip would be latency in front of the
       // offer.

@@ -33,6 +33,7 @@ import React from 'react'
 import { getApiUrl } from '~/lib/utils'
 import {
   JOIN_SOURCES,
+  resetGalleryMembershipSignal,
   useGalleryMembership,
 } from '~/hooks/useGalleryMembership'
 
@@ -81,6 +82,9 @@ beforeEach(() => {
   setSession(guest)
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
+  // The optimistic flip is one shared signal so every surface flips together
+  // (#446). A real page load throws it away; these cases share a module.
+  resetGalleryMembershipSignal()
 })
 
 afterEach(() => {
