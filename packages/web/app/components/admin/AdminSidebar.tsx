@@ -28,6 +28,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Store,
+  Percent,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
@@ -77,6 +78,11 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Orders',
     href: '/admin/orders',
     icon: ShoppingCart,
+  },
+  {
+    label: 'Promotions',
+    href: '/admin/promotions',
+    icon: Percent,
   },
   {
     label: 'Reviews',
