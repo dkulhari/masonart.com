@@ -157,4 +157,25 @@ describe('cart store as a server projection', () => {
 
     expect(useCartStore.getState().items).toEqual([])
   })
+
+  // #511 fix round 1, finding 1: syncError only ever had one way back to
+  // null — adding something — so a rejected write's message survived every
+  // successful edit that came after it, attached to an operation that no
+  // longer failed.
+  it('replaceFromServer clears a previous sync error', () => {
+    useCartStore.getState().setSyncError('Product variant is out of stock')
+    useCartStore.getState().replaceFromServer(serverCart)
+
+    expect(useCartStore.getState().syncError).toBeNull()
+  })
+
+  it('closeDrawer clears a previous sync error', () => {
+    useCartStore.setState({
+      syncError: 'Product variant is out of stock',
+      isDrawerOpen: true,
+    })
+    useCartStore.getState().closeDrawer()
+
+    expect(useCartStore.getState().syncError).toBeNull()
+  })
 })

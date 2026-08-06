@@ -213,7 +213,11 @@ export const useCartStore = create<CartStore>()(
       // any surface — header button, PDP, quickview — can open the cart
       // without prop-drilling through __root.
       openDrawer: () => set({ isDrawerOpen: true }),
-      closeDrawer: () => set({ isDrawerOpen: false }),
+      // Closing dismisses whatever alert was showing along with it — there is
+      // no separate dismiss control, and leaving a stale rejection attached to
+      // a drawer the customer already closed and reopened misattributes it to
+      // whatever they do next (#511 fix round 1, finding 1).
+      closeDrawer: () => set({ isDrawerOpen: false, syncError: null }),
       toggleDrawer: () =>
         set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
 
@@ -301,9 +305,16 @@ export const useCartStore = create<CartStore>()(
       /**
        * The server's cart, wholesale. Local ids, quantities and prices all
        * lose — the rows here are the rows order creation will read.
+       *
+       * Also clears `syncError` (#511 fix round 1, finding 1): every write
+       * that reaches this — whichever one the hook's sequence guard decided
+       * actually gets to apply — succeeded, so whatever the previous failure
+       * said is no longer true. Without this, a rejected PATCH left its
+       * message on screen through every write that came after it, until the
+       * customer happened to add something (the only path that cleared it).
        */
       replaceFromServer: (cart: ServerCartPayload) =>
-        set({ items: toCartItems(cart) }),
+        set({ items: toCartItems(cart), syncError: null }),
 
       setSyncError: (message: string | null) => set({ syncError: message }),
 
