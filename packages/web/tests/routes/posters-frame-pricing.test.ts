@@ -34,14 +34,36 @@ describe('the product page prices frames off the multiplier', () => {
   })
 })
 
+/**
+ * The quickview no longer carries a formula of its own (#511 final review,
+ * finding 1).
+ *
+ * It used to compute `Math.round(unitPrice * frame.priceRate) + priceAddition`
+ * inline, which was correct — and was the THIRD place that arithmetic lived,
+ * beside the product page's `calculateFramePrice` and, wrongly, the cart route.
+ * The cart route read the zeroed flat column alone, stored every framed line at
+ * a frame price of nothing, and `POST /api/orders` charged that. So the guard
+ * here is now the stronger one: there is one formula, in `@chobii/shared`, and
+ * the surfaces call it rather than reproducing it.
+ */
 describe('the quickview prices them the same way', () => {
-  it('derives its rate from priceModifier', () => {
-    expect(quickview).toContain("parseFloat(f.priceModifier || '1')")
+  it('delegates to the one shared formula rather than carrying its own', () => {
+    expect(quickview).toContain("from '@chobii/shared'")
+    expect(quickview).toContain('frameAddition(')
+    // No local arithmetic to drift from the server's.
+    expect(quickview).not.toMatch(/Math\.round\(unitPrice\s*\*/)
   })
 
   it('multiplies the chosen variant, not the product base', () => {
     // `unitPrice` is the selected variant's price. Applying the rate to
     // `product.basePrice` would charge the smallest size's frame on every size.
-    expect(quickview).toContain('Math.round(unitPrice * frame.priceRate)')
+    expect(quickview).toContain('frameAddition(unitPrice,')
+  })
+
+  it('hands the frame row s pricing columns through untransformed', () => {
+    // Pre-parsing `priceModifier` into a rate here is how the quickview came to
+    // own arithmetic in the first place; the helper reads the columns itself.
+    expect(quickview).toContain('priceModifier: f.priceModifier')
+    expect(quickview).toContain('priceAddition: f.priceAddition')
   })
 })
