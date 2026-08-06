@@ -62,6 +62,14 @@ test.describe('cart persistence', () => {
     const addedQuantity: number = added.item?.quantity
     expect(addedQuantity).toBeGreaterThan(0)
 
+    // `addItemLocal` (packages/web/app/stores/cart.ts) sets `isDrawerOpen:
+    // true` synchronously on every add, before the network call — the drawer
+    // panel itself carries no testid (it returns null while closed), but its
+    // backdrop does and renders unconditionally whenever the drawer is open.
+    // `cart-drawer-cursor` is not usable here: it only renders once the
+    // mouse has moved over the backdrop.
+    await expect(page.getByTestId('cart-drawer-backdrop')).toBeVisible()
+
     // Proof #2: the item is still there after a full reload — which
     // localStorage alone could also produce, so the assertion below is on
     // the server's own answer (`GET /api/cart`), never on rendered UI.
