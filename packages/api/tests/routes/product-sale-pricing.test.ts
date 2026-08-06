@@ -193,6 +193,22 @@ function cachedKeys(): string[] {
   return setCachedMock.mock.calls.map((call) => String(call[0]));
 }
 
+/**
+ * The projection object handed to the Nth `db.select(...)`.
+ *
+ * The only assertion in this file that can catch a column MISSING from a
+ * projection. `db` is mocked, so a fixture supplies whatever facets the test
+ * wants regardless of what the route actually selected — which is how #428
+ * shipped a list route that omitted `rooms` with every test green. Reading the
+ * projection argument itself closes that gap.
+ */
+function projection(call = 0): Record<string, unknown> {
+  return (selectMock.mock.calls[call]?.[0] ?? {}) as Record<string, unknown>;
+}
+
+/** Every column `resolveSalePrice` reads when matching a `filter` scope. */
+const FACET_COLUMNS = ['styles', 'subjects', 'rooms', 'isFeatured'] as const;
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -425,5 +441,286 @@ describe('product detail sale payload', () => {
     expect(guestKey).toContain('golden-dunes');
     expect(memberKey).toContain('golden-dunes');
     expect(memberKey).not.toBe(guestKey);
+  });
+});
+
+// ============================================================================
+// GET /api/products/featured
+// ============================================================================
+
+/**
+ * The home page's featured rail.
+ *
+ * It shows the same products the grid does, so it has to reach the same price
+ * for them. Before #516 it did not: no `sale` field at all, and a cache key
+ * with no viewer in it.
+ */
+describe('featured products sale payload', () => {
+  /** The featured projection: no review aggregate, no createdAt. */
+  function featuredRow(overrides: Record<string, unknown> = {}) {
+    const {
+      averageRating: _averageRating,
+      reviewCount: _reviewCount,
+      createdAt: _createdAt,
+      ...rest
+    } = productRow();
+    return { ...rest, isFeatured: true, featuredOrder: 1, ...overrides };
+  }
+
+  it('carries sale: null when no promotion is active', async () => {
+    givenPromotions([]);
+    queueSelects([featuredRow()]);
+
+    const res = await app.request('/api/products/featured');
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].sale).toBeNull();
+  });
+
+  it('carries the resolved sale price for an eligible product', async () => {
+    givenPromotions([promotion()]);
+    queueSelects([featuredRow()]);
+
+    const body = await (await app.request('/api/products/featured')).json();
+
+    expect(body.items[0].sale).toEqual({
+      promotionId: PROMOTION_ID,
+      headline: 'SUMMER SALE — 40% OFF EVERYTHING',
+      percentOff: 40,
+      basePrice: BASE_PRICE,
+      salePrice: SALE_PRICE,
+      locked: false,
+    });
+  });
+
+  it('reaches the same price the grid does for the same product', async () => {
+    givenPromotions([promotion()]);
+
+    queueSelects([{ count: 1 }], [productRow({ isFeatured: true })]);
+    const list = await (await app.request('/api/products')).json();
+
+    vi.clearAllMocks();
+    getCachedMock.mockResolvedValue(null);
+    setCachedMock.mockResolvedValue(undefined);
+    getSessionMock.mockResolvedValue(null);
+    givenPromotions([promotion()]);
+    queueSelects([featuredRow()]);
+    const featured = await (await app.request('/api/products/featured')).json();
+
+    // The disagreement #516 exists to end: one catalogue, one price.
+    expect(featured.items[0].sale).toEqual(list.items[0].sale);
+  });
+
+  it('projects every facet column the resolver reads', async () => {
+    givenPromotions([promotion()]);
+    queueSelects([featuredRow()]);
+
+    await app.request('/api/products/featured');
+
+    // A room-scoped sale priced the PDP and not the grid in #428 because
+    // `rooms` was missing from the projection. Same shape of bug, same guard.
+    for (const column of FACET_COLUMNS) {
+      expect(Object.keys(projection(0))).toContain(column);
+    }
+  });
+
+  it('prices a room-scoped promotion', async () => {
+    givenPromotions([
+      promotion({ scopeType: 'filter', scopeFilter: { rooms: ['living-room'] } }),
+    ]);
+    queueSelects([featuredRow({ rooms: ['living-room'] })]);
+
+    const body = await (await app.request('/api/products/featured')).json();
+    expect(body.items[0].sale?.salePrice).toBe(SALE_PRICE);
+  });
+
+  it('leaves an excluded product off the sale', async () => {
+    givenPromotions([promotion()], { excludedIds: [PRODUCT_ID] });
+    queueSelects([featuredRow()]);
+
+    const body = await (await app.request('/api/products/featured')).json();
+    expect(body.items[0].sale).toBeNull();
+  });
+
+  it('marks the price locked for a guest under a membersOnly promotion', async () => {
+    givenPromotions([promotion({ membersOnly: true })]);
+    queueSelects([featuredRow()]);
+
+    const body = await (await app.request('/api/products/featured')).json();
+    expect(body.items[0].sale.locked).toBe(true);
+    expect(body.items[0].sale.salePrice).toBe(SALE_PRICE);
+  });
+
+  it('unlocks the same promotion for a signed-in gallery member', async () => {
+    signInAsMember();
+    givenPromotions([promotion({ membersOnly: true })]);
+    queueSelects([featuredRow()]);
+
+    const body = await (await app.request('/api/products/featured')).json();
+    expect(body.items[0].sale.locked).toBe(false);
+  });
+
+  it('keys the featured cache on member state', async () => {
+    givenPromotions([promotion({ membersOnly: true })]);
+
+    queueSelects([featuredRow()]);
+    await app.request('/api/products/featured');
+
+    signInAsMember();
+    queueSelects([featuredRow()]);
+    await app.request('/api/products/featured');
+
+    const [guestKey, memberKey] = cachedKeys();
+    expect(guestKey).toContain('featured:');
+    expect(memberKey).toContain('featured:');
+    // Without this the guest's locked body is what the member gets served.
+    expect(memberKey).not.toBe(guestKey);
+  });
+
+  it('caches the priced rows, not the bare ones', async () => {
+    givenPromotions([promotion()]);
+    queueSelects([featuredRow()]);
+
+    await app.request('/api/products/featured');
+
+    const cachedItems = setCachedMock.mock.calls[0]?.[1] as Array<{
+      sale: { salePrice: string };
+    }>;
+    // Caching pre-resolution rows would serve an unpriced rail for the next
+    // fifteen minutes even once the sale is running.
+    expect(cachedItems[0].sale).toMatchObject({ salePrice: SALE_PRICE });
+  });
+
+  it('loads the promotion id sets once per request, not once per card', async () => {
+    givenPromotions([promotion()]);
+    queueSelects([
+      featuredRow({ id: PRODUCT_ID, slug: 'a' }),
+      featuredRow({ id: '33333333-3333-4333-8333-333333333333', slug: 'b' }),
+      featuredRow({ id: '44444444-4444-4444-8444-444444444444', slug: 'c' }),
+    ]);
+
+    const body = await (await app.request('/api/products/featured')).json();
+
+    expect(body.items).toHaveLength(3);
+    expect(getActivePromotionsMock).toHaveBeenCalledTimes(1);
+    expect(loadPromotionProductSetsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never leaks the real end date', async () => {
+    givenPromotions([promotion()]);
+    queueSelects([featuredRow()]);
+
+    const body = await (await app.request('/api/products/featured')).json();
+    expect(JSON.stringify(body).includes('endsAt')).toBe(false);
+  });
+
+  it('serves the cached body back without re-querying', async () => {
+    getCachedMock.mockResolvedValue([{ id: PRODUCT_ID, sale: null }]);
+
+    const body = await (await app.request('/api/products/featured')).json();
+
+    expect(body.fromCache).toBe(true);
+    expect(selectMock).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// GET /api/products/:slug/related
+// ============================================================================
+
+/**
+ * The PDP's "You May Also Like" row renders the same ProductCard as the grid,
+ * so it is the same disagreement one scroll further down the page.
+ */
+describe('related products sale payload', () => {
+  /** The related projection: no isFeatured, no featuredOrder, no description. */
+  function relatedRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: '33333333-3333-4333-8333-333333333333',
+      sku: 'SKU-PEAKS',
+      title: 'Blue Peaks',
+      slug: 'blue-peaks',
+      basePrice: BASE_PRICE,
+      styles: ['wabi-sabi'],
+      subjects: ['abstract'],
+      colors: ['blue'],
+      rooms: ['living-room'],
+      orientation: 'portrait',
+      images: [],
+      isFeatured: false,
+      isAiGenerated: false,
+      ...overrides,
+    };
+  }
+
+  /** The source lookup, then the related page. */
+  function queueRelated(rows: unknown[]) {
+    queueSelects(
+      [{ id: PRODUCT_ID, styles: ['wabi-sabi'], subjects: ['abstract'] }],
+      rows
+    );
+  }
+
+  it('carries sale: null when no promotion is active', async () => {
+    givenPromotions([]);
+    queueRelated([relatedRow()]);
+
+    const res = await app.request('/api/products/golden-dunes/related');
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.items[0].sale).toBeNull();
+  });
+
+  it('carries the resolved sale price for an eligible product', async () => {
+    givenPromotions([promotion()]);
+    queueRelated([relatedRow()]);
+
+    const body = await (
+      await app.request('/api/products/golden-dunes/related')
+    ).json();
+
+    expect(body.items[0].sale.salePrice).toBe(SALE_PRICE);
+    expect(body.items[0].sale.locked).toBe(false);
+  });
+
+  it('projects every facet column the resolver reads', async () => {
+    givenPromotions([promotion()]);
+    queueRelated([relatedRow()]);
+
+    await app.request('/api/products/golden-dunes/related');
+
+    // Call 0 is the source lookup; call 1 is the page of related rows.
+    for (const column of FACET_COLUMNS) {
+      expect(Object.keys(projection(1))).toContain(column);
+    }
+  });
+
+  it('keys the related cache on member state', async () => {
+    givenPromotions([promotion({ membersOnly: true })]);
+
+    queueRelated([relatedRow()]);
+    await app.request('/api/products/golden-dunes/related');
+
+    signInAsMember();
+    queueRelated([relatedRow()]);
+    await app.request('/api/products/golden-dunes/related');
+
+    const [guestKey, memberKey] = cachedKeys();
+    expect(guestKey).toContain('related:golden-dunes');
+    expect(memberKey).toContain('related:golden-dunes');
+    expect(memberKey).not.toBe(guestKey);
+  });
+
+  it('never leaks the real end date', async () => {
+    givenPromotions([promotion()]);
+    queueRelated([relatedRow()]);
+
+    const body = await (
+      await app.request('/api/products/golden-dunes/related')
+    ).json();
+    expect(JSON.stringify(body).includes('endsAt')).toBe(false);
   });
 });

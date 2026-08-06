@@ -637,8 +637,10 @@ productsApp.get(
   async (c) => {
     const { limit } = c.req.valid("query");
 
-    // Check cache
-    const cacheKey = `${CacheKeys.PRODUCT}featured:${limit}`;
+    const isMember = readIsMember(c.get("user"));
+
+    // Check cache — keyed on the viewer, same reason as the list and detail.
+    const cacheKey = `${CacheKeys.PRODUCT}featured:${limit}${viewerCacheSuffix(isMember)}`;
     const cached = await getCached<unknown[]>(cacheKey);
     if (cached) {
       return c.json({ items: cached, fromCache: true });
@@ -656,6 +658,13 @@ productsApp.get(
           styles: products.styles,
           subjects: products.subjects,
           colors: products.colors,
+          /**
+           * Selected for the sale resolver, not for the card — the same
+           * three-axis set the list projection carries. A `filter`-scoped
+           * promotion can name `rooms`, and a projection without it prices the
+           * PDP and not this rail.
+           */
+          rooms: products.rooms,
           orientation: products.orientation,
           images: products.images,
           isFeatured: products.isFeatured,
@@ -672,10 +681,21 @@ productsApp.get(
         .orderBy(asc(products.featuredOrder), desc(products.createdAt))
         .limit(limit);
 
-      // Cache the result
-      await setCached(cacheKey, featuredProducts, CACHE_TTL_FEATURED);
+      /**
+       * The home rail shows products the grid also shows, so it prices them
+       * through the same resolver. Anything less and the two disagree one
+       * screen apart.
+       */
+      const { activePromotions, ctx } = await loadSaleContext(isMember);
+      const items = featuredProducts.map((product) => ({
+        ...product,
+        sale: resolveSalePrice(product, activePromotions, ctx),
+      }));
 
-      return c.json({ items: featuredProducts });
+      // The priced rows, not the bare ones — this entry lives 15 minutes.
+      await setCached(cacheKey, items, CACHE_TTL_FEATURED);
+
+      return c.json({ items });
     } catch (error) {
       console.error("Error fetching featured products:", error);
       return c.json({ error: "Failed to fetch featured products" }, 500);
@@ -932,7 +952,11 @@ productsApp.get(
       return c.json({ error: "Invalid slug format" }, 400);
     }
 
-    const cacheKey = `${CacheKeys.PRODUCT}related:${slug}:${limit}`;
+    const isMember = readIsMember(c.get("user"));
+
+    // Keyed on the viewer: this row renders the same card as the grid, so it
+    // carries the same locked/unlocked payload and must not be shared.
+    const cacheKey = `${CacheKeys.PRODUCT}related:${slug}:${limit}${viewerCacheSuffix(isMember)}`;
     const cached = await getCached<unknown[]>(cacheKey);
     if (cached) {
       return c.json({ items: cached, fromCache: true });
@@ -992,8 +1016,12 @@ productsApp.get(
           styles: products.styles,
           subjects: products.subjects,
           colors: products.colors,
+          // `rooms` and `isFeatured` complete the set `resolveSalePrice`
+          // matches a `filter` scope against; the card itself reads neither.
+          rooms: products.rooms,
           orientation: products.orientation,
           images: products.images,
+          isFeatured: products.isFeatured,
           isAiGenerated: products.isAiGenerated,
         })
         .from(products)
@@ -1008,9 +1036,17 @@ productsApp.get(
         .orderBy(desc(overlapScore), desc(products.createdAt))
         .limit(limit);
 
-      await setCached(cacheKey, related, CACHE_TTL_FEATURED);
+      // Same resolver as the PDP above it — a "You May Also Like" row at base
+      // price under the product it is recommending is the same bug as #516.
+      const { activePromotions, ctx } = await loadSaleContext(isMember);
+      const items = related.map((product) => ({
+        ...product,
+        sale: resolveSalePrice(product, activePromotions, ctx),
+      }));
 
-      return c.json({ items: related });
+      await setCached(cacheKey, items, CACHE_TTL_FEATURED);
+
+      return c.json({ items });
     } catch (error) {
       console.error("Error fetching related products:", error);
       return c.json({ error: "Failed to fetch related products" }, 500);
