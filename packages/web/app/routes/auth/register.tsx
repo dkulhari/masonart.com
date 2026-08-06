@@ -6,7 +6,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import {
   User,
@@ -18,21 +18,68 @@ import {
   AlertCircle,
   Loader2,
   Check,
+  Sparkles,
 } from 'lucide-react'
-import { z } from 'zod'
 import { cn, isValidEmail } from '~/lib/utils'
 import { signIn, signUp } from '~/lib/auth-client'
+import { clearJoinIntent, setJoinIntent } from '~/lib/joinIntent'
 
 // ============================================================================
 // Route Definition
 // ============================================================================
 
-const searchParamsSchema = z.object({
-  redirect: z.string().optional(),
-})
+/** The value `?join=` carries when the sale offer sent the visitor here. */
+export const GALLERY_JOIN_INTENT = 'gallery'
+
+export interface RegisterSearch {
+  /** Where to return the visitor once they have an account. */
+  redirect?: string
+  /** `gallery` when the join modal (#444) sent them; absent otherwise. */
+  join?: string
+  /** The address the modal already collected, so it is not asked for twice. */
+  email?: string
+}
+
+/**
+ * Turn raw search into typed params.
+ *
+ * Exported so it can be tested without a router, and hand-written rather than
+ * left to a bare Zod object because getting it wrong is not a subtle failure:
+ * `app/router.tsx` overrides TanStack's search serialisation, so every value
+ * arrives as a STRING. A schema that assumes otherwise throws inside
+ * `validateSearch`, and a throw there error-boundaries the whole route to a
+ * blank page rather than degrading to an ordinary signup form.
+ *
+ * This is also the defect #444 walked into: the schema here validated
+ * `{ redirect }` alone, so the `?join=gallery&email=…` the modal sends was
+ * stripped on arrival and the offer dead-ended.
+ */
+export function parseRegisterSearch(
+  search: Record<string, unknown>
+): RegisterSearch {
+  const text = (value: unknown): string | undefined => {
+    if (value === undefined || value === null) return undefined
+    if (typeof value === 'object') return undefined
+    const asString = String(value)
+    return asString === '' ? undefined : asString
+  }
+
+  const parsed: RegisterSearch = {}
+
+  const redirect = text(search.redirect)
+  if (redirect !== undefined) parsed.redirect = redirect
+
+  const join = text(search.join)
+  if (join !== undefined) parsed.join = join
+
+  const email = text(search.email)
+  if (email !== undefined) parsed.email = email
+
+  return parsed
+}
 
 export const Route = createFileRoute('/auth/register')({
-  validateSearch: searchParamsSchema,
+  validateSearch: parseRegisterSearch,
   head: () => ({
     meta: [
       { title: 'Create Account | chobii.art' },
@@ -85,15 +132,21 @@ const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
 // Main Component
 // ============================================================================
 
-function RegisterPage() {
+export function RegisterPage() {
   const navigate = useNavigate()
   const search = useSearch({ from: '/auth/register' })
   const redirectUrl = search.redirect || '/'
 
+  /** The sale offer sent them here; they already said yes in the modal (#444). */
+  const arrivedWithJoinIntent = search.join === GALLERY_JOIN_INTENT
+
   // Form state
   const [formData, setFormData] = useState<FormData>({
     name: '',
-    email: '',
+    // The modal already asked for this. Asking again is a field the visitor
+    // has to fill twice, which is the cost minimal-field capture exists to
+    // avoid (design §2).
+    email: search.email ?? '',
     password: '',
     confirmPassword: '',
   })
@@ -103,6 +156,31 @@ function RegisterPage() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+
+  /**
+   * The gallery opt-in. UNCHECKED for someone who arrived the ordinary way —
+   * consent that was never given is not consent, and a default-on marketing
+   * box is exactly how a consent record becomes worthless. Arriving with
+   * `?join=gallery` is a different case: the visitor already pressed join in
+   * the modal, so the box shows the answer they gave rather than asking twice.
+   */
+  const [joinGallery, setJoinGallery] = useState(arrivedWithJoinIntent)
+
+  /**
+   * Mirror the box into a cookie, because the box itself does not survive what
+   * happens next. Google sign-in is a full navigation to another origin and
+   * back; this component and all of its state are gone by the time a session
+   * exists. The API reads the cookie in better-auth's `session.create.after`
+   * hook and joins with `joinSource: 'registration'` (#441).
+   *
+   * Written on arrival rather than at submit so the "Sign in" link works too:
+   * a visitor who took the offer but already has an account still gets joined.
+   * Unticking clears it — withdrawing has to actually withdraw.
+   */
+  useEffect(() => {
+    if (joinGallery) setJoinIntent()
+    else clearJoinIntent()
+  }, [joinGallery])
 
   // Check if password meets all requirements
   const passwordMeetsRequirements = PASSWORD_REQUIREMENTS.every((req) =>
@@ -223,6 +301,16 @@ function RegisterPage() {
 
   const isFormValid = Object.keys(validateForm(formData)).length === 0
 
+  /**
+   * The intent itself rides the cookie, not this link — but carrying
+   * `redirect` keeps a visitor who already has an account landing back where
+   * the offer found them rather than on the home page.
+   */
+  const signInHref =
+    redirectUrl !== '/'
+      ? `/auth/login?redirect=${encodeURIComponent(redirectUrl)}`
+      : '/auth/login'
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container-wide flex min-h-screen items-center justify-center py-12">
@@ -241,6 +329,29 @@ function RegisterPage() {
 
           {/* Register Card */}
           <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
+            {/**
+             * What joining unlocks, shown only to someone who arrived on the
+             * offer. It names no discount of its own — the depth comes from
+             * the active promotion (#432), and a number written down here
+             * would keep advertising a sale after it changed or ended.
+             */}
+            {arrivedWithJoinIntent && (
+              <div
+                data-testid="gallery-join-unlock"
+                className="mb-6 rounded-lg border border-border bg-muted/50 p-4"
+              >
+                <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  Your member price is waiting
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <li>Member-only pricing unlocks the moment your account exists.</li>
+                  <li>Early access to every drop and sale that follows.</li>
+                  <li>One email when something worth knowing happens. Leave whenever.</li>
+                </ul>
+              </div>
+            )}
+
             {/* Google Sign Up */}
             <button
               type="button"
@@ -468,6 +579,34 @@ function RegisterPage() {
                 )}
               </div>
 
+              {/**
+               * The gallery opt-in. Unchecked by default — see the state
+               * declaration. It is a real checkbox with a real label rather
+               * than a styled div so it is reachable by keyboard and readable
+               * by a screen reader, which a consent control has to be.
+               */}
+              <div className="flex items-start gap-3 rounded-lg border border-border bg-background p-3">
+                <input
+                  type="checkbox"
+                  id="joinGallery"
+                  data-testid="gallery-opt-in"
+                  checked={joinGallery}
+                  onChange={(e) => setJoinGallery(e.target.checked)}
+                  disabled={isLoading}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                />
+                <label
+                  htmlFor="joinGallery"
+                  className="cursor-pointer text-sm text-foreground"
+                >
+                  Join the gallery for member pricing
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Member-only prices, early access to drops, and the occasional
+                    email. Leave whenever you like.
+                  </span>
+                </label>
+              </div>
+
               {/* Submit Button */}
               <button
                 type="submit"
@@ -499,7 +638,7 @@ function RegisterPage() {
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{' '}
             <a
-              href={`/auth/login${redirectUrl !== '/' ? `?redirect=${encodeURIComponent(redirectUrl)}` : ''}`}
+              href={signInHref}
               className="font-medium text-foreground hover:text-foreground/60"
             >
               Sign in

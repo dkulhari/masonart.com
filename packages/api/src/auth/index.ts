@@ -18,6 +18,7 @@ import { defaultStatements, adminAc } from "better-auth/plugins/admin/access";
 import { db } from "../database";
 import * as schema from "../database/schema";
 import { sendEmail } from "../services/email";
+import { consumeJoinIntent } from "../services/gallery-membership";
 import {
   getVerificationEmailTemplate,
   getPasswordResetTemplate,
@@ -324,6 +325,42 @@ export const auth = betterAuth({
     cookieCache: {
       enabled: true,
       maxAge: 60 * 5, // Cache for 5 minutes
+    },
+  },
+
+  /**
+   * Database hooks
+   *
+   * The gallery join intent (#441) is honoured here rather than by
+   * reimplementing signup. A guest who takes the sale offer is sent to
+   * registration carrying the intent in a short-lived cookie — component state
+   * does not survive the OAuth round trip, which is a full navigation to
+   * Google and back.
+   *
+   * `session.create.after` is the hook because it is the first moment on the
+   * far side where a user id and the request's cookies are both in hand, and
+   * because BOTH ways in pass through it: email signup auto-signs-in, and in
+   * production (where email verification is required) the session arrives at
+   * the first real login instead. "On first successful session" is exactly
+   * this hook.
+   *
+   * `consumeJoinIntent` reads nothing and writes nothing when there is no
+   * intent cookie, so an ordinary sign-in costs no extra query.
+   */
+  databaseHooks: {
+    session: {
+      create: {
+        after: async (session, context) => {
+          try {
+            await consumeJoinIntent(session?.userId, context);
+          } catch (error) {
+            // A failed opt-in must never fail the sign-in that triggered it.
+            // The visitor still has an account; the join can be retried from
+            // any of the offer surfaces.
+            console.error("Failed to honour the gallery join intent:", error);
+          }
+        },
+      },
     },
   },
 
