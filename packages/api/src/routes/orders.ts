@@ -12,7 +12,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, desc, sql, inArray, notInArray } from "drizzle-orm";
@@ -35,7 +35,11 @@ import {
   ORDER_NUMBER_PREFIX,
 } from "../lib/order-number";
 import { deliverImmediateGiftCard } from "../services/gift-card-delivery";
-import { quoteGiftCard, GiftCardError } from "../services/gift-card";
+import {
+  quoteGiftCard,
+  redeemGiftCards,
+  GiftCardError,
+} from "../services/gift-card";
 import {
   giftCardCodeRateLimit,
   giftCardCodeSchema,
@@ -151,6 +155,28 @@ const createOrderReviewSchema = z.object({
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Gift card codes sent with a payment request.
+ *
+ * The payment endpoint predates gift cards and most callers still send no
+ * body at all, so a missing or unparseable body means "no cards" rather than
+ * an error. Duplicates are dropped: applying the same code twice in one
+ * request would otherwise try to lock the same row twice.
+ */
+async function readGiftCardCodes(c: Context): Promise<string[]> {
+  try {
+    const body = (await c.req.json()) as { giftCardCodes?: unknown };
+    if (!Array.isArray(body?.giftCardCodes)) return [];
+
+    const codes = body.giftCardCodes.filter(
+      (code): code is string => typeof code === "string" && code.length > 0,
+    );
+    return [...new Set(codes)];
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Calculate shipping cost based on method and subtotal
@@ -952,14 +978,31 @@ ordersApp.post("/:id/payment", async (c) => {
       return c.json({ error: "Cannot pay for a cancelled order" }, 400);
     }
 
+    // Gift card codes the customer applied at checkout. Quoted earlier, but
+    // the quote was advisory — the amounts are re-clamped under a row lock
+    // below.
+    const giftCardCodes = await readGiftCardCodes(c);
+
+    if (order.orderType === "gift_card" && giftCardCodes.length > 0) {
+      // Paying for a gift card with a gift card cycles balance between
+      // instruments and turns every refund into a graph traversal.
+      return c.json(
+        { error: "A gift card cannot be bought with a gift card" },
+        400,
+      );
+    }
+
     // Check if there's an existing Razorpay order that's still valid
     const existingPaymentDetails = order.paymentDetails as OrderPaymentDetails | null;
     if (existingPaymentDetails?.orderId) {
-      // Return existing Razorpay order if payment is still pending
+      // Return existing Razorpay order if payment is still pending.
+      // The amount is the remainder, not the total: gift cards already paid
+      // part of this order, and quoting the total would show the customer a
+      // figure they are not being charged.
       return c.json({
         razorpayOrderId: existingPaymentDetails.orderId,
         razorpayKeyId: getRazorpayKeyId(),
-        amount: toPaise(order.total),
+        amount: toPaise(order.total) - toPaise(order.giftCardAmount),
         currency: order.currency,
         orderNumber: order.orderNumber,
         orderId: order.id,
@@ -970,16 +1013,79 @@ ordersApp.post("/:id/payment", async (c) => {
       });
     }
 
-    // Create a new Razorpay order
-    const razorpayOrder = await createRazorpayOrder({
-      amount: toPaise(order.total),
-      currency: order.currency,
-      receipt: order.id,
-      notes: {
-        orderNumber: order.orderNumber,
-        orderId: order.id,
-      },
+    /**
+     * The debit, the tender record and the Razorpay order are one unit of
+     * work.
+     *
+     * createRazorpayOrder is called INSIDE the transaction on purpose: if the
+     * gateway fails, the gift card debit rolls back with it. Debiting first
+     * and creating the payment afterwards would take the customer's balance
+     * and leave them with nothing to pay against.
+     */
+    const payment = await db.transaction(async (tx) => {
+      const applied = await redeemGiftCards(
+        tx,
+        order.id,
+        giftCardCodes,
+        toPaise(order.total),
+        user.id,
+      );
+
+      const giftCardPaise = applied.reduce(
+        (sum, application) => sum + application.amountPaise,
+        0,
+      );
+      const remainder = toPaise(order.total) - giftCardPaise;
+
+      if (giftCardPaise > 0) {
+        await tx
+          .update(orders)
+          .set({
+            giftCardAmount: (giftCardPaise / 100).toFixed(2),
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, order.id));
+      }
+
+      // Exactly zero, never a threshold. A one-paisa remainder is still a
+      // payment, and rounding it away would mark an order paid that was not.
+      if (remainder === 0) {
+        await tx
+          .update(orders)
+          .set({
+            status: "confirmed",
+            paymentStatus: "paid",
+            paidAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(orders.id, order.id));
+
+        return { fullyCovered: true as const, giftCardPaise };
+      }
+
+      const razorpayOrder = await createRazorpayOrder({
+        amount: remainder,
+        currency: order.currency,
+        receipt: order.id,
+        notes: {
+          orderNumber: order.orderNumber,
+          orderId: order.id,
+        },
+      });
+
+      return { fullyCovered: false as const, giftCardPaise, razorpayOrder };
     });
+
+    if (payment.fullyCovered) {
+      return c.json({
+        fullyCoveredByGiftCard: true,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        giftCardAmount: (payment.giftCardPaise / 100).toFixed(2),
+      });
+    }
+
+    const razorpayOrder = payment.razorpayOrder;
 
     // Update order with Razorpay order ID
     await db
