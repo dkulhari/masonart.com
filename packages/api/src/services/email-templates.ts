@@ -1117,3 +1117,62 @@ If you didn't request this, ignore this email — your password will not change.
     text,
   };
 }
+
+/**
+ * Gift card delivery.
+ *
+ * This email is the ONLY place the code ever appears. Only its hash is
+ * stored, so it cannot be looked up, resent, or recovered by support — a
+ * lost card is replaced by disabling it and issuing a new one.
+ */
+export function getGiftCardTemplate(params: {
+  code: string;
+  amountRupees: string;
+  recipientName: string;
+  senderName: string;
+  message: string | null;
+}): EmailTemplate {
+  const code = escapeHtml(params.code);
+  const amount = escapeHtml(params.amountRupees);
+  const recipient = escapeHtml(params.recipientName || "there");
+  const sender = escapeHtml(params.senderName);
+  const message = params.message ? escapeHtml(params.message) : null;
+
+  const content = `
+    <div class="content">
+      <h2>${sender} sent you a gift card</h2>
+      <p>Hi ${recipient},</p>
+      <p>You have <strong>₹${amount}</strong> to spend on chobii.art.</p>
+      ${
+        message
+          ? `<blockquote style="margin: 24px 0; padding: 12px 20px; border-left: 3px solid #ddd; font-style: italic;">${message}</blockquote>`
+          : ""
+      }
+      <p>Use this code at checkout:</p>
+      <div style="text-align: center; margin: 24px 0;">
+        <span style="display: inline-block; padding: 16px 24px; border: 1px dashed #999;
+                     font-family: monospace; font-size: 20px; letter-spacing: 2px;">${code}</span>
+      </div>
+      <p>The card never expires, and you can spend it across several orders —
+      whatever is left stays on the card.</p>
+      <p><strong>Keep this email.</strong> We cannot show you this code again.</p>
+    </div>
+  `.trim();
+
+  const text = `Hi ${params.recipientName || "there"},
+
+${params.senderName} sent you a chobii.art gift card worth Rs ${params.amountRupees}.
+${params.message ? `\n"${params.message}"\n` : ""}
+Your code: ${params.code}
+
+Use it at checkout. It never expires, and you can spend it across several
+orders — whatever is left stays on the card.
+
+Keep this email: we cannot show you this code again.`;
+
+  return {
+    subject: `${params.senderName} sent you a ₹${params.amountRupees} gift card`,
+    html: baseTemplate(content),
+    text,
+  };
+}

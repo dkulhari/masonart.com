@@ -34,6 +34,7 @@ import {
   generateOrderNumber,
   ORDER_NUMBER_PREFIX,
 } from "../lib/order-number";
+import { deliverImmediateGiftCard } from "../services/gift-card-delivery";
 import type { Promotion } from "../database/schema/promotions";
 import {
   getActivePromotions,
@@ -1034,6 +1035,17 @@ ordersApp.post(
           updatedAt: new Date(),
         })
         .where(eq(orders.id, order.id));
+
+      // A gift card order mints its card now, once the money is real. A
+      // future send date is left for the delivery sweep: the code is
+      // returned once and never stored, so a card created today could not be
+      // emailed in three months. Failure here must not fail the payment —
+      // the customer has paid, and an undelivered card is recoverable.
+      if (order.orderType === "gift_card") {
+        await deliverImmediateGiftCard(order.id).catch((error) => {
+          console.error("Gift card delivery failed after payment:", error);
+        });
+      }
 
       return c.json({
         success: true,
