@@ -294,6 +294,16 @@ export const auth = betterAuth({
         required: false,
         defaultValue: "free",
       },
+      /**
+       * Carried in the session payload so a storefront surface can tell at
+       * render time whether the viewer is a gallery member — without a second
+       * request per surface.
+       */
+      galleryMember: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+      },
       lastLoginAt: {
         type: "date",
         required: false,

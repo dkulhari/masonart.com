@@ -173,6 +173,22 @@ export const users = pgTable(
     defaultAddressId: uuid("default_address_id"),
     defaultPaymentMethodId: uuid("default_payment_method_id"),
 
+    // Gallery membership
+    /**
+     * "The gallery" — an explicit opt-in, not a synonym for having an account.
+     * Defaults false for every existing customer: they see the same join
+     * prompt as anyone else, because we were never granted their consent.
+     */
+    galleryMember: boolean("gallery_member").default(false).notNull(),
+    galleryJoinedAt: timestamp("gallery_joined_at", { withTimezone: true }),
+    /** A timestamp, not a boolean — a date is what has to be produced if the
+     *  consent is ever questioned. */
+    marketingConsentAt: timestamp("marketing_consent_at", {
+      withTimezone: true,
+    }),
+    /** banner | rail | cart | registration | sale-page */
+    joinSource: text("join_source"),
+
     // Last login tracking
     lastLoginAt: timestamp("last_login_at"),
   },
