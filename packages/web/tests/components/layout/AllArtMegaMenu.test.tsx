@@ -8,8 +8,8 @@
  * literal list here — the drift #395 ended.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -77,12 +77,38 @@ describe('the trigger', () => {
 
 describe('closing', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
     fireEvent.mouseEnter(root())
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** Run the grace window out. */
+  const waitOutGrace = () => act(() => void vi.advanceTimersByTime(400))
+
   it('closes when the pointer leaves', () => {
     fireEvent.mouseLeave(root())
+    waitOutGrace()
     expect(root()).toHaveAttribute('data-open', 'false')
+  })
+
+  it('does not close the instant the pointer leaves', () => {
+    // The trigger is in the nav row and the panel hangs below it; the strip
+    // between them belongs to neither, and closing on `mouseleave` alone made
+    // the panel vanish the moment you set off towards it.
+    fireEvent.mouseLeave(root())
+    act(() => void vi.advanceTimersByTime(50))
+    expect(root()).toHaveAttribute('data-open', 'true')
+  })
+
+  it('cancels the close if the pointer comes back', () => {
+    fireEvent.mouseLeave(root())
+    act(() => void vi.advanceTimersByTime(50))
+    fireEvent.mouseEnter(root())
+    waitOutGrace()
+    expect(root()).toHaveAttribute('data-open', 'true')
   })
 
   it('closes on Escape', () => {
@@ -97,6 +123,7 @@ describe('closing', () => {
 
   it('keeps the panel out of the tab order while closed', () => {
     fireEvent.mouseLeave(root())
+    waitOutGrace()
     // `invisible` is what drops the nav rows' links out of the tab order
     // (#421); the panel earns its keyboard behaviour the same way.
     expect(panel().className).toContain('invisible')

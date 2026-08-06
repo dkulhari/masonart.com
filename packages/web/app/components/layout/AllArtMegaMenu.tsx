@@ -144,6 +144,22 @@ const PROMO_CARDS = CATEGORY_TILES.slice(0, 2)
 const UNDERLINE_WIPE =
   'bg-[linear-gradient(currentColor,currentColor)] bg-[length:0%_1px] bg-[position:0_100%] bg-no-repeat transition-[background-size,color] duration-500 ease-[cubic-bezier(0.3,1,0.3,1)] hover:bg-[length:100%_1px] hover:text-foreground motion-reduce:transition-none'
 
+/**
+ * How long the panel survives a pointer that is between things.
+ *
+ * The trigger sits inside the nav row; the panel hangs BELOW that row. Between
+ * the two is a strip — the row's own padding and border — that belongs to
+ * neither, and crossing it fires `mouseleave` on the wrapper. Closing on that
+ * event alone made the menu unreachable: it vanished the moment you set off
+ * towards it.
+ *
+ * A grace window is the fix rather than a taller hover target, because the
+ * pointer can also leave sideways at speed and a fatter target only moves the
+ * cliff. Long enough for a hand crossing ~10px, short enough that leaving on
+ * purpose still feels immediate.
+ */
+const CLOSE_GRACE_MS = 180
+
 export function AllArtMegaMenu({
   onOpenChange,
   onNavigate,
@@ -154,11 +170,40 @@ export function AllArtMegaMenu({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const setOpen = (next: boolean) => {
     setIsOpen(next)
     onOpenChange?.(next)
   }
+
+  const cancelPendingClose = () => {
+    if (closeTimer.current === null) return
+    clearTimeout(closeTimer.current)
+    closeTimer.current = null
+  }
+
+  const openNow = () => {
+    cancelPendingClose()
+    setOpen(true)
+  }
+
+  /** Leaving starts a countdown; coming back anywhere inside cancels it. */
+  const closeSoon = () => {
+    cancelPendingClose()
+    closeTimer.current = setTimeout(() => {
+      closeTimer.current = null
+      setOpen(false)
+    }, CLOSE_GRACE_MS)
+  }
+
+  const closeNow = () => {
+    cancelPendingClose()
+    setOpen(false)
+  }
+
+  // A timer that outlives the component would set state on nothing.
+  useEffect(() => cancelPendingClose, [])
 
   // Hover opens it; a panel that only closes by walking the pointer back
   // through it is a trap, so Escape and an outside press close it too.
@@ -166,10 +211,10 @@ export function AllArtMegaMenu({
     if (!isOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') closeNow()
     }
     const onPointerDown = (event: Event) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      if (!rootRef.current?.contains(event.target as Node)) closeNow()
     }
 
     document.addEventListener('keydown', onKeyDown)
@@ -182,7 +227,7 @@ export function AllArtMegaMenu({
   }, [isOpen])
 
   const close = () => {
-    setOpen(false)
+    closeNow()
     onNavigate?.()
   }
 
@@ -191,8 +236,8 @@ export function AllArtMegaMenu({
       ref={rootRef}
       data-testid="all-art-mega"
       data-open={isOpen}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={openNow}
+      onMouseLeave={closeSoon}
     >
       <Link
         to="/posters"

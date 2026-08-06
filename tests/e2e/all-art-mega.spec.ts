@@ -67,6 +67,43 @@ test.describe('All Art mega panel', () => {
     await expect(page).not.toHaveURL(/styles=/);
   });
 
+  test('survives the walk from the trigger down into the panel', async ({
+    page,
+  }) => {
+    // The bug this pins: the trigger sits in the nav row and the panel hangs
+    // BELOW that row, so a pointer travelling between them crosses a strip
+    // that belongs to neither. `.hover()` teleports and never touches it —
+    // only a stepped move reproduces what a hand does, which is why the
+    // original suite passed while the menu was unusable.
+    await openPanel(page);
+
+    const target = page
+      .getByTestId('all-art-column-style')
+      .getByRole('link', { name: 'Minimalist Art' });
+
+    const trigger = await page
+      .getByTestId('all-art-mega-trigger')
+      .boundingBox();
+    const destination = await target.boundingBox();
+
+    await page.mouse.move(
+      (trigger?.x ?? 0) + (trigger?.width ?? 0) / 2,
+      (trigger?.y ?? 0) + (trigger?.height ?? 0) / 2
+    );
+    await page.mouse.move(
+      (destination?.x ?? 0) + (destination?.width ?? 0) / 2,
+      (destination?.y ?? 0) + (destination?.height ?? 0) / 2,
+      { steps: 24 }
+    );
+
+    await expect(mega(page)).toHaveAttribute('data-open', 'true');
+
+    // And the option is still there to be clicked once you have walked to it.
+    await page.mouse.down();
+    await page.mouse.up();
+    await expect(page).toHaveURL(/\/posters\?.*styles=minimalist-art/);
+  });
+
   test('Escape closes it', async ({ page }) => {
     await openPanel(page);
     await page.keyboard.press('Escape');
