@@ -28,16 +28,14 @@ import {
 import { carts, cartItems } from "../database/schema/cart";
 import { productionApprovals } from "../database/schema/approvals";
 import { reviews } from "../database/schema/reviews";
-import {
-  requireAuth,
-  type AuthUser,
-  type AuthVariables,
-} from "../middleware/auth";
+import { requireAuth, type AuthVariables } from "../middleware/auth";
+import type { Promotion } from "../database/schema/promotions";
 import {
   getActivePromotions,
   loadPromotionProductSets,
   resolveSalePrice,
 } from "../lib/promotion-pricing";
+import { isGalleryMember } from "../services/gallery-membership";
 import { VOIDED_ORDER_STATUSES } from "../lib/product-sales";
 import {
   createRazorpayOrder,
@@ -218,21 +216,6 @@ function createItemSnapshot(
 // Sale pricing at order time
 // ============================================================================
 
-/**
- * Membership, read off the session at the moment the order is created.
- *
- * Mirrors `routes/cart.ts` and `routes/products.ts`: `galleryMember` is a
- * Better Auth additional field, so it rides on the session user without
- * appearing on `AuthUser` — the cast is what that costs. Reading it here rather
- * than trusting the cart is the point: a cart opened as a member and checked
- * out after a logout pays base.
- */
-function readIsMember(user: AuthUser): boolean {
-  return Boolean(
-    (user as AuthUser & { galleryMember?: boolean }).galleryMember
-  );
-}
-
 /** Half-up to 2dp, applied per line — the same rule the resolver uses. */
 function toMoney(value: number): string {
   return (Math.round((value + Number.EPSILON) * 100) / 100).toFixed(2);
@@ -278,6 +261,34 @@ async function countSettledOrdersForPromotion(
 }
 
 /**
+ * Whether a members-only price applies to this order.
+ *
+ * Read from the users row, never from the session (#526). `galleryMember` is a
+ * Better Auth additional field, so it rides on the session — and better-auth
+ * serves the session from a five-minute signed cookie. That cache is stale in
+ * both directions: a customer who joined a minute ago still reads as a guest,
+ * and a flag cleared a minute ago still reads as a member. `routes/cart.ts` and
+ * `routes/products.ts` can live with that — they render prices. This is the one
+ * place money actually moves, and it does not get to be wrong for five minutes
+ * in either direction.
+ *
+ * The read is lazy because it is only ever needed by a members-only promotion:
+ * `resolveSalePrice` consults `isMember` nowhere else, so with no such
+ * promotion in play the answer cannot change a single figure and the query is
+ * simply not issued.
+ */
+async function resolveMembership(
+  userId: string,
+  activePromotions: Promotion[]
+): Promise<boolean> {
+  if (!activePromotions.some((promotion) => promotion.membersOnly)) {
+    return false;
+  }
+
+  return isGalleryMember(userId);
+}
+
+/**
  * What comes off this order, resolved from the database.
  *
  * The client sends no prices and none are read from the cart's stored
@@ -294,7 +305,6 @@ async function countSettledOrdersForPromotion(
  */
 async function resolvePromotionDiscounts(
   userId: string,
-  isMember: boolean,
   items: PricedOrderLine[]
 ): Promise<{
   discountByLine: Map<string, string>;
@@ -304,6 +314,7 @@ async function resolvePromotionDiscounts(
   const activePromotions = await getActivePromotions();
   const { includedIds, excludedIds } =
     await loadPromotionProductSets(activePromotions);
+  const isMember = await resolveMembership(userId, activePromotions);
   const ctx = { isMember, includedIds, excludedIds };
 
   const perLine = new Map<string, LineDiscount>();
@@ -443,11 +454,7 @@ ordersApp.post(
       // Re-resolve every price from the database. Nothing the request said
       // about money reaches this point.
       const { discountByLine, promotionId, promotionDiscount } =
-        await resolvePromotionDiscounts(
-          user.id,
-          readIsMember(user),
-          activeItems
-        );
+        await resolvePromotionDiscounts(user.id, activeItems);
 
       // Calculate totals
       //

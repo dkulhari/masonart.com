@@ -23,6 +23,7 @@ import '../setup';
 
 import type { Promotion } from '../../src/database/schema/promotions';
 import { orders, orderItems } from '../../src/database/schema/orders';
+import { users } from '../../src/database/schema/users';
 
 // ============================================================================
 // Mocks
@@ -196,16 +197,33 @@ function givenPromotions(
 }
 
 /**
+ * What the users row says about membership.
+ *
+ * Order creation reads this from the database rather than the session (#526):
+ * `galleryMember` rides a five-minute cookie cache, and money must not be
+ * decided by a cache in either direction. `signIn({ galleryMember })` therefore
+ * sets what the SESSION believes and nothing more — it no longer moves a price.
+ */
+let memberRow = { galleryMember: false };
+
+function givenMember(isMember: boolean) {
+  memberRow = { galleryMember: isMember };
+}
+
+/**
  * Answers successive `db.select(...)` calls in order. Order creation issues one
  * count per limited promotion in play, then one for the order number.
+ *
+ * The membership read is addressed by TABLE rather than by position: it happens
+ * only when a members-only promotion is in play, so letting it consume a queued
+ * slot would shift every count in every other test.
  */
 function queueSelects(...results: unknown[][]) {
   let call = 0;
   selectMock.mockImplementation(() => {
-    const rows = results[call++] ?? [];
+    let rows: unknown[] = [];
     const chain: Record<string, unknown> = {};
     for (const key of [
-      'from',
       'where',
       'groupBy',
       'orderBy',
@@ -216,6 +234,10 @@ function queueSelects(...results: unknown[][]) {
     ]) {
       chain[key] = () => chain;
     }
+    chain.from = (table: unknown) => {
+      rows = table === users ? [{ ...memberRow }] : (results[call++] ?? []);
+      return chain;
+    };
     chain.then = (resolve: (v: unknown) => void) => resolve(rows);
     return chain;
   });
@@ -285,6 +307,7 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
   persistedOrder = {};
   persistedItems = [];
+  memberRow = { galleryMember: false };
   installTransaction();
   signIn();
   givenCart([cartItem()]);
@@ -446,7 +469,7 @@ describe('order creation — pricing authority', () => {
 
   it('charges base when the buyer is not a gallery member at order time', async () => {
     givenPromotions([promotion({ membersOnly: true })]);
-    signIn({ galleryMember: false });
+    givenMember(false);
 
     await postOrder();
 
@@ -459,7 +482,20 @@ describe('order creation — pricing authority', () => {
 
   it('applies a members-only promotion for a gallery member', async () => {
     givenPromotions([promotion({ membersOnly: true })]);
-    signIn({ galleryMember: true });
+    givenMember(true);
+
+    await postOrder();
+
+    expect(persistedOrder.promotionDiscount).toBe('800.00');
+    expect(persistedOrder.promotionId).toBe(PROMOTION_ID);
+  });
+
+  it('reads membership from the row, not from the session cookie (#526)', async () => {
+    givenPromotions([promotion({ membersOnly: true })]);
+    // Exactly the five-minute window after a join: the row is current, the
+    // signed session cookie better-auth is still serving is not.
+    signIn({ galleryMember: false });
+    givenMember(true);
 
     await postOrder();
 

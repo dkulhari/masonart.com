@@ -25,6 +25,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { joinGallery, joinSourceSchema } from "../services/gallery-membership";
+import { refreshSessionCookie } from "../lib/session-refresh";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 
 // ============================================================================
@@ -75,6 +76,21 @@ galleryApp.post("/join", async (c) => {
     if (result.status === "not-found") {
       return c.json({ error: "Account not found" }, 404);
     }
+
+    /**
+     * The row is not the whole truth until the session agrees with it.
+     *
+     * `galleryMember` rides the session (#439) and better-auth serves the
+     * session from a five-minute signed cookie, so a join that writes only the
+     * row leaves the server answering "guest" to the customer who just joined —
+     * locked prices on the grid, no saving in the cart (#526). Re-issued here,
+     * on the one request that knows the flag changed, rather than paid for by
+     * every priced request afterwards.
+     *
+     * A re-join refreshes too: an already-member calling this is usually a
+     * client that thinks it is not one, which is exactly the stale-cookie case.
+     */
+    await refreshSessionCookie(c);
 
     return c.json(result.membership);
   } catch (error) {

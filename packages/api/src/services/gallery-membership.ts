@@ -114,6 +114,37 @@ export function hasJoinIntent(
 }
 
 // ============================================================================
+// Membership, from the row
+// ============================================================================
+
+/**
+ * Is this user a gallery member, according to the database?
+ *
+ * The session carries `galleryMember` as well — it is a `user.additionalFields`
+ * entry (#439) — and every storefront surface reads it from there, which is the
+ * point of putting it on the session. But better-auth serves the session from a
+ * signed cookie for five minutes (`session.cookieCache`), so that copy is a
+ * cache and it is stale in BOTH directions: for five minutes after a join it
+ * still says guest, and for five minutes after any change the other way it
+ * still says member.
+ *
+ * A stale flag on a product grid costs a re-render. A stale flag at the till
+ * costs a customer the discount they were shown, or costs the shop one nobody
+ * earned. So the paths that decide money call this instead (#526).
+ */
+export async function isGalleryMember(userId: string): Promise<boolean> {
+  if (!userId) return false;
+
+  const [row] = await db
+    .select({ galleryMember: users.galleryMember })
+    .from(users)
+    .where(eq(users.id, userId));
+
+  // A session over a row that no longer exists is not a membership.
+  return row?.galleryMember === true;
+}
+
+// ============================================================================
 // The join
 // ============================================================================
 
@@ -237,6 +268,23 @@ function readCookieHeader(ctx: CookieBearingContext | null): string | null {
  * Returns `null` — with no database access whatever — when there is no intent.
  * Every login in the system runs this hook, and an ordinary sign-in must not
  * pay for a membership lookup it has no use for.
+ *
+ * THIS PATH CANNOT RE-ISSUE ITS OWN COOKIE
+ *
+ * `POST /api/gallery/join` refreshes the session after writing (see
+ * `lib/session-refresh.ts`), and this hook cannot do the same: better-auth
+ * writes the sign-in's cookie cache AFTER `session.create.after` returns, from
+ * the user object it fetched BEFORE the hook ran. Anything set here is
+ * overwritten a moment later, so a visitor who joins by registering carries a
+ * cookie that says "guest" for up to five minutes — verified against
+ * better-auth 1.4.17.
+ *
+ * What that costs is bounded on purpose: `routes/orders.ts` reads membership
+ * from the row (`isGalleryMember`), so no price is ever decided from that
+ * cookie, and the storefront's optimistic signal (#446) shows the right thing
+ * meanwhile. It is a stale render, not a wrong charge. Closing it properly
+ * means intercepting better-auth's own sign-in response — out of scope for
+ * #526, and not worth it for a five-minute cosmetic window.
  */
 export async function consumeJoinIntent(
   userId: string,
