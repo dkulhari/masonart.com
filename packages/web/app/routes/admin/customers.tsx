@@ -2,12 +2,16 @@
  * Admin Customers Page - chobii.art E-commerce Platform
  *
  * User list with per-field filtering and role assignment:
- * - Filters (search, role, status, joined date range) live in URL search
- *   params and are evaluated server-side, so the list is shareable,
- *   back-button safe and does not depend on loading the whole user table.
+ * - Filters (search, role, status, gallery membership, joined date range) live
+ *   in URL search params and are evaluated server-side, so the list is
+ *   shareable, back-button safe and does not depend on loading the whole user
+ *   table.
  * - Role dropdown per row to toggle customer <-> content-manager <-> admin
  * - Admin/super-admin rows show their role as static text (immutable here;
  *   the API also refuses to modify them)
+ * - "Export consented" downloads the gallery mailing list. The server decides
+ *   who is in it — only rows carrying a `marketingConsentAt` — so nothing on
+ *   this page can widen the file, only narrow it (#442).
  *
  * This page is admin-only: it sits outside the content-manager allowed
  * prefixes, so the /admin layout guard blocks content-managers.
@@ -26,6 +30,7 @@ import {
   CheckCircle2,
   X,
   ArrowUpDown,
+  Download,
 } from 'lucide-react'
 import { cn, getApiUrl } from '~/lib/utils'
 
@@ -72,12 +77,30 @@ const roleListParam = z.preprocess(
   z.array(z.enum(FILTERABLE_ROLES)).min(1).optional()
 )
 
+/**
+ * Same router quirk, the other direction. A boolean leaves as `true` and comes
+ * back as the string `'true'`, and `z.coerce.boolean()` would read `'false'`
+ * as true — every non-empty string is truthy — so "not members" would quietly
+ * list members. Map the two words by hand.
+ *
+ * Anything unrecognised becomes undefined rather than a parse error: a throw
+ * in `validateSearch` error-boundaries the whole route to a blank page, so a
+ * junk param would take the screen down instead of just ignoring the filter.
+ */
+const galleryMemberParam = z.preprocess((value) => {
+  if (typeof value === 'boolean') return value
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return undefined
+}, z.boolean().optional())
+
 const searchParamsSchema = z.object({
   page: z.coerce.number().positive().optional().default(1),
   pageSize: z.coerce.number().positive().max(100).optional().default(20),
   search: z.string().optional(),
   role: roleListParam,
   status: z.enum(FILTERABLE_STATUSES).optional(),
+  galleryMember: galleryMemberParam,
   joinedFrom: calendarDay.optional(),
   joinedTo: calendarDay.optional(),
   sortBy: z.enum(SORTABLE_COLUMNS).optional().default('createdAt'),
@@ -86,8 +109,16 @@ const searchParamsSchema = z.object({
 
 type SearchParams = z.infer<typeof searchParamsSchema>
 
+/**
+ * Exported so the coercion above is testable on its own. A wrong answer here
+ * does not throw a useful error — it error-boundaries the route to a blank
+ * page — so it is worth pinning away from the component.
+ */
+export const parseCustomerSearch = (search: unknown): SearchParams =>
+  searchParamsSchema.parse(search)
+
 export const Route = createFileRoute('/admin/customers')({
-  validateSearch: (search) => searchParamsSchema.parse(search),
+  validateSearch: parseCustomerSearch,
   head: () => ({
     meta: [
       { title: 'Customers | Admin | chobii.art' },
@@ -108,6 +139,10 @@ interface AdminCustomer {
   role: string
   status: string
   createdAt: string
+  galleryMember: boolean
+  galleryJoinedAt: string | null
+  marketingConsentAt: string | null
+  joinSource: string | null
 }
 
 interface CustomersResponse {
@@ -142,9 +177,8 @@ const STATUS_LABELS: Record<string, string> = {
 // API Functions
 // ============================================================================
 
-async function fetchCustomers(
-  params: SearchParams
-): Promise<CustomersResponse> {
+/** Filters the API understands. Shared so a download matches what is on screen. */
+function buildCustomerQuery(params: SearchParams): URLSearchParams {
   const query = new URLSearchParams()
 
   query.set('page', String(params.page))
@@ -156,11 +190,21 @@ async function fetchCustomers(
   if (params.status) query.set('status', params.status)
   if (params.joinedFrom) query.set('joinedFrom', params.joinedFrom)
   if (params.joinedTo) query.set('joinedTo', params.joinedTo)
+  // `false` is a filter, not an absent one — check for undefined, not falsiness
+  if (params.galleryMember !== undefined) {
+    query.set('galleryMember', String(params.galleryMember))
+  }
   // Repeated `role=` params — the API reads roles as a list
   for (const role of params.role ?? []) query.append('role', role)
 
+  return query
+}
+
+async function fetchCustomers(
+  params: SearchParams
+): Promise<CustomersResponse> {
   const response = await fetch(
-    `${getApiUrl()}/api/admin/customers?${query.toString()}`,
+    `${getApiUrl()}/api/admin/customers?${buildCustomerQuery(params)}`,
     {
       method: 'GET',
       credentials: 'include',
@@ -173,6 +217,40 @@ async function fetchCustomers(
   }
 
   return response.json()
+}
+
+/**
+ * Downloads the consented list as CSV.
+ *
+ * The server decides who is in the file — only rows carrying a
+ * `marketingConsentAt` — and no control on this page can change that. The
+ * filters are passed so the download matches the slice being viewed; they can
+ * only narrow it.
+ *
+ * Fetched rather than linked because the API is a different origin and the
+ * request needs `credentials: 'include'`. The filename is rebuilt here for the
+ * same reason: `Content-Disposition` is not a CORS-exposed response header, so
+ * reading it back would give null in the browser.
+ */
+async function downloadConsentedCsv(params: SearchParams): Promise<void> {
+  const response = await fetch(
+    `${getApiUrl()}/api/admin/customers/export?${buildCustomerQuery(params)}`,
+    { method: 'GET', credentials: 'include' }
+  )
+
+  if (!response.ok) {
+    throw new Error('Failed to export the consented list')
+  }
+
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `gallery-consented-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 async function updateCustomerRole(id: string, role: string): Promise<void> {
@@ -225,12 +303,52 @@ function hasActiveFilters(params: SearchParams): boolean {
       params.status ||
       params.joinedFrom ||
       params.joinedTo ||
+      params.galleryMember !== undefined ||
       (params.role && params.role.length > 0)
   )
 }
 
 const inputClasses =
   'h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500'
+
+/**
+ * Membership at a glance, and the one state worth shouting about: a member
+ * with no consent stamp. That row is a bug in whatever joined them — the
+ * export refuses to include it, and this is where someone notices why a
+ * member they expected is missing from the file.
+ */
+function GalleryCell({ customer }: { customer: AdminCustomer }) {
+  if (!customer.galleryMember) {
+    return <span className="text-xs text-muted-foreground">—</span>
+  }
+
+  const consented = Boolean(customer.marketingConsentAt)
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className={cn(
+          'inline-flex w-fit rounded-full px-2.5 py-0.5 text-xs font-medium',
+          consented
+            ? 'bg-brand-500/10 text-brand-700'
+            : 'bg-amber-100 text-amber-800'
+        )}
+        title={
+          consented
+            ? `Consented ${formatDate(customer.marketingConsentAt!)}`
+            : 'Member without a consent timestamp — not exportable'
+        }
+      >
+        {consented ? 'Member' : 'No consent'}
+      </span>
+      {customer.joinSource && (
+        <span className="text-xs text-muted-foreground">
+          via {customer.joinSource}
+        </span>
+      )}
+    </div>
+  )
+}
 
 // ============================================================================
 // Component
@@ -251,6 +369,7 @@ function AdminCustomersPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(searchParams.search ?? '')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error'
     message: string
@@ -365,6 +484,21 @@ function AdminCustomersPage() {
     }
   }
 
+  const handleExport = async () => {
+    setIsExporting(true)
+    try {
+      await downloadConsentedCsv(searchParams)
+      setFeedback({
+        type: 'success',
+        message: 'Consented gallery list downloaded',
+      })
+    } catch (err) {
+      setFeedback({ type: 'error', message: (err as Error).message })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const filtersActive = hasActiveFilters(searchParams)
 
   const sortIndicator = (column: (typeof SORTABLE_COLUMNS)[number]) =>
@@ -406,14 +540,27 @@ function AdminCustomersPage() {
             Manage users and assign the content manager role
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadCustomers()}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-        >
-          <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Only consented rows land in the file — see the export handler */}
+          <button
+            type="button"
+            onClick={() => void handleExport()}
+            disabled={isExporting}
+            title="CSV of gallery members who gave marketing consent"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? 'Exporting…' : 'Export consented'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void loadCustomers()}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Feedback banner */}
@@ -477,6 +624,35 @@ function AdminCustomersPage() {
                   {STATUS_LABELS[status]}
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Gallery membership */}
+          <div>
+            <label
+              htmlFor="gallery-filter"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              Gallery
+            </label>
+            <select
+              id="gallery-filter"
+              value={
+                searchParams.galleryMember === undefined
+                  ? ''
+                  : String(searchParams.galleryMember)
+              }
+              onChange={(e) =>
+                updateSearch({
+                  galleryMember:
+                    e.target.value === '' ? undefined : e.target.value === 'true',
+                })
+              }
+              className={cn(inputClasses, 'w-full')}
+            >
+              <option value="">Everyone</option>
+              <option value="true">Members</option>
+              <option value="false">Not members</option>
             </select>
           </div>
 
@@ -591,6 +767,7 @@ function AdminCustomersPage() {
               {sortableHeader('email', 'Email')}
               {sortableHeader('role', 'Role')}
               <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Gallery</th>
               {sortableHeader('createdAt', 'Joined')}
             </tr>
           </thead>
@@ -598,7 +775,7 @@ function AdminCustomersPage() {
             {isLoading ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-8 text-center text-muted-foreground"
                 >
                   Loading customers...
@@ -607,7 +784,7 @@ function AdminCustomersPage() {
             ) : customers.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-8 text-center text-muted-foreground"
                 >
                   No customers found
@@ -668,6 +845,9 @@ function AdminCustomersPage() {
                       >
                         {customer.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <GalleryCell customer={customer} />
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {formatDate(customer.createdAt)}
