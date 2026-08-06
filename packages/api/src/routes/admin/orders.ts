@@ -32,7 +32,10 @@ import {
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
-import { voidGiftCardHold } from "../../services/gift-card";
+import {
+  voidGiftCardHold,
+  refundToGiftCards,
+} from "../../services/gift-card";
 import {
   createRefund,
   isRazorpayConfigured,
@@ -975,6 +978,8 @@ adminOrdersApp.post(
           id: orders.id,
           orderNumber: orders.orderNumber,
           total: orders.total,
+          // Needed to split the refund by tender.
+          giftCardAmount: orders.giftCardAmount,
           paymentStatus: orders.paymentStatus,
           paymentDetails: orders.paymentDetails,
           internalNotes: orders.internalNotes,
@@ -1000,11 +1005,7 @@ adminOrdersApp.post(
         );
       }
 
-      // Get payment ID from payment details
       const paymentDetails = order.paymentDetails as OrderPaymentDetails | null;
-      if (!paymentDetails?.paymentId) {
-        return c.json({ error: "Payment ID not found for this order" }, 400);
-      }
 
       // Calculate refund amount
       const refundAmount = amount || parseFloat(order.total);
@@ -1017,16 +1018,76 @@ adminOrdersApp.post(
         );
       }
 
-      // Create refund via Razorpay
-      const refund = await createRefund({
-        paymentId: paymentDetails.paymentId,
-        amount: Math.round(refundAmount * 100), // Convert to paise
-        notes: {
-          reason,
-          orderNumber: order.orderNumber,
-          orderId: order.id,
-        },
-      });
+      /**
+       * Split the refund by tender, in paise.
+       *
+       * `refundAmount` is a float in rupees, and splitting a float is how a
+       * rupee goes missing. Everything below is integer paise.
+       *
+       * The Razorpay leg is SUBTRACTED rather than rounded independently, so
+       * the two legs always sum to exactly the refund.
+       */
+      const refundPaise = Math.round(refundAmount * 100);
+      const totalPaise = Math.round(totalAmount * 100);
+      const giftCardPaise = Math.round(parseFloat(order.giftCardAmount) * 100);
+      const capturedPaise = totalPaise - giftCardPaise;
+
+      const giftCardLeg =
+        giftCardPaise > 0
+          ? Math.round((refundPaise * giftCardPaise) / totalPaise)
+          : 0;
+      const razorpayLeg = refundPaise - giftCardLeg;
+
+      // The old guard only compared against the order total, which would
+      // happily ask Razorpay for more than it ever captured.
+      if (razorpayLeg > capturedPaise) {
+        return c.json(
+          {
+            error:
+              "Refund exceeds the amount captured by the payment gateway",
+          },
+          400
+        );
+      }
+
+      /**
+       * Razorpay first, deliberately.
+       *
+       * If the gateway fails, the gift card has not been credited yet and
+       * the whole refund can be retried. Crediting the card first would
+       * leave the customer holding balance for a refund that never
+       * completed.
+       */
+      let refund: { id: string; status: string } = {
+        id: "",
+        status: "processed",
+      };
+
+      if (razorpayLeg > 0) {
+        // A missing paymentId is only legitimate when gift cards covered
+        // everything — which is exactly when this branch does not run.
+        if (!paymentDetails?.paymentId) {
+          return c.json({ error: "Payment ID not found for this order" }, 400);
+        }
+
+        refund = await createRefund({
+          paymentId: paymentDetails.paymentId,
+          amount: razorpayLeg,
+          notes: {
+            reason,
+            orderNumber: order.orderNumber,
+            orderId: order.id,
+          },
+        });
+      }
+
+      if (giftCardLeg > 0) {
+        // refundToGiftCards splits this across the cards that paid and caps
+        // each at what it actually contributed to this order.
+        await db.transaction((tx) =>
+          refundToGiftCards(tx, order.id, giftCardLeg),
+        );
+      }
 
       // Determine new payment status
       const isFullRefund = refundAmount >= totalAmount;
@@ -1039,8 +1100,11 @@ adminOrdersApp.post(
       const noteAddition = `[${timestamp}] Refund initiated: ${refundAmount} INR. Reason: ${reason}`;
       const existingNotes = order.internalNotes || "";
 
+      // paymentDetails is legitimately absent when gift cards covered the
+      // whole order, so the provider is stated rather than spread from it.
       const updatedPaymentDetails: OrderPaymentDetails = {
-        ...paymentDetails,
+        provider: "razorpay",
+        ...(paymentDetails ?? {}),
         refundId: refund.id,
         refundAmount: refundAmount,
         refundedAt: timestamp,
