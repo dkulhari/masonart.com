@@ -16,6 +16,7 @@ import { AnnouncementBar } from '~/components/layout/AnnouncementBar'
 import { SaleStrip } from '~/components/layout/SaleStrip'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
+import { CartSync } from '~/components/cart/CartSync'
 import { CartDrawer } from '~/components/cart/CartDrawer'
 import { ReviewToast } from '~/components/reviews/ReviewToast'
 import { SaleBanner } from '~/components/promo/SaleBanner'
@@ -280,6 +281,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           {!isAdminRoute && <Footer />}
         </div>
         {/* Mounted once at the root so any surface can open the cart (#460) */}
+        {!isAdminRoute && <CartSync />}
         {!isAdminRoute && <CartDrawer />}
         {/**
          * After the outlet, so it paints above page content, and before the
