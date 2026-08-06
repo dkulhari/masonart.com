@@ -16,6 +16,11 @@ export interface AppliedGiftCard {
   giftCardId: string
   last4: string
   amountPaise: number
+  /**
+   * The plaintext code, held by checkout only until payment initiation sends
+   * it to be debited. Never rendered — the list below shows the last four.
+   */
+  code?: string
 }
 
 interface GiftCardControlProps {

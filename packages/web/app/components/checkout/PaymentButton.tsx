@@ -74,6 +74,8 @@ interface PaymentButtonProps {
    * card cannot go through the cart.
    */
   existingOrderId?: string
+  /** Gift card codes to spend on this order. Debited at initiation. */
+  giftCardCodes?: string[]
   /** Total amount to be paid */
   totalAmount: number
   /** Whether the payment button should be disabled */
@@ -133,6 +135,7 @@ function loadRazorpayScript(): Promise<boolean> {
 export function PaymentButton({
   orderData,
   existingOrderId,
+  giftCardCodes,
   totalAmount,
   disabled = false,
   customerPhone,
@@ -206,7 +209,7 @@ export function PaymentButton({
 
       // Step 2: Initiate payment with Razorpay
       setStatus('initiating_payment')
-      const paymentData = await ordersApi.initiatePayment(orderId)
+      const paymentData = await ordersApi.initiatePayment(orderId, giftCardCodes)
 
       // Step 3: Open Razorpay checkout modal
       setStatus('processing')
@@ -292,6 +295,7 @@ export function PaymentButton({
     scriptLoaded,
     orderData,
     existingOrderId,
+    giftCardCodes,
     customerPhone,
     onSuccess,
     onError,

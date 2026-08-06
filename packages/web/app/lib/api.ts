@@ -1113,13 +1113,25 @@ export const ordersApi = {
    * Initiate payment for an order
    * Creates a Razorpay order and returns checkout configuration
    */
-  async initiatePayment(orderId: string): Promise<PaymentInitiationResponse> {
+  async initiatePayment(
+    orderId: string,
+    /**
+     * Gift card codes to spend on this order.
+     *
+     * They are sent here, not earlier, because this is where the server
+     * debits them — under a row lock, in the same transaction as the
+     * Razorpay order. Anything the checkout screen showed before now was a
+     * quote and may be stale.
+     */
+    giftCardCodes?: string[],
+  ): Promise<PaymentInitiationResponse> {
     const response = await fetch(`${getApiUrl()}/api/orders/${orderId}/payment`, {
       method: "POST",
       credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ giftCardCodes: giftCardCodes ?? [] }),
     });
 
     if (!response.ok) {

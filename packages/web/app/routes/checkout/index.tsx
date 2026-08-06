@@ -19,7 +19,7 @@ import {
   Check,
   AlertCircle,
 } from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
+import { cn, formatPrice, getApiUrl } from '~/lib/utils'
 import {
   useCartItems,
   useCartSubtotal,
@@ -27,6 +27,7 @@ import {
 } from '~/stores/cart'
 import { AddressForm, type AddressFormData, type AddressFormErrors, SavedAddressSelector, type SavedAddress } from '~/components/checkout/AddressForm'
 import { OrderSummary } from '~/components/checkout/OrderSummary'
+import type { AppliedGiftCard } from '~/components/checkout/GiftCardControl'
 import { PaymentButton } from '~/components/checkout/PaymentButton'
 import { ShippingSelector, type SelectedShippingOption } from '~/components/checkout/ShippingSelector'
 import type { OrderInput } from '~/lib/api'
@@ -216,6 +217,80 @@ function CheckoutPage() {
   }
 
   // Handle payment success
+  /**
+   * Gift cards applied to this checkout.
+   *
+   * The order does not exist yet — PaymentButton creates it — so a code is
+   * checked against the balance endpoint, which needs no order, and clamped
+   * here for display only. The real debit happens at payment initiation,
+   * under a row lock, against the live balance. Everything shown here is a
+   * quote and is allowed to be stale.
+   */
+  const [giftCards, setGiftCards] = useState<AppliedGiftCard[]>([])
+
+  const applyGiftCard = useCallback(
+    async (code: string) => {
+      if (giftCards.some((card) => card.code === code)) {
+        return { success: false, error: 'That card is already applied.' }
+      }
+
+      try {
+        const response = await fetch(`${getApiUrl()}/api/gift-cards/balance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ code }),
+        })
+
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as {
+            error?: string
+          } | null
+          return {
+            success: false,
+            error: body?.error ?? 'This gift card cannot be used',
+          }
+        }
+
+        const body = (await response.json()) as {
+          last4: string
+          balancePaise: number
+        }
+
+        setGiftCards((current) => {
+          // Clamp against what this order still owes, so two cards cannot
+          // appear to pay more than the total.
+          const alreadyApplied = current.reduce(
+            (sum, card) => sum + card.amountPaise,
+            0
+          )
+          const remaining = Math.max(0, Math.round(total * 100) - alreadyApplied)
+
+          return [
+            ...current,
+            {
+              giftCardId: code,
+              code,
+              last4: body.last4,
+              amountPaise: Math.min(body.balancePaise, remaining),
+            },
+          ]
+        })
+
+        return { success: true }
+      } catch {
+        return { success: false, error: 'Could not check that gift card.' }
+      }
+    },
+    [giftCards, total]
+  )
+
+  const removeGiftCard = useCallback((giftCardId: string) => {
+    setGiftCards((current) =>
+      current.filter((card) => card.giftCardId !== giftCardId)
+    )
+  }, [])
+
   const handlePaymentSuccess = (_orderId: string, orderNumber: string) => {
     // Save address if checkbox was checked, user is logged in, and address wasn't from saved addresses
     if (isLoggedIn && shippingAddress?.saveAddress && !selectedSavedAddressId) {
@@ -486,6 +561,7 @@ function CheckoutPage() {
                     return (
                       <PaymentButton
                         orderData={orderData}
+                        giftCardCodes={giftCards.flatMap((card) => (card.code ? [card.code] : []))}
                         totalAmount={total}
                         customerPhone={shippingAddress?.phone}
                         onSuccess={handlePaymentSuccess}
@@ -520,6 +596,9 @@ function CheckoutPage() {
                 shippingCost={shippingCost}
                 showItems={true}
                 canProceed={false} // Hide checkout button in summary (using step navigation)
+                giftCards={giftCards}
+                onApplyGiftCard={applyGiftCard}
+                onRemoveGiftCard={removeGiftCard}
                 className="mb-6"
               />
 

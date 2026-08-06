@@ -166,7 +166,10 @@ function AdminGiftCardsPage() {
           <Gift className="h-4 w-4" />
           Outstanding liability
         </div>
-        <p className="mt-1 font-heading text-3xl font-medium text-foreground">
+        <p
+          data-testid="gift-card-liability"
+          className="mt-1 font-heading text-3xl font-medium text-foreground"
+        >
           {liabilityPaise === null
             ? '—'
             : formatPrice(liabilityPaise / 100)}
