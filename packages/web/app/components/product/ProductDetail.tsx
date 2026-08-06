@@ -239,6 +239,43 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
     return totalPrice
   }, [product.sale, isMember, totalPrice])
 
+  /**
+   * The one line that says what the button is about to commit to.
+   *
+   * At the scroll offset where the CTA is comfortable, the size control and
+   * the frame swatches are already off the top of the viewport — so the
+   * button confidently quotes a price for a configuration the buyer can no
+   * longer see. This restates it: size, frame, price, in that order, directly
+   * above the button.
+   *
+   * Deliberately NOT a second price block. It quotes `ctaPrice` — the very
+   * figure the button carries, not a re-derivation — at 14px muted, so it
+   * confirms the 24px red price above rather than competing with it.
+   *
+   * The size string keeps SizeSelector's own height-then-width convention
+   * rather than the more conventional W×H: a summary that transposed the
+   * numbers of the control it summarises would be worse than no summary.
+   *
+   * No frame chosen SAYS so. Omitting the segment would leave the line
+   * reading as though a frame were included at that price, which is the one
+   * misreading this line exists to prevent. The segment is dropped only when
+   * the poster offers no frames at all — there is then no frame decision to
+   * confirm, and FrameSelector is not on the page either.
+   */
+  const configSummary = useMemo(() => {
+    if (!selectedVariant) return null
+
+    const offersFrames = Boolean(product.frames && product.frames.length > 0)
+
+    return {
+      size: `${selectedVariant.heightInches}"H × ${selectedVariant.widthInches}"W`,
+      frame: offersFrames
+        ? (selectedFrame?.name ?? 'No frame selected')
+        : null,
+      price: formatPrice(ctaPrice),
+    }
+  }, [selectedVariant, selectedFrame, product.frames, ctaPrice])
+
   // Handle add to cart
   const handleAddToCart = useCallback(() => {
     if (!selectedVariant) return
@@ -624,46 +661,77 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
                 min-content as its hypothetical size, which is exactly the
                 width the wrap decision should be made on; deliberately no
                 `min-w-0`, since that would switch that floor off again and
-                bring the overflow back. */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-[60px] w-[100px] shrink-0 items-center justify-between rounded-pill border border-border px-1 sm:w-[130px]">
-                {/* The reference labels this stepper with nothing but its
-                    arrows. Sighted users read `‹ 1 ›`; everyone else needs
-                    the noun, so it is said once, out of the layout. */}
-                <span className="sr-only">Quantity</span>
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent sm:h-9 sm:w-9"
-                  disabled={quantity <= 1}
-                  aria-label="Decrease quantity"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <span className="min-w-[1.75rem] text-center text-base tabular-nums text-foreground sm:min-w-[3rem]">
-                  {quantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => q + 1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted sm:h-9 sm:w-9"
-                  aria-label="Increase quantity"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+                bring the overflow back.
 
-              <Button
-                variant="solid"
-                size="pill"
-                onClick={handleAddToCart}
-                disabled={!selectedVariant}
-                className="h-[60px] grow basis-0 px-5 text-[16px] sm:px-[26px]"
-              >
-                {selectedVariant
-                  ? `Add to cart - ${formatPrice(ctaPrice)}`
-                  : 'Add to cart'}
-              </Button>
+                Wrapped with the configuration summary rather than left as a
+                bare child of the `space-y-6` column: the summary has to hug
+                the button it describes, and a 24px gap is not "directly
+                above". 12px inside the pair, the column's own rhythm outside
+                it. */}
+            <div className="space-y-3">
+              {configSummary && (
+                <p
+                  data-testid="buybox-config-summary"
+                  className="text-sm text-muted-foreground"
+                >
+                  {/* The line is legible as a summary by position on a
+                      sighted read; said out loud it is three bare fragments,
+                      so the noun goes in once, out of the layout. */}
+                  <span className="sr-only">Selected: </span>
+                  {configSummary.size}
+                  {configSummary.frame && (
+                    <>
+                      <span aria-hidden="true"> · </span>
+                      {configSummary.frame}
+                    </>
+                  )}
+                  <span aria-hidden="true"> · </span>
+                  <span className="font-medium text-foreground">
+                    {configSummary.price}
+                  </span>
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex h-[60px] w-[100px] shrink-0 items-center justify-between rounded-pill border border-border px-1 sm:w-[130px]">
+                  {/* The reference labels this stepper with nothing but its
+                      arrows. Sighted users read `‹ 1 ›`; everyone else needs
+                      the noun, so it is said once, out of the layout. */}
+                  <span className="sr-only">Quantity</span>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent sm:h-9 sm:w-9"
+                    disabled={quantity <= 1}
+                    aria-label="Decrease quantity"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="min-w-[1.75rem] text-center text-base tabular-nums text-foreground sm:min-w-[3rem]">
+                    {quantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQuantity((q) => q + 1)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted sm:h-9 sm:w-9"
+                    aria-label="Increase quantity"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <Button
+                  variant="solid"
+                  size="pill"
+                  onClick={handleAddToCart}
+                  disabled={!selectedVariant}
+                  className="h-[60px] grow basis-0 px-5 text-[16px] sm:px-[26px]"
+                >
+                  {selectedVariant
+                    ? `Add to cart - ${formatPrice(ctaPrice)}`
+                    : 'Add to cart'}
+                </Button>
+              </div>
             </div>
 
             {/* Share (#520). The button that used to sit here had an

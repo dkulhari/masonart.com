@@ -380,9 +380,17 @@ function ProductPage() {
             styles: product.styles,
             subjects: product.subjects,
             primaryColor: product.primaryColor,
+            artist: product.artist,
             variants: product.variants,
             frames: product.frames,
           }}
+          /* The aggregate this route already fetches (`fetchReviewAggregate`)
+             and the buy panel already renders. Straight through, undefined
+             included: ProductTabs draws "unknown" and "none yet" differently
+             on purpose, so narrowing it to a number here would erase the
+             distinction. Without it the tab bar's star summary and the Review
+             tab's count both render nothing. */
+          rating={product.rating}
           reviewPanel={
             <ProductReviewSection
               productId={product.id}
