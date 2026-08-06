@@ -4,9 +4,15 @@
  * Full cart page showing all items, order summary, and checkout options.
  * Cart data is stored in localStorage via Zustand.
  *
+ * The one thing this page does NOT own is what the cart costs under a sale.
+ * Lines are local; prices are the server's (#429), read through
+ * `readCartSaving` below and rendered, never recomputed — see the comment
+ * there for why that distinction is the whole ticket (#436).
+ *
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   ShoppingBag,
@@ -15,9 +21,10 @@ import {
   Shield,
   RotateCcw,
   ChevronRight,
+  Lock,
   Trash2,
 } from 'lucide-react'
-import { formatPrice } from '~/lib/utils'
+import { cn, formatPrice } from '~/lib/utils'
 import {
   useCartItems,
   useCartSubtotal,
@@ -25,8 +32,12 @@ import {
   useCartActions,
   useIsCartEmpty,
   useCartHydration,
+  type CartItem as CartItemData,
 } from '~/stores/cart'
 import { CartItem } from '~/components/cart/CartItem'
+import { JoinGalleryModal } from '~/components/promo/JoinGalleryModal'
+import { useGalleryMembership } from '~/hooks/useGalleryMembership'
+import { useServerCart } from '~/hooks/useCart'
 
 // ============================================================================
 // Route Definition
@@ -48,6 +59,102 @@ export const Route = createFileRoute('/cart/')({
 })
 
 // ============================================================================
+// Sale pricing (#436)
+// ============================================================================
+
+/**
+ * One line's pricing, exactly as `GET /api/cart` resolves it (#429).
+ *
+ * `base` is the stored line total — the figure the cart was written with — and
+ * `sale` is re-resolved on every read, so a cart left sitting across the end of
+ * a promotion comes back with `sale: null` by itself. `locked` means the price
+ * exists but the viewer is not in the gallery yet: the server will charge
+ * `base`, and the cart-level `savingTotal` says `0.00` because that is the
+ * truth about the money. The teaser is still shown — that is what the gate is.
+ */
+interface CartLinePricing {
+  base: string
+  sale: string | null
+  locked: boolean
+  headline: string | null
+  percentOff: number | null
+}
+
+interface PricedCartLine {
+  productId: string
+  variantId: string
+  frameId: string | null
+  pricing: CartLinePricing
+}
+
+interface PricedCart {
+  items: PricedCartLine[]
+  savingTotal: string
+}
+
+/**
+ * A cart line's natural key, on both sides of the wire.
+ *
+ * The displayed lines come from the local store, which mints its own ids, so
+ * the server's row id is no use for matching. Product + variant + frame is what
+ * makes a line distinct in either place.
+ */
+function lineKey(line: {
+  productId: string
+  variantId: string
+  frameId: string | null
+}): string {
+  return `${line.productId}:${line.variantId}:${line.frameId ?? 'none'}`
+}
+
+/** Money as whole paise, so summing lines cannot drift by a rounding tick. */
+function toPaise(value: string | null | undefined): number {
+  const amount = parseFloat(value ?? '')
+  return Number.isFinite(amount) ? Math.round(amount * 100) : 0
+}
+
+interface CartSaving {
+  /** Paise actually coming off, straight from the server's `savingTotal`. */
+  unlocked: number
+  /** Paise behind the membership gate, summed from the locked lines. */
+  locked: number
+  /** What each displayed line saves, keyed by `lineKey`. */
+  byLine: Map<string, { amount: number; locked: boolean }>
+}
+
+const NO_SAVING: CartSaving = { unlocked: 0, locked: 0, byLine: new Map() }
+
+/**
+ * What the payload says the sale is worth — read, never recomputed.
+ *
+ * Two figures, because they are two different things. `unlocked` is the
+ * server's own `savingTotal`: money the checkout will take off, quoted from the
+ * single place that decides it, so the cart cannot promise a discount the order
+ * will not give. `locked` is money it will not take off — the server totals
+ * that as zero, correctly — so the teaser is recovered per line as
+ * `base − sale`, the same subtraction the server does over the same two
+ * figures. No percentage is ever applied on this side of the wire: `percentOff`
+ * is copy, not arithmetic.
+ */
+function readCartSaving(cart: PricedCart | null | undefined): CartSaving {
+  if (!cart?.items?.length) return NO_SAVING
+
+  const byLine = new Map<string, { amount: number; locked: boolean }>()
+  let locked = 0
+
+  for (const line of cart.items) {
+    if (!line.pricing?.sale) continue
+    const amount = toPaise(line.pricing.base) - toPaise(line.pricing.sale)
+    if (amount <= 0) continue
+
+    byLine.set(lineKey(line), { amount, locked: line.pricing.locked })
+    if (line.pricing.locked) locked += amount
+  }
+
+  return { unlocked: toPaise(cart.savingTotal), locked, byLine }
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -67,12 +174,48 @@ function CartPage() {
  * Cart content component that subscribes to cart store.
  * Only rendered after hydration to avoid SSR issues with Zustand persist.
  */
-function CartContent() {
+export function CartContent() {
   const items = useCartItems()
   const subtotal = useCartSubtotal()
   const itemCount = useCartItemCount()
   const isEmpty = useIsCartEmpty()
   const { updateQuantity, removeItem, clearCart } = useCartActions()
+
+  /**
+   * Every figure in the saving rows comes from here. The local store knows what
+   * is in the cart; only the server knows what it costs under a promotion.
+   */
+  const { data, refetch } = useServerCart()
+  const saving = useMemo(
+    () => readCartSaving(data as unknown as PricedCart | undefined),
+    [data]
+  )
+
+  const { isMember } = useGalleryMembership()
+  const [isJoinOpen, setIsJoinOpen] = useState(false)
+
+  /**
+   * A viewer who joined a moment ago — from the banner, or on the page before
+   * this one — still has a locked payload in the query cache. The answer is
+   * another read: unlocking the figure locally would be exactly the second
+   * pricing authority this feature exists to avoid. Once, guarded; if the
+   * server still says locked after that, it means it.
+   */
+  const hasRefetchedRef = useRef(false)
+  useEffect(() => {
+    if (!isMember || saving.locked === 0 || hasRefetchedRef.current) return
+    hasRefetchedRef.current = true
+    void refetch()
+  }, [isMember, saving.locked, refetch])
+
+  // A member is never shown the gate, not even for the beat before that read
+  // lands — neither in the summary nor against a line.
+  const lockedSaving = isMember ? 0 : saving.locked
+  const savingFor = (item: CartItemData) => {
+    const line = saving.byLine.get(lineKey(item))
+    if (!line || (line.locked && isMember)) return null
+    return line
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -109,14 +252,21 @@ function CartContent() {
 
               {/* Items List */}
               <div className="space-y-4">
-                {items.map((item) => (
-                  <CartItem
-                    key={item.id}
-                    item={item}
-                    onUpdateQuantity={updateQuantity}
-                    onRemove={removeItem}
-                  />
-                ))}
+                {items.map((item) => {
+                  const line = savingFor(item)
+                  return (
+                    <div key={item.id}>
+                      <CartItem
+                        item={item}
+                        onUpdateQuantity={updateQuantity}
+                        onRemove={removeItem}
+                      />
+                      {line && (
+                        <LineSaving amount={line.amount} locked={line.locked} />
+                      )}
+                    </div>
+                  )
+                })}
               </div>
 
               {/* Continue Shopping Link */}
@@ -133,12 +283,62 @@ function CartContent() {
 
             {/* Order Summary Column */}
             <div className="lg:col-span-1">
-              <OrderSummary subtotal={subtotal} itemCount={itemCount} />
+              <OrderSummary
+                subtotal={subtotal}
+                itemCount={itemCount}
+                saving={saving.unlocked}
+                lockedSaving={lockedSaving}
+                onJoinGallery={() => setIsJoinOpen(true)}
+              />
             </div>
           </div>
         )}
       </div>
+
+      {/* The gate, opened from the locked saving row */}
+      <JoinGalleryModal
+        open={isJoinOpen}
+        onClose={() => {
+          setIsJoinOpen(false)
+          // Joined or not, the priced cart is what decides — ask it again.
+          void refetch()
+        }}
+        source="cart"
+      />
     </div>
+  )
+}
+
+// ============================================================================
+// Saving Rows
+// ============================================================================
+
+/**
+ * What one line is worth under the promotion.
+ *
+ * Locked reads as an offer rather than as money already off, because the
+ * checkout charges base until the viewer joins — the copy has to survive being
+ * read next to the card statement.
+ */
+function LineSaving({ amount, locked }: { amount: number; locked: boolean }) {
+  return (
+    <p
+      data-testid="cart-line-saving"
+      data-locked={locked ? 'true' : 'false'}
+      className={cn(
+        'mt-1.5 flex items-center gap-1.5 pl-1 text-xs font-medium',
+        locked ? 'text-muted-foreground' : 'text-green-600'
+      )}
+    >
+      {locked ? (
+        <>
+          <Lock className="h-3 w-3" aria-hidden="true" />
+          <span>Save {formatPrice(amount / 100)} with the gallery</span>
+        </>
+      ) : (
+        <span>You save {formatPrice(amount / 100)}</span>
+      )}
+    </p>
   )
 }
 
@@ -149,9 +349,21 @@ function CartContent() {
 interface OrderSummaryProps {
   subtotal: number
   itemCount: number
+  /** Paise the server says are coming off this cart — its `savingTotal`. */
+  saving?: number
+  /** Paise the same promotion is worth, but only to a gallery member. */
+  lockedSaving?: number
+  /** Opens the join dialog from the locked row. */
+  onJoinGallery?: () => void
 }
 
-function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
+function OrderSummary({
+  subtotal,
+  itemCount,
+  saving = 0,
+  lockedSaving = 0,
+  onJoinGallery,
+}: OrderSummaryProps) {
   // Shipping is free over ₹999
   const shippingThreshold = 999
   const hasShippingFee = subtotal < shippingThreshold
@@ -197,11 +409,51 @@ function OrderSummary({ subtotal, itemCount }: OrderSummaryProps) {
           )}
         </div>
 
+        {saving > 0 && (
+          <div
+            data-testid="cart-saving"
+            className="flex items-center justify-between text-sm"
+          >
+            <span className="text-muted-foreground">Sale saving</span>
+            <span className="font-medium text-green-600">
+              −{formatPrice(saving / 100)}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Tax</span>
           <span className="text-muted-foreground">Calculated at checkout</span>
         </div>
       </div>
+
+      {/*
+        The gate, at the moment of payment. The figure is the sale the viewer is
+        not getting: the server prices these lines at base until they join, and
+        says so by totalling the saving as zero.
+      */}
+      {lockedSaving > 0 && (
+        <div
+          data-testid="cart-saving-locked"
+          className="mt-4 rounded-lg border border-border bg-accent p-4"
+        >
+          <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Lock className="h-4 w-4" aria-hidden="true" />
+            Save {formatPrice(lockedSaving / 100)} with the gallery
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            This saving is for gallery members. Join free and it comes off at
+            checkout.
+          </p>
+          <button
+            type="button"
+            onClick={onJoinGallery}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background transition-colors hover:bg-foreground/85"
+          >
+            Join the gallery
+          </button>
+        </div>
+      )}
 
       {/* Total */}
       <div className="mt-4 border-t border-border pt-4">
