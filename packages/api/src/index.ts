@@ -45,6 +45,7 @@ import { trackingApp } from "./routes/tracking";
 import { notificationPreferencesApp } from "./routes/notification-preferences";
 import { addressesApp } from "./routes/addresses";
 import wishlistApp from "./routes/wishlist";
+import { galleryApp } from "./routes/gallery";
 import { approvalsApp } from "./routes/approvals";
 import {
   productReviewsApp,
@@ -183,6 +184,9 @@ app.route("/api/addresses", addressesApp);
 
 // Wishlist API - saved products, over the existing users.wishlist_product_ids column
 app.route("/api/wishlist", wishlistApp);
+
+// Gallery API - authenticated, idempotent membership opt-in
+app.route("/api/gallery", galleryApp);
 
 // Approvals API - public production photo approval access
 app.route("/api/approvals", approvalsApp);
