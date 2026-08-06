@@ -81,7 +81,7 @@ function withResolver<T>(): { promise: Promise<T>; resolve: (value: T) => void }
 
 /**
  * Fetches the cart directly with `cartApi.get()` rather than through
- * `queryClient.fetchQuery`, and pushes the result into the cache by hand.
+ * `queryClient.fetchQuery`.
  *
  * `fetchQuery` does not issue a new request when one is already in flight for
  * the same key: `Query#fetch`, in @tanstack/query-core 5.90's source, returns
@@ -93,32 +93,45 @@ function withResolver<T>(): { promise: Promise<T>; resolve: (value: T) => void }
  * write's own PATCH or DELETE — settling the cart on a state older than what
  * was just sent, permanently, until something unrelated refetches. Calling
  * `cartApi.get()` directly guarantees this write's own re-projection reflects
- * what the server holds right now; `setQueryData` still populates the cache
- * so the cart page's `useServerCart` sees it without a second request.
+ * what the server holds right now.
+ *
+ * Does not itself touch the query cache — see `applyIfCurrent`, the only
+ * caller, for why that write has to wait behind the same currency check as
+ * the store write rather than happening unconditionally here (#511 fix
+ * round 2).
  */
-async function fetchCart(queryClient: QueryClient): Promise<ServerCartPayload> {
-  const cart = (await cartApi.get()) as ServerCartPayload;
-  queryClient.setQueryData(cartKeys.detail(), cart);
-  return cart;
+async function fetchCart(): Promise<ServerCartPayload> {
+  return (await cartApi.get()) as ServerCartPayload;
 }
 
 /**
- * Re-projects the server cart onto the store, but only for the write that is
- * still current.
+ * Re-projects the server cart onto the store and the query cache, but only
+ * for the write that is still current.
  *
  * Checked twice: once before `fetchCart` — a write already superseded has no
  * reason to make the request at all — and once more after it resolves, since
  * a write that was current when it started can go stale while its own
  * request is still in flight, and its answer must not land on top of
  * whatever the write that superseded it has already applied.
+ *
+ * Both writes — `setQueryData` and `replaceFromServer` — sit behind that
+ * second check, not just the store one. `cartKeys.detail()` is not
+ * decorative: `useServerCart` reads it for the cart page's `savingTotal` and
+ * per-line discount figures, separately from the store-derived subtotal, and
+ * `setQueryData` resets the query's staleness clock — so a cache write from a
+ * superseded write left the wrong savings figure on screen for up to
+ * `useServerCart`'s `staleTime` (60s) with nothing to correct it. Fix round 1
+ * gated the store against exactly this and missed that the cache needed the
+ * same gate (#511 fix round 2).
  */
 async function applyIfCurrent(
   sequence: number,
   queryClient: QueryClient
 ): Promise<void> {
   if (!isCurrent(sequence)) return;
-  const cart = await fetchCart(queryClient);
+  const cart = await fetchCart();
   if (!isCurrent(sequence)) return;
+  queryClient.setQueryData(cartKeys.detail(), cart);
   useCartStore.getState().replaceFromServer(cart);
 }
 

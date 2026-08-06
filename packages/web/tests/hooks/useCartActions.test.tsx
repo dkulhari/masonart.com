@@ -39,6 +39,7 @@ vi.mock('~/lib/api', () => ({
 }))
 
 import { cartApi } from '~/lib/api'
+import { cartKeys } from '~/hooks/useCart'
 import { useCartStore } from '~/stores/cart'
 import { useCartActions } from '~/hooks/useCartActions'
 
@@ -91,11 +92,17 @@ const addInput = {
   unitPrice: 2000,
 }
 
+// Captured on every render so tests can assert on `cartKeys.detail()` — the
+// same cache `useServerCart` reads on the cart page — not just the store.
+let currentQueryClient!: QueryClient
+
 function wrapper({ children }: { children: ReactNode }) {
-  const client = new QueryClient({
+  currentQueryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={currentQueryClient}>{children}</QueryClientProvider>
+  )
 }
 
 beforeEach(() => {
@@ -372,6 +379,16 @@ describe('useCartActions — overlapping writes', () => {
     // before B existed, answered after B already applied its own — must not
     // land on top of it.
     expect(useCartStore.getState().items[0]!.quantity).toBe(3)
+
+    // The query cache is the other place a stale answer could land: it is
+    // what `useServerCart` reads for the cart page's savings figures, and
+    // `setQueryData` resets its staleness clock, so a superseded write's
+    // payload landing here is wrong for up to a minute with nothing to
+    // correct it (#511 fix round 2) — even though the store above is right.
+    const cached = currentQueryClient.getQueryData<{
+      items: Array<{ quantity: number }>
+    }>(cartKeys.detail())
+    expect(cached?.items[0]?.quantity).toBe(3)
   })
 })
 
