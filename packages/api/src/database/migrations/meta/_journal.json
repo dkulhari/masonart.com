@@ -85,6 +85,13 @@
       "when": 1786004482819,
       "tag": "0011_round_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786029108659,
+      "tag": "0012_graceful_sentry",
+      "breakpoints": true
     }
   ]
 }

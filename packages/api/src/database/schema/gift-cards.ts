@@ -22,6 +22,7 @@ import {
   pgEnum,
   index,
   primaryKey,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./users";
@@ -71,7 +72,11 @@ export const giftCards = pgTable(
     issuedByUserId: text("issued_by_user_id").references(() => users.id, {
       onDelete: "set null",
     }),
-    /** Set for a customer purchase; null when an admin issued the card. */
+    /**
+     * Set for a customer purchase; null when an admin issued the card.
+     *
+     * Unique — see the constraint below. This is not merely a back-reference.
+     */
     purchaseOrderId: uuid("purchase_order_id").references(() => orders.id, {
       onDelete: "set null",
     }),
@@ -81,9 +86,9 @@ export const giftCards = pgTable(
     senderName: text("sender_name"),
     message: text("message"),
 
-    /** null means send as soon as payment is confirmed. */
+    /** The date the buyer chose, copied here when the card is minted. */
     sendAt: timestamp("send_at", { withTimezone: true }),
-    /** Idempotency guard for the delivery sweep — a restart cannot double-send. */
+    /** When the delivery email actually went out. Record, not guard. */
     sentAt: timestamp("sent_at", { withTimezone: true }),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -94,7 +99,19 @@ export const giftCards = pgTable(
   },
   (table) => ({
     last4Idx: index("gift_card_last4_idx").on(table.codeLast4),
-    purchaseOrderIdx: index("gift_card_purchase_order_idx").on(
+    /**
+     * Unique, not a plain index — this is the idempotency guarantee for
+     * minting.
+     *
+     * A card is created at the moment it is delivered, and two callers can
+     * reach that moment for the same order: a payment verification retried by
+     * Razorpay or the client, and the scheduled-delivery sweep. Both attempt
+     * the insert; the constraint decides, and the loser catches a unique
+     * violation. Reading "does a card exist for this order yet" before
+     * inserting races in exactly the window it is meant to protect, and a
+     * duplicate here is duplicated money.
+     */
+    purchaseOrderUnique: unique("gift_card_purchase_order_id_unique").on(
       table.purchaseOrderId,
     ),
     sendAtIdx: index("gift_card_send_at_idx").on(table.sendAt),

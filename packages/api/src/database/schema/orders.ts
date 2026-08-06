@@ -70,6 +70,22 @@ export interface OrderShippingDetails {
 }
 
 /**
+ * What a gift card order bought.
+ *
+ * Lives on the order between payment and delivery, because a scheduled card
+ * is not minted until the day it is sent — see `orders.giftCardPurchase`.
+ */
+export interface GiftCardPurchase {
+  amountPaise: number;
+  recipientEmail: string;
+  recipientName: string;
+  senderName: string;
+  message: string | null;
+  /** ISO timestamp; null means deliver as soon as payment is confirmed. */
+  sendAt: string | null;
+}
+
+/**
  * Order item snapshot - product details at time of purchase
  */
 export interface OrderItemSnapshot {
@@ -231,6 +247,19 @@ export const orders = pgTable(
     giftCardAmount: decimal("gift_card_amount", { precision: 10, scale: 2 })
       .default("0.00")
       .notNull(),
+
+    /**
+     * What a `gift_card` order bought, held until the card is minted.
+     *
+     * A scheduled card is deliberately not created when payment clears. The
+     * plaintext code is returned once by `issueGiftCard()` and never stored,
+     * so a card minted in March for a June send date would have no
+     * recoverable code when June arrives — minting happens at delivery time
+     * instead, and the sweep reads the recipient from here.
+     *
+     * Null on every ordinary order.
+     */
+    giftCardPurchase: jsonb("gift_card_purchase").$type<GiftCardPurchase>(),
 
     // Currency (for future multi-currency support)
     currency: text("currency").default("INR").notNull(),
