@@ -56,6 +56,7 @@ import { getCached, setCached, CacheKeys } from "../lib/redis";
 import {
   getActivePromotions,
   loadPromotionProductSets,
+  promotionScopeCondition,
   resolveSalePrice,
 } from "../lib/promotion-pricing";
 
@@ -171,6 +172,24 @@ const listProductsQuerySchema = z.object({
   isFeatured: z.coerce.boolean().optional(),
   isAiGenerated: z.coerce.boolean().optional(),
 
+  /**
+   * Only the products the running promotion actually applies to — its scope,
+   * minus its exclusions. This is what /sale lists.
+   *
+   * Deliberately NOT `z.coerce.boolean()` like its neighbours: coercion turns
+   * the string "false" into `true`, and on this parameter that silently swaps
+   * "the whole catalogue" for "the sale". A literal pair, and anything else is
+   * a 400 rather than a guess.
+   *
+   * The membership test runs in SQL (`promotionScopeCondition`) so the count,
+   * the page window and the resolved prices all come out of one `where`. The
+   * client never sees a scope filter or an exclusion list.
+   */
+  onSale: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === "true")),
+
   // Sorting
   sortBy: z.enum(["createdAt", "updatedAt", "title", "basePrice", "featuredOrder", "salesCount"]).optional().default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
@@ -235,6 +254,7 @@ productsApp.get(
       priceMax,
       isFeatured,
       isAiGenerated,
+      onSale,
       sortBy,
       sortOrder,
     } = query;
@@ -398,6 +418,32 @@ productsApp.get(
     const offset = (page - 1) * pageSize;
 
     try {
+      /**
+       * The promotion rows, loaded before the query rather than after it.
+       *
+       * They are needed twice: to narrow the query when `?onSale=true`, and to
+       * price every row that comes back. Loading once keeps the two answers
+       * from being drawn from two reads of a table that can change between
+       * them — a product could otherwise appear on /sale at its base price.
+       */
+      const { activePromotions, ctx } = await loadSaleContext(isMember);
+
+      /**
+       * `?onSale=true` narrows the whole query, not just the page.
+       *
+       * The predicate goes into `conditions`, which both the count and the
+       * page window run against — filtering after `limit/offset` would return
+       * short pages and a total counting products the sale never touched.
+       */
+      if (onSale) {
+        conditions.push(
+          promotionScopeCondition(activePromotions, {
+            includedIds: ctx.includedIds,
+            excludedIds: ctx.excludedIds,
+          })
+        );
+      }
+
       // Get total count
       const countResult = await db
         .select({ count: sql<number>`count(*)::int` })
@@ -475,7 +521,6 @@ productsApp.get(
        * the resolved payload — never the promotion row, whose `endsAt` is
        * private (the countdown ships as an already-resolved deadline).
        */
-      const { activePromotions, ctx } = await loadSaleContext(isMember);
       const items = productList.map((product) => ({
         ...product,
         sale: resolveSalePrice(product, activePromotions, ctx),

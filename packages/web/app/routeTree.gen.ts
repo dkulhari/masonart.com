@@ -19,6 +19,7 @@ import { Route as FaqRouteImport } from './routes/faq'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ReturnsRouteImport } from './routes/returns'
 import { Route as ReviewsRouteImport } from './routes/reviews'
+import { Route as SaleRouteImport } from './routes/sale'
 import { Route as ShippingRouteImport } from './routes/shipping'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as WishlistRouteImport } from './routes/wishlist'
@@ -111,6 +112,11 @@ const ReturnsRoute = ReturnsRouteImport.update({
 const ReviewsRoute = ReviewsRouteImport.update({
   id: '/reviews',
   path: '/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SaleRoute = SaleRouteImport.update({
+  id: '/sale',
+  path: '/sale',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShippingRoute = ShippingRouteImport.update({
@@ -349,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/returns': typeof ReturnsRoute
   '/reviews': typeof ReviewsRoute
+  '/sale': typeof SaleRoute
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
   '/wishlist': typeof WishlistRoute
@@ -403,6 +410,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/returns': typeof ReturnsRoute
   '/reviews': typeof ReviewsRoute
+  '/sale': typeof SaleRoute
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
   '/wishlist': typeof WishlistRoute
@@ -460,6 +468,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/returns': typeof ReturnsRoute
   '/reviews': typeof ReviewsRoute
+  '/sale': typeof SaleRoute
   '/shipping': typeof ShippingRoute
   '/terms': typeof TermsRoute
   '/wishlist': typeof WishlistRoute
@@ -517,6 +526,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/returns'
     | '/reviews'
+    | '/sale'
     | '/shipping'
     | '/terms'
     | '/wishlist'
@@ -571,6 +581,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/returns'
     | '/reviews'
+    | '/sale'
     | '/shipping'
     | '/terms'
     | '/wishlist'
@@ -627,6 +638,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/returns'
     | '/reviews'
+    | '/sale'
     | '/shipping'
     | '/terms'
     | '/wishlist'
@@ -684,6 +696,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ReturnsRoute: typeof ReturnsRoute
   ReviewsRoute: typeof ReviewsRoute
+  SaleRoute: typeof SaleRoute
   ShippingRoute: typeof ShippingRoute
   TermsRoute: typeof TermsRoute
   WishlistRoute: typeof WishlistRoute
@@ -774,6 +787,13 @@ declare module '@tanstack/react-router' {
       path: '/reviews'
       fullPath: '/reviews'
       preLoaderRoute: typeof ReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sale': {
+      id: '/sale'
+      path: '/sale'
+      fullPath: '/sale'
+      preLoaderRoute: typeof SaleRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shipping': {
@@ -1167,6 +1187,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ReturnsRoute: ReturnsRoute,
   ReviewsRoute: ReviewsRoute,
+  SaleRoute: SaleRoute,
   ShippingRoute: ShippingRoute,
   TermsRoute: TermsRoute,
   WishlistRoute: WishlistRoute,

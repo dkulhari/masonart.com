@@ -12,8 +12,9 @@
  */
 
 import type { PromotionScopeFilter, ResolvedSalePrice } from "@chobii/shared";
-import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../database";
+import { products } from "../database/schema/products";
 import {
   promotionExclusions,
   promotionProducts,
@@ -235,4 +236,120 @@ export function resolveSalePrice(
     // A sale price the viewer cannot have yet: shown, but base is charged.
     locked: promotion.membersOnly && !ctx.isMember,
   };
+}
+
+// ============================================================================
+// The same rule, as SQL
+// ============================================================================
+
+/**
+ * `matchesScope` and the exclusion rule, expressed against the products table.
+ *
+ * One caller needs it: `GET /api/products?onSale=true`, which feeds /sale.
+ * That page is not pricing rows it already has — it is asking *which* rows the
+ * running promotion applies to, and it pages.
+ *
+ * ## Why SQL rather than filtering the page after the fact
+ *
+ * The list query is `... limit pageSize offset n`. Dropping the off-sale rows
+ * from the result afterwards returns short pages, an infinite scroll that
+ * stops early, and a `total` counting products the sale never touched. The
+ * predicate has to be inside the same `where` the count runs against.
+ *
+ * ## This function and `matchesScope` must agree
+ *
+ * They are two spellings of one rule, and the failure mode when they drift is
+ * quiet: /sale lists a product whose card then prints the base price, or omits
+ * one that is genuinely discounted. Every branch below mirrors a branch up
+ * there deliberately, including the two that look like mistakes:
+ *
+ * - a `filter` scope with **no keys at all** matches nothing (that is what
+ *   scopeType `all` is for), while one whose keys are all empty arrays matches
+ *   everything — because `missesAxis` returns false for an empty wanted-list
+ *   and the final `Object.keys(filter).length > 0` then passes it;
+ * - `includedIds` is flat across the active promotions, exactly as the
+ *   resolver reads it, so a product pinned to any of them satisfies a
+ *   `products` scope.
+ *
+ * Change one, change both.
+ */
+export function promotionScopeCondition(
+  activePromotions: Promotion[],
+  sets: { includedIds: Set<string>; excludedIds: Set<string> }
+): SQL {
+  /** Nothing is on sale. Not "everything" — an absent sale sells nothing. */
+  const NOTHING = sql`false`;
+
+  if (activePromotions.length === 0) return NOTHING;
+
+  const overlap = (
+    column:
+      | typeof products.styles
+      | typeof products.subjects
+      | typeof products.rooms,
+    values: string[] | undefined
+  ): SQL | null => {
+    if (!values?.length) return null;
+    /**
+     * Each element binds as its own parameter. Passing the JS array as one
+     * bind and casting it does NOT work — postgres.js sends it as a scalar
+     * and the server answers "malformed array literal".
+     */
+    const elements = sql.join(
+      values.map((value) => sql`${value}`),
+      sql`, `
+    );
+    return sql`${column} && ARRAY[${elements}]::text[]`;
+  };
+
+  const scopeClauses: SQL[] = [];
+
+  for (const promotion of activePromotions) {
+    if (promotion.scopeType === "all") {
+      scopeClauses.push(sql`true`);
+      continue;
+    }
+
+    if (promotion.scopeType === "products") {
+      const ids = [...sets.includedIds];
+      // An empty pin list is a promotion that names no products, which is
+      // `ctx.includedIds?.has(...)` answering false for every row.
+      if (ids.length > 0) scopeClauses.push(sql`${inArray(products.id, ids)}`);
+      continue;
+    }
+
+    const filter = (promotion.scopeFilter ?? {}) as PromotionScopeFilter;
+    // See the note above: an empty filter is not the whole catalogue.
+    if (Object.keys(filter).length === 0) continue;
+
+    const axes: SQL[] = [];
+    for (const clause of [
+      overlap(products.styles, filter.styles),
+      overlap(products.subjects, filter.subjects),
+      overlap(products.rooms, filter.rooms),
+    ]) {
+      if (clause) axes.push(clause);
+    }
+    if (filter.isFeatured !== undefined) {
+      // `Boolean(product.isFeatured)` on the resolver side — a null column is
+      // false there, so coalesce rather than let NULL swallow the row.
+      axes.push(
+        sql`coalesce(${products.isFeatured}, false) = ${filter.isFeatured}`
+      );
+    }
+
+    scopeClauses.push(
+      axes.length > 0 ? sql`(${sql.join(axes, sql` and `)})` : sql`true`
+    );
+  }
+
+  if (scopeClauses.length === 0) return NOTHING;
+
+  const inScope = sql`(${sql.join(scopeClauses, sql` or `)})`;
+
+  const excluded = [...sets.excludedIds];
+  if (excluded.length === 0) return inScope;
+
+  // An exclusion always wins, whatever the scope said.
+  return sql`${inScope} and not (${inArray(products.id, excluded)})`;
 }

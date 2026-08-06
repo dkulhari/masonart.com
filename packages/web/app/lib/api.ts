@@ -39,6 +39,14 @@ export interface ProductFilters {
   priceMax?: number;
   isFeatured?: boolean;
   isAiGenerated?: boolean;
+  /**
+   * Only the products the running promotion applies to — its scope minus its
+   * exclusions, resolved in SQL on the API side. This is what /sale lists.
+   *
+   * The server answers an empty list when no promotion is running, which is
+   * how /sale knows to show its empty state without ever seeing a scope.
+   */
+  onSale?: boolean;
   /** Mirrors the `sortBy` enum on GET /api/products. */
   sortBy?:
     | "createdAt"

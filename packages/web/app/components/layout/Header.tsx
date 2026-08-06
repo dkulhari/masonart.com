@@ -13,6 +13,8 @@ import { useEffect, useRef, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { useNavReveal } from '~/hooks/useNavReveal'
 import { useChromeOffset } from '~/hooks/useChromeOffset'
+import { useActivePromotion } from '~/hooks/useActivePromotion'
+import type { ActivePromotion } from '~/components/layout/SaleStrip'
 import { useCartItemCount, useCartHydration, useCartStore } from '~/stores/cart'
 import { useWishlistCount, useWishlistActions, useWishlistStore } from '~/stores/wishlist'
 import {
@@ -84,6 +86,10 @@ export function Header() {
   const wishlistCount = useWishlistCount()
   const { load: loadWishlist } = useWishlistActions()
   const isWishlistLoaded = useWishlistStore((state) => state.isLoaded)
+
+  // One lookup, both nav trees. Absent promotion, absent link — see
+  // SaleNavLink at the bottom of this file.
+  const { promotion: activePromotion } = useActivePromotion()
 
   // Scroll down leaves the compact bar — wordmark and actions; scroll up
   // brings both nav rows back wherever the page happens to be (#421).
@@ -488,6 +494,12 @@ export function Header() {
                   </Link>
                 </li>
               ))}
+              {/* Appended after the generated list, never inside it: row 2 is
+                  STYLE_OPTIONS and a Sale entry woven into that map would mean
+                  either a fake style id or a special case in the loop. It is
+                  also the only red thing in the row, which is the whole point
+                  — see the --sale token. */}
+              <SaleNavLink promotion={activePromotion} />
             </ul>
           </div>
         </nav>
@@ -558,6 +570,13 @@ export function Header() {
               <MobileNavLink to="/about" onClick={closeMobileMenu}>
                 About
               </MobileNavLink>
+              {/* The drawer is a second, independent nav tree — patching only
+                  the desktop row is the classic miss, and a phone would have
+                  no way to reach the sale at all. */}
+              <SaleMobileNavLink
+                promotion={activePromotion}
+                onClick={closeMobileMenu}
+              />
               <div className="my-2 border-t border-border" />
               {staffLabel && staffHref && (
                 <MobileNavLink
@@ -582,6 +601,65 @@ export function Header() {
           </>
         )}
     </>
+  )
+}
+
+/**
+ * The red Sale link at the end of nav row 2 (#437).
+ *
+ * ## Absent, not disabled
+ *
+ * `null` renders nothing at all — no greyed entry, no placeholder. A Sale link
+ * that outlives its promotion sends shoppers to a page with nothing on it, and
+ * a greyed one advertises a discount that is not available. `undefined` — the
+ * lookup still out — renders nothing for the same reason in the other
+ * direction: flashing the link and withdrawing it is worse than showing it a
+ * beat late.
+ *
+ * ## Why red
+ *
+ * `--sale` is the only warm colour left in the storefront and is reserved for
+ * sale prices and sale tags. It reads as "discount" precisely because nothing
+ * else on the page is red — which is also why this is the one link in the row
+ * that does not take the near-black the styles take.
+ */
+export interface SaleNavLinkProps {
+  /** `undefined` while unknown, `null` once known to be absent. */
+  promotion?: ActivePromotion | null
+}
+
+export function SaleNavLink({ promotion }: SaleNavLinkProps) {
+  if (!promotion) return null
+
+  return (
+    <li>
+      <Link
+        to="/sale"
+        data-testid="sale-nav-link"
+        className="whitespace-nowrap text-nav font-medium text-sale transition-colors hover:text-sale/70"
+      >
+        Sale
+      </Link>
+    </li>
+  )
+}
+
+/** The same link in the mobile drawer, at the drawer's touch target size. */
+export function SaleMobileNavLink({
+  promotion,
+  onClick,
+}: SaleNavLinkProps & { onClick?: () => void }) {
+  if (!promotion) return null
+
+  return (
+    <Link
+      to="/sale"
+      onClick={onClick}
+      data-testid="sale-mobile-nav-link"
+      className="flex items-center px-2 py-2 text-base font-medium text-sale transition-colors hover:text-sale/70"
+    >
+      Sale
+    </Link>
   )
 }
 
