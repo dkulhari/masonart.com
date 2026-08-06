@@ -124,6 +124,7 @@ export const orderTypeEnum = pgEnum("order_type", [
   "regular", // Standard product order
   "ai_generated", // AI-generated poster order
   "trade", // Trade program order (wholesale)
+  "gift_card", // Buys a gift card; no shipping, no tax, not from the cart
 ]);
 
 // ============================================================================
@@ -206,6 +207,28 @@ export const orders = pgTable(
 
     // Trade discount (for trade program members)
     tradeDiscount: decimal("trade_discount", { precision: 10, scale: 2 })
+      .default("0.00")
+      .notNull(),
+
+    /**
+     * Gift card tender applied to this order, in rupees.
+     *
+     * NOT a discount. It sits here, below every discount bucket, because that
+     * is where it sits in the money path (sale-promotions design §5):
+     *
+     *   subtotal - promotionDiscount - couponDiscount + shipping + tax = total
+     *   total - giftCardAmount = what Razorpay is asked for
+     *
+     * So it is never summed into `discount` — that column is the derived total
+     * of the discount buckets above — and never becomes a fourth bucket
+     * beside couponDiscount / promotionDiscount / tradeDiscount. A discount
+     * reduces the price before tax; tender reduces what is charged after it.
+     *
+     * The charged amount stays derived rather than stored:
+     *   toPaise(total) - toPaise(giftCardAmount)
+     * Persisting it too would give two sources of truth for what is owed.
+     */
+    giftCardAmount: decimal("gift_card_amount", { precision: 10, scale: 2 })
       .default("0.00")
       .notNull(),
 
