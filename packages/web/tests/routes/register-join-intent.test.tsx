@@ -102,6 +102,13 @@ function fillValidForm() {
   })
 }
 
+/** Google sign-in is async too, and the click leaves state behind it. */
+async function clickGoogle() {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /continue with google/i }))
+  })
+}
+
 /** Submitting starts an async signup; act() keeps React's warning honest. */
 async function submitForm() {
   await act(async () => {
@@ -257,8 +264,8 @@ describe('the intent cookie', () => {
   it('survives the Google round trip by being a cookie, not state', async () => {
     renderAt({ join: 'gallery' })
 
-    fireEvent.click(screen.getByRole('button', { name: /continue with google/i }))
-    await vi.waitFor(() => expect(authClient.signInSocial).toHaveBeenCalled())
+    await clickGoogle()
+    expect(authClient.signInSocial).toHaveBeenCalled()
 
     // The cookie is still there for the callback to read — the component that
     // held the checkbox is about to be destroyed by a cross-origin navigation.
@@ -295,9 +302,8 @@ describe('where the visitor lands afterwards', () => {
 
   it('hands the same destination to the Google callback', async () => {
     renderAt({ join: 'gallery', redirect: '/sale' })
-    fireEvent.click(screen.getByRole('button', { name: /continue with google/i }))
+    await clickGoogle()
 
-    await vi.waitFor(() => expect(authClient.signInSocial).toHaveBeenCalled())
     expect(authClient.signInSocial).toHaveBeenCalledWith(
       expect.objectContaining({ callbackURL: '/sale' })
     )
