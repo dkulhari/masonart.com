@@ -145,6 +145,9 @@ describe('useCartActions.addItem', () => {
     vi.mocked(cartApi.addItem).mockRejectedValue(
       new Error('Product variant is out of stock')
     )
+    // The add was refused, so the cart it was refused from is still empty —
+    // and that, not the pre-write snapshot, is what the store settles on.
+    vi.mocked(cartApi.get).mockResolvedValue({ ...serverCart, items: [] })
 
     await act(() => result.current.addItem(addInput))
 
@@ -431,5 +434,151 @@ describe('useCartActions — removing a still-pending line', () => {
 
     expect(cartApi.removeItem).toHaveBeenCalledWith(SERVER_ID)
     expect(useCartStore.getState().items).toEqual([])
+  })
+})
+
+/**
+ * #511 final review, finding 2: a rejected write restored a client-side
+ * snapshot, and a superseded write's rollback was dropped with nothing to
+ * reconcile the difference.
+ *
+ * The sequence guard was right to stop an older write clobbering a newer one,
+ * but `if (!isCurrent(sequence)) return` skipped that older write's ROLLBACK
+ * too — while the newer write's own snapshot had been captured after the older
+ * write's optimistic mutation was already applied. Replaying it therefore
+ * restored a state that included a line the server had refused. The cart then
+ * showed items the database did not have, and checkout answered "Cart is
+ * empty" against a cart the customer could see a total for.
+ *
+ * The fix is to stop replaying snapshots on the failure path at all: re-read
+ * the cart and project THAT. The assertions below are all about the store and
+ * the server agreeing afterwards, whatever order the two writes resolved in.
+ */
+describe('useCartActions — reconciling after a rejected write', () => {
+  /** A second, distinct line — `addItemLocal` dedupes on product+variant+frame. */
+  const otherInput = { ...addInput, variantId: 'var-2' }
+
+  const emptyCart = { ...serverCart, itemCount: 0, subtotal: '0.00', items: [] }
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void
+    let reject!: (error: Error) => void
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve, reject }
+  }
+
+  it('leaves no phantom line when an earlier add and a later add are both refused', async () => {
+    const { result } = renderHook(() => useCartActions(), { wrapper })
+
+    const first = deferred<{ message: string }>()
+    const second = deferred<{ message: string }>()
+    vi.mocked(cartApi.addItem)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    // Neither add landed, so this is what the server actually holds.
+    vi.mocked(cartApi.get).mockResolvedValue(emptyCart)
+
+    await act(async () => {
+      const addX = result.current.addItem(addInput)
+      const addY = result.current.addItem(otherInput)
+      expect(useCartStore.getState().items).toHaveLength(2)
+
+      // X is refused while Y is still outstanding, so X's own reconciliation
+      // is superseded and dropped — Y owns settling the cart from here.
+      first.reject(new Error('X refused'))
+      second.reject(new Error('Y refused'))
+      await Promise.all([addX, addY])
+    })
+
+    // Restoring Y's snapshot leaves X's optimistic line behind: one item on
+    // screen, nothing in the database, and "Cart is empty" at checkout.
+    expect(useCartStore.getState().items).toEqual([])
+    expect(useCartStore.getState().syncError).toBe('Y refused')
+  })
+
+  it('replaces a still-pending line with the real row when the add behind it did land', async () => {
+    const { result } = renderHook(() => useCartActions(), { wrapper })
+
+    const first = deferred<{ message: string; item: { id: string } }>()
+    const second = deferred<{ message: string }>()
+    vi.mocked(cartApi.addItem)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    // X made it; Y did not. `serverCart` is exactly that cart.
+    vi.mocked(cartApi.get).mockResolvedValue(serverCart)
+    vi.mocked(cartApi.removeItem).mockResolvedValue({ message: 'ok' })
+
+    await act(async () => {
+      const addX = result.current.addItem(addInput)
+      const addY = result.current.addItem(otherInput)
+
+      // X succeeds but is already superseded, so its re-projection is skipped
+      // and its pending-id bookkeeping is torn down — the store is left
+      // holding an id nothing can address.
+      first.resolve({ message: 'ok', item: { id: SERVER_ID } })
+      second.reject(new Error('Y refused'))
+      await Promise.all([addX, addY])
+    })
+
+    const settled = useCartStore.getState().items
+    expect(settled).toHaveLength(1)
+    expect(settled[0]!.id).toBe(SERVER_ID)
+
+    // The consequence of getting this wrong is not cosmetic: removing the line
+    // the customer can see has to actually delete the row they will otherwise
+    // be charged for. With a stale `pending*` id it silently did nothing.
+    await act(() => result.current.removeItem(settled[0]!.id))
+    expect(cartApi.removeItem).toHaveBeenCalledWith(SERVER_ID)
+  })
+
+  it('sends a quantity change on a still-pending line once the add answers', async () => {
+    const { result } = renderHook(() => useCartActions(), { wrapper })
+
+    const add = deferred<{ message: string; item: { id: string } }>()
+    vi.mocked(cartApi.addItem).mockReturnValue(add.promise)
+    vi.mocked(cartApi.updateItem).mockResolvedValue({ message: 'ok' })
+    vi.mocked(cartApi.get).mockResolvedValue({
+      ...serverCart,
+      items: [{ ...serverCart.items[0], quantity: 4, lineTotal: '8000.00' }],
+    })
+
+    await act(async () => {
+      const addPromise = result.current.addItem(addInput)
+      const pendingId = useCartStore.getState().items[0]!.id
+      expect(pendingId).toMatch(/^pending/)
+
+      const bump = result.current.updateQuantity(pendingId, 4)
+      // Applied locally at once, as it must be...
+      expect(useCartStore.getState().items[0]!.quantity).toBe(4)
+      // ...but there is no row to patch yet.
+      expect(cartApi.updateItem).not.toHaveBeenCalled()
+
+      add.resolve({ message: 'ok', item: { id: SERVER_ID } })
+      await Promise.all([addPromise, bump])
+    })
+
+    // Bailing out here left the new quantity in the store and nowhere else,
+    // with nothing on screen to say so — and the customer was charged for the
+    // quantity they started with.
+    expect(cartApi.updateItem).toHaveBeenCalledWith(SERVER_ID, { quantity: 4 })
+    expect(useCartStore.getState().items[0]!.id).toBe(SERVER_ID)
+    expect(useCartStore.getState().items[0]!.quantity).toBe(4)
+  })
+
+  it('says the cart could not be re-read when the recovery fetch fails too', async () => {
+    useCartStore.getState().replaceFromServer(serverCart)
+    const { result } = renderHook(() => useCartActions(), { wrapper })
+    vi.mocked(cartApi.updateItem).mockRejectedValue(new Error('nope'))
+    vi.mocked(cartApi.get).mockRejectedValue(new Error('offline'))
+
+    await act(() => result.current.updateQuantity(SERVER_ID, 3))
+
+    // No authority to project, so the pre-write state is the best guess left —
+    // and it is labelled as a guess rather than left looking settled.
+    expect(useCartStore.getState().items[0]!.quantity).toBe(1)
+    expect(useCartStore.getState().syncError).toMatch(/reload/i)
   })
 })

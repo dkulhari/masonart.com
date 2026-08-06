@@ -4,9 +4,11 @@
  * The server cart is the one `POST /api/orders` reads, so it is the one that
  * decides. Each action applies its change locally first — the UI must not wait
  * on a round trip — then sends it, then replaces the local cart with whatever
- * the server says the cart now is. A rejection restores the snapshot and puts
- * the reason in `syncError`, so the two can never disagree about what checkout
- * will find.
+ * the server says the cart now is. A rejection re-reads the cart and puts the
+ * reason in `syncError`, so the two can never disagree about what checkout
+ * will find: every path out of every action, success or failure, ends with the
+ * store holding the server's rows rather than a locally-computed guess at them
+ * (#511 final review, finding 2 — see `recoverFromServer`).
  *
  * Two things past that single-write description, both from #511 fix round 1:
  *
@@ -135,6 +137,91 @@ async function applyIfCurrent(
   useCartStore.getState().replaceFromServer(cart);
 }
 
+/**
+ * What a rejected write settles the cart on (#511 final review, finding 2).
+ *
+ * NOT the snapshot it captured before mutating. Two writes can overlap, and
+ * `restore(snapshot)` is only correct if this write's optimistic mutation is
+ * the only one the store has applied since — which is exactly what overlapping
+ * means it is not. The snapshot a later write captured already contains the
+ * earlier write's optimism, and the earlier write's own rollback is dropped as
+ * superseded, so replaying a snapshot could leave a line the server never
+ * accepted sitting in a cart the customer then takes to checkout: the store
+ * says one item, `POST /api/orders` says "Cart is empty".
+ *
+ * Re-reading the cart instead makes the answer absolute rather than relative.
+ * Whatever the store had accumulated — one failed write's optimism or three —
+ * it is replaced by the rows order creation will actually read, so no amount of
+ * interleaving can leave a phantom line behind. It also clears out stale
+ * `pending*` ids, which is why removing or re-quantifying such a line is no
+ * longer a silent no-op.
+ *
+ * Order matters: `replaceFromServer` clears `syncError` unconditionally, so the
+ * message is set after it or it never survives. The customer is still told the
+ * write failed — the cart just no longer lies to them about what is in it.
+ *
+ * If the re-read itself fails there is no authority to project, and the
+ * fallback IS the snapshot: a failed write most likely left the server where it
+ * was, so the pre-write state is the best available guess. That is a guess and
+ * is labelled as one — the message says to reload — rather than being left to
+ * look like a settled cart.
+ */
+async function recoverFromServer(
+  sequence: number,
+  queryClient: QueryClient,
+  snapshot: CartItem[],
+  message: string
+): Promise<void> {
+  if (!isCurrent(sequence)) return;
+
+  try {
+    const cart = await fetchCart();
+    if (!isCurrent(sequence)) return;
+    queryClient.setQueryData(cartKeys.detail(), cart);
+    useCartStore.getState().replaceFromServer(cart);
+    useCartStore.getState().setSyncError(message);
+  } catch {
+    if (!isCurrent(sequence)) return;
+    useCartStore.getState().restore(snapshot);
+    useCartStore
+      .getState()
+      .setSyncError(`${message}. We could not reach your cart to check what it holds — please reload before checking out`);
+  }
+}
+
+/**
+ * The server id an optimistic line ended up with, or null if it has none.
+ *
+ * Null covers two cases that look the same from here: the add was refused, and
+ * the add landed but under a write that has since been superseded, so its
+ * bookkeeping entry is already gone. Neither can be addressed by id, and both
+ * are settled the same way — by re-reading the cart.
+ */
+async function resolveServerId(pendingId: string): Promise<string | null> {
+  const pending = pendingAdds.get(pendingId);
+  return pending ? await pending : null;
+}
+
+/**
+ * Take the server's answer for a write that could not be sent at all.
+ *
+ * Reached when a still-optimistic line turns out to have no server row to
+ * address. Nothing failed, so there is no message to show — but the local
+ * mutation has no way to reach the server either, and leaving it applied is
+ * precisely the local-only cart this change exists to end.
+ */
+async function settle(
+  sequence: number,
+  queryClient: QueryClient,
+  snapshot: CartItem[]
+): Promise<void> {
+  try {
+    await applyIfCurrent(sequence, queryClient);
+  } catch (error) {
+    await recoverFromServer(sequence, queryClient, snapshot, readError(error));
+  }
+}
+
 export interface CartActions {
   addItem: (input: AddToCartInput) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => Promise<void>;
@@ -182,9 +269,12 @@ export function useCartActions(): CartActions {
         await applyIfCurrent(sequence, queryClient);
       } catch (error) {
         resolvePending(null);
-        if (!isCurrent(sequence)) return;
-        useCartStore.getState().restore(snapshot);
-        useCartStore.getState().setSyncError(readError(error));
+        await recoverFromServer(
+          sequence,
+          queryClient,
+          snapshot,
+          readError(error)
+        );
       } finally {
         pendingAdds.delete(pendingId);
       }
@@ -206,9 +296,16 @@ export function useCartActions(): CartActions {
         // rather than skipping the server entirely, or its own success puts
         // the row it creates right back into the cart the customer just
         // removed it from.
-        const pending = pendingAdds.get(id);
-        const serverId = pending ? await pending : null;
-        if (!serverId) return; // The add never landed — nothing to delete.
+        const serverId = await resolveServerId(id);
+        if (!serverId) {
+          // No row to delete under this id — but "no row" is a claim about the
+          // server, and the last thing that spoke to the server here failed or
+          // was superseded. Returning on the strength of local bookkeeping is
+          // how a line the customer removed stayed in the database and got
+          // charged; ask instead.
+          await settle(sequence, queryClient, snapshot);
+          return;
+        }
         targetId = serverId;
       }
 
@@ -216,9 +313,12 @@ export function useCartActions(): CartActions {
         await cartApi.removeItem(targetId);
         await applyIfCurrent(sequence, queryClient);
       } catch (error) {
-        if (!isCurrent(sequence)) return;
-        useCartStore.getState().restore(snapshot);
-        useCartStore.getState().setSyncError(readError(error));
+        await recoverFromServer(
+          sequence,
+          queryClient,
+          snapshot,
+          readError(error)
+        );
       }
     },
     [queryClient]
@@ -238,15 +338,32 @@ export function useCartActions(): CartActions {
 
       store.updateQuantityLocal(id, quantity);
 
-      if (isPending(id)) return;
+      let targetId = id;
+      if (isPending(id)) {
+        // Same reasoning as `removeItem`: the add that minted this id is
+        // typically still in flight, so wait for the real id and patch that.
+        // Returning here instead left the new quantity in the store and
+        // nowhere else — permanently, with nothing on screen to say so, since
+        // this write's own sequence number had already superseded the add's
+        // re-projection.
+        const serverId = await resolveServerId(id);
+        if (!serverId) {
+          await settle(sequence, queryClient, snapshot);
+          return;
+        }
+        targetId = serverId;
+      }
 
       try {
-        await cartApi.updateItem(id, { quantity });
+        await cartApi.updateItem(targetId, { quantity });
         await applyIfCurrent(sequence, queryClient);
       } catch (error) {
-        if (!isCurrent(sequence)) return;
-        useCartStore.getState().restore(snapshot);
-        useCartStore.getState().setSyncError(readError(error));
+        await recoverFromServer(
+          sequence,
+          queryClient,
+          snapshot,
+          readError(error)
+        );
       }
     },
     [queryClient, removeItem]
@@ -263,9 +380,7 @@ export function useCartActions(): CartActions {
       await cartApi.clear();
       await applyIfCurrent(sequence, queryClient);
     } catch (error) {
-      if (!isCurrent(sequence)) return;
-      useCartStore.getState().restore(snapshot);
-      useCartStore.getState().setSyncError(readError(error));
+      await recoverFromServer(sequence, queryClient, snapshot, readError(error));
     }
   }, [queryClient]);
 
