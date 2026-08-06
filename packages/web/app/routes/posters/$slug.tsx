@@ -21,6 +21,7 @@ import {
 } from '~/components/product/ProductReviewSection'
 import type { SizeVariant } from '~/components/product/SizeSelector'
 import type { FrameOptionData } from '~/components/product/FrameSelector'
+import type { SalePricing } from '~/components/product/SalePrice'
 
 // ============================================================================
 // Types
@@ -77,6 +78,14 @@ interface ProductApiResponse {
   basePrice?: string | number
   minPrice?: number
   maxPrice?: number
+  /**
+   * The resolved sale, or null when nothing discounts this poster (#428).
+   *
+   * Passed through untouched. `locked` already accounts for the viewer's
+   * membership, because the endpoint resolves it against the session — the
+   * page never decides who the viewer is.
+   */
+  sale?: SalePricing | null
 }
 
 // ============================================================================
@@ -146,6 +155,10 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
       isAiGenerated: response.isAiGenerated,
       seoTitle: response.seoTitle,
       seoDescription: response.seoDescription,
+      // Straight through, deliberately: every figure was resolved by
+      // `resolveSalePrice` on the API side, and a transform here would be a
+      // second pricing rule.
+      sale: response.sale ?? null,
     }
 
     return product

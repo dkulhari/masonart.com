@@ -20,11 +20,18 @@ import {
   RotateCcw,
   Palette,
 } from 'lucide-react'
-import { cn, formatPrice } from '~/lib/utils'
+import { cn } from '~/lib/utils'
 import { WishlistButton } from './WishlistButton'
 import { useCartStore } from '~/stores/cart'
 import { SizeSelector, type SizeVariant } from './SizeSelector'
 import { FrameSelector, calculateFramePrice, type FrameOptionData } from './FrameSelector'
+import { SalePrice, type SalePricing } from './SalePrice'
+import { useGalleryMembership } from '~/hooks/useGalleryMembership'
+import {
+  useActivePromotion,
+  useCountdown,
+  type ActivePromotion,
+} from '~/hooks/useActivePromotion'
 
 // ============================================================================
 // Types
@@ -81,11 +88,25 @@ export interface ProductDetailData {
   seoTitle?: string
   /** SEO description */
   seoDescription?: string
+  /**
+   * The resolved sale, or null when this poster is not discounted (#428).
+   *
+   * Read, never recomputed — see SalePrice. The frame is deliberately not part
+   * of it: the sale is on the artwork, which is the same rule the cart prices
+   * a line by.
+   */
+  sale?: SalePricing | null
 }
 
 export interface ProductDetailProps {
   /** Product data */
   product: ProductDetailData
+  /**
+   * The running promotion, when the caller already holds it. Omit to let the
+   * shared lookup answer; pass `null` to say explicitly that none is running.
+   * Only the countdown echo reads it — the price comes from `product.sale`.
+   */
+  promotion?: ActivePromotion | null
   /** Optional className */
   className?: string
 }
@@ -97,7 +118,7 @@ export interface ProductDetailProps {
 /**
  * ProductDetail - Full product page component with all selection options
  */
-export function ProductDetail({ product, className }: ProductDetailProps) {
+export function ProductDetail({ product, promotion, className }: ProductDetailProps) {
   // State for selections
   const [selectedVariant, setSelectedVariant] = useState<SizeVariant | null>(
     product.variants.find((v) => v.isAvailable) || null
@@ -105,6 +126,38 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
   const [selectedFrame, setSelectedFrame] = useState<FrameOptionData | null>(null)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [quantity, setQuantity] = useState(1)
+
+  /**
+   * The one shared membership signal (#443), not a second read of the session.
+   *
+   * `product.sale.locked` was resolved before a mid-session join, so somebody
+   * who joins from the banner while standing on this page would otherwise keep
+   * looking at a gated price. This only ever unlocks the display; the server
+   * remains the authority on what is charged.
+   */
+  const { isMember } = useGalleryMembership()
+
+  /**
+   * The countdown echo (parity §1.4 item 6).
+   *
+   * The deadline is NOT on the product payload and is not derivable here: the
+   * server mints this visitor's rolling window into a cookie and clamps it
+   * against the real end (#432). It arrives through the same hook the header
+   * and /sale read, formatted by the same `formatRemaining` the strip renders
+   * through — so the band at the top of the page and the clock in the buy
+   * panel cannot print different digits for the same second.
+   *
+   * Echoed only when the running promotion is the one that priced THIS poster.
+   * A promotion this product is excluded from would otherwise hang a clock
+   * over a full-price piece, advertising a discount checkout will not honour.
+   */
+  const { promotion: activePromotion } = useActivePromotion(promotion)
+  const countdownPromotion =
+    product.sale &&
+    activePromotion &&
+    activePromotion.promotionId === product.sale.promotionId
+      ? activePromotion
+      : null
 
   // Cart store
   const addItem = useCartStore((state) => state.addItem)
@@ -327,13 +380,28 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
               <p className="mt-2 text-xs text-muted-foreground">SKU: {product.sku}</p>
             </div>
 
-            {/* Price Display */}
+            {/* Price Display.
+             *
+             * One component prints this whether or not a sale is running, so
+             * the panel and the grid card cannot drift apart about what a
+             * discounted price looks like. With no sale it renders exactly the
+             * figure this box always showed — the selected size plus frame.
+             *
+             * With a sale it shows what the payload resolved, which is priced
+             * off the artwork and not off the frame. That is not an oversight:
+             * `priceCartLine` adds the frame back at full price, so quoting a
+             * frame-inclusive discount here would promise a saving the cart
+             * then declines to give. The variance note below already says the
+             * figure moves with the selection. */}
             <div className="rounded-lg border border-border bg-muted/30 p-4">
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-medium text-foreground">
-                  {formatPrice(totalPrice)}
-                </span>
-                {selectedFrame && (
+                <SalePrice
+                  sale={product.sale ?? null}
+                  basePrice={totalPrice}
+                  isMember={isMember}
+                  className="text-3xl font-medium text-foreground"
+                />
+                {selectedFrame && !product.sale && (
                   <span className="text-sm text-muted-foreground">
                     (includes frame)
                   </span>
@@ -342,6 +410,13 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
               <p className="mt-1 text-sm text-muted-foreground">
                 Price varies by size and frame selection
               </p>
+
+              {countdownPromotion && (
+                <SaleCountdownEcho
+                  headline={countdownPromotion.headline}
+                  deadline={countdownPromotion.deadline}
+                />
+              )}
             </div>
 
             {/* Size Selector */}
@@ -472,6 +547,45 @@ export function ProductDetail({ product, className }: ProductDetailProps) {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * The buy panel's echo of the strip's clock.
+ *
+ * Its own component purely so the tick lives behind a conditional render
+ * rather than a conditional hook — the panel drops the clock when the window
+ * runs out, and a hook cannot be dropped with it.
+ *
+ * Reaching zero mid-session is ordinary rather than an error: the rolling
+ * window can expire while the sale is still live. The timer disappears, the
+ * price stays, and the next navigation picks up a freshly minted deadline.
+ */
+function SaleCountdownEcho({
+  headline,
+  deadline,
+}: {
+  headline: string
+  deadline: string
+}) {
+  const remaining = useCountdown(deadline)
+  if (!remaining) return null
+
+  return (
+    <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-muted-foreground">
+      <span>{headline}</span>
+      {/* Not a live region: a screen reader interrupting itself once a second
+          to re-read a clock is worse than no clock at all. The accessible name
+          carries the units the colon-separated digits leave to the layout. */}
+      <time
+        dateTime={deadline}
+        aria-label={remaining.label}
+        data-testid="buybox-sale-countdown"
+        className="font-medium tabular-nums text-sale"
+      >
+        {remaining.display}
+      </time>
+    </p>
   )
 }
 
