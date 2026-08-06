@@ -34,8 +34,20 @@
 import { sql, type SQL } from "drizzle-orm";
 import { products } from "../database/schema/products";
 
-/** Order statuses that undo a sale. Everything else with a paid order counts. */
-const VOIDED_ORDER_STATUSES = ["cancelled", "refunded", "failed"] as const;
+/**
+ * Order statuses that undo a sale. Everything else with a paid order counts.
+ *
+ * Exported because "an order that settled" has to mean the same thing wherever
+ * it is asked: the best-selling rank below, and the per-customer promotion
+ * limit in `routes/orders.ts`. Two copies of this list drift, and the day one
+ * of them gains a status the other does not, a refunded order starts counting
+ * against a customer's sale allowance.
+ */
+export const VOIDED_ORDER_STATUSES = [
+  "cancelled",
+  "refunded",
+  "failed",
+] as const;
 
 /**
  * `coalesce(sum(quantity), 0)` over settled orders for the given product row.

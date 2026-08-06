@@ -15,7 +15,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, notInArray } from "drizzle-orm";
 
 import { db } from "../database";
 import {
@@ -28,7 +28,17 @@ import {
 import { carts, cartItems } from "../database/schema/cart";
 import { productionApprovals } from "../database/schema/approvals";
 import { reviews } from "../database/schema/reviews";
-import { requireAuth, type AuthVariables } from "../middleware/auth";
+import {
+  requireAuth,
+  type AuthUser,
+  type AuthVariables,
+} from "../middleware/auth";
+import {
+  getActivePromotions,
+  loadPromotionProductSets,
+  resolveSalePrice,
+} from "../lib/promotion-pricing";
+import { VOIDED_ORDER_STATUSES } from "../lib/product-sales";
 import {
   createRazorpayOrder,
   verifyPaymentSignature,
@@ -67,12 +77,20 @@ const shippingAddressSchema = z.object({
 
 /**
  * Schema for creating a new order
+ *
+ * Deliberately carries no price and no coupon code. Money is resolved from the
+ * database at order time (see `resolvePromotionDiscounts`), so anything the
+ * request says about what this order costs is ignored — and a `couponCode` the
+ * request supplies used to be persisted beside a hardcoded zero discount, which
+ * made the order record claim a code was applied when none was.
+ *
+ * Exported so a test can assert what is *absent*: zod strips unknown keys
+ * silently, so a re-added `couponCode` would never surface as a 400.
  */
-const createOrderSchema = z.object({
+export const createOrderSchema = z.object({
   shippingAddress: shippingAddressSchema,
   shippingMethod: z.enum(["standard", "express"]).optional().default("standard"),
   customerNotes: z.string().max(500).optional(),
-  couponCode: z.string().max(50).optional(),
 });
 
 /**
@@ -197,6 +215,170 @@ function createItemSnapshot(
 }
 
 // ============================================================================
+// Sale pricing at order time
+// ============================================================================
+
+/**
+ * Membership, read off the session at the moment the order is created.
+ *
+ * Mirrors `routes/cart.ts` and `routes/products.ts`: `galleryMember` is a
+ * Better Auth additional field, so it rides on the session user without
+ * appearing on `AuthUser` — the cast is what that costs. Reading it here rather
+ * than trusting the cart is the point: a cart opened as a member and checked
+ * out after a logout pays base.
+ */
+function readIsMember(user: AuthUser): boolean {
+  return Boolean(
+    (user as AuthUser & { galleryMember?: boolean }).galleryMember
+  );
+}
+
+/** Half-up to 2dp, applied per line — the same rule the resolver uses. */
+function toMoney(value: number): string {
+  return (Math.round((value + Number.EPSILON) * 100) / 100).toFixed(2);
+}
+
+/** A line's own discount and the promotion that granted it. */
+type LineDiscount = { promotionId: string; amount: number };
+
+/** The lines `resolvePromotionDiscounts` prices, as little of them as it needs. */
+type PricedOrderLine = {
+  id: string;
+  unitPrice: string;
+  quantity: number;
+  product: { id: string; basePrice: string } | null;
+};
+
+/**
+ * How many settled orders this customer already has under `promotionId`.
+ *
+ * "Settled" means the same thing here as it does for the best-selling rank:
+ * payment succeeded and the order was not undone. Sharing
+ * `VOIDED_ORDER_STATUSES` with `lib/product-sales.ts` is what keeps the two
+ * definitions from drifting — a refunded order must not burn a customer's
+ * allowance any more than it counts as a unit sold.
+ */
+async function countSettledOrdersForPromotion(
+  userId: string,
+  promotionId: string
+): Promise<number> {
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.userId, userId),
+        eq(orders.promotionId, promotionId),
+        eq(orders.paymentStatus, "paid"),
+        notInArray(orders.status, [...VOIDED_ORDER_STATUSES])
+      )
+    );
+
+  return result[0]?.count ?? 0;
+}
+
+/**
+ * What comes off this order, resolved from the database.
+ *
+ * The client sends no prices and none are read from the cart's stored
+ * `lineTotal`: every line is re-resolved through `resolveSalePrice`, so a sale
+ * that ended while the cart sat open is simply not found.
+ *
+ * The discount comes off the line's own `unitPrice` — the variant's price,
+ * which is the money actually being charged — exactly as `routes/cart.ts`
+ * prices the same basket. Feeding the product's `basePrice` in instead would
+ * discount an A1 print by the A4's saving, and the cart and the order would
+ * quote different totals for the same items. The frame stays at full price:
+ * the sale is on the artwork, and a frame is not a product a promotion scopes
+ * over.
+ */
+async function resolvePromotionDiscounts(
+  userId: string,
+  isMember: boolean,
+  items: PricedOrderLine[]
+): Promise<{
+  discountByLine: Map<string, string>;
+  promotionId: string | null;
+  promotionDiscount: string;
+}> {
+  const activePromotions = await getActivePromotions();
+  const { includedIds, excludedIds } =
+    await loadPromotionProductSets(activePromotions);
+  const ctx = { isMember, includedIds, excludedIds };
+
+  const perLine = new Map<string, LineDiscount>();
+
+  for (const item of items) {
+    if (!item.product) continue;
+
+    const sale = resolveSalePrice(
+      { ...item.product, basePrice: item.unitPrice },
+      activePromotions,
+      ctx
+    );
+
+    // `locked` is a members-only price this buyer has not earned: shown on the
+    // storefront, base at the till.
+    if (!sale || sale.locked) continue;
+
+    const perUnit = parseFloat(sale.basePrice) - parseFloat(sale.salePrice);
+    if (perUnit <= 0) continue;
+
+    perLine.set(item.id, {
+      promotionId: sale.promotionId,
+      amount: parseFloat(toMoney(perUnit * item.quantity)),
+    });
+  }
+
+  // One count per promotion actually in play — usually one, often none. A
+  // promotion without a limit asks the database nothing.
+  const promotionIds = new Set(
+    [...perLine.values()].map((line) => line.promotionId)
+  );
+
+  for (const promotionId of promotionIds) {
+    const limit = activePromotions.find(
+      (promotion) => promotion.id === promotionId
+    )?.perCustomerOrderLimit;
+    if (!limit || limit <= 0) continue;
+
+    const settled = await countSettledOrdersForPromotion(userId, promotionId);
+    if (settled < limit) continue;
+
+    // Spent. The order still goes through, at base — refusing it at the till
+    // loses the sale rather than the discount.
+    for (const [lineId, line] of perLine) {
+      if (line.promotionId === promotionId) perLine.delete(lineId);
+    }
+  }
+
+  // One promotion id fits on the order row. Promotions never stack per
+  // product, so two of them pricing one basket is already an admin overlap;
+  // the deepest contributor is what gets recorded.
+  const totals = new Map<string, number>();
+  let promotionId: string | null = null;
+  let leadingTotal = 0;
+
+  for (const line of perLine.values()) {
+    const total = (totals.get(line.promotionId) ?? 0) + line.amount;
+    totals.set(line.promotionId, total);
+    if (total > leadingTotal) {
+      leadingTotal = total;
+      promotionId = line.promotionId;
+    }
+  }
+
+  const discountByLine = new Map(
+    [...perLine].map(([lineId, line]) => [lineId, toMoney(line.amount)])
+  );
+  const promotionDiscount = toMoney(
+    [...perLine.values()].reduce((sum, line) => sum + line.amount, 0)
+  );
+
+  return { discountByLine, promotionId, promotionDiscount };
+}
+
+// ============================================================================
 // Route Handler
 // ============================================================================
 
@@ -258,14 +440,35 @@ ordersApp.post(
         }
       }
 
+      // Re-resolve every price from the database. Nothing the request said
+      // about money reaches this point.
+      const { discountByLine, promotionId, promotionDiscount } =
+        await resolvePromotionDiscounts(
+          user.id,
+          readIsMember(user),
+          activeItems
+        );
+
       // Calculate totals
+      //
+      // `subtotal` stays GROSS — the sum of base line totals, as it has always
+      // been — and `total` subtracts the discount exactly once. Making subtotal
+      // net while `total` still subtracts would take the promotion off twice,
+      // and the free-shipping threshold below reads the same gross figure it
+      // read before this feature existed. Interim, pending #510.
       const subtotal = activeItems.reduce((sum, item) => {
         return sum + parseFloat(item.lineTotal);
       }, 0);
 
       const subtotalStr = subtotal.toFixed(2);
       const shippingCost = calculateShippingCost(input.shippingMethod, subtotalStr);
-      const discount = "0.00"; // TODO: Apply coupon if provided
+      // Reserved for discount codes (design D8). Nothing here writes it.
+      const couponDiscount = "0.00";
+      // Derived, not assigned: composing the total from its two source columns
+      // means the expression is already correct the day codes land.
+      const discount = toMoney(
+        parseFloat(promotionDiscount) + parseFloat(couponDiscount)
+      );
       const tax = "0.00"; // TODO: Calculate tax based on location
       const total = (
         subtotal +
@@ -295,8 +498,11 @@ ordersApp.post(
             discount,
             tax,
             total,
-            couponCode: input.couponCode || null,
-            couponDiscount: "0.00",
+            // No code was applied, so none is recorded. See createOrderSchema.
+            couponCode: null,
+            couponDiscount,
+            promotionId,
+            promotionDiscount,
             itemCount: activeItems.reduce((sum, item) => sum + item.quantity, 0),
             customerNotes: input.customerNotes || null,
             currency: "INR",
@@ -322,7 +528,10 @@ ordersApp.post(
           unitPrice: item.unitPrice,
           framePrice: item.framePrice,
           quantity: item.quantity,
+          // Base, always. The sale comes off in `itemDiscount` beside it, so a
+          // settled line still shows what it would have cost.
           lineTotal: item.lineTotal,
+          itemDiscount: discountByLine.get(item.id) ?? "0.00",
           isAiGenerated: item.isAiGenerated,
           aiGenerationId: item.aiGenerationId,
           customizations: item.customizations as Record<string, unknown> | null,
@@ -365,6 +574,8 @@ ordersApp.post(
             subtotal: newOrder.subtotal,
             shippingCost: newOrder.shippingCost,
             discount: newOrder.discount,
+            promotionId: newOrder.promotionId,
+            promotionDiscount: newOrder.promotionDiscount,
             tax: newOrder.tax,
             total: newOrder.total,
             itemCount: newOrder.itemCount,
@@ -568,6 +779,8 @@ ordersApp.get("/:id", async (c) => {
       total: order.total,
       couponCode: order.couponCode,
       couponDiscount: order.couponDiscount,
+      promotionId: order.promotionId,
+      promotionDiscount: order.promotionDiscount,
       itemCount: order.itemCount,
       currency: order.currency,
       customerNotes: order.customerNotes,

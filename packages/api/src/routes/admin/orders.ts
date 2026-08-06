@@ -528,6 +528,8 @@ adminOrdersApp.get("/:id", async (c) => {
       total: order.total,
       couponCode: order.couponCode,
       couponDiscount: order.couponDiscount,
+      promotionId: order.promotionId,
+      promotionDiscount: order.promotionDiscount,
       tradeDiscount: order.tradeDiscount,
       itemCount: order.itemCount,
       currency: order.currency,

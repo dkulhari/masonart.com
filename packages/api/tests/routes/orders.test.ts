@@ -726,8 +726,19 @@ describe('Orders Create Order Validation', () => {
     });
   });
 
-  describe('Coupon Code Validation', () => {
-    it('should accept valid coupon code', async () => {
+  describe('Coupon Code', () => {
+    /**
+     * The create-order schema no longer declares `couponCode`: the string was
+     * persisted beside a hardcoded zero discount, so the order claimed a code
+     * had been applied when none was. Zod strips unknown keys, so a request
+     * carrying one is still accepted — the code is simply dropped, and the
+     * order records `couponCode: null`.
+     *
+     * The assertion that the key is gone from the schema, and that null is
+     * what gets written, lives in tests/routes/order-promotion-pricing.test.ts
+     * where the schema and the persisted row are both inspected directly.
+     */
+    it('ignores a coupon code in the request body', async () => {
       if (!app) return;
 
       const res = await app.request('/api/orders', {
@@ -740,20 +751,6 @@ describe('Orders Create Order Validation', () => {
       });
       // Should pass validation, reach auth
       expect(res.status).toBe(401);
-    });
-
-    it('should reject coupon code exceeding max length (50 chars)', async () => {
-      if (!app) return;
-
-      const res = await app.request('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shippingAddress: validShippingAddress,
-          couponCode: 'x'.repeat(51),
-        }),
-      });
-      expect([400, 401].includes(res.status)).toBe(true);
     });
   });
 
