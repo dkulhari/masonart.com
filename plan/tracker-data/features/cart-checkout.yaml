@@ -36,6 +36,7 @@ tickets:
     "7": Implement cart and checkout with Razorpay
     "191": "Bug: Checkout shipping mock data mismatch and wrong assertion text"
     "195": "Bug: flows/checkout.spec.ts delivery options and shipping mock failures"
-total_tickets: 3
+    "511": The web app never writes to the server cart, so order creation reads an empty basket
+total_tickets: 4
 completion_percentage: 100
 is_completed: true

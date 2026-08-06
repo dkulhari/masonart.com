@@ -1,0 +1,107 @@
+ticket_number: 511
+title: The web app never writes to the server cart, so order creation reads an empty basket
+description: |-
+  ## Task
+  **Identify this ticket by title, not number — ticket numbers collided on 2026-08-06 under concurrent sessions.**
+
+  The storefront keeps its cart in a Zustand store persisted to `localStorage` (`packages/web/app/stores/cart.ts`). A complete server cart also exists — `packages/api/src/routes/cart.ts`, reached through `cartApi` and the mutation hooks in `packages/web/app/hooks/useCart.ts`.
+
+  **Nothing connects them.** Every cart-write hook has zero call sites:
+
+  ```
+  grep -rn "useAddToCart|useUpdateCartItem|useRemoveFromCart|useClearCart|useMergeCart" packages/web/app --include=*.tsx --include=*.ts | grep -v hooks/useCart.ts
+  (no results)
+  ```
+
+  `useServerCart` is read in exactly one place — `routes/cart/index.tsx:235`, added during the sale work — and `cartApi.addItem/updateItem/removeItem/clear/merge` are never called from anywhere.
+
+  Meanwhile checkout submits through `ordersApi.create()` (`components/checkout/PaymentButton.tsx:162`), and the API builds the order from the **database cart**: `routes/orders.ts:407-421` loads `userCart.items` and filters `isSavedForLater`. Nothing the customer added is in that table.
+
+  So an order placed by a real customer is assembled from an empty basket. Either checkout is failing outright in production, or it is succeeding against a cart that no longer reflects what was bought — both are severe, and both are invisible to the current tests because every route suite mocks `db` and every store test exercises Zustand alone.
+
+  ## Why it surfaced now
+  The sale work put server-resolved pricing on `GET /api/cart` and re-resolves it at order creation, which is correct — the server must be the pricing authority. That made the missing write path visible: sale prices computed over the server cart cannot reach a customer whose cart only exists in `localStorage`.
+
+  ## What to decide
+  The repo has two half-built carts and needs one. The server cart is the one order creation, pricing, the member gate and guest-session merging already assume, so wiring the writes to it is the smaller correction — but it touches add-to-cart call sites, `CartDrawer`, the header count, `checkout/index.tsx`, `PaymentButton`, guest merge-on-login, and a one-time `localStorage` → server migration for existing baskets.
+
+  ## Context
+  Found 2026-08-06 while verifying the cart-source bug during the sale-promotions build. Predates that feature entirely.
+
+  Related: `ticket-0510-cart-page-mixes-two-cart-sourc.yaml` (narrow fix already landed — savings are confined to lines present in both sources) and `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5.
+
+  **Verify against a real database.** `packages/api/tests/setup.ts:15` defaults `DATABASE_URL` to port 5433, which is a different application; chobii is on 5440. A suite whose `beforeAll` fails there is reported as *skipped*, not failed, which reads as green.
+feature: cart-checkout
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T06:46:06.302Z'
+last_updated: '2026-08-06T13:00:17.256Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T13:00:14.840Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commits** (in order): `ce390f5d`, `0ca80cbf`, `73aabe75`, `7610fa17`, `c8d80fee`, `580167f0`, `9483e0cf`, `9c80dfe1`, `495da77b`, `181bc9a1`, `66c25e75`, `aaaca424`, `cffb286e`, `bdb48b9c`, `d340c975`, `b0c8ef43`, `4c5b1971`, `c743674b`
+
+      **Summary**: The storefront now writes every cart mutation to the server before checkout runs. `packages/web/app/hooks/useCartActions.ts` is the single write path — add/update/remove/clear all go through it, optimistically updating the Zustand store and reconciling against the server response. The store is now a projection of the server cart: `item.id` is the server's `cartItems.id` (`packages/api/src/database/schema/cart.ts`), not a client-invented id — `packages/web/app/lib/cart-projection.ts` is the pure `GET /api/cart` → `CartItem[]` mapping, and `CartSync` loads/reconciles it on arrival. `POST /api/orders` now reads a cart that reflects what the customer actually added.
+
+      **Two deliberate deviations from this ticket's own implementation steps:**
+
+      1. **Step 3 said to wire call sites to the existing TanStack mutation hooks. They were deleted instead** (commit `b0c8ef43`). `useAddToCart`, `useUpdateCartItem`, `useRemoveFromCart`, `useClearCart`, `useMergeCart` and `useIsCartSyncing` (`packages/web/app/hooks/useCart.ts`) each carried their own optimistic-rollback logic against the TanStack Query cache. Keeping them beside the new store-level optimism in `useCartActions.ts` would have meant two optimistic layers reconciling against one server resource — how a cart starts disagreeing with itself. `grep` confirmed all six had zero call sites outside `useCart.ts` before deletion, and zero references anywhere in `packages/web` after. The write path is now the single hook, `useCartActions.ts`.
+
+      2. **The guest-cart merge moved into API middleware, and `POST /api/cart/merge` was deleted, because the endpoint was uncallable.** It required a `guestSessionId` in the request body, but that id lives only in the httpOnly `cart_session` cookie — unreadable from browser JS — and `GET /api/cart` never returned it either. No browser could ever have called it. `mergeGuestCartInto` (`packages/api/src/routes/cart.ts`) now holds the same merge logic, byte-for-byte, from the old handler, invoked by `mergeGuestCartOnAuth` middleware registered right after `optionalAuth` on every `cartApp` route — an authenticated request carrying a guest cookie is merged and the cookie cleared automatically, no client call required.
+
+      **Verification:**
+      - `tests/e2e/cart-server-persistence.spec.ts` (commits `4c5b1971`/`c743674b`) is the real proof this ticket asked for — no stubs, real API, real Postgres on :5440. Adds an item through the actual UI, asserts the `POST /api/cart/items` response, reloads, and re-fetches `GET /api/cart` directly via `page.request` (bypassing the page's own state), confirming the server — not a `localStorage` rehydration — is what came back. 3 stable runs, no flakes.
+      - `packages/api`: `cart-guest-merge.test.ts` (8/8), `cart-sale-pricing.test.ts` (15/15), `cart.test.ts` (73/73 when the DB is reachable) all green. Full suite regression: 82 failed / 4051 passed / 265 skipped — matches the documented pre-existing baseline noise (admin/auth/health/server/queues/redis), zero new cart-related failures.
+      - `packages/web`: `tests/hooks`, `tests/stores`, `tests/components/cart` — 382/382 passing (down from 416; the 34-test drop is exactly the deleted dead-hook suites, independently re-derived). `tsc --noEmit`: 27 errors, same count and same files as the pre-change baseline, none touching cart.
+      - `packages/web/tests/stores/cart.test.ts` (50 tests, the dead `packages/web/src/` tree) was left untouched, as instructed — it does not cover the live store and cleanup is out of scope for this ticket.
+
+      **Files touched** (see `.superpowers/sdd/2026-08-06-server-cart-write-path/progress.md` and the per-task reports alongside it for the full diff-by-diff account): `packages/web/app/stores/cart.ts`, `packages/web/app/hooks/useCartActions.ts` (new), `packages/web/app/lib/cart-projection.ts` (new), `packages/web/app/components/cart/CartSync.tsx`, `packages/web/app/hooks/useCart.ts` (mutation hooks deleted), `packages/web/app/lib/api.ts`, `packages/web/app/components/checkout/PaymentButton.tsx`, `packages/web/app/components/product/ProductDetail.tsx`, `packages/api/src/routes/cart.ts` (merge middleware), corresponding test files, and `tests/e2e/cart-server-persistence.spec.ts`.
+  - author: system
+    timestamp: '2026-08-06T13:00:17.256Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write a failing end-to-end-ish test: add an item through the UI path, then assert POST /api/orders builds an order containing it'
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm it fails today because the server cart is empty
+    status: done
+  - id: 3
+    action: implement
+    description: Wire the add/update/remove/clear call sites to the server cart mutations, keeping the store as an optimistic cache
+    file: packages/web/app/hooks/useCart.ts
+    status: done
+  - id: 4
+    action: implement
+    description: Merge the guest cart on login and migrate any existing localStorage basket once
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm the order contains what the customer added, for both a guest-then-login and an always-authenticated path
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git commit --only <paths> -m "fix(web): write the cart to the server so checkout builds the right order"'
+    status: done
+current_step: 6
+completed: '2026-08-06T13:00:17.256Z'
