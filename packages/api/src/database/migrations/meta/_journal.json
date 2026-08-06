@@ -57,6 +57,13 @@
       "when": 1785964581250,
       "tag": "0007_marvelous_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785993973840,
+      "tag": "0008_modern_king_bedlam",
+      "breakpoints": true
     }
   ]
 }

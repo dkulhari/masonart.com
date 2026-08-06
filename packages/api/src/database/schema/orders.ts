@@ -16,6 +16,7 @@ import {
 import { relations } from "drizzle-orm";
 import { users, addresses } from "./users";
 import { products, productVariants, frames } from "./products";
+import { promotions } from "./promotions";
 
 // ============================================================================
 // Type Definitions
@@ -177,6 +178,29 @@ export const orders = pgTable(
     // Coupon/discount tracking
     couponCode: text("coupon_code"),
     couponDiscount: decimal("coupon_discount", { precision: 10, scale: 2 })
+      .default("0.00")
+      .notNull(),
+
+    /**
+     * Which promotion priced this order. Nullable: most orders carry none.
+     * Recorded so the discount is visible in reporting rather than buried in
+     * an inflated compare-at price.
+     */
+    promotionId: uuid("promotion_id").references(() => promotions.id, {
+      onDelete: "set null",
+    }),
+
+    /**
+     * The promotion's own share of the discount. Deliberately NOT merged into
+     * `discount` or `couponDiscount`: `discount` is the derived total the
+     * customer sees, and `couponDiscount` is reserved for codes (design D8).
+     * Sharing one column makes a settled order unattributable — reporting
+     * could not separate an automatic sale from a leaked code.
+     */
+    promotionDiscount: decimal("promotion_discount", {
+      precision: 10,
+      scale: 2,
+    })
       .default("0.00")
       .notNull(),
 
