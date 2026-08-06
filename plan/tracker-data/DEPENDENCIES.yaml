@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-06T20:10:56.788Z'
+  last_updated: '2026-08-06T20:44:40.846Z'
   features:
     chobi-external-services:
       - ticket_number: 315
@@ -311,16 +311,6 @@ dependencies:
         blocked_by:
           - ticket_number: 555
             title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
-      - ticket_number: 553
-        title: Schema - unique purchaseOrderId and orders.giftCardPurchase
-        blocks:
-          - ticket_number: 550
-            title: API - POST /api/gift-cards/purchase creates the gift card order
-          - ticket_number: 551
-            title: API - mint the card on payment verification
-          - ticket_number: 552
-            title: Service - scheduled delivery sweep and the gift card email
-        blocked_by: []
       - ticket_number: 559
         title: Admin UI - /admin/gift-cards list, detail and issue form
         blocks: []
@@ -335,6 +325,16 @@ dependencies:
             title: API - gift card quote and balance endpoints, rate limited
           - ticket_number: 555
             title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+      - ticket_number: 553
+        title: Schema - unique purchaseOrderId and orders.giftCardPurchase
+        blocks:
+          - ticket_number: 550
+            title: API - POST /api/gift-cards/purchase creates the gift card order
+          - ticket_number: 551
+            title: API - mint the card on payment verification
+          - ticket_number: 552
+            title: Service - scheduled delivery sweep and the gift card email
+        blocked_by: []
     go-to-production:
       - ticket_number: 274
         title: Choose deployment target and add deployment configuration

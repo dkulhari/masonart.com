@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-08-06T20:10:56.540Z'
-total_tickets: 510
+last_updated: '2026-08-06T20:44:40.539Z'
+total_tickets: 515
 summary:
   critical: 29
   high: 196
-  medium: 220
-  low: 65
+  medium: 221
+  low: 69
 priorities:
   critical:
     - feature: qa-testing
@@ -2279,6 +2279,12 @@ priorities:
           title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 559
+          title: Admin UI - /admin/gift-cards list, detail and issue form
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 558
+              title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -2684,6 +2690,28 @@ priorities:
       tickets:
         - ticket_number: 520
           title: 'web: share row and need-help link close the buy panel'
+          assignee: unassigned
+          blocked_by: []
+    - feature: gift-cards
+      tickets:
+        - ticket_number: 560
+          title: Web - /gift-cards purchase page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 561
+          title: Web - gift card control at checkout and the amount-due line
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 554
+              title: API - gift card quote and balance endpoints, rate limited
+            - ticket_number: 555
+              title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+        - ticket_number: 562
+          title: Web - gift card tender line on order confirmation and order detail
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 563
+          title: E2E - buy a card, receive it, redeem part, spend the remainder
           assignee: unassigned
           blocked_by: []
 blocked_tickets:
@@ -3434,6 +3462,12 @@ blocked_tickets:
       - ticket_number: 550
         title: API - POST /api/gift-cards/purchase creates the gift card order
     description: API - POST /api/gift-cards/purchase creates the gift card order
+  - ticket_number: 559
+    title: Admin UI - /admin/gift-cards list, detail and issue form
+    blocked_by:
+      - ticket_number: 558
+        title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+    description: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
   - ticket_number: 232
     title: Implement save-address-on-checkout
     blocked_by:
@@ -3632,3 +3666,11 @@ blocked_tickets:
       - ticket_number: 508
         title: 'Web - Save as collection: create new, or overwrite an existing one'
     description: 'Web - load a collection''s members into the wishlist from the admin form, Web - Save as collection: create new, or overwrite an existing one'
+  - ticket_number: 561
+    title: Web - gift card control at checkout and the amount-due line
+    blocked_by:
+      - ticket_number: 554
+        title: API - gift card quote and balance endpoints, rate limited
+      - ticket_number: 555
+        title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+    description: API - gift card quote and balance endpoints, rate limited, API - debit gift cards at payment initiation, and skip Razorpay on full coverage

@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-06T20:10:56.359Z'
-total_tickets: 29
+last_updated: '2026-08-06T20:44:40.383Z'
+total_tickets: 24
 summary:
   critical: 3
   high: 6
-  medium: 10
-  low: 10
+  medium: 9
+  low: 6
 priorities:
   critical:
     - feature: go-live
@@ -125,14 +125,6 @@ priorities:
           title: Best Sellers band is missing the category pill row the reference carries on both viewports
           assignee: unassigned
           blocked_by: []
-    - feature: gift-cards
-      tickets:
-        - ticket_number: 559
-          title: Admin UI - /admin/gift-cards list, detail and issue form
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 558
-              title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
     - feature: cart-checkout
       tickets:
         - ticket_number: 566
@@ -169,28 +161,6 @@ priorities:
       tickets:
         - ticket_number: 546
           title: Seed catalogue artwork carries a MESON ART watermark baked into the pixels
-          assignee: unassigned
-          blocked_by: []
-    - feature: gift-cards
-      tickets:
-        - ticket_number: 560
-          title: Web - /gift-cards purchase page
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 561
-          title: Web - gift card control at checkout and the amount-due line
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 554
-              title: API - gift card quote and balance endpoints, rate limited
-            - ticket_number: 555
-              title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
-        - ticket_number: 562
-          title: Web - gift card tender line on order confirmation and order detail
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 563
-          title: E2E - buy a card, receive it, redeem part, spend the remainder
           assignee: unassigned
           blocked_by: []
     - feature: cart-checkout
@@ -253,22 +223,8 @@ blocked_tickets:
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
-  - ticket_number: 559
-    title: Admin UI - /admin/gift-cards list, detail and issue form
-    blocked_by:
-      - ticket_number: 558
-        title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
-    description: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
   - ticket_number: 283
     title: Document and configure database backup procedures
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
-  - ticket_number: 561
-    title: Web - gift card control at checkout and the amount-due line
-    blocked_by:
-      - ticket_number: 554
-        title: API - gift card quote and balance endpoints, rate limited
-      - ticket_number: 555
-        title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
-    description: API - gift card quote and balance endpoints, rate limited, API - debit gift cards at payment initiation, and skip Razorpay on full coverage
