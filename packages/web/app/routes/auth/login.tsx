@@ -22,6 +22,7 @@ import {
 import { z } from 'zod'
 import { cn, isValidEmail, getApiUrl } from '~/lib/utils'
 import { signIn } from '~/lib/auth-client'
+import { useCartAuthTransition } from '~/hooks/useCartAuthTransition'
 
 // ============================================================================
 // Route Definition
@@ -76,8 +77,12 @@ interface FormErrors {
 // Main Component
 // ============================================================================
 
-function LoginPage() {
+export function LoginPage() {
   const navigate = useNavigate()
+  // Whoever signs in here inherits whatever they put in the cart as a guest —
+  // but only if something asks the server for the cart, which is the one thing
+  // a client-side navigate() back to checkout does not do (#511).
+  const { onSignedIn } = useCartAuthTransition()
   const search = useSearch({ from: '/auth/login' })
   const redirectUrl = search.redirect || '/'
   const justRegistered = search.registered
@@ -172,6 +177,7 @@ function LoginPage() {
         return
       }
 
+      onSignedIn()
       navigate({ to: redirectUrl })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign in failed'
@@ -286,6 +292,7 @@ function LoginPage() {
         return
       }
 
+      onSignedIn()
       // Redirect to intended destination
       navigate({ to: redirectUrl })
     } catch (error) {
@@ -355,6 +362,7 @@ function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
+    onSignedIn()
     await signIn.social({
       provider: 'google',
       callbackURL: redirectUrl,

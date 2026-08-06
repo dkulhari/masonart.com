@@ -23,6 +23,7 @@ import {
 import { cn, formatDate, getInitials } from '~/lib/utils'
 import { ordersApi } from '~/lib/api'
 import { signOut } from '~/lib/auth-client'
+import { useCartAuthTransition } from '~/hooks/useCartAuthTransition'
 import { OrderList, type Order } from '~/components/account/OrderList'
 
 // ============================================================================
@@ -124,10 +125,11 @@ const QUICK_ACTIONS: QuickAction[] = [
 // Main Component
 // ============================================================================
 
-function AccountDashboardPage() {
+export function AccountDashboardPage() {
   const navigate = useNavigate()
   // Get user from route context (set by _authed layout's beforeLoad)
   const { user } = Route.useRouteContext()
+  const { onSignedOut } = useCartAuthTransition()
   const [orders, setOrders] = useState<Order[]>([])
   const [isLoadingOrders, setIsLoadingOrders] = useState(true)
   const [ordersError, setOrdersError] = useState<string | null>(null)
@@ -152,9 +154,12 @@ function AccountDashboardPage() {
   const handleSignOut = async () => {
     try {
       await signOut()
-      navigate({ to: '/' })
-    } catch {
-      // Still navigate away on error
+    } finally {
+      // Whether or not the request came back cleanly, this browser is done
+      // showing this account's cart: leaving it behind is how the next person
+      // to sign in here saw someone else's items and someone else's total
+      // (#511).
+      onSignedOut()
       navigate({ to: '/' })
     }
   }

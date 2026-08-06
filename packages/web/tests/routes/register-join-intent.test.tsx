@@ -59,6 +59,8 @@ vi.mock('~/lib/auth-client', () => ({
   signIn: { social: (...args: unknown[]) => authClient.signInSocial(...args) },
 }))
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
 import {
   JOIN_INTENT_COOKIE,
   JOIN_INTENT_VALUE,
@@ -72,9 +74,22 @@ import { RegisterPage, parseRegisterSearch } from '~/routes/auth/register'
 // Helpers
 // ============================================================================
 
+/**
+ * Registering is an auth transition, so the page tells the cart to re-read
+ * itself from the server (#511) — which needs a query client in scope. Nothing
+ * below asserts on it; this is the ambient provider the real app supplies from
+ * `__root`.
+ */
 function renderAt(search: Record<string, unknown>) {
   router.search = search
-  return render(<RegisterPage />)
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <RegisterPage />
+    </QueryClientProvider>
+  )
 }
 
 const optIn = () =>

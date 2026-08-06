@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { cn, isValidEmail } from '~/lib/utils'
 import { signIn, signUp } from '~/lib/auth-client'
+import { useCartAuthTransition } from '~/hooks/useCartAuthTransition'
 import { clearJoinIntent, setJoinIntent } from '~/lib/joinIntent'
 
 // ============================================================================
@@ -134,6 +135,9 @@ const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  // Registration can establish a session directly (auto sign-in), so it is an
+  // auth transition like any other and the cart has to be re-read (#511).
+  const { onSignedIn } = useCartAuthTransition()
   const search = useSearch({ from: '/auth/register' })
   const redirectUrl = search.redirect || '/'
 
@@ -274,6 +278,7 @@ export function RegisterPage() {
         return
       }
 
+      onSignedIn()
       // Redirect to login with success message
       navigate({
         to: '/auth/login',
@@ -293,6 +298,7 @@ export function RegisterPage() {
   // Handle Google sign-in
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true)
+    onSignedIn()
     await signIn.social({
       provider: 'google',
       callbackURL: redirectUrl,

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
+import { clearLocalCart } from '~/hooks/useCartAuthTransition'
 import { isAdminNavItemVisible, staffAreaLabel } from '~/lib/admin-nav'
 
 // ============================================================================
@@ -183,6 +184,10 @@ export function AdminSidebar({
       // session — that's exactly how #341 stayed invisible.
       console.error('Sign out failed:', error)
     }
+    // The reload below discards the query cache, but not the cart the store
+    // persisted to localStorage — which would rehydrate under whoever signs in
+    // next (#511).
+    clearLocalCart()
     window.location.href = '/'
   }
 
