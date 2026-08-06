@@ -144,6 +144,8 @@ export interface FullOrder {
   total: string
   couponCode?: string | null
   couponDiscount?: string | null
+  /** Tender applied to this order, in rupees. Not a discount. */
+  giftCardAmount?: string | null
   tradeDiscount?: string | null
   itemCount: number
   currency: string
@@ -945,6 +947,32 @@ export function OrderDetail({
                 <span>Total</span>
                 <span>{formatPrice(parseFloat(order.total))}</span>
               </div>
+
+              {/*
+                Gift card tender — below the total, after tax, never in the
+                discount block above. It reduces what was charged, not what
+                the goods cost, and the charged figure is what reconciles
+                against the payment gateway.
+              */}
+              {parseFloat(order.giftCardAmount ?? '0') > 0 && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Gift card</span>
+                    <span>
+                      -{formatPrice(parseFloat(order.giftCardAmount!))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-border pt-2 font-semibold text-foreground">
+                    <span>Charged</span>
+                    <span>
+                      {formatPrice(
+                        parseFloat(order.total) -
+                          parseFloat(order.giftCardAmount!),
+                      )}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

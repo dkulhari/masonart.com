@@ -821,6 +821,8 @@ ordersApp.get("/:id", async (c) => {
       couponDiscount: order.couponDiscount,
       promotionId: order.promotionId,
       promotionDiscount: order.promotionDiscount,
+      // Tender, not a discount. Surfaces render it below the total.
+      giftCardAmount: order.giftCardAmount,
       itemCount: order.itemCount,
       currency: order.currency,
       customerNotes: order.customerNotes,

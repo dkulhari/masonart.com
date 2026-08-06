@@ -121,6 +121,8 @@ interface OrderDetail {
   shippingCost: number
   taxAmount: number
   discountAmount: number
+  /** Gift card tender applied, in rupees. Not a discount. */
+  giftCardAmount?: number
   total: number
   shippingAddress: ShippingAddress
   shippingMethod?: string
@@ -750,6 +752,30 @@ function OrderDetailPage() {
                     <span className="text-foreground">{formatPrice(order.total)}</span>
                   </div>
                 </div>
+
+                {/*
+                  Gift card tender: below the total, after tax, and outside
+                  the discount block. It reduced what was charged, not what
+                  the items cost.
+                */}
+                {(order.giftCardAmount ?? 0) > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Gift card</span>
+                      <span className="text-foreground">
+                        -{formatPrice(order.giftCardAmount!)}
+                      </span>
+                    </div>
+                    <div className="border-t border-border pt-2">
+                      <div className="flex justify-between text-base font-semibold">
+                        <span className="text-foreground">Charged</span>
+                        <span className="text-foreground">
+                          {formatPrice(order.total - order.giftCardAmount!)}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Payment Status */}

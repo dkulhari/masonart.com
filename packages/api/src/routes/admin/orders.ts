@@ -95,7 +95,9 @@ const listOrdersQuerySchema = z.object({
       "cancelled",
     ])
     .optional(),
-  orderType: z.enum(["regular", "ai_generated", "trade"]).optional(),
+  orderType: z
+    .enum(["regular", "ai_generated", "trade", "gift_card"])
+    .optional(),
   search: z.string().optional(), // Search by order number, customer email, phone
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
@@ -534,6 +536,8 @@ adminOrdersApp.get("/:id", async (c) => {
       couponDiscount: order.couponDiscount,
       promotionId: order.promotionId,
       promotionDiscount: order.promotionDiscount,
+      // Tender, not a discount. Surfaces render it below the total.
+      giftCardAmount: order.giftCardAmount,
       tradeDiscount: order.tradeDiscount,
       itemCount: order.itemCount,
       currency: order.currency,
