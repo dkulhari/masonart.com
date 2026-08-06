@@ -1,0 +1,195 @@
+ticket_number: 513
+title: Schema - shared Zod schemas and types for gift cards
+description: |-
+  ## Task
+  New `packages/shared/src/schemas/gift-card.ts` with the request and response contracts, exported from the package barrel.
+
+  ## Honour the contracts that already exist
+  `packages/shared/src/schemas/checkout.ts:198-199` already declares `appliedGiftCardIds[]` and `giftCardAmount` on the cart, and `:359` declares `giftCardAmount` on the order. Those stay and finally become true. Do not add a second, differently-named field for the same thing.
+
+  ## What never crosses the wire
+  The full code appears in exactly one place: the delivery email. No response schema in this file may carry it — every card representation returned to any caller exposes `last4` only. Admin responses are no exception; the issue endpoint returns the code once, from its own dedicated response type, and never again.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 1 — Schema + contracts
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §4
+
+  Amounts crossing the wire are integer paise, matching the wallet's existing contracts.
+feature: gift-cards
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T21:19:32.428Z'
+last_updated: '2026-08-06T08:25:45.232Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.852Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-06T08:25:45.232Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the gift card contracts
+    file: packages/shared/tests/schemas/gift-card.test.ts
+    command: cd packages/shared && bunx vitest run tests/schemas/gift-card.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import {
+        giftCardPurchaseInputSchema,
+        giftCardCodeInputSchema,
+        giftCardPublicSchema,
+      } from '../../src/schemas/gift-card'
+
+      describe('purchase input', () => {
+        const valid = {
+          amountPaise: 200_000,
+          recipientEmail: 'friend@example.com',
+          recipientName: 'Friend',
+          senderName: 'Dhruv',
+          message: 'Happy birthday',
+        }
+
+        it('accepts a well-formed purchase', () => {
+          expect(giftCardPurchaseInputSchema.safeParse(valid).success).toBe(true)
+        })
+
+        it('rejects an amount below the minimum', () => {
+          expect(giftCardPurchaseInputSchema.safeParse({ ...valid, amountPaise: 100 }).success).toBe(false)
+        })
+
+        it('rejects an amount above the maximum', () => {
+          expect(giftCardPurchaseInputSchema.safeParse({ ...valid, amountPaise: 99_000_000 }).success).toBe(false)
+        })
+
+        it('rejects a send date more than a year out', () => {
+          const farFuture = new Date(Date.now() + 400 * 24 * 60 * 60 * 1000)
+          expect(giftCardPurchaseInputSchema.safeParse({ ...valid, sendAt: farFuture }).success).toBe(false)
+        })
+      })
+
+      describe('code input', () => {
+        it('accepts a grouped code as typed', () => {
+          expect(giftCardCodeInputSchema.safeParse({ code: '7QF3-A8K2-M4NP-XR59' }).success).toBe(true)
+        })
+
+        it('rejects an empty code', () => {
+          expect(giftCardCodeInputSchema.safeParse({ code: '' }).success).toBe(false)
+        })
+      })
+
+      describe('public representation', () => {
+        it('has no field capable of carrying the full code', () => {
+          const keys = Object.keys(giftCardPublicSchema.shape)
+          expect(keys).toContain('last4')
+          expect(keys).not.toContain('code')
+          expect(keys).not.toContain('codeHash')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/shared && bunx vitest run tests/schemas/gift-card.test.ts
+    expected_result: FAIL - cannot resolve ../../src/schemas/gift-card
+    status: done
+  - id: 3
+    action: implement
+    description: Write the shared contracts
+    file: packages/shared/src/schemas/gift-card.ts
+    status: done
+    code: |-
+      import { z } from 'zod'
+
+      export const GIFT_CARD_MIN_PAISE = 50_000
+      export const GIFT_CARD_MAX_PAISE = 5_000_000
+      export const GIFT_CARD_MAX_SCHEDULE_DAYS = 365
+
+      export const giftCardStatusSchema = z.enum(['active', 'spent', 'disabled', 'expired'])
+
+      /**
+       * What any caller may see of a card. There is deliberately no `code` field:
+       * the full code exists once, in the delivery email, and nowhere else.
+       */
+      export const giftCardPublicSchema = z.object({
+        id: z.string().uuid(),
+        last4: z.string().length(4),
+        balancePaise: z.number().int().nonnegative(),
+        initialBalancePaise: z.number().int().nonnegative(),
+        currency: z.string().min(3).max(3),
+        status: giftCardStatusSchema,
+        expiresAt: z.coerce.date().nullable(),
+        createdAt: z.coerce.date(),
+      })
+
+      export const giftCardPurchaseInputSchema = z.object({
+        amountPaise: z.number().int().min(GIFT_CARD_MIN_PAISE).max(GIFT_CARD_MAX_PAISE),
+        recipientEmail: z.string().email(),
+        recipientName: z.string().min(1).max(120),
+        senderName: z.string().min(1).max(120),
+        message: z.string().max(500).optional(),
+        sendAt: z.coerce
+          .date()
+          .refine((d) => d.getTime() <= Date.now() + GIFT_CARD_MAX_SCHEDULE_DAYS * 86_400_000, {
+            message: 'Send date cannot be more than a year away',
+          })
+          .optional(),
+      })
+
+      /** Accepted as typed — grouping and case are normalized server-side. */
+      export const giftCardCodeInputSchema = z.object({
+        code: z.string().min(1).max(32),
+      })
+
+      /** The reply to a quote: nothing is debited when this is produced. */
+      export const giftCardQuoteSchema = z.object({
+        giftCardId: z.string().uuid(),
+        last4: z.string().length(4),
+        balancePaise: z.number().int().nonnegative(),
+        applicablePaise: z.number().int().nonnegative(),
+      })
+
+      export const giftCardAdjustInputSchema = z.object({
+        amountPaise: z.number().int(),
+        /** Mandatory: an unexplained balance change is unauditable. */
+        reason: z.string().min(3).max(500),
+      })
+
+      export type GiftCardPublic = z.infer<typeof giftCardPublicSchema>
+      export type GiftCardPurchaseInput = z.infer<typeof giftCardPurchaseInputSchema>
+      export type GiftCardQuote = z.infer<typeof giftCardQuoteSchema>
+  - id: 4
+    action: implement
+    description: Export the new schemas from the package barrel
+    file: packages/shared/src/schemas/index.ts
+    status: done
+    code: export * from './gift-card'
+  - id: 5
+    action: verify-pass
+    description: Confirm the contract tests pass
+    command: cd packages/shared && bunx vitest run tests/schemas/gift-card.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the shared contracts
+    command: 'git add packages/shared/src/schemas/gift-card.ts packages/shared/src/schemas/index.ts packages/shared/tests/schemas/gift-card.test.ts && git commit -m "feat(shared): gift card request and response contracts"'
+    status: done
+current_step: 6
+started: '2026-08-06T07:27:02.852Z'
+completed: '2026-08-06T08:25:45.232Z'

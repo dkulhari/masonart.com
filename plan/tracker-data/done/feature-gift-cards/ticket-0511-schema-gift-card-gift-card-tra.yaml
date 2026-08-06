@@ -1,0 +1,267 @@
+ticket_number: 511
+title: Schema - gift_card, gift_card_transaction and order_gift_card tables
+description: |-
+  ## Task
+  New `packages/api/src/database/schema/gift-cards.ts` holding the three tables, exported from `schema/index.ts`. Migration included.
+
+  Mirror `schema/wallet.ts` exactly in shape and units: integer paise, a denormalized balance column, and an append-only ledger carrying a `balanceAfterPaise` snapshot. That file is the precedent; do not invent a second money-modelling style.
+
+  ## Status is derived, never stored
+  A card is `disabled` when `disabledAt` is set, `expired` when `expiresAt` has passed, `spent` when `balancePaise` is zero, otherwise `active`. No status column — it would fall out of sync with the balance on every redemption.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 1 — Schema + contracts
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §4
+
+  Only the hash and last four of the code are stored (G5). `expiresAt` ships nullable and is never set by any code path in this feature (G4); the column exists so a future policy is configuration rather than a migration.
+feature: gift-cards
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T21:19:31.317Z'
+last_updated: '2026-08-05T21:19:31.317Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing shape assertions for the three tables
+    file: packages/api/tests/database/gift-card-schema.test.ts
+    command: cd packages/api && bunx vitest run tests/database/gift-card-schema.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      /**
+       * Gift card schema shape.
+       *
+       * Mirrors wallet.ts: integer paise, denormalized balance, append-only ledger
+       * with a balanceAfter snapshot. Status is derived, so there is deliberately
+       * no status column to assert.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import {
+        giftCards,
+        giftCardTransactions,
+        orderGiftCards,
+      } from '../../src/database/schema/gift-cards'
+
+      describe('gift_card', () => {
+        it('stores only the hash and last four of the code', () => {
+          expect(giftCards.codeHash).toBeDefined()
+          expect(giftCards.codeLast4).toBeDefined()
+          // @ts-expect-error the plaintext code must not be a column
+          expect(giftCards.code).toBeUndefined()
+        })
+
+        it('tracks balance in integer paise, like the wallet', () => {
+          expect(giftCards.initialBalancePaise).toBeDefined()
+          expect(giftCards.balancePaise).toBeDefined()
+        })
+
+        it('has no status column — status is derived', () => {
+          // @ts-expect-error deriving from balance/disabledAt/expiresAt is the contract
+          expect(giftCards.status).toBeUndefined()
+          expect(giftCards.disabledAt).toBeDefined()
+          expect(giftCards.expiresAt).toBeDefined()
+          expect(giftCards.expiresAt.notNull).toBe(false)
+        })
+
+        it('carries delivery fields', () => {
+          expect(giftCards.recipientEmail).toBeDefined()
+          expect(giftCards.sendAt).toBeDefined()
+          expect(giftCards.sentAt).toBeDefined()
+        })
+      })
+
+      describe('gift_card_transaction', () => {
+        it('snapshots the balance after each entry', () => {
+          expect(giftCardTransactions.balanceAfterPaise).toBeDefined()
+          expect(giftCardTransactions.amountPaise).toBeDefined()
+        })
+
+        it('links an entry to the order that caused it', () => {
+          expect(giftCardTransactions.orderId).toBeDefined()
+        })
+      })
+
+      describe('order_gift_card', () => {
+        it('records what each card paid on an order', () => {
+          expect(orderGiftCards.orderId).toBeDefined()
+          expect(orderGiftCards.giftCardId).toBeDefined()
+          expect(orderGiftCards.amountPaise).toBeDefined()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/database/gift-card-schema.test.ts
+    expected_result: FAIL - cannot resolve ../../src/database/schema/gift-cards
+    status: done
+  - id: 3
+    action: implement
+    description: Create the schema file with the three tables, relations and derived-status helper
+    file: packages/api/src/database/schema/gift-cards.ts
+    status: done
+    code: |-
+      import {
+        pgTable, text, integer, timestamp, uuid, pgEnum, index, primaryKey,
+      } from 'drizzle-orm/pg-core'
+      import { relations } from 'drizzle-orm'
+      import { users } from './users'
+      import { orders } from './orders'
+
+      export const giftCardTransactionTypeEnum = pgEnum('gift_card_transaction_type', [
+        'issue',      // card created and funded
+        'redeem',     // debited towards an order
+        'refund',     // credited back from a refunded order
+        'adjustment', // admin correction, always with a reason
+        'void',       // held balance released when an order never completed
+      ])
+
+      export const giftCards = pgTable('gift_card', {
+        id: uuid('id').primaryKey().defaultRandom(),
+
+        /**
+         * sha256(normalized code + server pepper). The plaintext code is never
+         * stored: a database dump then leaks nothing spendable, and nobody with
+         * database access can spend a customer's balance.
+         */
+        codeHash: text('code_hash').notNull().unique(),
+        /** Display and admin search only: "•••• 7QF3". */
+        codeLast4: text('code_last4').notNull(),
+
+        initialBalancePaise: integer('initial_balance_paise').notNull(),
+        /** Denormalized, exactly as users.walletBalancePaise is. */
+        balancePaise: integer('balance_paise').notNull(),
+        currency: text('currency').default('INR').notNull(),
+
+        /** Always null today (G4). The column exists so a policy change is config. */
+        expiresAt: timestamp('expires_at', { withTimezone: true }),
+        /** Admin kill switch. Rows are never deleted. */
+        disabledAt: timestamp('disabled_at', { withTimezone: true }),
+
+        issuedByUserId: text('issued_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+        purchaseOrderId: uuid('purchase_order_id').references(() => orders.id, { onDelete: 'set null' }),
+
+        recipientEmail: text('recipient_email'),
+        recipientName: text('recipient_name'),
+        senderName: text('sender_name'),
+        message: text('message'),
+
+        /** null means send as soon as payment is confirmed. */
+        sendAt: timestamp('send_at', { withTimezone: true }),
+        /** Idempotency guard for the delivery sweep — a restart cannot double-send. */
+        sentAt: timestamp('sent_at', { withTimezone: true }),
+
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
+      }, (table) => ({
+        last4Idx: index('gift_card_last4_idx').on(table.codeLast4),
+        purchaseOrderIdx: index('gift_card_purchase_order_idx').on(table.purchaseOrderId),
+        sendAtIdx: index('gift_card_send_at_idx').on(table.sendAt),
+      }))
+
+      export const giftCardTransactions = pgTable('gift_card_transaction', {
+        id: uuid('id').primaryKey().defaultRandom(),
+        giftCardId: uuid('gift_card_id').notNull().references(() => giftCards.id, { onDelete: 'cascade' }),
+        type: giftCardTransactionTypeEnum('type').notNull(),
+        /** Positive; `type` carries direction, as wallet_transactions does. */
+        amountPaise: integer('amount_paise').notNull(),
+        balanceAfterPaise: integer('balance_after_paise').notNull(),
+        orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+        userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+        createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+        description: text('description').notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+      }, (table) => ({
+        giftCardIdx: index('gift_card_transaction_gift_card_idx').on(table.giftCardId),
+        orderIdx: index('gift_card_transaction_order_idx').on(table.orderId),
+        /** Refund capping reads this pair; see the per-order cap in §8. */
+        cardOrderTypeIdx: index('gift_card_transaction_card_order_type_idx').on(
+          table.giftCardId, table.orderId, table.type,
+        ),
+      }))
+
+      export const orderGiftCards = pgTable('order_gift_card', {
+        orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+        giftCardId: uuid('gift_card_id').notNull().references(() => giftCards.id, { onDelete: 'restrict' }),
+        /** What this card actually paid. Never mutated by a refund. */
+        amountPaise: integer('amount_paise').notNull(),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+      }, (table) => ({
+        pk: primaryKey({ columns: [table.orderId, table.giftCardId] }),
+      }))
+
+      export const giftCardsRelations = relations(giftCards, ({ many, one }) => ({
+        transactions: many(giftCardTransactions),
+        purchaseOrder: one(orders, {
+          fields: [giftCards.purchaseOrderId],
+          references: [orders.id],
+        }),
+      }))
+
+      export const giftCardTransactionsRelations = relations(giftCardTransactions, ({ one }) => ({
+        giftCard: one(giftCards, {
+          fields: [giftCardTransactions.giftCardId],
+          references: [giftCards.id],
+        }),
+      }))
+
+      export type GiftCard = typeof giftCards.$inferSelect
+      export type NewGiftCard = typeof giftCards.$inferInsert
+      export type GiftCardTransaction = typeof giftCardTransactions.$inferSelect
+      export type OrderGiftCard = typeof orderGiftCards.$inferSelect
+
+      /** Bounds on a purchased card. Unbounded amounts are a fraud-testing surface. */
+      export const GIFT_CARD_MIN_PAISE = 50_000      // Rs 500
+      export const GIFT_CARD_MAX_PAISE = 5_000_000   // Rs 50,000
+      /** A send date further out than this is almost always a typo. */
+      export const GIFT_CARD_MAX_SCHEDULE_DAYS = 365
+
+      export type GiftCardStatus = 'active' | 'spent' | 'disabled' | 'expired'
+
+      /** Derived, never stored — a status column would drift from the balance. */
+      export function giftCardStatus(card: Pick<GiftCard, 'balancePaise' | 'disabledAt' | 'expiresAt'>, now = new Date()): GiftCardStatus {
+        if (card.disabledAt) return 'disabled'
+        if (card.expiresAt && card.expiresAt <= now) return 'expired'
+        if (card.balancePaise <= 0) return 'spent'
+        return 'active'
+      }
+  - id: 4
+    action: implement
+    description: Export the new schema from the barrel file
+    file: packages/api/src/database/schema/index.ts
+    status: done
+    code: export * from "./gift-cards";
+  - id: 5
+    action: verify-pass
+    description: Confirm the shape assertions pass
+    command: cd packages/api && bunx vitest run tests/database/gift-card-schema.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: implement
+    description: Generate and apply the migration
+    file: packages/api/drizzle/
+    command: cd packages/api && bunx drizzle-kit generate && bunx drizzle-kit migrate
+    expected_result: Migration file created and applied
+    status: done
+  - id: 7
+    action: commit
+    description: Commit the gift card tables
+    command: 'git add packages/api/src/database/schema/gift-cards.ts packages/api/src/database/schema/index.ts packages/api/tests/database/gift-card-schema.test.ts packages/api/drizzle && git commit -m "feat(api): gift card, ledger and order-application tables"'
+    status: done
+current_step: 7

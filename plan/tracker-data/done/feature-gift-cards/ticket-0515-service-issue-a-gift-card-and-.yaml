@@ -1,0 +1,192 @@
+ticket_number: 515
+title: Service - issue a gift card and write its ledger row
+description: |-
+  ## Task
+  New `packages/api/src/services/gift-card.ts` with `issueGiftCard()`, modelled on `services/wallet.ts`.
+
+  One database transaction inserts the `gift_card` row and its opening `issue` ledger entry. A card whose balance has no matching ledger row is unauditable, so the two can never be written separately.
+
+  Returns the plaintext code **once**, to its caller. It is never persisted and never returned again — the caller is responsible for putting it in the delivery email or showing it to the admin who issued it.
+
+  ## Two callers, one function
+  - customer purchase: `purchaseOrderId` set, `issuedByUserId` null
+  - admin issuance: `issuedByUserId` set, `purchaseOrderId` null
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 2 — Code and service
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §4, §9
+
+  Collision on `codeHash` is astronomically unlikely at 2^80 but the unique index is authoritative: retry generation on a unique-violation rather than pre-checking, which would race.
+feature: gift-cards
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T21:19:32.783Z'
+last_updated: '2026-08-06T07:27:02.873Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.873Z'
+    text: Status changed from 'todo' to 'in-progress'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for issuance
+    file: packages/api/tests/services/gift-card-issue.test.ts
+    command: cd packages/api && bunx vitest run tests/services/gift-card-issue.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('issueGiftCard', () => {
+        it('returns the plaintext code exactly once', async () => {
+          // assert: result.code is a 16-char code, and nothing on the stored row equals it
+        })
+
+        it('stores only the hash and last four', async () => {
+          // assert: row.codeHash === hashGiftCardCode(result.code)
+          // assert: row.codeLast4 === result.code.slice(-4)
+        })
+
+        it('opens the ledger with an issue entry matching the balance', async () => {
+          // assert: one gift_card_transaction, type 'issue',
+          //         amountPaise === balanceAfterPaise === initialBalancePaise
+        })
+
+        it('writes the card and its ledger row in one transaction', async () => {
+          // force the ledger insert to throw
+          // assert: no gift_card row survives
+        })
+
+        it('records a customer purchase against its order', async () => {
+          // assert: purchaseOrderId set, issuedByUserId null
+        })
+
+        it('records an admin issuance against the admin', async () => {
+          // assert: issuedByUserId set, purchaseOrderId null
+        })
+
+        it('refuses an amount outside the configured bounds', async () => {
+          // assert: throws for 100 paise and for 99_000_000 paise
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/services/gift-card-issue.test.ts
+    expected_result: FAIL - cannot resolve ../../src/services/gift-card
+    status: done
+  - id: 3
+    action: implement
+    description: Write issueGiftCard with the transactional card-plus-ledger insert
+    file: packages/api/src/services/gift-card.ts
+    status: done
+    code: |-
+      import { db } from '../database'
+      import { giftCards, giftCardTransactions, GIFT_CARD_MIN_PAISE, GIFT_CARD_MAX_PAISE } from '../database/schema/gift-cards'
+      import { generateGiftCardCode, hashGiftCardCode, lastFour } from '../lib/gift-card-code'
+      import type { GiftCard } from '../database/schema/gift-cards'
+
+      export interface IssueGiftCardInput {
+        amountPaise: number
+        /** Set for a customer purchase. */
+        purchaseOrderId?: string | null
+        /** Set for an admin issuance. */
+        issuedByUserId?: string | null
+        recipientEmail?: string | null
+        recipientName?: string | null
+        senderName?: string | null
+        message?: string | null
+        sendAt?: Date | null
+        description?: string
+      }
+
+      /**
+       * Creates a funded card.
+       *
+       * The returned `code` is the only time the plaintext exists on our side — it
+       * is not stored and cannot be recovered. The caller must deliver it or lose
+       * it.
+       */
+      export async function issueGiftCard(
+        input: IssueGiftCardInput,
+      ): Promise<{ card: GiftCard; code: string }> {
+        if (input.amountPaise < GIFT_CARD_MIN_PAISE || input.amountPaise > GIFT_CARD_MAX_PAISE) {
+          throw new Error(`Gift card amount must be between ${GIFT_CARD_MIN_PAISE} and ${GIFT_CARD_MAX_PAISE} paise`)
+        }
+
+        // The unique index on codeHash is the authority. Pre-checking for a
+        // collision would race with a concurrent issue; retrying on the violation
+        // cannot. At 2^80 this loop effectively never runs twice.
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const code = generateGiftCardCode()
+          try {
+            const card = await db.transaction(async (tx) => {
+              const [created] = await tx.insert(giftCards).values({
+                codeHash: hashGiftCardCode(code),
+                codeLast4: lastFour(code),
+                initialBalancePaise: input.amountPaise,
+                balancePaise: input.amountPaise,
+                purchaseOrderId: input.purchaseOrderId ?? null,
+                issuedByUserId: input.issuedByUserId ?? null,
+                recipientEmail: input.recipientEmail ?? null,
+                recipientName: input.recipientName ?? null,
+                senderName: input.senderName ?? null,
+                message: input.message ?? null,
+                sendAt: input.sendAt ?? null,
+              }).returning()
+
+              if (!created) throw new Error('Failed to create gift card')
+
+              // Same transaction, always: a balance with no opening ledger entry
+              // cannot be audited or reconciled.
+              await tx.insert(giftCardTransactions).values({
+                giftCardId: created.id,
+                type: 'issue',
+                amountPaise: input.amountPaise,
+                balanceAfterPaise: input.amountPaise,
+                orderId: input.purchaseOrderId ?? null,
+                createdBy: input.issuedByUserId ?? null,
+                description: input.description ?? 'Gift card issued',
+              })
+
+              return created
+            })
+
+            return { card, code }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            if (!message.includes('gift_card_code_hash')) throw error
+            // Collision on the unique index — generate a fresh code and retry.
+          }
+        }
+
+        throw new Error('Failed to generate a unique gift card code')
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/services/gift-card-issue.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit issuance
+    command: 'git add packages/api/src/services/gift-card.ts packages/api/tests/services/gift-card-issue.test.ts && git commit -m "feat(api): issue gift cards with an opening ledger entry"'
+    status: done
+current_step: 5
+completed: '2026-08-06T08:31:59.962Z'
+started: '2026-08-06T07:27:02.873Z'

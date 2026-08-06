@@ -1,0 +1,228 @@
+ticket_number: 514
+title: Lib - gift card code generation, normalization and hashing
+description: |-
+  ## Task
+  New `packages/api/src/lib/gift-card-code.ts`: generate a code, normalize typed input, hash for lookup.
+
+  ## Why the alphabet matters
+  Sixteen characters of Crockford base32 — the alphabet excludes I, L, O and U, so nothing is misread off a phone screen and no accidental words are generated. Displayed grouped as `XXXX-XXXX-XXXX-XXXX`. That is roughly 2^80 of entropy.
+
+  **Entropy comes from `crypto.randomBytes`, never `Math.random`.** `Math.random` is seeded predictably and is not a security primitive; a predictable gift card code is free money.
+
+  Generate by rejection or by masking whole bytes — never `randomBytes(n) % 32` over a 256-value byte, which biases the first 24 letters of the alphabet.
+
+  ## Normalization
+  Input is uppercased and stripped of everything outside the alphabet before hashing, so `7qf3-a8k2…` and `7QF3A8K2…` resolve to the same card. Hash is sha256 over the normalized code plus a server-side pepper from the environment — the pepper means a leaked database still cannot be brute-forced offline against a 2^80 space using rainbow tables of common codes.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 2 — Code and service
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §4 "The code"
+
+  Add `GIFT_CARD_CODE_PEPPER` to `.env.example`. Startup must fail loudly if it is missing in production rather than silently hashing with an empty pepper.
+feature: gift-cards
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T21:19:32.579Z'
+last_updated: '2026-08-06T08:27:59.429Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.864Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-06T08:27:59.429Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for generation, normalization and hashing
+    file: packages/api/tests/lib/gift-card-code.test.ts
+    command: cd packages/api && bunx vitest run tests/lib/gift-card-code.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import {
+        generateGiftCardCode,
+        normalizeGiftCardCode,
+        hashGiftCardCode,
+        formatGiftCardCode,
+        GIFT_CARD_ALPHABET,
+      } from '../../src/lib/gift-card-code'
+
+      describe('generation', () => {
+        it('produces 16 characters from the Crockford alphabet', () => {
+          const code = generateGiftCardCode()
+          expect(code).toHaveLength(16)
+          for (const ch of code) expect(GIFT_CARD_ALPHABET).toContain(ch)
+        })
+
+        it('excludes the characters that get misread', () => {
+          for (const ch of ['I', 'L', 'O', 'U']) {
+            expect(GIFT_CARD_ALPHABET).not.toContain(ch)
+          }
+        })
+
+        it('does not repeat across a large sample', () => {
+          const seen = new Set(Array.from({ length: 5000 }, () => generateGiftCardCode()))
+          expect(seen.size).toBe(5000)
+        })
+
+        it('distributes across the alphabet without modulo bias', () => {
+          const counts = new Map<string, number>()
+          for (let i = 0; i < 4000; i++) {
+            for (const ch of generateGiftCardCode()) {
+              counts.set(ch, (counts.get(ch) ?? 0) + 1)
+            }
+          }
+          const expected = (4000 * 16) / GIFT_CARD_ALPHABET.length
+          for (const ch of GIFT_CARD_ALPHABET) {
+            // A modulo over a 256-value byte would leave the first 24 letters
+            // roughly 14% heavier than the rest; 20% tolerance catches that.
+            expect(counts.get(ch) ?? 0).toBeGreaterThan(expected * 0.8)
+            expect(counts.get(ch) ?? 0).toBeLessThan(expected * 1.2)
+          }
+        })
+      })
+
+      describe('normalization', () => {
+        it('treats grouping and case as cosmetic', () => {
+          expect(normalizeGiftCardCode('7qf3-a8k2-m4np-xr59')).toBe('7QF3A8K2M4NPXR59')
+          expect(normalizeGiftCardCode('  7QF3 A8K2 M4NP XR59 ')).toBe('7QF3A8K2M4NPXR59')
+        })
+
+        it('hashes the same regardless of how it was typed', () => {
+          const a = hashGiftCardCode('7qf3-a8k2-m4np-xr59')
+          const b = hashGiftCardCode('7QF3A8K2M4NPXR59')
+          expect(a).toBe(b)
+        })
+
+        it('produces a different hash for a different code', () => {
+          expect(hashGiftCardCode('7QF3A8K2M4NPXR59')).not.toBe(hashGiftCardCode('7QF3A8K2M4NPXR58'))
+        })
+      })
+
+      describe('display', () => {
+        it('groups in fours for reading aloud', () => {
+          expect(formatGiftCardCode('7QF3A8K2M4NPXR59')).toBe('7QF3-A8K2-M4NP-XR59')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/lib/gift-card-code.test.ts
+    expected_result: FAIL - cannot resolve ../../src/lib/gift-card-code
+    status: done
+  - id: 3
+    action: implement
+    description: Write the code primitives with rejection sampling and a peppered hash
+    file: packages/api/src/lib/gift-card-code.ts
+    status: done
+    code: |-
+      import { randomBytes, createHash } from 'node:crypto'
+
+      /**
+       * Crockford base32 without I, L, O and U.
+       *
+       * I/L/1 and O/0 are misread off a phone screen, and dropping U means no
+       * generated code spells anything unfortunate.
+       */
+      export const GIFT_CARD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+      export const GIFT_CARD_CODE_LENGTH = 16
+
+      /**
+       * ~2^80 of entropy from the OS CSPRNG. Never Math.random: it is seeded
+       * predictably and a predictable gift card code is free money.
+       *
+       * Rejection sampling, not modulo. `byte % 32` over 0..255 is uniform only
+       * because 256 divides evenly by 32 — that happens to hold here, but the
+       * alphabet length is a constant someone will edit one day, and a biased
+       * generator fails silently. Rejecting out-of-range bytes stays correct for
+       * any alphabet.
+       */
+      export function generateGiftCardCode(): string {
+        const limit = Math.floor(256 / GIFT_CARD_ALPHABET.length) * GIFT_CARD_ALPHABET.length
+        let out = ''
+        while (out.length < GIFT_CARD_CODE_LENGTH) {
+          for (const byte of randomBytes(GIFT_CARD_CODE_LENGTH)) {
+            if (byte >= limit) continue // discard, or the low letters get favoured
+            out += GIFT_CARD_ALPHABET[byte % GIFT_CARD_ALPHABET.length]
+            if (out.length === GIFT_CARD_CODE_LENGTH) break
+          }
+        }
+        return out
+      }
+
+      /** Grouping and case are cosmetic; strip everything outside the alphabet. */
+      export function normalizeGiftCardCode(input: string): string {
+        return input.toUpperCase().replace(/[^0-9A-Z]/g, '').split('')
+          .filter((ch) => GIFT_CARD_ALPHABET.includes(ch))
+          .join('')
+      }
+
+      function pepper(): string {
+        const value = process.env.GIFT_CARD_CODE_PEPPER
+        if (!value) {
+          // Failing loudly beats hashing every card with an empty pepper and only
+          // discovering it when the database leaks.
+          if (process.env.NODE_ENV === 'production') {
+            throw new Error('GIFT_CARD_CODE_PEPPER is required in production')
+          }
+          return 'development-pepper'
+        }
+        return value
+      }
+
+      /**
+       * Lookup key for a card. The plaintext code is never stored, so this is the
+       * only way to find one. The pepper lives outside the database, so a dump
+       * cannot be attacked offline with a table of precomputed codes.
+       */
+      export function hashGiftCardCode(input: string): string {
+        return createHash('sha256').update(`${normalizeGiftCardCode(input)}:${pepper()}`).digest('hex')
+      }
+
+      export function lastFour(code: string): string {
+        return normalizeGiftCardCode(code).slice(-4)
+      }
+
+      /** Display only — grouped so it can be read aloud over the phone. */
+      export function formatGiftCardCode(code: string): string {
+        return (normalizeGiftCardCode(code).match(/.{1,4}/g) ?? []).join('-')
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/lib/gift-card-code.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: implement
+    description: Document the pepper in the environment example
+    file: .env.example
+    status: done
+    code: |-
+      # Server-side pepper mixed into gift card code hashes.
+      # Required in production. Rotating it invalidates every existing card.
+      GIFT_CARD_CODE_PEPPER=
+  - id: 6
+    action: commit
+    description: Commit the code primitives
+    command: 'git add packages/api/src/lib/gift-card-code.ts packages/api/tests/lib/gift-card-code.test.ts .env.example && git commit -m "feat(api): gift card code generation, normalization and peppered hashing"'
+    status: done
+current_step: 6
+started: '2026-08-06T07:27:02.864Z'
+completed: '2026-08-06T08:27:59.429Z'

@@ -1,0 +1,139 @@
+ticket_number: 512
+title: Schema - orders.giftCardAmount and the gift_card order type
+description: |-
+  ## Task
+  Add `orders.giftCardAmount` decimal(10,2) default `'0.00'`, and a fourth value `'gift_card'` on the `orderType` enum (`schema/orders.ts:122`). Migration included.
+
+  ## Tender, not a discount
+  `giftCardAmount` is never summed into `orders.discount` and never sits beside `promotionDiscount` / `couponDiscount` / `tradeDiscount` as a discount bucket. It reduces the amount due *after* tax. The charged amount stays derived rather than stored:
+
+  ```
+  razorpayAmount = toPaise(order.total) − giftCardAmountPaise
+  ```
+
+  Storing a second money total would give two sources of truth for what the customer owes.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 1 — Schema + contracts
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §4, §5
+
+  The `gift_card` order type exists because a card is bought through its own flow, not the cart (G7) — `cart_items.productId` and `variantId` are both NOT NULL (`schema/cart.ts:115-121`).
+feature: gift-cards
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T21:19:32.126Z'
+last_updated: '2026-08-06T08:22:59.461Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.831Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-06T08:22:59.461Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing assertions for the order-side column and enum value
+    file: packages/api/tests/database/gift-card-order-columns.test.ts
+    command: cd packages/api && bunx vitest run tests/database/gift-card-order-columns.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import { orders, orderTypeEnum } from '../../src/database/schema/orders'
+
+      describe('orders gift card tender', () => {
+        it('records gift card tender in its own column', () => {
+          expect(orders.giftCardAmount).toBeDefined()
+          expect(orders.giftCardAmount.default).toBe('0.00')
+        })
+
+        it('keeps the discount buckets untouched — tender is not a discount', () => {
+          expect(orders.discount).toBeDefined()
+          expect(orders.couponDiscount).toBeDefined()
+          expect(orders.tradeDiscount).toBeDefined()
+        })
+      })
+
+      describe('order type', () => {
+        it('can describe an order that buys a gift card', () => {
+          expect(orderTypeEnum.enumValues).toContain('gift_card')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/database/gift-card-order-columns.test.ts
+    expected_result: FAIL - orders.giftCardAmount is undefined
+    status: done
+  - id: 3
+    action: implement
+    description: Add the enum value and the tender column
+    file: packages/api/src/database/schema/orders.ts
+    status: done
+    code: |-
+      // At the orderType enum (~line 122), add a fourth value:
+      export const orderTypeEnum = pgEnum("order_type", [
+        "regular",
+        "ai_generated",
+        "trade",
+        "gift_card", // buys a gift card; no shipping, no tax, not from the cart
+      ]);
+
+      // Beside the pricing breakdown, AFTER `total` — its position in the file
+      // mirrors its position in the money path: tender comes off the total, it is
+      // not one of the discount buckets above it.
+
+          /**
+           * Gift card tender applied to this order, in rupees.
+           *
+           * NOT a discount: never summed into `discount`, never beside
+           * couponDiscount / promotionDiscount / tradeDiscount. It reduces the
+           * amount due after tax. What Razorpay is asked for stays derived:
+           *   toPaise(total) - toPaise(giftCardAmount)
+           * so there is exactly one source of truth for what the customer owes.
+           */
+          giftCardAmount: decimal("gift_card_amount", { precision: 10, scale: 2 })
+            .default("0.00")
+            .notNull(),
+  - id: 4
+    action: verify-pass
+    description: Confirm the assertions pass
+    command: cd packages/api && bunx vitest run tests/database/gift-card-order-columns.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: implement
+    description: Generate and apply the migration
+    file: packages/api/drizzle/
+    command: cd packages/api && bunx drizzle-kit generate && bunx drizzle-kit migrate
+    expected_result: Migration file created and applied
+    status: done
+  - id: 6
+    action: verify-pass
+    description: Confirm the existing order suites still pass
+    command: cd packages/api && bunx vitest run tests/routes/orders.test.ts
+    expected_result: PASS
+    status: done
+  - id: 7
+    action: commit
+    description: Commit the order-side tender column
+    command: 'git add packages/api/src/database/schema/orders.ts packages/api/tests/database/gift-card-order-columns.test.ts packages/api/drizzle && git commit -m "feat(api): record gift card tender on orders"'
+    status: done
+current_step: 7
+started: '2026-08-06T07:27:02.831Z'
+completed: '2026-08-06T08:22:59.461Z'
