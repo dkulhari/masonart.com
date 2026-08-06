@@ -42,13 +42,13 @@ comments:
   - author: mcp-client
     timestamp: '2026-08-05T21:13:13.140Z'
     text: |-
-      Interim assumption for the totals block, pending #510 (DECISION NEEDED — subtotal semantics and free-shipping threshold):
+      Interim assumption for the totals block, pending #568 (DECISION NEEDED — subtotal semantics and free-shipping threshold):
 
       `orders.subtotal` stays GROSS (sum of base line totals, unchanged from today) and `total = subtotal + shipping − discount + tax` keeps subtracting the discount exactly once. The free-shipping threshold therefore keeps reading the gross figure, as it does today.
 
       Chosen because it changes nothing that already exists: the only new money movement is the promotion discount itself. §5 of the design doc reads as though subtotal becomes net — following that literally while `total` still subtracts `discount` would take the promotion off twice.
 
-      If #510 lands on net subtotal or a net threshold, the totals block in `routes/orders.ts` is the single place that changes.
+      If #568 lands on net subtotal or a net threshold, the totals block in `routes/orders.ts` is the single place that changes.
   - author: mcp-client
     timestamp: '2026-08-06T05:34:03.702Z'
     text: |-

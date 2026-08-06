@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-06T16:34:47.015Z'
-total_tickets: 48
+last_updated: '2026-08-06T19:13:48.924Z'
+total_tickets: 52
 summary:
   critical: 3
   high: 17
-  medium: 20
-  low: 8
+  medium: 22
+  low: 10
 priorities:
   critical:
     - feature: go-live
@@ -213,7 +213,7 @@ priorities:
           blocked_by:
             - ticket_number: 432
               title: API - countdown deadline resolution, cookie mint and clamp
-        - ticket_number: 510
+        - ticket_number: 568
           title: DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
           assignee: unassigned
           blocked_by: []
@@ -261,6 +261,10 @@ priorities:
           title: Two-row top strip — countdown announcement over utility bar
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 564
+          title: Best Sellers band is missing the category pill row the reference carries on both viewports
+          assignee: unassigned
+          blocked_by: []
     - feature: gift-cards
       tickets:
         - ticket_number: 558
@@ -273,6 +277,12 @@ priorities:
           blocked_by:
             - ticket_number: 558
               title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+    - feature: cart-checkout
+      tickets:
+        - ticket_number: 566
+          title: PDP frame options drop the flat priceAddition column, unlike the quickview and the server
+          assignee: unassigned
+          blocked_by: []
   low:
     - feature: go-to-production
       tickets:
@@ -319,6 +329,16 @@ priorities:
           blocked_by: []
         - ticket_number: 563
           title: E2E - buy a card, receive it, redeem part, spend the remainder
+          assignee: unassigned
+          blocked_by: []
+    - feature: cart-checkout
+      tickets:
+        - ticket_number: 565
+          title: 'Sign-out error handling diverged: account page swallows signOut() rejections, admin sidebar still logs them'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 567
+          title: Cleanup left behind by the server-cart write path (#511)
           assignee: unassigned
           blocked_by: []
 blocked_tickets:

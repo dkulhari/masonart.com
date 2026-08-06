@@ -77,15 +77,15 @@ tickets:
     "434": Storefront - sale strip with live countdown above the header
     "527": Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
     "528": A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
-  in_progress:
-    "510": Cart page mixes two cart sources, so the saving row can describe lines it is not showing
+    "568": DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
+  in_progress: {}
   done:
     "433": Admin UI - /admin/promotions list and editor
     "435": Storefront - sale pricing on product cards and the PDP buy panel
     "436": Storefront - cart saving row, locked for non-members
     "437": Storefront - /sale landing page and the red Sale nav link
     "438": E2E - sale lifecycle from no promotion to expiry
-    "510": DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
+    "510": Cart page mixes two cart sources, so the saving row can describe lines it is not showing
     "516": API - featured products endpoint returns no sale price, so the home rail disagrees with the grid
     "524": Bug - /sale and /posters cards print base prices during a sale
     "525": Bug - promotion writes leave stale prices in the product response cache
