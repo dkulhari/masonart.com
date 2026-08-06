@@ -47,8 +47,17 @@ import {
   availabilitySchema,
 } from "@chobii/shared";
 import { unitsSoldSql } from "../lib/product-sales";
-import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
+import {
+  optionalAuth,
+  type AuthUser,
+  type OptionalAuthVariables,
+} from "../middleware/auth";
 import { getCached, setCached, CacheKeys } from "../lib/redis";
+import {
+  getActivePromotions,
+  loadPromotionProductSets,
+  resolveSalePrice,
+} from "../lib/promotion-pricing";
 
 // ============================================================================
 // Constants
@@ -60,6 +69,47 @@ const CACHE_TTL_PRODUCTS = 300; // 5 minutes
 const CACHE_TTL_PRODUCT_DETAIL = 600; // 10 minutes
 const CACHE_TTL_FEATURED = 900; // 15 minutes
 
+
+// ============================================================================
+// Sale pricing helpers
+// ============================================================================
+
+/**
+ * Membership, read off the session.
+ *
+ * `galleryMember` is a Better Auth additional field, so it rides on the session
+ * user without appearing on the `AuthUser` interface — the cast is what that
+ * costs. A guest is a non-member, which is the safe default: a members-only
+ * sale renders to them locked rather than priced.
+ */
+function readIsMember(user: AuthUser | null | undefined): boolean {
+  return Boolean(
+    (user as (AuthUser & { galleryMember?: boolean }) | null | undefined)
+      ?.galleryMember
+  );
+}
+
+/**
+ * A member and a guest see different bodies for the same query — `sale.locked`
+ * differs, and on a members-only sale that is the whole payload. One shared
+ * cache entry hands whichever of them arrives second the other's prices.
+ */
+function viewerCacheSuffix(isMember: boolean): string {
+  return isMember ? ":member" : ":guest";
+}
+
+/**
+ * Everything a page needs to price its lines, fetched once.
+ *
+ * The two id sets are per-request, not per-product: resolving inside the map
+ * would turn a 24-card grid into 48 extra queries.
+ */
+async function loadSaleContext(isMember: boolean) {
+  const activePromotions = await getActivePromotions();
+  const { includedIds, excludedIds } =
+    await loadPromotionProductSets(activePromotions);
+  return { activePromotions, ctx: { isMember, includedIds, excludedIds } };
+}
 
 // ============================================================================
 // Validation Schemas
@@ -189,8 +239,11 @@ productsApp.get(
       sortOrder,
     } = query;
 
-    // Build cache key from query params
-    const cacheKey = `${CacheKeys.PRODUCT_LIST}${JSON.stringify(query)}`;
+    const isMember = readIsMember(c.get("user"));
+
+    // Build cache key from query params, viewer included — see
+    // `viewerCacheSuffix`.
+    const cacheKey = `${CacheKeys.PRODUCT_LIST}${JSON.stringify(query)}${viewerCacheSuffix(isMember)}`;
 
     // Try to get from cache
     const cached = await getCached<{ items: unknown[]; total: number }>(cacheKey);
@@ -365,6 +418,15 @@ productsApp.get(
           styles: products.styles,
           subjects: products.subjects,
           colors: products.colors,
+          /**
+           * Selected for the sale resolver, not for the card.
+           *
+           * `rooms` is one of the three axes a `filter`-scoped promotion can
+           * name. Leaving it out of the projection would make a room-scoped
+           * sale price the PDP (which reads the whole row) and not the grid —
+           * the same product at two prices on two pages.
+           */
+          rooms: products.rooms,
           orientation: products.orientation,
           images: products.images,
           isFeatured: products.isFeatured,
@@ -405,8 +467,22 @@ productsApp.get(
         .limit(pageSize)
         .offset(offset);
 
+      /**
+       * One resolve pass over the page.
+       *
+       * Every price on the storefront comes out of `resolveSalePrice`, so the
+       * grid cannot drift from the PDP or the cart. What crosses the wire is
+       * the resolved payload — never the promotion row, whose `endsAt` is
+       * private (the countdown ships as an already-resolved deadline).
+       */
+      const { activePromotions, ctx } = await loadSaleContext(isMember);
+      const items = productList.map((product) => ({
+        ...product,
+        sale: resolveSalePrice(product, activePromotions, ctx),
+      }));
+
       const result = {
-        items: productList,
+        items,
         total,
         page,
         pageSize,
@@ -416,7 +492,7 @@ productsApp.get(
       };
 
       // Cache the result
-      await setCached(cacheKey, { items: productList, total }, CACHE_TTL_PRODUCTS);
+      await setCached(cacheKey, { items, total }, CACHE_TTL_PRODUCTS);
 
       return c.json(result);
     } catch (error) {
@@ -730,8 +806,10 @@ productsApp.get("/:slug", async (c) => {
     return c.json({ error: "Invalid slug format" }, 400);
   }
 
-  // Check cache
-  const cacheKey = `${CacheKeys.PRODUCT}${slug}`;
+  const isMember = readIsMember(c.get("user"));
+
+  // Check cache — keyed on the viewer, same reason as the list.
+  const cacheKey = `${CacheKeys.PRODUCT}${slug}${viewerCacheSuffix(isMember)}`;
   const cached = await getCached<object>(cacheKey);
   if (cached) {
     return c.json({ ...cached, fromCache: true });
@@ -775,9 +853,13 @@ productsApp.get("/:slug", async (c) => {
       .where(eq(frames.isActive, true))
       .orderBy(asc(frames.sortOrder));
 
+    // Same resolver as the grid, so the two pages cannot disagree on a price.
+    const { activePromotions, ctx } = await loadSaleContext(isMember);
+
     const result = {
       ...product,
       frames: availableFrames,
+      sale: resolveSalePrice(product, activePromotions, ctx),
     };
 
     // Cache the result
