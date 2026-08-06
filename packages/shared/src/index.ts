@@ -29,6 +29,10 @@ export * from './schemas/collection';
 // modules, so `./schemas/index.ts` alone does not make these reachable through
 // `@chobii/shared`.
 export * from './schemas/promotion';
+// Gift cards. Same reason as collections and promotions above: this barrel
+// enumerates schema modules, so './schemas/index.ts' alone does not make
+// these reachable through `@chobii/shared`.
+export * from './schemas/gift-card';
 
 // Constants
 export * from './constants/brand';

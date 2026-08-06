@@ -31,3 +31,7 @@ export * from './ai';
 
 // Promotion schemas
 export * from './promotion';
+
+// Gift card schemas. A gift card is tender, not a discount — kept in its own
+// module rather than beside './promotion' so the two are never conflated.
+export * from './gift-card';
