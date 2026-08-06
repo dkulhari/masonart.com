@@ -12,6 +12,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { generateId } from "~/lib/utils";
+import { toCartItems, type ServerCartPayload } from "~/lib/cart-projection";
 
 // ============================================================================
 // Types
@@ -127,32 +128,46 @@ interface CartStore {
   items: CartItem[];
   /** Whether the slide-out cart drawer is showing. Never persisted. */
   isDrawerOpen: boolean;
+  /**
+   * Why the last write did not reach the server, or null.
+   *
+   * The server cart is the one checkout reads, so a rejected write is rolled
+   * back locally rather than kept — and the customer has to be told, or the
+   * item they added silently is not there (#511).
+   */
+  syncError: string | null;
 
-  // Actions
-  addItem: (input: AddToCartInput) => void;
+  // Drawer
   openDrawer: () => void;
   closeDrawer: () => void;
   toggleDrawer: () => void;
+
+  /**
+   * Local mutators. `useCartActions` owns these — it applies one optimistically,
+   * calls the API, and either re-projects the server's answer or restores the
+   * snapshot. A component calling them directly writes to a cart that checkout
+   * will never see, which is the bug this whole change exists to close.
+   */
+  addItemLocal: (input: AddToCartInput) => string;
+  updateQuantityLocal: (id: string, quantity: number) => void;
+  removeItemLocal: (id: string) => void;
+  clearLocal: () => void;
+  restore: (items: CartItem[]) => void;
+  replaceFromServer: (cart: ServerCartPayload) => void;
+  setSyncError: (message: string | null) => void;
+
+  /**
+   * Legacy local-only actions, kept so the existing call sites compile until
+   * part C moves them onto `useCartActions`. Deleted there, in the same commit.
+   */
+  addItem: (input: AddToCartInput) => void;
   updateQuantity: (id: string, quantity: number) => void;
-  updateFrame: (
-    id: string,
-    frameId: string | null,
-    frameName?: string,
-    frameType?: string,
-    framePrice?: number
-  ) => void;
   removeItem: (id: string) => void;
   clearCart: () => void;
 
   // Computed values (as functions for Zustand v5 compatibility)
   getItemCount: () => number;
   getSubtotal: () => number;
-  getItemTotal: (id: string) => number;
-  findExistingItem: (
-    productId: string,
-    variantId: string,
-    frameId: string | null
-  ) => CartItem | undefined;
 }
 
 // ============================================================================
@@ -202,6 +217,7 @@ export const useCartStore = create<CartStore>()(
       // Initial state
       items: [],
       isDrawerOpen: false,
+      syncError: null,
 
       // Drawer visibility. It lives here rather than in a parent component so
       // any surface — header button, PDP, quickview — can open the cart
@@ -211,10 +227,13 @@ export const useCartStore = create<CartStore>()(
       toggleDrawer: () =>
         set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
 
-      // Add item to cart
-      addItem: (input: AddToCartInput) =>
+      addItemLocal: (input: AddToCartInput) => {
+        // A placeholder id, replaced by the server's row id as soon as the
+        // write lands. Prefixed so it is obvious in a snapshot that this line
+        // has not been acknowledged yet.
+        const pendingId = generateId("pending");
+
         set((state) => {
-          // Check if item with same product, variant, and frame already exists
           const existing = state.items.find(
             (item) =>
               item.productId === input.productId &&
@@ -223,24 +242,20 @@ export const useCartStore = create<CartStore>()(
           );
 
           if (existing) {
-            // Update quantity of existing item
             return {
               items: state.items.map((item) =>
                 item.id === existing.id
-                  ? {
-                      ...item,
-                      quantity: item.quantity + (input.quantity ?? 1),
-                    }
+                  ? { ...item, quantity: item.quantity + (input.quantity ?? 1) }
                   : item
               ),
               // Adding always slides the cart open, the way mesonart's does.
               isDrawerOpen: true,
+              syncError: null,
             };
           }
 
-          // Add new item
           const newItem: CartItem = {
-            id: generateId("cart"),
+            id: pendingId,
             productId: input.productId,
             variantId: input.variantId,
             frameId: input.frameId ?? null,
@@ -261,17 +276,20 @@ export const useCartStore = create<CartStore>()(
             addedAt: new Date().toISOString(),
           };
 
-          return { items: [...state.items, newItem], isDrawerOpen: true };
-        }),
+          return {
+            items: [...state.items, newItem],
+            isDrawerOpen: true,
+            syncError: null,
+          };
+        });
 
-      // Update item quantity
-      updateQuantity: (id: string, quantity: number) =>
+        return pendingId;
+      },
+
+      updateQuantityLocal: (id: string, quantity: number) =>
         set((state) => {
-          // Remove item if quantity is 0 or less
           if (quantity <= 0) {
-            return {
-              items: state.items.filter((item) => item.id !== id),
-            };
+            return { items: state.items.filter((item) => item.id !== id) };
           }
 
           return {
@@ -281,36 +299,32 @@ export const useCartStore = create<CartStore>()(
           };
         }),
 
-      // Update frame selection for an item
-      updateFrame: (
-        id: string,
-        frameId: string | null,
-        frameName?: string,
-        frameType?: string,
-        framePrice?: number
-      ) =>
-        set((state) => ({
-          items: state.items.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  frameId,
-                  frameName: frameName ?? undefined,
-                  frameType: frameType ?? undefined,
-                  framePrice: framePrice ?? 0,
-                }
-              : item
-          ),
-        })),
-
-      // Remove item from cart
-      removeItem: (id: string) =>
+      removeItemLocal: (id: string) =>
         set((state) => ({
           items: state.items.filter((item) => item.id !== id),
         })),
 
-      // Clear entire cart
-      clearCart: () => set({ items: [] }),
+      clearLocal: () => set({ items: [] }),
+
+      restore: (items: CartItem[]) => set({ items }),
+
+      /**
+       * The server's cart, wholesale. Local ids, quantities and prices all
+       * lose — the rows here are the rows order creation will read.
+       */
+      replaceFromServer: (cart: ServerCartPayload) =>
+        set({ items: toCartItems(cart) }),
+
+      setSyncError: (message: string | null) => set({ syncError: message }),
+
+      // Deleted in part C, once every call site is on useCartActions. Until
+      // then these keep the five existing importers building — this branch is
+      // shared, and a commit that does not compile is everyone's problem.
+      addItem: (input: AddToCartInput) => void get().addItemLocal(input),
+      updateQuantity: (id: string, quantity: number) =>
+        get().updateQuantityLocal(id, quantity),
+      removeItem: (id: string) => get().removeItemLocal(id),
+      clearCart: () => get().clearLocal(),
 
       // Get total item count
       getItemCount: () => {
@@ -325,29 +339,6 @@ export const useCartStore = create<CartStore>()(
           const itemTotal = (item.unitPrice + item.framePrice) * item.quantity;
           return sum + itemTotal;
         }, 0);
-      },
-
-      // Get total for a specific item
-      getItemTotal: (id: string) => {
-        const { items } = get();
-        const item = items.find((i) => i.id === id);
-        if (!item) return 0;
-        return (item.unitPrice + item.framePrice) * item.quantity;
-      },
-
-      // Find existing item by product, variant, and frame
-      findExistingItem: (
-        productId: string,
-        variantId: string,
-        frameId: string | null
-      ) => {
-        const { items } = get();
-        return items.find(
-          (item) =>
-            item.productId === productId &&
-            item.variantId === variantId &&
-            item.frameId === frameId
-        );
       },
     }),
     {
@@ -415,7 +406,6 @@ export const useCartActions = () =>
     useShallow((state) => ({
       addItem: state.addItem,
       updateQuantity: state.updateQuantity,
-      updateFrame: state.updateFrame,
       removeItem: state.removeItem,
       clearCart: state.clearCart,
       openDrawer: state.openDrawer,
@@ -423,6 +413,13 @@ export const useCartActions = () =>
       toggleDrawer: state.toggleDrawer,
     }))
   );
+
+const selectSyncError = (state: CartStore) => state.syncError;
+
+/**
+ * Hook to read why the last cart write failed, or null.
+ */
+export const useCartSyncError = () => useCartStore(selectSyncError);
 
 /**
  * Hook to read whether the cart drawer is open
