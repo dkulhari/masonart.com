@@ -19,7 +19,7 @@
 - Never run `prettier` in this repo. It has no config; defaults rewrite whole files away from the single-quote/no-semi style.
 - Web tests run from `packages/web`; API tests from `packages/api`; Playwright from the repo root.
 - Commit style: conventional commits, `Implements #511` in the body, and the trailer `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
-- The API's `db` is mocked in every `tests/routes/` suite. That is the convention; follow it. **Deviation from spec §6:** the spec called for two new API integration tests against a real database on port 5440. There is no non-destructive real-database harness in this repo — `tests/database/` suites DROP tables and are gated behind a disposable `_test` URL (`packages/api/tests/helpers/destructive-db.ts`). Building one is its own piece of work. The real-database proof therefore comes from Task 9's Playwright spec, which talks to the real API and the real database and stubs nothing. If you want the API-level integration tests as well, that is a follow-up ticket, not a silent omission.
+- The API's `db` is mocked in every `tests/routes/` suite. That is the convention; follow it. **Deviation from spec §6:** the spec called for two new API integration tests against a real database on port 5440. There is no non-destructive real-database harness in this repo — `tests/database/` suites DROP tables and are gated behind a disposable `_test` URL (`packages/api/tests/helpers/destructive-db.ts`). Building one is its own piece of work. The real-database proof therefore comes from Task 7's Playwright spec, which talks to the real API and the real database and stubs nothing. If you want the API-level integration tests as well, that is a follow-up ticket, not a silent omission.
 - Shared 8-core box, many concurrent agents. Run single test files, not whole suites, unless verifying at the end.
 
 ---
@@ -337,9 +337,15 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Store holds state, and only state
+### Task 2: One cart, one write path
 
-The store stops minting ids and stops being the last word. It gains a way to be replaced by the server, a way to be rolled back, and somewhere to put an error.
+Three parts, three commits, one task. They are one task because the seam between them is not reviewable in isolation: the store's old actions, the new hook, and the call sites only make sense together.
+
+**Order matters, and it is not the order you would guess.** Part A *adds* the new store API while leaving the old actions in place; part B adds the hook; part C switches the call sites and deletes the old actions in the same commit. Every commit builds. This branch is shared with other agents — a commit that does not compile is their problem too, not just a note in a plan.
+
+#### Task 2, part A — the store keeps state, and only state
+
+The store stops minting ids and stops being the last word. It gains a way to be replaced by the server, a way to be rolled back, and somewhere to put an error. What it does not do yet is lose anything — the old actions stay until part C has somewhere else for the call sites to go.
 
 **Files:**
 - Modify: `packages/web/app/stores/cart.ts`
@@ -356,7 +362,8 @@ The store stops minting ids and stops being the last word. It gains a way to be 
   - `restore(items: CartItem[]): void`
   - `replaceFromServer(cart: ServerCartPayload): void`
   - `setSyncError(message: string | null): void`
-- Removed from `CartStore`: `addItem`, `updateQuantity`, `updateFrame`, `removeItem`, `clearCart`, `getItemTotal`, `findExistingItem`. Also removed: the `useCartActions` export (Task 3 replaces it).
+- Removed here: `getItemTotal`, `findExistingItem`, `updateFrame` — all three have zero call sites, so removing them breaks nothing.
+- **Kept here, deleted in part C:** `addItem`, `updateQuantity`, `removeItem`, `clearCart` and the store's `useCartActions` export. They become one-line delegates to the `*Local` actions so the five existing call sites keep compiling until part C moves them.
 
 The `Local` suffix is load-bearing. `useCartActions` exposes `addItem`; the store exposes `addItemLocal`. A call site that reaches past the hook into the store is then obviously wrong at a glance.
 
@@ -581,6 +588,15 @@ interface CartStore {
   replaceFromServer: (cart: ServerCartPayload) => void;
   setSyncError: (message: string | null) => void;
 
+  /**
+   * Legacy local-only actions, kept so the existing call sites compile until
+   * part C moves them onto `useCartActions`. Deleted there, in the same commit.
+   */
+  addItem: (input: AddToCartInput) => void;
+  updateQuantity: (id: string, quantity: number) => void;
+  removeItem: (id: string) => void;
+  clearCart: () => void;
+
   // Computed values (as functions for Zustand v5 compatibility)
   getItemCount: () => number;
   getSubtotal: () => number;
@@ -691,9 +707,22 @@ Replace the action implementations (the block from `addItem:` through `findExist
       setSyncError: (message: string | null) => set({ syncError: message }),
 ```
 
-Keep `getItemCount` and `getSubtotal` exactly as they are. Delete `getItemTotal` and `findExistingItem` — no call sites.
+Keep `getItemCount` and `getSubtotal` exactly as they are. Delete `getItemTotal`, `findExistingItem` and `updateFrame` — no call sites.
 
-Delete the `useCartActions` export (lines 413-425) and the `useShallow` import if nothing else uses it. Task 3 provides the replacement.
+Add the four legacy delegates beneath the new actions, so the existing call sites keep compiling until part C:
+
+```ts
+      // Deleted in part C, once every call site is on useCartActions. Until
+      // then these keep the five existing importers building — this branch is
+      // shared, and a commit that does not compile is everyone's problem.
+      addItem: (input: AddToCartInput) => void get().addItemLocal(input),
+      updateQuantity: (id: string, quantity: number) =>
+        get().updateQuantityLocal(id, quantity),
+      removeItem: (id: string) => get().removeItemLocal(id),
+      clearCart: () => get().clearLocal(),
+```
+
+Leave the `useCartActions` export (lines 413-425) in place, minus its `updateFrame` entry. Part C deletes it.
 
 Add a selector hook beside the others:
 
@@ -714,7 +743,13 @@ cd packages/web && npx vitest run tests/stores/cart-projection-store.test.ts tes
 
 Expected: the new file PASSES; `cart-drawer.test.ts` still passes (it only touches drawer state).
 
-The build is deliberately broken at this point — five call sites still import the deleted `useCartActions`. Task 3 and Task 5 close that. Do not skip ahead to patch them here.
+Then confirm the tree still builds, because the legacy delegates exist precisely so that it does:
+
+```bash
+cd packages/web && npx tsc --noEmit 2>&1 | tail -5
+```
+
+Expected: no *new* errors against the pre-existing baseline. Nothing about `useCartActions` or a missing store action.
 
 - [ ] **Step 5: Commit**
 
@@ -728,6 +763,9 @@ either re-projects the server's cart or restores the snapshot. replaceFromServer
 and restore are the two ends of that; syncError is where a rejection goes.
 
 updateFrame, getItemTotal and findExistingItem had no call sites and are gone.
+The four old actions stay one more commit, as delegates, so the call sites
+still compile — this branch is shared, and a tree that does not build is
+everyone's problem.
 
 Implements #511
 
@@ -736,14 +774,14 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 3: `useCartActions` — the only way to write the cart
+#### Task 2, part B — `useCartActions`, the only way to write the cart
 
 **Files:**
 - Create: `packages/web/app/hooks/useCartActions.ts`
 - Test: `packages/web/tests/hooks/useCartActions.test.tsx`
 
 **Interfaces:**
-- Consumes: store actions from Task 2; `cartApi` from `~/lib/api`; `cartKeys` from `~/hooks/useCart`; `ServerCartPayload` from Task 1.
+- Consumes: the `*Local` store actions from part A; `cartApi` from `~/lib/api`; `cartKeys` from `~/hooks/useCart`; `ServerCartPayload` from Task 1.
 - Produces: `useCartActions(): CartActions` where
 
 ```ts
@@ -1247,7 +1285,198 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 4: Load the server cart on arrival
+#### Task 2, part C — move every call site onto the hook, and show the error
+
+This is where the legacy delegates die. Nothing may still reach into the store for a write after this commit.
+
+**Files:**
+- Modify: `packages/web/app/components/product/ProductDetail.tsx`
+- Modify: `packages/web/app/components/product/ChooseOptions.tsx`
+- Modify: `packages/web/app/components/cart/CartDrawer.tsx`
+- Modify: `packages/web/app/routes/cart/index.tsx`
+- Modify: `packages/web/app/stores/cart.ts` — delete the legacy delegates and the store's `useCartActions`
+- Test: `packages/web/tests/components/cart/CartDrawer-sync-error.test.tsx`
+
+**Interfaces:**
+- Consumes: `useCartActions` (part B), `useCartSyncError` (part A).
+- Deletes, in the same commit as the call-site switch: the store's `addItem`, `updateQuantity`, `removeItem`, `clearCart` delegates, its `useCartActions` export, and the `useShallow` import if nothing else uses it.
+
+- [ ] **Step 1: Write the failing test**
+
+`packages/web/tests/components/cart/CartDrawer-sync-error.test.tsx`:
+
+```tsx
+/**
+ * A cart write that the server refused is rolled back, so the drawer has to
+ * say why — otherwise the item the customer added simply is not there and
+ * nothing explains it (#511).
+ */
+
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+vi.hoisted(() => {
+  const mem = new Map<string, string>()
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, v),
+      removeItem: (k: string) => void mem.delete(k),
+      clear: () => mem.clear(),
+      key: () => null,
+      length: 0,
+    },
+  })
+})
+
+vi.mock('~/lib/api', () => ({
+  cartApi: {
+    get: vi.fn().mockResolvedValue({
+      id: 'cart-1',
+      itemCount: 0,
+      subtotal: '0.00',
+      savingTotal: '0.00',
+      items: [],
+      savedForLater: [],
+    }),
+    addItem: vi.fn(),
+    updateItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  },
+}))
+
+import { useCartStore } from '~/stores/cart'
+import { CartDrawer } from '~/components/cart/CartDrawer'
+
+function renderDrawer() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={client}>
+      <CartDrawer />
+    </QueryClientProvider>
+  )
+}
+
+beforeEach(() => {
+  useCartStore.setState({ items: [], isDrawerOpen: true, syncError: null })
+})
+
+describe('CartDrawer sync error', () => {
+  it('shows nothing when there is no error', () => {
+    renderDrawer()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows the server’s reason when a write was refused', () => {
+    useCartStore.setState({ syncError: 'Product variant is out of stock' })
+    renderDrawer()
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Product variant is out of stock'
+    )
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+```bash
+cd packages/web && npx vitest run tests/components/cart/CartDrawer-sync-error.test.tsx
+```
+
+Expected: FAIL — no element with role `alert`.
+
+- [ ] **Step 3: Update the four call sites**
+
+`ProductDetail.tsx` — replace the store import and the action read:
+
+```tsx
+// was: import { useCartStore } from '~/stores/cart'
+import { useCartActions } from '~/hooks/useCartActions'
+
+// was: const addItem = useCartStore((state) => state.addItem)
+const { addItem } = useCartActions()
+```
+
+Leave the `addItem({...})` call at line 262 exactly as it is — the input shape is unchanged. Its `useCallback` dependency array already lists `addItem`.
+
+`ChooseOptions.tsx` — the same two edits. `handleAdd` (line 376) keeps its body and its dependency array.
+
+`CartDrawer.tsx`:
+
+```tsx
+// was: import { useCartActions, ... } from '~/stores/cart'
+import { useCartActions } from '~/hooks/useCartActions'
+import { useCartSyncError } from '~/stores/cart'   // alongside the other store imports
+```
+
+Add the read next to the existing hooks in the component body:
+
+```tsx
+  const syncError = useCartSyncError()
+```
+
+and render it above the item list, inside the panel:
+
+```tsx
+        {syncError && (
+          <p
+            role="alert"
+            className="mx-4 mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {syncError}
+          </p>
+        )}
+```
+
+`routes/cart/index.tsx` — same import move for `useCartActions`, plus the same `syncError` read and the same alert block rendered above the line items.
+
+`stores/cart.ts` — with nothing importing them any more, delete the four legacy delegates (`addItem`, `updateQuantity`, `removeItem`, `clearCart`), their declarations on the `CartStore` interface, the store's `useCartActions` export, and the `useShallow` import. This is the same commit as the call-site switch: the delegates existed to keep part A and part B compiling, and their reason to exist ends here.
+
+- [ ] **Step 4: Run the tests**
+
+```bash
+cd packages/web && npx vitest run tests/components/cart tests/hooks/useCartActions.test.tsx tests/stores
+```
+
+Expected: all PASS. Then confirm nothing still reaches into the store for a write, and that the delegates are gone:
+
+```bash
+cd /Users/dhruv/work/masonart.com && grep -rn "state\.addItem\|state\.updateQuantity\|state\.removeItem\|state\.clearCart" packages/web/app
+grep -n "useCartActions\|useShallow" packages/web/app/stores/cart.ts
+cd packages/web && npx tsc --noEmit 2>&1 | tail -5
+```
+
+Expected: the first grep gives no output; the second gives no output; the typecheck shows no new errors against the baseline.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/web/app/components/product/ProductDetail.tsx packages/web/app/components/product/ChooseOptions.tsx packages/web/app/components/cart/CartDrawer.tsx packages/web/app/routes/cart/index.tsx packages/web/app/stores/cart.ts packages/web/tests/components/cart/CartDrawer-sync-error.test.tsx
+git commit --only packages/web/app/components/product/ProductDetail.tsx packages/web/app/components/product/ChooseOptions.tsx packages/web/app/components/cart/CartDrawer.tsx packages/web/app/routes/cart/index.tsx packages/web/app/stores/cart.ts packages/web/tests/components/cart/CartDrawer-sync-error.test.tsx -m "feat(web): add to cart writes to the cart checkout reads
+
+The PDP, the quickview, the drawer and the cart page all go through
+useCartActions now, so what the customer adds is in the basket the order is
+built from. A refused write rolls back, and the drawer says why — the repo has
+no toast, and adding always opens the drawer, so that is where the customer
+already is.
+
+The store's local-only actions and its useCartActions go with them — they
+survived one commit longer than the rename so the tree never stopped building.
+
+Implements #511
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
+### Task 3: Load the server cart on arrival
 
 Without this the store shows whatever `localStorage` last held, which after this change is a stale projection rather than the truth.
 
@@ -1460,189 +1689,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 5: Move every call site onto the hook, and show the error
-
-This is where the build goes green again.
-
-**Files:**
-- Modify: `packages/web/app/components/product/ProductDetail.tsx`
-- Modify: `packages/web/app/components/product/ChooseOptions.tsx`
-- Modify: `packages/web/app/components/cart/CartDrawer.tsx`
-- Modify: `packages/web/app/routes/cart/index.tsx`
-- Test: `packages/web/tests/components/cart/CartDrawer-sync-error.test.tsx`
-
-**Interfaces:**
-- Consumes: `useCartActions` (Task 3), `useCartSyncError` (Task 2).
-
-- [ ] **Step 1: Write the failing test**
-
-`packages/web/tests/components/cart/CartDrawer-sync-error.test.tsx`:
-
-```tsx
-/**
- * A cart write that the server refused is rolled back, so the drawer has to
- * say why — otherwise the item the customer added simply is not there and
- * nothing explains it (#511).
- */
-
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-
-vi.hoisted(() => {
-  const mem = new Map<string, string>()
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: {
-      getItem: (k: string) => mem.get(k) ?? null,
-      setItem: (k: string, v: string) => void mem.set(k, v),
-      removeItem: (k: string) => void mem.delete(k),
-      clear: () => mem.clear(),
-      key: () => null,
-      length: 0,
-    },
-  })
-})
-
-vi.mock('~/lib/api', () => ({
-  cartApi: {
-    get: vi.fn().mockResolvedValue({
-      id: 'cart-1',
-      itemCount: 0,
-      subtotal: '0.00',
-      savingTotal: '0.00',
-      items: [],
-      savedForLater: [],
-    }),
-    addItem: vi.fn(),
-    updateItem: vi.fn(),
-    removeItem: vi.fn(),
-    clear: vi.fn(),
-  },
-}))
-
-import { useCartStore } from '~/stores/cart'
-import { CartDrawer } from '~/components/cart/CartDrawer'
-
-function renderDrawer() {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  })
-  return render(
-    <QueryClientProvider client={client}>
-      <CartDrawer />
-    </QueryClientProvider>
-  )
-}
-
-beforeEach(() => {
-  useCartStore.setState({ items: [], isDrawerOpen: true, syncError: null })
-})
-
-describe('CartDrawer sync error', () => {
-  it('shows nothing when there is no error', () => {
-    renderDrawer()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-
-  it('shows the server’s reason when a write was refused', () => {
-    useCartStore.setState({ syncError: 'Product variant is out of stock' })
-    renderDrawer()
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Product variant is out of stock'
-    )
-  })
-})
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-```bash
-cd packages/web && npx vitest run tests/components/cart/CartDrawer-sync-error.test.tsx
-```
-
-Expected: FAIL — no element with role `alert`.
-
-- [ ] **Step 3: Update the four call sites**
-
-`ProductDetail.tsx` — replace the store import and the action read:
-
-```tsx
-// was: import { useCartStore } from '~/stores/cart'
-import { useCartActions } from '~/hooks/useCartActions'
-
-// was: const addItem = useCartStore((state) => state.addItem)
-const { addItem } = useCartActions()
-```
-
-Leave the `addItem({...})` call at line 262 exactly as it is — the input shape is unchanged. Its `useCallback` dependency array already lists `addItem`.
-
-`ChooseOptions.tsx` — the same two edits. `handleAdd` (line 376) keeps its body and its dependency array.
-
-`CartDrawer.tsx`:
-
-```tsx
-// was: import { useCartActions, ... } from '~/stores/cart'
-import { useCartActions } from '~/hooks/useCartActions'
-import { useCartSyncError } from '~/stores/cart'   // alongside the other store imports
-```
-
-Add the read next to the existing hooks in the component body:
-
-```tsx
-  const syncError = useCartSyncError()
-```
-
-and render it above the item list, inside the panel:
-
-```tsx
-        {syncError && (
-          <p
-            role="alert"
-            className="mx-4 mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          >
-            {syncError}
-          </p>
-        )}
-```
-
-`routes/cart/index.tsx` — same import move for `useCartActions`, plus the same `syncError` read and the same alert block rendered above the line items.
-
-- [ ] **Step 4: Run the tests**
-
-```bash
-cd packages/web && npx vitest run tests/components/cart tests/hooks/useCartActions.test.tsx tests/stores
-```
-
-Expected: all PASS. Then confirm nothing still reaches for the deleted store action:
-
-```bash
-cd /Users/dhruv/work/masonart.com && grep -rn "state.addItem\|state\.updateQuantity\|state\.removeItem\|state\.clearCart" packages/web/app
-```
-
-Expected: no output.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add packages/web/app/components/product/ProductDetail.tsx packages/web/app/components/product/ChooseOptions.tsx packages/web/app/components/cart/CartDrawer.tsx packages/web/app/routes/cart/index.tsx packages/web/tests/components/cart/CartDrawer-sync-error.test.tsx
-git commit --only packages/web/app/components/product/ProductDetail.tsx packages/web/app/components/product/ChooseOptions.tsx packages/web/app/components/cart/CartDrawer.tsx packages/web/app/routes/cart/index.tsx packages/web/tests/components/cart/CartDrawer-sync-error.test.tsx -m "feat(web): add to cart writes to the cart checkout reads
-
-The PDP, the quickview, the drawer and the cart page all go through
-useCartActions now, so what the customer adds is in the basket the order is
-built from. A refused write rolls back, and the drawer says why — the repo has
-no toast, and adding always opens the drawer, so that is where the customer
-already is.
-
-Implements #511
-
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
-```
-
----
-
-### Task 6: Checkout stops double-clearing
+### Task 4: Checkout stops double-clearing
 
 **Files:**
 - Modify: `packages/web/app/components/checkout/PaymentButton.tsx`
@@ -1738,7 +1785,7 @@ describe('post-payment cart reset', () => {
 cd packages/web && npx vitest run tests/components/checkout/PaymentButton-cart-reset.test.tsx
 ```
 
-This one passes as soon as Task 3 is committed — it pins `resetLocalCart`, which already exists by now. It is a regression pin, not a red-green cycle; the behaviour this task delivers is the call-site switch in Step 3, and the check that proves it is the grep in Step 4.
+This one passes as soon as Task 2 part B is committed — it pins `resetLocalCart`, which already exists by now. It is a regression pin, not a red-green cycle; the behaviour this task delivers is the call-site switch in Step 3, and the check that proves it is the grep in Step 4.
 
 - [ ] **Step 3: Switch the button over**
 
@@ -1791,7 +1838,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 7: Merge the guest cart server-side
+### Task 5: Merge the guest cart server-side
 
 `POST /api/cart/merge` wants a `guestSessionId` in the body, but that id lives in an httpOnly cookie the page cannot read and `GET /api/cart` never returns it. The endpoint has never been callable from a browser. The merge moves to middleware, where the cookie is in scope.
 
@@ -2170,7 +2217,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 8: Delete the half of the cart that never ran
+### Task 6: Delete the half of the cart that never ran
 
 **Files:**
 - Modify: `packages/web/app/hooks/useCart.ts`
@@ -2195,7 +2242,7 @@ Expected: no output. If anything appears, an earlier task missed a call site —
 
 - `hooks/useCart.ts`: remove the six hooks, `CartMutationContext`, and the now-unused `useMutation` / `UseMutationOptions` imports.
 - `hooks/useCart.ts`, same pass: delete the local `ServerCart` / `ServerCartItem` / `CartItemCustomizations` / `AIDetails` interfaces and retype `useServerCart` to return `ServerCartPayload` from `~/lib/cart-projection` — one payload type, defined where the projection lives. Those interfaces claimed an `addedAt` field the database has never had (the column is `created_at`, `packages/api/src/database/schema/cart.ts:153`), which is its own proof nothing ever ran against them.
-- `components/cart/CartSync.tsx`: with `useServerCart` correctly typed, drop the `as unknown as ServerCartPayload` cast Task 4 needed — it becomes `replaceFromServer(data)`.
+- `components/cart/CartSync.tsx`: with `useServerCart` correctly typed, drop the `as unknown as ServerCartPayload` cast Task 3 needed — it becomes `replaceFromServer(data)`.
 - `lib/api.ts`: remove `cartApi.merge`.
 - `tests/hooks/useCart.test.tsx`: remove the `describe` blocks for the deleted hooks and their imports. Keep the query-key and `useServerCart` suites.
 
@@ -2236,7 +2283,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 9: Prove it against a real stack
+### Task 7: Prove it against a real stack
 
 Everything above runs against mocks. This is the task that would have caught the original bug.
 
@@ -2308,7 +2355,7 @@ cd /Users/dhruv/work/masonart.com && npx playwright test tests/e2e/cart-server-p
 
 The API and web servers must be up. E2E base URL is `http://localhost:3001` — **not** 5173, which is a different application and makes these tests pass vacuously.
 
-Expected before Tasks 1-8: FAIL, no `POST /api/cart/items` is ever sent. Expected after: PASS.
+Expected before Tasks 1-6: FAIL, no `POST /api/cart/items` is ever sent. Expected after: PASS.
 
 - [ ] **Step 3: Commit**
 
@@ -2327,7 +2374,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 10: Close the ticket
+### Task 8: Close the ticket
 
 - [ ] **Step 1: Full web suite**
 
