@@ -58,6 +58,7 @@ import {
   loadPromotionProductSets,
   promotionScopeCondition,
   resolveSalePrice,
+  saleCacheTtl,
 } from "../lib/promotion-pricing";
 
 // ============================================================================
@@ -69,6 +70,18 @@ const MAX_PAGE_SIZE = 100;
 const CACHE_TTL_PRODUCTS = 300; // 5 minutes
 const CACHE_TTL_PRODUCT_DETAIL = 600; // 10 minutes
 const CACHE_TTL_FEATURED = 900; // 15 minutes
+
+/**
+ * Every cache write below that carries a `sale` block passes its TTL through
+ * `saleCacheTtl` first.
+ *
+ * Promotion writes purge these keys outright (see
+ * `purgeProductResponseCache`), so an enable, an edit or a delete is visible
+ * at once. A promotion *expiring* has no write to hang that off — active state
+ * is read from the clock — so the deadline is folded into the TTL instead and
+ * the entry lapses with the sale. The two halves together are what make the
+ * cache unable to quote a price from the wrong side of a promotion boundary.
+ */
 
 
 // ============================================================================
@@ -537,7 +550,11 @@ productsApp.get(
       };
 
       // Cache the result
-      await setCached(cacheKey, { items, total }, CACHE_TTL_PRODUCTS);
+      await setCached(
+        cacheKey,
+        { items, total },
+        saleCacheTtl(activePromotions, CACHE_TTL_PRODUCTS)
+      );
 
       return c.json(result);
     } catch (error) {
@@ -692,8 +709,13 @@ productsApp.get(
         sale: resolveSalePrice(product, activePromotions, ctx),
       }));
 
-      // The priced rows, not the bare ones — this entry lives 15 minutes.
-      await setCached(cacheKey, items, CACHE_TTL_FEATURED);
+      // The priced rows, not the bare ones — this entry lives 15 minutes, or
+      // until the running sale ends, whichever comes first.
+      await setCached(
+        cacheKey,
+        items,
+        saleCacheTtl(activePromotions, CACHE_TTL_FEATURED)
+      );
 
       return c.json({ items });
     } catch (error) {
@@ -928,7 +950,11 @@ productsApp.get("/:slug", async (c) => {
     };
 
     // Cache the result
-    await setCached(cacheKey, result, CACHE_TTL_PRODUCT_DETAIL);
+    await setCached(
+      cacheKey,
+      result,
+      saleCacheTtl(activePromotions, CACHE_TTL_PRODUCT_DETAIL)
+    );
 
     return c.json(result);
   } catch (error) {
@@ -1044,7 +1070,11 @@ productsApp.get(
         sale: resolveSalePrice(product, activePromotions, ctx),
       }));
 
-      await setCached(cacheKey, items, CACHE_TTL_FEATURED);
+      await setCached(
+        cacheKey,
+        items,
+        saleCacheTtl(activePromotions, CACHE_TTL_FEATURED)
+      );
 
       return c.json({ items });
     } catch (error) {

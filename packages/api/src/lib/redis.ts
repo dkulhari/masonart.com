@@ -131,18 +131,70 @@ export async function deleteCached(key: string): Promise<void> {
 }
 
 /**
- * Delete all cached values matching a pattern
+ * How many keys one SCAN iteration asks for. A hint, not a limit — Redis may
+ * return more or fewer.
+ */
+const SCAN_BATCH = 200;
+
+/**
+ * Delete all cached values matching a pattern.
+ *
+ * Iterates with SCAN rather than KEYS. `KEYS` walks the entire keyspace inside
+ * a single command and blocks every other client for the duration, which on a
+ * Redis also holding sessions, carts and BullMQ queues is a site-wide stall.
+ * SCAN hands back a cursor between batches, so the same work becomes many
+ * short commands.
+ *
+ * The trade is that SCAN offers no point-in-time snapshot: a key written after
+ * the cursor has passed its slot can be missed. For a cache that is acceptable
+ * — the entry is at worst as stale as its own TTL — and for anything that is
+ * not a cache this is the wrong function.
  */
 export async function deleteCachedPattern(pattern: string): Promise<void> {
   try {
     if (redis.status !== 'ready') return;
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
+
+    let cursor = '0';
+    do {
+      const [next, keys] = await redis.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        SCAN_BATCH
+      );
+      cursor = next;
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } while (cursor !== '0');
   } catch {
     // Redis not available - skip silently
   }
+}
+
+/**
+ * Drop every cached product response.
+ *
+ * The product list, detail, featured and related bodies all carry the resolved
+ * `sale` block, and every one of them is keyed **twice** — once for members and
+ * once for guests, see `viewerCacheSuffix` in routes/products.ts. Two prefix
+ * purges cover all four key families and both viewer variants at once.
+ *
+ * Deleting named keys instead is not an option here: the list key embeds a hash
+ * of the whole query, so the set of live keys is unbounded and unknowable, and
+ * a purge that guessed at them would reliably leave the member copy behind —
+ * signed-in customers being the ones who see a members-only sale.
+ *
+ * Callers are writes that change how a product is *priced* without changing the
+ * product: promotion mutations, which routes/products.ts cannot see coming.
+ * Promotion writes are a handful of admin actions a day, so paying an
+ * O(keyspace) scan for each one is far cheaper than the alternative of reading
+ * a cache generation on every storefront request.
+ */
+export async function purgeProductResponseCache(): Promise<void> {
+  await deleteCachedPattern(`${CacheKeys.PRODUCT_LIST}*`);
+  await deleteCachedPattern(`${CacheKeys.PRODUCT}*`);
 }
 
 // ============================================================================

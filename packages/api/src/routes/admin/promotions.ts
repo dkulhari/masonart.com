@@ -9,10 +9,18 @@
  *
  * Three rules govern this file.
  *
- * **Every mutating handler ends with `invalidateActivePromotions()`.** The
- * resolver caches the active set for 60s, so without this an admin who enables
- * a sale watches the storefront ignore them for up to a minute and enables it
- * again.
+ * **Every mutating handler ends with `invalidatePricingCaches()`.** Two caches
+ * hold a promotion's effects and neither expires on its own fast enough to be
+ * left alone:
+ *
+ * - the resolver's 60s in-process active-promotion list, cleared by
+ *   `invalidateActivePromotions()` — without it an admin who enables a sale
+ *   watches the storefront ignore them for up to a minute and enables it again;
+ * - the Redis product-response cache (300–900s), dropped by
+ *   `purgeProductResponseCache()`. Product list, detail, featured and related
+ *   bodies carry the resolved `sale` block, so without this the chrome turns
+ *   over immediately while the *prices* stay pre-sale for the rest of the TTL —
+ *   and stay discounted for the rest of it on the way back out (#525).
  *
  * **`isActive` is derived, never read.** There is no status column — see
  * database/schema/promotions.ts. The same row answers differently as the clock
@@ -48,11 +56,34 @@ import {
   isPromotionActive,
   type Promotion,
 } from "../../lib/promotion-pricing";
+import { purgeProductResponseCache } from "../../lib/redis";
 import {
   requireAuth,
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
+
+// ============================================================================
+// Cache invalidation
+// ============================================================================
+
+/**
+ * Everything that has to forget a price, in the one place it can be kept
+ * complete.
+ *
+ * Both caches, always, on every mutating path — including the ones that only
+ * look like they change nothing. A disable that skipped the Redis purge would
+ * leave the storefront selling a sale the admin just switched off, which is
+ * the more expensive direction to be wrong in.
+ *
+ * Awaited before the handler responds, so an admin UI that refetches the
+ * storefront the instant the save returns sees the new prices rather than the
+ * ones it was trying to change.
+ */
+async function invalidatePricingCaches(): Promise<void> {
+  invalidateActivePromotions();
+  await purgeProductResponseCache();
+}
 
 // ============================================================================
 // Serialization
@@ -264,7 +295,7 @@ adminPromotionsApp.post(
       return row;
     });
 
-    invalidateActivePromotions();
+    await invalidatePricingCaches();
 
     return c.json(
       serialize(
@@ -342,7 +373,7 @@ adminPromotionsApp.patch(
       return row;
     });
 
-    invalidateActivePromotions();
+    await invalidatePricingCaches();
 
     return c.json(
       serialize(
@@ -381,7 +412,7 @@ adminPromotionsApp.post("/:id/enable", async (c) => {
     );
   }
 
-  invalidateActivePromotions();
+  await invalidatePricingCaches();
 
   const membership = await loadMembership([row.id]);
   return c.json(
@@ -398,7 +429,7 @@ adminPromotionsApp.post("/:id/disable", async (c) => {
     );
   }
 
-  invalidateActivePromotions();
+  await invalidatePricingCaches();
 
   const membership = await loadMembership([row.id]);
   return c.json(
@@ -427,7 +458,7 @@ adminPromotionsApp.delete("/:id", async (c) => {
     );
   }
 
-  invalidateActivePromotions();
+  await invalidatePricingCaches();
 
   return c.json({ success: true, id });
 });

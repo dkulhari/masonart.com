@@ -31,6 +31,7 @@ import {
   isPromotionActive,
   loadPromotionProductSets,
   resolveSalePrice,
+  saleCacheTtl,
   selectPromotion,
 } from '../../src/lib/promotion-pricing';
 
@@ -294,5 +295,69 @@ describe('loadPromotionProductSets', () => {
     expect(fromMock).toHaveBeenCalledTimes(2);
     expect(fromMock).toHaveBeenCalledWith(promotionProducts);
     expect(fromMock).toHaveBeenCalledWith(promotionExclusions);
+  });
+});
+
+// ============================================================================
+// saleCacheTtl — the half of staleness no write can reach
+// ============================================================================
+
+/**
+ * A promotion write can purge the caches it invalidates. A promotion *ending*
+ * cannot: active state is derived from the clock, so the moment a sale lapses
+ * nothing runs, nothing writes, and there is no hook to purge from. The only
+ * defence available at write time is to refuse to cache a priced body past the
+ * deadline that will make it wrong.
+ */
+describe('saleCacheTtl', () => {
+  const FULL = 600;
+
+  it('leaves the TTL alone when nothing is on sale', () => {
+    expect(saleCacheTtl([], FULL, NOW)).toBe(FULL);
+  });
+
+  it('leaves the TTL alone for an open-ended promotion', () => {
+    // No endsAt, no deadline to outlive.
+    expect(saleCacheTtl([promo({ endsAt: null })], FULL, NOW)).toBe(FULL);
+  });
+
+  it('leaves the TTL alone when the sale outlasts it', () => {
+    // Ends three weeks out; a 10-minute entry cannot survive into the wrong era.
+    expect(saleCacheTtl([promo()], FULL, NOW)).toBe(FULL);
+  });
+
+  it('clamps to the seconds left when the sale ends first', () => {
+    const endsAt = new Date(NOW.getTime() + 90_000); // 90s
+    expect(saleCacheTtl([promo({ endsAt })], FULL, NOW)).toBe(90);
+  });
+
+  it('clamps to the soonest deadline when several promotions run', () => {
+    const soon = new Date(NOW.getTime() + 30_000);
+    const later = new Date(NOW.getTime() + 120_000);
+    expect(
+      saleCacheTtl(
+        [promo({ id: 'a', endsAt: later }), promo({ id: 'b', endsAt: soon })],
+        FULL,
+        NOW
+      )
+    ).toBe(30);
+  });
+
+  it('rounds down, so an entry never outlives the sale by a part second', () => {
+    const endsAt = new Date(NOW.getTime() + 45_900); // 45.9s
+    expect(saleCacheTtl([promo({ endsAt })], FULL, NOW)).toBe(45);
+  });
+
+  it('floors at one second for a promotion the resolver has not noticed ending', () => {
+    // getActivePromotions memoises for 60s, so a row whose window closed can
+    // still be handed to a route as active. setex rejects a TTL of zero, and
+    // caching a body that is already wrong for a full 10 minutes is worse than
+    // caching it for one second.
+    const endsAt = new Date(NOW.getTime() - 30_000);
+    expect(saleCacheTtl([promo({ endsAt })], FULL, NOW)).toBe(1);
+  });
+
+  it('never lengthens a short TTL to reach a distant deadline', () => {
+    expect(saleCacheTtl([promo()], 60, NOW)).toBe(60);
   });
 });

@@ -72,6 +72,55 @@ export function invalidateActivePromotions(): void {
 }
 
 /**
+ * How long a response priced by these promotions may be cached.
+ *
+ * A promotion *write* can purge the caches it invalidates. A promotion
+ * *ending* cannot. Active state is derived from the clock rather than written
+ * (see `isPromotionActive`), which is what lets a sale stop on its own with no
+ * job to run — and also means that at the instant it stops, nothing runs, so
+ * there is no hook to purge from. A product body cached for its full 600s one
+ * minute before the deadline goes on quoting the discount for nine minutes
+ * after it.
+ *
+ * Clamping the entry to the soonest `endsAt` closes that by construction: the
+ * cache cannot outlive the thing that made it right. It costs nothing while a
+ * sale is far off and shortens TTLs only as one winds down, which is exactly
+ * when short TTLs are worth paying for.
+ *
+ * Two edges:
+ *
+ * - A promotion with no `endsAt` runs open-ended and clamps nothing.
+ * - The floor of one second covers the window where `getActivePromotions`
+ *   still reports a promotion whose end has already passed — its own 60s memo
+ *   can be that far behind. `setex` rejects a non-positive TTL, and one second
+ *   of a body that is already wrong beats ten minutes of it.
+ *
+ * This does not cover a promotion that has not *started* yet: the resolver only
+ * ever sees active rows, so a body cached now can still outlive a sale
+ * scheduled to begin in a minute. Enabling that sale is an admin write and gets
+ * purged; a start time reached on the clock does not.
+ */
+export function saleCacheTtl(
+  activePromotions: Promotion[],
+  ttlSeconds: number,
+  now: Date = new Date()
+): number {
+  let ttl = ttlSeconds;
+
+  for (const promotion of activePromotions) {
+    if (!promotion.endsAt) continue;
+    // Rounded down: an entry that expires a fraction early is invisible, one
+    // that expires a fraction late is a wrong price.
+    const remaining = Math.floor(
+      (promotion.endsAt.getTime() - now.getTime()) / 1000
+    );
+    if (remaining < ttl) ttl = remaining;
+  }
+
+  return Math.max(1, ttl);
+}
+
+/**
  * The membership rows behind the two scope decisions, in one query each.
  *
  * Every surface that prices a page needs the same two sets, so they are loaded
