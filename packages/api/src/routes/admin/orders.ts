@@ -32,6 +32,7 @@ import {
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
+import { voidGiftCardHold } from "../../services/gift-card";
 import {
   createRefund,
   isRazorpayConfigured,
@@ -603,9 +604,11 @@ adminOrdersApp.patch(
         ? eq(orders.id, id)
         : eq(orders.orderNumber, id);
 
-      // Check if order exists
+      // Check if order exists. paymentStatus comes along because cancelling
+      // an UNPAID order has to release any gift card hold, while a paid one
+      // must be left to the refund path.
       const existing = await db
-        .select({ id: orders.id })
+        .select({ id: orders.id, paymentStatus: orders.paymentStatus })
         .from(orders)
         .where(whereCondition)
         .limit(1);
@@ -651,12 +654,32 @@ adminOrdersApp.patch(
         return c.json({ error: "Order not found" }, 404);
       }
 
-      // Update order
-      const updatedOrders = await db
-        .update(orders)
-        .set(updateData)
-        .where(eq(orders.id, existingOrder.id))
-        .returning();
+      // Update order, releasing any gift card hold in the same transaction —
+      // a cancel that fails must not leave the card credited.
+      const updatedOrders = await db.transaction(async (tx) => {
+        const result = await tx
+          .update(orders)
+          .set(updateData)
+          .where(eq(orders.id, existingOrder.id))
+          .returning();
+
+        /**
+         * Cancelling an UNPAID order hands the held balance back.
+         *
+         * Only when unpaid. Once the money has moved, returning it belongs to
+         * the refund path, which splits proportionally across tenders and
+         * caps what each card may receive. Releasing here as well would
+         * credit the card twice.
+         */
+        if (
+          input.status === "cancelled" &&
+          existingOrder.paymentStatus !== "paid"
+        ) {
+          await voidGiftCardHold(tx, existingOrder.id);
+        }
+
+        return result;
+      });
 
       const updatedOrder = updatedOrders[0];
       if (!updatedOrder) {
@@ -714,11 +737,13 @@ adminOrdersApp.patch(
         ? eq(orders.id, id)
         : eq(orders.orderNumber, id);
 
-      // Check if order exists
+      // Check if order exists. paymentStatus comes along because cancelling
+      // an unpaid order releases any gift card hold.
       const existing = await db
         .select({
           id: orders.id,
           status: orders.status,
+          paymentStatus: orders.paymentStatus,
           internalNotes: orders.internalNotes,
         })
         .from(orders)
@@ -759,12 +784,24 @@ adminOrdersApp.patch(
           : noteAddition;
       }
 
-      // Update order
-      const updatedOrders = await db
-        .update(orders)
-        .set(updateData)
-        .where(eq(orders.id, existingOrder.id))
-        .returning();
+      // Update order, releasing any gift card hold in the same transaction.
+      const updatedOrders = await db.transaction(async (tx) => {
+        const result = await tx
+          .update(orders)
+          .set(updateData)
+          .where(eq(orders.id, existingOrder.id))
+          .returning();
+
+        // Same rule as the general update route: an unpaid cancellation
+        // hands the balance back, a paid one is the refund path's business.
+        // Both routes can cancel, so a release wired into only one of them
+        // would lose balance through the other.
+        if (status === "cancelled" && existingOrder.paymentStatus !== "paid") {
+          await voidGiftCardHold(tx, existingOrder.id);
+        }
+
+        return result;
+      });
 
       const updatedOrder = updatedOrders[0];
       if (!updatedOrder) {

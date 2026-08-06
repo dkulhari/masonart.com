@@ -38,6 +38,7 @@ import { deliverImmediateGiftCard } from "../services/gift-card-delivery";
 import {
   quoteGiftCard,
   redeemGiftCards,
+  voidGiftCardHold,
   GiftCardError,
 } from "../services/gift-card";
 import {
@@ -1170,14 +1171,22 @@ ordersApp.post(
       });
 
       if (!isValid) {
-        // Update order with failed payment
-        await db
-          .update(orders)
-          .set({
-            paymentStatus: "failed",
-            updatedAt: new Date(),
-          })
-          .where(eq(orders.id, order.id));
+        // Update order with failed payment, and hand back any gift card
+        // balance held for it. Payment initiation debited those cards; a
+        // failed verification means the order is going nowhere, and holding
+        // the balance would consume it silently — a card with less on it
+        // looks exactly like one that was spent.
+        await db.transaction(async (tx) => {
+          await tx
+            .update(orders)
+            .set({
+              paymentStatus: "failed",
+              updatedAt: new Date(),
+            })
+            .where(eq(orders.id, order.id));
+
+          await voidGiftCardHold(tx, order.id);
+        });
 
         return c.json({ error: "Payment verification failed" }, 400);
       }
