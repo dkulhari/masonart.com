@@ -28,8 +28,17 @@ import {
 } from "../database/schema/cart";
 import { products, productVariants, frames } from "../database/schema/products";
 import { aiGenerations } from "../database/schema/ai-generations";
-import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
+import {
+  optionalAuth,
+  type AuthUser,
+  type OptionalAuthVariables,
+} from "../middleware/auth";
 import { getCached, setCached, deleteCached, CacheKeys } from "../lib/redis";
+import {
+  getActivePromotions,
+  loadPromotionProductSets,
+  resolveSalePrice,
+} from "../lib/promotion-pricing";
 
 // ============================================================================
 // Constants
@@ -159,6 +168,121 @@ async function getOrCreateCart(
   return cart!;
 }
 
+// ============================================================================
+// Sale pricing
+// ============================================================================
+
+/**
+ * Membership, read off the session.
+ *
+ * Mirrors `routes/products.ts`: `galleryMember` is a Better Auth additional
+ * field, so it rides on the session user without appearing on `AuthUser` — the
+ * cast is what that costs. A guest is a non-member, which is the safe default:
+ * a members-only sale renders to them locked rather than priced.
+ */
+function readIsMember(user: AuthUser | null | undefined): boolean {
+  return Boolean(
+    (user as (AuthUser & { galleryMember?: boolean }) | null | undefined)
+      ?.galleryMember
+  );
+}
+
+/**
+ * A member and a guest get different bodies for the same cart — `pricing.locked`
+ * is the whole difference on a members-only sale — so they get different entries.
+ *
+ * Both keys have to be dropped together on a write (`invalidateCartCache`), or a
+ * mutation clears one and the other keeps serving the pre-mutation cart for the
+ * rest of the TTL.
+ */
+function cartCacheKey(cartId: string, isMember: boolean): string {
+  return `${CacheKeys.CART}${cartId}${isMember ? ":member" : ":guest"}`;
+}
+
+async function invalidateCartCache(cartId: string): Promise<void> {
+  await Promise.all([
+    deleteCached(cartCacheKey(cartId, false)),
+    deleteCached(cartCacheKey(cartId, true)),
+  ]);
+}
+
+/**
+ * Everything the cart needs to price its lines, fetched once per request.
+ *
+ * The two id sets are per-request, not per-line: resolving inside the map would
+ * turn a ten-line cart into twenty extra queries.
+ */
+async function loadSaleContext(isMember: boolean) {
+  const activePromotions = await getActivePromotions();
+  const { includedIds, excludedIds } =
+    await loadPromotionProductSets(activePromotions);
+  return { activePromotions, ctx: { isMember, includedIds, excludedIds } };
+}
+
+type SaleContext = Awaited<ReturnType<typeof loadSaleContext>>;
+
+/** Half-up to 2dp, applied per line — never to the cart subtotal. */
+function toMoney(value: number): string {
+  return (Math.round((value + Number.EPSILON) * 100) / 100).toFixed(2);
+}
+
+type PricedCartLine = {
+  quantity: number;
+  unitPrice: string;
+  framePrice: string;
+  lineTotal: string;
+  product: { id: string } | null;
+};
+
+/**
+ * What a line costs, base and on sale, resolved fresh on every read.
+ *
+ * The discount comes off the line's own `unitPrice` — the variant's price, which
+ * is the money actually being charged — and not off the product's base price.
+ * Handing the resolver the line's unit price keeps eligibility, the member gate
+ * and the rounding in the one module that owns them, while an A1 print discounts
+ * from its own price rather than from the A4's.
+ *
+ * The frame stays at full price: the sale is on the artwork.
+ *
+ * `pricing.base` is the stored `lineTotal`, unchanged. Nothing here writes.
+ */
+function priceCartLine<T extends PricedCartLine>(item: T, sale: SaleContext) {
+  const resolved = item.product
+    ? resolveSalePrice(
+        { ...item.product, basePrice: item.unitPrice },
+        sale.activePromotions,
+        sale.ctx
+      )
+    : null;
+
+  const framePrice = parseFloat(item.framePrice ?? "0") || 0;
+
+  return {
+    ...item,
+    pricing: {
+      base: item.lineTotal,
+      sale: resolved
+        ? toMoney((parseFloat(resolved.salePrice) + framePrice) * item.quantity)
+        : null,
+      locked: resolved?.locked ?? false,
+      headline: resolved?.headline ?? null,
+      percentOff: resolved?.percentOff ?? null,
+    },
+  };
+}
+
+/**
+ * What the viewer actually saves on a line.
+ *
+ * A locked line is charged base — the price is a teaser behind the membership
+ * gate — so it saves nothing until they join.
+ */
+function lineSaving(line: ReturnType<typeof priceCartLine>): number {
+  if (!line.pricing.sale || line.pricing.locked) return 0;
+  return parseFloat(line.pricing.base) - parseFloat(line.pricing.sale);
+}
+
 /**
  * Calculate and update cart totals
  */
@@ -187,11 +311,15 @@ async function updateCartTotals(cartId: string): Promise<void> {
     .where(eq(carts.id, cartId));
 
   // Invalidate cart cache
-  await deleteCached(`${CacheKeys.CART}${cartId}`);
+  await invalidateCartCache(cartId);
 }
 
 /**
  * Calculate line total for a cart item
+ *
+ * Base, deliberately. A promotion is never baked into the stored figure: a cart
+ * left sitting across the end of a sale would otherwise still charge the sale
+ * price. Sale is resolved at read time, every time — see `priceCartLine`.
  */
 function calculateLineTotal(
   unitPrice: string,
@@ -221,6 +349,23 @@ async function getCartWithItems(cartId: string) {
               slug: true,
               images: true,
               status: true,
+              /**
+               * Selected for the sale resolver, not for the cart row.
+               *
+               * `styles`, `subjects` and `rooms` are the three axes a
+               * `filter`-scoped promotion can name, and `isFeatured` the
+               * fourth. Leaving any of them out would price a scoped sale on
+               * the product pages (which read the whole row) and not in the
+               * cart — the same product at two prices on two surfaces.
+               *
+               * `basePrice` rides along for completeness; the discount itself
+               * comes off the line's own `unitPrice` (see `priceCartLine`).
+               */
+              basePrice: true,
+              styles: true,
+              subjects: true,
+              rooms: true,
+              isFeatured: true,
             },
           },
           variant: {
@@ -285,8 +430,9 @@ cartApp.get("/", async (c) => {
   try {
     const cart = await getOrCreateCart(userId, sessionId);
 
-    // Check cache
-    const cacheKey = `${CacheKeys.CART}${cart.id}`;
+    // Check cache — keyed on the viewer, see `cartCacheKey`.
+    const isMember = readIsMember(user);
+    const cacheKey = cartCacheKey(cart.id, isMember);
     const cached = await getCached<object>(cacheKey);
     if (cached) {
       return c.json({ ...cached, fromCache: true });
@@ -299,9 +445,22 @@ cartApp.get("/", async (c) => {
       return c.json({ error: "Cart not found" }, 404);
     }
 
+    /**
+     * One resolve pass over the cart.
+     *
+     * Every price on the storefront comes out of `resolveSalePrice`, so the
+     * cart cannot drift from the grid or the PDP. The stored figures below —
+     * `subtotal` and each line's `lineTotal` — stay exactly as written: base.
+     */
+    const saleContext = await loadSaleContext(isMember);
+
     // Separate active items and saved for later
-    const activeItems = cartWithItems.items.filter((i) => !i.isSavedForLater);
-    const savedItems = cartWithItems.items.filter((i) => i.isSavedForLater);
+    const activeItems = cartWithItems.items
+      .filter((i) => !i.isSavedForLater)
+      .map((i) => priceCartLine(i, saleContext));
+    const savedItems = cartWithItems.items
+      .filter((i) => i.isSavedForLater)
+      .map((i) => priceCartLine(i, saleContext));
 
     const result = {
       id: cartWithItems.id,
@@ -313,6 +472,16 @@ cartApp.get("/", async (c) => {
       currency: cartWithItems.currency,
       items: activeItems,
       savedForLater: savedItems,
+      /**
+       * Summed from the per-line savings, each already rounded — rounding the
+       * subtotal instead would stop the lines reconciling with the total.
+       *
+       * Saved-for-later lines are left out for the same reason `subtotal`
+       * leaves them out: they are not being bought yet.
+       */
+      savingTotal: toMoney(
+        activeItems.reduce((total, line) => total + lineSaving(line), 0)
+      ),
       createdAt: cartWithItems.createdAt,
       updatedAt: cartWithItems.updatedAt,
     };
@@ -843,7 +1012,7 @@ cartApp.post("/merge", zValidator("json", mergeCartSchema), async (c) => {
     await updateCartTotals(userCart.id);
 
     // Clear the guest cart cache
-    await deleteCached(`${CacheKeys.CART}${guestCart.id}`);
+    await invalidateCartCache(guestCart.id);
 
     return c.json({
       message: "Cart merged successfully",
