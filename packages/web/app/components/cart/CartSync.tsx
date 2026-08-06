@@ -10,19 +10,34 @@
  * PDP and adds from there is already working against the real cart.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { useServerCart } from '~/hooks/useCart'
 import type { ServerCartPayload } from '~/lib/cart-projection'
 import { useCartStore } from '~/stores/cart'
 
 export function CartSync(): null {
-  const { data } = useServerCart()
+  const { data, error } = useServerCart()
   const replaceFromServer = useCartStore((state) => state.replaceFromServer)
+  const setSyncError = useCartStore((state) => state.setSyncError)
+  const lastProjectedRef = useRef<ServerCartPayload | null>(null)
 
   useEffect(() => {
-    if (data) replaceFromServer(data as unknown as ServerCartPayload)
-  }, [data, replaceFromServer])
+    // Prevent double-projection when the same payload reference arrives
+    // from both applyIfCurrent's setQueryData (which notifies this observer)
+    // and its direct replaceFromServer call. Only project if the reference changed.
+    if (data && data !== lastProjectedRef.current) {
+      lastProjectedRef.current = data
+      replaceFromServer(data as unknown as ServerCartPayload)
+    }
+
+    // Handle fetch errors. If the query is in an error state, signal it.
+    // A successful fetch (even if it returns empty) clears the error because
+    // replaceFromServer always sets syncError: null.
+    if (error) {
+      setSyncError('Could not load your cart. Please try again.')
+    }
+  }, [data, error, replaceFromServer, setSyncError])
 
   return null
 }
