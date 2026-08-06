@@ -1,0 +1,234 @@
+ticket_number: 548
+title: Service - redeem under a row lock, with clamp and idempotency
+description: |-
+  ## Task
+  `redeemGiftCards(tx, orderId, codes, amountDuePaise, userId)` in `services/gift-card.ts`. This is the dangerous one.
+
+  ## The row lock is the whole defence
+  `SELECT ... FOR UPDATE` on each card row, then re-read the balance inside the lock. Without it, the same code checked out in two tabs debits twice and the business hands out the balance a second time. A read-then-write without the lock is a race that only shows up under real traffic, which is exactly when it is expensive.
+
+  The quote produced at code-entry time is advisory and may be stale by seconds or hours — re-clamp against the live balance, never trust the quoted figure.
+
+  ## Idempotency
+  If `order_gift_card` rows already exist for this order, return them and debit nothing. `routes/orders.ts:679` already returns an existing Razorpay order on a repeat call, so this function *will* be called twice for one checkout.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 2 — Code and service
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §7
+
+  Takes a transaction handle rather than opening its own — the caller composes it with setting `orders.giftCardAmount` and creating the Razorpay order, and a partial success there must roll the debit back.
+feature: gift-cards
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T15:04:12.520Z'
+last_updated: '2026-08-06T15:04:12.520Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the locked debit, including the concurrency case
+    file: packages/api/tests/services/gift-card-redeem.test.ts
+    command: cd packages/api && bunx vitest run tests/services/gift-card-redeem.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('redeemGiftCards', () => {
+        it('debits no more than the amount due', async () => {
+          // card 500000 paise, order due 200000
+          // assert: applied 200000, card balance 300000
+        })
+
+        it('debits no more than the balance', async () => {
+          // card 50000 paise, order due 200000
+          // assert: applied 50000, card balance 0
+        })
+
+        it('spreads several cards across one order until the due is met', async () => {
+          // cards 30000 and 40000, due 60000
+          // assert: first card fully spent, second card debited 30000
+        })
+
+        it('survives concurrency — two simultaneous redemptions debit once', async () => {
+          // Two transactions racing on the same card, balance 50000, each due 50000.
+          // Exactly one applies 50000; the other sees 0 and applies nothing.
+          // This is what the FOR UPDATE lock exists for.
+          // assert: final balance 0, exactly one redeem ledger row
+        })
+
+        it('is idempotent — a repeat call debits nothing', async () => {
+          // call twice for the same orderId
+          // assert: one redeem ledger row, balance debited once
+        })
+
+        it('refuses a disabled card', async () => {
+          // assert: throws, balance untouched
+        })
+
+        it('refuses an expired card', async () => {
+          // expiresAt set in the past
+          // assert: throws, balance untouched
+        })
+
+        it('refuses an unknown code without revealing whether it existed', async () => {
+          // assert: same error shape as a disabled card
+        })
+
+        it('writes a redeem ledger row per card carrying the order id', async () => {
+          // assert: type 'redeem', orderId set, balanceAfterPaise matches the new balance
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/services/gift-card-redeem.test.ts
+    expected_result: FAIL - redeemGiftCards is not exported
+    status: pending
+  - id: 3
+    action: implement
+    description: Write the locked, clamped, idempotent debit
+    file: packages/api/src/services/gift-card.ts
+    status: pending
+    code: |-
+      import { eq, and, sql } from 'drizzle-orm'
+      import { giftCards, giftCardTransactions, orderGiftCards, giftCardStatus } from '../database/schema/gift-cards'
+      import { hashGiftCardCode } from '../lib/gift-card-code'
+
+      export class GiftCardError extends Error {}
+
+      export interface RedeemedCard {
+        giftCardId: string
+        last4: string
+        amountPaise: number
+      }
+
+      /**
+       * Debits gift cards towards an order.
+       *
+       * Takes the caller's transaction: the debit, `orders.giftCardAmount` and the
+       * Razorpay order are one unit of work, and a failure creating the payment
+       * must give the customer their balance back.
+       */
+      export async function redeemGiftCards(
+        tx: any,
+        orderId: string,
+        codes: string[],
+        amountDuePaise: number,
+        userId: string,
+      ): Promise<RedeemedCard[]> {
+        // Idempotency first. routes/orders.ts:679 returns an existing Razorpay
+        // order on a repeat call, so this runs twice for a single checkout.
+        const existing = await tx.select().from(orderGiftCards).where(eq(orderGiftCards.orderId, orderId))
+        if (existing.length > 0) {
+          return existing.map((row: any) => ({
+            giftCardId: row.giftCardId,
+            last4: '',
+            amountPaise: row.amountPaise,
+          }))
+        }
+
+        const applied: RedeemedCard[] = []
+        let remaining = amountDuePaise
+
+        for (const code of codes) {
+          if (remaining <= 0) break
+
+          // FOR UPDATE is the entire defence against double-spend. Read the row
+          // under the lock; a value read before the lock is already stale.
+          const locked = await tx.execute(sql`
+            SELECT id, balance_paise, disabled_at, expires_at, code_last4
+            FROM gift_card
+            WHERE code_hash = ${hashGiftCardCode(code)}
+            FOR UPDATE
+          `)
+          const row = locked.rows?.[0]
+
+          // Same message for unknown, disabled and expired: distinguishing them
+          // turns the endpoint into an oracle for which codes exist.
+          if (!row) throw new GiftCardError('This gift card cannot be used')
+
+          const card = {
+            balancePaise: Number(row.balance_paise),
+            disabledAt: row.disabled_at ? new Date(row.disabled_at) : null,
+            expiresAt: row.expires_at ? new Date(row.expires_at) : null,
+          }
+          if (giftCardStatus(card as any) !== 'active') {
+            throw new GiftCardError('This gift card cannot be used')
+          }
+
+          // Re-clamp against the live balance. The quote shown at code entry is
+          // advisory and may be hours old.
+          const amount = Math.min(card.balancePaise, remaining)
+          if (amount <= 0) continue
+
+          const balanceAfter = card.balancePaise - amount
+
+          await tx.update(giftCards)
+            .set({ balancePaise: balanceAfter, updatedAt: new Date() })
+            .where(eq(giftCards.id, row.id))
+
+          await tx.insert(giftCardTransactions).values({
+            giftCardId: row.id,
+            type: 'redeem',
+            amountPaise: amount,
+            balanceAfterPaise: balanceAfter,
+            orderId,
+            userId,
+            description: `Redeemed towards order`,
+          })
+
+          await tx.insert(orderGiftCards).values({
+            orderId,
+            giftCardId: row.id,
+            amountPaise: amount,
+          })
+
+          applied.push({ giftCardId: row.id, last4: row.code_last4, amountPaise: amount })
+          remaining -= amount
+        }
+
+        return applied
+      }
+
+      /** Quote only — debits nothing. What the checkout screen calls. */
+      export async function quoteGiftCard(code: string, amountDuePaise: number) {
+        const card = await db.query.giftCards.findFirst({
+          where: eq(giftCards.codeHash, hashGiftCardCode(code)),
+        })
+        if (!card || giftCardStatus(card) !== 'active') {
+          throw new GiftCardError('This gift card cannot be used')
+        }
+        return {
+          giftCardId: card.id,
+          last4: card.codeLast4,
+          balancePaise: card.balancePaise,
+          applicablePaise: Math.min(card.balancePaise, amountDuePaise),
+        }
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass, concurrency case included
+    command: cd packages/api && bunx vitest run tests/services/gift-card-redeem.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit redemption
+    command: 'git add packages/api/src/services/gift-card.ts packages/api/tests/services/gift-card-redeem.test.ts && git commit -m "feat(api): redeem gift cards under a row lock"'
+    status: pending
+current_step: 1

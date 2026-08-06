@@ -1,0 +1,146 @@
+ticket_number: 553
+title: Schema - unique purchaseOrderId and orders.giftCardPurchase
+description: |-
+  ## Task
+  Two schema deltas that #511 and #512 could not anticipate, discovered while designing scheduled delivery. Both are needed before #550, #551 and #552.
+
+  1. **`gift_card.purchaseOrderId` becomes UNIQUE**, not merely indexed (`schema/gift-cards.ts:97`).
+  2. **`orders.giftCardPurchase` jsonb, nullable** — amountPaise, recipientEmail, recipientName, senderName, message, sendAt.
+
+  ## Why the unique constraint
+  It is the idempotency guarantee for minting. Razorpay can deliver a verification twice, the client can retry, and two sweep workers can race — all three reach the insert. With a unique constraint exactly one survives and the losers catch a violation. The alternative, reading "does a card exist for this order yet" before inserting, races in precisely the window it is meant to protect.
+
+  ## Why the jsonb column
+  Under G5 the plaintext code is returned once by `issueGiftCard()` and never stored. So a card minted at payment time for a send date three months out has **no recoverable code** when the sweep fires. Minting therefore moves to delivery time, and the recipient details need somewhere to live between purchase and delivery. The order is where the purchase already is.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 1 — Schema + contracts (late addition)
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §4, §6
+
+  #511 and #512 are already done and committed; this is a delta on top of them, not a reopening. The unique constraint can be added safely because no gift cards exist in production yet.
+feature: gift-cards
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T15:09:18.262Z'
+last_updated: '2026-08-06T15:09:18.262Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks:
+  - ticket: 550
+    feature: gift-cards
+    description: API - POST /api/gift-cards/purchase creates the gift card order
+  - ticket: 551
+    feature: gift-cards
+    description: API - mint the card on payment verification
+  - ticket: 552
+    feature: gift-cards
+    description: Service - scheduled delivery sweep and the gift card email
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing assertions for the constraint and the column
+    file: packages/api/tests/database/gift-card-delivery-schema.test.ts
+    command: cd packages/api && bunx vitest run tests/database/gift-card-delivery-schema.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import { giftCards } from '../../src/database/schema/gift-cards'
+      import { orders } from '../../src/database/schema/orders'
+
+      describe('minting idempotency', () => {
+        it('allows only one card per purchase order', async () => {
+          // Insert two cards with the same purchaseOrderId.
+          // assert: the second insert rejects with a unique violation.
+          // This constraint is what makes a retried payment verification safe.
+        })
+      })
+
+      describe('orders.giftCardPurchase', () => {
+        it('carries the purchase until the card is minted', () => {
+          expect(orders.giftCardPurchase).toBeDefined()
+        })
+
+        it('is nullable — ordinary orders buy no gift card', () => {
+          expect(orders.giftCardPurchase.notNull).toBe(false)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the assertions fail
+    command: cd packages/api && bunx vitest run tests/database/gift-card-delivery-schema.test.ts
+    expected_result: FAIL - orders.giftCardPurchase is undefined and duplicate purchase order ids are accepted
+    status: pending
+  - id: 3
+    action: implement
+    description: Promote the purchase order index to a unique constraint
+    file: packages/api/src/database/schema/gift-cards.ts
+    status: pending
+    code: |-
+      // Replace the plain index (~line 97):
+      //   purchaseOrderIdx: index("gift_card_purchase_order_idx").on(table.purchaseOrderId),
+      // with a unique constraint — this is the idempotency guarantee for minting,
+      // not a lookup optimisation. A retried payment verification and two racing
+      // sweep workers all attempt the insert; exactly one may win.
+
+          purchaseOrderUnique: unique("gift_card_purchase_order_id_unique").on(
+            table.purchaseOrderId,
+          ),
+  - id: 4
+    action: implement
+    description: Add the purchase payload column to orders
+    file: packages/api/src/database/schema/orders.ts
+    status: pending
+    code: |-
+      export interface GiftCardPurchase {
+        amountPaise: number;
+        recipientEmail: string;
+        recipientName: string;
+        senderName: string;
+        message: string | null;
+        /** ISO string; null means deliver as soon as payment is confirmed. */
+        sendAt: string | null;
+      }
+
+      // Beside giftCardAmount:
+
+          /**
+           * What this order bought, held until the card is minted.
+           *
+           * A scheduled card is deliberately not created at payment time: the
+           * plaintext code is returned once and never stored, so a card minted in
+           * March for a June send date could never be emailed. The sweep mints it
+           * on the day, and reads the recipient from here.
+           */
+          giftCardPurchase: jsonb("gift_card_purchase").$type<GiftCardPurchase>(),
+  - id: 5
+    action: verify-pass
+    description: Confirm the assertions pass
+    command: cd packages/api && bunx vitest run tests/database/gift-card-delivery-schema.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: implement
+    description: Generate and apply the migration
+    file: packages/api/drizzle/
+    command: cd packages/api && bunx drizzle-kit generate && bunx drizzle-kit migrate
+    expected_result: Migration file created and applied
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the delivery-time minting schema
+    command: 'git add packages/api/src/database/schema/gift-cards.ts packages/api/src/database/schema/orders.ts packages/api/tests/database/gift-card-delivery-schema.test.ts packages/api/drizzle && git commit -m "feat(api): make gift card minting idempotent and defer scheduled cards"'
+    status: pending
+current_step: 1

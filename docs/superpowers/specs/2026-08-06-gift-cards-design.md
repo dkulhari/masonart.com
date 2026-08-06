@@ -101,11 +101,16 @@ order_gift_card                              -- several cards may pay one order
   pk (orderId, giftCardId)
 ```
 
-**Order-side addition** — `packages/api/src/database/schema/orders.ts`:
+**Order-side additions** — `packages/api/src/database/schema/orders.ts`:
 
 ```
-orders.giftCardAmount  decimal(10,2) default '0.00' notnull
+orders.giftCardAmount    decimal(10,2) default '0.00' notnull
+orders.giftCardPurchase  jsonb null   -- amount, recipient, sender, message, sendAt
 ```
+
+`giftCardPurchase` holds what was bought until the card exists. A scheduled card is not minted at payment time (§6), so the recipient details have to live somewhere between purchase and delivery, and the order is where the purchase already is.
+
+`gift_card.purchaseOrderId` carries a **unique** constraint, not merely an index. That constraint is the idempotency guarantee for minting: a second mint attempt for the same order fails at the database rather than relying on a read-then-write check that races.
 
 **`giftCardAmount` is never summed into `orders.discount`.** It is tender, and it sits below the total, following the one-bucket-per-source rule established for promotions (`orders.promotionDiscount`, `orders.couponDiscount`, `orders.tradeDiscount` at `schema/orders.ts:184`). The charged amount is derived, not stored:
 
@@ -147,7 +152,7 @@ The accepted cost: **a gift card cannot be bought in the same checkout as a post
 
 ### Three rules that are correctness, not policy
 
-1. **The card is minted only after `paymentStatus === 'paid'`**, in the verify path. Minting at order creation means an abandoned checkout creates spendable money.
+1. **The card is minted only after `paymentStatus === 'paid'`, at the moment it is delivered.** Minting at order creation means an abandoned checkout creates spendable money. Minting at payment time for a *scheduled* card is equally wrong for a different reason: under G5 the plaintext code exists only in the return value of `issueGiftCard()`, so a card minted in March for a June send date has no recoverable code when June arrives. Immediate sends mint in the verify path; scheduled sends mint in the sweep (§6).
 2. **A gift card order cannot be paid with a gift card.** Redemption rejects `orderType === 'gift_card'`. Without it, balance cycles between cards and every refund becomes a graph traversal.
 3. **No tax on the voucher sale.** A voucher is neither goods nor services; the tax point is the redemption, not the sale. `tax` is hardcoded `"0.00"` across the codebase today, so this costs nothing now — it is recorded so that future tax work does not tax the voucher and then tax the poster it buys.
 
@@ -157,9 +162,20 @@ The accepted cost: **a gift card cannot be bought in the same checkout as a post
 
 ## 6. Delivery
 
-`sendAt` null means the card is emailed as soon as payment is confirmed.
+**Minting and sending are the same event.** G5 keeps only the hash, so the plaintext code exists exactly once — in the return value of `issueGiftCard()`. There is no later moment at which it can be recovered and emailed. Delivery therefore drives creation, not the other way round:
 
-A future `sendAt` is picked up by `services/gift-card-delivery.ts`, using the `setInterval` sweep pattern of `services/approval-deadline.ts:251`. The repo already made that tradeoff against BullMQ; this reuses it rather than introducing a second scheduling story. `sentAt` is the idempotency guard, so a restart mid-sweep cannot double-send. Scheduling is capped at one year ahead.
+| `sendAt` | Card created | By |
+|---|---|---|
+| null or past | at payment verification | the verify path |
+| future | when the date arrives | the sweep |
+
+Until a scheduled card is minted, the purchase lives on `orders.giftCardPurchase`. The order is paid and the customer has a receipt; the instrument simply does not exist yet, which is invisible to everyone except the recipient who has not been emailed.
+
+The sweep is `services/gift-card-delivery.ts`, using the `setInterval` pattern of `services/approval-deadline.ts:251` — the repo already made that tradeoff against BullMQ, and a second scheduling story costs more than it buys. It selects paid `gift_card` orders whose `giftCardPurchase.sendAt` has arrived, mints, then emails.
+
+**The unique constraint on `gift_card.purchaseOrderId` is the idempotency guard**, not `sentAt`. Two sweep workers, or a sweep racing a retried verification, both attempt the insert; exactly one wins and the loser sees a unique violation and stops. A read-then-write check would race in precisely the window that matters. `sentAt` remains as the record of when the email went out.
+
+If the email fails after a successful mint, the card exists and is unsent — recoverable by hand from the admin screen, and strictly better than a customer holding two codes for one balance. Scheduling is capped at one year ahead.
 
 The email carries the full code, the amount, the sender's name and the message, and is the only place the code ever appears.
 

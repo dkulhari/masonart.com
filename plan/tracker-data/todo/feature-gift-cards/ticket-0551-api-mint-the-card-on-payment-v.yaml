@@ -1,0 +1,149 @@
+ticket_number: 551
+title: API - mint the card on payment verification
+description: |-
+  ## Task
+  In the payment verify path (`routes/orders.ts`), when a verified order has `orderType: 'gift_card'`, call `issueGiftCard()` and either send the delivery email immediately or leave it for the sweep when `sendAt` is in the future.
+
+  ## Only immediate sends mint here
+  A card created at order creation is spendable money conjured by an abandoned checkout, so `paymentStatus === 'paid'` is the earliest a card may exist. But it is not always the right moment: under G5 the plaintext code is returned once by `issueGiftCard()` and never stored, so a card minted now for a send date three months out could never be emailed.
+
+  | `giftCardPurchase.sendAt` | This ticket |
+  |---|---|
+  | null or already past | mint and send now |
+  | future | do nothing — the sweep (#552) mints when the date arrives |
+
+  ## Idempotency comes from the unique constraint
+  Razorpay can deliver a verification twice and the client can retry. Rely on the UNIQUE constraint on `gift_card.purchaseOrderId` and catch the violation — a `findFirst` check before inserting races with the retry it is meant to protect against.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 3 — Purchase and delivery
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §5
+
+  The plaintext code returned by `issueGiftCard()` is handed straight to the email and then dropped. It is never logged — a code in an application log is a code in a log aggregator.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T15:04:12.650Z'
+last_updated: '2026-08-06T15:04:12.650Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 550
+    feature: gift-cards
+    description: API - POST /api/gift-cards/purchase creates the gift card order
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for minting on verification
+    file: packages/api/tests/routes/gift-card-mint.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-mint.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('minting on payment verification', () => {
+        it('creates the card once the order is paid', async () => {
+          // assert: gift_card row with purchaseOrderId === order.id, balance === total
+        })
+
+        it('creates nothing while the order is unpaid', async () => {
+          // assert: no gift_card row before verification
+        })
+
+        it('is idempotent — a second verification mints no second card', async () => {
+          // assert: exactly one gift_card row for the order
+        })
+
+        it('sends immediately when no send date was chosen', async () => {
+          // assert: sentAt set, email dispatched once
+        })
+
+        it('mints nothing at all for a future-dated purchase', async () => {
+          // assert: NO gift_card row exists for the order, no email.
+          // The card cannot be created early: its code would be unrecoverable
+          // by the time the sweep needs to email it.
+        })
+
+        it('never writes the code to a log', async () => {
+          // spy on the logger; assert no call argument contains the code
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-mint.test.ts
+    expected_result: FAIL - no card is minted
+    status: pending
+  - id: 3
+    action: implement
+    description: Mint on verification, keyed on the purchase order
+    file: packages/api/src/routes/orders.ts
+    status: pending
+    code: |-
+      // In the verify handler, after the order is marked paid:
+
+      if (order.orderType === 'gift_card') {
+        const purchase = order.giftCardPurchase as GiftCardPurchase
+
+        // A future send date means this card must NOT be created yet: the
+        // plaintext code is returned once and never stored, so a card minted
+        // now could not be emailed in June. The sweep mints it on the day.
+        const sendNow = !purchase.sendAt || new Date(purchase.sendAt) <= new Date()
+
+        if (sendNow) {
+          try {
+            // No "does it already exist" read: that races with the retried
+            // verification it is supposed to guard against. The UNIQUE
+            // constraint on purchase_order_id decides, and a duplicate here
+            // would be duplicated money.
+            const { card, code } = await issueGiftCard({
+              amountPaise: toPaise(order.total),
+              purchaseOrderId: order.id,
+              recipientEmail: purchase.recipientEmail,
+              recipientName: purchase.recipientName,
+              senderName: purchase.senderName,
+              message: purchase.message,
+              description: `Purchased on order ${order.orderNumber}`,
+            })
+
+            await sendGiftCardEmail(card, code)
+            await db.update(giftCards).set({ sentAt: new Date() }).where(eq(giftCards.id, card.id))
+            // `code` goes out of scope here: never persisted, never logged.
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            // Already minted by a previous verification. Nothing to do.
+            if (!message.includes('gift_card_purchase_order_id')) throw error
+          }
+        }
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-mint.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the existing order suites still pass
+    command: cd packages/api && bunx vitest run tests/routes/orders.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit minting
+    command: 'git add packages/api/src/routes/orders.ts packages/api/tests/routes/gift-card-mint.test.ts && git commit -m "feat(api): mint the gift card when its order is paid"'
+    status: pending
+current_step: 1

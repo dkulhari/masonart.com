@@ -1,0 +1,165 @@
+ticket_number: 550
+title: API - POST /api/gift-cards/purchase creates the gift card order
+description: |-
+  ## Task
+  New `packages/api/src/routes/gift-cards.ts`, mounted in `routes/index.ts`. `POST /api/gift-cards/purchase` creates an order with `orderType: 'gift_card'` holding one `order_item` with `productId: null` and title `Gift card — ₹2,000`.
+
+  No card is created here. Payment then reuses `POST /orders/:id/payment` and its verify endpoint unchanged.
+
+  ## Not through the cart (G7)
+  `cart_items.productId` and `variantId` are both NOT NULL (`schema/cart.ts:115-121`) and the cart derives `lineTotal` from those rows, so it cannot express a customer-typed amount without dummy product and variant records — which would then have to be excluded by hand from listing, facets, search, the sitemap and the sale resolver.
+
+  Accepted cost: a gift card cannot be bought in the same checkout as a poster.
+
+  ## No shipping, no tax
+  No address is collected. `shippingCost` and `tax` stay `'0.00'`. A voucher is neither goods nor services, so the tax point is the redemption rather than the sale — recorded now so future tax work does not tax the voucher and then tax the poster it buys.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 3 — Purchase and delivery
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §5
+
+  Requires an authenticated user, as order creation already does.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T15:04:12.625Z'
+last_updated: '2026-08-06T15:04:12.625Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the purchase order
+    file: packages/api/tests/routes/gift-card-purchase.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-purchase.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('POST /api/gift-cards/purchase', () => {
+        it('creates a gift_card order for the chosen amount', async () => {
+          // assert: order.orderType === 'gift_card', total === '2000.00'
+        })
+
+        it('writes one order item with no product behind it', async () => {
+          // assert: single order_item, productId null, title contains 'Gift card'
+        })
+
+        it('charges no shipping and no tax on a voucher', async () => {
+          // assert: shippingCost '0.00', tax '0.00'
+        })
+
+        it('does not create the card yet', async () => {
+          // assert: no gift_card row exists for the order until payment is verified
+        })
+
+        it('records the purchase on the order so a scheduled card can be minted later', async () => {
+          // assert: order.giftCardPurchase carries amountPaise, recipient, sender,
+          //         message and sendAt
+        })
+
+        it('rejects an amount outside the bounds', async () => {
+          // assert: 400 for 100 paise and for 99_000_000 paise
+        })
+
+        it('rejects a send date more than a year out', async () => {
+          // assert: 400
+        })
+
+        it('requires an account', async () => {
+          // assert: 401 unauthenticated
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-purchase.test.ts
+    expected_result: FAIL - route not mounted
+    status: pending
+  - id: 3
+    action: implement
+    description: Write the purchase route and mount it
+    file: packages/api/src/routes/gift-cards.ts
+    status: pending
+    code: |-
+      // POST /purchase — creates the order only. The card is minted on payment
+      // verification (see the mint ticket): minting here would let an abandoned
+      // checkout create spendable money.
+
+      const input = c.req.valid('json') // giftCardPurchaseInputSchema
+      const amountRupees = (input.amountPaise / 100).toFixed(2)
+
+      const order = await db.transaction(async (tx) => {
+        const [created] = await tx.insert(orders).values({
+          orderNumber: await generateOrderNumber(),
+          userId: user.id,
+          status: 'pending',
+          paymentStatus: 'pending',
+          orderType: 'gift_card',
+          // A voucher ships nothing and is taxed at redemption, not at sale.
+          shippingMethod: null,
+          shippingCost: '0.00',
+          tax: '0.00',
+          subtotal: amountRupees,
+          discount: '0.00',
+          total: amountRupees,
+          itemCount: 1,
+          currency: 'INR',
+          /**
+           * The purchase lives here until the card exists. A scheduled card is
+           * not minted at payment time (its code could never be recovered for
+           * the email months later), so the recipient details need a home
+           * between purchase and delivery, and the order is where the purchase
+           * already is.
+           */
+          giftCardPurchase: {
+            amountPaise: input.amountPaise,
+            recipientEmail: input.recipientEmail,
+            recipientName: input.recipientName,
+            senderName: input.senderName,
+            message: input.message ?? null,
+            sendAt: input.sendAt?.toISOString() ?? null,
+          },
+        }).returning()
+
+        await tx.insert(orderItems).values({
+          orderId: created.id,
+          productId: null, // already nullable at schema/orders.ts:236
+          title: `Gift card — ₹${(input.amountPaise / 100).toLocaleString('en-IN')}`,
+          quantity: 1,
+          unitPrice: amountRupees,
+          lineTotal: amountRupees,
+        })
+
+        return created
+      })
+
+      // The recipient details are needed at mint time. Stash them on the order's
+      // metadata rather than inventing a pending-card row that could be orphaned.
+      return c.json({ orderId: order.id, orderNumber: order.orderNumber, total: order.total })
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-purchase.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the purchase route
+    command: 'git add packages/api/src/routes/gift-cards.ts packages/api/src/routes/index.ts packages/api/tests/routes/gift-card-purchase.test.ts && git commit -m "feat(api): buy a gift card through its own order flow"'
+    status: pending
+current_step: 1

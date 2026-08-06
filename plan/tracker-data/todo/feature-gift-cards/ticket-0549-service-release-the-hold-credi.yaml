@@ -1,0 +1,217 @@
+ticket_number: 549
+title: Service - release the hold, credit refunds, and cap them per order
+description: |-
+  ## Task
+  `voidGiftCardHold(tx, orderId)` and `refundToGiftCards(tx, orderId, giftCardLegPaise)` in `services/gift-card.ts`.
+
+  ## The hold must be released
+  Balance is held from payment initiation until the order resolves — a genuine authorization hold. When an order is cancelled or payment fails, every `order_gift_card` amount is credited back with a `void` ledger row and `orders.giftCardAmount` is cleared. Without this path an abandoned checkout silently eats the customer's balance, and nobody reports it because it looks like the card was already spent.
+
+  ## Refunds are capped, per order, per card
+  `order_gift_card` records what was applied and is **never mutated by a refund**. So cumulative `refund` ledger rows for a `(orderId, giftCardId)` pair must never exceed that row's `amountPaise`. Without the check, two partial refunds credit back more than the card ever paid — minting balance out of a rounding argument.
+
+  ## Splitting across several cards
+  Each card gets `round(giftCardLeg × cardAmount / totalGiftCardAmount)`, and the last card in a stable order by `giftCardId` absorbs the remainder, so the parts sum to exactly the leg. Rounding each independently loses or invents paise.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 2 — Code and service
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §7, §8
+
+  A disabled card still receives its refund credit. It is the customer's money; re-enabling is a separate admin decision.
+feature: gift-cards
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T15:04:12.587Z'
+last_updated: '2026-08-06T15:04:12.587Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for release, refund credit and the cap
+    file: packages/api/tests/services/gift-card-refund.test.ts
+    command: cd packages/api && bunx vitest run tests/services/gift-card-refund.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('voidGiftCardHold', () => {
+        it('returns the held balance when an order is cancelled', async () => {
+          // card debited 30000 for an order, then cancelled
+          // assert: balance restored, void ledger row written, orders.giftCardAmount '0.00'
+        })
+
+        it('is idempotent — cancelling twice credits once', async () => {
+          // assert: exactly one void row, balance restored once
+        })
+      })
+
+      describe('refundToGiftCards', () => {
+        it('credits the card that paid', async () => {
+          // assert: refund ledger row, balance increased, balanceAfterPaise correct
+        })
+
+        it('splits across two cards so the parts sum to exactly the leg', async () => {
+          // cards paid 33333 and 66667 of 100000; refund leg 33333
+          // assert: parts sum to 33333 exactly, no paise invented or lost
+        })
+
+        it('refuses to credit a card more than it paid on that order', async () => {
+          // card paid 30000; refund 20000, then attempt 20000 more
+          // assert: second call throws; cumulative credit never exceeds 30000
+        })
+
+        it('credits a disabled card — it is still the customer money', async () => {
+          // assert: balance increases even though disabledAt is set
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/services/gift-card-refund.test.ts
+    expected_result: FAIL - voidGiftCardHold is not exported
+    status: pending
+  - id: 3
+    action: implement
+    description: Write release, refund credit and the per-order cap
+    file: packages/api/src/services/gift-card.ts
+    status: pending
+    code: |-
+      /**
+       * Releases balance held for an order that never completed.
+       *
+       * Payment initiation debits the card; if the customer walks away or the order
+       * is cancelled, that money has to come back. Skipping this path loses
+       * customer balance silently — it looks identical to a card that was spent.
+       */
+      export async function voidGiftCardHold(tx: any, orderId: string): Promise<number> {
+        const applications = await tx.select().from(orderGiftCards).where(eq(orderGiftCards.orderId, orderId))
+        if (applications.length === 0) return 0
+
+        let released = 0
+        for (const application of applications) {
+          const [card] = await tx.execute(sql`
+            SELECT id, balance_paise FROM gift_card WHERE id = ${application.giftCardId} FOR UPDATE
+          `).then((r: any) => r.rows)
+
+          const balanceAfter = Number(card.balance_paise) + application.amountPaise
+          await tx.update(giftCards)
+            .set({ balancePaise: balanceAfter, updatedAt: new Date() })
+            .where(eq(giftCards.id, application.giftCardId))
+
+          await tx.insert(giftCardTransactions).values({
+            giftCardId: application.giftCardId,
+            type: 'void',
+            amountPaise: application.amountPaise,
+            balanceAfterPaise: balanceAfter,
+            orderId,
+            description: 'Hold released — order did not complete',
+          })
+          released += application.amountPaise
+        }
+
+        // Deleting the applications is what makes this idempotent: a second call
+        // finds nothing to release.
+        await tx.delete(orderGiftCards).where(eq(orderGiftCards.orderId, orderId))
+        await tx.update(orders).set({ giftCardAmount: '0.00' }).where(eq(orders.id, orderId))
+
+        return released
+      }
+
+      /**
+       * Credits a refund back to the cards that paid for the order.
+       *
+       * `order_gift_card` is never mutated here — it is the permanent record of
+       * what was applied, and the cap below is measured against it.
+       */
+      export async function refundToGiftCards(
+        tx: any,
+        orderId: string,
+        giftCardLegPaise: number,
+      ): Promise<Array<{ giftCardId: string; amountPaise: number }>> {
+        if (giftCardLegPaise <= 0) return []
+
+        const applications = await tx.select().from(orderGiftCards)
+          .where(eq(orderGiftCards.orderId, orderId))
+          .orderBy(orderGiftCards.giftCardId) // stable order so the remainder lands predictably
+
+        const totalApplied = applications.reduce((sum: number, a: any) => sum + a.amountPaise, 0)
+        if (totalApplied === 0) return []
+
+        const results = []
+        let allocated = 0
+
+        for (const [index, application] of applications.entries()) {
+          const isLast = index === applications.length - 1
+          // The last card absorbs the remainder so the parts sum to exactly the
+          // leg. Rounding each share independently loses or invents paise.
+          const share = isLast
+            ? giftCardLegPaise - allocated
+            : Math.round((giftCardLegPaise * application.amountPaise) / totalApplied)
+          if (share <= 0) continue
+
+          // Cap against what this card actually paid on THIS order. Two partial
+          // refunds must not add up to more than the card contributed — that would
+          // mint balance out of nothing.
+          const [{ credited }] = await tx.execute(sql`
+            SELECT COALESCE(SUM(amount_paise), 0)::int AS credited
+            FROM gift_card_transaction
+            WHERE gift_card_id = ${application.giftCardId}
+              AND order_id = ${orderId}
+              AND type = 'refund'
+          `).then((r: any) => r.rows)
+
+          if (credited + share > application.amountPaise) {
+            throw new GiftCardError('Refund would exceed what this gift card paid on the order')
+          }
+
+          const [card] = await tx.execute(sql`
+            SELECT id, balance_paise FROM gift_card WHERE id = ${application.giftCardId} FOR UPDATE
+          `).then((r: any) => r.rows)
+
+          const balanceAfter = Number(card.balance_paise) + share
+          await tx.update(giftCards)
+            .set({ balancePaise: balanceAfter, updatedAt: new Date() })
+            .where(eq(giftCards.id, application.giftCardId))
+
+          await tx.insert(giftCardTransactions).values({
+            giftCardId: application.giftCardId,
+            type: 'refund',
+            amountPaise: share,
+            balanceAfterPaise: balanceAfter,
+            orderId,
+            description: 'Refunded from order',
+          })
+
+          results.push({ giftCardId: application.giftCardId, amountPaise: share })
+          allocated += share
+        }
+
+        return results
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/services/gift-card-refund.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit release and refund credit
+    command: 'git add packages/api/src/services/gift-card.ts packages/api/tests/services/gift-card-refund.test.ts && git commit -m "feat(api): release gift card holds and credit capped refunds"'
+    status: pending
+current_step: 1

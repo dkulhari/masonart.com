@@ -35,7 +35,13 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "548": Service - redeem under a row lock, with clamp and idempotency
+    "549": Service - release the hold, credit refunds, and cap them per order
+    "550": API - POST /api/gift-cards/purchase creates the gift card order
+    "551": API - mint the card on payment verification
+    "552": Service - scheduled delivery sweep and the gift card email
+    "553": Schema - unique purchaseOrderId and orders.giftCardPurchase
   in_progress: {}
   done:
     "511": Schema - gift_card, gift_card_transaction and order_gift_card tables
@@ -43,6 +49,6 @@ tickets:
     "513": Schema - shared Zod schemas and types for gift cards
     "514": Lib - gift card code generation, normalization and hashing
     "515": Service - issue a gift card and write its ledger row
-total_tickets: 5
-completion_percentage: 100
+total_tickets: 11
+completion_percentage: 45
 is_completed: false

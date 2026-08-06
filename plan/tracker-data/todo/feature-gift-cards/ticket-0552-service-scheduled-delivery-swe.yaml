@@ -1,0 +1,197 @@
+ticket_number: 552
+title: Service - scheduled delivery sweep and the gift card email
+description: |-
+  ## Task
+  New `packages/api/src/services/gift-card-delivery.ts` plus a template in `services/email-templates.ts`.
+
+  The sweep finds cards where `sendAt <= now` and `sentAt is null`, sends each, and stamps `sentAt`. Uses the `setInterval` pattern of `services/approval-deadline.ts:231-253` — the repo already chose that over BullMQ, and a second scheduling story would be worse than reusing the first.
+
+  ## The sweep mints the card, then sends it
+  Under G5 only the hash is stored, so the plaintext code exists exactly once — in the return value of `issueGiftCard()`. A card minted in March for a June send date has **no recoverable code in June**. So minting and sending are the same event: the sweep selects paid `gift_card` orders whose `giftCardPurchase.sendAt` has arrived and which have no card yet, mints, then emails.
+
+  Until then the purchase lives on `orders.giftCardPurchase`. The order is paid and the customer has a receipt; the instrument simply does not exist yet.
+
+  ## The unique constraint is the idempotency guard, not sentAt
+  `gift_card.purchaseOrderId` is UNIQUE. Two sweep workers, or a sweep racing a retried payment verification, both attempt the insert — exactly one wins and the loser catches a unique violation and stops. A read-then-write "does a card exist yet" check races in precisely the window that matters.
+
+  If the email fails after a successful mint, the card exists and is unsent: recoverable by hand from the admin screen, and strictly better than a customer holding two codes for one balance.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 3 — Purchase and delivery
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §6
+
+  Scheduling is capped at one year out by the shared schema.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T15:04:12.671Z'
+last_updated: '2026-08-06T15:04:12.671Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the sweep
+    file: packages/api/tests/services/gift-card-delivery.test.ts
+    command: cd packages/api && bunx vitest run tests/services/gift-card-delivery.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('delivery sweep', () => {
+        it('mints and sends when the send date has arrived', async () => {
+          // paid gift_card order, giftCardPurchase.sendAt in the past, no card yet
+          // assert: gift_card row created, email dispatched, sentAt stamped
+        })
+
+        it('leaves a future-dated purchase alone', async () => {
+          // assert: no gift_card row, no email
+        })
+
+        it('ignores an unpaid order however old its send date', async () => {
+          // assert: no card is minted for an abandoned checkout
+        })
+
+        it('mints once — a second sweep creates no second card', async () => {
+          // run the sweep twice
+          // assert: exactly one gift_card row for the order, one email
+        })
+
+        it('survives losing the race to a concurrent worker', async () => {
+          // two sweeps against the same order concurrently
+          // assert: one card, one email, no unhandled unique violation
+        })
+
+        it('leaves a minted-but-unsent card when the email fails', async () => {
+          // make sendGiftCardEmail throw
+          // assert: card exists, sentAt null, no crash — recoverable from admin
+        })
+
+        it('keeps going when one card fails to send', async () => {
+          // assert: the other purchases in the batch are still delivered
+        })
+
+        it('never logs the code', async () => {
+          // spy on the logger; assert no argument contains the plaintext
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/services/gift-card-delivery.test.ts
+    expected_result: FAIL - cannot resolve ../../src/services/gift-card-delivery
+    status: pending
+    code: ''
+  - id: 3
+    action: implement
+    description: Write the sweep that mints then sends
+    file: packages/api/src/services/gift-card-delivery.ts
+    status: pending
+    code: |-
+      /**
+       * Mints and delivers scheduled gift cards.
+       *
+       * Minting happens HERE, not at payment time: the plaintext code is
+       * returned once by issueGiftCard() and never stored (G5), so a card
+       * created months before its send date could never be emailed.
+       *
+       * setInterval rather than BullMQ, matching services/approval-deadline.ts:251.
+       * The repo already made that tradeoff; a second scheduling story costs
+       * more than it buys.
+       */
+      export async function sweepScheduledGiftCards(now = new Date()): Promise<number> {
+        // Paid gift card orders whose send date has arrived and which have no
+        // card yet. The LEFT JOIN is the cheap filter; the unique constraint
+        // on purchase_order_id is the correctness guarantee.
+        const due = await db.execute(sql`
+          SELECT o.id, o.gift_card_purchase
+          FROM orders o
+          LEFT JOIN gift_card g ON g.purchase_order_id = o.id
+          WHERE o.order_type = 'gift_card'
+            AND o.payment_status = 'paid'
+            AND g.id IS NULL
+            AND (o.gift_card_purchase ->> 'sendAt')::timestamptz <= ${now}
+          LIMIT 100
+        `)
+
+        let sent = 0
+        for (const row of due.rows) {
+          const purchase = row.gift_card_purchase as GiftCardPurchase
+
+          try {
+            // The unique constraint on purchase_order_id is what makes this
+            // safe. Two workers racing, or a sweep racing a retried payment
+            // verification, both reach this line; exactly one insert survives.
+            // Reading "does a card exist yet" before writing would race in
+            // precisely the window that matters.
+            const { card, code } = await issueGiftCard({
+              amountPaise: purchase.amountPaise,
+              purchaseOrderId: row.id,
+              recipientEmail: purchase.recipientEmail,
+              recipientName: purchase.recipientName,
+              senderName: purchase.senderName,
+              message: purchase.message,
+              sendAt: new Date(purchase.sendAt),
+              description: 'Scheduled gift card delivered',
+            })
+
+            await sendGiftCardEmail(card, code)
+            await db.update(giftCards)
+              .set({ sentAt: new Date() })
+              .where(eq(giftCards.id, card.id))
+            sent++
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            // Lost the race to another worker. Nothing to do.
+            if (message.includes('gift_card_purchase_order_id')) continue
+
+            // Minted but unsent is recoverable from the admin screen, and one
+            // bad address must not stall the batch. The code is never logged.
+            logger.error({ orderId: row.id }, 'Gift card delivery failed')
+          }
+        }
+        return sent
+      }
+
+      export function startGiftCardDeliveryScheduler(intervalMs = 5 * 60 * 1000) {
+        return setInterval(() => {
+          sweepScheduledGiftCards().catch((error) => {
+            logger.error({ err: error }, 'Gift card delivery sweep failed')
+          })
+        }, intervalMs)
+      }
+  - id: 4
+    action: implement
+    description: Add the delivery email template
+    file: packages/api/src/services/email-templates.ts
+    status: pending
+    code: |-
+      // giftCardTemplate({ code, amountRupees, senderName, recipientName, message })
+      // The code appears here and nowhere else in the system — it is not stored,
+      // not logged, and cannot be resent. Support reissues instead.
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/services/gift-card-delivery.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit delivery
+    command: 'git add packages/api/src/services/gift-card-delivery.ts packages/api/src/services/email-templates.ts packages/api/tests/services/gift-card-delivery.test.ts && git commit -m "feat(api): scheduled gift card delivery sweep"'
+    status: pending
+current_step: 1
