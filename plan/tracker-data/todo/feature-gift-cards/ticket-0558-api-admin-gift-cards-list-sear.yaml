@@ -1,0 +1,123 @@
+ticket_number: 558
+title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+description: |-
+  ## Task
+  New `packages/api/src/routes/admin/gift-cards.ts`, admin-only.
+
+  - `GET /` — paginated list with derived status, balance, recipient, purchase order link
+  - `GET /?q=` — search by full code (hashed, then looked up) or by last four (indexed column)
+  - `GET /:id` — card plus its full ledger
+  - `POST /` — issue a card. **Returns the plaintext code once**, in this response and never again
+  - `POST /:id/disable` and `/:id/enable` — toggle `disabledAt`; rows are never deleted
+  - `POST /:id/adjust` — balance correction with a mandatory reason, mirroring `adjustWalletBalance` (`services/wallet.ts:652`)
+  - `GET /liability` — total outstanding balance
+
+  ## The liability figure is the point of the whole screen
+  Unredeemed gift cards are money the business owes. That question currently has no answer at all. `SELECT SUM(balance_paise)` over non-disabled cards.
+
+  ## No response may carry a full code
+  Except the one-time issue response. Search by code takes a code in and returns a card — it must not echo it back.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 6 — Admin
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §9
+
+  An adjustment without a reason is unauditable; make it required at the schema, not the UI.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:33:27.090Z'
+last_updated: '2026-08-06T16:33:27.090Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the admin endpoints
+    file: packages/api/tests/routes/admin/gift-cards.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/gift-cards.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('admin gift cards', () => {
+        it('lists cards with derived status', async () => {
+          // active / spent / disabled / expired, computed not stored
+        })
+
+        it('finds a card by its full code', async () => {
+          // hashed, then looked up
+        })
+
+        it('finds a card by its last four', async () => {})
+
+        it('never echoes a full code back in search', async () => {
+          // assert: response contains no 16-char token
+        })
+
+        it('returns the plaintext code exactly once, when issuing', async () => {
+          // assert: present in the issue response, absent from every later GET
+        })
+
+        it('disables and re-enables without deleting', async () => {})
+
+        it('refuses an adjustment with no reason', async () => {
+          // assert: 400; an unexplained balance change is unauditable
+        })
+
+        it('reports total outstanding liability', async () => {
+          // assert: sum of non-disabled balances
+        })
+
+        it('refuses a non-admin', async () => {
+          // assert: 403
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin/gift-cards.test.ts
+    expected_result: FAIL - route not mounted
+    status: pending
+  - id: 3
+    action: implement
+    description: Write the admin routes
+    file: packages/api/src/routes/admin/gift-cards.ts
+    status: pending
+    code: |-
+      // Search accepts either form. A full code is hashed and looked up; the last
+      // four hits the indexed column. Neither echoes a code back.
+      const where = looksLikeFullCode(q)
+        ? eq(giftCards.codeHash, hashGiftCardCode(q))
+        : eq(giftCards.codeLast4, q.toUpperCase())
+
+      // Liability: what the business owes in unredeemed cards. Disabled cards are
+      // excluded — they cannot be spent.
+      const [{ liabilityPaise }] = await db
+        .select({ liabilityPaise: sql<number>`COALESCE(SUM(balance_paise), 0)::int` })
+        .from(giftCards)
+        .where(isNull(giftCards.disabledAt))
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/gift-cards.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the admin API
+    command: 'git add packages/api/src/routes/admin/gift-cards.ts packages/api/tests/routes/admin/gift-cards.test.ts && git commit -m "feat(api): admin gift card management and outstanding liability"'
+    status: pending
+current_step: 1

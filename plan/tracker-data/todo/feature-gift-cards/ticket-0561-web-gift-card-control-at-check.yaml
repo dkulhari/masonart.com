@@ -1,0 +1,96 @@
+ticket_number: 561
+title: Web - gift card control at checkout and the amount-due line
+description: |-
+  ## Task
+  In `packages/web/app/components/checkout/OrderSummary.tsx`: a gift card code input, the list of applied cards with a remove action, and an **Amount due** line showing total minus gift cards.
+
+  Applying a code calls the quote endpoint (#gc-11) and shows what it would cover. The codes are sent with payment initiation (#gc-12), which is where the debit actually happens.
+
+  ## Its own control, not the coupon box
+  `OrderSummary.tsx:201` already contains a complete coupon input that never renders, because no caller passes `onApplyCoupon`. Leave it dormant. There are no coupon codes in this system (sale-promotions D1), so labelling one box for both would promise something that does not exist.
+
+  ## Show the tender as tender
+  Gift cards must not appear in the discount rows. The line reads as a payment against the total, below tax — the same place it sits in the money path. A customer who sees it as a discount will expect it to change the price on the invoice.
+
+  When cards cover the whole total, the pay button says so and the flow skips the payment gateway.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 7 — Storefront
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §7, §10
+feature: gift-cards
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:34:35.631Z'
+last_updated: '2026-08-06T16:34:35.631Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 554
+    feature: gift-cards
+    description: API - gift card quote and balance endpoints, rate limited
+  - ticket: 555
+    feature: gift-cards
+    description: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the checkout control
+    file: packages/web/tests/components/checkout/GiftCardControl.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/checkout/GiftCardControl.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('gift card at checkout', () => {
+        it('shows what an applied card would cover', async () => {})
+        it('lists applied cards by last four and allows removing one', async () => {})
+        it('shows an amount due of total minus gift cards', async () => {})
+        it('renders the gift card as tender, not among the discount rows', async () => {
+          // a customer who reads it as a discount expects the invoice price to change
+        })
+        it('tells the buyer no payment is needed when cards cover the total', async () => {})
+        it('shows one message for unknown, disabled and expired codes', async () => {})
+        it('leaves the dormant coupon input dormant', async () => {
+          // no caller passes onApplyCoupon; there are no coupon codes in this system
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/components/checkout/GiftCardControl.test.tsx
+    expected_result: FAIL - control does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the control and the amount-due line
+    file: packages/web/app/components/checkout/OrderSummary.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/components/checkout/GiftCardControl.test.tsx
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the existing checkout suites still pass
+    command: cd packages/web && bunx vitest run tests/components/checkout
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the checkout control
+    command: 'git add packages/web/app/components/checkout packages/web/tests/components/checkout/GiftCardControl.test.tsx && git commit -m "feat(web): apply gift cards at checkout"'
+    status: pending
+current_step: 1

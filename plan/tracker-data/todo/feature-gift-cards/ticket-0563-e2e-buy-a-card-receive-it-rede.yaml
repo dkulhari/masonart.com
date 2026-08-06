@@ -1,0 +1,90 @@
+ticket_number: 563
+title: E2E - buy a card, receive it, redeem part, spend the remainder
+description: |-
+  ## Task
+  One Playwright journey in `tests/e2e/gift-cards.spec.ts` covering the whole instrument:
+
+  1. buy a gift card at `/gift-cards`, pay through the test gateway
+  2. read the code from the captured delivery email
+  3. apply it at checkout on a poster order — assert the amount due drops and the invoice price does not
+  4. complete that order
+  5. start a second order and spend the remainder — assert the balance carried over
+
+  ## The assertion that matters most
+  After step 3, **the item prices must be unchanged**. A gift card is tender: it reduces what is charged, not what things cost. If the poster's price moved, the card has been implemented as a discount and the tax and reporting behind it are wrong.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 8 — E2E
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §11
+
+  Seed data gains a gift card fixture. Scope selectors for mobile and desktop — the same test ids exist in both trees.
+feature: gift-cards
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:34:35.648Z'
+last_updated: '2026-08-06T16:34:35.648Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the end-to-end journey
+    file: tests/e2e/gift-cards.spec.ts
+    command: bunx playwright test tests/e2e/gift-cards.spec.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      test('a gift card is bought, delivered, and spent across two orders', async ({ page }) => {
+        // 1. buy at /gift-cards and pay
+        // 2. read the code out of the captured email
+        // 3. apply at checkout on a poster order
+        //    ASSERT: amount due falls by the card amount
+        //    ASSERT: the poster's price is unchanged — tender, not a discount
+        // 4. complete the order
+        // 5. second order spends the remainder
+        //    ASSERT: balance carried over correctly
+      })
+
+      test('a fully covered order never reaches the payment gateway', async ({ page }) => {
+        // ASSERT: no gateway request; order lands paid
+      })
+
+      test('a dead code is refused with one generic message', async ({ page }) => {
+        // ASSERT: same copy for unknown and disabled
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the journey fails
+    command: bunx playwright test tests/e2e/gift-cards.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the gift card seed fixture
+    file: packages/api/src/database/seed.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the journey passes
+    command: bunx playwright test tests/e2e/gift-cards.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the E2E journey
+    command: 'git add tests/e2e/gift-cards.spec.ts packages/api/src/database/seed.ts && git commit -m "test(e2e): gift card purchase through redemption"'
+    status: pending
+current_step: 1

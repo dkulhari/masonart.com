@@ -1,0 +1,103 @@
+ticket_number: 559
+title: Admin UI - /admin/gift-cards list, detail and issue form
+description: |-
+  ## Task
+  Three screens under `packages/web/app/routes/admin`, on the admin API from #gc-15.
+
+  - **List** — last four, initial and current balance, derived status badge, recipient, purchase order link, search box accepting a full code or last four. **Total outstanding liability sits at the top**, because that is the number nobody can currently answer.
+  - **Detail** — the card, its full ledger in date order, a disable/enable toggle, and a balance adjustment form with a required reason.
+  - **Issue form** — amount, optional recipient and message. On success the generated code is shown **once**, with an explicit warning that it cannot be retrieved again.
+
+  ## The one-time code display is the whole UX risk
+  Only the hash is stored. An admin who closes that dialog without copying the code has lost it, and the recovery is to disable the card and issue a replacement. Say so on the screen, plainly, next to the code — not in a tooltip.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 6 — Admin
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §9
+
+  Follow the existing admin route and table patterns; do not introduce a new table component.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:34:35.614Z'
+last_updated: '2026-08-06T16:34:35.614Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 558
+    feature: gift-cards
+    description: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing component tests for the list and issue flow
+    file: packages/web/tests/routes/admin/gift-cards.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/admin/gift-cards.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('admin gift cards list', () => {
+        it('shows total outstanding liability', async () => {})
+        it('renders a derived status badge per card', async () => {})
+        it('never renders a full code', async () => {
+          // assert: no 16-char token in the document
+        })
+      })
+
+      describe('issue form', () => {
+        it('shows the generated code once, with a warning it cannot be retrieved', async () => {
+          // assert: the warning text is present alongside the code, not hidden
+        })
+        it('does not show the code again after the dialog is dismissed', async () => {})
+        it('requires a reason before submitting an adjustment', async () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/routes/admin/gift-cards.test.tsx
+    expected_result: FAIL - route does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the list route with the liability header and search
+    file: packages/web/app/routes/admin/gift-cards/index.tsx
+    status: pending
+  - id: 4
+    action: implement
+    description: Build the detail route with ledger, toggle and adjustment
+    file: packages/web/app/routes/admin/gift-cards/$id.tsx
+    status: pending
+  - id: 5
+    action: implement
+    description: Build the issue form with the one-time code display
+    file: packages/web/app/components/admin/IssueGiftCardDialog.tsx
+    status: pending
+    code: |-
+      // The code is shown once and cannot be recovered — only its hash is stored.
+      // This warning goes next to the code in plain sight, not in a tooltip: an
+      // admin who closes this without copying has to disable the card and issue a
+      // replacement.
+  - id: 6
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/routes/admin/gift-cards.test.tsx
+    expected_result: PASS
+    status: pending
+  - id: 7
+    action: commit
+    description: Commit the admin screens
+    command: 'git add packages/web/app/routes/admin/gift-cards packages/web/app/components/admin/IssueGiftCardDialog.tsx packages/web/tests/routes/admin/gift-cards.test.tsx && git commit -m "feat(web): admin gift card screens"'
+    status: pending
+current_step: 1

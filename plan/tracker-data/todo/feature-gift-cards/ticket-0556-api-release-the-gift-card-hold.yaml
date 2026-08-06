@@ -1,0 +1,109 @@
+ticket_number: 556
+title: API - release the gift card hold when an order is cancelled or payment fails
+description: |-
+  ## Task
+  Call `voidGiftCardHold()` (#549) from every path that ends an unpaid order:
+
+  - admin status transition to `cancelled` (`routes/admin/orders.ts:623`)
+  - payment verification failure (`routes/orders.ts`, the branch that sets `payment_failed`)
+  - any customer-facing cancel, if one exists
+
+  ## Why this is not optional
+  Balance is held from payment initiation. Without a release path, an abandoned or cancelled checkout eats the customer's balance permanently — and nobody reports it, because a card with less money on it looks exactly like a card that was spent. It is the kind of bug that is only ever found by a customer who kept a receipt.
+
+  `voidGiftCardHold` is already idempotent: it deletes the applications it credits back, so a second cancellation finds nothing to release.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 4 — Redemption
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §7
+
+  Run it inside whatever transaction the cancel already uses, so a failed cancel does not credit the card.
+feature: gift-cards
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:33:26.993Z'
+last_updated: '2026-08-06T16:33:26.993Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 555
+    feature: gift-cards
+    description: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the release paths
+    file: packages/api/tests/routes/gift-card-release.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-release.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('releasing a gift card hold', () => {
+        it('returns the balance when an admin cancels the order', async () => {
+          // assert: balance restored, void ledger row, giftCardAmount '0.00'
+        })
+
+        it('returns the balance when payment verification fails', async () => {
+          // assert: same, via the payment_failed branch
+        })
+
+        it('does not release a paid order', async () => {
+          // a refund is not a release; the money moved for a reason
+        })
+
+        it('is safe to cancel twice', async () => {
+          // assert: one void ledger row, balance credited once
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-release.test.ts
+    expected_result: FAIL - the hold is never released
+    status: pending
+  - id: 3
+    action: implement
+    description: Release on admin cancellation
+    file: packages/api/src/routes/admin/orders.ts
+    status: pending
+    code: |-
+      // Where the status transitions to 'cancelled' (~line 623), inside the same
+      // transaction: a failed cancel must not credit the card.
+
+      if (input.status === 'cancelled' && order.paymentStatus !== 'paid') {
+        // Held balance goes back. Without this the customer silently loses it —
+        // and a card with less money on it looks exactly like one that was spent.
+        await voidGiftCardHold(tx, order.id)
+      }
+  - id: 4
+    action: implement
+    description: Release when payment verification fails
+    file: packages/api/src/routes/orders.ts
+    status: pending
+    code: |-
+      // In the branch that marks the order payment_failed:
+      await db.transaction((tx) => voidGiftCardHold(tx, order.id))
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-release.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the release paths
+    command: 'git add packages/api/src/routes/orders.ts packages/api/src/routes/admin/orders.ts packages/api/tests/routes/gift-card-release.test.ts && git commit -m "feat(api): release gift card holds when an order ends unpaid"'
+    status: pending
+current_step: 1

@@ -1,0 +1,137 @@
+ticket_number: 557
+title: API - split refunds proportionally across tender and cards
+description: |-
+  ## Task
+  Rewrite the refund handler at `routes/admin/orders.ts:955-1010` to split a refund between Razorpay and the gift cards that paid.
+
+  **All arithmetic in paise.** `refundAmount` arrives as a float in rupees (`admin/orders.ts:971`); splitting a float is how a rupee goes missing.
+
+  ```
+  giftCardLeg = round(X × G / T)
+  razorpayLeg = X − giftCardLeg      // subtracted, never rounded independently
+  ```
+
+  Subtracting the second leg guarantees the two sum to exactly X. `refundToGiftCards()` (#549) then splits the gift card leg across cards and enforces the per-`(order, card)` cap.
+
+  ## Two current behaviours must change
+  - **`admin/orders.ts:967`** returns 400 `"Payment ID not found for this order"` when `paymentDetails.paymentId` is absent. That is now a legitimate state — gift cards covered the whole order — and must skip the Razorpay leg rather than failing.
+  - **`admin/orders.ts:974`** guards only `refundAmount > order.total`. It must additionally never let the Razorpay leg exceed what Razorpay actually captured, which is `total − giftCardAmount`.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 5 — Refunds
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §8
+
+  Order the two legs so a Razorpay failure does not leave the gift card already credited.
+feature: gift-cards
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:33:27.013Z'
+last_updated: '2026-08-06T16:33:27.013Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the split
+    file: packages/api/tests/routes/admin-gift-card-refund.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin-gift-card-refund.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('refunding an order paid partly by gift card', () => {
+        it('splits proportionally by tender', async () => {
+          // total 1000, card paid 400, refund 500 -> card 200, razorpay 300
+        })
+
+        it('makes the two legs sum to exactly the refund', async () => {
+          // awkward ratio; assert giftCardLeg + razorpayLeg === refund, to the paisa
+        })
+
+        it('refunds a fully gift-card-paid order with no paymentId', async () => {
+          // currently 400s at admin/orders.ts:967 — must succeed and skip Razorpay
+        })
+
+        it('never asks Razorpay for more than it captured', async () => {
+          // assert: razorpayLeg <= total - giftCardAmount
+        })
+
+        it('rejects a refund larger than the order total', async () => {
+          // existing guard still holds
+        })
+
+        it('does not credit the card when the Razorpay leg fails', async () => {
+          // assert: card balance unchanged
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin-gift-card-refund.test.ts
+    expected_result: FAIL - refund assumes one Razorpay payment covers the total
+    status: pending
+  - id: 3
+    action: implement
+    description: Split the refund across tenders
+    file: packages/api/src/routes/admin/orders.ts
+    status: pending
+    code: |-
+      // Everything in paise: refundAmount arrives as a float in rupees, and
+      // splitting a float is how a rupee goes missing.
+      const refundPaise = Math.round(refundAmount * 100)
+      const totalPaise = toPaise(order.total)
+      const giftCardPaise = toPaise(order.giftCardAmount)
+      const capturedPaise = totalPaise - giftCardPaise
+
+      const giftCardLeg = Math.round((refundPaise * giftCardPaise) / totalPaise)
+      // Subtracted, never rounded independently, so the legs sum to exactly the
+      // refund.
+      const razorpayLeg = refundPaise - giftCardLeg
+
+      if (razorpayLeg > capturedPaise) {
+        return c.json({ error: 'Refund exceeds the amount captured by the payment gateway' }, 400)
+      }
+
+      // Razorpay first: if it fails the transaction rolls back and the card was
+      // never credited.
+      if (razorpayLeg > 0) {
+        if (!paymentDetails?.paymentId) {
+          return c.json({ error: 'Payment ID not found for this order' }, 400)
+        }
+        await createRefund({ paymentId: paymentDetails.paymentId, amount: razorpayLeg, notes: { reason } })
+      }
+
+      // A missing paymentId is legitimate when gift cards covered everything.
+      if (giftCardLeg > 0) {
+        await db.transaction((tx) => refundToGiftCards(tx, order.id, giftCardLeg))
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin-gift-card-refund.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the existing admin order suites still pass
+    command: cd packages/api && bunx vitest run tests/routes/admin
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the refund split
+    command: 'git add packages/api/src/routes/admin/orders.ts packages/api/tests/routes/admin-gift-card-refund.test.ts && git commit -m "feat(api): split refunds between Razorpay and the gift cards that paid"'
+    status: pending
+current_step: 1

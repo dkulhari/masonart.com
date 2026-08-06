@@ -1,0 +1,155 @@
+ticket_number: 555
+title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+description: |-
+  ## Task
+  Wire `redeemGiftCards()` (#548) into `POST /orders/:id/payment` (`routes/orders.ts`). One transaction:
+
+  1. debit the cards under their row locks
+  2. set `orders.giftCardAmount`
+  3. create the Razorpay order for `toPaise(order.total) − giftCardAmountPaise`
+
+  All three or none. If Razorpay fails, the debit must roll back — otherwise the customer's balance is gone and they have no payment to show for it.
+
+  ## Full coverage skips Razorpay entirely
+  When the remainder is exactly zero there is no payment to create and nothing to verify. The same transaction marks the order paid and the endpoint returns `{ fullyCoveredByGiftCard: true }`. **Guarded on an exact zero, never a threshold** — a near-zero remainder is still a payment.
+
+  That path must also trigger gift card delivery if the order is itself a gift card purchase... it cannot be: a gift card order rejects gift card payment (below). But it does need whatever else payment verification does for a normal order.
+
+  ## Two rules
+  - **A gift card order cannot be paid with a gift card.** Reject when `orderType === 'gift_card'`. Without it, balance cycles between cards and every refund becomes a graph traversal.
+  - **Idempotent.** `orders.ts:679` returns an existing Razorpay order on a repeat call; `redeemGiftCards` already no-ops when applications exist, but the endpoint must not double-set `giftCardAmount` either.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 4 — Redemption
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §7
+
+  The codes arrive in the request body; they were quoted earlier by #gc-11 but the quote is advisory and is re-clamped inside the lock.
+feature: gift-cards
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:33:26.973Z'
+last_updated: '2026-08-06T16:33:26.973Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 554
+    feature: gift-cards
+    description: API - gift card quote and balance endpoints, rate limited
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the debit at payment initiation
+    file: packages/api/tests/routes/gift-card-payment.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-payment.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('POST /api/orders/:id/payment with gift cards', () => {
+        it('asks Razorpay only for the remainder', async () => {
+          // total 2000, card pays 500 -> razorpay amount 150000 paise
+        })
+
+        it('records the tender on the order', async () => {
+          // assert: orders.giftCardAmount === '500.00', order_gift_card row written
+        })
+
+        it('skips Razorpay entirely when cards cover the total', async () => {
+          // assert: fullyCoveredByGiftCard true, paymentStatus 'paid',
+          //         createRazorpayOrder never called
+        })
+
+        it('treats a one-paisa remainder as a payment, not full coverage', async () => {
+          // the guard is an exact zero, not a threshold
+        })
+
+        it('rolls the debit back when Razorpay fails', async () => {
+          // make createRazorpayOrder throw
+          // assert: card balance untouched, no order_gift_card row
+        })
+
+        it('refuses to pay for a gift card order with a gift card', async () => {
+          // assert: 400; otherwise balance cycles between cards
+        })
+
+        it('does not debit twice on a repeat call', async () => {
+          // assert: one redeem ledger row, giftCardAmount unchanged
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-payment.test.ts
+    expected_result: FAIL - gift cards are ignored at payment
+    status: pending
+  - id: 3
+    action: implement
+    description: Debit inside the payment transaction and handle full coverage
+    file: packages/api/src/routes/orders.ts
+    status: pending
+    code: |-
+      // Inside POST /:id/payment, before creating the Razorpay order.
+
+      if (order.orderType === 'gift_card' && codes.length > 0) {
+        // Paying for a gift card with a gift card cycles balance between
+        // instruments and turns every refund into a graph traversal.
+        return c.json({ error: 'A gift card cannot be bought with a gift card' }, 400)
+      }
+
+      const result = await db.transaction(async (tx) => {
+        const applied = await redeemGiftCards(tx, order.id, codes, toPaise(order.total), user.id)
+        const giftCardPaise = applied.reduce((sum, a) => sum + a.amountPaise, 0)
+        const remainder = toPaise(order.total) - giftCardPaise
+
+        await tx.update(orders)
+          .set({ giftCardAmount: (giftCardPaise / 100).toFixed(2), updatedAt: new Date() })
+          .where(eq(orders.id, order.id))
+
+        // Exactly zero, never a threshold: a one-paisa remainder is still a
+        // payment and still needs verifying.
+        if (remainder === 0) {
+          await tx.update(orders)
+            .set({ status: 'confirmed', paymentStatus: 'paid', paidAt: new Date() })
+            .where(eq(orders.id, order.id))
+          return { fullyCovered: true, remainder }
+        }
+
+        // Inside the transaction on purpose: if this throws, the debit rolls back
+        // and the customer keeps their balance.
+        const razorpayOrder = await createRazorpayOrder({
+          amount: remainder,
+          currency: order.currency,
+          receipt: order.id,
+        })
+        await tx.update(orders).set({ paymentDetails: { provider: 'razorpay', orderId: razorpayOrder.id } }).where(eq(orders.id, order.id))
+        return { fullyCovered: false, remainder, razorpayOrder }
+      })
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-payment.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm the existing order suites still pass
+    command: cd packages/api && bunx vitest run tests/routes/orders.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the debit at payment initiation
+    command: 'git add packages/api/src/routes/orders.ts packages/api/tests/routes/gift-card-payment.test.ts && git commit -m "feat(api): debit gift cards at payment initiation"'
+    status: pending
+current_step: 1

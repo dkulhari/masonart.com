@@ -13,7 +13,7 @@ status: in-progress
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T11:51:47.053Z'
-last_updated: '2026-08-06T14:21:36.926Z'
+last_updated: '2026-08-06T15:33:51.890Z'
 time_spent_minutes: 0
 labels:
   - home-page-parity
@@ -147,6 +147,153 @@ comments:
         api  image-processing mat/crop/seed-media suites: 38 passed (unchanged).
 
       New tests: tests/components/product/artFraming.test.ts (14), packages/api/tests/lib/image-processing-art-box.test.ts (10), plus framing/LCP cases on ProductCardMedia, the two trigger shapes on ChooseOptions, and LCP + band-padding cases on ProductRail. ProductCard.tokens.test.ts's "keeps the baked mat colour" assertion now asserts PLATE_BG and the absence of bg-mat, with the reason inline — the mat/plate split is the point, and --mat is still pinned to MAT_COLOR where that pairing belongs.
+  - author: mcp-client
+    timestamp: '2026-08-06T15:33:51.890Z'
+    text: |-
+      Fix round 2, after the second blind A/B loss (desktop + mobile). Still in-progress — needs a third blind A/B.
+
+      == THE DECISIVE MEASUREMENT, AND WHY ROUND 1 DID NOT FIX IT
+
+      Round 1 measured the artwork box and normalised its AREA. Both halves were wrong for this row.
+
+      1. `measureArtBox` measured where the composited PHOTO sits, which is correct only when the photograph is OF a canvas. Part of the catalogue is not. cosmic-harmony and paper-layers are pieces shot HANGING ON A NEAR-WHITE WALL, and that wall is inside the pixels: #F6F6F4 against a #FAFAFA mat, four levels apart, inside any colour tolerance that would not also eat real paint. So the card scaled the wall. cosmic-harmony measured 1.04:1 when the painting in it is 0.51:1.
+
+         That single fact is BOTH of the critic's round-2 headline findings. "Cards 3 and 4 are the same 0.52 portrait aspect yet render 115px and 157px wide" — card 3's box was the wall, not the piece. "A hard-edged bright rectangle sits inside that one tile" — same wall, newly visible because round 1 gave the plate a real colour.
+
+      2. Equal AREA gives an even ink-to-plate RATIO and an uneven ROW. At equal area a 1.02:1 piece is 233px across and a 1.96:1 piece is 304px. Round 1 reported 55/46/55/50 and called it even; the eye was reading 233/304/235/159.
+
+      == WHAT THE REFERENCE ACTUALLY DOES — measured, since the brief asked for proof rather than argument
+
+      Its Best Seller band, canvases measured off the full-page capture (plate 322x321):
+
+        card 1  260x255  1.02  padT 34 padB 32   long side 81% of the plate
+        card 2  260x255  1.02  padT 34 padB 32   81%
+        card 3  244x302  0.81  padT 10 padB  8   95%
+        card 4  233x311  0.75  padT  6 padB  3   97%
+
+      So: NOT a shared box — long sides 260/260/302/311, a 1.19x spread — and its areas (66.3k / 70.2k / 72.5k) fit equal-area at ~0.68 of the plate almost exactly. On its own numbers the reference normalises area, not box.
+
+      It gets away with that because its four aspects span 0.75 to 1.02. Ours span 0.35 to 1.96, where equal-area hits the max-side clamp and degenerates: the clamped pieces stop growing while the near-square ones keep going, so the rule silently stops applying to exactly the cards that need it. That is the failure mode above.
+
+      I also measured the reference's PLATE, which settles item 1: at the mid-height of its card 1 the plate reads rgb(239 239 239) continuously right up to the frame. Its photographs are matted to the same colour as its plate, so it never has a wall edge to hide. We cannot copy that without reprocessing every asset.
+
+      == 1. Framing — one shared image box, and the wall excluded
+
+      Both changes, because either alone leaves the row broken.
+
+      `measureArtBox` (packages/api/src/lib/image-processing.ts) gets a SECOND PASS. After the mat scan it peels light, flat, edge-free lines off each side until one of them holds a picture. Judged by DARKEST pixel, not by colour: a wall can be any light tone and cosmic-harmony's carries a gradient (246 at the top down to 225 at the foot), but it cannot contain a frame edge. Thresholds: p2 luminance >= 205, p98-p2 <= 30.
+
+        GUARD RAIL: full-bleed images leave the function BEFORE the trim. Every room mockup is a cropped photograph with no mat, and a pale ceiling is a light flat band — trimming one would hand the card a box and have it scale an interior as if it were art. Caught in the first dry run, which produced `room-mockup 100x92%`; now covered by a test.
+
+      Backfill re-run with --force: 41/41 products, 163 images scanned, 41 measured, 122 skipped, 0 failed. Three boxes changed materially — cosmic-harmony 88x85% -> 42x82%, create-every-day 88x85% -> 63x82%, paper-layers 88x65% -> 87x42% (two panels on an empty wall). The rest moved ~1%, which is the anti-aliased edge.
+
+      `artFraming.ts` replaces ART_AREA/ART_MAX_SIDE with a single `ART_BOX = 0.90`: `object-fit: contain` into one square, long side on the box. Two pieces of the same shape are now identical UNCONDITIONALLY, where equal-area guaranteed it only while nothing clamped.
+
+      0.90 and not 0.95, which I tried first and rendered: at 0.95 the ring is 8px, the near-square pieces sit all but flush inside their rounded corners and the plate stops reading as a surface on the very cards the plate colour was introduced for. The reference leaves 6-10px on its portraits and 28-34px on its near-squares; 16px sits inside that.
+
+      RENDERED IMAGE BOXES, desktop 1440, plate 321x321, measured by pixel scan (padL/padR/padT/padB):
+
+        card              BEFORE                          AFTER
+        1 Wabi-Sabi       233x228   44/44/47/46           289x283   16/16/19/19
+        2 Desert Bloom    304x155    8/ 9/83/83           289x147   16/16/87/87
+        3 Cosmic Harmony  235x226   43/43/47/48           147x289   87/87/16/16
+        4 Mountain Maj.   159x303   81/81/ 9/ 9           151x289   85/85/16/16
+
+        long sides   233 / 304 / 235 / 303  = 1.30x spread   ->   289 / 289 / 289 / 289  = 1.00x
+        plate ring on the long axis   44 / 8 / 43 / 9        ->   16 / 16 / 16 / 16
+
+        Cards 3 and 4, the critic's diagnostic: 115 and 157 wide (canvases) -> 147 and 151. The
+        4px that remains IS the aspect difference, 0.51 against 0.52, not an accident.
+
+      Independent confirmation on the New In rail, same component, different products: Neural Dreams and Blush Hour are both 0.80 aspect and now render 231 and 232 wide. Long sides 289/289/289/289, ring 16 on all four.
+
+      Mobile 390, plate 287x287:
+
+        1 Wabi-Sabi (full)   207x204  40/40/42/41   ->   259x253  14/14/17/17
+        2 Desert Bloom (peek) 273x139   -/ -/74/74  ->   258x131  14/14/78/78
+        3 Cosmic Harmony                            ->   131x258  78/78/14/14
+        4 Mountain Majesty                          ->   134x258  76/76/14/14
+
+        long sides 259 / 258 / 258 / 258 = 1.00x.
+
+      THE HONEST TRADE-OFF, stated because the critic named the metric. Equalising the long side necessarily maximises the SHORT-side spread between a 1.96:1 panorama and a near-square. On mobile the peek card's bottom edge was 33px above the full card's; it is now 61px. On desktop card 2 keeps ~87px of grey above and below.
+
+      That air is not fixable by any framing rule: a 1.97:1 piece in a 321px plate can be at most 163px tall, so 79px per side is the floor, and every candidate rule (equal-area at 0.52, at 0.68, shared box at 0.90 or 0.95) produces the same 8..87 range because both extremes clamp identically. What changes between rules is only where the MIDDLE cards sit. Under equal area they sat at 47px, i.e. a fourth distinct value; under the shared box they join the 16px group, so the row now reads as one rule — 16px ring on the long axis, air on the short — rather than four accidents. Shrinking that delta requires shrinking the near-square pieces, which is what lost the first two rounds.
+
+      == 2. Mobile quick-add — dark, not white
+
+      Measured the reference's: rgb(23 23 23), i.e. exactly --foreground, a filled circle with a light cart glyph. Ours was `bg-background` — a 1.1:1 fill difference against the #EFEFEF plate held together only by its drop shadow.
+
+      Below `md` it is now `bg-foreground text-background`, ~14:1 against the plate. From `md` the measured white pill returns explicitly (`md:bg-background md:text-foreground`) — it is only drawn on hover there, so it costs the picture nothing. Both halves asserted, and the old `expect(className).toContain('bg-background')` tightened to `md:bg-background`, since substring matching would have let the regression through.
+
+      == 3. Stars
+
+      The five glyphs were flush: `flex` with no gap, 14px lucide stars, ~0.5px between their points. Reference measured: 16px glyphs on a 19px pitch = 3px of air. Ours are 14px on a 17px pitch now (`gap-[3px]`). Verified rendered.
+
+      == 4. The cool hue
+
+      New `--card-meta: 30 5% 42%` = rgb(112 107 102), read by ProductRating's count and WishlistButton's `card` variant. Both were `--muted-foreground`, shadcn's default slate `215.4 16.3% 46.9%` = rgb(100 116 139) — nobody chose it, it arrived with the component library, and it was the only cool hue in the band.
+
+      NOT a fix by fading, which the brief ruled out and rightly: 5.4:1 against white where the slate was 4.76:1, so the heart is MORE legible than the one two round-1 critics praised, not less. (The reference's own heart measures rgb(219 216 194) — 1.3:1, invisible.) The reference sets its review count in rgb(29 29 29), near-black, so if anything this is still the conservative direction.
+
+      Scoped to a new token rather than editing --muted-foreground, which every muted string in the app and in /admin reads. Guarded by a test that asserts the hue is in the warm 15-60 band and the lightness is no lighter than the slate it replaced.
+
+      == 5. Mobile rhythm
+
+      Measured at 390, ink to ink: 20px plate->stars, 18px stars->title, 4px title->price. The tightest gap in the stack sat between the two things that most need separating, and under the title's own 20px leading it joined the title block.
+
+      `mt-[13px]` on the content block and `gap-6 ... lg:gap-2` (the direction is column until lg, where the price moves beside the title and gap-2 is horizontal and unchanged). Now 20 / 20 / 20 exactly. The reference's own mobile card measures 28.5 / 27.5 / 25 — three equal gaps, which is the property, not the absolute number.
+
+      Scale, same section: card 1's picture filled 71% of its tile and now fills 90%; the peek card's long side went 95% -> 90% and both now land on the same 258px box.
+
+      == NOT REGRESSED — the three the critic named as ours
+
+      - Artwork dead-centred: padL == padR on every card, every viewport. 16/16, 16/16, 87/87, 85/85 desktop; 14/14, 14/14, 78/78, 76/76 mobile.
+      - The rail still bleeds to the screen edge. Untouched.
+      - The heart is still legible, and is now MORE legible: 5.4:1 vs 4.76:1.
+
+      == /posters, /collections/$slug and the PDP
+
+      Nothing became opt-in. Every change improves those surfaces too, so gating per surface would ship the worse version to the pages already signed off.
+
+      - /posters desktop: screenshotted. The grid row gains the same shared box — four pieces on one box with a consistent 16px ring where they previously sat at four sizes. Same grid, same chrome, no CLS (framing is clip-path + transform, both paint-time; the one in-flow image still carries MEDIA_RATIO and still defines the media box height).
+      - /posters mobile: four dark corner buttons instead of four white ones; same rhythm fix.
+      - PDP: the gallery, buy box, frame swatches and tabs use none of these components. The only ProductCard surface is the "Visually Similar Artworks" row. ONE thing beyond that: `ProductDetail.tsx` renders WishlistButton with `variant="card"`, so the PDP's own heart also moves slate -> warm at better contrast. Called out rather than buried.
+
+      == TESTS
+
+        web  tests/components/product + tests/components/home + tests/styles: 827 passed, 1 failed.
+             The failure is tests/styles.test.ts "no dark: utility variants in app source", offender
+             app/routes/admin/promotions/index.tsx — committed in dd636345 by another feature, not
+             touched here. PRE-EXISTING, same one round 1 recorded.
+        web  tsc --noEmit: 22 errors, all in admin/track/ai-generator. Diffed against the recorded
+             baseline: identical file set, identical codes; the only text difference is TypeScript
+             printing union members in a different order. None in any file touched here.
+        api  tsc --noEmit: 0.  shared tsc --noEmit: 0.
+        api  image-processing suites: 52 passed (was 38 + the art-box file).
+
+      New/updated tests:
+      - artFraming.test.ts rewritten for the box rule: every shape lands on the same long side; two
+        pieces of the same shape are identical (the round-2 finding, as an assertion); the box stays
+        inside 0.85-0.92 so the plate keeps a visible ring.
+      - image-processing-art-box.test.ts: a new "the wall inside the photograph" block — measures the
+        art not the wall, recovers the same shape whether or not the wall is there, trims a GRADIENT
+        wall (a flat-colour match would not), and the full-bleed guard rail on room mockups.
+      - ChooseOptions: dark below md / white from md, both directions.
+      - ProductCard.tokens: star gap, both marks on --card-meta, --card-meta is warm and no lighter
+        than the slate, and the price gap.
+
+      == FILES
+
+        packages/api/src/lib/image-processing.ts          second pass + guard rail
+        packages/web/app/components/product/artFraming.ts shared box replaces equal area
+        packages/web/app/components/product/ProductRating.tsx    star gap, warm count
+        packages/web/app/components/product/WishlistButton.tsx   warm heart (card variant)
+        packages/web/app/components/product/ChooseOptions.tsx    dark below md
+        packages/web/app/components/product/ProductCard.tsx      meta rhythm
+        packages/web/app/styles/globals.css                      --card-meta
+
+      Backfill must be re-run wherever the catalogue lives: `bun run backfill:art-box --force`. Additive and idempotent as before — one key inside the existing images JSONB, no reprocessing, no re-upload, no URL changes.
 work_sessions: []
 related_tickets: []
 blocked_by: []

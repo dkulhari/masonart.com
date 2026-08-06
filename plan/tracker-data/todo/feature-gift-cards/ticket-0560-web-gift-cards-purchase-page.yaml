@@ -1,0 +1,80 @@
+ticket_number: 560
+title: Web - /gift-cards purchase page
+description: |-
+  ## Task
+  A storefront page at `/gift-cards`: amount (presets plus a custom field, bounded ₹500–₹50,000), recipient email and name, sender name, optional message, optional send date capped a year out. Posts to `POST /api/gift-cards/purchase`, then hands off to the existing Razorpay payment flow with the returned `orderId`.
+
+  ## Say what the customer is buying
+  Two things belong on the page because they are surprising otherwise:
+  - the card **never expires**
+  - it can be spent across several orders; whatever is left stays on the card
+
+  And one operational fact: the code goes to the recipient's email address, so a typo there is not recoverable by us.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 7 — Storefront
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §5, §10
+
+  Bounds live in `packages/shared/src/schemas/gift-card.ts` — read them, do not retype the numbers.
+feature: gift-cards
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:34:35.625Z'
+last_updated: '2026-08-06T16:34:35.625Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the purchase form
+    file: packages/web/tests/routes/gift-cards.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/gift-cards.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('/gift-cards', () => {
+        it('offers preset amounts and a custom field', async () => {})
+        it('rejects an amount outside the shared bounds', async () => {
+          // bounds come from packages/shared, not a retyped literal
+        })
+        it('rejects a send date more than a year out', async () => {})
+        it('requires a valid recipient email', async () => {})
+        it('tells the buyer the card never expires and carries a remainder', async () => {})
+        it('hands the returned orderId to the payment flow', async () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/routes/gift-cards.test.tsx
+    expected_result: FAIL - route does not exist
+    status: pending
+  - id: 3
+    action: implement
+    description: Build the purchase page
+    file: packages/web/app/routes/gift-cards/index.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/routes/gift-cards.test.tsx
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the purchase page
+    command: 'git add packages/web/app/routes/gift-cards packages/web/tests/routes/gift-cards.test.tsx && git commit -m "feat(web): gift card purchase page"'
+    status: pending
+current_step: 1

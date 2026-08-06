@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-06T15:19:08.788Z'
-total_tickets: 41
+last_updated: '2026-08-06T16:34:47.015Z'
+total_tickets: 48
 summary:
   critical: 3
-  high: 13
-  medium: 21
-  low: 4
+  high: 17
+  medium: 20
+  low: 8
 priorities:
   critical:
     - feature: go-live
@@ -127,6 +127,26 @@ priorities:
           title: Schema - unique purchaseOrderId and orders.giftCardPurchase
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 554
+          title: API - gift card quote and balance endpoints, rate limited
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 555
+          title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 554
+              title: API - gift card quote and balance endpoints, rate limited
+        - ticket_number: 556
+          title: API - release the gift card hold when an order is cancelled or payment fails
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 555
+              title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+        - ticket_number: 557
+          title: API - split refunds proportionally across tender and cards
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: go-to-production
       tickets:
@@ -243,20 +263,16 @@ priorities:
           blocked_by: []
     - feature: gift-cards
       tickets:
-        - ticket_number: 550
-          title: API - POST /api/gift-cards/purchase creates the gift card order
+        - ticket_number: 558
+          title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 551
-          title: API - mint the card on payment verification
+        - ticket_number: 559
+          title: Admin UI - /admin/gift-cards list, detail and issue form
           assignee: unassigned
           blocked_by:
-            - ticket_number: 550
-              title: API - POST /api/gift-cards/purchase creates the gift card order
-        - ticket_number: 552
-          title: Service - scheduled delivery sweep and the gift card email
-          assignee: unassigned
-          blocked_by: []
+            - ticket_number: 558
+              title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
   low:
     - feature: go-to-production
       tickets:
@@ -281,6 +297,28 @@ priorities:
       tickets:
         - ticket_number: 546
           title: Seed catalogue artwork carries a MESON ART watermark baked into the pixels
+          assignee: unassigned
+          blocked_by: []
+    - feature: gift-cards
+      tickets:
+        - ticket_number: 560
+          title: Web - /gift-cards purchase page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 561
+          title: Web - gift card control at checkout and the amount-due line
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 554
+              title: API - gift card quote and balance endpoints, rate limited
+            - ticket_number: 555
+              title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+        - ticket_number: 562
+          title: Web - gift card tender line on order confirmation and order detail
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 563
+          title: E2E - buy a card, receive it, redeem part, spend the remainder
           assignee: unassigned
           blocked_by: []
 blocked_tickets:
@@ -348,6 +386,18 @@ blocked_tickets:
       - ticket_number: 344
         title: 'Content-Security-Policy for SSR pages (deferred from #264)'
     description: 'Content-Security-Policy for SSR pages (deferred from #264)'
+  - ticket_number: 555
+    title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+    blocked_by:
+      - ticket_number: 554
+        title: API - gift card quote and balance endpoints, rate limited
+    description: API - gift card quote and balance endpoints, rate limited
+  - ticket_number: 556
+    title: API - release the gift card hold when an order is cancelled or payment fails
+    blocked_by:
+      - ticket_number: 555
+        title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+    description: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
   - ticket_number: 278
     title: Set up external uptime monitoring for production
     blocked_by:
@@ -421,14 +471,22 @@ blocked_tickets:
       - ticket_number: 444
         title: Web - join modal, one field
     description: Web - join modal, one field
-  - ticket_number: 551
-    title: API - mint the card on payment verification
+  - ticket_number: 559
+    title: Admin UI - /admin/gift-cards list, detail and issue form
     blocked_by:
-      - ticket_number: 550
-        title: API - POST /api/gift-cards/purchase creates the gift card order
-    description: API - POST /api/gift-cards/purchase creates the gift card order
+      - ticket_number: 558
+        title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+    description: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
   - ticket_number: 283
     title: Document and configure database backup procedures
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
+  - ticket_number: 561
+    title: Web - gift card control at checkout and the amount-due line
+    blocked_by:
+      - ticket_number: 554
+        title: API - gift card quote and balance endpoints, rate limited
+      - ticket_number: 555
+        title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+    description: API - gift card quote and balance endpoints, rate limited, API - debit gift cards at payment initiation, and skip Razorpay on full coverage

@@ -1,5 +1,5 @@
 dependencies:
-  last_updated: '2026-08-06T15:19:09.194Z'
+  last_updated: '2026-08-06T16:34:47.466Z'
   features:
     chobi-external-services:
       - ticket_number: 315
@@ -326,6 +326,49 @@ dependencies:
         blocked_by:
           - ticket_number: 444
             title: Web - join modal, one field
+    gift-cards:
+      - ticket_number: 551
+        title: API - mint the card on payment verification
+        blocks: []
+        blocked_by:
+          - ticket_number: 550
+            title: API - POST /api/gift-cards/purchase creates the gift card order
+      - ticket_number: 553
+        title: Schema - unique purchaseOrderId and orders.giftCardPurchase
+        blocks:
+          - ticket_number: 550
+            title: API - POST /api/gift-cards/purchase creates the gift card order
+          - ticket_number: 551
+            title: API - mint the card on payment verification
+          - ticket_number: 552
+            title: Service - scheduled delivery sweep and the gift card email
+        blocked_by: []
+      - ticket_number: 555
+        title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+        blocks: []
+        blocked_by:
+          - ticket_number: 554
+            title: API - gift card quote and balance endpoints, rate limited
+      - ticket_number: 556
+        title: API - release the gift card hold when an order is cancelled or payment fails
+        blocks: []
+        blocked_by:
+          - ticket_number: 555
+            title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+      - ticket_number: 559
+        title: Admin UI - /admin/gift-cards list, detail and issue form
+        blocks: []
+        blocked_by:
+          - ticket_number: 558
+            title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+      - ticket_number: 561
+        title: Web - gift card control at checkout and the amount-due line
+        blocks: []
+        blocked_by:
+          - ticket_number: 554
+            title: API - gift card quote and balance endpoints, rate limited
+          - ticket_number: 555
+            title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
     go-to-production:
       - ticket_number: 274
         title: Choose deployment target and add deployment configuration
@@ -1103,23 +1146,6 @@ dependencies:
         blocked_by:
           - ticket_number: 477
             title: Guest wishlist persists locally and merges into the account on sign-in
-    gift-cards:
-      - ticket_number: 551
-        title: API - mint the card on payment verification
-        blocks: []
-        blocked_by:
-          - ticket_number: 550
-            title: API - POST /api/gift-cards/purchase creates the gift card order
-      - ticket_number: 553
-        title: Schema - unique purchaseOrderId and orders.giftCardPurchase
-        blocks:
-          - ticket_number: 550
-            title: API - POST /api/gift-cards/purchase creates the gift card order
-          - ticket_number: 551
-            title: API - mint the card on payment verification
-          - ticket_number: 552
-            title: Service - scheduled delivery sweep and the gift card email
-        blocked_by: []
     go-live:
       - ticket_number: 293
         title: 'Ops: owner console setup + mini bootstrap execution'

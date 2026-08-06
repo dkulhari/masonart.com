@@ -1,0 +1,164 @@
+ticket_number: 554
+title: API - gift card quote and balance endpoints, rate limited
+description: |-
+  ## Task
+  Two read endpoints on top of `quoteGiftCard()` (already built in #548):
+
+  - `POST /api/orders/:id/gift-card { code }` — what this card could pay towards this order. Authenticated, order must belong to the caller. Returns `{ giftCardId, last4, balancePaise, applicablePaise }`.
+  - `POST /api/gift-cards/balance { code }` — balance and last four, no order needed. Recipients ask constantly; without it support answers by hand.
+
+  **Neither debits anything.** The debit happens at payment initiation (#gc-12) under a row lock.
+
+  ## Rate limiting is not optional here
+  Both take a bearer code and answer a question about it, which is precisely a free-money oracle if left open. Reuse the existing `rateLimit()` factory (`middleware/rate-limit.ts:48`), keyed on user and IP, in the shape of `otpRateLimit`. 2^80 is unguessable, but short-lived admin-issued cards are a smaller space and an unthrottled check invites a sweep.
+
+  The error for an unknown, disabled or expired card is already a single shared message from `GiftCardError` — do not add a status code or body that distinguishes them.
+
+  ## Context
+  Part of feature: gift-cards
+  Phase: 4 — Redemption
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §7
+
+  `quoteGiftCard` and `GiftCardError` are exported from `services/gift-card.ts`.
+feature: gift-cards
+type: task
+priority: high
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T16:33:26.937Z'
+last_updated: '2026-08-06T16:33:26.937Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for both endpoints
+    file: packages/api/tests/routes/gift-card-quote.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-quote.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('POST /api/orders/:id/gift-card', () => {
+        it('reports what the card could pay without debiting it', async () => {
+          // assert: applicablePaise === min(balance, amountDue); balance unchanged
+        })
+
+        it('caps the quote at the amount due', async () => {
+          // card 500000, order due 200000 -> applicable 200000
+        })
+
+        it('refuses an order belonging to someone else', async () => {
+          // assert: 404, and no information about the card
+        })
+
+        it('returns the same error for unknown, disabled and expired codes', async () => {
+          // assert: identical status and body for all three
+        })
+
+        it('requires an account', async () => {
+          // assert: 401
+        })
+
+        it('rate limits repeated code attempts', async () => {
+          // assert: 429 after the configured burst
+        })
+      })
+
+      describe('POST /api/gift-cards/balance', () => {
+        it('returns balance and last four for a valid code', async () => {
+          // assert: { balancePaise, last4 }, no id, no hash
+        })
+
+        it('never returns anything resembling the full code', async () => {
+          // assert: no 16-char token anywhere in the body
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-quote.test.ts
+    expected_result: FAIL - routes not mounted
+    status: pending
+  - id: 3
+    action: implement
+    description: Add the quote endpoint to the orders route
+    file: packages/api/src/routes/orders.ts
+    status: pending
+    code: |-
+      // POST /:id/gift-card — quote only. Nothing is debited here; the debit
+      // happens at payment initiation under a row lock, because a quote taken now
+      // may be hours stale by the time the customer pays.
+
+      ordersApp.post(
+        "/:id/gift-card",
+        giftCardCodeRateLimit,
+        zValidator("json", giftCardCodeInputSchema),
+        async (c) => {
+          const user = c.get("user");
+          const order = await findOwnedOrder(c.req.param("id"), user.id);
+          if (!order) return c.json({ error: "Order not found" }, 404);
+
+          try {
+            const quote = await quoteGiftCard(
+              c.req.valid("json").code,
+              toPaise(order.total),
+            );
+            return c.json(quote);
+          } catch (error) {
+            if (error instanceof GiftCardError) {
+              return c.json({ error: error.message }, 400);
+            }
+            throw error;
+          }
+        },
+      );
+  - id: 4
+    action: implement
+    description: Add the balance endpoint and the shared rate limiter
+    file: packages/api/src/routes/gift-cards.ts
+    status: pending
+    code: |-
+      // An endpoint that answers questions about a bearer code is a free-money
+      // oracle if left unthrottled. Same shape as otpRateLimit.
+      const giftCardCodeRateLimit = rateLimit({
+        windowMs: 60_000,
+        max: 10,
+        message: "Too many gift card attempts. Please try again shortly.",
+      });
+
+      giftCardsApp.post(
+        "/balance",
+        giftCardCodeRateLimit,
+        zValidator("json", giftCardCodeInputSchema),
+        async (c) => {
+          try {
+            const quote = await quoteGiftCard(c.req.valid("json").code, Number.MAX_SAFE_INTEGER)
+            return c.json({ last4: quote.last4, balancePaise: quote.balancePaise })
+          } catch (error) {
+            if (error instanceof GiftCardError) return c.json({ error: error.message }, 400)
+            throw error
+          }
+        },
+      );
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-quote.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the read endpoints
+    command: 'git add packages/api/src/routes/gift-cards.ts packages/api/src/routes/orders.ts packages/api/tests/routes/gift-card-quote.test.ts && git commit -m "feat(api): quote and balance endpoints for gift cards"'
+    status: pending
+current_step: 1
