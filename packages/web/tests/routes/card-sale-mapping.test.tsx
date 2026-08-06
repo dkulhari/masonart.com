@@ -32,6 +32,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createRootRoute,
   createRoute,
@@ -234,7 +235,17 @@ function renderWithRouter(ui: React.ReactNode) {
     routeTree: rootRoute.addChildren(children),
     history: createMemoryHistory({ initialEntries: ['/'] }),
   })
-  return render(<RouterProvider router={router} />)
+  // ProductGrid renders ProductCard, which renders ChooseOptions, whose
+  // add-to-cart button now reads useCartActions (#511) — which calls
+  // useQueryClient unconditionally. Every render needs a client.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  )
 }
 
 describe.each(LOADERS)('$name renders the mapped price', ({ run }) => {

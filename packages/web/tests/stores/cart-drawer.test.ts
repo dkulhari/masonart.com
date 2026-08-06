@@ -74,15 +74,15 @@ describe('cart drawer state', () => {
   })
 
   it('auto-opens when an item is added', () => {
-    useCartStore.getState().addItem(sampleItem)
+    useCartStore.getState().addItemLocal(sampleItem)
     expect(useCartStore.getState().isDrawerOpen).toBe(true)
   })
 
   it('auto-opens when adding a duplicate that only bumps quantity', () => {
-    useCartStore.getState().addItem(sampleItem)
+    useCartStore.getState().addItemLocal(sampleItem)
     useCartStore.getState().closeDrawer()
 
-    useCartStore.getState().addItem(sampleItem)
+    useCartStore.getState().addItemLocal(sampleItem)
 
     expect(useCartStore.getState().items).toHaveLength(1)
     expect(useCartStore.getState().items[0].quantity).toBe(2)
@@ -90,7 +90,7 @@ describe('cart drawer state', () => {
   })
 
   it('does not persist drawer state to localStorage', () => {
-    useCartStore.getState().addItem(sampleItem)
+    useCartStore.getState().addItemLocal(sampleItem)
 
     const raw = localStorage.getItem('chobii-cart-storage') ?? '{}'
     expect(raw).not.toContain('isDrawerOpen')

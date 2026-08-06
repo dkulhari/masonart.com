@@ -35,7 +35,7 @@ import {
 import { cn, formatPrice } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
 import { WishlistButton } from './WishlistButton'
-import { useCartStore } from '~/stores/cart'
+import { useCartActions } from '~/hooks/useCartActions'
 import { SizeSelector, type SizeVariant } from './SizeSelector'
 import { FrameSelector, calculateFramePrice, type FrameOptionData } from './FrameSelector'
 import { DeliveryEstimate } from './DeliveryEstimate'
@@ -194,7 +194,7 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
       : null
 
   // Cart store
-  const addItem = useCartStore((state) => state.addItem)
+  const { addItem } = useCartActions()
 
   // Calculate total price
   const totalPrice = useMemo(() => {
@@ -333,8 +333,16 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
                 puts the rail back on the left for the desktop measurement. */}
             <div className="flex flex-col gap-3 lg:flex-row-reverse">
               {/* Main image. No border, no padding, no card — the reference
-                  has no chrome around the artwork at all. */}
-              <div className="group relative aspect-square min-w-0 flex-1 overflow-hidden rounded-lg lg:rounded-none">
+                  has no chrome around the artwork at all.
+
+                  Except at mobile, where it is a rounded card (#523): measured
+                  on the reference at 390 the artwork is a 350x350 square — the
+                  full content column, so the "~16px of side padding" the spec
+                  describes is `container-wide`'s own 20px gutter, not padding
+                  this component adds — with a 10px radius. The radius is
+                  dropped again from `lg`, where the reference squares the
+                  corners off. */}
+              <div className="group relative aspect-square min-w-0 flex-1 overflow-hidden rounded-[10px] lg:rounded-none">
                 {currentImage?.url ? (
                   <img
                     src={currentImage.url}
@@ -390,13 +398,24 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
               </div>
 
               {/* Thumbnail rail — vertical and 58px wide on desktop, a
-                  horizontal scroll strip under the image on mobile. */}
+                  horizontal scroll strip under the image on mobile (#523).
+                  Measured on the reference at 390: 62px squares on a 78px
+                  pitch, so a 16px gutter, 10px radius, scrolling past the
+                  right edge of the column rather than wrapping. (The parity
+                  doc says "~72px" for these; the page itself says 62, and the
+                  page is the thing being matched.)
+
+                  `snap-x`/`snap-start` because a strip that scrolls should
+                  come to rest on a thumbnail rather than halfway through one;
+                  `scrollbar-hide` because the reference shows no bar and a
+                  62px-tall strip loses a third of itself to one on the
+                  platforms that paint them. */}
               {product.images.length > 1 && (
-                <ul className="flex gap-3 overflow-x-auto pb-1 lg:w-[58px] lg:shrink-0 lg:flex-col lg:overflow-x-visible lg:pb-0">
+                <ul className="scrollbar-hide flex snap-x gap-4 overflow-x-auto pb-1 lg:w-[58px] lg:shrink-0 lg:snap-none lg:flex-col lg:gap-3 lg:overflow-x-visible lg:pb-0">
                   {product.images.map((image, index) => {
                     const isCurrent = index === currentImageIndex
                     return (
-                      <li key={image.id} className="shrink-0">
+                      <li key={image.id} className="shrink-0 snap-start lg:snap-align-none">
                         <button
                           type="button"
                           onClick={() => setCurrentImageIndex(index)}
@@ -404,7 +423,7 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
                           aria-current={isCurrent ? 'true' : undefined}
                           data-testid="pdp-thumbnail"
                           className={cn(
-                            'block h-[72px] w-[72px] overflow-hidden border transition-colors lg:h-[58px] lg:w-[58px]',
+                            'block h-[62px] w-[62px] overflow-hidden rounded-[10px] border transition-colors lg:h-[58px] lg:w-[58px] lg:rounded-none',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                             isCurrent
                               ? 'border-foreground'
@@ -466,10 +485,16 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
 
               {/* H1 — Urbanist 300 at 42px, SKU inline in the title text.
                   Stepped down on small screens: 42px of Urbanist across a
-                  390px viewport is four words a line. */}
+                  390px viewport is four words a line.
+
+                  The step is a single one at `md`, not a ramp, because that is
+                  what the reference does — probed at 390 it is 24px, and at
+                  768, 1024 and 1440 it is already 42px. Ours sat at 30px until
+                  1024, which made the title the one element on the tablet page
+                  that was smaller than the page it is copying. */}
               <h1
                 className={cn(
-                  'mt-3 font-heading text-[30px] font-light leading-[1.15] lg:text-[42px]',
+                  'mt-3 font-heading text-[24px] font-light leading-[1.15] md:text-[42px]',
                   TITLE_COLOR
                 )}
               >
@@ -582,15 +607,26 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
                 button takes the remainder, so the pair keeps that ratio as
                 the column narrows instead of the button collapsing first.
 
-                `flex-wrap` plus a 240px basis rather than `flex-1`: the label
-                carries a price and cannot wrap mid-word, so on a 350px mobile
-                column an unwrappable row sets a min-content wider than the
-                page and the whole document gains a horizontal scrollbar —
-                which it did. Wrapping lets the button drop to its own line
-                exactly when it stops fitting, and the basis is low enough
-                that every column from 468px up still keeps it on the row. */}
+                The reference keeps that row intact at 390 too (#523): stepper
+                ~99, button ~234. Ours could not, because a 130px stepper plus
+                a label carrying a rupee price left the button under its own
+                min-content on a 350px column. So the stepper shrinks with the
+                page — 32px arrows and a narrower readout make 100px — and the
+                button gives up 6px of its padding either side. That is enough
+                slack that a five-figure price still fits on the row rather
+                than tipping it.
+
+                `flex-wrap` and `basis-0` rather than `flex-1`: the label
+                cannot wrap mid-word (Button is `whitespace-nowrap`), so a row
+                that cannot fit it must BREAK, not squeeze — squeezing pushes
+                the text out of the button and the document gains a horizontal
+                scrollbar, which it did. `basis-0` leaves the button's own
+                min-content as its hypothetical size, which is exactly the
+                width the wrap decision should be made on; deliberately no
+                `min-w-0`, since that would switch that floor off again and
+                bring the overflow back. */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-[60px] w-[130px] shrink-0 items-center justify-between rounded-pill border border-border px-1">
+              <div className="flex h-[60px] w-[100px] shrink-0 items-center justify-between rounded-pill border border-border px-1 sm:w-[130px]">
                 {/* The reference labels this stepper with nothing but its
                     arrows. Sighted users read `‹ 1 ›`; everyone else needs
                     the noun, so it is said once, out of the layout. */}
@@ -598,19 +634,19 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent sm:h-9 sm:w-9"
                   disabled={quantity <= 1}
                   aria-label="Decrease quantity"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <span className="min-w-[3rem] text-center text-base tabular-nums text-foreground">
+                <span className="min-w-[1.75rem] text-center text-base tabular-nums text-foreground sm:min-w-[3rem]">
                   {quantity}
                 </span>
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => q + 1)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted sm:h-9 sm:w-9"
                   aria-label="Increase quantity"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -622,7 +658,7 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
                 size="pill"
                 onClick={handleAddToCart}
                 disabled={!selectedVariant}
-                className="h-[60px] min-w-0 grow basis-[240px] text-[16px]"
+                className="h-[60px] grow basis-0 px-5 text-[16px] sm:px-[26px]"
               >
                 {selectedVariant
                   ? `Add to cart - ${formatPrice(ctaPrice)}`
@@ -728,12 +764,12 @@ export function ProductDetailSkeleton() {
       <div className="grid animate-pulse gap-8 lg:grid-cols-[minmax(0,728px)_minmax(0,485px)] lg:items-start lg:gap-x-12">
         {/* Gallery: square artwork with the rail beside it on desktop. */}
         <div className="flex flex-col gap-3 lg:flex-row-reverse">
-          <div className="aspect-square min-w-0 flex-1 rounded-lg bg-muted lg:rounded-none" />
-          <div className="flex gap-3 lg:w-[58px] lg:shrink-0 lg:flex-col">
+          <div className="aspect-square min-w-0 flex-1 rounded-[10px] bg-muted lg:rounded-none" />
+          <div className="flex gap-4 overflow-hidden lg:w-[58px] lg:shrink-0 lg:flex-col lg:gap-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="h-[72px] w-[72px] shrink-0 bg-muted lg:h-[58px] lg:w-[58px]"
+                className="h-[62px] w-[62px] shrink-0 rounded-[10px] bg-muted lg:h-[58px] lg:w-[58px] lg:rounded-none"
               />
             ))}
           </div>
@@ -746,7 +782,7 @@ export function ProductDetailSkeleton() {
               <div className="h-4 w-32 rounded bg-muted" />
               <div className="h-9 w-9 rounded-full bg-muted" />
             </div>
-            <div className="h-12 w-3/4 rounded bg-muted" />
+            <div className="h-7 w-3/4 rounded bg-muted md:h-12" />
             <div className="h-4 w-40 rounded bg-muted" />
           </div>
 
@@ -761,8 +797,8 @@ export function ProductDetailSkeleton() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="h-[60px] w-[130px] rounded-pill bg-muted" />
-            <div className="h-[60px] grow basis-[240px] rounded-pill bg-muted" />
+            <div className="h-[60px] w-[100px] shrink-0 rounded-pill bg-muted sm:w-[130px]" />
+            <div className="h-[60px] grow basis-[200px] rounded-pill bg-muted" />
           </div>
         </div>
       </div>

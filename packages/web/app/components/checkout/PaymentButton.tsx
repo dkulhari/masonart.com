@@ -14,7 +14,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { CreditCard, Loader2, ShieldCheck, AlertCircle } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
 import { ordersApi, type OrderInput } from '~/lib/api'
-import { useCartActions } from '~/stores/cart'
+import { useCartActions } from '~/hooks/useCartActions'
 
 // ============================================================================
 // Types
@@ -135,7 +135,7 @@ export function PaymentButton({
   const [status, setStatus] = useState<PaymentStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [scriptLoaded, setScriptLoaded] = useState(false)
-  const { clearCart } = useCartActions()
+  const { resetLocalCart } = useCartActions()
 
   // Load Razorpay script on mount
   useEffect(() => {
@@ -200,8 +200,11 @@ export function PaymentButton({
 
             if (verifyResult.success) {
               setStatus('success')
-              // Clear the cart after successful payment
-              clearCart()
+              // The order has already consumed these lines server-side
+              // (routes/orders.ts); this only needs to catch up the local
+              // projection, not send a DELETE that could take out anything
+              // added since.
+              resetLocalCart()
               onSuccess(verifyResult.order.id, verifyResult.order.orderNumber)
             } else {
               throw new Error('Payment verification failed')
@@ -237,7 +240,7 @@ export function PaymentButton({
       setErrorMessage(errorMsg)
       onError(errorMsg)
     }
-  }, [scriptLoaded, orderData, customerPhone, onSuccess, onError, clearCart])
+  }, [scriptLoaded, orderData, customerPhone, onSuccess, onError, resetLocalCart])
 
   // Get button text based on status
   const getButtonText = () => {

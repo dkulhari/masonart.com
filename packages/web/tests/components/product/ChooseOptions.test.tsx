@@ -34,13 +34,26 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import type { ProductImage } from '@chobii/shared'
 
 const getBySlug = vi.fn()
 
+// useCartActions (#511) reaches cartApi directly; the add-to-cart tests below
+// exercise only the optimistic local write, so `get` is left permanently
+// pending — a resolved empty cart would race the assertions below and
+// re-project the optimistic line away before they run.
 vi.mock('~/lib/api', () => ({
   productsApi: {
     getBySlug: (slug: string) => getBySlug(slug),
+  },
+  cartApi: {
+    get: vi.fn(() => new Promise(() => {})),
+    addItem: vi.fn().mockResolvedValue({ message: 'ok' }),
+    updateItem: vi.fn().mockResolvedValue({ message: 'ok' }),
+    removeItem: vi.fn().mockResolvedValue({ message: 'ok' }),
+    clear: vi.fn().mockResolvedValue({ message: 'ok' }),
   },
 }))
 
@@ -189,6 +202,16 @@ const ready = async () => {
   await screen.findByLabelText('Size')
 }
 
+// ChooseOptions reads addItem from useCartActions (#511), which calls
+// useQueryClient — every render needs a provider now, not just the ones that
+// exercise a write.
+function wrapper({ children }: { children: ReactNode }) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+}
+
 beforeEach(() => {
   getBySlug.mockReset()
   getBySlug.mockResolvedValue(apiProduct)
@@ -197,7 +220,7 @@ beforeEach(() => {
 
 describe('the trigger', () => {
   it('is a labelled button, not a bare icon', () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
 
     const trigger = screen.getByRole('button', { name: /choose options/i })
     expect(trigger.tagName).toBe('BUTTON')
@@ -205,7 +228,7 @@ describe('the trigger', () => {
   })
 
   it('is a white pill at the foot of the image, the way theirs is', () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     const trigger = screen.getByRole('button', { name: /choose options/i })
 
     // 172x40 at radius 60 on a white fill, centred — not our full-bleed black
@@ -218,7 +241,7 @@ describe('the trigger', () => {
   })
 
   it('stays reachable by keyboard, so hover is not the only way in', () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     const trigger = screen.getByRole('button', { name: /choose options/i })
 
     // `pointer-events-none` and a negative tabindex are how the decorative eye
@@ -233,7 +256,7 @@ describe('the trigger', () => {
   })
 
   it('says whether the panel is open', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     const trigger = screen.getByRole('button', { name: /choose options/i })
 
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
@@ -242,7 +265,7 @@ describe('the trigger', () => {
   })
 
   it('opens nothing until it is pressed', () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
 
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(getBySlug).not.toHaveBeenCalled()
@@ -251,7 +274,7 @@ describe('the trigger', () => {
 
 describe('the panel', () => {
   it('is a modal dialog named after the product', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
 
     const dialog = screen.getByRole('dialog')
@@ -260,7 +283,7 @@ describe('the panel', () => {
   })
 
   it('gives the artwork its own column, as theirs does', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
 
     // Their panel is 1344x768 split down the middle: image left, buy box
@@ -271,7 +294,7 @@ describe('the panel', () => {
   })
 
   it('offers the other images as carousel dots', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
 
     // Three images, so three dots — theirs runs one per slide along the foot
@@ -286,7 +309,7 @@ describe('the panel', () => {
   })
 
   it('carries the rating row', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
 
     expect(
@@ -295,7 +318,7 @@ describe('the panel', () => {
   })
 
   it('links out to the full product page', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
 
     const link = screen.getByRole('link', { name: /view full details/i })
@@ -303,7 +326,7 @@ describe('the panel', () => {
   })
 
   it('loads the real variants and frames for the slug', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -312,7 +335,7 @@ describe('the panel', () => {
   })
 
   it('fetches once across repeated opens', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     const trigger = await open()
     await ready()
 
@@ -327,7 +350,7 @@ describe('the panel', () => {
 
 describe('choosing a size', () => {
   it('is a select, not seventeen chips', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -339,7 +362,7 @@ describe('choosing a size', () => {
   })
 
   it('preselects the first available size', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -349,7 +372,7 @@ describe('choosing a size', () => {
   })
 
   it('names the chosen size beside the label, as theirs does', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -365,7 +388,7 @@ describe('choosing a size', () => {
 
 describe('choosing a frame', () => {
   it('heads the row with their format axis, not the word "Frame"', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -377,7 +400,7 @@ describe('choosing a frame', () => {
   })
 
   it('opens on the tube option, the cheapest way to buy the piece', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -390,7 +413,7 @@ describe('choosing a frame', () => {
   })
 
   it('offers a swatch per frame, named', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -408,7 +431,7 @@ describe('choosing a frame', () => {
    * "Black+Frame" placard on the panel — worse than the drawing.
    */
   it('uses the frame photograph when the data carries a real one', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -419,7 +442,7 @@ describe('choosing a frame', () => {
   })
 
   it('draws the corner when the asset is a placeholder', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -429,7 +452,7 @@ describe('choosing a frame', () => {
   })
 
   it('draws the format when there is no photograph of it', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -439,7 +462,7 @@ describe('choosing a frame', () => {
   })
 
   it('uses the photograph for the tube option', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -452,7 +475,7 @@ describe('choosing a frame', () => {
   })
 
   it('names each swatch in a pill, the way theirs does on hover', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -465,7 +488,7 @@ describe('choosing a frame', () => {
   })
 
   it('marks the chosen one as pressed and names it beside the label', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -481,7 +504,7 @@ describe('choosing a frame', () => {
 
 describe('the price on the button', () => {
   it('quotes the total on the CTA, the way theirs does', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -504,7 +527,7 @@ describe('the price on the button', () => {
    * shape at our own magnitude: +33% stretched, +40% framed.
    */
   it('scales the frame with the size, rather than charging a flat fee', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -523,7 +546,7 @@ describe('the price on the button', () => {
   })
 
   it('charges the stretched format less than the framed one', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -535,7 +558,7 @@ describe('the price on the button', () => {
   })
 
   it('multiplies by the quantity', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -548,7 +571,7 @@ describe('the price on the button', () => {
 
 describe('quantity', () => {
   it('starts at one and will not go below it', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -560,7 +583,7 @@ describe('quantity', () => {
 
 describe('adding to cart', () => {
   it('carries the chosen variant, frame and quantity into the cart', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -584,7 +607,7 @@ describe('adding to cart', () => {
   })
 
   it('sends no frame id for the print-only option', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -596,7 +619,7 @@ describe('adding to cart', () => {
   })
 
   it('closes and hands focus back to the trigger', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     const trigger = await open()
     await ready()
 
@@ -609,7 +632,7 @@ describe('adding to cart', () => {
 
 describe('getting out', () => {
   it('gives the close button the same wipe the toolbar pills have', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
 
     // Not a hover tint — the circle-wipe off the `outline` variant, so it goes
@@ -621,7 +644,7 @@ describe('getting out', () => {
   })
 
   it('turns the pointer into a close control outside the panel', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
 
     // Theirs hides the native cursor over the backdrop and follows the pointer
@@ -634,7 +657,7 @@ describe('getting out', () => {
   })
 
   it('closes when the backdrop is clicked, and restores focus', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     const trigger = await open()
 
     fireEvent.click(screen.getByTestId('quickview-backdrop'))
@@ -644,7 +667,7 @@ describe('getting out', () => {
   })
 
   it('closes on Escape and restores focus', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     const trigger = await open()
 
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -654,7 +677,7 @@ describe('getting out', () => {
   })
 
   it('closes on the close button and restores focus', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     const trigger = await open()
 
     fireEvent.click(screen.getByRole('button', { name: /close/i }))
@@ -664,7 +687,7 @@ describe('getting out', () => {
   })
 
   it('leaves nothing in the cart when it is dismissed', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     fireEvent.keyDown(document, { key: 'Escape' })
 
@@ -675,7 +698,7 @@ describe('getting out', () => {
 
 describe('stock', () => {
   it('reports a genuinely low count, and says nothing otherwise', async () => {
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
     await ready()
 
@@ -693,7 +716,7 @@ describe('stock', () => {
 describe('when the fetch fails', () => {
   it('says so instead of offering an empty panel', async () => {
     getBySlug.mockRejectedValue(new Error('boom'))
-    render(<ChooseOptions product={product} />)
+    render(<ChooseOptions product={product} />, { wrapper })
     await open()
 
     expect(await screen.findByRole('alert')).toBeTruthy()

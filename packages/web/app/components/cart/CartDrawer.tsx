@@ -24,9 +24,10 @@ import {
   useCartItems,
   useCartSubtotal,
   useCartItemCount,
-  useCartActions,
   useIsCartDrawerOpen,
+  useCartSyncError,
 } from '~/stores/cart'
+import { useCartActions } from '~/hooks/useCartActions'
 import { CartItem } from './CartItem'
 
 // ============================================================================
@@ -58,6 +59,7 @@ export function CartDrawer({ className }: CartDrawerProps) {
   const subtotal = useCartSubtotal()
   const itemCount = useCartItemCount()
   const { updateQuantity, removeItem, closeDrawer } = useCartActions()
+  const syncError = useCartSyncError()
 
   const panelRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
@@ -183,6 +185,15 @@ export function CartDrawer({ className }: CartDrawerProps) {
             <X className="h-4 w-4" />
           </Button>
         </div>
+
+        {syncError && (
+          <p
+            role="alert"
+            className="mx-4 mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {syncError}
+          </p>
+        )}
 
         {/* Cart Content */}
         {items.length === 0 ? (

@@ -53,7 +53,7 @@ import { Minus, Plus, X, ArrowRight } from 'lucide-react'
 import { sortedImages } from '@chobii/shared'
 import { cn, formatPrice } from '~/lib/utils'
 import { productsApi } from '~/lib/api'
-import { useCartStore } from '~/stores/cart'
+import { useCartActions } from '~/hooks/useCartActions'
 import { buttonVariants } from '~/components/ui/Button'
 import { ProductRating } from './ProductRating'
 import { EASE_FAST } from './productCardTokens'
@@ -282,7 +282,7 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
   const sizeSelectId = useId()
   const titleId = useId()
 
-  const addItem = useCartStore((state) => state.addItem)
+  const { addItem } = useCartActions()
 
   const images = useMemo(() => sortedImages(product.images), [product.images])
   const active = images[slide] ?? images[0]

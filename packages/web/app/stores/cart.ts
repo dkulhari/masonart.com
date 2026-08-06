@@ -10,7 +10,6 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { useShallow } from "zustand/react/shallow";
 import { generateId } from "~/lib/utils";
 import { toCartItems, type ServerCartPayload } from "~/lib/cart-projection";
 
@@ -156,15 +155,6 @@ interface CartStore {
   replaceFromServer: (cart: ServerCartPayload) => void;
   setSyncError: (message: string | null) => void;
 
-  /**
-   * Legacy local-only actions, kept so the existing call sites compile until
-   * part C moves them onto `useCartActions`. Deleted there, in the same commit.
-   */
-  addItem: (input: AddToCartInput) => void;
-  updateQuantity: (id: string, quantity: number) => void;
-  removeItem: (id: string) => void;
-  clearCart: () => void;
-
   // Computed values (as functions for Zustand v5 compatibility)
   getItemCount: () => number;
   getSubtotal: () => number;
@@ -179,10 +169,10 @@ interface CartStore {
  *
  * @example
  * // In a component
- * import { useCartStore } from '~/stores/cart';
+ * import { useCartActions } from '~/hooks/useCartActions';
  *
  * function AddToCartButton({ product, variant, frame }) {
- *   const addItem = useCartStore((state) => state.addItem);
+ *   const { addItem } = useCartActions();
  *
  *   const handleAddToCart = () => {
  *     addItem({
@@ -317,15 +307,6 @@ export const useCartStore = create<CartStore>()(
 
       setSyncError: (message: string | null) => set({ syncError: message }),
 
-      // Deleted in part C, once every call site is on useCartActions. Until
-      // then these keep the five existing importers building — this branch is
-      // shared, and a commit that does not compile is everyone's problem.
-      addItem: (input: AddToCartInput) => void get().addItemLocal(input),
-      updateQuantity: (id: string, quantity: number) =>
-        get().updateQuantityLocal(id, quantity),
-      removeItem: (id: string) => get().removeItemLocal(id),
-      clearCart: () => get().clearLocal(),
-
       // Get total item count
       getItemCount: () => {
         const { items } = get();
@@ -396,23 +377,6 @@ export const useCartItemCount = () => useCartStore(selectItemCount);
  * Uses stable selector to prevent unnecessary re-renders
  */
 export const useCartSubtotal = () => useCartStore(selectSubtotal);
-
-/**
- * Hook to get cart actions
- * Uses shallow comparison since this returns an object
- */
-export const useCartActions = () =>
-  useCartStore(
-    useShallow((state) => ({
-      addItem: state.addItem,
-      updateQuantity: state.updateQuantity,
-      removeItem: state.removeItem,
-      clearCart: state.clearCart,
-      openDrawer: state.openDrawer,
-      closeDrawer: state.closeDrawer,
-      toggleDrawer: state.toggleDrawer,
-    }))
-  );
 
 const selectSyncError = (state: CartStore) => state.syncError;
 

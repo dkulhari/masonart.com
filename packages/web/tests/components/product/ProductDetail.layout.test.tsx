@@ -22,7 +22,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import type { ProductImage } from '@chobii/shared'
 
 const routeContext: { session: { user?: { id: string; galleryMember: boolean } } | null } =
@@ -82,6 +84,16 @@ const product = {
 const addToCart = () =>
   screen.getByRole('button', { name: /add to cart/i })
 
+// ProductDetail reads addItem from useCartActions (#511), which calls
+// useQueryClient — every render needs a provider, not just the ones that
+// exercise a write.
+function wrapper({ children }: { children: ReactNode }) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+}
+
 beforeEach(() => {
   routeContext.session = null
   resetGalleryMembershipSignal()
@@ -89,7 +101,7 @@ beforeEach(() => {
 
 describe('the buy panel header', () => {
   it('carries the SKU inside the title rather than on a line of its own', () => {
-    render(<ProductDetail product={product} promotion={null} />)
+    render(<ProductDetail product={product} promotion={null} />, { wrapper })
 
     const h1 = screen.getByRole('heading', { level: 1 })
     expect(h1.textContent).toContain('Dream Big')
@@ -97,7 +109,7 @@ describe('the buy panel header', () => {
   })
 
   it('keeps the way down to the reviews wall', () => {
-    render(<ProductDetail product={product} promotion={null} />)
+    render(<ProductDetail product={product} promotion={null} />, { wrapper })
 
     const link = screen.getByTestId('buybox-reviews-link')
     expect(link.getAttribute('href')).toBe('#reviews')
@@ -113,7 +125,7 @@ describe('the buy panel header', () => {
    * a data source behind them.
    */
   it('invents no social-proof counters', () => {
-    const { container } = render(<ProductDetail product={product} promotion={null} />)
+    const { container } = render(<ProductDetail product={product} promotion={null} />, { wrapper })
     const text = container.textContent ?? ''
 
     expect(text).not.toMatch(/\bsaves\b/i)
@@ -124,14 +136,14 @@ describe('the buy panel header', () => {
 
 describe('the add-to-cart label', () => {
   it('names the price the panel is showing', () => {
-    render(<ProductDetail product={{ ...product, sale: null }} promotion={null} />)
+    render(<ProductDetail product={{ ...product, sale: null }} promotion={null} />, { wrapper })
 
     expect(addToCart().textContent).toContain('2,000.00')
     expect(screen.getByTestId('price-current').textContent).toContain('2,000.00')
   })
 
   it('follows the sale down when the sale is the viewer’s', () => {
-    render(<ProductDetail product={{ ...product, sale: SALE }} promotion={null} />)
+    render(<ProductDetail product={{ ...product, sale: SALE }} promotion={null} />, { wrapper })
 
     expect(addToCart().textContent).toContain('1,200.00')
   })
@@ -146,7 +158,8 @@ describe('the add-to-cart label', () => {
       <ProductDetail
         product={{ ...product, sale: { ...SALE, locked: true } }}
         promotion={null}
-      />
+      />,
+      { wrapper }
     )
 
     expect(screen.getByTestId('sale-members-tag')).toBeTruthy()
@@ -161,7 +174,8 @@ describe('the add-to-cart label', () => {
       <ProductDetail
         product={{ ...product, sale: { ...SALE, locked: true } }}
         promotion={null}
-      />
+      />,
+      { wrapper }
     )
 
     expect(addToCart().textContent).toContain('1,200.00')
@@ -176,14 +190,14 @@ describe('the gallery', () => {
    * screenshot and taken the keyboard route away.
    */
   it('keeps prev/next in the accessibility tree', () => {
-    render(<ProductDetail product={product} promotion={null} />)
+    render(<ProductDetail product={product} promotion={null} />, { wrapper })
 
     expect(screen.getByRole('button', { name: 'Previous image' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Next image' })).toBeTruthy()
   })
 
   it('offers every thumbnail as a named button', () => {
-    render(<ProductDetail product={product} promotion={null} />)
+    render(<ProductDetail product={product} promotion={null} />, { wrapper })
 
     for (let i = 1; i <= product.images.length; i++) {
       expect(
@@ -192,13 +206,39 @@ describe('the gallery', () => {
     }
   })
 
+  /**
+   * At 390 the rail stops being a rail and becomes a horizontal scroll strip
+   * under the artwork (#523), which means the ring marking the current
+   * thumbnail can be scrolled off the edge of its own strip. `aria-current` is
+   * the half of that state which does not depend on being able to see it, so
+   * it is the half worth pinning — and pinned on the selection CHANGING, not
+   * merely on first paint, since a mark that never moves is indistinguishable
+   * from a hardcoded one.
+   */
+  it('marks exactly one thumbnail as current, and moves the mark on selection', () => {
+    render(<ProductDetail product={product} promotion={null} />, { wrapper })
+
+    const marked = () =>
+      screen
+        .getAllByTestId('pdp-thumbnail')
+        .filter((el) => el.getAttribute('aria-current') === 'true')
+
+    expect(marked()).toHaveLength(1)
+    expect(marked()[0]).toBe(screen.getByRole('button', { name: 'Show image 1 of 3' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show image 3 of 3' }))
+
+    expect(marked()).toHaveLength(1)
+    expect(marked()[0]).toBe(screen.getByRole('button', { name: 'Show image 3 of 3' }))
+  })
+
   it('gives the expand affordance a name', () => {
-    render(<ProductDetail product={product} promotion={null} />)
+    render(<ProductDetail product={product} promotion={null} />, { wrapper })
     expect(screen.getByRole('button', { name: 'Expand image' })).toBeTruthy()
   })
 
   it('still labels the quantity stepper, which now shows only arrows', () => {
-    render(<ProductDetail product={product} promotion={null} />)
+    render(<ProductDetail product={product} promotion={null} />, { wrapper })
 
     expect(screen.getByRole('button', { name: 'Decrease quantity' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Increase quantity' })).toBeTruthy()

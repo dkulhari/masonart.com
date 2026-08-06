@@ -14,9 +14,11 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render as rtlRender, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { ReactElement } from 'react'
 import type { ProductImage } from '@chobii/shared'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -26,6 +28,14 @@ vi.mock('@tanstack/react-router', () => ({
     </a>
   ),
 }))
+
+// ProductCard renders ChooseOptions, whose add-to-cart button now reads
+// useCartActions (#511) — which calls useQueryClient unconditionally, even
+// while the quickview dialog itself is closed. Every render needs a client.
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 const { ProductCard } = await import('~/components/product/ProductCard')
 const { ProductCardSkeleton } = await import('~/components/product/ProductCardSkeleton')
@@ -191,6 +201,65 @@ describe('ProductCard — Choose options', () => {
 
     expect(eye.getAttribute('aria-hidden')).toBe('true')
     expect(eye.className).toContain('pointer-events-none')
+  })
+})
+
+/**
+ * §1.3.6 — the mesonart card rows.
+ *
+ * Row 1: stars + review count left, wishlist heart right.
+ * Row 2: title then catalogue code left, price right, price a step smaller
+ *        than the title.
+ *
+ * The heart previously rode in the price column because there was no star row
+ * to sit opposite; these assertions are what stop it drifting back.
+ */
+describe('ProductCard — card rows', () => {
+  const heart = (container: HTMLElement) =>
+    container.querySelector('button[aria-label="Add to wishlist"]')!
+
+  it('puts the heart on the rating row, not in the price column', () => {
+    const { container } = render(
+      <ProductCard product={{ ...product, averageRating: 4.5, reviewCount: 12 }} />
+    )
+    const content = container.querySelector('[data-testid="card-content"]')!
+    expect(content.contains(heart(container))).toBe(false)
+
+    // Same row as the stars, which carry the accessible rating label.
+    const stars = container.querySelector('[aria-label^="Rated"]')!
+    expect(stars.parentElement).toBe(heart(container).parentElement)
+  })
+
+  it('keeps the heart on unrated cards, where the star row is empty', () => {
+    const { container } = render(<ProductCard product={product} />)
+    expect(container.querySelector('[aria-label^="Rated"]')).toBeNull()
+    expect(heart(container)).not.toBeNull()
+    // `justify-between` alone would slide a lone heart left.
+    expect(heart(container).className).toContain('ms-auto')
+  })
+
+  it('renders the catalogue code under the title, inside the title link', () => {
+    const { container } = render(
+      <ProductCard product={{ ...product, sku: 'ABS-001' }} />
+    )
+    const code = screen.getByText('#ABS-001')
+    expect(code.className).toContain('block')
+    expect(code.closest('a')!.textContent).toContain('Wabi-Sabi Wall Art')
+    expect(container.querySelector('[data-testid="card-content"]')!.contains(code)).toBe(
+      true
+    )
+  })
+
+  it('omits the code line entirely when the product has no sku', () => {
+    render(<ProductCard product={product} />)
+    expect(screen.queryByText(/^#/)).toBeNull()
+  })
+
+  it('sets the price a step below the title on the fluid scale', () => {
+    render(<ProductCard product={product} />)
+    const price = screen.getByText(/28,000/)
+    expect(price.className).toContain('text-price')
+    expect(price.className).not.toContain('text-product')
   })
 })
 

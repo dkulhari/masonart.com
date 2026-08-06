@@ -30,7 +30,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render as rtlRender, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 
 // ============================================================================
 // Mocks
@@ -70,6 +72,14 @@ vi.mock('~/components/promo/JoinGalleryModal', () => ({
 
 import { CartContent } from '~/routes/cart/index'
 import { useCartStore, type CartItem } from '~/stores/cart'
+
+// CartContent reads updateQuantity/removeItem/clearCart from useCartActions
+// (#511), which calls useQueryClient unconditionally. Every render needs a
+// client.
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 // ============================================================================
 // Fixtures

@@ -10,6 +10,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Node 25's `localStorage` global shadows jsdom's and has no methods; zustand's
 // persist grabs storage at module init, so this has to run before the import.
@@ -51,6 +52,20 @@ const sampleItem: CartItem = {
   addedAt: '2026-08-05T00:00:00.000Z',
 }
 
+// CartDrawer reads updateQuantity/removeItem from useCartActions (#511), which
+// calls useQueryClient — so every render needs a provider, not just the ones
+// that exercise a write.
+function renderDrawer() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={client}>
+      <CartDrawer />
+    </QueryClientProvider>
+  )
+}
+
 describe('CartDrawer', () => {
   beforeEach(() => {
     useCartStore.setState({ items: [], isDrawerOpen: true })
@@ -62,7 +77,7 @@ describe('CartDrawer', () => {
   })
 
   it('anchors the panel to the right edge', () => {
-    render(<CartDrawer />)
+    renderDrawer()
 
     const panel = screen.getByRole('dialog')
     expect(panel.className).toContain('right-0')
@@ -73,7 +88,7 @@ describe('CartDrawer', () => {
     // tailwindcss-animate's `.animate-in` hardcodes animation-duration: 150ms
     // and beats a duration utility next to it, so the timing lives in one
     // named animation. cart-drawer.spec.ts asserts the computed 0.6s.
-    render(<CartDrawer />)
+    renderDrawer()
 
     const panel = screen.getByRole('dialog')
     expect(panel.className).toContain('animate-drawer-in-right')
@@ -83,7 +98,7 @@ describe('CartDrawer', () => {
   it('closes with the Quickview modal’s button (#420)', () => {
     // Two modal surfaces must not close with two different buttons. This is
     // the outline variant's wipe on a 48px circle, same as ChooseOptions.
-    render(<CartDrawer />)
+    renderDrawer()
 
     const close = screen.getByRole('button', { name: /close cart/i })
     expect(close.className).toContain('text-button')
@@ -95,7 +110,7 @@ describe('CartDrawer', () => {
   })
 
   it('draws the X under the pointer while it is over the backdrop (#420)', () => {
-    render(<CartDrawer />)
+    renderDrawer()
 
     const backdrop = screen.getByTestId('cart-drawer-backdrop')
     // The backdrop IS the close control, so it hides the arrow and says so.
@@ -114,14 +129,14 @@ describe('CartDrawer', () => {
   })
 
   it('is their 576px wide', () => {
-    render(<CartDrawer />)
+    renderDrawer()
 
     // max-w-xl is 36rem. max-w-md (448px) was ours, not theirs.
     expect(screen.getByRole('dialog').className).toContain('max-w-xl')
   })
 
   it('rounds the page-facing edge only', () => {
-    render(<CartDrawer />)
+    renderDrawer()
 
     const panel = screen.getByRole('dialog')
     // Theirs is 34px 0 0 34px: square where it meets the viewport edge.
@@ -131,13 +146,13 @@ describe('CartDrawer', () => {
 
   it('renders nothing when the store says closed', () => {
     useCartStore.setState({ isDrawerOpen: false })
-    render(<CartDrawer />)
+    renderDrawer()
 
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('closes on Escape', () => {
-    render(<CartDrawer />)
+    renderDrawer()
 
     fireEvent.keyDown(document, { key: 'Escape' })
 
@@ -145,7 +160,7 @@ describe('CartDrawer', () => {
   })
 
   it('closes on backdrop click', () => {
-    render(<CartDrawer />)
+    renderDrawer()
 
     fireEvent.click(screen.getByTestId('cart-drawer-backdrop'))
 
@@ -153,7 +168,7 @@ describe('CartDrawer', () => {
   })
 
   it('closes from the close button', () => {
-    render(<CartDrawer />)
+    renderDrawer()
 
     fireEvent.click(screen.getByRole('button', { name: /close cart/i }))
 
@@ -161,7 +176,7 @@ describe('CartDrawer', () => {
   })
 
   it('shows the empty state when there is nothing in the cart', () => {
-    render(<CartDrawer />)
+    renderDrawer()
 
     expect(screen.getByText(/your cart is currently empty/i)).toBeInTheDocument()
   })
@@ -169,7 +184,7 @@ describe('CartDrawer', () => {
   it('offers collections rather than one Browse button when empty', () => {
     // Theirs answers "empty cart" with somewhere to go. A single CTA back to
     // /posters returns the user to where they already were.
-    render(<CartDrawer />)
+    renderDrawer()
 
     expect(screen.getByText(/not sure where to start/i)).toBeInTheDocument()
     expect(
@@ -187,7 +202,7 @@ describe('CartDrawer', () => {
 
   it('lists the items and links on to checkout and the cart page', () => {
     useCartStore.setState({ items: [sampleItem], isDrawerOpen: true })
-    render(<CartDrawer />)
+    renderDrawer()
 
     expect(screen.getByText('Test Poster')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /checkout/i })).toHaveAttribute(
@@ -201,7 +216,7 @@ describe('CartDrawer', () => {
   })
 
   it('locks body scroll while open and restores it on close', () => {
-    const { unmount } = render(<CartDrawer />)
+    const { unmount } = renderDrawer()
     expect(document.body.style.overflow).toBe('hidden')
 
     unmount()

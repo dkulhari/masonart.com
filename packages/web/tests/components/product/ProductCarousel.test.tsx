@@ -20,8 +20,18 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import type { ProductCardData } from '~/components/product/ProductCard'
+
+// ProductCarousel renders ProductCard, which renders ChooseOptions, whose
+// add-to-cart button now reads useCartActions (#511) — which calls
+// useQueryClient unconditionally. Every render needs a client.
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, to, params, ...rest }: any) => (

@@ -36,11 +36,12 @@ import {
   useCartItems,
   useCartSubtotal,
   useCartItemCount,
-  useCartActions,
   useIsCartEmpty,
   useCartHydration,
+  useCartSyncError,
   type CartItem as CartItemData,
 } from '~/stores/cart'
+import { useCartActions } from '~/hooks/useCartActions'
 import { CartItem } from '~/components/cart/CartItem'
 import { JoinGalleryModal } from '~/components/promo/JoinGalleryModal'
 import { useGalleryMembership } from '~/hooks/useGalleryMembership'
@@ -223,6 +224,7 @@ export function CartContent() {
   const itemCount = useCartItemCount()
   const isEmpty = useIsCartEmpty()
   const { updateQuantity, removeItem, clearCart } = useCartActions()
+  const syncError = useCartSyncError()
 
   /**
    * Every figure in the saving rows comes from here. The local store knows what
@@ -283,6 +285,15 @@ export function CartContent() {
             </p>
           )}
         </div>
+
+        {syncError && (
+          <p
+            role="alert"
+            className="mb-6 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {syncError}
+          </p>
+        )}
 
         {isEmpty ? (
           <EmptyCartState />

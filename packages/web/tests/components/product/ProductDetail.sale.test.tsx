@@ -14,6 +14,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import type { ProductImage } from '@chobii/shared'
 
 const routeContext: { session: { user?: { id: string; galleryMember: boolean } } | null } =
@@ -72,6 +74,16 @@ const product = {
 /** An hour out, so the clock has something real to print. */
 const deadline = () => new Date(Date.now() + 3_600_000).toISOString()
 
+// ProductDetail reads addItem from useCartActions (#511), which calls
+// useQueryClient — every render needs a provider, not just the ones that
+// exercise a write.
+function wrapper({ children }: { children: ReactNode }) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+}
+
 beforeEach(() => {
   routeContext.session = null
   resetGalleryMembershipSignal()
@@ -83,7 +95,7 @@ afterEach(() => {
 
 describe('ProductDetail buy panel — sale pricing', () => {
   it('leaves the panel exactly as it was when nothing is on sale', () => {
-    render(<ProductDetail product={{ ...product, sale: null }} promotion={null} />)
+    render(<ProductDetail product={{ ...product, sale: null }} promotion={null} />, { wrapper })
 
     expect(screen.queryByTestId('price-was')).toBeNull()
     expect(screen.queryByTestId('sale-percent-off')).toBeNull()
@@ -91,7 +103,7 @@ describe('ProductDetail buy panel — sale pricing', () => {
   })
 
   it('strikes the base price and prints the sale price', () => {
-    render(<ProductDetail product={{ ...product, sale: SALE }} promotion={null} />)
+    render(<ProductDetail product={{ ...product, sale: SALE }} promotion={null} />, { wrapper })
 
     expect(screen.getByTestId('price-was').textContent).toContain('2,000.00')
     expect(screen.getByTestId('price-was').className).toContain('line-through')
@@ -99,7 +111,7 @@ describe('ProductDetail buy panel — sale pricing', () => {
   })
 
   it('carries the percent-off marker the payload resolved', () => {
-    render(<ProductDetail product={{ ...product, sale: SALE }} promotion={null} />)
+    render(<ProductDetail product={{ ...product, sale: SALE }} promotion={null} />, { wrapper })
     expect(screen.getByTestId('sale-percent-off').textContent).toContain('40')
   })
 
@@ -108,7 +120,8 @@ describe('ProductDetail buy panel — sale pricing', () => {
       <ProductDetail
         product={{ ...product, sale: { ...SALE, locked: true } }}
         promotion={null}
-      />
+      />,
+      { wrapper }
     )
     expect(screen.getByTestId('sale-members-tag')).toBeTruthy()
   })
@@ -120,7 +133,8 @@ describe('ProductDetail buy panel — sale pricing', () => {
       <ProductDetail
         product={{ ...product, sale: { ...SALE, locked: true } }}
         promotion={null}
-      />
+      />,
+      { wrapper }
     )
     expect(screen.queryByTestId('sale-members-tag')).toBeNull()
   })
@@ -140,7 +154,8 @@ describe('ProductDetail buy panel — the countdown echo', () => {
       <ProductDetail
         product={{ ...product, sale: SALE }}
         promotion={promotion}
-      />
+      />,
+      { wrapper }
     )
 
     const clock = await screen.findByTestId('buybox-sale-countdown')
@@ -163,7 +178,8 @@ describe('ProductDetail buy panel — the countdown echo', () => {
           membersOnly: false,
           deadline: new Date(Date.now() - 1000).toISOString(),
         }}
-      />
+      />,
+      { wrapper }
     )
 
     expect(screen.queryByTestId('buybox-sale-countdown')).toBeNull()
@@ -181,7 +197,8 @@ describe('ProductDetail buy panel — the countdown echo', () => {
           membersOnly: false,
           deadline: deadline(),
         }}
-      />
+      />,
+      { wrapper }
     )
 
     // A promotion can be running that this poster is excluded from. Echoing
@@ -192,7 +209,8 @@ describe('ProductDetail buy panel — the countdown echo', () => {
 
   it('never derives a window of its own — an absent promotion means no clock', () => {
     render(
-      <ProductDetail product={{ ...product, sale: SALE }} promotion={null} />
+      <ProductDetail product={{ ...product, sale: SALE }} promotion={null} />,
+      { wrapper }
     )
     expect(screen.queryByTestId('buybox-sale-countdown')).toBeNull()
     // The sale still shows: the price comes from the product payload, the
