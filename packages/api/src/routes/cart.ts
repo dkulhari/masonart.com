@@ -7,17 +7,21 @@
  * - PATCH /api/cart/items/:id - Update cart item (quantity)
  * - DELETE /api/cart/items/:id - Remove item from cart
  * - DELETE /api/cart - Clear entire cart
- * - POST /api/cart/merge - Merge guest cart into user cart (after login)
+ *
+ * A guest cart merges into the user's automatically — see
+ * `mergeGuestCartOnAuth` — on the first authenticated request that still
+ * carries the guest session cookie. There is no client-callable merge route:
+ * the guest session id is httpOnly and the client never has it to send.
  *
  * Supports both authenticated users and guest sessions.
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, sql } from "drizzle-orm";
-import { getCookie, setCookie } from "hono/cookie";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 
 import { db } from "../database";
 import {
@@ -98,13 +102,6 @@ const updateCartItemSchema = z.object({
     })
     .optional(),
   isSavedForLater: z.boolean().optional(),
-});
-
-/**
- * Schema for merging guest cart
- */
-const mergeCartSchema = z.object({
-  guestSessionId: z.string().min(1),
 });
 
 // ============================================================================
@@ -398,6 +395,129 @@ async function getCartWithItems(cartId: string) {
 }
 
 // ============================================================================
+// Guest cart merge
+// ============================================================================
+
+/**
+ * Fold a guest cart into a user's, then leave the guest cart empty.
+ *
+ * Matching is on (productId, variantId, frameId, isSavedForLater) — the same
+ * natural key `POST /items` dedupes on — and a match sums the quantities rather
+ * than creating a second line.
+ *
+ * Returns true when a guest cart was found.
+ */
+export async function mergeGuestCartInto(
+  userId: string,
+  guestSessionId: string
+): Promise<boolean> {
+  // Find guest cart
+  const guestCarts = await db
+    .select()
+    .from(carts)
+    .where(and(eq(carts.sessionId, guestSessionId), eq(carts.isActive, true)))
+    .limit(1);
+
+  if (!guestCarts[0]) {
+    return false;
+  }
+
+  const guestCart = guestCarts[0];
+
+  // Get or create user's cart
+  const userCart = await getOrCreateCart(userId, null);
+
+  // Get all items from guest cart
+  const guestItems = await db
+    .select()
+    .from(cartItems)
+    .where(eq(cartItems.cartId, guestCart.id));
+
+  // Merge items into user cart
+  for (const item of guestItems) {
+    // Check if same item exists in user cart
+    const existingItems = await db
+      .select()
+      .from(cartItems)
+      .where(
+        and(
+          eq(cartItems.cartId, userCart.id),
+          eq(cartItems.productId, item.productId),
+          eq(cartItems.variantId, item.variantId),
+          item.frameId
+            ? eq(cartItems.frameId, item.frameId)
+            : sql`${cartItems.frameId} IS NULL`,
+          eq(cartItems.isSavedForLater, item.isSavedForLater)
+        )
+      )
+      .limit(1);
+
+    if (existingItems[0]) {
+      // Update quantity
+      const newQuantity = existingItems[0].quantity + item.quantity;
+      const lineTotal = calculateLineTotal(
+        item.unitPrice,
+        item.framePrice,
+        newQuantity
+      );
+
+      await db
+        .update(cartItems)
+        .set({ quantity: newQuantity, lineTotal })
+        .where(eq(cartItems.id, existingItems[0].id));
+    } else {
+      // Move item to user cart
+      await db
+        .update(cartItems)
+        .set({ cartId: userCart.id })
+        .where(eq(cartItems.id, item.id));
+    }
+  }
+
+  // Deactivate guest cart
+  await db
+    .update(carts)
+    .set({ isActive: false })
+    .where(eq(carts.id, guestCart.id));
+
+  // Update user cart totals
+  await updateCartTotals(userCart.id);
+
+  // Clear the guest cart cache
+  await invalidateCartCache(guestCart.id);
+
+  return true;
+}
+
+/**
+ * Merge on the first authenticated request that still carries a guest cookie.
+ *
+ * The guest session id is httpOnly and never leaves the server, so the client
+ * cannot ask for this — it has to happen where the cookie is readable (#511).
+ * The cookie is deleted afterwards so a second request cannot merge again.
+ *
+ * A failure here is logged and swallowed: an unmergeable guest cart must not
+ * take down every cart read for that customer.
+ */
+const mergeGuestCartOnAuth: MiddlewareHandler<{
+  Variables: OptionalAuthVariables;
+}> = async (c, next) => {
+  const user = c.get("user");
+  const sessionId = getCookie(c, GUEST_CART_COOKIE);
+
+  if (user && sessionId) {
+    try {
+      await mergeGuestCartInto(user.id, sessionId);
+    } catch (error) {
+      console.error("Error merging guest cart:", error);
+    }
+    deleteCookie(c, GUEST_CART_COOKIE, { path: "/" });
+  }
+
+  await next();
+};
+
+// ============================================================================
 // Route Handler
 // ============================================================================
 
@@ -405,6 +525,7 @@ const cartApp = new Hono<{ Variables: OptionalAuthVariables }>();
 
 // Apply optional auth to all routes
 cartApp.use("*", optionalAuth);
+cartApp.use("*", mergeGuestCartOnAuth);
 
 // ============================================================================
 // GET /api/cart - Get Cart
@@ -922,105 +1043,6 @@ cartApp.delete("/", async (c) => {
   } catch (error) {
     console.error("Error clearing cart:", error);
     return c.json({ error: "Failed to clear cart" }, 500);
-  }
-});
-
-// ============================================================================
-// POST /api/cart/merge - Merge Guest Cart into User Cart
-// ============================================================================
-
-cartApp.post("/merge", zValidator("json", mergeCartSchema), async (c) => {
-  const user = c.get("user");
-
-  if (!user) {
-    return c.json({ error: "Authentication required" }, 401);
-  }
-
-  const { guestSessionId } = c.req.valid("json");
-
-  try {
-    // Find guest cart
-    const guestCarts = await db
-      .select()
-      .from(carts)
-      .where(and(eq(carts.sessionId, guestSessionId), eq(carts.isActive, true)))
-      .limit(1);
-
-    if (!guestCarts[0]) {
-      return c.json({ message: "No guest cart to merge" });
-    }
-
-    const guestCart = guestCarts[0];
-
-    // Get or create user's cart
-    const userCart = await getOrCreateCart(user.id, null);
-
-    // Get all items from guest cart
-    const guestItems = await db
-      .select()
-      .from(cartItems)
-      .where(eq(cartItems.cartId, guestCart.id));
-
-    // Merge items into user cart
-    for (const item of guestItems) {
-      // Check if same item exists in user cart
-      const existingItems = await db
-        .select()
-        .from(cartItems)
-        .where(
-          and(
-            eq(cartItems.cartId, userCart.id),
-            eq(cartItems.productId, item.productId),
-            eq(cartItems.variantId, item.variantId),
-            item.frameId
-              ? eq(cartItems.frameId, item.frameId)
-              : sql`${cartItems.frameId} IS NULL`,
-            eq(cartItems.isSavedForLater, item.isSavedForLater)
-          )
-        )
-        .limit(1);
-
-      if (existingItems[0]) {
-        // Update quantity
-        const newQuantity = existingItems[0].quantity + item.quantity;
-        const lineTotal = calculateLineTotal(
-          item.unitPrice,
-          item.framePrice,
-          newQuantity
-        );
-
-        await db
-          .update(cartItems)
-          .set({ quantity: newQuantity, lineTotal })
-          .where(eq(cartItems.id, existingItems[0].id));
-      } else {
-        // Move item to user cart
-        await db
-          .update(cartItems)
-          .set({ cartId: userCart.id })
-          .where(eq(cartItems.id, item.id));
-      }
-    }
-
-    // Deactivate guest cart
-    await db
-      .update(carts)
-      .set({ isActive: false })
-      .where(eq(carts.id, guestCart.id));
-
-    // Update user cart totals
-    await updateCartTotals(userCart.id);
-
-    // Clear the guest cart cache
-    await invalidateCartCache(guestCart.id);
-
-    return c.json({
-      message: "Cart merged successfully",
-      cartId: userCart.id,
-    });
-  } catch (error) {
-    console.error("Error merging carts:", error);
-    return c.json({ error: "Failed to merge carts" }, 500);
   }
 });
 

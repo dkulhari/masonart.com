@@ -7,7 +7,9 @@
  * - PATCH /api/cart/items/:id - Update cart item (quantity, frame, customizations)
  * - DELETE /api/cart/items/:id - Remove item from cart
  * - DELETE /api/cart - Clear entire cart
- * - POST /api/cart/merge - Merge guest cart into user cart (after login)
+ *
+ * The guest-cart merge (after login) is `mergeGuestCartOnAuth` middleware, not
+ * a route — see tests/routes/cart-guest-merge.test.ts (#511).
  *
  * Tests are organized into:
  * 1. Configuration tests - Always run, don't require database
@@ -237,20 +239,10 @@ describe('Cart Route Availability', () => {
     expect(res.headers.get('content-type')).toContain('application/json');
   });
 
-  it('should have merge cart route at /api/cart/merge', async () => {
-    if (!app) {
-      console.log('App not available, skipping route availability test');
-      return;
-    }
-
-    const res = await app.request('/api/cart/merge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    // Should not be 404 - might be 400 (validation) or 401 (unauthorized)
-    expect(res.status).not.toBe(404);
-  });
+  // POST /api/cart/merge was removed (#511): the guest session id it needed
+  // lives in an httpOnly cookie the client can never read, so no browser
+  // could ever call it. The merge is now `mergeGuestCartOnAuth` middleware —
+  // see tests/routes/cart-guest-merge.test.ts.
 });
 
 // ============================================================================
@@ -748,47 +740,10 @@ describe('Cart Delete Item Validation', () => {
   });
 });
 
-// ============================================================================
-// Merge Cart Validation Tests (Always Run)
-// ============================================================================
-
-describe('Cart Merge Validation', () => {
-  describe('POST /api/cart/merge - Merge Guest Cart', () => {
-    it('should require guestSessionId', async () => {
-      if (!app) return;
-
-      const res = await app.request('/api/cart/merge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      expect(res.status).toBe(400);
-    });
-
-    it('should reject empty guestSessionId', async () => {
-      if (!app) return;
-
-      const res = await app.request('/api/cart/merge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestSessionId: '' }),
-      });
-      expect(res.status).toBe(400);
-    });
-
-    it('should require authentication', async () => {
-      if (!app) return;
-
-      const res = await app.request('/api/cart/merge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestSessionId: 'guest_12345678_abc123' }),
-      });
-      // Should be 401 (unauthorized) since no auth provided
-      expect(res.status).toBe(401);
-    });
-  });
-});
+// POST /api/cart/merge validation tests were removed with the route (#511):
+// the guest session id it validated lives in an httpOnly cookie the client
+// can never read. See tests/routes/cart-guest-merge.test.ts for the
+// replacement, `mergeGuestCartOnAuth`.
 
 // ============================================================================
 // HTTP Method Tests (Always Run)
@@ -920,16 +875,6 @@ describe('Cart Response Headers', () => {
     expect(res.headers.get('content-type')).toContain('application/json');
   });
 
-  it('should return JSON content-type for merge endpoint', async () => {
-    if (!app) return;
-
-    const res = await app.request('/api/cart/merge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guestSessionId: 'test_session' }),
-    });
-    expect(res.headers.get('content-type')).toContain('application/json');
-  });
 });
 
 // ============================================================================
@@ -965,20 +910,6 @@ describe('Cart Error Response Format', () => {
     expect(JSON.stringify(json)).not.toContain('node_modules');
   });
 
-  it('should return proper error for unauthorized merge request', async () => {
-    if (!app) return;
-
-    const res = await app.request('/api/cart/merge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guestSessionId: 'guest_test_session' }),
-    });
-    expect(res.status).toBe(401);
-
-    const json = await res.json();
-    expect(json).toHaveProperty('error');
-    expect(json.error).toBe('Authentication required');
-  });
 });
 
 // ============================================================================
@@ -1216,25 +1147,8 @@ describe('Cart Runtime Tests (Database Required)', () => {
     });
   });
 
-  describe('POST /api/cart/merge - Merge Guest Cart', () => {
-    it('should require authentication', async () => {
-      if (!isDatabaseAvailable) {
-        console.log('Skipping: Database not available');
-        return;
-      }
-      if (!app) return;
-
-      const res = await app.request('/api/cart/merge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestSessionId: 'guest_test_123_abc' }),
-      });
-      expect(res.status).toBe(401);
-
-      const json = await res.json();
-      expect(json.error).toBe('Authentication required');
-    });
-  });
+  // POST /api/cart/merge was removed (#511) — see
+  // tests/routes/cart-guest-merge.test.ts for its replacement.
 });
 
 // ============================================================================
