@@ -993,27 +993,6 @@ export const cartApi = {
 
     return response.json();
   },
-
-  /**
-   * Merge guest cart into user cart after login
-   */
-  async merge(guestSessionId: string) {
-    const response = await fetch(`${getApiUrl()}/api/cart/merge`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ guestSessionId }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to merge cart");
-    }
-
-    return response.json();
-  },
 };
 
 // Payment initiation response

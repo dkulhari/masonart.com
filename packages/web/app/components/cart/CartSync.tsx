@@ -19,7 +19,6 @@
 import { useEffect } from 'react'
 
 import { useServerCart } from '~/hooks/useCart'
-import type { ServerCartPayload } from '~/lib/cart-projection'
 import { useCartStore } from '~/stores/cart'
 
 export function CartSync(): null {
@@ -29,7 +28,7 @@ export function CartSync(): null {
 
   useEffect(() => {
     // Project successful fetches into the store
-    if (data) replaceFromServer(data as unknown as ServerCartPayload)
+    if (data) replaceFromServer(data)
 
     // Handle fetch errors. If the query is in an error state, signal it.
     // A successful fetch (even if it returns empty) clears the error because
