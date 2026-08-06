@@ -1,9 +1,9 @@
 status: done
-last_updated: '2026-08-06T20:44:40.539Z'
-total_tickets: 515
+last_updated: '2026-08-06T20:45:19.424Z'
+total_tickets: 516
 summary:
   critical: 29
-  high: 196
+  high: 197
   medium: 221
   low: 69
 priorities:
@@ -1039,6 +1039,10 @@ priorities:
           blocked_by: []
         - ticket_number: 549
           title: Service - release the hold, credit refunds, and cap them per order
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 553
+          title: Schema - unique purchaseOrderId and orders.giftCardPurchase
           assignee: unassigned
           blocked_by: []
         - ticket_number: 554

@@ -1,9 +1,9 @@
 status: todo
-last_updated: '2026-08-06T20:44:40.383Z'
-total_tickets: 24
+last_updated: '2026-08-06T20:45:19.305Z'
+total_tickets: 23
 summary:
   critical: 3
-  high: 6
+  high: 5
   medium: 9
   low: 6
 priorities:
@@ -79,12 +79,6 @@ priorities:
           blocked_by: []
         - ticket_number: 547
           title: Review toast covers page content on every screen and has no counterpart on the reference
-          assignee: unassigned
-          blocked_by: []
-    - feature: gift-cards
-      tickets:
-        - ticket_number: 553
-          title: Schema - unique purchaseOrderId and orders.giftCardPurchase
           assignee: unassigned
           blocked_by: []
   medium:
