@@ -30,6 +30,10 @@ import { invalidateCartCache } from "./cart";
 import { productionApprovals } from "../database/schema/approvals";
 import { reviews } from "../database/schema/reviews";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
+import {
+  generateOrderNumber,
+  ORDER_NUMBER_PREFIX,
+} from "../lib/order-number";
 import type { Promotion } from "../database/schema/promotions";
 import {
   getActivePromotions,
@@ -53,7 +57,6 @@ import {
 
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
-const ORDER_NUMBER_PREFIX = "MA";
 
 // ============================================================================
 // Validation Schemas
@@ -142,26 +145,6 @@ const createOrderReviewSchema = z.object({
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/**
- * Generate a unique order number
- * Format: MA-YYYY-NNNNNN (e.g., MA-2024-000123)
- */
-async function generateOrderNumber(): Promise<string> {
-  const year = new Date().getFullYear();
-  const prefix = `${ORDER_NUMBER_PREFIX}-${year}-`;
-
-  // Get the count of orders this year for sequential numbering
-  const result = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(orders)
-    .where(sql`${orders.orderNumber} LIKE ${prefix + "%"}`);
-
-  const count = (result[0]?.count ?? 0) + 1;
-  const sequenceNumber = count.toString().padStart(6, "0");
-
-  return `${prefix}${sequenceNumber}`;
-}
 
 /**
  * Calculate shipping cost based on method and subtotal

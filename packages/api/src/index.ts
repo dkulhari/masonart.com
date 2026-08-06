@@ -23,6 +23,7 @@ import { cartApp } from "./routes/cart";
 import { ordersApp } from "./routes/orders";
 import { aiApp } from "./routes/ai";
 import { walletApp } from "./routes/wallet";
+import { giftCardsApp } from "./routes/gift-cards";
 import { phoneAuthApp } from "./routes/phone-auth";
 import { razorpayWebhooksApp } from "./routes/webhooks/razorpay";
 import { walletWebhookApp } from "./routes/webhooks/wallet";
@@ -141,6 +142,9 @@ app.route("/api/ai", aiApp);
 
 // Wallet API - balance, transactions, top-up
 app.route("/api/wallet", walletApp);
+
+// Gift Cards API - purchase a card (tender, not a discount)
+app.route("/api/gift-cards", giftCardsApp);
 
 // Phone Auth API - SMS OTP login (rate limited)
 app.post("/api/phone-auth/*", otpRateLimit); // 5/min
