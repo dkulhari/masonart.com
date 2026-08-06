@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Store,
   Percent,
+  Gift,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
@@ -84,6 +85,11 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Promotions',
     href: '/admin/promotions',
     icon: Percent,
+  },
+  {
+    label: 'Gift Cards',
+    href: '/admin/gift-cards',
+    icon: Gift,
   },
   {
     label: 'Reviews',

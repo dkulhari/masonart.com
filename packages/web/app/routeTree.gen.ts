@@ -39,6 +39,7 @@ import { Route as CheckoutSuccessRouteImport } from './routes/checkout/success'
 import { Route as CollectionsSlugRouteImport } from './routes/collections/$slug'
 import { Route as CreateIndexRouteImport } from './routes/create/index'
 import { Route as GalleryIndexRouteImport } from './routes/gallery/index'
+import { Route as GiftCardsIndexRouteImport } from './routes/gift-cards/index'
 import { Route as PostersIndexRouteImport } from './routes/posters/index'
 import { Route as PostersSlugRouteImport } from './routes/posters/$slug'
 import { Route as TrackIndexRouteImport } from './routes/track/index'
@@ -54,6 +55,8 @@ import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$
 import { Route as AdminCollectionsIndexRouteImport } from './routes/admin/collections/index'
 import { Route as AdminCollectionsIdRouteImport } from './routes/admin/collections/$id'
 import { Route as AdminCollectionsNewRouteImport } from './routes/admin/collections/new'
+import { Route as AdminGiftCardsIndexRouteImport } from './routes/admin/gift-cards/index'
+import { Route as AdminGiftCardsIdRouteImport } from './routes/admin/gift-cards/$id'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
 import { Route as AdminOrdersIdRouteImport } from './routes/admin/orders/$id'
 import { Route as AdminProductsIndexRouteImport } from './routes/admin/products/index'
@@ -214,6 +217,11 @@ const GalleryIndexRoute = GalleryIndexRouteImport.update({
   path: '/gallery/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GiftCardsIndexRoute = GiftCardsIndexRouteImport.update({
+  id: '/gift-cards/',
+  path: '/gift-cards/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PostersIndexRoute = PostersIndexRouteImport.update({
   id: '/posters/',
   path: '/posters/',
@@ -289,6 +297,16 @@ const AdminCollectionsIdRoute = AdminCollectionsIdRouteImport.update({
 const AdminCollectionsNewRoute = AdminCollectionsNewRouteImport.update({
   id: '/collections/new',
   path: '/collections/new',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminGiftCardsIndexRoute = AdminGiftCardsIndexRouteImport.update({
+  id: '/gift-cards/',
+  path: '/gift-cards/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminGiftCardsIdRoute = AdminGiftCardsIdRouteImport.update({
+  id: '/gift-cards/$id',
+  path: '/gift-cards/$id',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
@@ -377,6 +395,7 @@ export interface FileRoutesByFullPath {
   '/checkout/': typeof CheckoutIndexRoute
   '/create/': typeof CreateIndexRoute
   '/gallery/': typeof GalleryIndexRoute
+  '/gift-cards/': typeof GiftCardsIndexRoute
   '/posters/': typeof PostersIndexRoute
   '/track/': typeof TrackIndexRoute
   '/account/addresses': typeof AuthedAccountAddressesRoute
@@ -387,6 +406,7 @@ export interface FileRoutesByFullPath {
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/collections/$id': typeof AdminCollectionsIdRoute
   '/admin/collections/new': typeof AdminCollectionsNewRoute
+  '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
@@ -394,6 +414,7 @@ export interface FileRoutesByFullPath {
   '/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
+  '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/admin/promotions/': typeof AdminPromotionsIndexRoute
@@ -432,6 +453,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutIndexRoute
   '/create': typeof CreateIndexRoute
   '/gallery': typeof GalleryIndexRoute
+  '/gift-cards': typeof GiftCardsIndexRoute
   '/posters': typeof PostersIndexRoute
   '/track': typeof TrackIndexRoute
   '/account/addresses': typeof AuthedAccountAddressesRoute
@@ -442,6 +464,7 @@ export interface FileRoutesByTo {
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/collections/$id': typeof AdminCollectionsIdRoute
   '/admin/collections/new': typeof AdminCollectionsNewRoute
+  '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
@@ -449,6 +472,7 @@ export interface FileRoutesByTo {
   '/account': typeof AuthedAccountIndexRoute
   '/admin/approvals': typeof AdminApprovalsIndexRoute
   '/admin/collections': typeof AdminCollectionsIndexRoute
+  '/admin/gift-cards': typeof AdminGiftCardsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
   '/admin/promotions': typeof AdminPromotionsIndexRoute
@@ -490,6 +514,7 @@ export interface FileRoutesById {
   '/checkout/': typeof CheckoutIndexRoute
   '/create/': typeof CreateIndexRoute
   '/gallery/': typeof GalleryIndexRoute
+  '/gift-cards/': typeof GiftCardsIndexRoute
   '/posters/': typeof PostersIndexRoute
   '/track/': typeof TrackIndexRoute
   '/_authed/account/addresses': typeof AuthedAccountAddressesRoute
@@ -500,6 +525,7 @@ export interface FileRoutesById {
   '/admin/approvals/$id': typeof AdminApprovalsIdRoute
   '/admin/collections/$id': typeof AdminCollectionsIdRoute
   '/admin/collections/new': typeof AdminCollectionsNewRoute
+  '/admin/gift-cards/$id': typeof AdminGiftCardsIdRoute
   '/admin/orders/$id': typeof AdminOrdersIdRoute
   '/admin/products/$id': typeof AdminProductsIdRoute
   '/admin/products/new': typeof AdminProductsNewRoute
@@ -507,6 +533,7 @@ export interface FileRoutesById {
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
+  '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
   '/admin/promotions/': typeof AdminPromotionsIndexRoute
@@ -548,6 +575,7 @@ export interface FileRouteTypes {
     | '/checkout/'
     | '/create/'
     | '/gallery/'
+    | '/gift-cards/'
     | '/posters/'
     | '/track/'
     | '/account/addresses'
@@ -558,6 +586,7 @@ export interface FileRouteTypes {
     | '/admin/approvals/$id'
     | '/admin/collections/$id'
     | '/admin/collections/new'
+    | '/admin/gift-cards/$id'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
@@ -565,6 +594,7 @@ export interface FileRouteTypes {
     | '/account/'
     | '/admin/approvals/'
     | '/admin/collections/'
+    | '/admin/gift-cards/'
     | '/admin/orders/'
     | '/admin/products/'
     | '/admin/promotions/'
@@ -603,6 +633,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/create'
     | '/gallery'
+    | '/gift-cards'
     | '/posters'
     | '/track'
     | '/account/addresses'
@@ -613,6 +644,7 @@ export interface FileRouteTypes {
     | '/admin/approvals/$id'
     | '/admin/collections/$id'
     | '/admin/collections/new'
+    | '/admin/gift-cards/$id'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
@@ -620,6 +652,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin/approvals'
     | '/admin/collections'
+    | '/admin/gift-cards'
     | '/admin/orders'
     | '/admin/products'
     | '/admin/promotions'
@@ -660,6 +693,7 @@ export interface FileRouteTypes {
     | '/checkout/'
     | '/create/'
     | '/gallery/'
+    | '/gift-cards/'
     | '/posters/'
     | '/track/'
     | '/_authed/account/addresses'
@@ -670,6 +704,7 @@ export interface FileRouteTypes {
     | '/admin/approvals/$id'
     | '/admin/collections/$id'
     | '/admin/collections/new'
+    | '/admin/gift-cards/$id'
     | '/admin/orders/$id'
     | '/admin/products/$id'
     | '/admin/products/new'
@@ -677,6 +712,7 @@ export interface FileRouteTypes {
     | '/_authed/account/'
     | '/admin/approvals/'
     | '/admin/collections/'
+    | '/admin/gift-cards/'
     | '/admin/orders/'
     | '/admin/products/'
     | '/admin/promotions/'
@@ -713,6 +749,7 @@ export interface RootRouteChildren {
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   CreateIndexRoute: typeof CreateIndexRoute
   GalleryIndexRoute: typeof GalleryIndexRoute
+  GiftCardsIndexRoute: typeof GiftCardsIndexRoute
   PostersIndexRoute: typeof PostersIndexRoute
   TrackIndexRoute: typeof TrackIndexRoute
 }
@@ -929,6 +966,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GalleryIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/gift-cards/': {
+      id: '/gift-cards/'
+      path: '/gift-cards'
+      fullPath: '/gift-cards/'
+      preLoaderRoute: typeof GiftCardsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/posters/': {
       id: '/posters/'
       path: '/posters'
@@ -1032,6 +1076,20 @@ declare module '@tanstack/react-router' {
       path: '/collections/new'
       fullPath: '/admin/collections/new'
       preLoaderRoute: typeof AdminCollectionsNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/gift-cards/': {
+      id: '/admin/gift-cards/'
+      path: '/gift-cards'
+      fullPath: '/admin/gift-cards/'
+      preLoaderRoute: typeof AdminGiftCardsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/gift-cards/$id': {
+      id: '/admin/gift-cards/$id'
+      path: '/gift-cards/$id'
+      fullPath: '/admin/gift-cards/$id'
+      preLoaderRoute: typeof AdminGiftCardsIdRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/orders/': {
@@ -1143,12 +1201,14 @@ interface AdminRouteChildren {
   AdminApprovalsIdRoute: typeof AdminApprovalsIdRoute
   AdminCollectionsIdRoute: typeof AdminCollectionsIdRoute
   AdminCollectionsNewRoute: typeof AdminCollectionsNewRoute
+  AdminGiftCardsIdRoute: typeof AdminGiftCardsIdRoute
   AdminOrdersIdRoute: typeof AdminOrdersIdRoute
   AdminProductsIdRoute: typeof AdminProductsIdRoute
   AdminProductsNewRoute: typeof AdminProductsNewRoute
   AdminPromotionsIdRoute: typeof AdminPromotionsIdRoute
   AdminApprovalsIndexRoute: typeof AdminApprovalsIndexRoute
   AdminCollectionsIndexRoute: typeof AdminCollectionsIndexRoute
+  AdminGiftCardsIndexRoute: typeof AdminGiftCardsIndexRoute
   AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
   AdminProductsIndexRoute: typeof AdminProductsIndexRoute
   AdminPromotionsIndexRoute: typeof AdminPromotionsIndexRoute
@@ -1163,12 +1223,14 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminApprovalsIdRoute: AdminApprovalsIdRoute,
   AdminCollectionsIdRoute: AdminCollectionsIdRoute,
   AdminCollectionsNewRoute: AdminCollectionsNewRoute,
+  AdminGiftCardsIdRoute: AdminGiftCardsIdRoute,
   AdminOrdersIdRoute: AdminOrdersIdRoute,
   AdminProductsIdRoute: AdminProductsIdRoute,
   AdminProductsNewRoute: AdminProductsNewRoute,
   AdminPromotionsIdRoute: AdminPromotionsIdRoute,
   AdminApprovalsIndexRoute: AdminApprovalsIndexRoute,
   AdminCollectionsIndexRoute: AdminCollectionsIndexRoute,
+  AdminGiftCardsIndexRoute: AdminGiftCardsIndexRoute,
   AdminOrdersIndexRoute: AdminOrdersIndexRoute,
   AdminProductsIndexRoute: AdminProductsIndexRoute,
   AdminPromotionsIndexRoute: AdminPromotionsIndexRoute,
@@ -1204,6 +1266,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutIndexRoute: CheckoutIndexRoute,
   CreateIndexRoute: CreateIndexRoute,
   GalleryIndexRoute: GalleryIndexRoute,
+  GiftCardsIndexRoute: GiftCardsIndexRoute,
   PostersIndexRoute: PostersIndexRoute,
   TrackIndexRoute: TrackIndexRoute,
 }
