@@ -65,8 +65,15 @@ interface RazorpayResponse {
 type PaymentStatus = 'idle' | 'creating_order' | 'initiating_payment' | 'processing' | 'verifying' | 'success' | 'error'
 
 interface PaymentButtonProps {
-  /** Order input data (shipping address, delivery method, etc.) */
-  orderData: OrderInput
+  /** Order input data. Not needed when `existingOrderId` is given. */
+  orderData?: OrderInput
+  /**
+   * Pay for an order that already exists, skipping creation.
+   *
+   * Used by the gift card flow, which builds its own order because a gift
+   * card cannot go through the cart.
+   */
+  existingOrderId?: string
   /** Total amount to be paid */
   totalAmount: number
   /** Whether the payment button should be disabled */
@@ -125,6 +132,7 @@ function loadRazorpayScript(): Promise<boolean> {
 
 export function PaymentButton({
   orderData,
+  existingOrderId,
   totalAmount,
   disabled = false,
   customerPhone,
@@ -174,10 +182,27 @@ export function PaymentButton({
     setErrorMessage(null)
 
     try {
-      // Step 1: Create order in our system
-      setStatus('creating_order')
-      const orderResponse = await ordersApi.create(orderData)
-      const orderId = orderResponse.order.id
+      /**
+       * Step 1: Create order in our system.
+       *
+       * Skipped when the order already exists. A gift card purchase creates
+       * its own order — it cannot come from the cart, which needs a real
+       * product and variant behind every line — and then reuses the rest of
+       * this flow rather than growing a second Razorpay integration.
+       */
+      let resolvedOrderId = existingOrderId
+      if (!resolvedOrderId) {
+        setStatus('creating_order')
+        const orderResponse = await ordersApi.create(orderData!)
+        resolvedOrderId = orderResponse.order.id
+      }
+      // Definite from here on; the callbacks below close over it. A payment
+      // with no order behind it is a bug worth failing loudly on rather than
+      // sending an undefined id to Razorpay.
+      if (!resolvedOrderId) {
+        throw new Error('Could not determine which order to pay for')
+      }
+      const orderId: string = resolvedOrderId
 
       // Step 2: Initiate payment with Razorpay
       setStatus('initiating_payment')
@@ -194,9 +219,9 @@ export function PaymentButton({
         description: `Order #${paymentData.orderNumber}`,
         order_id: paymentData.razorpayOrderId,
         prefill: {
-          name: paymentData.prefill.name || orderData.shippingAddress.fullName,
+          name: paymentData.prefill.name || orderData?.shippingAddress.fullName,
           email: paymentData.prefill.email,
-          contact: customerPhone || orderData.shippingAddress.phone,
+          contact: customerPhone || orderData?.shippingAddress.phone,
         },
         notes: {
           orderNumber: paymentData.orderNumber,
@@ -266,6 +291,7 @@ export function PaymentButton({
   }, [
     scriptLoaded,
     orderData,
+    existingOrderId,
     customerPhone,
     onSuccess,
     onError,
