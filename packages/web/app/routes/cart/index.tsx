@@ -9,6 +9,13 @@
  * `readCartSaving` below and rendered, never recomputed — see the comment
  * there for why that distinction is the whole ticket (#436).
  *
+ * Because those are two different sources with nothing keeping them in step,
+ * `readCartSaving` is only ever allowed to quote lines that appear in both
+ * (#510). Reconciling them properly — one server-owned cart, with the store
+ * demoted to a cache in front of it — is a larger change than this page: today
+ * nothing in the app writes to the server cart at all, so it cannot yet be the
+ * render source.
+ *
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
@@ -114,7 +121,7 @@ function toPaise(value: string | null | undefined): number {
 }
 
 interface CartSaving {
-  /** Paise actually coming off, straight from the server's `savingTotal`. */
+  /** Paise actually coming off, for the lines this page is rendering. */
   unlocked: number
   /** Paise behind the membership gate, summed from the locked lines. */
   locked: number
@@ -127,31 +134,67 @@ const NO_SAVING: CartSaving = { unlocked: 0, locked: 0, byLine: new Map() }
 /**
  * What the payload says the sale is worth — read, never recomputed.
  *
- * Two figures, because they are two different things. `unlocked` is the
- * server's own `savingTotal`: money the checkout will take off, quoted from the
- * single place that decides it, so the cart cannot promise a discount the order
- * will not give. `locked` is money it will not take off — the server totals
- * that as zero, correctly — so the teaser is recovered per line as
- * `base − sale`, the same subtraction the server does over the same two
- * figures. No percentage is ever applied on this side of the wire: `percentOff`
- * is copy, not arithmetic.
+ * Two figures, because they are two different things. `unlocked` is money the
+ * checkout will take off, quoted from the single place that decides it, so the
+ * cart cannot promise a discount the order will not give. `locked` is money it
+ * will not take off — the server totals that as zero, correctly — so the teaser
+ * is recovered per line as `base − sale`, the same subtraction the server does
+ * over the same two figures. No percentage is ever applied on this side of the
+ * wire: `percentOff` is copy, not arithmetic.
+ *
+ * ## Why this takes the displayed lines as an argument (#510)
+ *
+ * The lines on screen come from the local store; these figures come from the
+ * server, and nothing synchronises the two. When they hold different baskets —
+ * a line added while logged out, on another device, or lost to a `localStorage`
+ * clear — `savingTotal` is a total over lines the customer cannot see, and
+ * quoting it would describe a basket that is not the one being bought.
+ *
+ * So every figure here is confined to lines present in *both* sources.
+ * `savingTotal` is still passed through verbatim whenever it is wholly
+ * attributable to displayed lines, which is the ordinary case and the one that
+ * must not change: the server's own arithmetic, untouched. Only when a
+ * discounted, unlocked line is missing from the page does the total fall back
+ * to the sum of the server's per-line figures for the lines that *are* shown —
+ * still the server's numbers, just narrowed to the basket on screen. The
+ * alternative is a page that advertises a saving against something it is not
+ * displaying, which is the one thing a discount must never do.
  */
-function readCartSaving(cart: PricedCart | null | undefined): CartSaving {
+function readCartSaving(
+  cart: PricedCart | null | undefined,
+  displayed: ReadonlySet<string>
+): CartSaving {
   if (!cart?.items?.length) return NO_SAVING
 
   const byLine = new Map<string, { amount: number; locked: boolean }>()
   let locked = 0
+  let unlockedShown = 0
+  // A discounted, unlocked line the server counted into `savingTotal` but this
+  // page is not rendering. Only these can make the server's total overstate
+  // what is on screen: locked lines already total as zero.
+  let hasUnshownSaving = false
 
   for (const line of cart.items) {
     if (!line.pricing?.sale) continue
     const amount = toPaise(line.pricing.base) - toPaise(line.pricing.sale)
     if (amount <= 0) continue
 
-    byLine.set(lineKey(line), { amount, locked: line.pricing.locked })
+    const key = lineKey(line)
+    if (!displayed.has(key)) {
+      if (!line.pricing.locked) hasUnshownSaving = true
+      continue
+    }
+
+    byLine.set(key, { amount, locked: line.pricing.locked })
     if (line.pricing.locked) locked += amount
+    else unlockedShown += amount
   }
 
-  return { unlocked: toPaise(cart.savingTotal), locked, byLine }
+  return {
+    unlocked: hasUnshownSaving ? unlockedShown : toPaise(cart.savingTotal),
+    locked,
+    byLine,
+  }
 }
 
 // ============================================================================
@@ -184,11 +227,20 @@ export function CartContent() {
   /**
    * Every figure in the saving rows comes from here. The local store knows what
    * is in the cart; only the server knows what it costs under a promotion.
+   *
+   * The two can hold different baskets, so the displayed lines are handed to
+   * `readCartSaving` as the set it is allowed to quote — see there for why
+   * (#510).
    */
   const { data, refetch } = useServerCart()
+  const displayedLines = useMemo(
+    () => new Set(items.map((item) => lineKey(item))),
+    [items]
+  )
   const saving = useMemo(
-    () => readCartSaving(data as unknown as PricedCart | undefined),
-    [data]
+    () =>
+      readCartSaving(data as unknown as PricedCart | undefined, displayedLines),
+    [data, displayedLines]
   )
 
   const { isMember } = useGalleryMembership()

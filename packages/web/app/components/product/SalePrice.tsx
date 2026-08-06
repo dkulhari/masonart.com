@@ -109,14 +109,24 @@ export function SalePrice({
    * sites. Callers pass their own; everything below is relative to it.
    */
   if (!sale) {
+    /**
+     * The price is a direct text child of the styled element, not a wrapped
+     * span. That is load-bearing twice over: it is one unbreakable line, and
+     * the card's own suite asserts that the element carrying the price is the
+     * one carrying `text-price`. A wrapper would put the figure in a child
+     * with no type scale on it.
+     */
     return (
-      <span className={cn('whitespace-nowrap', className)}>
+      <span
+        data-testid="price-current"
+        className={cn('whitespace-nowrap', className)}
+      >
         {prefix && (
           <>
             <small className="text-[0.8em]">{prefix}</small>{' '}
           </>
         )}
-        <span data-testid="price-current">{formatPrice(basePrice)}</span>
+        {formatPrice(basePrice)}
       </span>
     )
   }

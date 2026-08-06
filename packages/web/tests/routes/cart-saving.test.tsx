@@ -344,6 +344,110 @@ describe('cart saving row', () => {
     expect(cartSaving('cart-saving')).toBe(10120)
   })
 
+  /**
+   * #510 — the page draws its lines from the local store and its money from the
+   * server, and nothing keeps the two in step. A line bought while logged out,
+   * added on another device, or dropped by a `localStorage` clear leaves the
+   * server holding a basket the customer is not looking at — and `savingTotal`
+   * is summed over *that* basket.
+   *
+   * The invariant these lock down: a figure on this page may only ever describe
+   * a line the page is rendering. Where the two carts agree — the ordinary
+   * case, and the one every test above exercises — nothing changes at all, and
+   * `savingTotal` is still passed through untouched.
+   */
+  describe('when the two cart sources disagree', () => {
+    it('never quotes a cart-level saving for a line it is not rendering', () => {
+      membership.isMember = true
+      // The server prices two lines and totals both. The customer sees one.
+      givenPricedCart(DISCOUNTED, '11720.00')
+      useCartStore.setState({ items: [LINE_A] })
+
+      render(<CartContent />)
+
+      expect(lineSavings()).toEqual([10120])
+      // 11,720 would be quoting Kyoto Rain's 1,600 against a basket that does
+      // not contain it.
+      expect(cartSaving('cart-saving')).toBe(10120)
+      expect(screen.queryByText(/11,720/)).toBeNull()
+    })
+
+    it('never quotes a locked saving for a line it is not rendering', () => {
+      givenPricedCart(LOCKED, '0.00')
+      useCartStore.setState({ items: [LINE_A] })
+
+      render(<CartContent />)
+
+      expect(lineSavings()).toEqual([10120])
+      expect(cartSaving('cart-saving-locked')).toBe(10120)
+      expect(screen.queryByText(/11,720/)).toBeNull()
+    })
+
+    it('still reconciles: the rendered lines sum to the rendered total', () => {
+      membership.isMember = true
+      givenPricedCart(DISCOUNTED, '11720.00')
+      useCartStore.setState({ items: [LINE_A] })
+
+      render(<CartContent />)
+
+      const sum = lineSavings().reduce((total, amount) => total + amount, 0)
+      expect(sum).toBe(cartSaving('cart-saving'))
+    })
+
+    it('shows nothing when the carts disagree but no promotion is running', () => {
+      // The no-promotion cart is the one that must not move. Divergent sources,
+      // nothing discounted: the page looks exactly as it does with no sale at
+      // all — no rows, no gate, no arithmetic.
+      membership.isMember = false
+      givenPricedCart(
+        [
+          pricedLine(LINE_A, { base: '25300.00', sale: null }),
+          pricedLine(LINE_B, { base: '4000.00', sale: null }),
+        ],
+        '0.00'
+      )
+      useCartStore.setState({ items: [LINE_A] })
+
+      render(<CartContent />)
+
+      expect(screen.queryByTestId('cart-saving')).toBeNull()
+      expect(screen.queryByTestId('cart-saving-locked')).toBeNull()
+      expect(screen.queryAllByTestId('cart-line-saving')).toHaveLength(0)
+      expect(screen.queryByText(/join the gallery/i)).toBeNull()
+    })
+
+    it('leaves a line the server has never seen without a saving', () => {
+      // The other direction: the store is ahead of the server. The line the
+      // server does know about keeps its saving; the unknown one simply has
+      // none, which is what an unpriced line has always had.
+      membership.isMember = true
+      givenPricedCart(
+        [pricedLine(LINE_A, { base: '25300.00', sale: '15180.00' })],
+        '10120.00'
+      )
+      useCartStore.setState({ items: [LINE_A, LINE_B] })
+
+      render(<CartContent />)
+
+      expect(lineSavings()).toEqual([10120])
+      expect(cartSaving('cart-saving')).toBe(10120)
+    })
+
+    it('passes the server total through untouched when both carts agree', () => {
+      // The guard against over-correcting. When every priced line is on screen
+      // the total is still the server's own figure, quoted verbatim — even
+      // where it does not match what summing the lines would give. Reconciling
+      // the display must not become a licence to compute the discount here.
+      membership.isMember = true
+      givenPricedCart(DISCOUNTED, '11000.00')
+      useCartStore.setState({ items: [LINE_A, LINE_B] })
+
+      render(<CartContent />)
+
+      expect(cartSaving('cart-saving')).toBe(11000)
+    })
+  })
+
   it('re-reads the cart when the viewer is a member but the payload is locked', () => {
     // Joining from the banner on the previous page leaves a locked payload in
     // the query cache. The fix is another read, never a locally invented
