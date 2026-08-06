@@ -77,7 +77,15 @@ export interface FrameSelectorProps {
 // ============================================================================
 
 /**
- * Calculate the price addition for a frame based on modifier type
+ * Calculate the price addition for a frame based on modifier type.
+ *
+ * The percentage branch rounds to the rupee, matching `frameAddition` in
+ * `@chobii/shared` — the formula `POST /api/cart/items` stores and
+ * `POST /api/orders` charges. This helper keeps its own signature because the
+ * PDP has already converted the frame row's `priceModifier` into a percentage
+ * by the time it gets here (see `routes/posters/$slug.tsx`), but the number it
+ * produces has to be the same one, or the buy panel quotes a price the drawer
+ * corrects a rupee later (#511 final review, finding 1).
  */
 export function calculateFramePrice(
   basePrice: number,
@@ -85,7 +93,7 @@ export function calculateFramePrice(
   modifierValue: number
 ): number {
   if (modifierType === 'percentage') {
-    return basePrice * (modifierValue / 100)
+    return Math.round(basePrice * (modifierValue / 100))
   }
   // Fixed price is stored in paise, convert to rupees
   return modifierValue / 100

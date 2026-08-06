@@ -50,7 +50,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Minus, Plus, X, ArrowRight } from 'lucide-react'
-import { sortedImages } from '@chobii/shared'
+import { frameAddition, sortedImages, type FramePriceColumns } from '@chobii/shared'
 import { cn, formatPrice } from '~/lib/utils'
 import { productsApi } from '~/lib/api'
 import { useCartActions } from '~/hooks/useCartActions'
@@ -96,17 +96,16 @@ interface QuickviewFrame {
   type: string
   name: string
   /**
-   * Fraction of the piece this format adds — 0.4 for +40%.
+   * The frame row's two pricing columns, carried through untransformed so the
+   * one shared formula can read them.
    *
    * A moulding for a 12x16 and one for a 60x80 are not the same amount of
    * timber, and theirs price accordingly: measured across three sizes of one
    * piece, the framed option ran +85%, +76% and +91% of the rolled price
    * rather than a fixed sum. A flat `priceAddition` would undercharge every
-   * large piece and overcharge every small one.
+   * large piece and overcharge every small one — see `frameAddition`.
    */
-  priceRate: number
-  /** Flat rupees, for any row still priced that way. */
-  priceAddition: number
+  pricing: FramePriceColumns
   /** A real photograph of this frame, or null when we have none worth showing. */
   photo: string | null
 }
@@ -254,8 +253,7 @@ function toOptions(response: ProductOptionsResponse | null): ProductOptions {
       type: f.type,
       name: f.name,
       // `1.40` on the row means "the piece plus 40%".
-      priceRate: Math.max(0, parseFloat(f.priceModifier || '1') - 1),
-      priceAddition: parseFloat(f.priceAddition || '0'),
+      pricing: { priceModifier: f.priceModifier, priceAddition: f.priceAddition },
       photo: usablePhoto(f.thumbnailUrl, f.imageUrl),
     })),
   }
@@ -292,11 +290,10 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
   const frame = options?.frames.find((f) => f.id === frameId) ?? null
 
   const unitPrice = variant ? variant.price : parseFloat(product.basePrice)
-  // Rounded to the rupee here rather than at display time, so the number the
-  // CTA quotes is the number that reaches the cart.
-  const framePrice = frame
-    ? Math.round(unitPrice * frame.priceRate) + frame.priceAddition
-    : 0
+  // One formula, shared with `POST /api/cart/items` — the quickview's quote
+  // and the row the server writes have to be the same number, or the drawer
+  // re-prices itself the moment the write lands (#511 final review, finding 1).
+  const framePrice = frameAddition(unitPrice, frame?.pricing)
   const total = (unitPrice + framePrice) * quantity
 
   /** Close and hand the keyboard back where it came from. */

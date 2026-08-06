@@ -22,6 +22,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, sql } from "drizzle-orm";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { frameAddition } from "@chobii/shared";
 
 import { db } from "../database";
 import {
@@ -326,6 +327,26 @@ function calculateLineTotal(
   const unit = parseFloat(unitPrice) || 0;
   const frame = parseFloat(framePrice) || 0;
   return ((unit + frame) * quantity).toFixed(2);
+}
+
+/**
+ * What the frame on a line costs, as the column stores it.
+ *
+ * Delegates to `frameAddition` in `@chobii/shared` — the one formula the
+ * storefront quotes from — rather than reading `priceAddition` on its own,
+ * which is `0.00` on every seeded frame and stored every framed line at a
+ * frame price of zero. `POST /api/orders` then sums those `lineTotal`s, so
+ * every framed order was undercharged by the entire frame markup (#511 final
+ * review, finding 1).
+ *
+ * Both the POST and the PATCH path go through here; there is no second
+ * expression to keep in step.
+ */
+function resolveFramePrice(
+  unitPrice: string,
+  frame: { priceModifier: string | null; priceAddition: string | null }
+): string {
+  return frameAddition(parseFloat(unitPrice) || 0, frame).toFixed(2);
 }
 
 /**
@@ -684,6 +705,7 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
       const frame = await db
         .select({
           id: frames.id,
+          priceModifier: frames.priceModifier,
           priceAddition: frames.priceAddition,
           isActive: frames.isActive,
         })
@@ -695,7 +717,7 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
         return c.json({ error: "Frame not found or unavailable" }, 404);
       }
 
-      framePrice = frame[0].priceAddition || "0.00";
+      framePrice = resolveFramePrice(variant[0].price, frame[0]);
     }
 
     // Check AI generation moderation status if adding AI-generated content
@@ -885,6 +907,7 @@ cartApp.patch(
           const frame = await db
             .select({
               id: frames.id,
+              priceModifier: frames.priceModifier,
               priceAddition: frames.priceAddition,
               isActive: frames.isActive,
             })
@@ -897,7 +920,11 @@ cartApp.patch(
           }
 
           updates.frameId = input.frameId;
-          newFramePrice = frame[0].priceAddition || "0.00";
+          // The line's own stored unit price, not the variant's current one:
+          // the frame is a percentage OF THIS LINE, and re-reading the variant
+          // would silently re-price a cart that has been sitting since the
+          // catalogue moved.
+          newFramePrice = resolveFramePrice(cartItem.unitPrice, frame[0]);
         }
         updates.framePrice = newFramePrice;
       }

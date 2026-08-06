@@ -518,3 +518,60 @@ export const GIFT_WRAP_CONFIG = {
   currency: 'INR',
   isAvailable: true,
 } as const;
+
+// ============================================================================
+// Frame Price Addition (database rows)
+// ============================================================================
+
+/**
+ * The two pricing columns a `frames` row carries.
+ *
+ * Both are `decimal` in the database and therefore arrive as strings; numbers
+ * are accepted too so a caller that has already parsed does not have to
+ * re-stringify.
+ */
+export interface FramePriceColumns {
+  /** `1.40` means "the piece plus 40%". `1.00` (or absent) means no markup. */
+  priceModifier?: string | number | null;
+  /** A flat sum on top, in rupees. `0.00` on every seeded frame today. */
+  priceAddition?: string | number | null;
+}
+
+const toAmount = (value: string | number | null | undefined, fallback: number): number => {
+  if (value === null || value === undefined) return fallback;
+  const parsed = typeof value === 'number' ? value : parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+/**
+ * What a frame adds to one unit of the piece it is wrapped around.
+ *
+ * THE one frame-pricing formula (#511 final review, finding 1). The storefront
+ * quotes it before the write, `POST /api/cart/items` stores it, and
+ * `POST /api/orders` charges what was stored — three surfaces that have to
+ * produce the same number to the paisa, or the drawer visibly re-prices itself
+ * the moment the server's answer lands and the customer is charged something
+ * other than what the button promised.
+ *
+ * A frame is a percentage of the piece, not a flat fee: a moulding for a 12x16
+ * and one for a 60x80 are not the same amount of timber. `priceAddition` is
+ * added on top for the day a frame carries a genuine flat component; it is
+ * `0.00` on every frame seeded today, which is exactly why reading it ALONE —
+ * as the cart route did — quoted every framed line at zero and undercharged
+ * every framed order by the whole markup.
+ *
+ * Rounded to the rupee, deliberately, and here rather than at display time, so
+ * the number the CTA quotes is the number that reaches the cart.
+ *
+ * A modifier below 1.00 is clamped to no markup rather than allowed to
+ * discount the piece: frames do not make artwork cheaper, and a bad row should
+ * not be able to sell at a loss.
+ */
+export const frameAddition = (
+  unitPrice: number,
+  frame: FramePriceColumns | null | undefined
+): number => {
+  if (!frame) return 0;
+  const rate = Math.max(0, toAmount(frame.priceModifier, 1) - 1);
+  return Math.round(unitPrice * rate) + toAmount(frame.priceAddition, 0);
+};
