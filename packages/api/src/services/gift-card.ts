@@ -25,6 +25,7 @@ import {
   GIFT_CARD_MAX_PAISE,
   type GiftCard,
 } from "../database/schema/gift-cards";
+import { orders } from "../database/schema/orders";
 import {
   generateGiftCardCode,
   hashGiftCardCode,
@@ -322,4 +323,164 @@ export async function redeemGiftCards(
   }
 
   return applied;
+}
+
+// ============================================================================
+// Releasing and refunding
+// ============================================================================
+
+/** Locks a card and returns its live balance. Raw SQL: drizzle has no FOR UPDATE. */
+async function lockCardBalance(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  giftCardId: string,
+): Promise<number> {
+  const locked = await tx.execute<{ balance_paise: number }>(sql`
+    SELECT balance_paise FROM gift_card WHERE id = ${giftCardId} FOR UPDATE
+  `);
+
+  const row = locked[0];
+  if (!row) throw new GiftCardError("Gift card no longer exists");
+  return Number(row.balance_paise);
+}
+
+/**
+ * Releases balance held for an order that never completed.
+ *
+ * Payment initiation debits the card; if the customer walks away or the order
+ * is cancelled, that money has to come back. Skipping this path loses
+ * customer balance silently — it looks identical to a card that was spent, so
+ * nobody reports it.
+ *
+ * Deleting the applications is what makes a second call a no-op: there is
+ * nothing left to release.
+ */
+export async function voidGiftCardHold(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  orderId: string,
+): Promise<number> {
+  const applications = await tx
+    .select()
+    .from(orderGiftCards)
+    .where(eq(orderGiftCards.orderId, orderId));
+
+  if (applications.length === 0) return 0;
+
+  let released = 0;
+
+  for (const application of applications) {
+    const balancePaise = await lockCardBalance(tx, application.giftCardId);
+    const balanceAfter = balancePaise + application.amountPaise;
+
+    await tx
+      .update(giftCards)
+      .set({ balancePaise: balanceAfter, updatedAt: new Date() })
+      .where(eq(giftCards.id, application.giftCardId));
+
+    await tx.insert(giftCardTransactions).values({
+      giftCardId: application.giftCardId,
+      type: "void",
+      amountPaise: application.amountPaise,
+      balanceAfterPaise: balanceAfter,
+      orderId,
+      description: "Hold released — order did not complete",
+    });
+
+    released += application.amountPaise;
+  }
+
+  await tx.delete(orderGiftCards).where(eq(orderGiftCards.orderId, orderId));
+  await tx
+    .update(orders)
+    .set({ giftCardAmount: "0.00", updatedAt: new Date() })
+    .where(eq(orders.id, orderId));
+
+  return released;
+}
+
+/**
+ * Credits a refund back to the cards that paid for the order.
+ *
+ * `order_gift_card` is deliberately never mutated here: it is the permanent
+ * record of what each card applied, and the cap below is measured against it.
+ *
+ * Callers pass only the gift card share of the refund. Working out that share
+ * against the Razorpay leg belongs to the admin refund route, which knows
+ * what was actually captured.
+ */
+export async function refundToGiftCards(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  orderId: string,
+  giftCardLegPaise: number,
+): Promise<Array<{ giftCardId: string; amountPaise: number }>> {
+  if (giftCardLegPaise <= 0) return [];
+
+  const applications = await tx
+    .select()
+    .from(orderGiftCards)
+    .where(eq(orderGiftCards.orderId, orderId))
+    // Stable order so the remainder always lands on the same card.
+    .orderBy(orderGiftCards.giftCardId);
+
+  const totalApplied = applications.reduce(
+    (sum, application) => sum + application.amountPaise,
+    0,
+  );
+  if (totalApplied === 0) return [];
+
+  const results: Array<{ giftCardId: string; amountPaise: number }> = [];
+  let allocated = 0;
+
+  for (const [index, application] of applications.entries()) {
+    const isLast = index === applications.length - 1;
+
+    // The last card absorbs the remainder so the parts sum to exactly the
+    // leg. Rounding every share independently loses or invents paise.
+    const share = isLast
+      ? giftCardLegPaise - allocated
+      : Math.round((giftCardLegPaise * application.amountPaise) / totalApplied);
+
+    if (share <= 0) continue;
+
+    // Cap against what this card actually paid on THIS order. Two partial
+    // refunds must not add up to more than the card contributed — that would
+    // mint balance out of a rounding argument.
+    const credited = await tx.execute<{ credited: number }>(sql`
+      SELECT COALESCE(SUM(amount_paise), 0)::int AS credited
+      FROM gift_card_transaction
+      WHERE gift_card_id = ${application.giftCardId}
+        AND order_id = ${orderId}
+        AND type = 'refund'
+    `);
+
+    const alreadyCredited = Number(credited[0]?.credited ?? 0);
+    if (alreadyCredited + share > application.amountPaise) {
+      throw new GiftCardError(
+        "Refund would exceed what this gift card paid on the order",
+      );
+    }
+
+    const balancePaise = await lockCardBalance(tx, application.giftCardId);
+    const balanceAfter = balancePaise + share;
+
+    await tx
+      .update(giftCards)
+      .set({ balancePaise: balanceAfter, updatedAt: new Date() })
+      .where(eq(giftCards.id, application.giftCardId));
+
+    await tx.insert(giftCardTransactions).values({
+      giftCardId: application.giftCardId,
+      type: "refund",
+      amountPaise: share,
+      balanceAfterPaise: balanceAfter,
+      orderId,
+      // A disabled card still gets its credit: it is the customer's money,
+      // and re-enabling is a separate admin decision.
+      description: "Refunded from order",
+    });
+
+    results.push({ giftCardId: application.giftCardId, amountPaise: share });
+    allocated += share;
+  }
+
+  return results;
 }
