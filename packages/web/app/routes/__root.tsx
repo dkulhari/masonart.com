@@ -18,6 +18,7 @@ import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
 import { CartDrawer } from '~/components/cart/CartDrawer'
 import { ReviewToast } from '~/components/reviews/ReviewToast'
+import { SaleBanner } from '~/components/promo/SaleBanner'
 import { buttonVariants } from '~/components/ui/Button'
 import { cn } from '~/lib/utils'
 import { useWishlistStore } from '~/stores/wishlist'
@@ -289,6 +290,16 @@ function RootDocument({ children }: { children: React.ReactNode }) {
          * place, one test.
          */}
         <ReviewToast />
+        {/**
+         * The join offer (#445). Mounted once here so the promotion is looked
+         * up once for the whole visit and the "once per session" rule is not
+         * re-decided on every navigation. It renders nothing on the server pass
+         * and nothing at all unless a promotion is active and the viewer is not
+         * already a member — the frequency rules live in the component, with
+         * the rail (#446) reading the same store. Do not add a second gate
+         * here.
+         */}
+        {!isAdminRoute && <SaleBanner />}
         <Scripts />
       </body>
     </html>
