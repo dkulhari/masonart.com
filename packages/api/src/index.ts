@@ -18,6 +18,7 @@ import { auth } from "./auth";
 import { productsApp } from "./routes/products";
 import { collectionsApp } from "./routes/collections";
 import { adminCollectionsApp } from "./routes/admin/collections";
+import { promotionsApp } from "./routes/promotions";
 import { cartApp } from "./routes/cart";
 import { ordersApp } from "./routes/orders";
 import { aiApp } from "./routes/ai";
@@ -123,6 +124,9 @@ app.route("/api/products", productsApp);
 
 // Collections API - the Discover rail and the collection pages behind it
 app.route("/api/collections", collectionsApp);
+
+// Promotions API - the running sale and this visitor's countdown deadline
+app.route("/api/promotions", promotionsApp);
 
 // Cart API - get, add item, update, remove
 app.route("/api/cart", cartApp);
