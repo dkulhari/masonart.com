@@ -144,6 +144,17 @@ async function fetchSaleProducts(page: number): Promise<SalePageData> {
         isAiGenerated: item.isAiGenerated as boolean | undefined,
         averageRating: (item.averageRating as number | null) ?? null,
         reviewCount: (item.reviewCount as number | undefined) ?? 0,
+        /**
+         * The resolved discount, carried through untouched (#524).
+         *
+         * `?onSale=true` asked for exactly the rows a promotion applies to,
+         * so on this page it is never null — and leaving it out of this
+         * literal was how the sale page came to print base prices on every
+         * card. Copied, never recomputed: `resolveSalePrice` produced these
+         * figures server-side and the cart re-resolves them at checkout, so a
+         * second opinion formed here could only ever disagree.
+         */
+        sale: (item.sale as ProductCardData['sale']) ?? null,
       })
     )
 

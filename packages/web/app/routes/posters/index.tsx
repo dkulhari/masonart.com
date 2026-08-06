@@ -166,6 +166,17 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
         isAiGenerated: item.isAiGenerated as boolean | undefined,
         averageRating: (item.averageRating as number | null) ?? null,
         reviewCount: (item.reviewCount as number | undefined) ?? 0,
+        /**
+         * The resolved discount, carried through untouched (#524).
+         *
+         * Null on most rows here — the catalogue listing is not filtered to a
+         * promotion — and that is the point: whichever posters a sale does
+         * cover have to price themselves the same on this grid as they do on
+         * their own detail page. Copied, never recomputed; `resolveSalePrice`
+         * produced these figures server-side and the cart re-resolves them at
+         * checkout.
+         */
+        sale: (item.sale as ProductCardData['sale']) ?? null,
       })
     )
 
