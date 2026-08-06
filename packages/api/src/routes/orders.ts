@@ -35,6 +35,11 @@ import {
   ORDER_NUMBER_PREFIX,
 } from "../lib/order-number";
 import { deliverImmediateGiftCard } from "../services/gift-card-delivery";
+import { quoteGiftCard, GiftCardError } from "../services/gift-card";
+import {
+  giftCardCodeRateLimit,
+  giftCardCodeSchema,
+} from "./gift-cards";
 import type { Promotion } from "../database/schema/promotions";
 import {
   getActivePromotions,
@@ -848,6 +853,59 @@ ordersApp.get("/:id", async (c) => {
     return c.json({ error: "Failed to fetch order" }, 500);
   }
 });
+
+// ============================================================================
+// POST /api/orders/:id/gift-card - Quote a gift card against this order
+// ============================================================================
+
+/**
+ * What a card would cover on this order. Debits nothing.
+ *
+ * The customer is still deciding at this point, and may add or remove cards
+ * freely. The figure returned is advisory: payment initiation re-clamps it
+ * against the live balance under a row lock, because the quote can be hours
+ * old by the time they pay.
+ */
+ordersApp.post(
+  "/:id/gift-card",
+  giftCardCodeRateLimit,
+  zValidator("json", giftCardCodeSchema),
+  async (c) => {
+    const user = c.get("user");
+    const { id } = c.req.param();
+
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isOrderNumber = id.startsWith(ORDER_NUMBER_PREFIX);
+    if (!isUUID && !isOrderNumber) {
+      return c.json({ error: "Invalid order ID format" }, 400);
+    }
+
+    const order = await db.query.orders.findFirst({
+      where: isUUID
+        ? and(eq(orders.id, id), eq(orders.userId, user.id))
+        : and(eq(orders.orderNumber, id), eq(orders.userId, user.id)),
+    });
+
+    // 404 rather than 403: whether someone else's order exists is not the
+    // caller's business.
+    if (!order) return c.json({ error: "Order not found" }, 404);
+
+    try {
+      const quote = await quoteGiftCard(
+        c.req.valid("json").code,
+        toPaise(order.total),
+      );
+      return c.json(quote);
+    } catch (error) {
+      if (error instanceof GiftCardError) {
+        return c.json({ error: error.message }, 400);
+      }
+      console.error("Error quoting gift card:", error);
+      return c.json({ error: "Failed to check gift card" }, 500);
+    }
+  },
+);
 
 // ============================================================================
 // POST /api/orders/:id/payment - Initiate Payment

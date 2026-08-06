@@ -15,6 +15,8 @@ import { z } from "zod";
 
 import { db } from "../database";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
+import { rateLimit } from "../middleware/rate-limit";
+import { quoteGiftCard, GiftCardError } from "../services/gift-card";
 import { orders, orderItems } from "../database/schema/orders";
 import {
   GIFT_CARD_MIN_PAISE,
@@ -26,6 +28,11 @@ import { generateOrderNumber } from "../lib/order-number";
 // ============================================================================
 // Validation
 // ============================================================================
+
+/** Accepted as typed — grouping and case are normalized server-side. */
+const giftCardCodeSchema = z.object({
+  code: z.string().min(1).max(32),
+});
 
 const purchaseSchema = z.object({
   amountPaise: z
@@ -57,7 +64,28 @@ const purchaseSchema = z.object({
 
 const giftCardsApp = new Hono<{ Variables: AuthVariables }>();
 
-giftCardsApp.use("*", requireAuth);
+/**
+ * Both code-taking endpoints are throttled.
+ *
+ * An endpoint that accepts a bearer code and answers a question about it is a
+ * free-money oracle when left open. Sixteen Crockford characters are
+ * unguessable, but admin-issued cards are a smaller, shorter-lived population
+ * and an unthrottled check invites a sweep.
+ */
+const giftCardCodeRateLimit = rateLimit({
+  limit: 10,
+  windowSeconds: 60,
+  keyPrefix: "gift-card-code",
+});
+
+/**
+ * Auth is applied per route rather than across the app.
+ *
+ * Buying requires an account. Reading a balance deliberately does not: a
+ * bearer card is meant to be forwarded to someone who has not registered yet
+ * (G2), and making them sign up to see what they were given would contradict
+ * that.
+ */
 
 /**
  * Creates the order that buys a gift card.
@@ -71,7 +99,11 @@ giftCardsApp.use("*", requireAuth);
  * productId and a variantId, and the cart derives lineTotal from those rows,
  * so it has no way to carry an amount the customer typed.
  */
-giftCardsApp.post("/purchase", zValidator("json", purchaseSchema), async (c) => {
+giftCardsApp.post(
+  "/purchase",
+  requireAuth,
+  zValidator("json", purchaseSchema),
+  async (c) => {
   const user = c.get("user");
   const input = c.req.valid("json");
 
@@ -155,10 +187,44 @@ giftCardsApp.post("/purchase", zValidator("json", purchaseSchema), async (c) => 
       orderNumber: order.orderNumber,
       total: order.total,
     });
-  } catch (error) {
-    console.error("Error creating gift card order:", error);
-    return c.json({ error: "Failed to create gift card order" }, 500);
-  }
-});
+    } catch (error) {
+      console.error("Error creating gift card order:", error);
+      return c.json({ error: "Failed to create gift card order" }, 500);
+    }
+  },
+);
 
-export { giftCardsApp };
+/**
+ * What is left on a card.
+ *
+ * No account required (G2) and nothing debited. Recipients ask this
+ * constantly; without it every enquiry becomes a support ticket.
+ *
+ * `Number.MAX_SAFE_INTEGER` as the amount due means "clamp to the balance" —
+ * there is no order in play here.
+ */
+giftCardsApp.post(
+  "/balance",
+  giftCardCodeRateLimit,
+  zValidator("json", giftCardCodeSchema),
+  async (c) => {
+    try {
+      const quote = await quoteGiftCard(
+        c.req.valid("json").code,
+        Number.MAX_SAFE_INTEGER,
+      );
+
+      // Deliberately narrower than the quote: no id, no hash, nothing that
+      // could be walked back to a code.
+      return c.json({ last4: quote.last4, balancePaise: quote.balancePaise });
+    } catch (error) {
+      if (error instanceof GiftCardError) {
+        return c.json({ error: error.message }, 400);
+      }
+      console.error("Error reading gift card balance:", error);
+      return c.json({ error: "Failed to read gift card balance" }, 500);
+    }
+  },
+);
+
+export { giftCardsApp, giftCardCodeRateLimit, giftCardCodeSchema };
