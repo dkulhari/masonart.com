@@ -150,26 +150,182 @@ describe('replaceFromServer idempotent behavior', () => {
     expect(secondItems).toHaveLength(2)
   })
 
-  it('does not call set when items are unchanged (avoiding re-render)', () => {
-    // Mock zustand's set to track calls
-    const originalState = useCartStore.getState()
-    let setCallCount = 0
-    const originalSet = useCartStore.setState as any
+  it('preserves array identity when aiDetails are equal but distinct objects', () => {
+    // This tests the case that matters most in production: AI-generated items
+    // with aiDetails objects that are deep-equal but have different references
+    // (which happens when TanStack Query's structuralSharing reuses unchanged
+    // leaf objects but allocates new parents when any sibling field changes).
 
-    // This test verifies the optimization by checking that set is not called
-    // when the items array is preserved. In practice, this prevents unnecessary
-    // re-renders of all cart subscribers.
+    const cartWithAi: ServerCartPayload = {
+      id: 'cart-1',
+      itemCount: 1,
+      subtotal: '2000.00',
+      savingTotal: '0.00',
+      savedForLater: [],
+      items: [
+        {
+          ...serverCart.items[0],
+          isAiGenerated: true,
+          aiDetails: {
+            generationId: 'gen-1',
+            prompt: 'blue landscape',
+            stylePreset: 'oil-painting',
+            thumbnailUrl: 'https://example.com/thumb.jpg',
+          },
+        },
+      ],
+    }
 
     // First projection
-    useCartStore.getState().replaceFromServer(serverCart)
+    useCartStore.getState().replaceFromServer(cartWithAi)
     const firstItems = useCartStore.getState().items
+    const firstAiDetails = firstItems[0].aiDetails
+    expect(firstAiDetails).not.toBeNull()
 
-    // Project equal payload - should not trigger re-renders
-    const equalCart: ServerCartPayload = JSON.parse(JSON.stringify(serverCart))
-    useCartStore.getState().replaceFromServer(equalCart)
+    // Second projection with equal aiDetails but different object reference
+    // (simulating what structuralSharing does)
+    const cartWithEqualAi: ServerCartPayload = {
+      ...cartWithAi,
+      items: [
+        {
+          ...cartWithAi.items[0],
+          aiDetails: {
+            generationId: 'gen-1',
+            prompt: 'blue landscape',
+            stylePreset: 'oil-painting',
+            thumbnailUrl: 'https://example.com/thumb.jpg',
+          },
+        },
+      ],
+    }
+
+    useCartStore.getState().replaceFromServer(cartWithEqualAi)
     const secondItems = useCartStore.getState().items
 
-    // Verify identity preserved
+    // Array identity should be preserved (content is equal)
+    // This proves the dedup worked: even though toCartItems received a new
+    // customizations/aiDetails object, the item content was equal so the
+    // array identity was preserved
     expect(secondItems).toBe(firstItems)
+  })
+
+  it('preserves array identity when customizations are equal but distinct objects', () => {
+    const cartWithCustomizations: ServerCartPayload = {
+      id: 'cart-1',
+      itemCount: 1,
+      subtotal: '2000.00',
+      savingTotal: '0.00',
+      savedForLater: [],
+      items: [
+        {
+          ...serverCart.items[0],
+          customizations: {
+            matWidth: 2,
+            matColor: 'white',
+            mountingStyle: 'float',
+            glazingType: 'anti-glare',
+            notes: 'frame me carefully',
+          },
+        },
+      ],
+    }
+
+    useCartStore.getState().replaceFromServer(cartWithCustomizations)
+    const firstItems = useCartStore.getState().items
+    const firstCustomizations = firstItems[0].customizations
+
+    // Simulate structuralSharing: new customizations object with same content
+    const cartWithEqualCustomizations: ServerCartPayload = {
+      ...cartWithCustomizations,
+      items: [
+        {
+          ...cartWithCustomizations.items[0],
+          customizations: {
+            matWidth: 2,
+            matColor: 'white',
+            mountingStyle: 'float',
+            glazingType: 'anti-glare',
+            notes: 'frame me carefully',
+          },
+        },
+      ],
+    }
+
+    useCartStore.getState().replaceFromServer(cartWithEqualCustomizations)
+    const secondItems = useCartStore.getState().items
+
+    // Array identity should be preserved (content is equal)
+    // This proves the dedup worked even though customizations was a new object
+    expect(secondItems).toBe(firstItems)
+  })
+
+  it('replaces items when aiDetails genuinely differ', () => {
+    const cartWithAi: ServerCartPayload = {
+      ...serverCart,
+      items: [
+        {
+          ...serverCart.items[0],
+          isAiGenerated: true,
+          aiDetails: {
+            generationId: 'gen-1',
+            prompt: 'blue landscape',
+            stylePreset: 'oil-painting',
+            thumbnailUrl: 'https://example.com/thumb.jpg',
+          },
+        },
+      ],
+    }
+
+    useCartStore.getState().replaceFromServer(cartWithAi)
+    const firstItems = useCartStore.getState().items
+
+    // Change a field in aiDetails
+    const cartWithDifferentAi: ServerCartPayload = {
+      ...cartWithAi,
+      items: [
+        {
+          ...cartWithAi.items[0],
+          aiDetails: {
+            generationId: 'gen-2', // different
+            prompt: 'blue landscape',
+            stylePreset: 'oil-painting',
+            thumbnailUrl: 'https://example.com/thumb.jpg',
+          },
+        },
+      ],
+    }
+
+    useCartStore.getState().replaceFromServer(cartWithDifferentAi)
+    const secondItems = useCartStore.getState().items
+
+    // Array should be replaced (content differs)
+    expect(secondItems).not.toBe(firstItems)
+    expect(secondItems[0].aiDetails?.generationId).toBe('gen-2')
+  })
+
+  it('handles null and undefined correctly for nested objects', () => {
+    const cartWithNullAi: ServerCartPayload = {
+      ...serverCart,
+      items: [
+        {
+          ...serverCart.items[0],
+          aiDetails: null,
+          customizations: null,
+        },
+      ],
+    }
+
+    useCartStore.getState().replaceFromServer(cartWithNullAi)
+    const firstItems = useCartStore.getState().items
+
+    // Project again with null aiDetails and customizations
+    useCartStore.getState().replaceFromServer(cartWithNullAi)
+    const secondItems = useCartStore.getState().items
+
+    // Array identity should be preserved when both are null
+    expect(secondItems).toBe(firstItems)
+    // Both should be falsy (null or undefined is acceptable since projection normalizes)
+    expect(secondItems[0].aiDetails).toBeFalsy()
+    expect(secondItems[0].customizations).toBeFalsy()
   })
 })

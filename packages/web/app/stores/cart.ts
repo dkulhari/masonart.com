@@ -14,15 +14,57 @@ import { generateId } from "~/lib/utils";
 import { toCartItems, type ServerCartPayload } from "~/lib/cart-projection";
 
 /**
+ * Compare customizations objects by value.
+ * Handles null, undefined, and partial objects correctly.
+ */
+function customizationsAreEqual(
+  a: CartItemCustomizations | undefined | null,
+  b: CartItemCustomizations | undefined | null
+): boolean {
+  if (a === null && b === null) return true;
+  if (a === undefined && b === undefined) return true;
+  if (a === null || a === undefined || b === null || b === undefined) return false;
+  return (
+    a.matWidth === b.matWidth &&
+    a.matColor === b.matColor &&
+    a.mountingStyle === b.mountingStyle &&
+    a.glazingType === b.glazingType &&
+    a.notes === b.notes
+  );
+}
+
+/**
+ * Compare aiDetails objects by value.
+ * Handles null, undefined, and partial objects correctly.
+ */
+function aiDetailsAreEqual(
+  a: AIGenerationDetails | undefined | null,
+  b: AIGenerationDetails | undefined | null
+): boolean {
+  if (a === null && b === null) return true;
+  if (a === undefined && b === undefined) return true;
+  if (a === null || a === undefined || b === null || b === undefined) return false;
+  return (
+    a.generationId === b.generationId &&
+    a.prompt === b.prompt &&
+    a.stylePreset === b.stylePreset &&
+    a.thumbnailUrl === b.thumbnailUrl
+  );
+}
+
+/**
  * Deep equality check for CartItem arrays.
  * Returns true if both arrays have the same items in the same order.
+ * Compares nested objects (customizations, aiDetails) by value to handle
+ * TanStack Query's structuralSharing, which reuses unchanged leaf objects
+ * but allocates new parents when sibling fields change.
  */
 function itemsAreEqual(a: CartItem[], b: CartItem[]): boolean {
   if (a.length !== b.length) return false;
   return a.every((itemA, i) => {
     const itemB = b[i];
     if (!itemB) return false;
-    // Compare all fields of the CartItem
+    // Compare all fields of the CartItem, using value-based comparison for nested objects
     return (
       itemA.id === itemB.id &&
       itemA.productId === itemB.productId &&
@@ -39,9 +81,9 @@ function itemsAreEqual(a: CartItem[], b: CartItem[]): boolean {
       itemA.frameType === itemB.frameType &&
       itemA.unitPrice === itemB.unitPrice &&
       itemA.framePrice === itemB.framePrice &&
-      itemA.customizations === itemB.customizations && // reference equality OK for now
+      customizationsAreEqual(itemA.customizations, itemB.customizations) &&
       itemA.isAiGenerated === itemB.isAiGenerated &&
-      itemA.aiDetails === itemB.aiDetails && // reference equality OK for now
+      aiDetailsAreEqual(itemA.aiDetails, itemB.aiDetails) &&
       itemA.addedAt === itemB.addedAt
     );
   });
