@@ -1,0 +1,131 @@
+ticket_number: 527
+title: Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
+description: |-
+  ## Task
+  **Identify by title, not number — numbers collided on 2026-08-06.**
+
+  `packages/api/src/routes/admin/products.ts` calls `deleteCached(CacheKeys.PRODUCT_LIST)` in five places. That is an **exact-key** delete against the literal string `"product-list:"`, which is only ever used as a PREFIX — real keys are `product-list:{queryHash}{:member|:guest}`. The literal key is never written, so the delete removes nothing and admin product edits do not bust the list cache at all.
+
+  This predates the sale work and is not limited to it: editing a product's title, price or status in admin leaves stale rows in the storefront list cache until the TTL lapses.
+
+  #525 (commit `17b5f421`) added `purgeProductResponseCache()`, which globs `product-list:*` and `product:*` via a SCAN cursor loop and correctly covers both `:member` and `:guest` variants. The fix here is to call that instead of the five no-op deletes.
+
+  While there: audit other `deleteCached(CacheKeys.X)` call sites for the same prefix-vs-key confusion. The bug is invisible in tests because a delete that matches nothing still resolves successfully.
+
+  ## Context
+  Found by the #525 agent while implementing the promotion cache purge. Related: `packages/api/src/lib/redis.ts` (`deleteCachedPattern` is now SCAN-based, not `KEYS`).
+
+  **Verify against the real database:** `export $(grep -m1 '^DATABASE_URL=' /Users/dhruv/work/masonart.com/.env)` — port 5433 is a different application and a failed `beforeAll` there reports as *skipped*, which reads green.
+feature: sale-promotions
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:59:52.244Z'
+last_updated: '2026-08-06T20:02:21.595Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T19:54:30.690Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T20:01:57.248Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `b6c6c493` — fix(api): admin product writes actually bust the storefront cache
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/products.ts` — all six mutating handlers now call `purgeProductResponseCache()`
+      - `packages/api/src/lib/redis.ts` — docstring only; records why naming keys cannot work, so a second purge does not grow beside it
+      - `packages/api/tests/routes/admin/product-cache-purge.test.ts` — new, 13 tests
+
+      **Root Cause**: `deleteCached(CacheKeys.PRODUCT_LIST)` is an exact-key `DEL` against the literal `"product-list:"`, which is only ever a *prefix*. Real keys are `product-list:<query-json><:member|:guest>`. `DEL` on a missing key resolves successfully, so five no-op deletes looked healthy.
+
+      **Location**: `packages/api/src/routes/admin/products.ts:501, 625, 626, 628, 682, 683, 753, 845, 907`
+
+      **Fix**: `purgeProductResponseCache()` (already shared in `lib/redis.ts` from #525 — no lifting needed) on every mutating path.
+
+      **Two findings beyond the ticket's five call sites:**
+
+      1. **The detail-key deletes were broken too, not just the list ones.** `deleteCached(`${CacheKeys.PRODUCT}${slug}`)` targets `product:<slug>`, but the real key carries a viewer suffix (`viewerCacheSuffix`, `routes/products.ts:111`) — `product:<slug>:member` / `:guest`. Same silent miss, six more call sites, unreported in the ticket. Covered by the same fix.
+      2. **The variant handlers never invalidated the list at all** — they only named `product:<slug>`. A variant price *is* the price the grid shows, so a repriced variant was stale in the list on two counts. There is now a test naming this case specifically.
+
+      Also removed: the rename branch (`if (input.slug !== existingProduct.slug)`) is unnecessary under a prefix purge, and two `select slug from products` round-trips that existed solely to build keys that never matched.
+
+      **Audit of every remaining `deleteCached(...)` call site:**
+
+      | Site | Verdict |
+      |---|---|
+      | `routes/admin/shipping.ts:180, 281, 334` | 🔴 **Broken, same class.** `deleteCached(`${SHIPPING_CACHE_PREFIX}options:*`)` passes a **glob to an exact-key DEL**. Redis `DEL` treats `*` literally; the real key is `shipping:options:active` (`routes/shipping.ts:55`). Never matches — admin shipping-option writes do not bust the storefront options cache. One-word fix (`deleteCached` → `deleteCachedPattern`), left alone to respect this ticket's scope. **Worth its own ticket.** |
+      | `routes/admin/collections.ts:88-89` | ✅ Correct. `collection:list:discover=true/false` match `routes/collections.ts:97` exactly. |
+      | `routes/admin/collections.ts:90` | ⚪ Dead but harmless. `collection:detail:<slug>` has **no writer anywhere** — nothing caches it. |
+      | `routes/admin/wallet-config.ts:177` | ✅ Correct. Matches `services/wallet.ts:147`. |
+      | `routes/cart.ts:211-212` | ✅ Correct. Builds both viewer variants via `cartCacheKey(id, bool)`. |
+      | `lib/redis.ts:289` (`deleteSession`) | ✅ Correct. Full key. |
+
+      Adjacent, not a `deleteCached` bug: an admin product archive can stale the discover-chip rail (`collection:list:discover=true` embeds a product image since #410). Out of scope here; noting it in case it bites.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/product-cache-purge.test.ts tests/routes/admin/promotion-cache-purge.test.ts tests/routes/admin/products.test.ts` (with `DATABASE_URL` exported from `.env` → port **5440**, not the 5433 default)
+      - Result: **PASS — 141 tests, 141 passing, 3 files**
+      - RED first: the new suite failed 9/13 against the broken code, each failure showing all 10 seeded keys surviving a `200`/`201` admin write — the handlers succeeded, the cache simply was not busted.
+      - `bunx tsc --noEmit -p packages/api/tsconfig.json` → **0 errors**
+      - `tests/routes/admin/products-role-access.test.ts` has 2 failures (`GET /api/admin/products` → 500). **Pre-existing**, proven by running the same suite against `git show HEAD:` of the file as an additive sibling module: identical 2 failures. Unrelated to this change (the GET handler touches no cache).
+
+      The tests assert cache **contents**, never the call. A test spying on `deleteCached` would have passed for the entire life of this bug — it *was* called, five times, against nothing.
+  - author: system
+    timestamp: '2026-08-06T20:02:03.443Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write a failing test: cache a product-list response, edit a product in admin, assert the cached entry is gone'
+    command: cd packages/api && bunx vitest run tests/routes/admin/products.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm the stale entry survives the admin write
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Replace the five no-op deleteCached calls with purgeProductResponseCache()
+    file: packages/api/src/routes/admin/products.ts
+    status: done
+  - id: 4
+    action: refactor
+    description: Audit remaining deleteCached call sites for prefix-vs-exact-key confusion; note findings in a comment
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm admin product writes bust the list cache
+    command: cd packages/api && bunx vitest run tests/routes/admin/products.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git commit --only <paths> -m "fix(api): admin product writes actually bust the list cache"'
+    status: done
+current_step: 6
+started: '2026-08-06T19:54:30.689Z'
+completed: '2026-08-06T20:02:03.443Z'
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/admin/product-cache-purge.test.ts tests/routes/admin/promotion-cache-purge.test.ts tests/routes/admin/products.test.ts
+  test_output: '3 files passed, 141/141 tests passing. New suite went 9-failed → 13-passed across the fix. tsc: 0 errors.'
+  build_passed: true
+  build_command: bunx tsc --noEmit -p packages/api/tsconfig.json
+  verified_at: '2026-08-06T20:02:15.452Z'

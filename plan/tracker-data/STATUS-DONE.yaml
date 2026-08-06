@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-08-06T16:34:47.151Z'
-total_tickets: 502
+last_updated: '2026-08-06T20:10:56.540Z'
+total_tickets: 510
 summary:
   critical: 29
-  high: 190
-  medium: 218
+  high: 196
+  medium: 220
   low: 65
 priorities:
   critical:
@@ -915,6 +915,10 @@ priorities:
           title: Bug - promotion writes leave stale prices in the product response cache
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 527
+          title: Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
+          assignee: unassigned
+          blocked_by: []
     - feature: gallery-membership
       tickets:
         - ticket_number: 439
@@ -1037,6 +1041,26 @@ priorities:
           title: Service - release the hold, credit refunds, and cap them per order
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 554
+          title: API - gift card quote and balance endpoints, rate limited
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 555
+          title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 554
+              title: API - gift card quote and balance endpoints, rate limited
+        - ticket_number: 556
+          title: API - release the gift card hold when an order is cancelled or payment fails
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 555
+              title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+        - ticket_number: 557
+          title: API - split refunds proportionally across tender and cards
+          assignee: unassigned
+          blocked_by: []
     - feature: product-page-parity
       tickets:
         - ticket_number: 516
@@ -1057,6 +1081,10 @@ priorities:
           blocked_by: []
     - feature: home-page-parity
       tickets:
+        - ticket_number: 530
+          title: Best Sellers product rail — rating stars, review count, title-left price-right
+          assignee: unassigned
+          blocked_by: []
         - ticket_number: 531
           title: Shop By Popular band — four photo tiles with labels below and a pill CTA
           assignee: unassigned
@@ -1983,6 +2011,10 @@ priorities:
           title: API - featured products endpoint returns no sale price, so the home rail disagrees with the grid
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 528
+          title: A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
+          assignee: unassigned
+          blocked_by: []
     - feature: gallery-membership
       tickets:
         - ticket_number: 440
@@ -2241,6 +2273,10 @@ priorities:
               title: API - POST /api/gift-cards/purchase creates the gift card order
         - ticket_number: 552
           title: Service - scheduled delivery sweep and the gift card email
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 558
+          title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
           assignee: unassigned
           blocked_by: []
   low:
@@ -2875,6 +2911,18 @@ blocked_tickets:
       - ticket_number: 500
         title: API - PUT /api/wishlist to rewrite the order, permutation-guarded
     description: API - PUT /api/wishlist to rewrite the order, permutation-guarded
+  - ticket_number: 555
+    title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+    blocked_by:
+      - ticket_number: 554
+        title: API - gift card quote and balance endpoints, rate limited
+    description: API - gift card quote and balance endpoints, rate limited
+  - ticket_number: 556
+    title: API - release the gift card hold when an order is cancelled or payment fails
+    blocked_by:
+      - ticket_number: 555
+        title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+    description: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
   - ticket_number: 229
     title: Add addressesApi to web API client
     blocked_by:

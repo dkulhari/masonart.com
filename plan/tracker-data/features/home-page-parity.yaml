@@ -26,12 +26,13 @@ tickets:
     "545": Product orientation column contradicts the artwork for 6 of 14 collection representatives
     "546": Seed catalogue artwork carries a MESON ART watermark baked into the pixels
     "547": Review toast covers page content on every screen and has no counterpart on the reference
+    "564": Best Sellers band is missing the category pill row the reference carries on both viewports
   in_progress:
-    "530": Best Sellers product rail — rating stars, review count, title-left price-right
     "540": Section rhythm, type scale and button system pass across the whole page
     "542": Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
   done:
     "529": Home hero — full-bleed image carousel with peek slides replaces the text hero
+    "530": Best Sellers product rail — rating stars, review count, title-left price-right
     "531": Shop By Popular band — four photo tiles with labels below and a pill CTA
     "532": Shop by Room split band — image panel left, olive list panel right with counts
     "533": Three promo tiles — On Sale / Quick Ship / Custom Art
@@ -40,6 +41,6 @@ tickets:
     "536": Featured Artists band — structure built, real data or graceful omission
     "538": Brand Story band — olive panel with copy, Read More pill and media
     "539": Trust icons row above the footer
-total_tickets: 19
-completion_percentage: 47
+total_tickets: 20
+completion_percentage: 50
 is_completed: false

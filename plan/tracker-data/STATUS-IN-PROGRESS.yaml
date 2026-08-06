@@ -1,19 +1,15 @@
 status: in-progress
-last_updated: '2026-08-06T16:34:47.018Z'
-total_tickets: 5
+last_updated: '2026-08-06T20:10:56.361Z'
+total_tickets: 2
 summary:
   critical: 0
-  high: 3
-  medium: 2
+  high: 2
+  medium: 0
   low: 0
 priorities:
   high:
     - feature: home-page-parity
       tickets:
-        - ticket_number: 530
-          title: Best Sellers product rail — rating stars, review count, title-left price-right
-          assignee: unassigned
-          blocked_by: []
         - ticket_number: 540
           title: Section rhythm, type scale and button system pass across the whole page
           assignee: unassigned
@@ -22,33 +18,4 @@ priorities:
           title: Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
           assignee: unassigned
           blocked_by: []
-  medium:
-    - feature: sale-promotions
-      tickets:
-        - ticket_number: 436
-          title: Storefront - cart saving row, locked for non-members
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 429
-              title: API - cart returns base, sale and locked per line without touching stored lineTotal
-    - feature: gallery-membership
-      tickets:
-        - ticket_number: 441
-          title: API - registration opt-in and post-auth auto-join from the join intent
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 440
-              title: API - POST /api/gallery/join
-blocked_tickets:
-  - ticket_number: 436
-    title: Storefront - cart saving row, locked for non-members
-    blocked_by:
-      - ticket_number: 429
-        title: API - cart returns base, sale and locked per line without touching stored lineTotal
-    description: API - cart returns base, sale and locked per line without touching stored lineTotal
-  - ticket_number: 441
-    title: API - registration opt-in and post-auth auto-join from the join intent
-    blocked_by:
-      - ticket_number: 440
-        title: API - POST /api/gallery/join
-    description: API - POST /api/gallery/join
+blocked_tickets: []

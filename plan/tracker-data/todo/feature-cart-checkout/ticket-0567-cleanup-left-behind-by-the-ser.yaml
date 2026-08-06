@@ -1,0 +1,71 @@
+ticket_number: 567
+title: Cleanup left behind by the server-cart write path (#511)
+description: |
+  ## Task
+
+  Deferred findings from the review of the server-cart write path (#511). None block anything; all were adjudicated as non-blocking at the time and are recorded here so they are not lost. Each is independent — close them individually.
+
+  ### 1. `ServerCartPayload` is narrower than the real `GET /api/cart` response
+
+  `packages/web/app/lib/cart-projection.ts` models a projection, not the wire format: it omits the per-line `pricing` object and the top-level `userId`, `couponCode`, `couponDiscount`, `currency`, `createdAt`, `updatedAt`.
+
+  Nothing it asserts is false — unlike the `ServerCartItem.addedAt` field it replaced, which named a column that has never existed. But because `pricing` is missing, `packages/web/app/routes/cart/index.tsx:244` still needs a `data as unknown as PricedCart` cast. Widening the type would let that cast go and would stop the next consumer hitting the same wall.
+
+  ### 2. Six more dead exports in the file the deletion pass cleaned
+
+  `packages/web/app/hooks/useCart.ts` — `invalidateCart`, `setCartData`, `getCachedCart`, `useServerCartItemCount`, `useServerCartSubtotal` and `cartKeys.items()` have zero production call sites. They are referenced only by `packages/web/tests/hooks/useCart.test.tsx`, which spends ~60 lines proving they work.
+
+  Commit `b0c8ef43` applied "delete what has no call site" to the five mutation hooks and stopped there, in the same file.
+
+  ### 3. Three doc blocks now assert the opposite of HEAD
+
+  - `packages/web/app/routes/cart/index.tsx:12-17` still says "today nothing in the app writes to the server cart at all, so it cannot yet be the render source."
+  - `tests/e2e/sale-promotions.spec.ts:19-30` and `tests/e2e/gallery-membership.spec.ts:17-25` both still say "every `cartApi` mutation hook … has zero call sites … That is a filed critical bug." Those hooks no longer exist.
+
+  `sale-promotions.spec.ts` names its own follow-up: "When the write path lands, the row itself can be asserted in the UI with no change here."
+
+  ### 4. Coverage seam: the savings half of #511 has no end-to-end proof
+
+  #511 had two symptoms — checkout 404, and a savings row that was always zero. `tests/e2e/cart-server-persistence.spec.ts` covers the first. Nothing covers the second against a real server cart: `readCartSaving`'s join is unit-tested with hand-built fixtures, and both promotion specs seed the server cart with a direct `POST /api/cart/items` rather than through the UI.
+
+  A UI-level add followed by an assertion on `[data-testid="cart-saving"]` would close it. Worth noting: a test of that shape would have caught the frame-pricing bug that the final review found.
+
+  ### 5. A superseded failing write drops its error message
+
+  `packages/web/app/hooks/useCartActions.ts:176`. In "add X fails, add Y succeeds", X vanishes with no `syncError`. The store ends up correct — only the notification is missing.
+
+  ### 6. A failed guest merge deletes the cookie anyway
+
+  `packages/api/src/routes/cart.ts:508-515` — `deleteCookie` sits outside the `try`, so a transient DB error during `mergeGuestCartInto` swallows the error *and* destroys the only handle to the guest cart, with no retry. Moving the delete into the success path costs nothing; "don't retry forever" is better served by a marker than by discarding the cart.
+
+  ### 7. Concurrent merges are not serialised
+
+  `packages/api/src/routes/cart.ts:502-518` runs on every cart request while the cookie is present, and the cookie deletion only takes effect on the next request. Two cart requests issued together right after login both carry the cookie and both call `mergeGuestCartInto`. The `isActive: false` write makes the second a no-op in the common case, but the read-modify-write on `existingItems[0].quantity` has a lost-update window. Low probability; an advisory lock or a `WHERE is_active = true` guard on the deactivate would close it.
+
+  ### 8. `packages/web/src/` is a dead tree with 50 passing tests
+
+  Nothing in `packages/web/app/` imports it. `packages/web/tests/stores/cart.test.ts` — 50 green tests — covers its cart store, not the live one. That green suite has been standing in for coverage of code that does not ship. Deleting the tree and its tests is its own piece of work; the risk is that someone "fixes" a bug there and wonders why nothing changes.
+
+  ## Context
+
+  All eight of these come from the task-scoped and whole-branch reviews of #511 (2026-08-06). The parked frame-pricing and sign-out items were filed separately as #565 and #566.
+feature: cart-checkout
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T19:13:48.430Z'
+last_updated: '2026-08-06T19:13:48.430Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - backend
+  - tech-debt
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

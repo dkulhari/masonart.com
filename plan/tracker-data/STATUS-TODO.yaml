@@ -1,10 +1,10 @@
 status: todo
-last_updated: '2026-08-06T19:13:48.924Z'
-total_tickets: 52
+last_updated: '2026-08-06T20:10:56.359Z'
+total_tickets: 29
 summary:
   critical: 3
-  high: 17
-  medium: 22
+  high: 6
+  medium: 10
   low: 10
 priorities:
   critical:
@@ -71,46 +71,6 @@ priorities:
           blocked_by:
             - ticket_number: 344
               title: 'Content-Security-Policy for SSR pages (deferred from #264)'
-    - feature: sale-promotions
-      tickets:
-        - ticket_number: 423
-          title: Schema - promotion, promotion_product and promotion_exclusion tables
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 424
-          title: Schema - shared Zod schemas and types for promotions
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 425
-          title: Schema - record the promotion and its discount on orders
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 423
-              title: Schema - promotion, promotion_product and promotion_exclusion tables
-        - ticket_number: 426
-          title: Resolver - active promotion selection with derived state and no stacking
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 423
-              title: Schema - promotion, promotion_product and promotion_exclusion tables
-        - ticket_number: 427
-          title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 424
-              title: Schema - shared Zod schemas and types for promotions
-            - ticket_number: 426
-              title: Resolver - active promotion selection with derived state and no stacking
-        - ticket_number: 527
-          title: Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
-          assignee: unassigned
-          blocked_by: []
-    - feature: gallery-membership
-      tickets:
-        - ticket_number: 439
-          title: Schema - gallery membership columns and the session field
-          assignee: unassigned
-          blocked_by: []
     - feature: home-page-parity
       tickets:
         - ticket_number: 545
@@ -125,26 +85,6 @@ priorities:
       tickets:
         - ticket_number: 553
           title: Schema - unique purchaseOrderId and orders.giftCardPurchase
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 554
-          title: API - gift card quote and balance endpoints, rate limited
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 555
-          title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 554
-              title: API - gift card quote and balance endpoints, rate limited
-        - ticket_number: 556
-          title: API - release the gift card hold when an order is cancelled or payment fails
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 555
-              title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
-        - ticket_number: 557
-          title: API - split refunds proportionally across tender and cards
           assignee: unassigned
           blocked_by: []
   medium:
@@ -171,86 +111,6 @@ priorities:
           title: 'DECISION: order numbers still use the masonart MA- prefix after the rebrand'
           assignee: unassigned
           blocked_by: []
-    - feature: sale-promotions
-      tickets:
-        - ticket_number: 428
-          title: API - product list and detail return the resolved sale price
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 427
-              title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-        - ticket_number: 429
-          title: API - cart returns base, sale and locked per line without touching stored lineTotal
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 427
-              title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-        - ticket_number: 430
-          title: API - order creation writes the real discount and enforces the per-customer limit
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 425
-              title: Schema - record the promotion and its discount on orders
-            - ticket_number: 427
-              title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-        - ticket_number: 431
-          title: API - admin promotions CRUD
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 424
-              title: Schema - shared Zod schemas and types for promotions
-            - ticket_number: 426
-              title: Resolver - active promotion selection with derived state and no stacking
-        - ticket_number: 432
-          title: API - countdown deadline resolution, cookie mint and clamp
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 423
-              title: Schema - promotion, promotion_product and promotion_exclusion tables
-        - ticket_number: 434
-          title: Storefront - sale strip with live countdown above the header
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 432
-              title: API - countdown deadline resolution, cookie mint and clamp
-        - ticket_number: 568
-          title: DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 528
-          title: A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
-          assignee: unassigned
-          blocked_by: []
-    - feature: gallery-membership
-      tickets:
-        - ticket_number: 440
-          title: API - POST /api/gallery/join
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 439
-              title: Schema - gallery membership columns and the session field
-        - ticket_number: 443
-          title: Web - SSR-safe member state hook
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 439
-              title: Schema - gallery membership columns and the session field
-            - ticket_number: 440
-              title: API - POST /api/gallery/join
-        - ticket_number: 444
-          title: Web - join modal, one field
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 443
-              title: Web - SSR-safe member state hook
-            - ticket_number: 432
-              title: API - countdown deadline resolution, cookie mint and clamp
-        - ticket_number: 445
-          title: Web - dismissible sale banner with session and 7-day cooldown
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 444
-              title: Web - join modal, one field
     - feature: home-page-parity
       tickets:
         - ticket_number: 537
@@ -267,10 +127,6 @@ priorities:
           blocked_by: []
     - feature: gift-cards
       tickets:
-        - ticket_number: 558
-          title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
-          assignee: unassigned
-          blocked_by: []
         - ticket_number: 559
           title: Admin UI - /admin/gift-cards list, detail and issue form
           assignee: unassigned
@@ -281,6 +137,12 @@ priorities:
       tickets:
         - ticket_number: 566
           title: PDP frame options drop the flat priceAddition column, unlike the quickview and the server
+          assignee: unassigned
+          blocked_by: []
+    - feature: sale-promotions
+      tickets:
+        - ticket_number: 568
+          title: DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
           assignee: unassigned
           blocked_by: []
   low:
@@ -380,117 +242,17 @@ blocked_tickets:
       - ticket_number: 292
         title: 'Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
     description: 'Infra: same-origin web bundle + single-hostname config, Infra: deploy/ Makefile + GHCR registry — dev machine builds/pushes, mini pulls, Infra: ship drizzle migrations in api image; replace db:push with drizzle-kit migrate, BUG: prod compose healthchecks exec curl but slim images have no curl — web can never start, SECURITY: trust cf-connecting-ip for client IPs — first XFF entry is spoofable behind the tunnel, Hardening: prod env contract with :? guards + http2 tunnel transport + mem_limits budget'
-  - ticket_number: 425
-    title: Schema - record the promotion and its discount on orders
-    blocked_by:
-      - ticket_number: 423
-        title: Schema - promotion, promotion_product and promotion_exclusion tables
-    description: Schema - promotion, promotion_product and promotion_exclusion tables
-  - ticket_number: 426
-    title: Resolver - active promotion selection with derived state and no stacking
-    blocked_by:
-      - ticket_number: 423
-        title: Schema - promotion, promotion_product and promotion_exclusion tables
-    description: Schema - promotion, promotion_product and promotion_exclusion tables
-  - ticket_number: 427
-    title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-    blocked_by:
-      - ticket_number: 424
-        title: Schema - shared Zod schemas and types for promotions
-      - ticket_number: 426
-        title: Resolver - active promotion selection with derived state and no stacking
-    description: Schema - shared Zod schemas and types for promotions, Resolver - active promotion selection with derived state and no stacking
   - ticket_number: 458
     title: Verify enforced CSP on production after deploy (post-#344 gate)
     blocked_by:
       - ticket_number: 344
         title: 'Content-Security-Policy for SSR pages (deferred from #264)'
     description: 'Content-Security-Policy for SSR pages (deferred from #264)'
-  - ticket_number: 555
-    title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
-    blocked_by:
-      - ticket_number: 554
-        title: API - gift card quote and balance endpoints, rate limited
-    description: API - gift card quote and balance endpoints, rate limited
-  - ticket_number: 556
-    title: API - release the gift card hold when an order is cancelled or payment fails
-    blocked_by:
-      - ticket_number: 555
-        title: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
-    description: API - debit gift cards at payment initiation, and skip Razorpay on full coverage
   - ticket_number: 278
     title: Set up external uptime monitoring for production
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
-  - ticket_number: 428
-    title: API - product list and detail return the resolved sale price
-    blocked_by:
-      - ticket_number: 427
-        title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-    description: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-  - ticket_number: 429
-    title: API - cart returns base, sale and locked per line without touching stored lineTotal
-    blocked_by:
-      - ticket_number: 427
-        title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-    description: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-  - ticket_number: 430
-    title: API - order creation writes the real discount and enforces the per-customer limit
-    blocked_by:
-      - ticket_number: 425
-        title: Schema - record the promotion and its discount on orders
-      - ticket_number: 427
-        title: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-    description: Schema - record the promotion and its discount on orders, Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-  - ticket_number: 431
-    title: API - admin promotions CRUD
-    blocked_by:
-      - ticket_number: 424
-        title: Schema - shared Zod schemas and types for promotions
-      - ticket_number: 426
-        title: Resolver - active promotion selection with derived state and no stacking
-    description: Schema - shared Zod schemas and types for promotions, Resolver - active promotion selection with derived state and no stacking
-  - ticket_number: 432
-    title: API - countdown deadline resolution, cookie mint and clamp
-    blocked_by:
-      - ticket_number: 423
-        title: Schema - promotion, promotion_product and promotion_exclusion tables
-    description: Schema - promotion, promotion_product and promotion_exclusion tables
-  - ticket_number: 434
-    title: Storefront - sale strip with live countdown above the header
-    blocked_by:
-      - ticket_number: 432
-        title: API - countdown deadline resolution, cookie mint and clamp
-    description: API - countdown deadline resolution, cookie mint and clamp
-  - ticket_number: 440
-    title: API - POST /api/gallery/join
-    blocked_by:
-      - ticket_number: 439
-        title: Schema - gallery membership columns and the session field
-    description: Schema - gallery membership columns and the session field
-  - ticket_number: 443
-    title: Web - SSR-safe member state hook
-    blocked_by:
-      - ticket_number: 439
-        title: Schema - gallery membership columns and the session field
-      - ticket_number: 440
-        title: API - POST /api/gallery/join
-    description: Schema - gallery membership columns and the session field, API - POST /api/gallery/join
-  - ticket_number: 444
-    title: Web - join modal, one field
-    blocked_by:
-      - ticket_number: 443
-        title: Web - SSR-safe member state hook
-      - ticket_number: 432
-        title: API - countdown deadline resolution, cookie mint and clamp
-    description: Web - SSR-safe member state hook, API - countdown deadline resolution, cookie mint and clamp
-  - ticket_number: 445
-    title: Web - dismissible sale banner with session and 7-day cooldown
-    blocked_by:
-      - ticket_number: 444
-        title: Web - join modal, one field
-    description: Web - join modal, one field
   - ticket_number: 559
     title: Admin UI - /admin/gift-cards list, detail and issue form
     blocked_by:

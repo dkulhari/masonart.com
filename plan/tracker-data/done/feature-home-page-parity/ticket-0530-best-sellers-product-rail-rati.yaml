@@ -9,11 +9,11 @@ description: |-
 feature: home-page-parity
 type: task
 priority: high
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T11:51:47.053Z'
-last_updated: '2026-08-06T15:33:51.890Z'
+last_updated: '2026-08-06T17:58:19.814Z'
 time_spent_minutes: 0
 labels:
   - home-page-parity
@@ -294,9 +294,269 @@ comments:
         packages/web/app/styles/globals.css                      --card-meta
 
       Backfill must be re-run wherever the catalogue lives: `bun run backfill:art-box --force`. Additive and idempotent as before — one key inside the existing images JSONB, no reprocessing, no re-upload, no URL changes.
+  - author: mcp-client
+    timestamp: '2026-08-06T16:46:58.742Z'
+    text: |-
+      Fix round 3, desktop only. Still in-progress — needs a fourth blind A/B.
+
+      == THE FINDING, BEFORE THE FIX: I MEASURED THE BAR'S OWN ROWS AND IT IS NOT EVEN
+
+      Rounds 2 and 3 each prescribed the opposite of the other, so before changing anything I scanned the bar's own bands the way a viewer judges them — ink bounding box inside each grey plate, off `shots/bar-desktop-full.png`, plates located at x 48/389/729/1069, 322px:
+
+        BAR Best Seller   coverage 65 / 65 / 73 / 88 %   spread 1.35x   mean 72.7%
+                          long side 262/262/306/314      spread 1.20x
+                          mat 3..46px   padT 32/32/8/4, range 28px
+        BAR New In        coverage 96 / 65 / 47 / 96 %   spread 2.05x   mean 76.2%
+                          mat 3..85px   padT 3/32/80/3, range 76px
+
+        OURS Best Seller  coverage 79 / 41 / 41 / 42 %   spread 1.93x   mean 51.0%
+                          mat 16..88px  padT 19/87/16/16, range 71px
+
+      So round 3's critic's premise does not hold on the bar's own pixels. Its New In band spreads coverage 2.05x — worse than the 1.93x it marked us down for — with a 3..85px mat range and a 76px padT range, i.e. all three of the "clearly ours" faults, at our magnitude or larger. Flat coverage is not what the bar does and chasing it would take us away from the thing we are judged against.
+
+      The one axis where the bar is unambiguously ahead is MEAN coverage: 72.7% against our 51.0%. Its artworks are big in their tiles; three of ours are small. "One big picture beside three small ones" is真 as an observation, but the fix that moves us toward the bar is to stop the near-square dominating — not to shrink everything, which is what flat coverage does.
+
+      == WHY NO SINGLE RULE FITS — the identity, since it settles the whole argument
+
+      With a square plate, art centred and uncropped, L = long side as a fraction of the plate and r = short/long of the artwork:
+
+          coverage = L^2 * r          minMat = P(1 - L)/2          maxMat = P(1 - L*r)/2
+
+      Holding coverage constant forces L ∝ r^-0.5. Holding L constant forces coverage ∝ r. They are the same dial pulled in opposite directions, and you can only have both when every piece has the same r. The bar's Best Seller stock runs r 0.75..0.98. Ours runs 0.48..0.98.
+
+      Catalogue census, all 41 dev products, artBox recovered from the rendered clip-path on /posters:
+          r  0.48 x1 | 0.51-0.53 x15 | 0.62 x1 | 0.74-0.78 x11 | 0.80 x7 | 0.98 x8
+      39% of the catalogue is 2:1. That is the real defect, and it is a merchandising one — see the last section.
+
+      == THE RULE I CHOSE: equal ink AREA, capped by the plate's corner radius
+
+      `artFraming.ts` — ART_BOX (one shared long side) is replaced by two constants:
+
+        ART_AREA = 0.554       target ink area as a fraction of the plate
+        ART_MAX_SIDE = 0.90    cap on the long side
+
+        long = min(ART_MAX_SIDE, sqrt(ART_AREA / r)), short follows from the aspect.
+
+      ART_MAX_SIDE is not a taste call. The plate's corner radius is 15.16px on a 321px plate and our artwork is photographed FRAMED, with hard gilt edges; a mat thinner than the radius runs the plate's curve through a straight frame edge. 0.90 leaves 16px, the first whole pixel clear of it. (The bar runs to 3px because its images are canvases on a wall — the corner it clips is empty plaster.)
+
+      ART_AREA is read off the bar rather than argued: 0.554 is the value at which our Best Seller row reproduces BOTH of the bar's measured spreads at once — coverage 1.35x and long side 1.20x — and lands the row's near-square at 242px against the bar's own 262px. Three independent targets agreeing on one constant is the evidence for it.
+
+      I did NOT take coverage to flat, and that is a deliberate call against the stated pass condition, so here are the measured alternatives (all on the live row at 1440), which are now also in the file so round 5 need not re-derive them:
+
+        ART_AREA   cov spread   near-square   row mean cov
+         0.810 *     1.93x        289px         51.0%    <- round 2's shared box
+         0.554       1.35x        242px         45.0%    <- chosen; the bar's own 1.35x
+         0.492       1.20x        228px         43.4%
+         0.410       1.05x        208px         41.3%    <- flat, and 54px under the bar's 262px
+        * 0.81 = ART_MAX_SIDE^2; at or above it every shape caps and the rule degenerates to the shared box, which is exactly what round 2 shipped.
+
+      Flat coverage is reachable. It costs 4 points of mean coverage on the one axis the bar already wins by 22, and puts the row's lead artwork 54px under the bar's. Matching the bar's 1.35x is the parity answer; beating it to 1.05x is buying a metric.
+
+      == MEASUREMENTS, BEFORE AND AFTER
+
+      DESKTOP 1440, Best Sellers, plate 321x321, pixel-scanned ink bbox off a full-page capture:
+
+        card                aspect   BEFORE art  cov%     AFTER art  cov%   padL/padT after
+        1 Wabi-Sabi Study   1.022     289x283   79.4  ->   242x237   55.7      40 / 42
+        2 Desert Bloom      1.976     289x146   41.1  ->   289x146   41.1      16 / 87
+        3 Cosmic Harmony    0.508     147x289   41.2  ->   147x289   41.2      87 / 16
+        4 Mountain Majesty  0.520     150x289   42.2  ->   150x289   42.2      85 / 16
+
+        COVERAGE SPREAD   1.93x -> 1.35x   (bar 1.35x)
+        long-side spread  1.00x -> 1.19x   (bar 1.20x)
+        mean coverage     51.0% -> 45.0%   (bar 72.7%)
+
+      Only card 1 moves. Cards 2-4 are on the corner-radius cap under both rules — they were never the dial.
+
+      DESKTOP, New In rail (same component, different products; computed from the rendered clip-path because the pixel scan there is contaminated by the AI/Featured badges):
+        coverage  42/50/65/65  spread 1.54x  ->  42/50/55/55  spread 1.32x
+        long      289/289/289/289 1.00x      ->  289/289/268/267 1.08x
+
+      Independent check across the whole 12-card track: every product with r > 0.684 now renders at 55.4% coverage exactly, whatever its shape (1.35:1 landscape 278x206, 0.80 portrait 213x267, 0.75 portrait 206x277 — all 55.4%). Below 0.684 the cap binds and coverage falls as 0.81*r, 38.9% to 42.9%. 17 of 41 products are in that band.
+
+      == THE THREE OTHER FAULTS
+
+      3. "On tile 1 the mat is 16px — thinner than the 20px gap between tiles — so the plate reads as a hairline border." FIXED, and structurally: tile 1's ring is now 40px on all four sides. A card can only have a UNIFORM ring if it is near-square, a near-square is never capped, and an uncapped near-square's ring is (1 - sqrt(0.554))/2 * 321 = 41px. The failure mode cannot recur at any catalogue.
+
+      2. "The grey mat ranges 16px to 88px so adjacent tiles don't read as the same component." The 16..88 extent is unchanged and cannot change (see 1 below). What DID change is that the mat is now a legible function of shape, in the bar's own direction — the rounder the picture, the wider its mat:
+
+           shortness r         0.98   0.80   0.74   <=0.68
+           our long-axis mat     40     27     22      16
+           the bar's, measured   32      -      8       3
+
+         Under the shared box ours was a flat 16px on every card — the opposite of the bar, which is why the near-square read as bordered rather than matted.
+
+      1. "The four pictures share no horizon — top edges 20/88/16/17." NOT FIXED, and I can show it is not fixable: a piece of aspect a >= 1 centred and uncropped in a square plate of side P leaves padT >= P(1 - 1/a)/2. For Desert Bloom at 1.976 in a 321px plate that is 78.7px — at ANY scale, under ANY rule, even bleeding to the plate edge. A portrait on the cap sits at 16px. So the row's padT range is >= 62.7px before any rule gets a vote. Observed 71px, of which 63 is the artwork's shape and 8 is the corner-radius mat. Our padT is now 42/87/16/16 against 19/87/16/16; the range is identical at 71px, and card 1 has moved from "nearly on the portraits' line" to "between them and the landscape". The bar has the same fault (padT range 28px on its Best Seller row, 76px on its New In row) for the same reason, at a smaller magnitude only because its stock is not 2:1.
+         What all four DO share, and what the bar shares too, is the centre line: padT == padB on every card, ours 42/42, 87/87, 16/16, 16/16, the bar's 32/32, 32/32, 8/8, 4/4.
+
+      == NOT REGRESSED — the two the critic named as ours
+
+      - The meta row is untouched. No file involved in it was edited. Stars + count left / heart right, then title left and price right on one baseline with its own reserved gutter, card bottoms flush. Verified on the final capture.
+      - Artwork still dead-centred on the FRAME, not the bitmap: padL == padR to the pixel on all four cards, desktop and mobile (40/40, 16/16, 87/87, 85/85). The bar's own cards measure up to 46.5 left vs 27.5 right, and its card 4 3.0 vs 30.0.
+
+      == MOBILE MOVED — stating it explicitly, as asked
+
+      Framing is one shared module, so the desktop rule reaches 390 too. Only the near-square lead card changes; every capped card is pixel-identical.
+
+        mobile Best Seller card 1, plate 287     BEFORE      AFTER      BAR (measured)
+        artwork                                 258x253     216x211      236x231
+        coverage                                  79.3%       55.4%        ~66%
+        mat                                        14px        36px         28px
+
+      It moves ACROSS the bar's value rather than away from it: closer on the mat (14->36 vs 28) and marginally closer on coverage (79->55 vs 66) and on the long side (258->216 vs 236). I chose not to gate the rule per viewport — one framing rule that renders the same product at two sizes depending on window width is a worse thing to own than a 20px difference on one card, and mobile's actual wins (dark quick-add circle, the 20/20/20 rhythm, the dark plate) are in other files and untouched.
+
+      == /posters, /collections/$slug and the PDP — all signed off, all checked
+
+      Screenshotted before and after at 1440 and 390 by flipping ART_AREA to 0.81, which reproduces the old shared box exactly, so the two captures differ only by the rule.
+
+      - /posters desktop: document height identical, 5526px both. 41 cards, card box 243x368 and plate 243x243 both. Pixel-diffed: the ONLY differing bands are the twelve grid media rows (y 808-1027, 1196-1415, ...) plus y 13-25, which is the countdown strip's live timer. No chrome, no filter rail, no meta, no CLS.
+      - /posters mobile: document height identical, 8782px both. Card 168x302, plate 168x168 both.
+      - PDP (/posters/wabi-sabi-study): document height identical, 3065px both. Pixel diff shows ONE differing region, y 1678-1906 — the "Visually Similar Artworks" row, which is ProductCard. Gallery, buy box, frame swatches and tabs byte-identical.
+
+      == THE MERCHANDISING FINDING, since it is the real defect
+
+      The bar's plate does not contain an extracted canvas. It contains the whole product PHOTOGRAPH — a canvas hanging on a near-white wall — and the wall is the same tone as the plate, so the two merge and the piece appears to float on a continuous surface. That is where its 65-96% coverage and its even rows come from: its photographs are square-ish even when its artworks are not. Its artworks span r 0.75..0.98 and its photographs essentially fill the tile.
+
+      Ours are extracted canvases on a plate (round 2 added the wall-trim pass deliberately, because the untrimmed wall showed as a hard bright rectangle against the new plate colour). With 39% of the catalogue at 2:1, no layout rule can close the mean-coverage gap: a 1.98:1 piece cannot exceed 50.6% of a square plate at any scale without cropping the artwork, where none of the bar's four goes below 65%.
+
+      The fix is photographic, not CSS: shoot elongated pieces in a room or against a wall so the HERO frame is near-square, exactly as the bar does. Our catalogue already has square full-bleed room mockups for these products — they are the hover slides. Promoting one to primary for elongated stock is a merchandising/photography decision that changes what /posters and the PDP lead with, so I have not made it here. Worth its own ticket.
+
+      I did NOT touch the sort. The band is still salesCount desc from settled orders with the curator's isPopular/popularOrder pin above it; reordering to group aspects would have won a screenshot and lied about what sells.
+
+      == TESTS
+
+        web  tests/components/product + tests/components/home + tests/styles: 831 passed, 1 failed.
+             The failure is tests/styles.test.ts "no dark: utility variants in app source", offender
+             app/routes/admin/promotions/index.tsx — committed by another feature, not touched here.
+             PRE-EXISTING, the same one rounds 1 and 2 recorded.
+        web  tsc --noEmit: 22 errors, all in admin/track/ai-generator. Exactly the recorded baseline;
+             none in any file touched here.
+
+      artFraming.test.ts rewritten for the new rule — every uncapped shape carries the same coverage (landscape and portrait of the same shortness both listed, since a portrait-only list would pass a one-way rule); the cap can only make a piece SMALLER than the target, never larger; the cap binds exactly below r = 0.684; the row reproduces the bar's 1.35x and 1.20x spreads and its 242px near-square; every mat clears the plate's 15.16px corner radius; and a near-square is never shrunk below 0.70 of the plate. 19 tests.
+
+      == FILES
+
+        packages/web/app/components/product/artFraming.ts        ART_AREA + ART_MAX_SIDE replace ART_BOX
+        packages/web/tests/components/product/artFraming.test.ts rewritten for the new invariants
+
+      Nothing else. No API change, no backfill re-run needed — `artBox` and the round-2 wall-trim pass are unchanged and still correct.
+  - author: mcp-client
+    timestamp: '2026-08-06T17:24:20.728Z'
+    text: |-
+      Round 4 correction — ART_AREA 0.554 -> 0.64. One constant and its justification; nothing else touched. Still in-progress.
+
+      == I RE-MEASURED THE REFERENCE MYSELF. ALL THREE CLAIMS CONFIRMED; ROUND 3's 88% IS WRONG.
+
+      Source `scratchpad/shots/bar-desktop-full.png` (reference home page, 1440x900 viewport, deviceScaleFactor 2). Method: locate each grey plate, take the median of its 4..8px border ring as the plate colour, bound the pixels differing from it by more than an ink threshold. Run at thresholds 8, 20 and 45.
+
+      BAND A — the reference's Best Seller row, 322px plates at x 48/389/729/1070:
+
+        art       261x255   261x256   245x304   233x311
+        aspect       1.02      1.02      0.81      0.75
+        coverage    64.2%     64.3%     71.8%     70.2%
+        spread 1.121 / 1.119 / 1.109x at thr 8 / 20 / 45     mean 67.6%
+
+      Card 4 is 233x311 in a 322px plate = 70.2%, NOT 88%. Round 3's other three figures (65/65/73) are right to within a point. So Band A's real coverage spread is 1.12x, not 1.35x — and 0.554 was fitted to a number the reference never had.
+
+      BAND B — the reference's "New In" rail, same page, and the useful one because its stock is genuinely mixed the way ours is (visually confirmed on a crop: four framed pieces with visible mats):
+
+        art       231x301   261x256   306x156   149x301
+        aspect       0.77      1.02      1.96      0.49
+        coverage    67.0%     64.4%     46.1%     43.2%     spread 1.550x, mean 55.2%
+        mat L/T     46/12     33/33     10/80     87/12
+
+      So: the reference draws a near-square at 261x256 / ~64% in BOTH bands — same shape, same scale, twice, which is a rule — and its own mixed-aspect row spreads 1.55x with 80-87px mats on the elongated pieces. Every one of the three measurements in the correction is confirmed. Mine agrees with yours to within a point everywhere.
+
+      A FOURTH ERROR, same cause, worth recording. Round 3 also read Band B as `96 / 65 / 47 / 96 %`, spread 2.05x, and used it to argue the reference tolerates very uneven rows. That is the SAME artefact read at a low threshold: Band B's cards 1 and 4 are photographed against a wall whose tone sits 1-2 levels off the plate (239,238,237 vs 239,239,239), so at thr 8 their bbox swallows the whole plate and reads 100.0%. At thr 20 and 45 they resolve to 67% and 43%. The reference's New In row spreads 1.55x, not 2.05x. Both of round 3's headline reference figures were threshold artefacts of the same kind.
+
+      == THE CHANGE
+
+      `ART_AREA = 0.554` -> `0.64`. ART_MAX_SIDE, the sort, the plate, the mat colour, the meta row and the mobile quick-add are untouched. 0.64 IS the reference's measured near-square coverage; the row's spread is now an OUTPUT of it rather than the thing being tuned, which is the inversion round 3 got wrong.
+
+      Side effect worth naming: the cap now binds below r = ART_AREA/ART_MAX_SIDE^2 = 0.790 instead of 0.684. On the dev census (r 0.48 x1, 0.51-0.53 x15, 0.62 x1, 0.74-0.78 x11, 0.80 x7, 0.98 x8) that is 28 of 41 products rather than 17, and their coverage lands at 0.81*r — 38.9% at r 0.48 up to 63.2% at r 0.78 — against the flat 64% the other 13 share. Coverage now falls away CONTINUOUSLY with shape rather than splitting the row into "full" and "2:1", which is the reference's own profile in Band B (67/64/46/43 across r 0.77/0.98/0.51/0.49).
+
+      == PER-CARD MEASUREMENTS, BEFORE AND AFTER
+
+      Pixel-scanned off live captures of the rail with all fixed overlays suppressed, ink threshold 20 (also run at 8 and 45; coverage moves <0.4pt).
+
+      DESKTOP 1440, plate 321x321:
+
+        card                aspect   BEFORE          cov     AFTER           cov    mat L/T after
+        1 Wabi-Sabi Study    1.02    242x236 css   55.3%  -> 260x254 css   64.0%     30 / 33
+        2 Desert Bloom       1.98    289x146       40.9%  -> 289x146       40.9%     16 / 87
+        3 Cosmic Harmony     0.51    147x289       41.2%  -> 147x289       41.2%     87 / 16
+        4 Mountain Majesty   0.52    150x289       42.1%  -> 150x289       42.1%     86 / 16
+
+        coverage spread   1.351x -> 1.562x     (reference Band B 1.550x)
+        long-side spread  1.197x -> 1.114x
+        mean coverage      44.9% ->  47.1%     (reference Band A 67.6%, Band B 55.2%)
+        near-square       242px  -> 260px      (reference 261px)
+        near-square mat    40px  ->  30px      (reference 33px)
+
+      Only card 1 moves. Cards 2-4 are on the corner-radius cap under both constants and are pixel-identical.
+
+      MOBILE 390, plate 287x287 (each card measured with the track scrolled so it is fully in the viewport):
+
+        card                aspect   BEFORE          cov     AFTER           cov    mat L/T after
+        1 Wabi-Sabi Study    1.02    216x212 css   55.5%  -> 232x227 css   63.9%     28 / 30
+        2 Desert Bloom       1.97    258x131       41.0%  -> 258x131       41.0%     14 / 78
+        3 Cosmic Harmony     0.51    131x258       41.0%  -> 131x258       41.0%     78 / 14
+        4 Mountain Majesty   0.52    134x258       42.1%  -> 134x258       42.1%     76 / 14
+
+      Framing is a fraction of the plate, so mobile lands on the same 64% as desktop by construction. I did NOT quote a reference mobile target: `shots/bar-mobile-full.png` has the reference's own fixed tab bar baked across the plate in the full-page capture, so no reliable ink bbox can be taken from it. Round 3's "bar mobile 236x231 / ~66%" is not verifiable from the captures we hold, and I have left it out of the file rather than repeat it.
+
+      == SHARED SURFACES — /posters, the PDP and a collection page
+
+      `frameArt` is imported by exactly one file, `ProductCardMedia`, which is used by exactly one file, `ProductCard`. Blast radius is the card media box wherever a card appears. Verified by full-page pixel diff, captured with the constant flipped so the two runs differ only by the rule:
+
+        /posters desktop      document height 5526px both — differing rows confined to the
+                              twelve grid media bands (y 808-1026, 1196-1414, ...), no chrome,
+                              no filter rail, no meta, no CLS
+        /posters mobile       8782px both — 17 bands, all media rows
+        PDP wabi-sabi-study   3065px both — ONE differing band, y 1678-1906, which is the
+                              "Visually Similar Artworks" row. Gallery, buy box, frame
+                              swatches and tabs byte-identical.
+        /collections/wabi-sabi-art  3398px both — 3 bands, all media rows
+
+      Both surfaces move in the intended direction (near-squares grow to 64%, elongated stock unchanged) and nothing else moves.
+
+      == TESTS
+
+        web  tests/components/product + tests/components/home + tests/styles:
+             832 passed, 1 failed. The failure is tests/styles.test.ts "no dark: utility
+             variants in app source", offender app/routes/admin/promotions/index.tsx —
+             committed by another feature, not touched here. PRE-EXISTING, the same one
+             rounds 1-3 recorded. Nothing else.
+        web  tsc --noEmit: 22 errors, all in admin/track/ai-generator. Exactly the recorded
+             baseline; none in either file touched here.
+
+      `tests/components/product/artFraming.test.ts` updated for the new constant, 20 tests. The intent is kept and sharpened — the row-spread test that pinned round 3's mis-derived 1.35x is replaced by two:
+
+        - "draws the near-square at the reference's own measured 64%" — the PIN. Asserts
+          coverage(1.022) == 64% and the resulting 260x254 of a 321px plate, with the
+          capture, the viewport and the threshold named inline and the 88% mis-read
+          written down, so a future drift fails HERE rather than in a blind A/B.
+        - "lands the row's coverage spread where the reference's mixed row is" — asserts
+          1.55x, and notes explicitly that the spread is an output of ART_AREA, never the
+          thing tuned.
+
+      The uncapped/capped aspect lists moved with the new 0.790 cap threshold (0.75 and 1.34 are now capped and are asserted as such).
+
+      == FILES
+
+        packages/web/app/components/product/artFraming.ts         ART_AREA 0.554 -> 0.64;
+                                                                  header rewritten around the
+                                                                  re-measurement
+        packages/web/tests/components/product/artFraming.test.ts  new pin, updated lists
+
+      Nothing else. No API change, no backfill re-run.
+  - author: system
+    timestamp: '2026-08-06T17:58:19.814Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
 started: '2026-08-06T11:57:51.672Z'
+completed: '2026-08-06T17:58:19.814Z'

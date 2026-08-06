@@ -1,0 +1,68 @@
+ticket_number: 565
+title: 'Sign-out error handling diverged: account page swallows signOut() rejections, admin sidebar still logs them'
+description: |-
+  ## The bug
+
+  `packages/web/app/routes/_authed/account/index.tsx:154-164`'s `handleSignOut` used to wrap `signOut()` in `try/catch`. During the recent server-cart-write-path work it became `try/finally`:
+
+  ```ts
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } finally {
+      // Whether or not the request came back cleanly, this browser is done
+      // showing this account's cart...
+      onSignedOut()
+      navigate({ to: '/' })
+    }
+  }
+  ```
+
+  A `signOut()` rejection now propagates out of `handleSignOut` as an unhandled promise rejection instead of being caught and logged. The `finally` block still runs — `onSignedOut()` clears the local cart and `navigate({ to: '/' })` still fires — so there is no user-visible regression; the browser still ends up signed out and redirected either way.
+
+  `packages/web/app/components/admin/AdminSidebar.tsx:179-192` was touched by the same piece of work and kept its `catch`:
+
+  ```ts
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      // Surface the failure instead of silently redirecting with a live
+      // session — that's exactly how #341 stayed invisible.
+      console.error('Sign out failed:', error)
+    }
+    clearLocalCart()
+    window.location.href = '/'
+  }
+  ```
+
+  So the two sign-out paths in the app now disagree on how a failed sign-out is reported: the admin path logs it (per the explicit #341 rationale in its own comment — a hand-rolled body-less fetch once 500'd through the prod edge and left a session alive undetected), the account path does not.
+
+  ## Why this matters, and why it's low priority
+
+  Nothing is user-visibly broken — both paths still clear local state and navigate away. The risk is purely diagnostic: a `signOut()` failure on the account page (network blip, 500 from Better Auth, the same class of prod-edge issue #341 called out) is invisible — no console log, no telemetry, just a rejected promise the browser swallows. If sessions ever fail to sign out silently in production, the admin path would show it and the account path would not.
+
+  ## Suggested fix
+
+  Restore `try/catch` (with the same `console.error` treatment `AdminSidebar.tsx` uses, or shared telemetry) around `signOut()` in `handleSignOut`, keeping `onSignedOut()` and `navigate({ to: '/' })` running unconditionally afterward — i.e. `try/catch` followed by the cleanup, not `try/catch/finally` folding the cleanup into `catch` only. A regression test should assert that a rejected `signOut()` is caught (logged, not thrown) and that the cart is still cleared and navigation still happens.
+
+  ## Found while
+
+  Final review of the server-cart-authoritative change (ticket #511 follow-on), 2026-08-06/07. Not fixed as part of that review — filed instead, per instruction to only fix the cart pricing residual.
+feature: cart-checkout
+type: bug
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T19:10:38.850Z'
+last_updated: '2026-08-06T19:10:38.850Z'
+time_spent_minutes: 0
+labels: []
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

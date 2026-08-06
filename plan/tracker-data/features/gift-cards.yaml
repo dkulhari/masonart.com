@@ -1,7 +1,7 @@
 name: gift-cards
 title: Gift Cards
 priority: low
-created: '2026-01-28T07:46:31.374Z'
+created: "2026-01-28T07:46:31.374Z"
 assignee: unassigned
 tags: []
 description: |-
@@ -31,37 +31,37 @@ objectives:
   - TBD
 work_session_summary:
   total_sessions: 0
-  total_duration: '00:00:00'
+  total_duration: "00:00:00"
   total_tokens: 0
   agents: {}
 tickets:
   todo:
-    '554': API - gift card quote and balance endpoints, rate limited
-    '555': API - debit gift cards at payment initiation, and skip Razorpay on full coverage
-    '556': API - release the gift card hold when an order is cancelled or payment fails
-    '557': API - split refunds proportionally across tender and cards
-    '558': 'API - admin gift cards: list, search, issue, disable, adjust, liability'
-    '559': Admin UI - /admin/gift-cards list, detail and issue form
-    '560': Web - /gift-cards purchase page
-    '561': Web - gift card control at checkout and the amount-due line
-    '562': Web - gift card tender line on order confirmation and order detail
-    '563': E2E - buy a card, receive it, redeem part, spend the remainder
+    "559": Admin UI - /admin/gift-cards list, detail and issue form
+    "560": Web - /gift-cards purchase page
+    "561": Web - gift card control at checkout and the amount-due line
+    "562": Web - gift card tender line on order confirmation and order detail
+    "563": E2E - buy a card, receive it, redeem part, spend the remainder
   in_progress: {}
   done:
-    '511': Schema - gift_card, gift_card_transaction and order_gift_card tables
-    '512': Schema - orders.giftCardAmount and the gift_card order type
-    '513': Schema - shared Zod schemas and types for gift cards
-    '514': Lib - gift card code generation, normalization and hashing
-    '515': Service - issue a gift card and write its ledger row
-    '548': Service - redeem under a row lock, with clamp and idempotency
-    '549': Service - release the hold, credit refunds, and cap them per order
-    '550': API - POST /api/gift-cards/purchase creates the gift card order
-    '551': API - mint the card on payment verification
-    '552': Service - scheduled delivery sweep and the gift card email
-    '553': Schema - unique purchaseOrderId and orders.giftCardPurchase
+    "511": Schema - gift_card, gift_card_transaction and order_gift_card tables
+    "512": Schema - orders.giftCardAmount and the gift_card order type
+    "513": Schema - shared Zod schemas and types for gift cards
+    "514": Lib - gift card code generation, normalization and hashing
+    "515": Service - issue a gift card and write its ledger row
+    "548": Service - redeem under a row lock, with clamp and idempotency
+    "549": Service - release the hold, credit refunds, and cap them per order
+    "550": API - POST /api/gift-cards/purchase creates the gift card order
+    "551": API - mint the card on payment verification
+    "552": Service - scheduled delivery sweep and the gift card email
+    "553": Schema - unique purchaseOrderId and orders.giftCardPurchase
+    "554": API - gift card quote and balance endpoints, rate limited
+    "555": API - debit gift cards at payment initiation, and skip Razorpay on full coverage
+    "556": API - release the gift card hold when an order is cancelled or payment fails
+    "557": API - split refunds proportionally across tender and cards
+    "558": "API - admin gift cards: list, search, issue, disable, adjust, liability"
   undefined: {}
 total_tickets: 21
-completion_percentage: 52
+completion_percentage: 76
 is_completed: false
 plan:
   phases:
@@ -110,4 +110,4 @@ plan:
       location: tests/e2e
       tickets:
         - 563
-  generated_at: '2026-08-06T16:34:56.545Z'
+  generated_at: "2026-08-06T16:34:56.545Z"

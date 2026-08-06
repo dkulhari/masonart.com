@@ -1,0 +1,62 @@
+ticket_number: 566
+title: PDP frame options drop the flat priceAddition column, unlike the quickview and the server
+description: |-
+  ## The bug
+
+  `packages/web/app/routes/posters/$slug.tsx:127-147` maps each frame the API returns into the `FrameOptionData` the product detail page (PDP) hands to `FrameSelector`/`ProductDetail`:
+
+  ```ts
+  frames: response.frames?.map((f): FrameOptionData => ({
+    id: f.id,
+    type: f.type,
+    name: f.name,
+    description: f.description,
+    material: f.material,
+    imageUrl: f.thumbnailUrl || f.imageUrl,
+    priceModifierType: 'percentage',
+    priceModifierValue: Math.max(
+      0,
+      (parseFloat(f.priceModifier || '1') - 1) * 100
+    ),
+    isAvailable: true,
+  })),
+  ```
+
+  There is no channel for the flat `priceAddition` column at all — `FrameOptionData` (`packages/web/app/components/product/FrameSelector.tsx:41-57`) only has `priceModifierType`/`priceModifierValue`, and `calculateFramePrice` (used by both `FrameSelector.tsx` and `ProductDetail.tsx`) only ever multiplies off `priceModifierValue`. A frame carrying a non-zero `priceAddition` alongside a `priceModifier` would be quoted low on the PDP's buy panel.
+
+  Contrast with the quickview, `packages/web/app/components/product/ChooseOptions.tsx:78,256`, which passes both fields straight through: `pricing: { priceModifier: f.priceModifier, priceAddition: f.priceAddition }`. And the server: `frameAddition` in `@chobii/shared` (`packages/shared/src/constants/frames.ts:570-577`), used by both `POST /api/cart/items` and `PATCH /api/cart/items/:id` via `resolveFramePrice` in `packages/api/src/routes/cart.ts`, already combines `round(unitPrice * (priceModifier - 1)) + priceAddition` correctly — the shared helper handles the column fine, it's only the PDP's own re-derivation that drops it.
+
+  So a frame with a non-zero `priceAddition` would show one (wrong, low) price on the PDP buy panel, a different (correct) price in the quickview, and the server would charge the quickview's number — the PDP silently under-quotes what the customer will actually be charged at checkout.
+
+  ## Why this isn't live yet, and why it should still be fixed
+
+  - `priceAddition` defaults to `"0.00"` and is `.notNull()` (`packages/api/src/database/schema/products.ts:262-263`).
+  - The seed data never sets it to anything else.
+  - There is no admin write path for frames today — nothing in the app can currently set a frame's `priceAddition` to a non-zero value.
+
+  So today `priceModifierValue` alone happens to reproduce the right number. **This becomes a real mispricing the moment frames become admin-editable** — the instant an admin sets a flat addition on a frame, the PDP quotes low while checkout charges the correct, higher amount, and nothing in the current code would catch it.
+
+  ## Suggested fix
+
+  Extend `FrameOptionData` (and `calculateFramePrice`) to carry a flat addition alongside the percentage modifier — mirroring what `ChooseOptions.tsx` already does, or better, routing both the PDP and the quickview through the same `frameAddition`-equivalent calculation so there is one formula on the client the way there is now one (`frameAddition`) on the server. Map `f.priceAddition` through in `posters/$slug.tsx` and add a case to whatever frame-pricing test suite exists for a frame with both a non-zero `priceModifier` and a non-zero `priceAddition`.
+
+  ## Found while
+
+  Final review of the server-cart-authoritative change (ticket #511 follow-on / the frame-pricing fix in `packages/api/src/routes/cart.ts`), 2026-08-06/07. Not fixed here — filed instead, since the instruction for that review was to fix only the cart pricing residual (the POST dedupe branch) and file this separately.
+feature: cart-checkout
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T19:10:57.094Z'
+last_updated: '2026-08-06T19:10:57.094Z'
+time_spent_minutes: 0
+labels: []
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

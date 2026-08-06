@@ -75,8 +75,6 @@ tickets:
     "431": API - admin promotions CRUD
     "432": API - countdown deadline resolution, cookie mint and clamp
     "434": Storefront - sale strip with live countdown above the header
-    "527": Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
-    "528": A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
     "568": DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
   in_progress: {}
   done:
@@ -89,8 +87,10 @@ tickets:
     "516": API - featured products endpoint returns no sale price, so the home rail disagrees with the grid
     "524": Bug - /sale and /posters cards print base prices during a sale
     "525": Bug - promotion writes leave stale prices in the product response cache
+    "527": Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
+    "528": A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
 total_tickets: 23
-completion_percentage: 39
+completion_percentage: 48
 is_completed: false
 plan:
   phases:

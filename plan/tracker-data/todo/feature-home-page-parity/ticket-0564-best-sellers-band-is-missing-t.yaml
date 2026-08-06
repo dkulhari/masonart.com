@@ -1,0 +1,55 @@
+ticket_number: 564
+title: Best Sellers band is missing the category pill row the reference carries on both viewports
+description: |-
+  Found by the round-4 cropper while auditing why the band keeps losing its blind A/B.
+
+  The reference's Best Seller band contains a row of category pills directly under the heading — Wabi-Sabi Art / Plaster & Texture Art / Pop Art / Minimalist Paintings / Colorful Art — on BOTH desktop and mobile. Ours has no such row at all.
+
+  This was a deliberate omission, not an oversight. The #530/#534 builder wrote: "I deliberately did not build mesonart's category tab row under the Best Seller heading — a per-style refetch, outside the ticket, and the facets endpoint could back it later." That was a reasonable call for a build ticket. It is no longer reasonable now that the band has lost three consecutive blind comparisons, because a whole row of content the reference has and we do not is a structural difference no amount of artwork framing will close.
+
+  It is also the strongest remaining tell in the blind pairs: the cropper flags it as identifying which crop is which, independently of any capture artefact.
+
+  To build it: the row filters the rail by style, so it needs a per-style refetch or client-side filter over the best-seller set. The facets endpoint already returns style counts and the orientation chip row (#535) established the pattern for sourcing chip vocabulary from shared constants rather than literals. Only show styles that have best-selling products behind them — same honesty rule as every other band on this page.
+
+  One open question worth deciding rather than assuming: the reference's pills read as filters on the rail, so confirm whether selecting one refetches, filters in place, or navigates, and match the behaviour rather than only the shape.
+feature: home-page-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T17:04:02.782Z'
+last_updated: '2026-08-06T17:58:35.498Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - blind-ab
+  - products
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T17:58:35.369Z'
+    text: |-
+      Reconsider before building this. A blind critic has now judged the reference's own filter row and called it a weakness, not a strength.
+
+      Context: I filed this after the Best Sellers band lost three consecutive blind A/Bs, on the reasoning that a whole row of content they have and we lack was a structural gap no framing rule could close. The band has since won both viewports on the fourth judged round — without this row.
+
+      What the round-4 critic said about the reference's version of it, not knowing which page was which:
+
+      - their rail arrows have dropped off the heading line down onto the filter row, leaving "Best Seller" alone with roughly 1030px of empty line to its right
+      - four of their five chips are #fafafa on #ffffff — a 2% step — against one solid-black active chip, so the row reads as one button plus loose text rather than a set
+      - on mobile the same four inactive chips are 40px tall, so the row contributes one visible black button and four runs of unhoused text
+
+      So copying it as built would import three defects. That does not mean the feature is wrong — filtering a best-seller rail by style is a reasonable thing to offer, and the row is still the largest structural difference between the two bands. It means this ticket should be a design decision rather than a copy job.
+
+      If it gets built: give the inactive chips a real surface rather than a 2% step, keep the prev/next controls on the heading line, and hold the mobile chips at a 44px touch target. The orientation chip row (#535) already won its own blind A/B on exactly those properties — chip proportion, internal padding and label weight against container — so use it as the in-house precedent rather than the reference.
+
+      Dropping the priority to medium; it is no longer blocking a failing band.
+  - author: system
+    timestamp: '2026-08-06T17:58:35.498Z'
+    text: Priority changed from 'high' to 'medium'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

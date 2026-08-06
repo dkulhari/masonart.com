@@ -30,13 +30,16 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
+  todo:
+    "565": "Sign-out error handling diverged: account page swallows signOut() rejections, admin sidebar still logs them"
+    "566": PDP frame options drop the flat priceAddition column, unlike the quickview and the server
+    "567": Cleanup left behind by the server-cart write path (#511)
   in_progress: {}
   done:
     "7": Implement cart and checkout with Razorpay
     "191": "Bug: Checkout shipping mock data mismatch and wrong assertion text"
     "195": "Bug: flows/checkout.spec.ts delivery options and shipping mock failures"
     "511": The web app never writes to the server cart, so order creation reads an empty basket
-total_tickets: 4
-completion_percentage: 100
-is_completed: true
+total_tickets: 7
+completion_percentage: 57
+is_completed: false
