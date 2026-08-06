@@ -29,6 +29,7 @@ import { razorpayWebhooksApp } from "./routes/webhooks/razorpay";
 import { walletWebhookApp } from "./routes/webhooks/wallet";
 import { adminProductsApp } from "./routes/admin/products";
 import { adminOrdersApp } from "./routes/admin/orders";
+import { adminGiftCardsApp } from "./routes/admin/gift-cards";
 import { adminCustomersApp } from "./routes/admin/customers";
 import { adminPromotionsApp } from "./routes/admin/promotions";
 import { adminWalletConfigApp } from "./routes/admin/wallet-config";
@@ -208,6 +209,9 @@ app.route("/api/admin/collections", adminCollectionsApp);
 
 // Admin Orders API - order management
 app.route("/api/admin/orders", adminOrdersApp);
+
+// Admin Gift Cards API - issue, inspect, disable, adjust, liability
+app.route("/api/admin/gift-cards", adminGiftCardsApp);
 
 // Admin Customers API - user list and role assignment
 app.route("/api/admin/customers", adminCustomersApp);
