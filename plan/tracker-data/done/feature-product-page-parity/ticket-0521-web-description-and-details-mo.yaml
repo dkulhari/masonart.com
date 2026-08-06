@@ -4,11 +4,11 @@ description: 'Reference groups the long-form content into four tabs with an unde
 feature: product-page-parity
 type: task
 priority: high
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T07:21:35.356Z'
-last_updated: '2026-08-06T08:40:25.789Z'
+last_updated: '2026-08-06T11:07:14.788Z'
 time_spent_minutes: 0
 labels:
   - pdp-parity
@@ -71,9 +71,23 @@ comments:
       STILL NEEDED — two purely additive props at the $slug.tsx call site, blocked while the mobile builder owns that file: rating={product.rating} and artist on the spec projection. Until those land the rating summary, tab count and byline render nothing.
 
       HONEST ASSESSMENT of what remains: About is now thin because of DATA, not layout. What we hold is exhausted. To match the reference's About region the schema would need an artist bio/portrait/statement (we hold a name and a slug), print medium and paper/canvas stock, ink and edition info, care instructions, and editorial description copy of real length — the seed sentence is a fixture, not marketing copy. `tags` exists on the shared Product but is not projected onto ProductDetailData. This is worth its own schema ticket; no amount of layout work will fix it.
+  - author: system
+    timestamp: '2026-08-06T11:07:07.465Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T11:07:14.788Z'
+    text: |-
+      ROUND 3 CONFIRMED — two independent blind critics, different lenses, both picked ours, both "CLOSE: no". This region lost round 2 and has now been retaken. Marking #521 and #522 done.
+
+      Critic 2 (doubt-retirement lens) on the reference: its tab strip "is jammed against the very bottom edge of the viewport with none of its panel content visible, and the sticky add-to-cart bar is layered on top of it — occluding the 'Reviews' tab label down to a single letter and burying the 'Write a review' control." It also caught that the reference's star row "renders as five empty outline stars with no numeric rating and no review count next to it, which reads as 'nobody has ever reviewed this' — the strongest possible reason not to buy, stated by accident." That is precisely the defect the round-2 fix removed from our page, arrived at independently.
+
+      ONE CRITICISM THAT APPLIES TO US TOO, despite the win. The critic faulted the reference for spending "its entire below-fold screen on 'Visually Similar Artworks' — five competing products with prices, shown before a single specification of the item the buyer already chose, which invites them off this page instead of closing them on it." We deliberately copied that order, because #522 specified matching the reference's sequence. We won both verdicts with it, so I am not changing it now — but the argument for hoisting the tabs above the carousel is sound and independent of parity, and it is the kind of change that should be A/B'd against real buyers rather than settled by a critic or by imitation. Recording it rather than acting on it.
+
+      Also unresolved from round 2 and still true: About is thin because of DATA, not layout. Matching the reference's About region needs schema we do not have — artist bio and statement, print medium and stock, ink and edition, care instructions, and description copy of real length. Worth its own ticket.
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
 started: '2026-08-06T07:27:02.984Z'
+completed: '2026-08-06T11:07:07.465Z'

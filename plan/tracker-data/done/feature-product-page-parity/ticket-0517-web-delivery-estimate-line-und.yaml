@@ -1,0 +1,57 @@
+ticket_number: 517
+title: 'web: delivery estimate line under the selectors'
+description: 'Reference shows one line beneath the frame swatches: a check glyph then ''Arrives soon! Get it by **Aug 13-Aug 21** if you order today'', date range bold, surrounding text muted. We have no equivalent. Add it, deriving the window from the current date plus the existing shipping lead time rather than hardcoding dates.'
+feature: product-page-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.135Z'
+last_updated: '2026-08-06T11:05:21.612Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - buy-panel
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:27:02.934Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:32:17.957Z'
+    text: |-
+      Built. New DeliveryEstimate.tsx — check glyph, "Arrives soon! Get it by <bold range> if you order today".
+
+      No exported lead-time constant existed. The real figure lives as prose, duplicated in app/routes/shipping.tsx and app/routes/faq.tsx: production 2-4 business days, delivery a further 3-7. That gives DEFAULT_LEAD_TIME_DAYS = { min: 5, max: 11 }, exposed as an overridable prop rather than hardcoded dates. The window is computed from the current date with Sat/Sun skipping, reusing the same business-day algorithm ShippingSelector.tsx already uses. An injectable `now` prop keeps the tests deterministic.
+
+      Date formatting uses en-US rather than the site's usual en-IN, because the reference format is month-first ("Aug 13") and en-IN renders "13 Aug". Worth a second look at integration — en-IN may be the more correct choice for our actual customers even though it diverges from the reference.
+
+      Worth noting as a follow-up: the lead time being prose in two route files rather than one exported constant means it can drift. A shared constant would be the better home.
+
+      Still needs a blind critic verdict before this is done.
+  - author: system
+    timestamp: '2026-08-06T11:05:13.477Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T11:05:21.612Z'
+    text: |-
+      ROUND 3 BLIND VERDICT: ours won, "CLOSE: no" — and this is a REVERSAL BY THE SAME LENS.
+
+      Round 2's committability critic gave this region to the reference ("CLOSE: yes"). Round 3, same lens, fresh context, new coin flip, picked ours and was not close. Both the general brief lens (round 2, critic 1) and the committability lens have now chosen ours, so the buy panel is settled on two independent lenses rather than two runs of one.
+
+      What flipped it — the three fixes dispatched off round 2's complaints:
+      1. Frame swatches now carry visible names and price uplifts. The critic's remaining complaint on that point was aimed squarely at the reference: "B's seven frame/material options are unlabelled circular swatches with no names and no price deltas... picking any other means guessing both what it is and what it adds to the total." That was OUR defect two rounds ago; it is now only theirs.
+      2. The configuration summary line. The critic: "B never states the configuration back to the buyer; A's '16"H × 12"W · No frame selected · ₹2,499.00' line is the single most committable element in either image."
+      3. The sticky header no longer covers the artwork.
+
+      Note the honesty design paid off directly. The critic attacked the reference for quoting "a firm 'Add To Cart - $218.00'" beside an unchosen "Select a Size": "either $218 belongs to some silent default the panel never names, or it will change the moment the dropdown is opened, and nothing on screen tells the buyer which." We preselect a real variant and restate it, so our number always refers to something nameable. The frame caption does the same job for the frame — "adds ₹999.60 to the ₹2,499.00 size price" above a button reading ₹3,498.60.
+
+      Marking #515, #516, #517, #519, #520 done. Eleven of twelve regions judged; below-fold and mobile verdicts still pending.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:27:02.934Z'
+completed: '2026-08-06T11:05:13.477Z'

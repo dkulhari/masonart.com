@@ -1,0 +1,66 @@
+ticket_number: 523
+title: 'web: PDP mobile layout matches the reference at 390px'
+description: At 390px the reference gives the main image a rounded card with ~16px side padding, moves the thumbnails to a horizontal scroll strip of ~72px squares directly beneath it, keeps the expand button pinned top-right, then stacks the social-proof line, H1 and sold-count line. Bring our PDP to that at 390x844, and keep the desktop result from regressing.
+feature: product-page-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:21:35.487Z'
+last_updated: '2026-08-06T11:06:46.525Z'
+time_spent_minutes: 0
+labels:
+  - pdp-parity
+  - mobile
+  - responsive
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T11:04:16.062Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T11:04:27.656Z'
+    text: |-
+      BUILT, awaiting blind verdict.
+
+      The builder probed the live reference rather than trusting the spec doc, and found two errors in it — both now corrected in docs/design/pdp-parity-reference.md:
+      - mobile thumbnails are 62px on a 78px pitch (x = 20/98/176/254/332), not the "~72px" the doc claimed
+      - the reference's H1 is already 42px at 768, not desktop-only. Ours was text-[30px] lg:text-[42px], which made our tablet H1 the only element on the page smaller than the page it copies. Now text-[24px] md:text-[42px], matching the reference's 24px at 390.
+      The "~16px side padding" in the doc was also wrong: the reference's artwork is 350x350 at x=20, i.e. it fills the content column — that gutter is container-wide's own 20px, not padding the gallery adds.
+
+      Quantity + add-to-cart now share one row at 390 as the reference does (its stepper is 99px, button 234px; ours is 100px and 238px). Ours previously wrapped to two rows.
+
+      Structural fix worth recording: the CTA had min-w-0, which switches off the min-content floor on a whitespace-nowrap button, letting the flex line squeeze the button narrower than its own label — the text then escapes and the document gains a horizontal scrollbar. Removing min-w-0 means the label's true width drives the wrap decision, so an unusually long price BREAKS THE ROW instead of overflowing. Verified against the worst case "Add to cart - ₹1,29,999.00" (198px of label vs 180.6px today) — wraps cleanly.
+
+      Overflow is 0 at 390/768/1024/1440, and also at 360/414/640/1280. Desktop geometry unchanged: buy panel x=796 w=485, H1 42px/300, image 658 square, CTA 343x60. 768 now matches the reference exactly (CTA x=162 w=586 pad 26px, both).
+
+      One cross-file change: ProductTabs' tab bar was centred, and centring a wrapped row at 390 produced a three-row zigzag with each row centred on its own axis. Now left-aligned below md, centred from md. Two-per-row is arithmetically impossible there — the labels measure 143 + 203 = 346 in a 350px column — so it stays three rows, just aligned.
+
+      Test added: exactly one thumbnail carries aria-current="true" AND the mark MOVES on selection. A mark that never moves is indistinguishable from a hardcoded one.
+
+      Blind critic running now.
+  - author: system
+    timestamp: '2026-08-06T11:06:38.628Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T11:06:46.525Z'
+    text: |-
+      ROUND 3 CONFIRMED — two independent blind critics at 390x844, different lenses, both picked ours, both "CLOSE: no". Marking done.
+
+      Both landed on the same criticism of the reference, independently: it spends the highest-value block on the phone screen — directly under the thumbnail strip — on "… saves · In 17 carts now" and "4 sold in last 81 hours", pushing the price below the fold entirely.
+
+      Critic 2: "On a phone, on a bad connection, from an unknown brand, that inverts the deal: the page is asking for panic before it has told me what the thing costs... the counters read as dropshipper furniture and actively reduce belief that anyone will crate and ship a large canvas."
+
+      This is now the THIRD independent critic across two viewports to attack those counters. The decision made at the very start of this work — that we would not fabricate social-proof numbers we have no data for — has been vindicated four times over by critics who had no idea which page was which. It was taken as an honesty constraint and it turned out to be the single biggest competitive advantage in the comparison.
+
+      Both critics also flagged the reference's two-line breadcrumb repeating the product title verbatim, and a floating widget clipping its social-proof line mid-sentence.
+
+      One criticism aimed at the reference that is worth weighing for us: critic 2 argued the hero slot should be the flat framed shot with the room scene demoted to thumbnail 2, because in a staged room scene "the artwork itself occupies under half the frame". Our seed product leads with the flat artwork already, so we are on the right side of this — but it is a rule worth applying deliberately to image sort order across the catalogue rather than by accident of seeding.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T11:04:16.062Z'
+completed: '2026-08-06T11:06:38.627Z'

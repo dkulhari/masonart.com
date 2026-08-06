@@ -4,11 +4,11 @@ description: Reference ends the buy panel with a 'Share:' label followed by soci
 feature: product-page-parity
 type: task
 priority: low
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T07:21:35.299Z'
-last_updated: '2026-08-06T07:32:27.201Z'
+last_updated: '2026-08-06T11:05:13.507Z'
 time_spent_minutes: 0
 labels:
   - pdp-parity
@@ -30,9 +30,13 @@ comments:
       31 tests across the three leaf components pass. tsc clean.
 
       Still needs a blind critic verdict before this is done.
+  - author: system
+    timestamp: '2026-08-06T11:05:13.507Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
 started: '2026-08-06T07:27:02.976Z'
+completed: '2026-08-06T11:05:13.507Z'

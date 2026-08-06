@@ -18,21 +18,21 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo:
-    "515": "web: size selector becomes a single 52px dropdown instead of a stacked price list"
-    "523": "web: PDP mobile layout matches the reference at 390px"
-  in_progress:
-    "516": "web: frame selector becomes circular photographic swatches with a selected-value label"
-    "517": "web: delivery estimate line under the selectors"
-    "519": "web: trust badges become a four-row list with sub-lines"
-    "520": "web: share row and need-help link close the buy panel"
-    "521": "web: description and details move into a tab bar"
-    "522": "web: related products become a Visually Similar Artworks carousel"
+  todo: {}
+  in_progress: {}
   done:
     "512": "web: PDP two-column geometry matches the reference (727px gallery / 485px buy panel)"
     "513": "web: image gallery becomes a vertical thumbnail rail beside a square main image"
     "514": "web: buy panel header — 42px H1 with inline SKU, red 24px price, no price card"
+    "515": "web: size selector becomes a single 52px dropdown instead of a stacked price list"
+    "516": "web: frame selector becomes circular photographic swatches with a selected-value label"
+    "517": "web: delivery estimate line under the selectors"
     "518": "web: quantity stepper and add-to-cart share one row, with the price inside the button"
+    "519": "web: trust badges become a four-row list with sub-lines"
+    "520": "web: share row and need-help link close the buy panel"
+    "521": "web: description and details move into a tab bar"
+    "522": "web: related products become a Visually Similar Artworks carousel"
+    "523": "web: PDP mobile layout matches the reference at 390px"
 total_tickets: 12
-completion_percentage: 33
-is_completed: false
+completion_percentage: 100
+is_completed: true

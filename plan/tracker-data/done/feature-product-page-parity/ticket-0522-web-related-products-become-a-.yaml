@@ -4,11 +4,11 @@ description: Reference shows 'Visually Similar Artworks' as a horizontal carouse
 feature: product-page-parity
 type: task
 priority: high
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T07:21:35.466Z'
-last_updated: '2026-08-06T07:29:07.463Z'
+last_updated: '2026-08-06T11:07:07.479Z'
 time_spent_minutes: 0
 labels:
   - pdp-parity
@@ -30,9 +30,28 @@ comments:
       19 tests pass. tsc clean for this file.
 
       Not yet wired into routes/posters/$slug.tsx — the integrator replaces RelatedProductsSection. Still needs a blind critic verdict before this is done.
+  - author: mcp-client
+    timestamp: '2026-08-06T11:06:16.224Z'
+    text: |-
+      ROUND 3 BLIND VERDICT: ours won, "CLOSE: no" — reversing round 2's loss for this region.
+
+      Round 2 the critic called our post-purchase region "nearly empty" and gave it to the reference. After the ProductTabs fixes (min-height, review count + star summary visible without a click, At A Glance, cross-link row with real numbers), a fresh critic with a new coin flip picked ours and was not close.
+
+      Every gap it named was against the reference:
+      - "all four [tabs] set in the same pale grey with no active state, no underline, no panel content beneath them, and the fourth label plus the 'Write a review' button are physically covered by the floating add-to-cart bar, while the chat launcher covers the star row" — two floating widgets parked on the exact content the section exists to deliver.
+      - "The MESONART watermark is stamped across the centre of every recommendation thumbnail, obscuring the one thing a browsing buyer is scanning."
+      - "Card metadata is ragged: the title wraps to two or three lines down the left while the price stays pinned to the right of line one, so prices float unanchored and no two cards end on the same baseline."
+
+      WORTH CHECKING ON OUR SIDE despite the win: our seed images are sourced from the reference site and carry the same MESONART watermark, so that criticism may apply to our thumbnails too — the critic was looking at their capture, but we should confirm our own product imagery is not watermarked with another company's brand before this ships. That is a content/asset issue, not a layout one, and it is out of this ticket's scope, but it should not go unrecorded.
+
+      Confirming critic running with a doubt-retirement lens before this is marked done.
+  - author: system
+    timestamp: '2026-08-06T11:07:07.479Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
 started: '2026-08-06T07:27:02.995Z'
+completed: '2026-08-06T11:07:07.479Z'

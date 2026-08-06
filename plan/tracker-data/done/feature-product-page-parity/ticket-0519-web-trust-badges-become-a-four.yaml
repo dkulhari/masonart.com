@@ -4,11 +4,11 @@ description: 'Reference stacks four rows under the buy button, each an icon, a b
 feature: product-page-parity
 type: task
 priority: medium
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T07:21:35.288Z'
-last_updated: '2026-08-06T07:32:12.948Z'
+last_updated: '2026-08-06T11:05:13.493Z'
 time_spent_minutes: 0
 labels:
   - pdp-parity
@@ -33,9 +33,13 @@ comments:
       The `?` is a real button with aria-describedby/aria-expanded, opening on hover, focus or click (click covers touch) and closing on blur, second click or Escape. 6 dedicated tests.
 
       Still needs a blind critic verdict before this is done.
+  - author: system
+    timestamp: '2026-08-06T11:05:13.493Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
 started: '2026-08-06T07:27:02.971Z'
+completed: '2026-08-06T11:05:13.493Z'
