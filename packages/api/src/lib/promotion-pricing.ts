@@ -12,7 +12,7 @@
  */
 
 import type { PromotionScopeFilter, ResolvedSalePrice } from "@chobii/shared";
-import { and, eq, gt, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../database";
 import { products } from "../database/schema/products";
 import {
@@ -45,10 +45,26 @@ export function selectPromotion(candidates: Promotion[]): Promotion | null {
 const CACHE_TTL_MS = 60_000;
 let cache: { at: number; rows: Promotion[] } | null = null;
 
-/** Tiny table, read on every product request. 60s of staleness is acceptable. */
-export async function getActivePromotions(
-  now: Date = new Date()
-): Promise<Promotion[]> {
+/**
+ * Every enabled promotion that has not ended: the ones running now, and the
+ * ones still to start.
+ *
+ * The memo deliberately holds *more* than any one caller wants, because the
+ * alternative — memoising the rows that were active at load time — makes the
+ * 60s window a second source of staleness. A promotion scheduled for 10:00,
+ * with the list loaded at 09:59:30, would not be visible until 10:00:30 however
+ * carefully the response caches were clamped: the entry would expire on the
+ * boundary and be rebuilt from a memo that still says nothing is on sale (#528).
+ *
+ * Filtering here rather than in the WHERE clause makes the derivation happen at
+ * *read* time against the caller's `now`, which is the same clock rule the rest
+ * of the module follows. It costs a pass over a table that holds a handful of
+ * rows.
+ *
+ * Ended promotions are still dropped in SQL. They can never become interesting
+ * again, so keeping them would grow the memo without bound.
+ */
+async function getSchedulablePromotions(now: Date): Promise<Promotion[]> {
   if (cache && now.getTime() - cache.at < CACHE_TTL_MS) return cache.rows;
 
   const rows = await db
@@ -57,13 +73,47 @@ export async function getActivePromotions(
     .where(
       and(
         eq(promotions.isEnabled, true),
-        lte(promotions.startsAt, now),
         or(isNull(promotions.endsAt), gt(promotions.endsAt, now))
       )
     );
 
   cache = { at: now.getTime(), rows };
   return rows;
+}
+
+/** Tiny table, read on every product request. 60s of staleness is acceptable. */
+export async function getActivePromotions(
+  now: Date = new Date()
+): Promise<Promotion[]> {
+  const rows = await getSchedulablePromotions(now);
+  return rows.filter((row) => isPromotionActive(row, now));
+}
+
+/**
+ * When the next promotion starts, or null if none is scheduled.
+ *
+ * The sibling `getActivePromotions` needs so that a cache write can see the
+ * next boundary coming rather than only the one it is already inside. Both read
+ * the same memo, so a caller asking for both still pays one query per minute.
+ *
+ * `isEnabled` is re-checked rather than left to the WHERE clause: a disabled
+ * row has no start time in any sense that matters — nothing happens when the
+ * clock passes it — and clamping a cache against one would discard entries for
+ * a sale that never arrives. The memo can also be holding a row an admin
+ * disabled since it was loaded.
+ */
+export async function getNextPromotionStart(
+  now: Date = new Date()
+): Promise<Date | null> {
+  const rows = await getSchedulablePromotions(now);
+
+  let next: Date | null = null;
+  for (const row of rows) {
+    if (!row.isEnabled) continue;
+    if (row.startsAt <= now) continue;
+    if (!next || row.startsAt < next) next = row.startsAt;
+  }
+  return next;
 }
 
 /** Admin writes call this so an enable takes effect without a 60s wait. */
@@ -87,35 +137,51 @@ export function invalidateActivePromotions(): void {
  * sale is far off and shortens TTLs only as one winds down, which is exactly
  * when short TTLs are worth paying for.
  *
- * Two edges:
+ * A sale *starting* is the same problem at the other end (#528), and gets the
+ * same answer. A body cached at 09:00:00 while a sale is scheduled for
+ * 09:00:30 is right for thirty seconds and wrong for the rest of its TTL, and
+ * again nothing runs at 09:00:30 to purge it — enabling the sale was an admin
+ * write and did get purged, but *reaching its start time* is only the clock
+ * moving. So the boundary this clamps to is the soonest of the two:
+ * `min(soonest active endsAt, next startsAt)`. `getNextPromotionStart` supplies
+ * the second, off the same memo the active list comes from, so asking for it
+ * costs nothing per request.
+ *
+ * Neither clamp lengthens anything, and both are inert while the boundary is
+ * further off than the TTL already reaches — a sale scheduled for next week
+ * shortens nothing.
+ *
+ * Three edges:
  *
  * - A promotion with no `endsAt` runs open-ended and clamps nothing.
+ * - `nextPromotionStart` is null when nothing is scheduled, which is the
+ *   ordinary case and also clamps nothing.
  * - The floor of one second covers the window where `getActivePromotions`
  *   still reports a promotion whose end has already passed — its own 60s memo
  *   can be that far behind. `setex` rejects a non-positive TTL, and one second
  *   of a body that is already wrong beats ten minutes of it.
- *
- * This does not cover a promotion that has not *started* yet: the resolver only
- * ever sees active rows, so a body cached now can still outlive a sale
- * scheduled to begin in a minute. Enabling that sale is an admin write and gets
- * purged; a start time reached on the clock does not.
  */
 export function saleCacheTtl(
   activePromotions: Promotion[],
+  nextPromotionStart: Date | null,
   ttlSeconds: number,
   now: Date = new Date()
 ): number {
   let ttl = ttlSeconds;
 
+  // Rounded down throughout: an entry that expires a fraction early is
+  // invisible, one that expires a fraction late is a wrong price.
+  const clampTo = (boundary: Date): void => {
+    const remaining = Math.floor((boundary.getTime() - now.getTime()) / 1000);
+    if (remaining < ttl) ttl = remaining;
+  };
+
   for (const promotion of activePromotions) {
     if (!promotion.endsAt) continue;
-    // Rounded down: an entry that expires a fraction early is invisible, one
-    // that expires a fraction late is a wrong price.
-    const remaining = Math.floor(
-      (promotion.endsAt.getTime() - now.getTime()) / 1000
-    );
-    if (remaining < ttl) ttl = remaining;
+    clampTo(promotion.endsAt);
   }
+
+  if (nextPromotionStart) clampTo(nextPromotionStart);
 
   return Math.max(1, ttl);
 }

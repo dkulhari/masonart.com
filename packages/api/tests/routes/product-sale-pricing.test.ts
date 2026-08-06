@@ -65,6 +65,7 @@ vi.mock('../../src/auth', () => ({
 }));
 
 const getActivePromotionsMock = vi.fn();
+const getNextPromotionStartMock = vi.fn();
 const loadPromotionProductSetsMock = vi.fn();
 
 vi.mock('../../src/lib/promotion-pricing', async (importOriginal) => {
@@ -74,6 +75,13 @@ vi.mock('../../src/lib/promotion-pricing', async (importOriginal) => {
     ...actual,
     getActivePromotions: (...args: unknown[]) =>
       getActivePromotionsMock(...args),
+    /**
+     * Reads the promotion table like its two neighbours, so it is stubbed like
+     * them. Left real it would spend one of `queueSelects`' queued results and
+     * every list assertion below would read the wrong query's rows.
+     */
+    getNextPromotionStart: (...args: unknown[]) =>
+      getNextPromotionStartMock(...args),
     loadPromotionProductSets: (...args: unknown[]) =>
       loadPromotionProductSetsMock(...args),
   };
@@ -175,6 +183,9 @@ function givenPromotions(
   sets: { includedIds?: string[]; excludedIds?: string[] } = {}
 ) {
   getActivePromotionsMock.mockResolvedValue(active);
+  // Nothing scheduled — the cache-TTL clamp for an upcoming sale has its own
+  // suite (tests/routes/product-scheduled-sale-cache.test.ts).
+  getNextPromotionStartMock.mockResolvedValue(null);
   loadPromotionProductSetsMock.mockResolvedValue({
     includedIds: new Set(sets.includedIds ?? []),
     excludedIds: new Set(sets.excludedIds ?? []),

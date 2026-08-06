@@ -28,6 +28,9 @@ import {
   promotionProducts,
 } from '../../src/database/schema/promotions';
 import {
+  getActivePromotions,
+  getNextPromotionStart,
+  invalidateActivePromotions,
   isPromotionActive,
   loadPromotionProductSets,
   resolveSalePrice,
@@ -303,32 +306,33 @@ describe('loadPromotionProductSets', () => {
 // ============================================================================
 
 /**
- * A promotion write can purge the caches it invalidates. A promotion *ending*
- * cannot: active state is derived from the clock, so the moment a sale lapses
- * nothing runs, nothing writes, and there is no hook to purge from. The only
- * defence available at write time is to refuse to cache a priced body past the
- * deadline that will make it wrong.
+ * A promotion write can purge the caches it invalidates. A promotion crossing a
+ * boundary *on the clock* cannot: active state is derived rather than stored, so
+ * at the moment a sale lapses — or the moment a scheduled one begins — nothing
+ * runs, nothing writes, and there is no hook to purge from. The only defence
+ * available at write time is to refuse to cache a priced body past the instant
+ * that will make it wrong, whichever end that instant sits at.
  */
 describe('saleCacheTtl', () => {
   const FULL = 600;
 
   it('leaves the TTL alone when nothing is on sale', () => {
-    expect(saleCacheTtl([], FULL, NOW)).toBe(FULL);
+    expect(saleCacheTtl([], null, FULL, NOW)).toBe(FULL);
   });
 
   it('leaves the TTL alone for an open-ended promotion', () => {
     // No endsAt, no deadline to outlive.
-    expect(saleCacheTtl([promo({ endsAt: null })], FULL, NOW)).toBe(FULL);
+    expect(saleCacheTtl([promo({ endsAt: null })], null, FULL, NOW)).toBe(FULL);
   });
 
   it('leaves the TTL alone when the sale outlasts it', () => {
     // Ends three weeks out; a 10-minute entry cannot survive into the wrong era.
-    expect(saleCacheTtl([promo()], FULL, NOW)).toBe(FULL);
+    expect(saleCacheTtl([promo()], null, FULL, NOW)).toBe(FULL);
   });
 
   it('clamps to the seconds left when the sale ends first', () => {
     const endsAt = new Date(NOW.getTime() + 90_000); // 90s
-    expect(saleCacheTtl([promo({ endsAt })], FULL, NOW)).toBe(90);
+    expect(saleCacheTtl([promo({ endsAt })], null, FULL, NOW)).toBe(90);
   });
 
   it('clamps to the soonest deadline when several promotions run', () => {
@@ -337,6 +341,7 @@ describe('saleCacheTtl', () => {
     expect(
       saleCacheTtl(
         [promo({ id: 'a', endsAt: later }), promo({ id: 'b', endsAt: soon })],
+        null,
         FULL,
         NOW
       )
@@ -345,7 +350,7 @@ describe('saleCacheTtl', () => {
 
   it('rounds down, so an entry never outlives the sale by a part second', () => {
     const endsAt = new Date(NOW.getTime() + 45_900); // 45.9s
-    expect(saleCacheTtl([promo({ endsAt })], FULL, NOW)).toBe(45);
+    expect(saleCacheTtl([promo({ endsAt })], null, FULL, NOW)).toBe(45);
   });
 
   it('floors at one second for a promotion the resolver has not noticed ending', () => {
@@ -354,10 +359,125 @@ describe('saleCacheTtl', () => {
     // caching a body that is already wrong for a full 10 minutes is worse than
     // caching it for one second.
     const endsAt = new Date(NOW.getTime() - 30_000);
-    expect(saleCacheTtl([promo({ endsAt })], FULL, NOW)).toBe(1);
+    expect(saleCacheTtl([promo({ endsAt })], null, FULL, NOW)).toBe(1);
   });
 
   it('never lengthens a short TTL to reach a distant deadline', () => {
-    expect(saleCacheTtl([promo()], 60, NOW)).toBe(60);
+    expect(saleCacheTtl([promo()], null, 60, NOW)).toBe(60);
+  });
+
+  // -- the start boundary (#528) --------------------------------------------
+
+  it('clamps to a scheduled start with nothing on sale yet', () => {
+    // The bug in one line: no active promotion means no `endsAt` to clamp
+    // against, and the entry used to run its full 600s straight through the
+    // start of a sale 30s away.
+    const startsAt = new Date(NOW.getTime() + 30_000);
+    expect(saleCacheTtl([], startsAt, FULL, NOW)).toBe(30);
+  });
+
+  it('leaves the TTL alone when the next sale starts after it lapses', () => {
+    const startsAt = new Date(NOW.getTime() + 7_200_000); // two hours
+    expect(saleCacheTtl([], startsAt, FULL, NOW)).toBe(FULL);
+  });
+
+  it('takes the soonest of a running end and an upcoming start', () => {
+    const endsAt = new Date(NOW.getTime() + 120_000);
+    const startsAt = new Date(NOW.getTime() + 45_000);
+    expect(saleCacheTtl([promo({ endsAt })], startsAt, FULL, NOW)).toBe(45);
+  });
+
+  it('keeps the end clamp when the running sale finishes first', () => {
+    // The #525 half has to survive the #528 half.
+    const endsAt = new Date(NOW.getTime() + 20_000);
+    const startsAt = new Date(NOW.getTime() + 300_000);
+    expect(saleCacheTtl([promo({ endsAt })], startsAt, FULL, NOW)).toBe(20);
+  });
+
+  it('rounds a start boundary down too', () => {
+    const startsAt = new Date(NOW.getTime() + 45_900);
+    expect(saleCacheTtl([], startsAt, FULL, NOW)).toBe(45);
+  });
+
+  it('floors at one second for a start the memo has not caught up with', () => {
+    const startsAt = new Date(NOW.getTime() - 5_000);
+    expect(saleCacheTtl([], startsAt, FULL, NOW)).toBe(1);
+  });
+});
+
+// ============================================================================
+// getNextPromotionStart — the boundary saleCacheTtl clamps against
+// ============================================================================
+
+/**
+ * Both readers share one memo of the enabled, not-yet-ended rows, so these
+ * assertions run against a single stubbed `db.select()` and the second call
+ * must not reach the database again.
+ *
+ * The disabled case is the one worth stating out loud: a promotion that is
+ * scheduled but switched off must clamp nothing. Nothing happens when the clock
+ * passes its `startsAt`, so shortening cache entries against it would throw away
+ * live entries for a sale that never arrives.
+ */
+describe('getNextPromotionStart', () => {
+  /** The table read is a memo, so every test starts from an empty one. */
+  beforeEach(() => {
+    fromMock.mockReset();
+    invalidateActivePromotions();
+  });
+
+  function givenRows(rows: unknown[]) {
+    fromMock.mockReturnValue({ where: () => Promise.resolve(rows) });
+  }
+
+  const soon = new Date(NOW.getTime() + 30_000);
+  const later = new Date(NOW.getTime() + 300_000);
+
+  it('is null when nothing is scheduled', async () => {
+    givenRows([promo()]); // started a week ago
+    expect(await getNextPromotionStart(NOW)).toBeNull();
+  });
+
+  it('returns the start of a scheduled promotion', async () => {
+    givenRows([promo({ startsAt: soon })]);
+    expect(await getNextPromotionStart(NOW)).toEqual(soon);
+  });
+
+  it('returns the soonest of several', async () => {
+    givenRows([
+      promo({ id: 'a', startsAt: later }),
+      promo({ id: 'b', startsAt: soon }),
+    ]);
+    expect(await getNextPromotionStart(NOW)).toEqual(soon);
+  });
+
+  it('ignores a scheduled promotion that is disabled', async () => {
+    givenRows([promo({ startsAt: soon, isEnabled: false })]);
+    expect(await getNextPromotionStart(NOW)).toBeNull();
+  });
+
+  it('reads the same memo as the active list, not a second query', async () => {
+    givenRows([promo({ startsAt: soon })]);
+
+    const active = await getActivePromotions(NOW);
+    const next = await getNextPromotionStart(NOW);
+
+    // Not started yet, so it prices nothing — and it is still the boundary.
+    expect(active).toEqual([]);
+    expect(next).toEqual(soon);
+    expect(fromMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a scheduled promotion become active inside the memo window', async () => {
+    // The other half of #528. Clamping the response cache to the start time is
+    // useless if the memo, filled before the sale began, goes on reporting an
+    // empty active list for the rest of its own 60s.
+    givenRows([promo({ startsAt: soon })]);
+
+    expect(await getActivePromotions(NOW)).toEqual([]);
+
+    const afterStart = new Date(NOW.getTime() + 45_000);
+    expect(await getActivePromotions(afterStart)).toHaveLength(1);
+    expect(fromMock).toHaveBeenCalledTimes(1);
   });
 });

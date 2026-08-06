@@ -55,6 +55,7 @@ import {
 import { getCached, setCached, CacheKeys } from "../lib/redis";
 import {
   getActivePromotions,
+  getNextPromotionStart,
   loadPromotionProductSets,
   promotionScopeCondition,
   resolveSalePrice,
@@ -77,10 +78,12 @@ const CACHE_TTL_FEATURED = 900; // 15 minutes
  *
  * Promotion writes purge these keys outright (see
  * `purgeProductResponseCache`), so an enable, an edit or a delete is visible
- * at once. A promotion *expiring* has no write to hang that off — active state
- * is read from the clock — so the deadline is folded into the TTL instead and
- * the entry lapses with the sale. The two halves together are what make the
- * cache unable to quote a price from the wrong side of a promotion boundary.
+ * at once. A promotion *reaching a boundary on the clock* has no write to hang
+ * that off — active state is read from the clock, not stored — so both
+ * boundaries are folded into the TTL instead: an entry lapses with the sale
+ * that priced it, and lapses again at the start of the next one scheduled. The
+ * two halves together are what make the cache unable to quote a price from the
+ * wrong side of a promotion boundary.
  */
 
 
@@ -117,12 +120,22 @@ function viewerCacheSuffix(isMember: boolean): string {
  *
  * The two id sets are per-request, not per-product: resolving inside the map
  * would turn a 24-card grid into 48 extra queries.
+ *
+ * `nextPromotionStart` prices nothing — it is only ever handed to
+ * `saleCacheTtl`, so that a response cached before a scheduled sale begins
+ * cannot outlive the start of it (#528). It reads the same memoised promotion
+ * list as the active rows, so it costs no query of its own.
  */
 async function loadSaleContext(isMember: boolean) {
   const activePromotions = await getActivePromotions();
+  const nextPromotionStart = await getNextPromotionStart();
   const { includedIds, excludedIds } =
     await loadPromotionProductSets(activePromotions);
-  return { activePromotions, ctx: { isMember, includedIds, excludedIds } };
+  return {
+    activePromotions,
+    nextPromotionStart,
+    ctx: { isMember, includedIds, excludedIds },
+  };
 }
 
 // ============================================================================
@@ -439,7 +452,8 @@ productsApp.get(
        * from being drawn from two reads of a table that can change between
        * them — a product could otherwise appear on /sale at its base price.
        */
-      const { activePromotions, ctx } = await loadSaleContext(isMember);
+      const { activePromotions, nextPromotionStart, ctx } =
+        await loadSaleContext(isMember);
 
       /**
        * `?onSale=true` narrows the whole query, not just the page.
@@ -553,7 +567,7 @@ productsApp.get(
       await setCached(
         cacheKey,
         { items, total },
-        saleCacheTtl(activePromotions, CACHE_TTL_PRODUCTS)
+        saleCacheTtl(activePromotions, nextPromotionStart, CACHE_TTL_PRODUCTS)
       );
 
       return c.json(result);
@@ -703,7 +717,8 @@ productsApp.get(
        * through the same resolver. Anything less and the two disagree one
        * screen apart.
        */
-      const { activePromotions, ctx } = await loadSaleContext(isMember);
+      const { activePromotions, nextPromotionStart, ctx } =
+        await loadSaleContext(isMember);
       const items = featuredProducts.map((product) => ({
         ...product,
         sale: resolveSalePrice(product, activePromotions, ctx),
@@ -714,7 +729,7 @@ productsApp.get(
       await setCached(
         cacheKey,
         items,
-        saleCacheTtl(activePromotions, CACHE_TTL_FEATURED)
+        saleCacheTtl(activePromotions, nextPromotionStart, CACHE_TTL_FEATURED)
       );
 
       return c.json({ items });
@@ -941,7 +956,8 @@ productsApp.get("/:slug", async (c) => {
       .orderBy(asc(frames.sortOrder));
 
     // Same resolver as the grid, so the two pages cannot disagree on a price.
-    const { activePromotions, ctx } = await loadSaleContext(isMember);
+    const { activePromotions, nextPromotionStart, ctx } =
+      await loadSaleContext(isMember);
 
     const result = {
       ...product,
@@ -953,7 +969,11 @@ productsApp.get("/:slug", async (c) => {
     await setCached(
       cacheKey,
       result,
-      saleCacheTtl(activePromotions, CACHE_TTL_PRODUCT_DETAIL)
+      saleCacheTtl(
+        activePromotions,
+        nextPromotionStart,
+        CACHE_TTL_PRODUCT_DETAIL
+      )
     );
 
     return c.json(result);
@@ -1064,7 +1084,8 @@ productsApp.get(
 
       // Same resolver as the PDP above it — a "You May Also Like" row at base
       // price under the product it is recommending is the same bug as #516.
-      const { activePromotions, ctx } = await loadSaleContext(isMember);
+      const { activePromotions, nextPromotionStart, ctx } =
+        await loadSaleContext(isMember);
       const items = related.map((product) => ({
         ...product,
         sale: resolveSalePrice(product, activePromotions, ctx),
@@ -1073,7 +1094,7 @@ productsApp.get(
       await setCached(
         cacheKey,
         items,
-        saleCacheTtl(activePromotions, CACHE_TTL_FEATURED)
+        saleCacheTtl(activePromotions, nextPromotionStart, CACHE_TTL_FEATURED)
       );
 
       return c.json({ items });
