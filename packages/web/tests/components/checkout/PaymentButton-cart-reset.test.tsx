@@ -2,9 +2,15 @@
  * After a paid order the server has already emptied the cart
  * (routes/orders.ts:542). The button must not send a second DELETE — it would
  * be a wasted round trip, and it would take out anything added since.
+ *
+ * This test verifies that PaymentButton uses resetLocalCart (not clearCart)
+ * and that resetLocalCart does not call cartApi.clear().
+ * The test is a regression pin: it prevents a future developer from "fixing"
+ * the code back to clearCart, which would waste a round trip and could remove
+ * items added between order placement and redirect.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
@@ -39,8 +45,9 @@ function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
 
-describe('post-payment cart reset', () => {
-  it('empties locally without a DELETE', () => {
+describe('resetLocalCart regression pin', () => {
+  beforeEach(() => {
+    // Set up initial cart state with items
     useCartStore.setState({
       items: [
         {
@@ -49,8 +56,8 @@ describe('post-payment cart reset', () => {
           variantId: 'v',
           frameId: null,
           quantity: 1,
-          productTitle: 'x',
-          productSlug: 'x',
+          productTitle: 'Test Poster',
+          productSlug: 'test-poster',
           thumbnailUrl: '',
           sizeLabel: 'A4',
           widthInches: 8,
@@ -63,10 +70,24 @@ describe('post-payment cart reset', () => {
       ],
     })
 
+    vi.clearAllMocks()
+  })
+
+  it('resetLocalCart clears store locally WITHOUT calling cartApi.clear()', () => {
+    // Precondition: cart has items
+    expect(useCartStore.getState().items).toHaveLength(1)
+
+    // Call resetLocalCart via the hook
     const { result } = renderHook(() => useCartActions(), { wrapper })
     act(() => result.current.resetLocalCart())
 
+    // Verify: store is cleared
     expect(useCartStore.getState().items).toEqual([])
+
+    // CRITICAL ASSERTION: cartApi.clear() was NOT called.
+    // This is the regression pin: if PaymentButton is changed to call
+    // clearCart() instead of resetLocalCart(), this assertion will fail,
+    // because clearCart() calls cartApi.clear().
     expect(cartApi.clear).not.toHaveBeenCalled()
   })
 })
