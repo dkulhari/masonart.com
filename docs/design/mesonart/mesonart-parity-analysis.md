@@ -180,7 +180,7 @@ Two things that made it stick, both worth remembering because neither was in the
 
 | mesonart | chobii today (measured 2026-08-04) | State |
 |---|---|---|
-| Sale strip + countdown | none | ❌ **blocked** — no promotion entity in the schema. A countdown to a sale that does not exist is the fabricated-urgency pattern this document rules out |
+| Sale strip + countdown | beige strip above the announcement bar: promotion headline + `HH : MM : SS`, rendered only while a promotion row is active | ✅ #434 (feature `sale-promotions`) — the blocker was the missing promotion entity, not the countdown. There is a row now, so the headline and the depth are columns and the deadline arrives resolved from the server (design §6). No sale running means no strip and no timer; nothing is hardcoded, so nothing outlives the promotion that justified it |
 | Announcement bar (social / rotator / currency) | present, social left / rotating message centre | ✅ #400 — no currency selector (single-currency store) |
 | Centered logo; Search / Login / Wishlist / Cart right | wordmark centred within 12px of header centre; all four actions present | ✅ #401 |
 | Two-row nav (pages + styles) | 2 nav rows, 19 style links generated from `STYLE_OPTIONS` | ✅ #401 |
@@ -500,7 +500,7 @@ Method: both sites loaded in headless Chrome at 1440×900 and measured from `get
 | Area | State |
 |---|---|
 | §2 design tokens | **Closed.** Every row measures green but card shadow. The "tokens declared, never consumed" finding is resolved |
-| §3.1 global chrome | **Closed** but the sale strip — announcement bar, centred wordmark, two nav rows (19 style links), search, wishlist, 4-column footer with USP strip |
+| §3.1 global chrome | **Closed** — announcement bar, centred wordmark, two nav rows (19 style links), search, wishlist, 4-column footer with USP strip, and the sale strip with #434. Only the floating offer tab is outstanding, and the chat bubble beside it is not something we are copying |
 | §3.3 collection page | **Closed** but four items: Discover chips, promo tile, facet counts and sort 6→8 all landed. Remaining: quick-view / "Choose options", "Most relevant" sort, mat-colour decision, catalogue depth |
 | §3.2 home | **Barely started.** 6 sections against their 12. Only Phase A typography is visible |
 | §3.4 product page | **Barely started.** Heading, dual-unit sizes and real review data only |

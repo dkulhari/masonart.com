@@ -13,6 +13,7 @@ import { BRAND_NAME, BRAND_TAGLINE } from '@chobii/shared'
 import { useEffect } from 'react'
 import type * as React from 'react'
 import { AnnouncementBar } from '~/components/layout/AnnouncementBar'
+import { SaleStrip } from '~/components/layout/SaleStrip'
 import { Header } from '~/components/layout/Header'
 import { Footer } from '~/components/layout/Footer'
 import { CartDrawer } from '~/components/cart/CartDrawer'
@@ -266,6 +267,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           Skip to content
         </a>
         <div className="relative flex min-h-screen flex-col">
+          {/* Above the announcement bar, and self-suppressing: it renders
+              nothing at all unless a promotion row is actually active (#434) */}
+          {!isAdminRoute && <SaleStrip />}
           {!isAdminRoute && <AnnouncementBar />}
           {!isAdminRoute && <Header />}
           <main id="main-content" tabIndex={-1} className="flex-1">

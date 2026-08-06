@@ -8,10 +8,17 @@
  *
  * 1. **No region selector.** We price in INR only; a selector with one option
  *    is furniture that implies a choice the customer does not have.
- * 2. **No sale strip and no countdown.** Theirs advertises "SUMMER SALE 40%
- *    OFF" over a live timer. We have no promotion entity — a countdown to a
- *    sale that does not exist is the fabricated-urgency pattern the parity
- *    analysis explicitly forbids. It waits for something real to announce.
+ * 2. **No promotional copy in this bar.** Theirs runs "SUMMER SALE 40% OFF"
+ *    over a live timer in the band above. Ours has one too now — `SaleStrip`,
+ *    added in #434 — but it is a separate component that renders `null` unless
+ *    a promotion row is genuinely active, and every word and number in it comes
+ *    from that row. What has expired is only the reason the strip could not be
+ *    built: there is a promotion entity now. The constraint it was protecting
+ *    survives intact, and it lands here: this bar never advertises a sale. It
+ *    has no promotion to read, so anything sale-shaped written into the
+ *    messages below would be a hardcoded claim that outlives whatever it was
+ *    describing. When no sale is running there is no strip, and this bar reads
+ *    exactly as it does today.
  *
  * The messages below are things already stated on the home page trust row, so
  * they are claims we can stand behind.
