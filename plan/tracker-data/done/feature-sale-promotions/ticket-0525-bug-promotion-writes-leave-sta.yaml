@@ -1,0 +1,108 @@
+ticket_number: 525
+title: Bug - promotion writes leave stale prices in the product response cache
+description: |-
+  ## Bug
+
+  Enabling, editing or expiring a promotion does not take effect on the storefront for up to 5–10 minutes. An admin who starts a sale sees the strip and the countdown appear immediately, but product grids and PDPs keep quoting pre-sale prices; when a sale ends, they keep quoting the discount.
+
+  ## Root cause
+
+  The admin promotion routes (`packages/api/src/routes/admin/promotions.ts`) call `invalidateActivePromotions()` and nothing else. That clears the 60s in-memory active-promotion list, which is why `GET /api/promotions/active` and all the promotion-driven chrome update at once.
+
+  The **product responses** are a separate Redis cache and carry the resolved `sale` block:
+
+  - `product-list:<query><viewer>` — `CACHE_TTL_PRODUCTS = 300s`
+  - `product:<slug><viewer>` — `CACHE_TTL_PRODUCT_DETAIL = 600s`
+  - `product:featured:<limit><viewer>` — `CACHE_TTL_FEATURED = 900s`
+  - `product:related:<slug>:<limit><viewer>`
+
+  Nothing purges these on a promotion write, so they serve the prices from before the change until their own TTL runs out. Admin *product* writes already do the right thing (`deleteCached(CacheKeys.PRODUCT_LIST)` in `routes/admin/products.ts`); the promotion routes just never got the equivalent.
+
+  The `viewerCacheSuffix` member/guest split means each variant has to be purged, so a prefix/pattern delete is the right tool — `deleteCachedPattern` already exists in `packages/api/src/lib/redis.ts`.
+
+  ## Fix
+
+  In the create / update / enable / disable / delete handlers, alongside `invalidateActivePromotions()`:
+
+  ```ts
+  await deleteCachedPattern(`${CacheKeys.PRODUCT_LIST}*`)
+  await deleteCachedPattern(`${CacheKeys.PRODUCT}*`)
+  ```
+
+  ## Evidence
+
+  Reproduced by hand against the dev stack: two identical `GET /api/products?page=1&pageSize=7&onSale=false` calls return `fromCache: undefined` then `fromCache: true`, and a promotion created between them changes nothing until the key expires.
+
+  `tests/e2e/sale-promotions.spec.ts` (#438) has to work around this — `purgeProductCache()` in `tests/e2e/helpers/promotions.ts` drops the `product-list:*` and `product:*` keys between legs, because the spec reads the same PDP in the "no sale" and "on sale" legs well inside the 600s TTL. Once this is fixed, that helper stays useful as fixture hygiene but stops being load-bearing.
+
+  The expiry leg of that spec is written to keep the two apart: it asserts the chrome vanishes with nothing purged and nothing touched, and only purges before asserting on prices.
+
+  ## Context
+
+  Found while writing the lifecycle E2E for #438.
+feature: sale-promotions
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:31:34.212Z'
+last_updated: '2026-08-06T07:58:59.086Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - bug
+  - cache
+  - sale-promotions
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:48:06.346Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:58:55.804Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `17b5f421` — fix(api): promotion writes purge the product response cache
+
+      **Files Changed**:
+      - `packages/api/src/lib/redis.ts` — `deleteCachedPattern` now iterates with SCAN instead of KEYS; new `purgeProductResponseCache()` globbing the `product-list:` and `product:` prefixes
+      - `packages/api/src/lib/promotion-pricing.ts` — new `saleCacheTtl(activePromotions, ttl, now)`, the expiry half
+      - `packages/api/src/routes/admin/promotions.ts` — all five mutating handlers now `await invalidatePricingCaches()` (resolver list + Redis purge)
+      - `packages/api/src/routes/products.ts` — the four cache writes that carry a `sale` block pass their TTL through `saleCacheTtl`
+      - `packages/api/tests/lib/promotion-pricing.test.ts` — 8 new tests for the TTL clamp
+      - `packages/api/tests/routes/admin/promotion-cache-purge.test.ts` — new, 11 tests
+
+      **Root Cause**: `packages/api/src/routes/admin/promotions.ts` called only `invalidateActivePromotions()`, which clears the resolver's 60s in-process active list. The Redis product-response cache (`product-list:` 300s, `product:<slug>` 600s, `product:featured:<n>` 900s, `product:related:<slug>:<n>` 900s) carries the resolved `sale` block and was never purged, so a sale switched on in admin kept serving base prices until the TTL lapsed — and kept serving discounts after the sale ended.
+
+      **Purge strategy — prefix purge over SCAN, not a generation counter.** A cache-generation counter folded into the key prefix is race-free and O(1) per bump, but it costs a Redis read on *every* storefront product request to resolve the current generation. Promotion writes are a handful of admin actions a day; product reads are constant. Paying an O(keyspace) scan a few times a day is far cheaper in aggregate than an extra round trip on every read, and the key shape stays unchanged so the E2E `purgeProductCache()` helper and the admin product-write invalidation keep working. `deleteCachedPattern` was switched from `KEYS` to `SCAN` in the same change — `KEYS` walks the whole keyspace inside one command and blocks every other client, and the three review route files already calling this helper were paying that.
+
+      **Expiry — TTL clamp.** Nothing runs when a promotion simply ends; active state is derived from the clock, so there is no write to hang a purge off. `saleCacheTtl` shortens each entry to the soonest active `endsAt`, floored at 1s (`setex` rejects a non-positive TTL, and `getActivePromotions`'s own 60s memo can hand a route a row whose window already closed). Rounded down, so an entry never outlives the sale by a part second. Open-ended promotions clamp nothing.
+
+      **Known gap, deliberately not closed here**: a promotion that has not *started* yet. The resolver only ever returns active rows, so a body cached now can still outlive a sale scheduled to begin in a minute. Enabling that sale is an admin write and does get purged; a start time reached on the clock does not. Covering it needs the route to know the next `startsAt`, which changes the resolver's query shape — worth its own ticket.
+
+      **Also noticed, not fixed (out of scope)**: `packages/api/src/routes/admin/products.ts` calls `deleteCached(CacheKeys.PRODUCT_LIST)` in five places. `deleteCached` takes an *exact* key, so that deletes a literal `"product-list:"` key that is never written — admin product writes are not actually busting the list cache. Contrary to this ticket's description, that path has the same bug. Worth a follow-up ticket.
+
+      **E2E**: `tests/e2e/sale-promotions.spec.ts` was read and not modified. Its expiry leg asserts the chrome vanishes *before* any purge — that half is driven by `GET /api/promotions/active`, which is not Redis-cached, so the premise is untouched. The price assertions later in that leg still purge first and still pass; the purge is now redundant rather than load-bearing, which is what this ticket was for.
+
+      **Verification**:
+      - Command: `VITEST_MAX_WORKERS=1 bunx vitest run tests/lib/promotion-pricing.test.ts tests/routes/admin/promotion-cache-purge.test.ts tests/routes/admin/promotions.test.ts` (with `DATABASE_URL` pointed at :5440)
+      - Result: PASS — 3 files, 75 tests, 75 passing
+      - Command: `bunx tsc --noEmit` in packages/api
+      - Result: PASS — 0 errors
+      - Red-first evidence: the 8 TTL tests failed with `saleCacheTtl is not a function`, and the purge suite failed 7/11 with seeded `:member`/`:guest` keys surviving and `scan` call count 0.
+
+      **Pre-existing failures confirmed unrelated**:
+      - `tests/lib/redis.test.ts` fails a varying set (2, then 4, then 10 across three identical runs) in `setCached`/rate-limit tests — a lazy-connect race against the live Redis on :6380, in code this ticket did not touch. Its `deleteCachedPattern` runtime test passes.
+      - `tests/routes/products.test.ts > should filter by styles` returns 400 from the query validator, before any handler code runs.
+  - author: system
+    timestamp: '2026-08-06T07:58:59.086Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:48:06.346Z'
+completed: '2026-08-06T07:58:59.086Z'

@@ -1,0 +1,111 @@
+ticket_number: 529
+title: Home hero — full-bleed image carousel with peek slides replaces the text hero
+description: |-
+  BAR: mesonart.com hero. Full-bleed lifestyle photograph carousel, rounded corners, adjacent slides peeking at both edges, campaign artwork burned into the image, single large outline pill CTA (SHOP All ART) bottom-right, dot indicators. Sits directly under the category rail with no white gap.
+
+  OURS TODAY: HeroSection in routes/index.tsx renders a centred text block on white — badge pill, two-line h1, 3-line paragraph, two buttons, trust row. Reads as a SaaS landing page, not an art storefront. This is the single biggest gap on the page.
+
+  Build a HomeHero component under app/components/home/. Desktop 1440 and mobile 390 both judged. Mobile: single slide, full-bleed, no peek, CTA stays reachable.
+feature: home-page-parity
+type: task
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.029Z'
+last_updated: '2026-08-06T14:44:55.626Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - hero
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T11:59:16.502Z'
+    text: |-
+      Blocker found while scoping, applies beyond this ticket: the repo has no interior/lifestyle photography. Everything available is product artwork in MinIO (products/*.webp), 7 frame swatches in public/frames/, 4 category jpgs in public/images/categories/, and two OG images. mesonart's hero, room band and promo tiles are all built on room photography of art hanging in styled interiors.
+
+      The previous hero pass hit the same wall — see the comment above HeroSection in routes/index.tsx: "The photography itself is Phase D — a contained slideshow needs room mockups we do not have yet."
+
+      So the carousel structure, peek slides, rounded frame, overlay and pill CTA can all reach parity now; the imagery inside them cannot until we have room mockups. Build the structure against real product artwork and flag the imagery gap rather than faking an interior.
+  - author: system
+    timestamp: '2026-08-06T12:06:37.988Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:31:13.765Z'
+    text: |-
+      Built `packages/web/app/components/home/HomeHero.tsx` (+ `packages/web/tests/components/home/HomeHero.test.tsx`, 17 tests). `app/routes/index.tsx` untouched — the integration step wires it in.
+
+      SUPERSEDES `HeroSection` in `app/routes/index.tsx` (the centred badge pill / h1 / paragraph / two-buttons / trust-row block). Left in place for the integration step to delete.
+
+      ## Geometry — measured off the captured bar at device-pixel accuracy, then verified in a headless browser
+
+      | | bar | ours |
+      |---|---|---|
+      | desktop slide | 1344 x 553 at x=48 | 1344 x 553 at x=48 |
+      | desktop gap / peek | 30 / 18px each edge | 30 / 18px each edge |
+      | desktop pill | 229.5 x 45, inset 60/60 from the slide's right and bottom | 218 x 45, inset 60/60 |
+      | mobile slide | 349.5 x 513.5 at x=20, no peek | 350 x 514 at x=20, no peek |
+      | mobile pill | 309.5 x 40, inset 20/20, 10px off the bottom | 310 x 40, inset 20/20, 10px off the bottom |
+      | band padding | none — slide starts 10px under the category rail | none |
+
+      The peek is not positioned anywhere: with a track inset `I` and gap `G` a neighbour shows exactly `I - G`. 48/30 gives the desktop's 18px, 20/20 gives the phone's zero. Slide width is `100%` of the track's content box (already narrowed by the inset), so no `100vw` and no scrollbar overhang. The track is capped at `--page-width` and centred, so past 1600px the hero stays 56px narrower than `.container-wide`, as it is at 1440.
+
+      ## Decisions
+
+      - **Both edges peek** — the bar shows a slide at the LEFT edge while its first slide is showing, which `scrollLeft: 0` cannot do. The track renders `[last, ...slides, first]` and starts one step in; when a clone settles under the snap point the position jumps to its real twin with `behavior: 'instant'`, invisible because they are the same photograph. Scroll position is the only state, so a swipe and an arrow press cannot disagree.
+      - **Two source crops per slide** via `<picture>`: a wide asset above `md`, a tall one below. Desktop `aspect-[1344/553]`, mobile `aspect-[349/513]` (the mobile box matches the source ratio, so nothing is cropped there).
+      - **Pill border is 1px, not the system's 2px `--border-button`.** Measured: their standard buttons sit on white and carry 2px; the hero pill sits on a photograph and carries 1, and the difference is visible side by side. Everything else is `buttonVariants({ variant: 'outline' })` retinted white, so the hover wipe and pill radius stay the system's.
+      - **No scrim.** I built one, screenshotted it next to the bar, and removed it: the bar has none and a scrim greys the bottom of the photograph the band exists to show. Legibility comes from the pill's white outline, as it does on the bar.
+      - **No arrows or dots at rest**, matching the bar. The track is a real tab stop with ArrowLeft/ArrowRight (same shape as `product/ProductCarousel`); circular arrows fade in on hover or keyboard focus only, so they are absent from a screenshot. Autoplay 6s, pauses on hover/focus, does not run at all under `prefers-reduced-motion`.
+      - **An `sr-only` h1.** The bar's hero has no heading element — its words are pixels — but dropping ours would leave the home page with no h1. It carries the route's own `<title>` claim.
+      - **CTA "Shop All Art" -> `/posters`**, one for the whole band (the overlay sits above the track, not inside every slide) so N slides do not put N identically-named links on the page.
+
+      ## Real data
+
+      Nothing in this component reads or prints a promotion. The "Late Summer / Home Refresh Event / 40% off" wording in the band is pixels inside the placeholder JPEG, not copy this file writes — and that is also how the real band will work, since the slide is a merchandising slot with the campaign composited into the asset, exactly as the bar does it. A test asserts the rendered band contains no `%`, no "off", no "sale", and that the file never touches `/api/promotions/active`. The sale surfaces (`SaleStrip`, `SaleBanner`, sale pricing) keep owning that, against a real row.
+
+      I did build and then remove a promotion-driven HTML lockup (headline + `percentOff`, de-duplicated when the headline already quoted a percentage). It double-printed against the burned-in artwork and, more importantly, it was my invention — the bar's hero does not read its promotion table. Worth revisiting only if we ever want a campaign line over photography that has none.
+
+      ## Photography
+
+      Per the coordinator's brief the slides are the bar's own, from the git-ignored `packages/web/public/dev-reference/hero/`. Routed through ONE exported constant, `HERO_SLIDES` (with `HERO_IMAGE_BASE` beside it); a test asserts the directory is named on exactly one non-comment line of the file, so replacing them is an edit to that table and nothing else. Nothing outside this band references the directory. #544 blocks go-live.
+
+      The directory is git-ignored, so a clone that has not run `scripts/dev/fetch-reference-imagery.sh` has no images. An `onError` on any slide hides the WHOLE band rather than painting broken-image glyphs above the fold — pinned by a test.
+
+      ## Correction to the scoping comment above
+
+      "the repo has no interior/lifestyle photography" is no longer true of the seeded catalogue. Every one of the 41 dev products carries three `room-mockup` images, and a good share of them are exactly what this band wants: the artwork photographed hanging in a styled interior (`digital-cosmos-1` is a lounge with a sofa and a cane chair, `neon-dreams-1` a living room, `wabi-sabi-study-1` an entryway). They come from `.cache/seed-media` via `packages/api/src/database/seed-images.ts`. Two caveats, which is why they are not the source here: they are square 1500x1500, so both a wide and a tall crop would have to be cut before they can fill these boxes, and the set is mixed — some mockups are tight detail shots of a frame edge rather than a room. Noted in the file header as the second source for when #544 comes round. (Watermarks on some of them are #546 and were not a factor in any choice here.)
+
+      Status stays in-progress until a critic picks ours blind.
+  - author: mcp-client
+    timestamp: '2026-08-06T13:25:45.020Z'
+    text: |-
+      Blind A/B result: OURS WINS on both desktop and mobile. The critic did not know which page was which.
+
+      Faults it named on the reference: three unrelated type treatments inside one three-line lockup (light wide teal geometric, heavy tight white grotesque, ultra-bold gold carrying both a white keyline and a drop shadow) reading as three one-offs from a discount banner; their CTA pill centred 145px right of the copy it belongs to; their nominally-centred stack drifting 21px left line by line so no two lines share an axis; their mobile inverting the hierarchy relative to their own desktop. It also caught their button rendering "SHOP All ART" — an uppercase transform failing to reach the middle word.
+
+      Do not bank this as a clean win. The critic's own closeness note:
+
+        "Mobile was close — A wins largely by not attempting type at all"
+
+      We won by omission. Their hero carries a campaign message; ours carries a photograph and a pill, because the promotion lockup built here was removed after it double-printed against artwork already burned into the placeholder JPEG. A critic judging craft prefers a clean photograph to a badly set message. A merchandiser would say our hero says nothing.
+
+      That is a substance gap per-band craft judging cannot see, and it does not close on this ticket. It closes when the placeholder imagery is replaced (#544) and a real campaign has somewhere to live (#543 owns the promotion data). Whoever picks those up should revisit the hero lockup — the removal was correct given burned-in artwork, and stops being correct once the artwork is ours.
+
+      Two defects the critic named in OURS, against its own verdict, both properties of the placeholder image rather than the carousel:
+      - the row seam at y=513 slices flat across the crown of a woman's head in the lower panel
+      - the triptych's three desktop columns are 430 / 466 / 448 CSS px with zero gutter, so the butt-joins between tonally clashing frames read as accidents rather than a considered three-up
+
+      The carousel geometry itself was verified correct against the live DOM — 1344x553 at x=48, neighbours at -1326 and 1422, an 18px peek each side. Both defects resolve with real imagery.
+  - author: system
+    timestamp: '2026-08-06T14:44:55.627Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T12:06:37.988Z'
+completed: '2026-08-06T14:44:55.626Z'

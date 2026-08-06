@@ -1,0 +1,74 @@
+ticket_number: 532
+title: Shop by Room split band — image panel left, olive list panel right with counts
+description: |-
+  BAR: mesonart 'Shop by Room'. One full-width rounded band split in two: left is a lifestyle photograph with the room name overlaid in large white type plus a 'Shop Collection →' link; right is a sage/olive panel headed 'Shop by Room' listing rooms (Living Room, Entryway, Executive Office, Bathroom, Reading Nook, Dining Room…) in large type, each with its product count as a small superscript, the active row underlined.
+
+  OURS TODAY: missing entirely.
+
+  No rooms table exists in the DB — drive this from a curated config that links to real filtered collection URLs, and only render a count where a real facet count backs it. Do not invent counts. Desktop + mobile (mobile stacks image over list).
+feature: home-page-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.105Z'
+last_updated: '2026-08-06T14:44:55.677Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - merchandising
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T12:37:48.277Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:38:21.596Z'
+    text: |-
+      Built. New file, nothing shared edited.
+
+      FILES
+      - `packages/web/app/components/home/ShopByRoomBand.tsx` (new) — exports `ShopByRoomBand` (connected, mount it with no props like `CustomerReviewsSection`), `ShopByRoomBandView` (presentational), `resolveRoomCards`, `ROOM_BAND_ORDER`, `ROOM_PHOTOS`.
+      - `packages/web/tests/components/home/ShopByRoomBand.test.tsx` (new) — 16 tests, green. Whole `tests/components/home` folder green (111). No new tsc errors.
+      - `app/routes/index.tsx` NOT touched. It supersedes nothing; the band is new. Integration = import and mount `<ShopByRoomBand />` between the Shop By Popular band (#531) and the promo tiles (#533).
+
+      SEVEN ROOMS, NOT SIX
+      The ticket text says six. It is seven: the desktop band's seventh row, "Nursery & Kids Room 140", straddles the s02/s03 slice boundary and is invisible in the slices — it is there in `bar-desktop-full.png` and in mobile s03. Built to seven.
+
+      WHERE THE LINKS GO
+      `/posters?rooms=<facet id>`, via `<Link to="/posters" search={{ rooms: id }}>` — the search object, never a hand-built href, for the reason `parseCollectionSearch` documents. There is no per-room collection row to link at; the seed builds collections per style plus new/best-selling, so `/posters` with one facet is the honest destination (same as the orientation band #535 and the All Art panel's Room column). Ids and labels both come from `ROOM_OPTIONS` in `@chobii/shared` — the file spells no room word of its own, and a test fails if one appears.
+
+      THE COUNTS ARE REAL
+      `GET /api/products/facets` already returns per-room counts over active products. Living Room 6, Entryway 9, Executive Office 6, Bathroom 6, Reading Nook 6, Dining Room 8, Nursery & Kids Room 7 — against their 3895 / 2694 / 588 / 126 / 159 / 326 / 140. A room the call does not answer for gets no superscript; a failed call costs the band its numbers, not its existence. Nothing rounds or falls back to zero, and a test pins that.
+
+      PHOTOGRAPHY
+      Seven `public/dev-reference/rooms/*.jpg`, one per row, all routed through the single exported `ROOM_PHOTOS` constant — a test asserts that no `/dev-reference/` path exists anywhere else in the file, so #544's swap is one object literal. They mount on first hover and never unmount: all seven at once is ~2MB of JPEG for a band where six sit at opacity 0.
+
+      MEASURED, AT 1440 AND 390
+      Band 1344x608 inset by the gutter, radius 12px (23 device px at 2x). Split at 45.25%; the photo is a perfect square and is what sets the band's height — their panel content is top-aligned with ~90px of slack under it, not centred. Panel fill is rgb(219 216 194), which is exactly our `--band-strong`; no new token. Rows 38px on a 52px line, heading 16px, panel padding 64/96, overlay title 42px with its cap 32px below the top edge. Counts are ~16px with their ink top level with the name's cap.
+
+      THREE THINGS THAT ARE NOT OBVIOUS AND ARE COMMENTED IN THE FILE
+      1. `aspect-square` on the flex ITEM does not survive `align-items: stretch` — the band came out as tall as its list and the photo was cropped. Exactly one image is in normal flow carrying the ratio, the rest are `absolute inset-0`, the same mechanism `ProductCardMedia` uses.
+      2. The count's lift is `vertical-align: 0.79em`, not `<sup>`: `super` raises by whatever the font says, about 5px in Urbanist against the 12.6px measured. It needs `leading-none` too, or the raised box grows every line box and the rows drift from 52px to 57px apart.
+      3. The gap before the count is two non-breaking spaces. Their underline is one rule under name, gap and number; Chrome will not draw a link's decoration under a child's padding, and a margin is nobody's box, so either one saws it in half.
+
+      TWO DELIBERATE DEPARTURES
+      - A shallow top scrim plus a soft text-shadow on the overlay. Theirs runs white type onto bare photography and loses half of "Shop Collection" in the blonde highlight; the bathroom and reading-nook placeholders are near-white top to bottom and would lose all of it.
+      - Hover swaps the photo on `focus` as well as `mouseEnter`, so the band works from the keyboard, and the count carries an sr-only " posters" so it does not read as a bare number.
+
+      DATA GAPS / NOT SOURCED
+      - Photography is #544's placeholder, not ours. Also: the fetched `living-room.jpg` is a slightly tighter crop of the same photograph than the one their live band serves — visible only side by side, and moot once we shoot our own.
+      - Our counts are single digits against their four. Nothing to do about that but sell more posters; the band is built so it needs no change when they grow.
+      - Before the coordinator unblocked photography I had this resolving each room's picture from a `room-mockup` image on a product carrying that room facet — real, and it worked — so if the placeholders are ever pulled before we shoot, that fallback is a known-good path rather than an idea.
+  - author: system
+    timestamp: '2026-08-06T14:44:55.677Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T12:37:48.277Z'
+completed: '2026-08-06T14:44:55.677Z'

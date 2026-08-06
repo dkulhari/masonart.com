@@ -15,17 +15,43 @@ description: |-
 feature: sale-promotions
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T08:04:59.202Z'
-last_updated: '2026-08-05T08:04:59.202Z'
+last_updated: '2026-08-06T06:11:22.085Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T06:11:18.268Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `aa24b758` - feat(web): the cart shows what the sale is worth, locked or not
+
+      **Files Changed**:
+      - `packages/web/app/routes/cart/index.tsx` — `readCartSaving()` reads the #429 payload (`items[].pricing` + `savingTotal`); per-line `LineSaving` under each cart line; `Sale saving` row and the locked block in `OrderSummary`; `JoinGalleryModal` (#444) opened with `source: 'cart'`; `CartContent` exported for the test.
+      - `packages/web/tests/routes/cart-saving.test.tsx` — 12 tests (new).
+
+      **Summary**:
+      - Nothing discounted → no row anywhere (also true before the priced cart has loaded).
+      - Member: per-line `base − sale` plus the cart-level row printing the server's own `savingTotal`; the line figures sum to it.
+      - Guest under a members-only sale: the server truthfully reports `savingTotal: '0.00'` (it charges base), so the locked teaser is summed from the locked lines' `base − sale` — the same subtraction the server's `lineSaving()` does, never a percentage applied client-side. Same number a member is shown, presented as locked, with a "Join the gallery" button in the summary next to the checkout button.
+      - Membership from `useGalleryMembership()` (#443): a member is never shown the gate, and a payload cached from before they joined triggers exactly one refetch instead of a locally invented unlocked figure.
+
+      **Note for the feature owner**: the storefront cart page renders lines from the local Zustand store and nothing in `packages/web` currently writes to `/api/cart`, so pricing is matched onto the displayed lines by product+variant+frame and the rows stay absent until the server cart carries the same lines. Wiring the cart to the server cart is outside this ticket.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/routes/cart-saving.test.tsx`
+      - Result: PASS (12 tests, 12 passing)
+      - Output: `Test Files 1 passed (1) | Tests 12 passed (12)`
+  - author: system
+    timestamp: '2026-08-06T06:11:22.085Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -61,7 +87,7 @@ implementation_steps:
     action: implement
     description: Render per-line and cart-level savings, locked variant included
     file: packages/web/app/routes/cart/index.tsx
-    status: pending
+    status: done
     code: |-
       // Line: struck base line total + sale line total when pricing.sale exists.
       // Summary: a saving row above the subtotal. locked === true renders the same
@@ -72,10 +98,16 @@ implementation_steps:
     description: Confirm the tests pass
     command: cd packages/web && bunx vitest run tests/routes/cart-saving.test.tsx
     expected_result: PASS
-    status: pending
+    status: done
   - id: 5
     action: commit
     description: Commit the cart saving row
     command: 'git add packages/web/app/routes/cart packages/web/tests/routes/cart-saving.test.tsx && git commit -m "feat(web): cart saving row with the members-only lock"'
-    status: pending
+    status: done
 current_step: 1
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run tests/routes/cart-saving.test.tsx
+  test_output: Test Files 1 passed (1) | Tests 12 passed (12)
+  verified_at: '2026-08-06T06:11:09.168Z'
+completed: '2026-08-06T06:11:22.085Z'

@@ -1,0 +1,118 @@
+ticket_number: 510
+title: Cart page mixes two cart sources, so the saving row can describe lines it is not showing
+description: |-
+  ## Task
+  The storefront cart has **two independent sources of truth** and the page now reads both:
+
+  - `packages/web/app/stores/cart.ts` — a Zustand store with `localStorage` persistence. `routes/cart/index.tsx` takes `useCartItems`, `useCartSubtotal`, `useCartItemCount` from it (lines 178-180).
+  - `GET /api/cart` — the server cart (`packages/api/src/routes/cart.ts`), reached through `cartApi` / `useCart.ts`. This is where #429 resolves sale pricing, and where #430 re-resolves at order creation.
+
+  #436 wired `useServerCart` into the page to render the saving row, so the page now shows **line items from Zustand and savings from the server**. Nothing synchronises the two. A line added while logged out, or on another device, or before a `localStorage` clear, puts them out of step — and then the saving row quotes a number computed over a basket the customer is not looking at.
+
+  This predates the sale work; the sale work is what makes it visible and consequential, because the saving row is the gate's single point of contact with the customer.
+
+  ## Decide, then implement
+  - **Server as truth** — the page renders `GET /api/cart`; Zustand becomes an optimistic cache in front of it. Matches where pricing, the member gate and order creation already live. Bigger change to the page.
+  - **Sync on read** — keep Zustand as the render source but reconcile against the server on cart mount, and render savings only for lines present in both. Smaller, but leaves two sources alive.
+
+  Server-as-truth is the recommendation: order creation already re-resolves server-side and ignores the client, so any divergence is a display lie rather than a pricing bug — but a display lie about a discount is exactly the thing this feature must not ship.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 4 — Frontend
+  Found while verifying #436 (commit aa24b758). Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5, §7
+
+  Affects the E2E in #438 and #447: a spec driving the UI cart while asserting server-resolved savings will be testing the seam, not the feature. Settle this before writing those assertions.
+feature: sale-promotions
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T06:12:36.613Z'
+last_updated: '2026-08-06T06:45:00.000Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T06:36:03.359Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: claude-code
+    timestamp: '2026-08-06T06:45:00.000Z'
+    text: |-
+      ✅ Landed as the smaller fix, not server-as-truth — commit `6eb64913` (originally 4487c24e; another session rebased the branch and folded its own `SalePrice.tsx` edit into it).
+
+      **Why the recommended option was not taken.** Server-as-truth is unreachable from this page: *nothing in the web app writes to the server cart*. `cartApi.addItem` / `updateItem` / `removeItem` / `clear` / `merge`, and the `useAddToCart` / `useUpdateCartItem` / `useRemoveFromCart` / `useClearCart` / `useMergeCart` hooks in `packages/web/app/hooks/useCart.ts`, all have **zero call sites**. The only server-cart consumer in the app is the `useServerCart()` read at `routes/cart/index.tsx:188`, added by #436. So `GET /api/cart` is empty for real customers, and rendering the page from it would show everyone an empty cart. Per the escape hatch in the brief, the smaller correct fix was landed instead of a half-migration.
+
+      Corollary worth its own ticket: the #436 saving row is effectively dead in production today, since it can only render against a server cart that nothing populates.
+
+      **What was implemented.** Every figure the page quotes is confined to lines present in *both* sources. `readCartSaving` now takes the displayed line keys and:
+      - restricts `byLine` and the locked total to displayed lines;
+      - passes the server's `savingTotal` through **verbatim** whenever it is wholly attributable to displayed lines — the ordinary case, unchanged;
+      - falls back to the sum of the server's own per-line `base − sale` figures only when a discounted, *unlocked* line is missing from the page (locked lines already total zero server-side, so they cannot make `savingTotal` overstate).
+
+      No discount is recomputed client-side; the numbers stay the server's, narrowed to the basket on screen.
+
+      **Files changed**
+      - `packages/web/app/routes/cart/index.tsx` — `readCartSaving(cart, displayed)`; displayed-line set built from the store in `CartContent`.
+      - `packages/web/tests/routes/cart-saving.test.tsx` — 6 new tests under "when the two cart sources disagree".
+
+      **Verification**
+      - `cd packages/web && bunx vitest run tests/routes/cart-saving.test.tsx` → PASS (18 tests; 3 of the 6 new ones failed first against the old code, quoting 11,720 for a one-line basket).
+      - `bunx vitest run tests/stores/cart.test.ts tests/stores/cart-drawer.test.ts tests/components/cart/CartDrawer.test.tsx` → PASS (70 tests, unchanged).
+      - `bunx tsc --noEmit` → no errors in either changed file (24 pre-existing package errors, unchanged).
+
+      New tests cover: the cart-level total never quoting an undisplayed line; the same for the locked total; rendered lines reconciling to the rendered total; **no behaviour change when no promotion is active even with divergent carts**; a store line the server has never seen; and pass-through of `savingTotal` when both carts agree (the guard against over-correcting into client-side arithmetic).
+
+      **A full server-as-truth migration would need**: wiring the cart writes into `components/product/ChooseOptions.tsx` + `ProductDetail.tsx`, `components/cart/CartDrawer.tsx`, `components/layout/Header.tsx` (item count), `routes/checkout/index.tsx` and `components/checkout/PaymentButton.tsx`, plus guest merge-on-login and a one-time localStorage→server migration for existing carts. Feature-sized, and two of those files are held by live agents (#437, #435).
+
+      ⚠️ **Tracker data issue**: two tickets share the number **510** — this one and `todo/feature-sale-promotions/ticket-0510-decision-needed-orders-subtota.yaml` ("DECISION NEEDED - orders.subtotal semantics"). `showTicketDetails(510)` and `updateTicketStatus(510)` resolve here, but `updateImplementationStep(510, …)` and `addComment(510)` resolve to the *decision* ticket. Both stray writes to it (two steps marked done, one comment) have been reverted; it is back to all-pending, `comments: []`, `current_step: 1`. Steps and this comment were written into this YAML directly.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing test where the Zustand cart and the server cart disagree, asserting the page never shows a saving for a line it is not rendering
+    file: packages/web/tests/routes/cart-saving.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/cart-saving.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm it fails against the current mixed-source page
+    command: cd packages/web && bunx vitest run tests/routes/cart-saving.test.tsx
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Make the server cart the render source, with the store as an optimistic cache in front of it
+    file: packages/web/app/routes/cart/index.tsx
+    status: skipped
+    note: >-
+      Not attempted: nothing in the web app writes to the server cart. cartApi
+      addItem/updateItem/removeItem/clear/merge have zero call sites, so
+      GET /api/cart is empty for real customers and rendering from it would show
+      an empty cart to everyone. Took the smaller correct fix instead — savings
+      are quoted only for lines present in both sources. See the ticket comment.
+  - id: 4
+    action: verify-pass
+    description: Confirm cart tests pass
+    command: cd packages/web && bunx vitest run tests/routes/cart-saving.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit
+    command: 'git commit --only packages/web/app/routes/cart/index.tsx packages/web/tests/routes/cart-saving.test.tsx -m "fix(web): render the cart from one source so savings match the lines shown"'
+    status: done
+    commit: 6eb64913
+current_step: 5
+started: '2026-08-06T06:36:03.359Z'
+completed: '2026-08-06T06:45:00.000Z'

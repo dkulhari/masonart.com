@@ -1,0 +1,28 @@
+ticket_number: 541
+title: Mobile home layout at 390 — the whole page, band by band
+description: |-
+  BAR: mesonart at 390 is 8414px tall and stays dense and shoppable — full-bleed hero image, a horizontally scrolling category chip rail under the Best Seller heading, two-up product grids, stacked split bands, tight type.
+
+  OURS TODAY: 7317px at 390 but mostly whitespace — the hero is a centred wall of text, the product cards put a 'Choose Options' button overlapping the artwork, and there is no chip rail. The collection page has the same mobile weakness, so whatever pattern lands here should be the one that page can adopt.
+
+  Go band by band at 390 and judge each against the bar's matching band. Do not fix mobile by hiding sections.
+feature: home-page-parity
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.188Z'
+last_updated: '2026-08-06T11:51:47.188Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - mobile
+  - blind-ab
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,149 @@
+ticket_number: 526
+title: Bug - joining is invisible to server pricing for 5 minutes, so a fresh member is charged base price
+description: |-
+  ## Task
+  **Identify by title, not number — ticket numbers collided on 2026-08-06.**
+
+  better-auth's `session.cookieCache` serves the session from a signed cookie for 5 minutes. `galleryMember` rides that session (declared in `packages/api/src/auth/index.ts` under `user.additionalFields`, #439). `POST /api/gallery/join` (#440) writes the database row but never refreshes the cookie.
+
+  So for up to five minutes after joining, every server-side read of `isMember` is **false**:
+
+  - `GET /api/products` and `/:slug` resolve `locked: true` and serve a members-only price the customer supposedly cannot have
+  - `GET /api/cart` reports the saving as locked and contributes 0 to `savingTotal`
+  - **`POST /api/orders` charges the base price** — the design's own rule is "if the viewer is not a member at the moment the order is created, they pay base" (design §5), and the server correctly believes they are not one
+
+  The UI hides the problem: the shared optimistic membership signal (#446) flips immediately, so the customer sees prices unlock, joins, checks out — and is charged full price. **A customer who is shown a discount and then billed without it is the worst failure mode this feature has**, and it is invisible from the browser.
+
+  Verified directly by the #447 E2E agent, whose fixtures drop that one cookie rather than encode the stale behaviour as expected.
+
+  ## Fix direction
+  Make the join refresh the session rather than only the row. Options, in rough order of preference:
+  1. Have `POST /api/gallery/join` re-issue the session cookie so the new `galleryMember` value is in it before the response returns — the join already knows the user and is the one place the flag changes.
+  2. Read membership with `disableCookieCache: true` on the paths where money is decided (cart pricing, order creation) — correct but pays a database read on every priced request.
+  3. Read `galleryMember` from the database rather than the session in `resolveSalePrice`'s callers — most robust, least dependent on better-auth behaviour, but touches every call site.
+
+  Option 1 plus option 2 narrowed to order creation is probably the right combination: the cookie refresh fixes the common path, and order creation — the only place money is actually taken — never trusts a cached flag.
+
+  ## Context
+  Feature: gallery-membership. Found 2026-08-06 by the #447 E2E work (commit f5432bc3).
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5, §8.
+
+  Second, smaller finding from the same run: there is no "leave the gallery" endpoint, so E2E non-member legs each register a throwaway account — a shared fixture would become a member on run one and pass vacuously thereafter. Worth a test-only helper or an admin-side reset.
+
+  **Verify against the real database:** `export $(grep -m1 '^DATABASE_URL=' /Users/dhruv/work/masonart.com/.env)` — the default port 5433 is a different application, and a failed `beforeAll` there reports as *skipped*, which reads as green.
+feature: gallery-membership
+type: bug
+priority: critical
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:52:21.826Z'
+last_updated: '2026-08-06T08:11:19.568Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:58:49.582Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T08:11:14.188Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `1d46167a` — fix(api): a fresh gallery member is charged the member price, not base
+
+      **Root Cause**: `session.cookieCache` (5 min, `packages/api/src/auth/index.ts:325`) serves the whole session — `galleryMember` included, it is a `user.additionalFields` entry — from a signed cookie. `POST /api/gallery/join` wrote the users row and nothing else, so every server-side read for the rest of that window still resolved the joiner as a guest. `POST /api/orders` read `isMember` off that session and charged base, while the optimistic client signal (#446) showed the discount unlocked.
+
+      **Fix**: options 1 + 2 from the ticket, as suggested.
+
+      1. **The join re-issues the session** — `packages/api/src/lib/session-refresh.ts` (new). Uses better-auth's own primitive rather than hand-writing a cookie: `auth.api.getSession({ query: { disableCookieCache: true }, returnHeaders: true })`. That endpoint skips the cached payload, reads session+user from the database, and *ends by calling `setCookieCache` with what it found* — so asking better-auth for the session IS the refresh; `returnHeaders` hands back the `Set-Cookie` it produced. Deliberately NOT `setCookieCache` directly: it needs a `GenericEndpointContext`, which a Hono handler does not have, and `lib/session-cookie.ts` is already one hand-rolled encoding too many.
+         - Cookies are **appended**, not set. A real refresh comes back as two `chobii.session_data` headers (the cached payload is chunked); `headers.get('set-cookie')` would comma-join them into something a browser cannot parse.
+         - Best-effort: a refresh that throws does not fail the join, and cannot cost a wrong price because of (2).
+
+      2. **Order creation resolves membership from the row** — `isGalleryMember(userId)` in `services/gallery-membership.ts`, called from `orders.ts`. Closes the mirror case too: a stale *"member"* cookie can no longer buy a discount nobody earned. The read is **lazy** — `resolveSalePrice` consults `isMember` only for `membersOnly` promotions, so with none active the query is not issued and an ordinary order costs no extra round trip.
+
+      Left `cart.ts` / `products.ts` on the session, per the ticket: they render prices, and (1) makes them correct on the very next request after a join.
+
+      **Verified against the real library (better-auth 1.4.17)**, not just mocks — a memory-adapter harness reproduced the bug and the fix end to end:
+      ```
+      row now says galleryMember: true
+      cached getSession galleryMember: false      <- the bug
+      fresh getSession galleryMember: true        <- disableCookieCache
+      re-issued set-cookie: [chobii.session_data, chobii.session_data]
+      cached-again getSession galleryMember: true <- next request is correct
+      ```
+
+      **Files Changed**:
+      - `packages/api/src/lib/session-refresh.ts` (new) — the better-auth-native session re-issue
+      - `packages/api/src/routes/gallery.ts` — join refreshes the session after writing
+      - `packages/api/src/routes/orders.ts` — `resolveMembership` reads the row, lazily; `readIsMember` removed
+      - `packages/api/src/services/gallery-membership.ts` — `isGalleryMember`; note on the #441 limitation
+      - `packages/api/tests/routes/gallery-join-order-pricing.test.ts` (new) — 15 tests
+      - `packages/api/tests/routes/order-promotion-pricing.test.ts` — membership fixtures now drive the row, not the session, + one new regression test
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/gallery-join-order-pricing.test.ts tests/routes/order-promotion-pricing.test.ts tests/routes/gallery.test.ts tests/routes/gallery-join-intent.test.ts`
+      - Result: PASS (4 files, **79 passing**)
+      - Command: `bunx vitest run tests/routes/orders.test.ts` against the real DB (`:5440`, not the 5433 decoy)
+      - Result: PASS (**115 passing**, 0 skipped — beforeAll genuinely connected)
+      - Command: `bunx tsc --noEmit` → exit 0
+
+      The acceptance-bar test was written first and watched fail for the right reason: `expected '0.00' to be '800.00'` on join-then-order, and `expected '800.00' to be '0.00'` on the mirror case. 7 failed / 7 passed at RED.
+
+      ---
+
+      ⚠️ **Follow-up worth its own ticket — the #441 registration-intent path has the same staleness and cannot fix itself.** Verified against 1.4.17: better-auth writes the sign-in's cookie cache *after* `session.create.after` returns, from the user object it fetched *before* the hook ran, so anything `consumeJoinIntent` sets is overwritten a moment later. A visitor who joins by registering therefore carries a `galleryMember: false` cookie for up to five minutes.
+
+      Impact is bounded and **not financial** — order creation reads the row, so no price can be wrong; it is a stale render that #446 already papers over, and it self-heals in five minutes. Closing it properly means intercepting better-auth's own sign-in response. Documented in the `consumeJoinIntent` docblock so it is not rediscovered the hard way.
+
+      Also unchanged, as instructed: there is still no "leave the gallery" endpoint. No test added here depends on demoting a member — the mirror case is expressed by disagreeing row/cookie fixtures, not by a demotion.
+  - author: system
+    timestamp: '2026-08-06T08:11:19.568Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Write a failing test: join, then immediately create an order, and assert the promotion discount is applied'
+    file: packages/api/tests/routes/order-promotion-pricing.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm it fails — the order is priced at base because the cached session still says non-member
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Re-issue the session on join so galleryMember is current in the cookie
+    file: packages/api/src/routes/gallery.ts
+    status: done
+  - id: 4
+    action: implement
+    description: Make order creation read membership without the cookie cache, so money is never decided on a cached flag
+    file: packages/api/src/routes/orders.ts
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm join-then-buy applies the discount, and the cart reflects membership immediately
+    command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts tests/routes/cart-sale-pricing.test.ts tests/routes/gallery.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git commit --only <paths> -m "fix(api): a fresh gallery member is priced as one immediately"'
+    status: done
+current_step: 6
+started: '2026-08-06T07:58:49.582Z'
+verification:
+  verified_at: '2026-08-06T08:10:44.699Z'
+completed: '2026-08-06T08:11:19.568Z'

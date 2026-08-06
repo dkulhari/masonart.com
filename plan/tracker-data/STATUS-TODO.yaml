@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-05T21:09:16.264Z'
-total_tickets: 36
+last_updated: '2026-08-06T15:19:08.788Z'
+total_tickets: 41
 summary:
-  critical: 1
-  high: 9
-  medium: 20
-  low: 6
+  critical: 3
+  high: 13
+  medium: 21
+  low: 4
 priorities:
   critical:
     - feature: go-live
@@ -32,6 +32,16 @@ priorities:
               title: Set up external uptime monitoring for production
             - ticket_number: 283
               title: Document and configure database backup procedures
+    - feature: home-page-parity
+      tickets:
+        - ticket_number: 541
+          title: Mobile home layout at 390 — the whole page, band by band
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 544
+          title: Replace mesonart development placeholder photography before production
+          assignee: unassigned
+          blocked_by: []
   high:
     - feature: go-live
       tickets:
@@ -91,10 +101,30 @@ priorities:
               title: Schema - shared Zod schemas and types for promotions
             - ticket_number: 426
               title: Resolver - active promotion selection with derived state and no stacking
+        - ticket_number: 527
+          title: Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
+          assignee: unassigned
+          blocked_by: []
     - feature: gallery-membership
       tickets:
         - ticket_number: 439
           title: Schema - gallery membership columns and the session field
+          assignee: unassigned
+          blocked_by: []
+    - feature: home-page-parity
+      tickets:
+        - ticket_number: 545
+          title: Product orientation column contradicts the artwork for 6 of 14 collection representatives
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 547
+          title: Review toast covers page content on every screen and has no counterpart on the reference
+          assignee: unassigned
+          blocked_by: []
+    - feature: gift-cards
+      tickets:
+        - ticket_number: 553
+          title: Schema - unique purchaseOrderId and orders.giftCardPurchase
           assignee: unassigned
           blocked_by: []
   medium:
@@ -157,48 +187,24 @@ priorities:
           blocked_by:
             - ticket_number: 423
               title: Schema - promotion, promotion_product and promotion_exclusion tables
-        - ticket_number: 433
-          title: Admin UI - /admin/promotions list and editor
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 431
-              title: API - admin promotions CRUD
         - ticket_number: 434
           title: Storefront - sale strip with live countdown above the header
           assignee: unassigned
           blocked_by:
             - ticket_number: 432
               title: API - countdown deadline resolution, cookie mint and clamp
-        - ticket_number: 435
-          title: Storefront - sale pricing on product cards and the PDP buy panel
+        - ticket_number: 510
+          title: DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
           assignee: unassigned
-          blocked_by:
-            - ticket_number: 428
-              title: API - product list and detail return the resolved sale price
-            - ticket_number: 432
-              title: API - countdown deadline resolution, cookie mint and clamp
-        - ticket_number: 436
-          title: Storefront - cart saving row, locked for non-members
+          blocked_by: []
+        - ticket_number: 528
+          title: A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
           assignee: unassigned
-          blocked_by:
-            - ticket_number: 429
-              title: API - cart returns base, sale and locked per line without touching stored lineTotal
+          blocked_by: []
     - feature: gallery-membership
       tickets:
         - ticket_number: 440
           title: API - POST /api/gallery/join
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 439
-              title: Schema - gallery membership columns and the session field
-        - ticket_number: 441
-          title: API - registration opt-in and post-auth auto-join from the join intent
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 440
-              title: API - POST /api/gallery/join
-        - ticket_number: 442
-          title: API + Admin - member filter and consented-email export
           assignee: unassigned
           blocked_by:
             - ticket_number: 439
@@ -225,12 +231,32 @@ priorities:
           blocked_by:
             - ticket_number: 444
               title: Web - join modal, one field
-        - ticket_number: 446
-          title: Web - black vertical rail tab on the right edge
+    - feature: home-page-parity
+      tickets:
+        - ticket_number: 537
+          title: Customer Reviews band restyled to the bar
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 543
+          title: Two-row top strip — countdown announcement over utility bar
+          assignee: unassigned
+          blocked_by: []
+    - feature: gift-cards
+      tickets:
+        - ticket_number: 550
+          title: API - POST /api/gift-cards/purchase creates the gift card order
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 551
+          title: API - mint the card on payment verification
           assignee: unassigned
           blocked_by:
-            - ticket_number: 445
-              title: Web - dismissible sale banner with session and 7-day cooldown
+            - ticket_number: 550
+              title: API - POST /api/gift-cards/purchase creates the gift card order
+        - ticket_number: 552
+          title: Service - scheduled delivery sweep and the gift card email
+          assignee: unassigned
+          blocked_by: []
   low:
     - feature: go-to-production
       tickets:
@@ -245,50 +271,16 @@ priorities:
           title: Production Cutover Gate - chobi.art domain external registrations
           assignee: unassigned
           blocked_by: []
-    - feature: sale-promotions
-      tickets:
-        - ticket_number: 437
-          title: Storefront - /sale landing page and the red Sale nav link
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 428
-              title: API - product list and detail return the resolved sale price
-            - ticket_number: 432
-              title: API - countdown deadline resolution, cookie mint and clamp
-        - ticket_number: 438
-          title: E2E - sale lifecycle from no promotion to expiry
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 433
-              title: Admin UI - /admin/promotions list and editor
-            - ticket_number: 434
-              title: Storefront - sale strip with live countdown above the header
-            - ticket_number: 435
-              title: Storefront - sale pricing on product cards and the PDP buy panel
-            - ticket_number: 436
-              title: Storefront - cart saving row, locked for non-members
-            - ticket_number: 437
-              title: Storefront - /sale landing page and the red Sale nav link
-    - feature: gallery-membership
-      tickets:
-        - ticket_number: 447
-          title: E2E - locked to unlocked, and the banner-rail handover
-          assignee: unassigned
-          blocked_by:
-            - ticket_number: 441
-              title: API - registration opt-in and post-auth auto-join from the join intent
-            - ticket_number: 444
-              title: Web - join modal, one field
-            - ticket_number: 445
-              title: Web - dismissible sale banner with session and 7-day cooldown
-            - ticket_number: 446
-              title: Web - black vertical rail tab on the right edge
-            - ticket_number: 438
-              title: E2E - sale lifecycle from no promotion to expiry
     - feature: wishlist-curation
       tickets:
         - ticket_number: 505
           title: Bug - a late wishlist load() reverts a reorder made during it
+          assignee: unassigned
+          blocked_by: []
+    - feature: home-page-parity
+      tickets:
+        - ticket_number: 546
+          title: Seed catalogue artwork carries a MESON ART watermark baked into the pixels
           assignee: unassigned
           blocked_by: []
 blocked_tickets:
@@ -395,46 +387,14 @@ blocked_tickets:
       - ticket_number: 423
         title: Schema - promotion, promotion_product and promotion_exclusion tables
     description: Schema - promotion, promotion_product and promotion_exclusion tables
-  - ticket_number: 433
-    title: Admin UI - /admin/promotions list and editor
-    blocked_by:
-      - ticket_number: 431
-        title: API - admin promotions CRUD
-    description: API - admin promotions CRUD
   - ticket_number: 434
     title: Storefront - sale strip with live countdown above the header
     blocked_by:
       - ticket_number: 432
         title: API - countdown deadline resolution, cookie mint and clamp
     description: API - countdown deadline resolution, cookie mint and clamp
-  - ticket_number: 435
-    title: Storefront - sale pricing on product cards and the PDP buy panel
-    blocked_by:
-      - ticket_number: 428
-        title: API - product list and detail return the resolved sale price
-      - ticket_number: 432
-        title: API - countdown deadline resolution, cookie mint and clamp
-    description: API - product list and detail return the resolved sale price, API - countdown deadline resolution, cookie mint and clamp
-  - ticket_number: 436
-    title: Storefront - cart saving row, locked for non-members
-    blocked_by:
-      - ticket_number: 429
-        title: API - cart returns base, sale and locked per line without touching stored lineTotal
-    description: API - cart returns base, sale and locked per line without touching stored lineTotal
   - ticket_number: 440
     title: API - POST /api/gallery/join
-    blocked_by:
-      - ticket_number: 439
-        title: Schema - gallery membership columns and the session field
-    description: Schema - gallery membership columns and the session field
-  - ticket_number: 441
-    title: API - registration opt-in and post-auth auto-join from the join intent
-    blocked_by:
-      - ticket_number: 440
-        title: API - POST /api/gallery/join
-    description: API - POST /api/gallery/join
-  - ticket_number: 442
-    title: API + Admin - member filter and consented-email export
     blocked_by:
       - ticket_number: 439
         title: Schema - gallery membership columns and the session field
@@ -461,50 +421,14 @@ blocked_tickets:
       - ticket_number: 444
         title: Web - join modal, one field
     description: Web - join modal, one field
-  - ticket_number: 446
-    title: Web - black vertical rail tab on the right edge
+  - ticket_number: 551
+    title: API - mint the card on payment verification
     blocked_by:
-      - ticket_number: 445
-        title: Web - dismissible sale banner with session and 7-day cooldown
-    description: Web - dismissible sale banner with session and 7-day cooldown
+      - ticket_number: 550
+        title: API - POST /api/gift-cards/purchase creates the gift card order
+    description: API - POST /api/gift-cards/purchase creates the gift card order
   - ticket_number: 283
     title: Document and configure database backup procedures
     blocked_by:
       - title: 'Ticket #undefined'
     description: ''
-  - ticket_number: 437
-    title: Storefront - /sale landing page and the red Sale nav link
-    blocked_by:
-      - ticket_number: 428
-        title: API - product list and detail return the resolved sale price
-      - ticket_number: 432
-        title: API - countdown deadline resolution, cookie mint and clamp
-    description: API - product list and detail return the resolved sale price, API - countdown deadline resolution, cookie mint and clamp
-  - ticket_number: 438
-    title: E2E - sale lifecycle from no promotion to expiry
-    blocked_by:
-      - ticket_number: 433
-        title: Admin UI - /admin/promotions list and editor
-      - ticket_number: 434
-        title: Storefront - sale strip with live countdown above the header
-      - ticket_number: 435
-        title: Storefront - sale pricing on product cards and the PDP buy panel
-      - ticket_number: 436
-        title: Storefront - cart saving row, locked for non-members
-      - ticket_number: 437
-        title: Storefront - /sale landing page and the red Sale nav link
-    description: Admin UI - /admin/promotions list and editor, Storefront - sale strip with live countdown above the header, Storefront - sale pricing on product cards and the PDP buy panel, Storefront - cart saving row, locked for non-members, Storefront - /sale landing page and the red Sale nav link
-  - ticket_number: 447
-    title: E2E - locked to unlocked, and the banner-rail handover
-    blocked_by:
-      - ticket_number: 441
-        title: API - registration opt-in and post-auth auto-join from the join intent
-      - ticket_number: 444
-        title: Web - join modal, one field
-      - ticket_number: 445
-        title: Web - dismissible sale banner with session and 7-day cooldown
-      - ticket_number: 446
-        title: Web - black vertical rail tab on the right edge
-      - ticket_number: 438
-        title: E2E - sale lifecycle from no promotion to expiry
-    description: API - registration opt-in and post-auth auto-join from the join intent, Web - join modal, one field, Web - dismissible sale banner with session and 7-day cooldown, Web - black vertical rail tab on the right edge, E2E - sale lifecycle from no promotion to expiry

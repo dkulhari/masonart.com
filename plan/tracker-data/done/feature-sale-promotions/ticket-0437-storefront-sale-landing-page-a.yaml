@@ -1,0 +1,139 @@
+ticket_number: 437
+title: Storefront - /sale landing page and the red Sale nav link
+description: |-
+  ## Task
+  A page for the sale: headline, countdown, and the grid of products the promotion actually applies to (scope minus exclusions, resolved server-side). Plus the red **Sale** link at the end of nav row 2, matching theirs.
+
+  No active promotion → the nav link is absent and `/sale` returns a plain empty state rather than a 404, so an old link from an email does not dead-end.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 4 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §7
+  Closes: mesonart parity analysis §3.5 "Sale/promo page"
+
+  Reuse the existing collection grid rather than building a second one — the page is a product list with a promotion filter. Nav row 2 is generated from `STYLE_OPTIONS` in `Header.tsx` (see §3.1 row 4); the Sale link is appended after it, not woven into the style list.
+feature: sale-promotions
+type: task
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:04:59.239Z'
+last_updated: '2026-08-06T06:32:11.906Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T06:21:17.513Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T06:32:07.975Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `190d4f51` - feat(web): /sale lists what the promotion actually covers, and says so
+
+      **Files Changed**:
+      - `packages/api/src/lib/promotion-pricing.ts` — new `promotionScopeCondition()`: the SQL mirror of `matchesScope` plus the exclusion rule, against the products table
+      - `packages/api/src/routes/products.ts` — new `onSale` query parameter on `GET /api/products`; the sale context now loads before the query so the predicate lands in the same `where` the count and the page window run against
+      - `packages/web/app/lib/api.ts` — `onSale?: boolean` on `ProductFilters`
+      - `packages/web/app/hooks/useActivePromotion.ts` — new: shared `useActivePromotion()` lookup (in-flight deduped) and `useCountdown()`, which formats through SaleStrip's exported `formatRemaining`
+      - `packages/web/app/routes/sale.tsx` — new: the /sale route, hero, empty state, grid
+      - `packages/web/app/components/layout/Header.tsx` — `SaleNavLink` appended after the `STYLE_OPTIONS` map in nav row 2, `SaleMobileNavLink` in the drawer
+      - `packages/web/app/routeTree.gen.ts` — /sale registered
+      - `packages/web/tests/routes/sale.test.tsx` — new: 29 tests
+
+      **Summary**
+
+      The grid is `ProductGrid`, fed by `GET /api/products?onSale=true`. Scope minus exclusions is resolved entirely server-side: `promotionScopeCondition` mirrors `matchesScope` branch for branch (including the two odd ones — a `filter` scope with no keys matches nothing, one whose keys are all empty arrays matches everything — and the flat `includedIds`) and is pushed into `conditions`, so the count, the page window and the resolved prices all come out of one `where`. Filtering after `limit/offset` would have returned short pages and a total counting products the sale never touched. Nothing describing a scope crosses the wire.
+
+      `onSale` is a literal `'true'`/`'false'` pair rather than `z.coerce.boolean()` like its neighbours: coercion reads the string `'false'` as `true`, which on this parameter silently swaps the whole catalogue for the sale.
+
+      The countdown reuses SaleStrip's exported `formatRemaining` via `useCountdown`, so the strip and the page cannot print different digits for the same second. `SaleStrip.tsx` itself is untouched — folding its own lookup into the new hook is a change to a component with its own suite and belongs in its own ticket.
+
+      `/sale` with no promotion is a plain empty state with a link back to `/posters` — `notFound()` appears nowhere in the route, and a test asserts that at the source level. The nav link is absent (not greyed) when nothing is running, and absent while the lookup is still out, so it cannot flash and withdraw.
+
+      `validateSearch` coerces `page` from the string `router.tsx` hands it and floors junk to 1. `SaleSearchParams.page` is optional in the TYPE and always present in the VALUE, so `<Link to="/sale">` does not have to carry `?page=1`.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/routes/sale.test.tsx`
+      - Result: PASS (29 tests, 29 passing, 0 failing)
+      - Typecheck: `packages/api` 0 errors; `packages/web` 22 errors, all pre-existing and in unrelated files (admin/ai-moderation, track/*, admin/products/*, admin/orders/*, PromptSuggestions) — none in any file this ticket touched
+  - author: system
+    timestamp: '2026-08-06T06:32:11.906Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 428
+    feature: sale-promotions
+    description: API - product list and detail return the resolved sale price
+  - ticket: 432
+    feature: sale-promotions
+    description: API - countdown deadline resolution, cookie mint and clamp
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the sale route and nav link
+    file: packages/web/tests/routes/sale.test.tsx
+    command: cd packages/web && bunx vitest run tests/routes/sale.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('/sale', () => {
+        it('renders headline, countdown and the eligible grid', () => {})
+        it('renders an empty state rather than 404 when no sale is running', () => {})
+        it('excludes products on the exclusion list', () => {})
+      })
+
+      describe('Sale nav link', () => {
+        it('appears after the style links when a promotion is active', () => {})
+        it('is absent when no promotion is active', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/routes/sale.test.tsx
+    expected_result: FAIL - route does not exist
+    status: done
+  - id: 3
+    action: implement
+    description: Add the /sale route reusing the collection grid
+    file: packages/web/app/routes/sale.tsx
+    status: done
+    code: |-
+      // Loader asks the API for products under the active promotion (scope minus
+      // exclusions, resolved server-side — the client never evaluates a scope).
+      // Header block: promotion headline + the same resolved deadline the strip
+      // uses. Body: the existing collection grid component.
+  - id: 4
+    action: implement
+    description: Append the red Sale link to nav row 2
+    file: packages/web/app/components/layout/Header.tsx
+    status: done
+    code: |-
+      // After the STYLE_OPTIONS-generated links, conditional on an active
+      // promotion. Red is the one deliberate colour exception in a monochrome nav,
+      // matching theirs.
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/routes/sale.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the sale page and nav link
+    command: 'git add packages/web/app/routes/sale.tsx packages/web/app/components/layout/Header.tsx packages/web/tests/routes/sale.test.tsx && git commit -m "feat(web): /sale landing page and the Sale nav link"'
+    status: done
+current_step: 6
+started: '2026-08-06T06:21:17.513Z'
+completed: '2026-08-06T06:32:11.906Z'

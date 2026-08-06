@@ -1,0 +1,141 @@
+ticket_number: 524
+title: Bug - /sale and /posters cards print base prices during a sale
+description: |-
+  ## Bug
+
+  The two main product grids list discounted products but render every card at its **base price**. The `/sale` landing page is the worst case: it exists only to show the sale, and every card on it is wrong.
+
+  ## Root cause
+
+  Both routes rebuild `ProductCardData` field by field and neither mapper copies the `sale` block that the API returns on every product:
+
+  - `packages/web/app/routes/sale.tsx` — `fetchSaleProducts()`, the `(response.items || []).map(...)` object literal has no `sale` key.
+  - `packages/web/app/routes/posters/index.tsx` — same shape, same omission.
+
+  `ProductCard` itself is fine: it renders `<SalePrice sale={product.sale ?? null} …>` and works wherever it is handed raw API items. The "You May Also Like" row on a PDP proves it — that row goes through `toFeaturedProducts()`, which is a pass-through, and its cards show the struck price, the `price-was` and the `N% off` badge correctly.
+
+  ## Fix
+
+  Add `sale: (item.sale as SalePricing | null) ?? null` to both mappers. `ProductCardData.sale` already exists on the type.
+
+  ## Verification
+
+  `tests/e2e/sale-promotions.spec.ts` (#438) already covers the passing surfaces. When this is fixed, the grid assertion in `grid cards print the struck sale price` can be pointed at `/sale` and tightened to "every card on the page carries a sale price", which is the assertion the ticket originally wanted:
+
+  ```ts
+  const cards = page.getByTestId('sale-page').getByTestId('product-card')
+  const cardCount = await cards.count()
+  await expect(page.getByTestId('sale-page').getByTestId('sale-price')).toHaveCount(cardCount)
+  ```
+
+  The spec's header comment and the comment on that test both name this ticket's defect as the reason the coverage sits where it does.
+
+  ## Context
+
+  Found while writing the lifecycle E2E for #438. `/sale` is #437; the card integration is #435.
+feature: sale-promotions
+type: bug
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T07:31:20.858Z'
+last_updated: '2026-08-06T07:44:30.157Z'
+time_spent_minutes: 6
+labels:
+  - frontend
+  - bug
+  - sale-promotions
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T07:38:08.420Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T07:44:19.410Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `3a3ba18d` — fix(web): the grid mappers keep the sale they were handed
+
+      **Root Cause**: Both grid loaders rebuild `ProductCardData` as a hand-written object literal, which is a whitelist — any field the API grows must be added by hand or it is dropped before a card ever sees it. `sale` was never in either literal.
+      **Location**: `packages/web/app/routes/sale.tsx:132-148` (`fetchSaleProducts`) and `packages/web/app/routes/posters/index.tsx:156-171` (`fetchPostersData`).
+      **Fix**: Both mappers now copy `sale: (item.sale as ProductCardData['sale']) ?? null` straight through. Nothing is recomputed client-side — `resolveSalePrice` produced the figures server-side and the cart re-resolves them at checkout.
+
+      **Files Changed**:
+      - `packages/web/app/routes/sale.tsx` — `sale` added to the loader's card mapper
+      - `packages/web/app/routes/posters/index.tsx` — same
+      - `packages/web/tests/routes/card-sale-mapping.test.tsx` — new, 14 tests
+
+      **Full sweep of every API-row → card-props mapping**
+
+      Audited all seven mapping sites. Exactly two dropped the field, and they are the only two written as field-by-field literals:
+
+      | Site | Style | `sale` |
+      |---|---|---|
+      | `routes/sale.tsx:132` | field-by-field literal | **dropped → fixed** |
+      | `routes/posters/index.tsx:156` | field-by-field literal | **dropped → fixed** |
+      | `routes/posters/$slug.tsx:207` (You May Also Like) | `toFeaturedProducts` pass-through | ok |
+      | `routes/index.tsx:72` (home featured rail) | `toFeaturedProducts` pass-through | ok |
+      | `routes/collections/$slug.tsx:323` | cast pass-through | ok |
+      | `components/wishlist/WishlistContents.tsx:76` | pass-through by id | ok |
+      | `lib/api.ts:89` `toFeaturedProducts` | pure pass-through | ok |
+
+      Also checked and deliberately left alone:
+      - `routes/posters/$slug.tsx:108-162` — the PDP detail mapper is a field-by-field literal too, but it already carries `sale` (line 161). That is why the PDP was right while the grids were wrong.
+      - `components/layout/SearchDrawer.tsx:26` — narrows results to a 4-field `SearchResult` and renders its own rows, not `ProductCard`. No card involved.
+      - `hooks/useProducts.ts:55-77` — `ProductListItem` has no `sale` field, so `useFeaturedProducts` / `useProductsByIds` / `useProductSearch` would hide it. All three have **zero consumers** in `app/`; noted rather than changed.
+
+      **Tests pin the mapping, not the rendering**
+
+      The suite mocks `productsApi.list` and drives the two *real* route loaders through one `describe.each`, asserting on the objects the loader hands the grid. A hand-built `ProductCardData` fixture carrying `sale` passes whether or not the mapper preserves it — it never went through the mapper — which is precisely how this survived #435's green card suite. Two of the fourteen also render the loader's output through `ProductGrid` and assert the struck price reaches the DOM, so the whole API-row → pixels path is covered.
+
+      Includes a whole-row anti-drop guard (`preserves every card field the API sends`). This is the fourth field the feature has lost to a projection or a mapper; asserting only on `sale` would have fixed today's field and left the mechanism intact.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/card-sale-mapping.test.tsx tests/routes/sale.test.tsx tests/routes/posters-*.test.ts* tests/components/product/{SalePrice,ProductCard,ProductCard.tokens,ProductGrid}.test.*`
+      - Result: PASS — 12 files, 168/168 tests
+      - Red-first evidence: the new suite was 10 failed / 4 passed before the fix, every failure reading `expected undefined to deeply equal {…}` on `sale`. The 4 passing were the no-sale negative controls.
+      - Typecheck: `tsc --noEmit` on `packages/web` → 22 errors, all pre-existing (baseline ~26), **zero** in the three touched files.
+
+      **Concurrency note**: `packages/web/app/routes/posters/index.tsx` also carried an uncommitted `sku:` line from another in-flight session (the card-parity change that holds `ProductCard.tsx`). Only my `sale` hunk was staged, via a hunk-scoped `git apply --cached` — no stash, no amend. That session's `sku` line and its whole `ProductCard.tsx` integration are still uncommitted and untouched in the working tree.
+
+      **Follow-up available**: `tests/e2e/sale-promotions.spec.ts`'s `grid cards print the struck sale price` can now be repointed from the PDP's related row to `/sale` and tightened to "every card on the page carries a sale price", as this ticket's description sketches. Not done here — another agent owns `tests/e2e/` this session.
+  - author: system
+    timestamp: '2026-08-06T07:44:23.303Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-06T07:38:17.348Z'
+    agent: claude-code
+    summary: 'Fixed both grid card mappers dropping the sale field (routes/sale.tsx fetchSaleProducts and routes/posters/index.tsx fetchPostersData). Swept all 7 API-row-to-card mapping sites; the other 5 are pass-throughs and were already correct. Added tests/routes/card-sale-mapping.test.tsx (14 tests) that drive the real loaders against a mocked productsApi.list, including a whole-row anti-drop guard. Red-first: 10 failed before, 14/14 after; 168/168 across 12 related suites; tsc clean on touched files. Commit 3a3ba18d, staged hunk-scoped so another session''s uncommitted sku line and ProductCard.tsx integration stayed untouched.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-06T07:44:30.152Z'
+    duration: '00:06:12'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T07:38:08.420Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:06:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:06:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/card-sale-mapping.test.tsx tests/routes/sale.test.tsx tests/routes/posters-*.test.ts* tests/components/product/{SalePrice,ProductCard,ProductCard.tokens,ProductGrid}.test.*
+  test_output: '12 test files passed, 168/168 tests passing. New suite tests/routes/card-sale-mapping.test.tsx: 14/14. Before the fix the same suite was 10 failed / 4 passed (the 4 being the no-sale negative controls).'
+  build_passed: true
+  build_command: bunx tsc --noEmit -p packages/web/tsconfig.json
+  verified_at: '2026-08-06T07:43:58.879Z'
+completed: '2026-08-06T07:44:23.303Z'

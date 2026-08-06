@@ -1,0 +1,43 @@
+ticket_number: 536
+title: Featured Artists band — structure built, real data or graceful omission
+description: |-
+  BAR: mesonart 'Featured Artists'. Heading with a 'View All →' pill at the right, a one-line subhead, then per artist: the name set in very wide-tracked light caps stacked over two lines on the left, a circular black-and-white portrait, and a row of five artwork thumbnails to the right.
+
+  OURS TODAY: missing entirely, and there is no artists table in the schema and no artist API.
+
+  Build the band, but source it from real data only — gallery/creator records if the gallery-membership feature exposes them, otherwise render nothing. Do NOT invent artist names or portraits: fabricated people on a live storefront is misleading content, not a parity win. If no real source exists, land the component behind an empty-state and say so on the ticket.
+feature: home-page-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.143Z'
+last_updated: '2026-08-06T12:15:58.713Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - content-gated
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T12:15:58.451Z'
+    text: |-
+      Descoped by the user mid-run: artists are not wanted for now.
+
+      Nothing was built. This band was already data-gated — there is no artists table in the schema and no artist API, and the instruction to the builder was to source it from real gallery/creator records or render nothing rather than invent people. That question is now moot.
+
+      Consequences for the rest of the feature:
+      - The bar's Featured Artists band has no counterpart on ours by choice, not by oversight. The blind critic must not be asked to judge it, and #540's band-count and page-height comparison against the bar's 7028px should expect us to be one band shorter.
+      - Section order stands otherwise: Shop By Orientation (#535) is followed directly by Customer Reviews (#537).
+      - If artists are wanted later, the honest source is the gallery-membership feature, and the ticket can be reopened as-is.
+  - author: system
+    timestamp: '2026-08-06T12:15:58.713Z'
+    text: Status changed from 'todo' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+completed: '2026-08-06T12:15:58.713Z'

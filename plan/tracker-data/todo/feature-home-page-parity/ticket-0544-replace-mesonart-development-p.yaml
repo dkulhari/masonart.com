@@ -1,0 +1,53 @@
+ticket_number: 544
+title: Replace mesonart development placeholder photography before production
+description: |-
+  BLOCKS GO-LIVE.
+
+  The home page bands (hero, Shop by Room, promo tiles, Brand Story) are built against interior/lifestyle photographs downloaded from mesonart.com, because this repo has no photography of its own — only product artwork in MinIO, 7 frame swatches and 4 category jpgs.
+
+  Those photographs belong to mesonart.com. Shipping them on chobii.art would be using another company's licensed imagery on a commercial storefront.
+
+  Current containment:
+  - files live in packages/web/public/dev-reference/, which is git-ignored (.gitignore line 96), so nothing infringing is in git history
+  - repopulated by scripts/dev/fetch-reference-imagery.sh, which is committed and carries the warning
+  - packages/web/public/dev-reference/README.md restates it at the point of use
+
+  To close: source our own interiors — shoot them, license stock, or render room mockups with our own AI generator using our real artwork — drop them in at the same paths under a committed directory, and delete the dev-reference references. The bands should need no layout changes.
+
+  Until this is closed the home page must not be deployed.
+feature: home-page-parity
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T12:11:05.625Z'
+last_updated: '2026-08-06T12:32:46.786Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - blocks-go-live
+  - legal
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T12:32:46.786Z'
+    text: |-
+      Correction — this ticket is no longer blocked on sourcing, and the premise it was filed under was wrong.
+
+      I told the user the repo has no interior photography. It does. The #529 builder found it and I verified: the products API returns image type `room-mockup`, 72 of them across 24 products in a single page of the catalogue — three per product, art hanging in styled rooms. My original check missed them because I listed the MinIO bucket and read only the first page of keys, where the main-artwork variants crowd out everything else.
+
+      So closing this no longer means commissioning photography. It means cutting crops from imagery we already own.
+
+      Two real caveats, both from the #529 builder:
+      - They are square 1500x1500, and these bands need wide and tall crops cut before they can fill the boxes.
+      - The set is mixed — some are genuine room scenes, some are frame-edge detail shots. It needs curating, not a blanket swap.
+
+      Every band that uses placeholder photography was deliberately built to make this a one-line change: #529 HERO_SLIDES, #533 PROMO_TILE_IMAGES, #538 BRAND_STORY_MEDIA, and the room band's constant when it lands. #529 even has a test asserting the dev-reference directory is named on exactly one non-comment line.
+
+      Recommendation on sequencing: keep the placeholders through the blind critic loop. They are the bar's own photographs, so the critic ends up judging our layout and craft rather than whose photography is better — which is the comparison we actually want. Swap to our room-mockups once the bands have passed.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

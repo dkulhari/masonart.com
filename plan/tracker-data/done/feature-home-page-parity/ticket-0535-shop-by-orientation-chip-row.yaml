@@ -1,0 +1,75 @@
+ticket_number: 535
+title: Shop By Orientation chip row
+description: |-
+  BAR: mesonart 'Shop By Orientation'. Left-aligned heading, then a single row of large soft-cream rounded pill chips: Vertical, Square, Horizontal, Panoramic, Circular, Set Of 2/3.
+
+  OURS TODAY: missing entirely.
+
+  The data already exists — ORIENTATION_OPTIONS in packages/shared/src/constants/facets.ts was built to mirror this exact list including set-of-2-3. Each chip links to the collection page pre-filtered on that orientation. Note the router coerces search params as strings, so build the links through the same helper the collection page uses. Desktop + mobile (mobile wraps or scrolls, chips stay tappable).
+feature: home-page-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.137Z'
+last_updated: '2026-08-06T14:44:55.886Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - facets
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T11:59:08.939Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:14:22.889Z'
+    text: |-
+      Built as packages/web/app/components/home/ShopByOrientationSection.tsx (new file). Test: packages/web/tests/components/home/ShopByOrientationSection.test.tsx, 8 tests green. app/routes/index.tsx NOT edited — the band still needs wiring by the integration step. It supersedes nothing; there was no orientation section before.
+
+      SOURCE OF TRUTH — ORIENTATION_OPTIONS from @chobii/shared. The component holds no literal list; the test fails if any vocabulary label reappears as a string literal there. Two things it does own, both surface properties rather than vocabulary ones, both commented in the file and pinned by the test:
+
+        1. ORDER. Theirs leads Vertical, not Square. A rank map reorders a copy; any id the map does not name keeps its constant order at the tail, so a seventh orientation added upstream still gets a chip instead of vanishing.
+        2. ONE LABEL. Their home pill reads "Circular" where their filter sidebar reads "Circle" — the parity analysis records the sidebar wording at §1.3 and facets.test.ts pins it, so renaming the constant would buy this band a word and cost the shipped collection page one. Override lives next to the surface that needs it.
+
+      CONSTANT FIXED. ORIENTATION_OPTIONS read `option('set-of-2-3', 'Set of 2-3')`. Both mesonart's storefront and §1.3 of the parity analysis read "Set of 2/3" — a hyphen-for-slash transcription slip. Changed to 'Set of 2/3' in packages/shared/src/constants/facets.ts and rebuilt dist. No test pinned the old string; shared (927) and web ProductFilters.facets + AllArtMegaMenu (49) all still pass. Ids untouched, so nothing in the enum, schema or seed moves.
+
+      LINK TARGET AND PROOF. `<Link to="/posters" search={{ orientation: id }} />` — the search object goes to the router, never a hand-built query string, which is what router.tsx's overridden serialisation would throw on. Same destination the All Art mega panel's Orientation column uses; there is no per-orientation collection row to link at (seed-collections builds one per style plus "new" and "best-selling").
+
+      Verified live against the dev server, not assumed. Rendered hrefs: /posters?orientation=portrait|square|landscape|panoramic|round|set-of-2-3. SSR product counts on those URLs: unfiltered 41, portrait 15, square 13, landscape 9, panoramic 4 — which sums to exactly 41, so the facet partitions the catalogue rather than being ignored. All six return HTTP 200 with a real page (title, toolbar, grid), no error boundary.
+
+      DATA GAP — round and set-of-2-3 return 0 products and render the honest "No products found" empty state. Nothing in the seed carries either orientation yet; the parity analysis already booked this ("add the missing orientation families (Circle, Set of 2/3) if we adopt those facets", §5.6/§6). Both chips are kept: they are genuine vocabulary values the API accepts, and dropping them would put four chips against their six. Worth a seed ticket.
+  - author: mcp-client
+    timestamp: '2026-08-06T12:14:48.516Z'
+    text: |-
+      MEASUREMENTS, taken off the bar PNGs by pixel rather than by eye, then re-measured on our own render at the same two viewports.
+
+      Chip fill rgb(245 241 230). No token existed and globals.css is a shared file three other builders are in, so it is an arbitrary value with the measurement in the comment rather than a new --token. Hover darkens to bg-band, which is a real token one step down the same family.
+
+      Desktop 1440 — theirs: chip 52px tall, 27px horizontal padding, fully rounded, single left row, 24.5px gaps, on white. Ours: 52px tall, px-7, rounded-full, gaps 24. Chip widths theirs 113/109/132/139/115/130 vs ours 117/113/136/143/119/134. Heading 44px: theirs runs 364px wide, ours 362 at text-display (the clamp lands on 44px at 1440, which is what that token was measured for). Heading-to-chips 18px theirs, 20px ours.
+
+      Mobile 390 — theirs is NOT the desktop row wrapped. It is a two-column grid on a full-bleed sand band, rgb(219 216 194), which is exactly our --band-strong. Chips 167px wide, 40px tall, 16.5px column gap, 12.5px row gap, 20px gutter. Ours: 167 / 40 / gap-x-4 / gap-y-3 / 20px. Band height theirs 267.5px, ours 268. Band-top to first chip theirs 92px, ours 91.6.
+
+      The band colour really does differ between their breakpoints — the desktop capture is white edge to edge through the same section, checked across the full width. So: bg-band-strong below lg, white from lg up.
+
+      Their chip labels carry text-transform: capitalize, which is why theirs reads "Set Of 2/3" with a capital O. Reproduced with `capitalize` rather than by writing the capital into the label, so the vocabulary string stays the vocabulary's.
+
+      Chip label weight: first pass at our body Poppins 300 measured 144k units of ink against their 203k over an identical 59x12px "Vertical" bounding box — same size, visibly lighter stroke. font-normal (Poppins 400, already loaded) brings it to 184k at the same 59px width. The residual ~9% is face, not weight; Poppins is our stand-in for their geometric sans across the whole storefront.
+
+      GLOBAL FINDING, NOT FIXED HERE — mesonart's desktop page gutter is 48px; ours is 20px. Measured on their s01/s02/s03/s05 (48, 48, 48, 49.5) and on our own s01/s02 (20.5, 20). It is --page-padding in globals.css, measured at 20px during global-chrome-parity and correct on mobile (theirs 21.5 there), so something adds ~28px at desktop that the token does not carry. This band uses container-wide like every other, so it is inset 20px like every other; special-casing one band would misalign it from the page it sits in. Belongs to global-chrome-parity, not to #535.
+
+      SMALLER FINDING, NOT FIXED HERE — `Orientation` in app/components/product/ProductFilters.tsx is a five-value union that predates set-of-2-3, and PostersSearchParams['orientation'] is typed from it. The sixth chip's search object is therefore typed Record<string, unknown> (same as AllArtMegaMenu does it) rather than naming that union, or the chip the API's own zod enum accepts would be a type error. Runtime is unaffected; the union is the thing that is behind.
+
+      Verification artefacts in the shared scratchpad: shots/ours-orientation-desktop.png, shots/ours-orientation-mobile.png, and the side-by-sides shots/cmp-535-desktop.png and shots/cmp-535-mobile.png. To render them the section was mounted into app/routes/index.tsx for the duration of two screenshots and the file restored byte-for-byte afterwards (md5 edb4a6da56a0c57de49486cc7be0f3d8 before and after, git status clean on it). No throwaway preview route was added, so routeTree.gen.ts carries nothing of mine.
+  - author: system
+    timestamp: '2026-08-06T14:44:55.886Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T11:59:08.939Z'
+completed: '2026-08-06T14:44:55.886Z'

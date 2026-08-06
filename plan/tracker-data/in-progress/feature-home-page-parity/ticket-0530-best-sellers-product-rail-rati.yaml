@@ -1,0 +1,155 @@
+ticket_number: 530
+title: Best Sellers product rail — rating stars, review count, title-left price-right
+description: |-
+  BAR: mesonart Best Seller carousel. Each card: image on light-grey rounded tile, then a row of gold rating stars + (count) on the left with a wishlist heart on the right, then product title on the left and 'From $X' right-aligned on the SAME baseline. Rail scrolls horizontally; a single outline 'View All' pill with a small icon sits centred below.
+
+  OURS TODAY: FeaturedProductsSection is a static 2-row 4-up grid with no ratings, no counts, price stacked under the title, and a plain 'View all >' text link at the top right.
+
+  Reuse the canonical ProductCard where possible (it is shared with /posters — do not fork its layout in a way that regresses the collection page). Desktop + mobile.
+feature: home-page-parity
+type: task
+priority: high
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.053Z'
+last_updated: '2026-08-06T14:21:36.926Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - products
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T11:57:51.672Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:17:26.197Z'
+    text: |-
+      Built. Files created (all new, no shared file edited):
+      - packages/web/app/components/home/ProductRail.tsx — the rail primitive shared with #534
+      - packages/web/app/components/home/BestSellersRail.tsx — band + `fetchBestSellerProducts()`
+      - packages/web/tests/components/home/ProductRail.test.tsx — 21 tests, all passing
+      - packages/web/app/routes/zz-preview-rails.tsx — TEMPORARY preview route so the band can be screenshotted at 1440/390 without editing routes/index.tsx. Delete at integration. (Same convention as the existing zz-preview-brand-story.tsx.)
+
+      SUPERSEDES: `FeaturedProductsSection` in `app/routes/index.tsx` — the "Featured Collection" heading, its subtitle, the `View all >` text link, the two-row four-up `ProductGrid`, and the mobile "View all products" link at the bottom. I did NOT delete it (concurrency rule); the integration step should drop that section and render `<BestSellersRail products={...} />` in its place.
+
+      WIRING (two lines in the home loader's existing createServerFn — no new server function needed):
+      ```ts
+      import { BestSellersRail, fetchBestSellerProducts } from '~/components/home/BestSellersRail'
+      // inside getHomePageData's Promise.allSettled:
+      fetchBestSellerProducts()   // -> ProductCardData[], never throws
+      ```
+
+      DATA SOURCE — and the actual cause of "no ratings, no counts":
+      This was never a ProductCard defect. `product/ProductCard` has drawn the star row + `(count)` since the collection parity work and `/posters` shows it. The home page did not, because it reads `GET /api/products/featured`, whose SQL projection (packages/api/src/routes/products.ts:667-699) selects NO review aggregate — no `averageRating`, no `reviewCount`. Every home card therefore arrived unrated, and ProductRating correctly rendered nothing rather than inventing a score.
+
+      `GET /api/products` DOES join the aggregate (`round(avg(reviews.rating),1)` over approved reviews only, `count(reviews.id)`) — products.ts:506-522. So the rail reads the LIST endpoint with `sortBy=salesCount&sortOrder=desc`, which is real units sold from settled orders with the curator's isPopular/popularOrder pin above it — not the featured flag and not a hand-written list. Ratings are real: verified against the dev catalogue (41 active products; Wabi-Sabi Study 5.0/2, Desert Bloom 4.0/1, Cosmic Harmony 4.5/2, Mountain Majesty 5.0/2).
+
+      MEASURED GEOMETRY (verified in the browser at 1440x900 and 390x844):
+      - desktop: track 1400 wide, 4 cards of 335 at a 20px gutter — 4*335+3*20 = 1400 exactly
+      - mobile: card 287px inside 390 (bar's is 286), next card peeks at x=327 (bar's at 322); the track bleeds past the page gutter and `scroll-pl` snaps a card back to x=20 — confirmed by scrolling it and re-measuring
+      - View All pill 142x56 (bar's 148x49), centred under the rail, leading clipboard icon
+      - prev/next 56px circles at the far right of the heading row, prev disabled at rest
+
+      DECISIONS:
+      - `showFeaturedBadge={false}` inside the rail. mesonart puts no badge on these cards, and on a band that is entirely best sellers a per-card "Featured" chip labels nothing. The AI badge stays — it is real provenance, it is rare, and suppressing it would be a disclosure regression.
+      - Heading reads "Best Seller" (singular), which is what the band itself says on mesonart; "Best Sellers" is only their nav label.
+      - The band renders NOTHING on an empty list rather than a heading over a dead track.
+      - NOT built: mesonart's category tab row under the Best Seller heading (Wabi-Sabi Art / Plaster & Texture Art / Pop Art / Minimalist Paintings / Colorful Art). It is a per-style refetch of the rail and is out of this ticket's description; the facets endpoint could back it if someone wants it later.
+
+      SHARED FILES I NEEDED BUT DID NOT EDIT:
+      1. `product/ChooseOptions.tsx` — on mobile the bar replaces the centred white "Choose Options" pill with a small BLACK CIRCULAR CART BUTTON at the bottom-right of the artwork plate. Ours keeps the full-width white pill, which is the single most visible remaining difference at 390. Fixing it means an opt-in variant prop on ChooseOptions (threaded through ProductCard), which would touch a file live on /posters and /collections/$slug.
+      2. `product/ProductCardMedia.tsx` — `loading="lazy"` is hardcoded. The Best Seller rail is the first band under the hero, so its first card is the LCP candidate and should be eager.
+      3. `styles/globals.css` — `--page-padding: 20px` gives a 20px page gutter at 1440; mesonart's is ~48px, so our four cards sit ~29px closer to each edge than theirs. Global chrome / #540 territory, not this band's.
+
+      Verification: `npx tsc --noEmit` — zero errors in the new files (40-line pre-existing baseline elsewhere). `vitest run tests/components/product` — 428/428 pass, so /posters and the collection page are unregressed. `vitest run tests/components/home/ProductRail.test.tsx` — 21/21.
+  - author: mcp-client
+    timestamp: '2026-08-06T14:21:36.926Z'
+    text: |-
+      Fix round after the blind A/B loss (desktop + mobile). All five defects addressed; measurements before/after below. Still in-progress — needs a re-run of the blind A/B.
+
+      == 1. Artwork scale not normalised across a row (the decisive desktop failure)
+
+      ROOT CAUSE, and it is NOT a card defect. `matToSquare` bakes the mat into the pixels: art is contained at MAT_ART_INSET (88%) of its LONGEST side on a 1500x1500 canvas. That normalises one axis and nothing else, and the stored asset then says `1500x1500` for a 3:1 panorama and a perfect square alike — the storefront has no way to tell them apart. Measured art aspects in the dev catalogue run 0.53:1 to 1.96:1, and `product.orientation` does not track them (desert-bloom is labelled `square`, its photograph is 1.96:1), so no existing field could stand in.
+
+      Measured on the rail at 1440 (plate 321px), ink as a share of the plate:
+        BEFORE  79% / 41% / 77% / 42%   -> 1.93:1 spread
+        AFTER   55% / 46% / 55% / 50%   -> 1.20:1 spread
+        BAR     65% / 65% / 73% / 70%   -> 1.12:1 spread
+      The bar gets its evenness for free: all four of its photographs are between 0.77:1 and 1.02:1.
+
+      FIX — supply the missing measurement, then use it:
+      - `ProductImage.artBox` (optional, `@chobii/shared`): where the art sits inside its square master, normalised. Additive to the existing `images` JSONB, so no migration.
+      - `measureArtBox()` (`packages/api/src/lib/image-processing.ts`): recovers the box from the composited output by scanning for non-MAT_COLOR pixels at MAT_CANVAS/4 with a nearest kernel. Reads the stored asset rather than the geometry that produced it, which is what lets one function serve both new uploads and the backfill.
+      - `buildProductMedia` populates it for every new artwork upload.
+      - `bun run backfill:art-box` (`packages/api/src/database/backfill-art-box.ts`): one-off, additive, idempotent, `--dry-run`/`--force`. Fetches each asset over HTTP (public bucket, no credentials), measures, writes one key into the JSONB. No re-processing, no re-upload, no URL changes. RUN AGAINST DEV: 41/41 products, 163 images scanned, 41 measured, 122 skipped (only `main` is matted; cropped photographs are full-bleed and correctly get no box), 0 failed.
+      - `app/components/product/artFraming.ts`: given a box, returns `clip-path` (crops the baked mat off) + `transform` (scales and centres the piece to ART_AREA = 0.52 of the plate, clamped so no side passes ART_MAX_SIDE = 0.95). Both are paint-time only, so the row-alignment contract — one in-flow image carrying MEDIA_RATIO, hover slides `absolute inset-0` — is untouched, and `ProductCardMedia`'s existing structure tests still pass unchanged.
+
+      Air is now symmetric per card (gapT == gapB: 46/46, 83/83, 47/47, 8/8), which is the bar's own rule — its four cards measure 32/32, 32/32, 8/8, 7/7.
+
+      DEGRADES CLEANLY: no `artBox` -> no style -> exactly today's rendering. Nothing in the pipeline changed for existing pixels.
+
+      == 2. Plate at #FAFAFA on white (2% contrast)
+
+      The plate could not simply be recoloured: the visible grey WAS the baked mat, so the image covered the plate edge to edge and `--mat` was inert. Cropping the mat away in (1) is what makes a plate colour visible at all.
+
+      - New `--plate` token, separate from `--mat`. They are different things: `--mat` is what sharp bakes into pixels (still pinned to MAT_COLOR by tests/styles/mat-token.test.ts, unchanged); `--plate` is the surface the card draws under them and no pixels depend on it.
+      - Value rgb(239 239 239), measured directly off the reference capture as the mode of the plate ring across all four Best Seller cards (12,228 samples). The other review's #ECEDEA is 3 levels off this; both are ~4% against white where ours was 2%.
+      - Held as `PLATE_BG = 'bg-[hsl(var(--plate))]'` in productCardTokens rather than a `colors` entry, because a tailwind.config colour needs a dev-server restart to exist and a token that only a restart can make real silently does nothing.
+      Verified rendered: plate computes to rgb(239, 239, 239).
+
+      == 3. Mobile: no shared picture baseline
+
+      Equal-area framing plus symmetric air narrows the bottom-gap delta between neighbours from 60px (19 vs 79) to 38px (44 vs 82), and the band under a picture is now a visible plate rather than an invisible one. Deliberately NOT hard baseline-anchored: the bar centres its pieces (gapT == gapB on all four), and a baseline anchor pushed a 1.96:1 piece into a large empty top band and clipped the tallest piece.
+
+      == 4. Mobile "Choose Options"
+
+      Was a 163x37 white pill printed permanently across the artwork's lower third — white on pale cream, no edge of its own, centred horizontally and bottom-anchored 25px, i.e. centred on one axis and arbitrary on the other. Flagged independently by three reviews.
+
+      Below `md` it is now a 40px round corner button at the same 16px inset the quick-view eye uses on the opposite corner, with a shadow so it has an edge against a light picture. From `md` up it is unchanged: the measured 172x40 white pill at radius 60, revealed on hover, which costs the picture nothing because at rest it is not drawn. Accessible name stays "Choose Options" (`sr-only md:not-sr-only`), so it is not an unlabelled glyph.
+
+      == 5. Band rhythm
+
+      The bar's Best Seller band runs 617px from heading top to pill foot; ours runs 616 — the content stacks are the same object. The difference was air. Overrode SectionBand's `py-16 sm:py-24` with `py-12 sm:py-14` on the rail only (both breakpoints named — twMerge only resolves a conflict within one variant, so `py-12` alone would leave `sm:py-24` standing), and tightened the heading margin.
+
+        desktop  heading->artwork 46 -> 34 (bar: 32) | track->pill 48 (bar: 46.5, kept)
+                 pill->band edge 96 -> 56 | band height 814 -> 722
+                 pill pocket 48/96 -> 48/56 (bar's own ratio: 46.5/63.5)
+        mobile   pill pocket 41/64 -> 40/48
+
+      Remaining page-level item, NOT this ticket: two adjacent bands still put 56 + 96 = 152px between this pill and the next heading against the bar's 63.5, because every other band still carries SectionBand's default. That is a SectionBand change affecting every band on the page.
+
+      == LCP
+
+      `ProductCardMedia` hardcoded `loading="lazy"`. Added `priority` on ProductCardMedia -> ProductCard -> ProductRail; BestSellersRail sets it, NewInRail does not. Only the FIRST card of the first band under the hero goes `loading="eager" fetchpriority="high"`; hover slides stay lazy. Verified rendered: Best Seller card 1 `eager`, New In card 1 `lazy`.
+
+      == Not regressed — kept as measured
+
+      The meta row is untouched: heart in slate #647B8B sharing an exact right edge with the price, price 15px under the title. Both reviews called it the better-finished one against the bar's near-invisible #D6D6D6 heart.
+
+      == /posters and /collections/$slug (both signed off at parity)
+
+      Screenshotted at 1440 and 390 before and after. Nothing became opt-in — every change improves those surfaces too, so gating them per surface would have shipped the worse version to the pages that are already signed off:
+      - /posters desktop: same grid, same chrome, same heights (no CLS). Plates visible, row ink evened out the same way.
+      - /posters mobile: the biggest single win — four permanent white "Choose Options" slabs across four artworks replaced by four 40px corner buttons.
+      - PDP: pixel-diffed before/after. The ONLY differing region is y 1439-1691, the "Visually Similar Artworks" row, which is ProductCard. Gallery, buy box, frame swatches and tabs are byte-identical.
+
+      == Tests
+
+        web  tests/components/product + tests/components/home + tests/styles: 820 passed, 1 failed
+             The failure is tests/styles.test.ts "no dark: utility variants in app source", offender
+             app/routes/admin/promotions/index.tsx — committed code I did not touch. PRE-EXISTING.
+        web  tsc --noEmit: 22 errors, all in admin/track/ai-generator. Exactly the known baseline, none
+             in any file touched here.
+        api  tsc --noEmit: 0.  shared tsc --noEmit: 0.
+        api  image-processing mat/crop/seed-media suites: 38 passed (unchanged).
+
+      New tests: tests/components/product/artFraming.test.ts (14), packages/api/tests/lib/image-processing-art-box.test.ts (10), plus framing/LCP cases on ProductCardMedia, the two trigger shapes on ChooseOptions, and LCP + band-padding cases on ProductRail. ProductCard.tokens.test.ts's "keeps the baked mat colour" assertion now asserts PLATE_BG and the absence of bg-mat, with the reason inline — the mat/plate split is the point, and --mat is still pinned to MAT_COLOR where that pairing belongs.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T11:57:51.672Z'

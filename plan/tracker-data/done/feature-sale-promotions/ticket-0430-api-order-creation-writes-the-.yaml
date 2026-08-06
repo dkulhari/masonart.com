@@ -28,11 +28,11 @@ description: |-
 feature: sale-promotions
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T08:03:30.589Z'
-last_updated: '2026-08-06T06:42:51.609Z'
+last_updated: '2026-08-06T05:54:04.986Z'
 time_spent_minutes: 0
 labels:
   - backend
@@ -40,16 +40,59 @@ labels:
 acceptance_criteria: []
 comments:
   - author: mcp-client
-    timestamp: '2026-08-06T06:42:51.609Z'
+    timestamp: '2026-08-05T21:13:13.140Z'
     text: |-
-      **Correction to the comment above:** the decision ticket is identified by FILE, not by number. Two tickets collided on #510 tonight because a parallel `gift-cards` session consumed 511-515 at the same time.
+      Interim assumption for the totals block, pending #510 (DECISION NEEDED — subtotal semantics and free-shipping threshold):
 
-      The interim-assumption decision ticket is:
-      `plan/tracker-data/todo/feature-sale-promotions/ticket-0510-decision-needed-orders-subtota.yaml` — "DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale"
+      `orders.subtotal` stays GROSS (sum of base line totals, unchanged from today) and `total = subtotal + shipping − discount + tax` keeps subtracting the discount exactly once. The free-shipping threshold therefore keeps reading the gross figure, as it does today.
 
-      The other #510 is an unrelated bug: `ticket-0510-cart-page-mixes-two-cart-sourc.yaml`.
+      Chosen because it changes nothing that already exists: the only new money movement is the promotion discount itself. §5 of the design doc reads as though subtotal becomes net — following that literally while `total` still subtracts `discount` would take the promotion off twice.
 
-      The interim assumption itself is unchanged and is what shipped in commit 059f1ee0: subtotal stays gross, `total` subtracts the discount exactly once, free-shipping threshold behaviour untouched.
+      If #510 lands on net subtotal or a net threshold, the totals block in `routes/orders.ts` is the single place that changes.
+  - author: mcp-client
+    timestamp: '2026-08-06T05:34:03.702Z'
+    text: |-
+      Two gotchas found while implementing #427 (commit 4a998e91) — both bite this ticket:
+
+      **1. Product facets are arrays, not scalars.** `products.styles`, `products.subjects`, `products.rooms` are `text[]` (`packages/api/src/database/schema/products.ts:111-114`), not the singular `style`/`subject`/`room` sketched in these tickets. `resolveSalePrice` normalises both via `facetValues()` — pass the product row straight in.
+
+      **2. `@chobii/shared` needs a rebuild before its new types resolve.** `dist/` is gitignored and stale after #424; run `cd packages/shared && bunx tsc` if `tsc` rejects `ResolvedSalePrice` imports. Build output only, nothing to stage.
+
+      **3. Use the helper, don't re-query.** #427 also added `loadPromotionProductSets(activePromotions)` to `packages/api/src/lib/promotion-pricing.ts`, returning `{ includedIds, excludedIds }`. Call it once per request — do not query `promotion_product` / `promotion_exclusion` per line item.
+  - author: system
+    timestamp: '2026-08-06T05:49:11.754Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-06T05:53:53.391Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T05:54:04.986Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `059f1ee0` - feat(api): order creation writes the real promotion discount
+
+      **Files Changed**:
+      - `packages/api/src/routes/orders.ts` — `resolvePromotionDiscounts()` + `countSettledOrdersForPromotion()`; totals block writes `promotionId`, `promotionDiscount`, derived `discount`, per-line `itemDiscount`; `couponCode` dropped from the input schema and written as null; create + detail responses carry the promotion figures
+      - `packages/api/src/routes/admin/orders.ts` — admin order detail returns `promotionId` / `promotionDiscount`
+      - `packages/api/src/lib/product-sales.ts` — `VOIDED_ORDER_STATUSES` exported so "settled" means one thing
+      - `packages/api/tests/routes/order-promotion-pricing.test.ts` — new, 21 tests
+      - `packages/api/tests/routes/orders.test.ts` — the coupon-code validation block replaced; it described a schema field that no longer exists
+
+      **Summary**:
+      Order creation re-resolves every line through `promotion-pricing` and ignores anything the request says about money. Per the mid-flight correction from #429 (`d896d440`), the discount comes off the line's own `unitPrice` — `resolveSalePrice({ ...item.product, basePrice: item.unitPrice }, ...)` — so cart and order quote the same total for the same basket; the frame stays at full price, matching `priceCartLine`. A non-member at order time gets `locked` and pays base.
+
+      `perCustomerOrderLimit` counts the customer's settled orders (`payment_status = 'paid'`, status not in `VOIDED_ORDER_STATUSES`) under the same `promotionId`, one count per promotion actually in play — an unlimited promotion asks the database nothing. Past the limit the order still goes through at base rather than being refused at the till.
+
+      Money model as specified: `itemDiscount` per line → `promotionDiscount` their sum → `discount` composed from `promotionDiscount + couponDiscount`, which stays `'0.00'`. Interim totals assumption honoured — `subtotal` gross, discount subtracted once in `total`, `calculateShippingCost` untouched (a test pins the free-shipping threshold reading the gross figure).
+
+      Two judgement calls worth recording: the frame's `priceAddition` is never discounted (a promotion scopes over products, and frames are not products — and this matches what #429 landed), and when two promotions somehow price one basket the deepest contributor is what `orders.promotionId` records, since one column cannot hold both.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts`
+      - Result: PASS (21 tests, 21 passing) — red first: 18 failed / 3 passed before the implementation
+      - Command: `cd packages/api && bunx vitest run tests/routes/orders.test.ts`
+      - Result: PASS (115 tests, 115 passing) — no regression
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -68,7 +111,7 @@ implementation_steps:
     file: packages/api/tests/routes/order-promotion-pricing.test.ts
     command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       import { describe, it, expect } from 'vitest'
 
@@ -115,12 +158,12 @@ implementation_steps:
     description: Confirm the tests fail
     command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
     expected_result: FAIL - discount is hardcoded "0.00"
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Re-resolve pricing server-side and write the discount, promotionId and limit check
     file: packages/api/src/routes/orders.ts
-    status: pending
+    status: done
     code: |-
       // Replaces: const discount = "0.00"; // TODO: Apply coupon if provided
 
@@ -179,16 +222,18 @@ implementation_steps:
     description: Confirm the tests pass
     command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
     expected_result: PASS
-    status: pending
+    status: done
   - id: 5
     action: verify-pass
     description: Confirm the existing order suites still pass
     command: cd packages/api && bunx vitest run tests/routes/orders.test.ts
     expected_result: PASS
-    status: pending
+    status: done
   - id: 6
     action: commit
     description: Commit server-authoritative discount writing
     command: 'git add packages/api/src/routes/orders.ts packages/api/tests/routes/order-promotion-pricing.test.ts && git commit -m "feat(api): write real promotion discounts on orders, enforce per-customer limit"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 6
+started: '2026-08-06T05:49:11.754Z'
+completed: '2026-08-06T05:53:53.391Z'

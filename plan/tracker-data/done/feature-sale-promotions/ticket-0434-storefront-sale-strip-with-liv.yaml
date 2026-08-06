@@ -1,0 +1,185 @@
+ticket_number: 434
+title: Storefront - sale strip with live countdown above the header
+description: |-
+  ## Task
+  Beige strip above the announcement bar: promotion headline + `HH : MM : SS` counting to the resolved deadline. Renders `null` when no promotion is active — no hardcoded "40% OFF" string anywhere in the component.
+
+  Also rewrite the omission comment at `AnnouncementBar.tsx:11-14` (the constraint survives, only the reason it was unbuildable expires) and update the parity analysis §3.1 row that records the strip as blocked.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 4 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §6, §7
+  Closes: mesonart parity analysis §3.1 row 1
+
+  Deadline comes resolved from the server (T10) — the component only formats and ticks down; it must not compute a window itself. The strip is NOT sticky: the header is `sticky top-0` and the collection toolbar sits at `top-16` assuming the header alone owns that offset (see the note in `AnnouncementBar.tsx`).
+
+  Band colour is the existing `bg-band` token — do not introduce a new colour.
+feature: sale-promotions
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:04:59.167Z'
+last_updated: '2026-08-06T05:58:43.811Z'
+time_spent_minutes: 4
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T05:54:16.693Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T05:58:37.743Z'
+    text: |-
+      Landed in 9a25d337 on feat/mesonart-design-parity.
+
+      - New `packages/web/app/components/layout/SaleStrip.tsx` + 21 tests at `packages/web/tests/components/layout/SaleStrip.test.tsx`.
+      - Mounted above `AnnouncementBar` in `__root.tsx`, behind the same `!isAdminRoute` gate. It self-suppresses when no promotion is active, so the mount needs no second condition.
+      - Reads `GET /api/promotions/active` (#432) on mount with `credentials: 'include'` — the countdown cookie rides on it, and without the cookie every load would re-mint the window. Absolute `${getApiUrl()}` base: there is no Vite `/api` proxy here.
+      - Exports `ActivePromotion` and `formatRemaining`. `formatRemaining` returns `null` at and below zero — that single guard is what keeps a negative clock off the screen. Hours accumulate past 24 rather than wrapping, since `countdownMode: 'real'` can end days out and wrapping only ever understates.
+      - `promotion` prop overrides the lookup (an explicit `null` means "none running, do not ask"), matching `JoinGalleryModal`'s shape.
+
+      Two deliberate calls worth recording:
+
+      1. The `ActivePromotion` interface is declared here rather than imported from `components/promo/JoinGalleryModal`. Same five fields. That file was uncommitted and under active edit by another session at the time, and a promotion payload is a contract rather than a modal's property — worth pulling into a shared module when the rest of the §7 surfaces land and there are four copies instead of two.
+      2. The lookup runs on mount, not in the root loader, so on a cold load the strip appears a beat after first paint and pushes the page down. Design §6's "no hydration flicker" is about the deadline being resolved server-side, which it is. Moving the fetch into `__root`'s `beforeLoad` would remove the shift, at the cost of a promotion request on every SSR response including the majority with no sale to show. Left as-is and noted in the component.
+
+      `AnnouncementBar`'s omission comment is rewritten, not deleted. The constraint moved rather than expired: the bar has no promotion to read, so it still carries no promotional copy; only the "there is no promotion entity" justification is gone.
+
+      Parity analysis §3.1 row 1 flipped from blocked to done, and the §6 summary row for global chrome updated with it — it named the sale strip as the one outstanding item, which is now the floating offer tab.
+  - author: system
+    timestamp: '2026-08-06T05:58:42.903Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-06T05:54:17.442Z'
+    agent: claude-code
+    summary: SaleStrip built and mounted, 21 tests passing, AnnouncementBar comment rewritten, parity analysis §3.1 updated. Commit 9a25d337.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-06T05:58:43.808Z'
+    duration: '00:04:26'
+related_tickets: []
+blocked_by:
+  - ticket: 432
+    feature: sale-promotions
+    description: API - countdown deadline resolution, cookie mint and clamp
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing component tests for the strip
+    file: packages/web/tests/components/layout/SaleStrip.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/layout/SaleStrip.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import { render, screen } from '@testing-library/react'
+      import { SaleStrip } from '~/components/layout/SaleStrip'
+
+      describe('SaleStrip', () => {
+        it('renders nothing when no promotion is active', () => {
+          const { container } = render(<SaleStrip promotion={null} />)
+          expect(container.firstChild).toBeNull()
+        })
+
+        it('renders the headline from the promotion, not a hardcoded string', () => {
+          render(
+            <SaleStrip
+              promotion={{ headline: 'MONSOON SALE — 25% OFF', deadline: futureIso() }}
+            />
+          )
+          expect(screen.getByText(/MONSOON SALE/)).toBeInTheDocument()
+        })
+
+        it('formats the remaining time as HH : MM : SS', () => {})
+
+        it('does not render a timer when the promotion has no deadline', () => {})
+
+        it('is not sticky — the header owns the top offset', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/components/layout/SaleStrip.test.tsx
+    expected_result: FAIL - Cannot find module '~/components/layout/SaleStrip'
+    status: done
+  - id: 3
+    action: implement
+    description: Build SaleStrip and mount it above AnnouncementBar
+    file: packages/web/app/components/layout/SaleStrip.tsx
+    status: done
+    code: |-
+      /**
+       * The sale strip.
+       *
+       * Everything here comes from the active promotion row: headline, and a
+       * deadline the server already resolved (see api/lib/promotion-countdown.ts).
+       * No promotion, no strip — and no hardcoded discount anywhere in the file.
+       *
+       * NOT sticky: the header is `sticky top-0` and the collection toolbar assumes
+       * the header alone owns that offset.
+       */
+
+      export function SaleStrip({ promotion }: { promotion: ActivePromotion | null }) {
+        if (!promotion) return null
+        // useCountdown(promotion.deadline) -> { hours, minutes, seconds, expired }
+        // expired -> render the headline without the timer; the next navigation
+        // picks up a re-minted deadline from the server.
+      }
+  - id: 4
+    action: implement
+    description: Rewrite the omission comment and the parity-analysis row
+    file: packages/web/app/components/layout/AnnouncementBar.tsx
+    status: done
+    code: |-
+      // Replace the "No sale strip and no countdown" paragraph (lines 11-14) with
+      // the rule that survives it: the strip lives in SaleStrip.tsx, renders only
+      // when a promotion row is active, and reads its headline and deadline from
+      // that row — the bar itself still carries no promotional copy.
+      //
+      // Then update docs/design/mesonart/mesonart-parity-analysis.md §3.1: the
+      // "Sale strip + countdown" row moves from ❌ blocked to done, referencing
+      // this feature.
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/components/layout/SaleStrip.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the sale strip
+    command: 'git add packages/web/app/components/layout/SaleStrip.tsx packages/web/app/components/layout/AnnouncementBar.tsx packages/web/tests/components/layout/SaleStrip.test.tsx docs/design/mesonart/mesonart-parity-analysis.md && git commit -m "feat(web): promotion-driven sale strip with live countdown"'
+    status: done
+current_step: 6
+started: '2026-08-06T05:54:16.693Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/web && bunx vitest run tests/components/layout/SaleStrip.test.tsx
+  test_output: |-
+    1 file, 21 tests passed (877ms). Covers: null payload / non-ok / rejected fetch / explicit null prop all render nothing; headline and depth follow the row (25% and 15% fixtures, no 40 anywhere, source scanned with comments stripped for a hardcoded percentage); HH : MM : SS from the resolved deadline, ticking, hours past 24, zero drops the timer and keeps the headline, past and unparseable deadlines, aria units; bg-band and not sticky; one credentialed request to the API origin.</testOutput>
+    </invoke>
+    <invoke name="mcp__ticketrack__addComment">
+    <parameter name="ticketNumber">434
+  verified_at: '2026-08-06T05:58:23.646Z'
+completed: '2026-08-06T05:58:42.903Z'

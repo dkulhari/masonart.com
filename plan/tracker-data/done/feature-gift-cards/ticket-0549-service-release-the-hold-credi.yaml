@@ -22,17 +22,20 @@ description: |-
 feature: gift-cards
 type: task
 priority: high
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T15:04:12.587Z'
-last_updated: '2026-08-06T15:04:12.587Z'
+last_updated: '2026-08-06T15:19:08.558Z'
 time_spent_minutes: 0
 labels:
   - backend
   - api
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T15:19:08.558Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -215,3 +218,4 @@ implementation_steps:
     command: 'git add packages/api/src/services/gift-card.ts packages/api/tests/services/gift-card-refund.test.ts && git commit -m "feat(api): release gift card holds and credit capped refunds"'
     status: pending
 current_step: 1
+completed: '2026-08-06T15:19:08.558Z'

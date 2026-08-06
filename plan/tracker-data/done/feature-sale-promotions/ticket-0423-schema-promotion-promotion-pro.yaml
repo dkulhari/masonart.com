@@ -1,0 +1,291 @@
+ticket_number: 423
+title: Schema - promotion, promotion_product and promotion_exclusion tables
+description: |-
+  ## Task
+  Add the promotion entity. Three tables in a new `packages/api/src/database/schema/promotions.ts`, exported from `schema/index.ts`, plus the generated migration.
+
+  State is DERIVED, never stored: a promotion is active when `isEnabled && now >= startsAt && (endsAt is null || now < endsAt)`. No `status` column — it would fall out of sync and a sale would need someone to remember to switch it off.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 1 — Schema + contracts
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §4
+
+  Follow the idiom in `packages/api/src/database/schema/products.ts` (pgTable + pgEnum + index callbacks). Test as shape assertions on the drizzle object, like `tests/database/product-popularity-columns.test.ts` — the route suites mock `db`, so nothing else catches a column that does not exist (see #387).
+
+  `endsAt` is nullable and PRIVATE — it must never be serialized to the storefront (enforced in T6/T10, documented here).
+feature: sale-promotions
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:01:35.084Z'
+last_updated: '2026-08-06T05:24:28.032Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T21:15:01.714Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T21:19:01.726Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4b8edcd5` - feat(api): promotion entity — scope, exclusions and derived active state
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/promotions.ts` - new: `promotions`, `promotionProducts`, `promotionExclusions`, three pgEnums (`discount_type`, `promotion_scope`, `countdown_mode`), relations and inferred types
+      - `packages/api/src/database/schema/index.ts` - re-exports the new module
+      - `packages/api/tests/database/promotions-schema.test.ts` - 9 shape assertions
+      - `packages/api/src/database/migrations/0007_marvelous_king_cobra.sql` + `meta/0007_snapshot.json` + `meta/_journal.json` - generated migration, applied
+
+      **Summary**:
+      Three tables as designed. No `status` column — active state is derived from `isEnabled && now in [startsAt, endsAt)`. `endsAt` is nullable (open-ended sale) and documented private. Countdown behaviour is configuration (`countdownMode` default `rolling`, `rollingWindowMinutes` 720, `rollingJitterMinutes` 90); `priority` (default 0) breaks overlap so promotions never stack. `membersOnly` defaults true, `isEnabled` defaults false. `promotion_exclusion` is a separate table from `promotion_product` so an exclusion can beat every scope. Composite PKs on both membership tables plus a product-side index each; `promotion_active_idx` on (is_enabled, starts_at, ends_at) and `promotion_priority_idx`.
+
+      Code follows repo style rather than the verbatim step snippet: `packages/api/src` is double-quote + semicolon (matching `collections.ts`), `tests/database` is single-quote + semicolon (matching `product-popularity-columns.test.ts`). Also added the two `one()` relations and `$inferSelect/$inferInsert` types the collections module carries, so the module matches its neighbour.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/database/promotions-schema.test.ts`
+      - Result (RED, before implementation): FAIL — `Cannot find module '../../src/database/schema/promotions'`
+      - Result (GREEN): PASS (9 tests, 9 passing, 0 failing)
+      - Regression: `bunx vitest run tests/database/promotions-schema.test.ts tests/database/migrations.test.ts` → PASS (36 passing, 63 skipped, 0 failing)
+      - Type-check: `bunx tsc --noEmit -p tsconfig.json` → no errors referencing `promotions` or `schema/index`
+      - Migration reviewed before applying: purely additive (3 CREATE TYPE, 3 CREATE TABLE, 5 FKs, 4 indexes). No drops, no alters to existing tables.
+      - Applied to dev DB (localhost:5440) and confirmed live: all three tables present, `ends_at` `is_nullable=YES`, `is_enabled` default `false`, `members_only` default `true`, `countdown_mode` default `'rolling'`, `rolling_window_minutes` 720, `rolling_jitter_minutes` 90, `priority` 0, and no `status` column.
+  - author: system
+    timestamp: '2026-08-06T05:24:20.053Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T05:24:28.032Z'
+    text: |-
+      Completed in commit 4b8edcd5. Verified independently after the implementing agent hit its session limit on the final step:
+
+      - `tests/database/promotions-schema.test.ts` — 9 tests passing
+      - Migration `0007_marvelous_king_cobra.sql` generated AND applied: `promotion`, `promotion_product`, `promotion_exclusion` all present in `poster_app_dev` on :5440
+      - `schema/index.ts` exports the new module
+
+      No status column, as designed — active state is derived from `isEnabled` plus the date window.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing shape assertions for the three promotion tables
+    file: packages/api/tests/database/promotions-schema.test.ts
+    command: cd packages/api && bunx vitest run tests/database/promotions-schema.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      /**
+       * Schema support for sale promotions.
+       *
+       * Shape assertions on the drizzle objects, matching
+       * product-popularity-columns.test.ts: the route suites mock `db`, so nothing
+       * else in the API catches a column that does not exist.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import {
+        promotions,
+        promotionProducts,
+        promotionExclusions,
+      } from '../../src/database/schema/promotions'
+
+      describe('promotion table', () => {
+        it('carries the customer-facing headline and the discount', () => {
+          expect(promotions.headline).toBeDefined()
+          expect(promotions.discountType).toBeDefined()
+          expect(promotions.discountValue).toBeDefined()
+        })
+
+        it('has no status column — active state is derived from the dates', () => {
+          expect((promotions as Record<string, unknown>).status).toBeUndefined()
+          expect(promotions.isEnabled).toBeDefined()
+          expect(promotions.startsAt).toBeDefined()
+          expect(promotions.endsAt).toBeDefined()
+        })
+
+        it('is disabled by default — a live sale is a deliberate act', () => {
+          expect(promotions.isEnabled.default).toBe(false)
+        })
+
+        it('endsAt is nullable, so an open-ended sale is expressible', () => {
+          expect(promotions.endsAt.notNull).toBe(false)
+        })
+
+        it('carries scope, membership gate and the per-customer guardrail', () => {
+          expect(promotions.scopeType).toBeDefined()
+          expect(promotions.scopeFilter).toBeDefined()
+          expect(promotions.membersOnly.default).toBe(true)
+          expect(promotions.perCustomerOrderLimit.notNull).toBe(false)
+        })
+
+        it('carries the countdown configuration rather than hardcoding it', () => {
+          expect(promotions.countdownMode.default).toBe('rolling')
+          expect(promotions.rollingWindowMinutes.default).toBe(720)
+          expect(promotions.rollingJitterMinutes.default).toBe(90)
+        })
+
+        it('priority breaks overlap — promotions never stack', () => {
+          expect(promotions.priority.default).toBe(0)
+        })
+      })
+
+      describe('promotion membership tables', () => {
+        it('promotion_product pins an explicit product list', () => {
+          expect(promotionProducts.promotionId).toBeDefined()
+          expect(promotionProducts.productId).toBeDefined()
+        })
+
+        it('promotion_exclusion exists separately — an exclusion beats every scope', () => {
+          expect(promotionExclusions.promotionId).toBeDefined()
+          expect(promotionExclusions.productId).toBeDefined()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/database/promotions-schema.test.ts
+    expected_result: FAIL - Cannot find module '../../src/database/schema/promotions'
+    status: done
+  - id: 3
+    action: implement
+    description: Create the promotions schema module and export it from schema/index.ts
+    file: packages/api/src/database/schema/promotions.ts
+    status: done
+    code: |-
+      /**
+       * Sale promotions.
+       *
+       * Active state is derived, never stored: `isEnabled && now in [startsAt, endsAt)`.
+       * A stored status column would need a job to flip it and would be wrong for the
+       * window between the sale ending and the job running.
+       *
+       * `endsAt` is private. Only the resolved countdown deadline crosses the wire —
+       * see lib/promotion-pricing.ts and the countdown resolver.
+       */
+
+      import { relations } from 'drizzle-orm'
+      import {
+        boolean,
+        index,
+        integer,
+        jsonb,
+        pgEnum,
+        pgTable,
+        primaryKey,
+        text,
+        timestamp,
+        uuid,
+      } from 'drizzle-orm/pg-core'
+      import { products } from './products'
+      import { users } from './users'
+
+      export const discountTypeEnum = pgEnum('discount_type', ['percentage', 'fixed'])
+      export const promotionScopeEnum = pgEnum('promotion_scope', ['all', 'filter', 'products'])
+      export const countdownModeEnum = pgEnum('countdown_mode', ['real', 'rolling'])
+
+      export const promotions = pgTable(
+        'promotion',
+        {
+          id: uuid('id').primaryKey().defaultRandom(),
+          /** Internal label, e.g. "Summer Sale 2026". Never rendered. */
+          name: text('name').notNull(),
+          /** Customer-facing, e.g. "SUMMER SALE — 40% OFF EVERYTHING". */
+          headline: text('headline').notNull(),
+          discountType: discountTypeEnum('discount_type').notNull(),
+          /** Percent when type='percentage', paise when type='fixed'. */
+          discountValue: integer('discount_value').notNull(),
+          scopeType: promotionScopeEnum('scope_type').notNull(),
+          /** { styles: [], subjects: [], rooms: [], isFeatured: bool } when scopeType='filter'. */
+          scopeFilter: jsonb('scope_filter'),
+          membersOnly: boolean('members_only').default(true).notNull(),
+          startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+          /** Null = open-ended. PRIVATE: never serialized to the storefront. */
+          endsAt: timestamp('ends_at', { withTimezone: true }),
+          isEnabled: boolean('is_enabled').default(false).notNull(),
+          /** Highest wins when two promotions overlap. Promotions never stack. */
+          priority: integer('priority').default(0).notNull(),
+          perCustomerOrderLimit: integer('per_customer_order_limit'),
+          countdownMode: countdownModeEnum('countdown_mode').default('rolling').notNull(),
+          rollingWindowMinutes: integer('rolling_window_minutes').default(720).notNull(),
+          rollingJitterMinutes: integer('rolling_jitter_minutes').default(90).notNull(),
+          createdBy: text('created_by').references(() => users.id),
+          createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+          updatedAt: timestamp('updated_at', { withTimezone: true })
+            .defaultNow()
+            .$onUpdate(() => new Date())
+            .notNull(),
+        },
+        (table) => ({
+          activeIdx: index('promotion_active_idx').on(table.isEnabled, table.startsAt, table.endsAt),
+          priorityIdx: index('promotion_priority_idx').on(table.priority),
+        })
+      )
+
+      export const promotionProducts = pgTable(
+        'promotion_product',
+        {
+          promotionId: uuid('promotion_id')
+            .notNull()
+            .references(() => promotions.id, { onDelete: 'cascade' }),
+          productId: uuid('product_id')
+            .notNull()
+            .references(() => products.id, { onDelete: 'cascade' }),
+        },
+        (table) => ({
+          pk: primaryKey({ columns: [table.promotionId, table.productId] }),
+          productIdx: index('promotion_product_product_idx').on(table.productId),
+        })
+      )
+
+      /** Always wins, whatever the scope. */
+      export const promotionExclusions = pgTable(
+        'promotion_exclusion',
+        {
+          promotionId: uuid('promotion_id')
+            .notNull()
+            .references(() => promotions.id, { onDelete: 'cascade' }),
+          productId: uuid('product_id')
+            .notNull()
+            .references(() => products.id, { onDelete: 'cascade' }),
+        },
+        (table) => ({
+          pk: primaryKey({ columns: [table.promotionId, table.productId] }),
+          productIdx: index('promotion_exclusion_product_idx').on(table.productId),
+        })
+      )
+
+      export const promotionsRelations = relations(promotions, ({ many }) => ({
+        includedProducts: many(promotionProducts),
+        exclusions: many(promotionExclusions),
+      }))
+  - id: 4
+    action: verify-pass
+    description: Confirm the shape assertions pass
+    command: cd packages/api && bunx vitest run tests/database/promotions-schema.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: implement
+    description: Generate and apply the migration
+    file: packages/api/drizzle/
+    command: cd packages/api && bunx drizzle-kit generate && bunx drizzle-kit migrate
+    expected_result: Migration file created and applied
+    status: done
+  - id: 6
+    action: commit
+    description: Commit schema and migration
+    command: 'git add packages/api/src/database/schema/promotions.ts packages/api/src/database/schema/index.ts packages/api/tests/database/promotions-schema.test.ts packages/api/drizzle && git commit -m "feat(api): promotion entity — scope, exclusions and derived active state"'
+    status: done
+current_step: 6
+started: '2026-08-05T21:15:01.714Z'
+completed: '2026-08-06T05:24:20.053Z'

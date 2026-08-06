@@ -1,0 +1,28 @@
+ticket_number: 543
+title: Two-row top strip — countdown announcement over utility bar
+description: |-
+  BAR: mesonart stacks two strips above the header. Row one is sage with the campaign line in tracked caps and a live countdown (19H : 12M : 23S) next to a stopwatch icon. Row two is cream with social icons at the left, a rotating message with prev/next arrows centred, and a country/currency selector at the right.
+
+  OURS TODAY: one cream strip — socials left, one rotating message centred, nothing at the right, no countdown.
+
+  Only render the countdown row when a real promotion with a real end time is active (the sale-promotions feature owns that data); never show a fake timer. Currency selector only if multi-currency is actually wired, otherwise leave the right slot empty rather than faking it. Desktop + mobile.
+feature: home-page-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.206Z'
+last_updated: '2026-08-06T11:51:47.206Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - chrome
+  - blind-ab
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

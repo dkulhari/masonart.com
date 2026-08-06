@@ -1,0 +1,133 @@
+ticket_number: 516
+title: API - featured products endpoint returns no sale price, so the home rail disagrees with the grid
+description: |-
+  ## Task
+  #428 added resolved sale pricing to the product list (`products.ts:246`) and detail (`:812`) routes, both correctly keyed on member state via `viewerCacheSuffix`. The **featured** handler (~`products.ts:596-631`) was not in that ticket's scope and still returns rows with no `sale` field, and its cache key `${CacheKeys.PRODUCT}featured:${limit}` carries no viewer suffix.
+
+  Consequence: during a sale the home page's featured rail shows base prices while the same products show struck-through sale prices on `/posters`. Same catalogue, two prices, one screen apart.
+
+  Resolve sale pricing there the same way the list route does — `getActivePromotions()` + `loadPromotionProductSets()` once per request, `resolveSalePrice` per row — and add the viewer suffix to the cache key so a guest's locked body is never served to a member.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 3 — API surfaces
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5, §7
+
+  Found while verifying #428. Check the row projection includes every facet column `resolveSalePrice` reads — the same omission bit the list route, where `rooms` was missing and a room-scoped sale priced the PDP but not the grid.
+
+  Worth a sweep while here: any other handler returning product rows to the storefront needs the same treatment or it becomes the next disagreement.
+feature: sale-promotions
+type: bug
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T05:41:04.845Z'
+last_updated: '2026-08-06T06:41:17.840Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T06:37:40.865Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T06:40:08.434Z'
+    text: |-
+      **Step 5 — sweep: every handler returning product rows to the storefront**
+
+      Searched `packages/api/src/routes/` for handlers selecting from `products` (excluding `admin/`, which is out of scope: an admin grid showing base prices is correct).
+
+      | Handler | Sale resolved? | Viewer-keyed cache? | Verdict |
+      |---|---|---|---|
+      | `GET /api/products` (list, `:246`) | yes (#428) | yes | fine |
+      | `GET /api/products/:slug` (detail, `:857`) | yes (#428) | yes | fine |
+      | `GET /api/products/featured` | **no → fixed here** | **no → fixed here** | this ticket |
+      | `GET /api/products/:slug/related` | **no → fixed here** | **no → fixed here** | fixed, same file, same card |
+      | `GET /api/cart` | yes (#429) | n/a | fine |
+      | `GET /api/collections/:slug` | **no** | no cache | **not fixed — see below** |
+      | `GET /api/products/search` | no | no cache | not fixed, renders no price |
+      | `GET /api/products/:slug/variants` | no | no cache | observation only |
+      | `GET /api/products/facets`, `/frames`, `sitemap.ts`, `reviews.ts` | n/a | — | no price on the wire |
+
+      **Fixed beyond the featured handler: `/:slug/related`.** The PDP's "You May Also Like" row feeds the same `ProductCardData` → `ProductCard` as the grid (`app/routes/posters/$slug.tsx:352`), so it was the identical disagreement one scroll below a correctly-priced buy panel. Its projection was missing both `rooms` *and* `isFeatured`, and its cache key `related:${slug}:${limit}` had no viewer suffix. Same three-line shape as featured, same file, covered by the same test file.
+
+      **Found and deliberately NOT fixed — `GET /api/collections/:slug` (`collections.ts:426`).** This is a genuine storefront price surface: `app/routes/collections/$slug.tsx:323` casts its `items` to `ProductCardData`, so every collection grid (Best Sellers, curated lists) shows base prices during a sale. It needs the same treatment plus `rooms` in the projection.
+
+      It is not fixed here because it is not a three-line change: `collectionsApp` is `new Hono()` with **no `optionalAuth`** and no `OptionalAuthVariables`, so there is no member state to resolve against. Pricing it as a guest unconditionally would be worse than the current bug — it would stamp `locked: true` on members. Wiring the middleware in pulls `src/auth` into that module's import graph, and neither `collection-detail.test.ts` nor `collections.test.ts` mocks `../../src/auth` (they mock only `db` and redis), so they would need auth mocks added too. That is a separate ticket's worth of change to another feature's route and test files, and it could not be verified inside this ticket's test budget. **Recommend a follow-up ticket.**
+
+      `GET /api/products/search` returns unpriced rows, but its only consumer is `SearchDrawer.tsx`, which renders no price at all — there is nothing to disagree with today. Worth pricing if that drawer ever grows a price; not worth widening this diff for.
+
+      `GET /api/products/:slug/variants` returns `productVariants.price` with no promotion applied. Noting it rather than fixing it: the PDP reads its variants from the detail route's payload (`response.variants`), not from this endpoint, and whether a promotion discounts a per-size variant price is a design question the resolver (which only knows `basePrice`) does not currently answer.
+  - author: mcp-client
+    timestamp: '2026-08-06T06:41:14.145Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `fd38bf0d` — fix(api): price the featured rail and the related row, so the catalogue agrees with itself
+
+      **Files Changed**:
+      - `packages/api/src/routes/products.ts` — sale resolution + viewer cache suffix + facet columns on the `featured` and `:slug/related` handlers
+      - `packages/api/tests/routes/product-sale-pricing.test.ts` — 15 new tests across two describe blocks
+
+      **Summary**:
+      `GET /api/products/featured` now reads member state off the session, keys its cache `featured:${limit}${viewerCacheSuffix(isMember)}`, selects `rooms` alongside the other facet columns, resolves `sale` per row through `loadSaleContext` + `resolveSalePrice`, and caches the **priced** rows rather than the bare ones (the old key lived 15 minutes, so caching pre-resolution rows would have kept the rail unpriced well into a running sale).
+
+      `GET /api/products/:slug/related` got the same treatment — it feeds the identical `ProductCard` on the PDP and was missing `rooms` *and* `isFeatured* from its projection on top of the unkeyed cache.
+
+      One test asserts against the projection object handed to `db.select(...)` rather than a fixture. With `db` mocked, that is the only assertion in the file capable of catching a column missing from a projection — the precise gap that let #428's `rooms` omission through.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/product-sale-pricing.test.ts` (with `DATABASE_URL` overridden from `.env` to port 5440; the repo default of 5433 is a different application's database and silently reports skips as green)
+      - Result: PASS (34 tests, 34 passing, 0 failing) — 19 pre-existing #428 tests plus 15 new
+      - Red-first evidence: the same command reported **15 failed | 19 passed** before the implementation landed, failing on `sale` being `undefined`, `rooms` absent from the projection, and guest/member cache keys comparing equal
+      - Type-check: `bunx tsc --noEmit` in `packages/api` — 0 errors
+
+      **Follow-up recommended**: `GET /api/collections/:slug` carries the same bug (see the sweep comment above). It needs `optionalAuth` wired onto `collectionsApp` plus auth mocks in `collection-detail.test.ts` and `collections.test.ts`, which is its own ticket.
+  - author: system
+    timestamp: '2026-08-06T06:41:17.840Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing test that the featured endpoint carries sale pricing and keys its cache on member state
+    file: packages/api/tests/routes/product-sale-pricing.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/product-sale-pricing.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm it fails — featured rows have no sale field today
+    command: cd packages/api && bunx vitest run tests/routes/product-sale-pricing.test.ts
+    expected_result: FAIL - sale is undefined on featured rows
+    status: done
+  - id: 3
+    action: implement
+    description: Resolve sale pricing in the featured handler and add the viewer cache suffix
+    file: packages/api/src/routes/products.ts
+    status: done
+  - id: 4
+    action: verify-pass
+    description: Confirm the suite passes
+    command: cd packages/api && bunx vitest run tests/routes/product-sale-pricing.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: refactor
+    description: Sweep for any other storefront handler returning product rows without sale pricing; note findings in a comment
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: 'git add packages/api/src/routes/products.ts packages/api/tests/routes/product-sale-pricing.test.ts && git commit -m "fix(api): resolve sale pricing on the featured rail too"'
+    status: done
+current_step: 6
+started: '2026-08-06T06:37:40.865Z'
+completed: '2026-08-06T06:41:17.840Z'

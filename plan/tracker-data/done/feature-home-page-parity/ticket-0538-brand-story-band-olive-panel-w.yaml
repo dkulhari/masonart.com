@@ -1,0 +1,107 @@
+ticket_number: 538
+title: Brand Story band — olive panel with copy, Read More pill and media
+description: |-
+  BAR: mesonart 'Brand Story'. Full-width rounded sage/olive band: left column has the heading, a short lead line, a two-paragraph story and a 'Read More →' outline pill; right column is a video still with a play affordance.
+
+  OURS TODAY: missing. The nearest equivalents are the black 'Create Your Own Masterpiece' AI band and the 'Why Choose chobii.art?' card row, neither of which reads like the bar.
+
+  Use real chobii.art brand copy — do not copy mesonart's story text. Decide whether the AI band stays, moves, or folds into this; state the call on the ticket. Desktop + mobile.
+feature: home-page-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.164Z'
+last_updated: '2026-08-06T14:44:55.910Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - brand
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T11:58:15.222Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:17:01.537Z'
+    text: |-
+      Built: packages/web/app/components/home/BrandStorySection.tsx (new file; app/routes/index.tsx untouched — integration step mounts `<BrandStorySection />`, no props).
+
+      WHAT IT IS
+      Full-width rounded sage band (`bg-band-strong`, radius 24px, inset 8px / 16px ≥sm). Desktop: left column = "Brand Story" heading, a one-line lead, a two-paragraph story, a "Read More →" outline pill; right column = a 25rem media panel, row-spanned so it fills the band top to bottom like the bar's still. Mobile: heading → media → lead → story → pill, which is the bar's own stacked order (checked against bar-mobile-s06/s07, not assumed).
+
+      Geometry measured off bar-desktop-full at 1440 and bar-mobile-full at 390 (2x captures, halved): band inset ~7px, radius ~22px, padding 20px mobile / 40px desktop, media 394x364 sitting 64px below the band top and ~60px above its bottom, heading ~32px mobile / ~48px desktop. Ours renders media 398 wide, 64px top inset, 66px bottom inset, heading 30/48. Verified by screenshotting the band at 1440x900 and 390x844 through a throwaway preview route, which has been deleted; routeTree.gen.ts is back to exactly what it was (the residual diff there is two other builders' preview routes, left alone).
+
+      NOT wrapped in SectionBand, deliberately: SectionBand nests `container-wide` (20px gutter) inside a full-bleed section, so the panel would inset 20px and then indent the copy another 20px inside it. At 390 that is a 40px gutter against the bar's 20px and the copy column visibly narrows. Vertical rhythm classes kept so it still sits in the page's spacing system. Flagging for #540's rhythm pass rather than fixing shared CSS mid-flight.
+
+      COPY — ALL OURS, sourced not invented
+      Every sentence is compressed from app/routes/about.tsx, which is the only place chobii.art already tells this story:
+      - Lead "Great walls make great rooms." — About's own "built around one idea: great walls make great rooms".
+      - Para 1 (curated styles, quality stock, frames/mats/glass) — About §"What we do".
+      - Para 2 (AI generator: describe it, choose a style, order it as a print in the frame of your choice) — About §"Create your own with AI".
+      The Footer blurb says the same in one line and agrees with both. mesonart's founder story (a named person, his friend, the platform he envisioned) is another company's history and is not paraphrased anywhere here — the band has no origin narrative at all, because we do not have one on record.
+
+      "Read More" → /about. Not /our-story: docs/Requirement.md §list-of-pages names that route but it has never been built, and a pill pointing at a 404 is worse than one pointing at the shorter true page.
+
+      MEDIA — placeholder, and #544 owns it
+      No brand video and no owned interior photography exists. Ruled out on the way: /images/categories/*.jpg and /og-*.jpg are flat generated graphics, not photographs; catalogue `room-mockup` images look exactly right and are all seeded from .cache/seed-media, the third-party set the parity analysis §3.2 calls "fine to develop against, not fine to launch on" — every one carries a competitor's watermark straight across the artwork. /frames/*.jpg is the one real owned photography in the repo but it is 240px frame-corner macros, ~3.3x upscale in this slot.
+
+      Per the coordinator's photography note, the slot now holds a development placeholder from the git-ignored public/dev-reference/ tree, routed through a single exported constant, BRAND_STORY_MEDIA, so replacing it is one line.
+
+      It uses story/portrait.png, NOT story/still.jpg. They are frames of the same clip; still.jpg is the cover frame and has a competitor's wordmark and the tagline "Your Fisrt Choice For Personalizabled Original Art" burned into the pixels. The placeholder allowance covers borrowing a photograph, not shipping someone else's logo on our home page — and in a blind A/B it would have identified our band as theirs. portrait.png is the same room, clean, and its native 3:4 is exactly the ratio the bar crops to on mobile.
+
+      No play affordance. A play triangle over a still promises a video we do not have; same rule as the copy.
+
+      SUPERSEDES: nothing. This band is additive — it is the missing section, not a restyle. ValuePropsSection ("Why Choose chobii.art?") is #539's business (trust icons row); my call on the black AI band is in the next comment.
+  - author: mcp-client
+    timestamp: '2026-08-06T12:17:19.407Z'
+    text: |-
+      CALL ON THE BLACK AI BAND ("Create Your Own Masterpiece", AIGeneratorSection in app/routes/index.tsx ~L424).
+
+      Recommendation: it STAYS as its own section — do not fold it into Brand Story — but it MOVES up into the merchandising stack and comes off `tone="ink"`. I have not touched it; the integration step should act on this.
+
+      Concretely, in preference order:
+      1. Best: it becomes the "Custom Art" tile in the three-promo-tile row (#533), and the standalone full-width band retires. The bar's promo row is On Sale / Quick Ship / Custom Art — mesonart already reserves a slot in that row for a made-to-order offer, and our AI generator IS our custom-art offer. That is the structurally correct home for it, and it lands above the brand copy where the bar puts every commerce CTA.
+      2. If #533 ships without an AI destination: keep the section, restyle it from `tone="ink"` to `tone="beige"`, and place it after the New In rail and before Featured Artists. Same job, inside the band alternation.
+
+      Why not fold it into Brand Story:
+      - The bar's brand band has exactly ONE call to action, the Read More pill. Adding "Start Creating" would give this band two CTAs of different intent, and the band would stop being a story and start being a landing page. That is a straight loss in the blind A/B.
+      - The story already carries the AI generator, in the right register: paragraph two is "when the piece you are picturing does not exist yet, our AI generator makes it", and Read More → /about opens onto the page where that is explained at length. That is the correct dose of AI in a brand-voice block — narrative, not conversion.
+
+      Why not leave it where it is:
+      - Nothing on mesonart's home page is inverted. The page is white / sage / cream bands with a lot of air; a full-width near-black band at 1440 is the loudest object on our page and it breaks the alternation #540 exists to establish. Whatever else is true, it will lose a band-vs-band comparison against a page that never goes dark.
+      - Its current position (after Shop by Style, before Value Props) puts a marketing interstitial in the middle of the merchandising rails, which is precisely where the bar is densest with product. The bar runs roughly eight product/collection rails before any brand copy at all.
+      - Restyling it is not the same as deleting our differentiator. The parity analysis §3.2 says to keep the AI banner as our differentiator, and both options above keep it — one as a promo tile, one as a beige band. What goes is the inverted treatment, not the offer.
+
+      Not blocking on this: BrandStorySection is complete and correct whichever way the AI band goes, and it supersedes nothing.
+  - author: mcp-client
+    timestamp: '2026-08-06T12:52:42.378Z'
+    text: |-
+      INTEGRATION DECISION — the black AI band is RETIRED. #538's first choice, taken.
+
+      `AIGeneratorSection` (the `tone="ink"` "Create Your Own Masterpiece" band) is deleted from `app/routes/index.tsx`. The AI generator is now reached from the **Custom Art tile in the #533 promo row**, which #533 had already wired to `/create` (`CUSTOM_ART_DESTINATION` in `app/components/home/PromoTilesSection.tsx`, `to: '/create'`, verified in the file rather than taken from the ledger). So the precondition #538 attached to the fallback — "keep the section if #533 has no AI destination" — was never met: the destination existed before I started, and the first choice was already satisfied by the time integration ran. Nothing new had to be built to retire the band.
+
+      WHY, restating #538's own reasoning because it holds up against the assembled page:
+      1. Nothing on the reference home page is inverted. A full-width near-black band was the loudest object on our stack and it broke the white/beige/sage alternation every other band was built to sit inside. Screenshotted end to end at 1440 and 390, the page now alternates cleanly all the way down.
+      2. The band was a second CTA competing with Brand Story's single "Read More". Two "here is who we are" panels 400px apart halved both.
+      3. `/create` loses nothing: it is in the primary nav, the mega-menu, the footer Shop column, the mobile tab bar's Shop panel, AND now a 4:3 promo tile with an interior photograph — a better shopfront than a text band with three feature chips.
+
+      Nothing about the generator itself changed; only the home page's way of pointing at it.
+
+      FALLOUT HANDLED IN THIS PASS:
+      - `tests/routes/home-tokens.test.ts` asserted `AIGeneratorSection` and `tone="ink"` were present ("deliberate survivals"). Those assertions are inverted now, with the reasoning above in the test: the guard is that the route has NO inverted band. The same file's "keeps the category legibility scrims" case was already red before I started — it asserted `from-slate-700/80`, a literal that lives in `~/lib/homeCategories`, not in the route — and went out with `CategoriesSection`.
+      - `tests/routes/home-tokens.test.ts` now pins the band order and that none of the five superseded sections (`HeroSection`, `FeaturedProductsSection`, `CategoriesSection`, `AIGeneratorSection`, `ValuePropsSection`) is defined inline again.
+
+      BAND AS SHIPPED: `BrandStorySection` mounts between `CustomerReviewsSection` and `NewsletterSection`, sage `bg-band-strong` panel, measured 668px tall at 1440 / 1234px at 390, `Read More` → `/about`, portrait from `BRAND_STORY_MEDIA`. Renders correctly in both captures.
+  - author: system
+    timestamp: '2026-08-06T14:44:55.910Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T11:58:15.222Z'
+completed: '2026-08-06T14:44:55.910Z'

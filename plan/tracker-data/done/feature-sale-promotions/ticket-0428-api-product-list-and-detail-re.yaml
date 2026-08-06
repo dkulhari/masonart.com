@@ -1,0 +1,194 @@
+ticket_number: 428
+title: API - product list and detail return the resolved sale price
+description: |-
+  ## Task
+  Attach `sale: ResolvedSalePrice | null` to every product returned by the list and detail routes, resolved through `promotion-pricing.ts`. Load the exclusion and inclusion id sets once per request, not per product.
+
+  `endsAt` must never appear in the response — assert it in the test, because the real end date leaking into the network tab defeats the countdown design (§6).
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 3 — API surfaces
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5, §7
+
+  Routes: `packages/api/src/routes/products.ts`. Membership comes from the session (`isMember`), defaulting to `false` for guests until `gallery-membership` lands. Route tests mock `db` — see the header note in `tests/routes/product-facets.test.ts`; keep the schema-shape guard in `tests/database/` doing the real column checking.
+
+  Redis caching already wraps the product list (`CacheKeys.PRODUCT_LIST`): the cache key must include member state, or a guest response gets served to a member.
+feature: sale-promotions
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:03:30.167Z'
+last_updated: '2026-08-06T05:40:09.492Z'
+time_spent_minutes: 4
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T05:36:19.437Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T05:40:02.490Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `2e85f7f1` — feat(api): resolved sale price on the product list and detail
+
+      **Files Changed**:
+      - `packages/api/src/routes/products.ts` — `sale` on the list and detail payloads, viewer-keyed cache keys, `rooms` added to the list projection
+      - `packages/api/tests/routes/product-sale-pricing.test.ts` — new, 16 tests
+
+      **Summary**:
+      `GET /api/products` and `GET /api/products/:slug` attach `sale: ResolvedSalePrice | null`, resolved through `lib/promotion-pricing`. `getActivePromotions` + `loadPromotionProductSets` are called once per request via a `loadSaleContext` helper and the sets handed to every line, so a 24-card grid costs the same two queries as a one-card one — asserted with `toHaveBeenCalledTimes(1)` over a three-product page.
+
+      `endsAt` never crosses the wire: only the resolved payload is serialised, never the promotion row. Asserted on `JSON.stringify(body)` for both routes.
+
+      Cache keys carry the viewer (`:member` / `:guest`) on the list **and** the detail route. The ticket only called out `PRODUCT_LIST`, but `CacheKeys.PRODUCT}${slug}` had the identical leak — `sale.locked` is the whole payload difference on a members-only sale.
+
+      Membership reads `galleryMember` off the session user. It is a Better Auth additional field and is not on the `AuthUser` interface, so `readIsMember` casts locally rather than editing the shared middleware; guests default to non-member, which fails safe (price shown locked, base charged).
+
+      **Two spec defects found**:
+      1. The step-3 code sketch resolved against singular `style`/`subject`/`room`. The columns are `text[]` (`schema/products.ts:111-114`). Fixtures use arrays and there is an explicit test that a filter-scoped promotion matches the array columns.
+      2. Step 5 named `tests/routes/product-collections.test.ts`, which does not exist. Substituted the route's real neighbours: `products`, `product-sort`, `product-facet-filters`, `review-card-shape`, `product-facets`.
+
+      Also: the list projection did not select `rooms`, one of the three axes a `filter`-scoped promotion can name. A room-scoped sale would have priced the PDP (whole row) and not the grid. Added it.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/routes/product-sale-pricing.test.ts`
+      - Result: PASS (16 tests, 16 passing) — red first at 13 failing / 3 vacuous
+      - Regression: `product-facets` + `products` + `product-sort` + `product-facet-filters` + `review-card-shape` → PASS (134 tests, 134 passing)
+      - Build: `bunx tsc --noEmit` in packages/api → 0 errors (after `cd packages/shared && bunx tsc` to refresh the gitignored dist)
+  - author: system
+    timestamp: '2026-08-06T05:40:09.492Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-06T05:36:27.802Z'
+    agent: claude-code
+    summary: Attached resolved sale price to the product list and detail routes; viewer-keyed caches; 16 new tests, 134 neighbour tests green, tsc clean. Commit 2e85f7f1.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-06T05:40:06.404Z'
+    duration: '00:03:38'
+related_tickets: []
+blocked_by:
+  - ticket: 427
+    feature: sale-promotions
+    description: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the sale payload on list and detail
+    file: packages/api/tests/routes/product-sale-pricing.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/product-sale-pricing.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      /**
+       * Sale pricing on the product routes.
+       *
+       * `db` is mocked here, so these cannot catch a bad column — that guard lives
+       * in tests/database/promotions-schema.test.ts.
+       */
+
+      import { describe, it, expect } from 'vitest'
+
+      describe('product list sale payload', () => {
+        it('carries sale: null when no promotion is active', async () => {
+          // arrange: getActivePromotions -> []
+          // assert: body.products[0].sale === null
+        })
+
+        it('carries the resolved sale price for an eligible product', async () => {
+          // assert: sale.percentOff === 40 && sale.salePrice === '15180.00'
+        })
+
+        it('marks the price locked for a guest under a membersOnly promotion', async () => {
+          // assert: sale.locked === true
+        })
+
+        it('never leaks the real end date', async () => {
+          // assert: JSON.stringify(body).includes('endsAt') === false
+        })
+
+        it('keys the product-list cache on member state', async () => {
+          // assert: guest and member requests use different CacheKeys.PRODUCT_LIST keys
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/product-sale-pricing.test.ts
+    expected_result: FAIL - sale is undefined on the product payload
+    status: done
+  - id: 3
+    action: implement
+    description: Resolve sale pricing in the list and detail handlers
+    file: packages/api/src/routes/products.ts
+    status: done
+    code: |-
+      import {
+        getActivePromotions,
+        resolveSalePrice,
+      } from '../lib/promotion-pricing'
+      import { loadPromotionProductSets } from '../lib/promotion-pricing'
+
+      // inside the list handler, once per request — not per product:
+      const activePromotions = await getActivePromotions()
+      const { includedIds, excludedIds } = await loadPromotionProductSets(activePromotions)
+      const isMember = Boolean(c.get('user')?.galleryMember)
+
+      const withSale = rows.map((product) => ({
+        ...product,
+        sale: resolveSalePrice(product, activePromotions, { isMember, includedIds, excludedIds }),
+      }))
+
+      // Cache key must separate member from guest, or a guest body is served to a
+      // member with the price still locked.
+      const cacheKey = `${CacheKeys.PRODUCT_LIST}${queryHash}:${isMember ? 'member' : 'guest'}`
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/product-sale-pricing.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm no regression in the existing product route suites
+    command: cd packages/api && bunx vitest run tests/routes/product-facets.test.ts tests/routes/product-collections.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the product-route sale payload
+    command: 'git add packages/api/src/routes/products.ts packages/api/src/lib/promotion-pricing.ts packages/api/tests/routes/product-sale-pricing.test.ts && git commit -m "feat(api): resolved sale price on product list and detail"'
+    status: done
+current_step: 6
+started: '2026-08-06T05:36:19.436Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run tests/routes/product-sale-pricing.test.ts
+  test_output: '16 passed (16). Regression: product-facets + products + product-sort + product-facet-filters + review-card-shape = 134 passed (134). tsc --noEmit on packages/api: 0 errors.'
+  build_passed: true
+  build_command: cd packages/api && bunx tsc --noEmit
+  verified_at: '2026-08-06T05:39:47.085Z'
+completed: '2026-08-06T05:40:09.492Z'

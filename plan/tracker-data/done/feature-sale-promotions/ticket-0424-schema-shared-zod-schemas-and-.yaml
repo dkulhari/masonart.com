@@ -1,0 +1,247 @@
+ticket_number: 424
+title: Schema - shared Zod schemas and types for promotions
+description: |-
+  ## Task
+  Add `packages/shared/src/schemas/promotion.ts`: the promotion record, the scope filter, the admin create/update inputs, and the resolved-price payload every storefront surface consumes.
+
+  The resolved payload is the contract that keeps discount maths in one place: `{ promotionId, headline, percentOff, basePrice, salePrice, locked }`. `endsAt` is deliberately absent — the storefront receives a resolved countdown deadline, never the real end date.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 1 — Schema + contracts
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §4, §5
+
+  `discountTypeSchema` already exists at `packages/shared/src/schemas/checkout.ts:100` with a third member (`free-shipping`) we do not implement — do not reuse it; promotions are percentage|fixed. Follow the export idiom in `packages/shared/src/schemas/order.ts` (schema + inferred type, named exports).
+feature: sale-promotions
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:01:35.517Z'
+last_updated: '2026-08-05T21:16:59.293Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-05T21:14:59.871Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-05T21:16:58.919Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `4603dc25` - feat(shared): promotion schemas and the resolved sale-price contract (branch `feat/mesonart-design-parity`)
+
+      **Files Changed**:
+      - `packages/shared/src/schemas/promotion.ts` (new) - discount/scope/countdown enums, strict scope filter, create/update input with four refinements, `resolvedSalePriceSchema`, inferred types
+      - `packages/shared/tests/schemas/promotion.test.ts` (new) - 8 tests
+      - `packages/shared/src/schemas/index.ts` - `export * from './promotion'`
+      - `packages/shared/src/index.ts` - also exports `./schemas/promotion`; this barrel enumerates schema modules rather than re-exporting `schemas/index.ts`, so adding it there alone would have left the schemas unreachable through `@chobii/shared`
+
+      **Summary**:
+      Followed the ticket steps verbatim. Two deviations, both deliberate:
+      1. **Style**: the ticket's code sample is semicolon-free, but every file in `packages/shared` (`order.ts`, `collection.ts`, `checkout.ts`, both barrels) uses single quotes *with* semicolons and there is no prettier/eslint config in the repo. Matched the surrounding files instead of the sample.
+      2. **Extra exports**: added `PromotionDiscountType`, `PromotionScopeType` and `CountdownMode` inferred types alongside the four the ticket listed, so all three enums have the schema+type pairing the `order.ts` idiom uses. Verified no name collisions with any existing export in `packages/shared/src`.
+
+      Did not reuse `discountTypeSchema` from `checkout.ts:100` — its `free-shipping` arm has no pricing-resolver branch.
+
+      **Verification**:
+      - Command: `cd packages/shared && bunx vitest run tests/schemas/promotion.test.ts`
+      - RED: FAIL — `Cannot find module '../../src/schemas/promotion'` (0 tests, the expected reason)
+      - GREEN: PASS — `Test Files 1 passed (1) / Tests 8 passed (8)`
+      - Typecheck: `bunx tsc --noEmit` in `packages/shared` — exit 0, no errors
+
+      Scope note: touched `packages/shared` only; `packages/api` left alone for the concurrent #423 work. Staged the four files by path, no `git add -A`.
+  - author: system
+    timestamp: '2026-08-05T21:16:59.293Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the promotion schemas
+    file: packages/shared/tests/schemas/promotion.test.ts
+    command: cd packages/shared && bunx vitest run tests/schemas/promotion.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+      import {
+        promotionScopeFilterSchema,
+        createPromotionInputSchema,
+        resolvedSalePriceSchema,
+      } from '../../src/schemas/promotion'
+
+      describe('promotionScopeFilterSchema', () => {
+        it('accepts a partial filter — every axis is optional', () => {
+          expect(promotionScopeFilterSchema.parse({ styles: ['wabi-sabi'] })).toEqual({
+            styles: ['wabi-sabi'],
+          })
+        })
+
+        it('rejects unknown axes rather than silently ignoring them', () => {
+          expect(() => promotionScopeFilterSchema.parse({ colours: ['red'] })).toThrow()
+        })
+      })
+
+      describe('createPromotionInputSchema', () => {
+        const base = {
+          name: 'Summer Sale 2026',
+          headline: 'SUMMER SALE — 40% OFF',
+          discountType: 'percentage' as const,
+          discountValue: 40,
+          scopeType: 'all' as const,
+          startsAt: '2026-08-05T00:00:00.000Z',
+        }
+
+        it('accepts a minimal sitewide promotion', () => {
+          expect(createPromotionInputSchema.parse(base).membersOnly).toBe(true)
+        })
+
+        it('caps a percentage at 100', () => {
+          expect(() =>
+            createPromotionInputSchema.parse({ ...base, discountValue: 140 })
+          ).toThrow()
+        })
+
+        it('requires a filter when scopeType is filter', () => {
+          expect(() =>
+            createPromotionInputSchema.parse({ ...base, scopeType: 'filter' })
+          ).toThrow()
+        })
+
+        it('rejects an end date that precedes the start', () => {
+          expect(() =>
+            createPromotionInputSchema.parse({
+              ...base,
+              endsAt: '2026-08-04T00:00:00.000Z',
+            })
+          ).toThrow()
+        })
+      })
+
+      describe('resolvedSalePriceSchema', () => {
+        it('carries what a surface needs and nothing more', () => {
+          const resolved = resolvedSalePriceSchema.parse({
+            promotionId: '0b6c2f7e-6f0e-4a9b-9a52-2a6d3f9c1e11',
+            headline: 'SUMMER SALE — 40% OFF',
+            percentOff: 40,
+            basePrice: '25300.00',
+            salePrice: '15180.00',
+            locked: true,
+          })
+          expect(resolved.locked).toBe(true)
+        })
+
+        it('never carries the real end date', () => {
+          expect('endsAt' in resolvedSalePriceSchema.shape).toBe(false)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/shared && bunx vitest run tests/schemas/promotion.test.ts
+    expected_result: FAIL - Cannot find module '../../src/schemas/promotion'
+    status: done
+  - id: 3
+    action: implement
+    description: Write the promotion schemas and export them from schemas/index.ts
+    file: packages/shared/src/schemas/promotion.ts
+    status: done
+    code: |-
+      import { z } from 'zod'
+
+      /** Promotions discount by percentage or a flat amount. No free-shipping arm. */
+      export const promotionDiscountTypeSchema = z.enum(['percentage', 'fixed'])
+      export const promotionScopeTypeSchema = z.enum(['all', 'filter', 'products'])
+      export const countdownModeSchema = z.enum(['real', 'rolling'])
+
+      /** Strict: an unknown axis is a typo, and silently ignoring it prices the wrong products. */
+      export const promotionScopeFilterSchema = z
+        .object({
+          styles: z.array(z.string()).optional(),
+          subjects: z.array(z.string()).optional(),
+          rooms: z.array(z.string()).optional(),
+          isFeatured: z.boolean().optional(),
+        })
+        .strict()
+
+      export const createPromotionInputSchema = z
+        .object({
+          name: z.string().min(1).max(120),
+          headline: z.string().min(1).max(160),
+          discountType: promotionDiscountTypeSchema,
+          discountValue: z.number().int().positive(),
+          scopeType: promotionScopeTypeSchema,
+          scopeFilter: promotionScopeFilterSchema.optional(),
+          productIds: z.array(z.string().uuid()).optional(),
+          excludedProductIds: z.array(z.string().uuid()).optional(),
+          membersOnly: z.boolean().default(true),
+          startsAt: z.string().datetime(),
+          endsAt: z.string().datetime().optional(),
+          isEnabled: z.boolean().default(false),
+          priority: z.number().int().default(0),
+          perCustomerOrderLimit: z.number().int().positive().optional(),
+          countdownMode: countdownModeSchema.default('rolling'),
+          rollingWindowMinutes: z.number().int().positive().default(720),
+          rollingJitterMinutes: z.number().int().nonnegative().default(90),
+        })
+        .refine(
+          (input) => input.discountType !== 'percentage' || input.discountValue <= 100,
+          { message: 'A percentage discount cannot exceed 100', path: ['discountValue'] }
+        )
+        .refine((input) => input.scopeType !== 'filter' || input.scopeFilter !== undefined, {
+          message: 'scopeType "filter" requires a scopeFilter',
+          path: ['scopeFilter'],
+        })
+        .refine(
+          (input) => input.scopeType !== 'products' || (input.productIds?.length ?? 0) > 0,
+          { message: 'scopeType "products" requires at least one product', path: ['productIds'] }
+        )
+        .refine((input) => !input.endsAt || input.endsAt > input.startsAt, {
+          message: 'endsAt must follow startsAt',
+          path: ['endsAt'],
+        })
+
+      export const updatePromotionInputSchema = createPromotionInputSchema
+
+      /**
+       * What a storefront surface receives. No endsAt: the real end date stays
+       * server-side, and the countdown ships as an already-resolved deadline.
+       */
+      export const resolvedSalePriceSchema = z.object({
+        promotionId: z.string().uuid(),
+        headline: z.string(),
+        percentOff: z.number().int().nonnegative(),
+        basePrice: z.string(),
+        salePrice: z.string(),
+        /** A sale price exists but the viewer is not a member: show it, charge base. */
+        locked: z.boolean(),
+      })
+
+      export type PromotionScopeFilter = z.infer<typeof promotionScopeFilterSchema>
+      export type CreatePromotionInput = z.infer<typeof createPromotionInputSchema>
+      export type UpdatePromotionInput = z.infer<typeof updatePromotionInputSchema>
+      export type ResolvedSalePrice = z.infer<typeof resolvedSalePriceSchema>
+  - id: 4
+    action: verify-pass
+    description: Confirm the schema tests pass
+    command: cd packages/shared && bunx vitest run tests/schemas/promotion.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit shared schemas
+    command: 'git add packages/shared/src/schemas/promotion.ts packages/shared/src/schemas/index.ts packages/shared/tests/schemas/promotion.test.ts && git commit -m "feat(shared): promotion schemas and the resolved sale-price contract"'
+    status: done
+current_step: 5
+started: '2026-08-05T21:14:59.871Z'
+completed: '2026-08-05T21:16:59.293Z'

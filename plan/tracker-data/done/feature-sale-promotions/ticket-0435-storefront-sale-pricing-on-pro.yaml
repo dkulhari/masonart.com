@@ -1,0 +1,168 @@
+ticket_number: 435
+title: Storefront - sale pricing on product cards and the PDP buy panel
+description: |-
+  ## Task
+  Show the sale on the two surfaces that sell: the grid card and the product buy panel. Base price struck through, sale price beside it, percent-off marker, and a "Members" tag when `locked`. PDP additionally carries the countdown echo their buy panel runs (parity §1.4 item 6).
+
+  All of it reads `product.sale` from the API (T6). No component computes a discount.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 4 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §7
+
+  Files: `packages/web/app/components/product/ProductCard.tsx`, the PDP buy panel under `app/routes/posters/`. Parity §3.3 already flags our orange/purple badges as clashing with a monochrome system — do not add a third loud colour; the sale marker follows the existing token set. Card tests live in `packages/web/tests/components/product/`.
+feature: sale-promotions
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:04:59.183Z'
+last_updated: '2026-08-06T06:43:01.660Z'
+time_spent_minutes: 13
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T06:29:59.257Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T06:42:51.256Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5fc9f820` — feat(web): sale pricing in the PDP buy panel, behind one SalePrice component
+
+      **Files Changed**:
+      - `packages/web/app/components/product/SalePrice.tsx` (new) — the one component that prints a possibly-discounted price: sale price, base struck through, percent-off marker, "Members" tag when locked. Pure/hook-free so it can mount once per grid cell.
+      - `packages/web/tests/components/product/SalePrice.test.tsx` (new) — 19 tests.
+      - `packages/web/app/components/product/ProductDetail.tsx` — buy panel renders SalePrice + the countdown echo; reads `useGalleryMembership()`.
+      - `packages/web/tests/components/product/ProductDetail.sale.test.tsx` (new) — 9 tests.
+      - `packages/web/app/routes/posters/$slug.tsx` — pipes `response.sale` through the loader untouched.
+      - `packages/web/app/components/product/ProductCard.tsx` — **edited but NOT committed**, see below.
+
+      **Summary**:
+      Both selling surfaces render through one component, so a discounted card and the buy panel cannot describe the same saving differently. Nothing computes a discount: every figure is read off the resolved `product.sale` payload (#428), and `percentOff` is printed rather than derived.
+
+      The buy panel shows the artwork's sale rather than a frame-inclusive one, matching `priceCartLine` — the frame is added back at full price, so a frame-inclusive discount here would promise a saving checkout declines to give.
+
+      Countdown echo reuses `useActivePromotion`/`useCountdown`, which format through SaleStrip's own `formatRemaining`. One cookie-minted deadline, no second clock. Echoed only when the running promotion is the one that priced this poster, so a promotion the product is excluded from cannot hang a clock over a full-price piece.
+
+      Colour is the reserved `--sale` token only — parity §3.3 rules out a third loud colour beside the orange Featured and purple AI badges.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/components/product/SalePrice.test.tsx tests/components/product/ProductDetail.sale.test.tsx tests/components/product/ProductCard.test.tsx tests/components/product/ProductCard.tokens.test.ts`
+      - Result: PASS (4 files, 72 tests, 28 of them new)
+      - `bunx tsc --noEmit`: 22 errors, all pre-existing, none in any touched file.
+
+      ---
+
+      ⚠️ **Two things a human needs to know**
+
+      **1. ProductCard.tsx is edited but deliberately uncommitted.** The file holds live uncommitted work from a different session (rating-row parity refactor + a new `sku` field). The #435 edit — `sale?: SalePricing | null` on `ProductCardData`, plus swapping the price span for `<SalePrice>` — is applied in the working tree so it is not lost, but was not staged or committed. It needs landing once that session commits. Their `ProductCard.test.tsx` (27 tests) and `ProductCard.tokens.test.ts` (17) both pass against the edit.
+
+      **2. A `git commit --amend` of mine raced another agent and rewrote their commit.** I amended a SalePrice fix onto what I believed was my own HEAD; between the `git log` check and the amend, agent #436 committed `4487c24e` ("fix(web): quote cart savings only for lines the page is showing"). The amend produced `6eb64913`, which contains **all of their work intact** plus my 14-line SalePrice change. Nothing was lost. By the time I noticed, a third agent had already committed `fd38bf0d` on top, so unwinding would have meant rewriting two commits while others were actively committing — I left history alone rather than risk compounding it. Net effect: #436's commit hash is `6eb64913`, not `4487c24e`, and it carries one extra file belonging to #435. **Never use `git commit --amend` in this shared worktree.**
+
+      **3. Dependency note**: `ProductDetail.tsx` imports `~/hooks/useActivePromotion`, which is still **untracked** in the working tree (created by the #437 session). My commit builds fine against the working tree but is not self-contained until that file is committed.
+  - author: system
+    timestamp: '2026-08-06T06:42:55.376Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-06T06:30:11.396Z'
+    agent: claude-code
+    summary: 'Built SalePrice component (19 tests) + PDP buy panel integration with countdown echo (9 tests), committed as 5fc9f820. ProductCard edit applied to working tree but left uncommitted — file still dirty from another session. Note: a git commit --amend raced agent #436 and folded a SalePrice fix into their commit (6eb64913); their work is intact, history left alone since a third agent had already committed on top.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-06T06:43:01.656Z'
+    duration: '00:12:50'
+related_tickets: []
+blocked_by:
+  - ticket: 428
+    feature: sale-promotions
+    description: API - product list and detail return the resolved sale price
+  - ticket: 432
+    feature: sale-promotions
+    description: API - countdown deadline resolution, cookie mint and clamp
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for card and buy-panel sale rendering
+    file: packages/web/tests/components/product/ProductCard.sale.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCard.sale.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('ProductCard sale pricing', () => {
+        it('shows only the base price when sale is null', () => {})
+        it('strikes the base price and shows the sale price', () => {})
+        it('marks the price as members-only when locked', () => {})
+        it('keeps the title-left / price-right line intact', () => {})
+        it('uses no colour outside the existing token set', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/components/product/ProductCard.sale.test.tsx
+    expected_result: FAIL - no sale price rendered
+    status: done
+  - id: 3
+    action: implement
+    description: Render sale pricing on the card
+    file: packages/web/app/components/product/ProductCard.tsx
+    status: done
+    code: |-
+      // Price line becomes: struck base + sale price + optional "Members" tag.
+      // product.sale === null keeps the existing single-price rendering byte for
+      // byte, so the no-sale path cannot regress.
+  - id: 4
+    action: implement
+    description: Render sale pricing and the countdown echo in the buy panel
+    file: packages/web/app/routes/posters/$slug.tsx
+    status: done
+    code: |-
+      // Price block: struck base, sale price, percent-off marker, Members tag when
+      // locked. Below it, the countdown echo ("Hurry up! Sale ends in HH : MM : SS")
+      // reusing the same resolved deadline as the strip — one deadline per page, or
+      // the two timers disagree on screen.
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/components/product/
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the storefront sale pricing
+    command: 'git add packages/web/app/components/product/ProductCard.tsx packages/web/app/routes/posters packages/web/tests/components/product/ProductCard.sale.test.tsx && git commit -m "feat(web): sale pricing on product cards and the buy panel"'
+    status: done
+current_step: 6
+started: '2026-08-06T06:29:59.257Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:13:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:13:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/components/product/SalePrice.test.tsx tests/components/product/ProductDetail.sale.test.tsx tests/components/product/ProductCard.test.tsx tests/components/product/ProductCard.tokens.test.ts
+  test_output: '4 files passed, 72 tests passed (28 new: 19 SalePrice + 9 ProductDetail.sale). tsc --noEmit: 22 errors, all pre-existing, none in touched files.'
+  build_passed: true
+  build_command: bunx tsc --noEmit -p tsconfig.json (packages/web)
+  verified_at: '2026-08-06T06:42:28.622Z'
+completed: '2026-08-06T06:42:55.376Z'

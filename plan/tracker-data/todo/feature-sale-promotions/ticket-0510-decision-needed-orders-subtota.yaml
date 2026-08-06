@@ -1,0 +1,85 @@
+ticket_number: 510
+title: DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
+description: |-
+  ## Task
+  **Do not implement without Dhruv's input.** Two coupled decisions the layering block in the design doc (§5) opens and does not close. Implementation of #430 proceeds under a stated interim assumption (below) that changes no existing behaviour; this ticket is where the real call gets made.
+
+  ### Decision 1 — what `orders.subtotal` means under a promotion
+
+  §5 step 2 says the discounted line subtotal goes to `orders.subtotal`. Current code (`routes/orders.ts:262-275`) computes `subtotal` as the sum of base line totals and then `total = subtotal + shipping − discount + tax`. Following both literally subtracts the promotion twice.
+
+  - **Option A — subtotal stays gross.** Sum of base line totals; `discount` subtracts once inside `total`. Smallest diff, and `orders.subtotal` keeps the meaning it has on every settled order today.
+  - **Option B — subtotal becomes net.** Discounted line subtotal; `total` drops its `− discount` term. Matches §5 as written, but reinterprets an existing column, so pre- and post-sale orders stop being comparable in reporting.
+
+  ### Decision 2 — which figure the free-shipping threshold reads
+
+  `calculateShippingCost(input.shippingMethod, subtotalStr)` reads that same figure, and the announcement bar promises "Free shipping on orders over ₹999" (`AnnouncementBar.tsx:25`). Under a 40% sale a ₹1,600 cart is ₹960 net: gross qualifies, net does not.
+
+  - **Gross** — the sale does not cost customers their free shipping. More generous, and it is what the banner implies to someone who has not done the arithmetic.
+  - **Net** — the threshold means money actually spent. Protects margin on a deep sale, but a customer who qualified before the sale can stop qualifying during it, which reads as a penalty.
+
+  Whichever subtotal option wins decides this one silently unless it is stated separately, which is why both live in one ticket.
+
+  ## Interim assumption already implemented (#430)
+  Option A + gross threshold — chosen because it changes nothing that exists: `subtotal` keeps its current meaning, shipping keeps its current behaviour, and the only new money movement is the promotion discount. If the decision lands on B or net, #430's totals block is the single place that changes.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 3 — API surfaces (decision, not a build)
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5
+
+  Blocks nothing. Once decided, update §5 of the design doc and the totals block in `routes/orders.ts`.
+feature: sale-promotions
+type: spike
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T21:12:56.535Z'
+last_updated: '2026-08-05T21:12:56.535Z'
+time_spent_minutes: 0
+labels:
+  - needs-input
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Get the decision from Dhruv on both points — do not choose unilaterally
+    status: pending
+  - id: 2
+    action: implement
+    description: Update design doc §5 layering block to state the chosen semantics explicitly
+    file: docs/superpowers/specs/2026-08-05-sale-promotions-design.md
+    status: pending
+  - id: 3
+    action: write-test
+    description: Add a totals test asserting the chosen subtotal semantics and threshold figure
+    file: packages/api/tests/routes/order-promotion-pricing.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
+    expected_result: FAIL if the current interim assumption differs from the decision
+    status: pending
+  - id: 4
+    action: implement
+    description: Adjust the totals block in order creation if the decision differs from the interim assumption
+    file: packages/api/src/routes/orders.ts
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm order and cart suites pass under the chosen semantics
+    command: cd packages/api && bunx vitest run tests/routes/orders.test.ts tests/routes/order-promotion-pricing.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the decision
+    command: 'git add packages/api/src/routes/orders.ts docs/superpowers/specs/2026-08-05-sale-promotions-design.md && git commit -m "fix(api): settle subtotal semantics and the free-shipping threshold under a sale"'
+    status: pending
+current_step: 1

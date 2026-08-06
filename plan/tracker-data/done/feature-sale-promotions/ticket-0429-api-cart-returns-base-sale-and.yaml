@@ -1,0 +1,205 @@
+ticket_number: 429
+title: API - cart returns base, sale and locked per line without touching stored lineTotal
+description: |-
+  ## Task
+  Cart read resolves sale pricing per line and returns `{ base, sale, locked }` alongside the stored figures, plus a cart-level saving total.
+
+  **Stored `cartItem.lineTotal` stays a BASE price.** `routes/cart.ts:196-204` computes `(unitPrice + framePrice) * quantity` at add-to-cart time; baking a sale price into that column means a cart held across the end of a sale still charges sale prices. Sale is resolved at read time, every time.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 3 — API surfaces
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5
+
+  Carts support guests via the `GUEST_CART_COOKIE` session (`routes/cart.ts:272-276`), so `isMember` is false for them and every line comes back `locked` under a membersOnly promotion. `carts.couponCode`/`couponDiscount` (`schema/cart.ts:73-75`) stay unused — this feature has no codes (design D1).
+feature: sale-promotions
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:03:30.523Z'
+last_updated: '2026-08-06T05:50:15.843Z'
+time_spent_minutes: 5
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T05:34:00.271Z'
+    text: |-
+      Two gotchas found while implementing #427 (commit 4a998e91) — both bite this ticket:
+
+      **1. Product facets are arrays, not scalars.** `products.styles`, `products.subjects`, `products.rooms` are `text[]` (`packages/api/src/database/schema/products.ts:111-114`). The `PricedProduct` type sketched in these tickets declared singular `style`/`subject`/`room`. The resolver now normalises both shapes via `facetValues()`, so pass the product row through as-is — do not hand-map singular fields, and do not write a test fixture with singular values only, or it will pass against a schema that cannot occur.
+
+      **2. `@chobii/shared` needs a rebuild before its new types resolve.** #424 landed the source but `dist/` is gitignored and stale, so `tsc` rejects imports of `ResolvedSalePrice` / `PromotionScopeFilter` until you run `cd packages/shared && bunx tsc`. Build output only — no source change, nothing to stage.
+  - author: system
+    timestamp: '2026-08-06T05:44:34.822Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T05:50:09.345Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `d896d440` - feat(api): cart resolves sale at read time, stored lineTotal stays base
+
+      **Files Changed**:
+      - `packages/api/src/routes/cart.ts` — read-time sale resolution, `savingTotal`, viewer-keyed cache, widened product projection
+      - `packages/api/tests/routes/cart-sale-pricing.test.ts` — new, 15 tests
+
+      **Summary**:
+      GET /api/cart returns `pricing: { base, sale, locked, headline, percentOff }` per line plus a cart-level `savingTotal`. Stored `lineTotal` is untouched on both paths — the read never writes, and a PATCH mid-sale still stores `(unitPrice + framePrice) * quantity`, which a test pins.
+
+      **Spec deviation, deliberate** — the ticket's step-3 snippet used `sale.salePrice`, resolved from `product.basePrice`, as the line's sale unit price. A cart line is priced from the *variant* (`cartItems.unitPrice`, schema comment: "Variant base price"), so on any variant above the base size that snippet charges far less than the discount: a 40000.00 A1 print under a 40% sale would have come out at 15180.00 instead of 24000.00. Implemented instead as `resolveSalePrice({ ...item.product, basePrice: item.unitPrice }, ...)` — the resolver still owns eligibility, exclusions, the member gate and the half-up rounding; only the base it works from is the line's own unit price. Matches design §5's layering ("1. line base price − 2. promotion discount per line"). Test: *discounts the line off its own variant price, not the product base price*. **Order creation (#430) should apply the same rule** or the cart and the order will disagree.
+
+      Two other notes:
+      - The product projection gains `styles`, `subjects`, `rooms`, `isFeatured`, `basePrice` (gotcha 3 from #428). Without them a filter-scoped promotion prices the PDP and not the cart.
+      - Member-keying the cart cache breaks `deleteCached(`cart:<id>`)` in `updateCartTotals` and `/merge`, which would have left mutations invisible for the 5-minute TTL. Both now go through `invalidateCartCache`, which drops the `:guest` and `:member` entries together; a test pins that.
+
+      Frame price stays undiscounted (the sale is on the artwork); locked lines show their sale price but contribute 0 to `savingTotal`; saved-for-later lines are priced but excluded from the total, as `subtotal` excludes them.
+
+      **Verification**:
+      - Command: `cd packages/api && bunx vitest run tests/routes/cart-sale-pricing.test.ts`
+      - Result: PASS (15 tests, 15 passing)
+      - Command: `cd packages/api && bunx vitest run tests/routes/cart.test.ts`
+      - Result: PASS (80 tests, 80 passing — no regression)
+      - Command: `cd packages/api && bunx tsc --noEmit`
+      - Result: PASS (0 errors)
+  - author: system
+    timestamp: '2026-08-06T05:50:13.634Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-06T05:45:35.725Z'
+    agent: claude-code
+    summary: 'Cart read-time sale resolution landed in d896d440: per-line { base, sale, locked, headline, percentOff }, cart savingTotal, viewer-keyed cache with both entries invalidated together, widened product projection. Discount applied to the line''s own unitPrice rather than the product basePrice (spec defect, noted on the ticket). 15 new tests + 80 existing cart tests passing, tsc clean.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-06T05:50:15.836Z'
+    duration: '00:04:40'
+related_tickets: []
+blocked_by:
+  - ticket: 427
+    feature: sale-promotions
+    description: Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for cart-line sale resolution
+    file: packages/api/tests/routes/cart-sale-pricing.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/cart-sale-pricing.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('cart sale pricing', () => {
+        it('returns base, sale and locked per line', async () => {
+          // assert: items[0].pricing = { base: '25300.00', sale: '15180.00', locked: false }
+        })
+
+        it('leaves the stored lineTotal at the base figure', async () => {
+          // A cart held across the end of a sale must not still charge sale prices.
+          // assert: the update path never writes a discounted lineTotal
+        })
+
+        it('locks every line for a guest under a membersOnly promotion', async () => {
+          // assert: items.every(i => i.pricing.locked)
+        })
+
+        it('totals the saving across lines, rounding per line not on the subtotal', async () => {
+          // assert: savingTotal === sum of per-line savings
+        })
+
+        it('reports no saving once the promotion has expired', async () => {
+          // assert: pricing.sale === null && savingTotal === '0.00'
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/cart-sale-pricing.test.ts
+    expected_result: FAIL - pricing is undefined on cart items
+    status: done
+  - id: 3
+    action: implement
+    description: Resolve sale pricing at cart read time and add the saving total
+    file: packages/api/src/routes/cart.ts
+    status: done
+    code: |-
+      // In getCartWithItems / the GET handler, after items are loaded.
+      // Stored lineTotal is untouched — it is the base figure and stays that way.
+
+      const activePromotions = await getActivePromotions()
+      const { includedIds, excludedIds } = await loadPromotionProductSets(activePromotions)
+      const isMember = Boolean(user?.galleryMember)
+
+      let saving = 0
+      const items = cartWithItems.items.map((item) => {
+        const sale = resolveSalePrice(item.product, activePromotions, {
+          isMember,
+          includedIds,
+          excludedIds,
+        })
+        const base = parseFloat(item.lineTotal) || 0
+        const saleLineTotal = sale
+          ? ((parseFloat(sale.salePrice) + parseFloat(item.framePrice ?? '0')) * item.quantity).toFixed(2)
+          : null
+        if (sale && !sale.locked && saleLineTotal) saving += base - parseFloat(saleLineTotal)
+
+        return {
+          ...item,
+          pricing: {
+            base: item.lineTotal,
+            sale: saleLineTotal,
+            locked: sale?.locked ?? false,
+            headline: sale?.headline ?? null,
+            percentOff: sale?.percentOff ?? null,
+          },
+        }
+      })
+
+      return { ...cartWithItems, items, savingTotal: saving.toFixed(2) }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/cart-sale-pricing.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm the existing cart suite still passes
+    command: cd packages/api && bunx vitest run tests/routes/cart.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit cart sale resolution
+    command: 'git add packages/api/src/routes/cart.ts packages/api/tests/routes/cart-sale-pricing.test.ts && git commit -m "feat(api): resolve cart sale pricing at read time, base stays stored"'
+    status: done
+current_step: 6
+started: '2026-08-06T05:44:34.822Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:05:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:05:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: cd packages/api && bunx vitest run tests/routes/cart-sale-pricing.test.ts && bunx vitest run tests/routes/cart.test.ts
+  test_output: 'cart-sale-pricing.test.ts: 15 passed (15). cart.test.ts: 80 passed (80). bunx tsc --noEmit in packages/api: 0 errors.'
+  build_passed: true
+  build_command: cd packages/api && bunx tsc --noEmit
+  verified_at: '2026-08-06T05:49:54.034Z'
+completed: '2026-08-06T05:50:13.634Z'

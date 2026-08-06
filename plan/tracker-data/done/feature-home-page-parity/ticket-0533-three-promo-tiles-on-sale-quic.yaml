@@ -1,0 +1,72 @@
+ticket_number: 533
+title: Three promo tiles — On Sale / Quick Ship / Custom Art
+description: |-
+  BAR: mesonart's row of three equal photo tiles below the room band. Each is a lifestyle shot with a rounded corner, the label in large white type bottom-left and a thin white arrow bottom-right, no scrim beyond what the photo provides.
+
+  OURS TODAY: missing entirely.
+
+  Wire the three to real destinations — sale landing, a quick-ship/in-stock filter, and the AI/custom art route. Desktop + mobile.
+feature: home-page-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.126Z'
+last_updated: '2026-08-06T14:44:55.688Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - merchandising
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T12:22:04.612Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:22:34.878Z'
+    text: |-
+      Built as `packages/web/app/components/home/PromoTilesSection.tsx` (+ `tests/components/home/PromoTilesSection.test.tsx`, 15 tests). New band — supersedes nothing; `app/routes/index.tsx` untouched, integration wires it.
+
+      THE THREE DESTINATIONS, and why
+
+      1. On Sale -> `/sale`, but only while a promotion is actually running. `SaleNavLink` already settles this rule for the red Sale link: absent, not disabled, because a Sale door that outlives its promotion opens onto a page with nothing on it. A tile is a louder door than a nav link, so it obeys the same rule. `GET /api/promotions/active` answers null today and `?onSale=true` returns 0 products, so on the current data the tile is Limited Edition.
+
+      2. Limited Edition -> `/posters?uniqueness=limited-edition` is what slot one becomes with no promotion running, so the row stays three wide. Real facet, 19 products today.
+
+      3. In Stock -> `/posters?availability=in-stock` (22 products) replaces their "Quick Ship". We make no delivery-speed promise anywhere on the storefront — no express tier, no dispatch SLA on a product, nothing in /shipping to back one — so "Quick Ship" would have been a claim invented by the component. `availability` is a real facet in the shared vocabulary and `in-stock` is the honest half of the same idea. The tile carries the vocabulary's own caption so it names exactly the filter it applies.
+
+      4. Custom Art -> `/create`. Lands on theirs without translation.
+
+      Both facet ids are read off AVAILABILITY_OPTIONS / UNIQUENESS_OPTIONS rather than typed as literals — the #452 drift. No runtime facet-count guard in front of them: the destination is always a valid /posters query, so an empty facet degrades to that page's own empty state rather than a dead link, and a count guard would make a photographic band vanish whenever the facets endpoint hiccups.
+
+      Links go through `<Link to search={...}>`, not hand-built hrefs — router.tsx overrides TanStack's search serialisation.
+
+      IMAGERY
+
+      Placeholders, per the coordinator's photography note: mesonart's own, from the git-ignored `packages/web/public/dev-reference/promo/`. All three paths live in one exported constant, `PROMO_TILE_IMAGES`, so #544 is three lines. tile-1 and tile-2 are the interiors behind their own On Sale and Quick Ship tiles, used the same way. Their third tile is a painter at an easel and no equivalent was supplied; tile-4 (wet impasto flowers — paint as a substance rather than a finished frame) is the closest reading, and its soft pinks/greens hold the row's tonal unity where tile-3's deep blue figurative scene breaks it. tile-3 left unused. Rendered both and compared against the bar before choosing.
+
+      Rejected first pass: borrowing `room-mockup` images from real catalogue products per destination. It worked and was fully honest, but roughly half the seeded product photography carries a visible "MESON ART" watermark (the images were scraped), and the Custom Art tile landed on one every time — `isAiGenerated` has only 3 products and the other two were taken by the earlier tiles. Worth a separate data ticket: the same watermarks will show on the Best Seller and New In product cards.
+
+      MEASURED, off mesonart at 1440x900 and 390x844 (2x captures, halved)
+      - desktop: three 436x327 tiles (4:3), 18px gap, 12px radius, 48px page gutter; label ~28px cap-aligned with a ~15x12 single-pixel arrow; 27px padding at the label's left and the arrow's right.
+      - mobile: 20px gutter, 12px gaps, lead tile full width at 350x263 (still 4:3), the other two 169x126 beside each other; label ~21px / ~17px, 11px padding.
+      Ours takes the house `--card-radius` (15px at 1440) over a literal 12, and the house container (20px gutter) over their 48 — every other band on the page is on that container.
+
+      DEVIATIONS worth knowing
+      - A bottom gradient, black/30 over the lower third. Theirs has none; their photography is chosen to carry white type. Ours has to survive whatever interior replaces these placeholders, and this is the least that guarantees the label. Tuned down from /35 after comparing side by side.
+      - The band renders nothing until the promotion lookup answers. That lookup is the deduplicated one the header already makes, so it costs no extra request, but the band does arrive a beat after hydration — the alternative was painting "Limited Edition" server-side and swapping it to "On Sale", which is the flash SaleNavLink documents as worse.
+      - Own padding is `py-8 lg:py-10`, deliberately shallower than the house 96px: measured, their tiles sit 64px under the room band. Whatever band precedes this one adds its own bottom padding, so the integrator can take the top to nothing with `className="pt-0"` if the stack ends up airier than theirs.
+
+      Verified by screenshotting the band at 1440 and 390 through a temporary preview route (created, screenshotted, deleted; routeTree.gen.ts confirmed clean of it).
+  - author: system
+    timestamp: '2026-08-06T14:44:55.688Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T12:22:04.612Z'
+completed: '2026-08-06T14:44:55.688Z'

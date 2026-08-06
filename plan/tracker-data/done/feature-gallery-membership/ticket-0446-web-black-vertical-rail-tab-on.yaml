@@ -1,0 +1,128 @@
+ticket_number: 446
+title: Web - black vertical rail tab on the right edge
+description: |-
+  ## Task
+  Black vertical tab pinned to the right edge, mid-viewport, reading the promotion's offer (their `Get 40% OFF`). Appears when the banner is dismissed or in cooldown; clicking reopens the modal.
+
+  This is the recovery path for a dismissed offer — the documented sticky-teaser pattern — so it must persist across navigation within the session rather than resetting per page.
+
+  ## Context
+  Part of feature: gallery-membership
+  Phase: 3 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §2, §7
+  Closes: mesonart parity analysis §3.1 "Floating offer tab" row
+
+  `packages/web/app/components/promo/OfferRail.tsx`. Label text is derived from the promotion (`Get {percentOff}% OFF`), never hardcoded. Hidden for members and when no promotion is active.
+
+  Mobile: their layout runs a bottom dock, and a right-edge rail collides with it — constrain the rail to `lg:` and up, or place it clear of the dock. Accessibility: it is a `<button>` with a discernible name, not a decorated `div`.
+feature: gallery-membership
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:15:20.047Z'
+last_updated: '2026-08-06T06:15:42.710Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T06:07:45.126Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-06T06:15:20.523Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T06:15:42.710Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `9f5b4836` — feat(web): black offer rail on the right edge, and one membership signal
+
+      **Files Changed**
+      - `packages/web/app/components/promo/OfferRail.tsx` (new) — the tab itself. Renders on `stage === 'rail'` from `useSaleOffer()` and calls `reopen()`; it resolves nothing of its own.
+      - `packages/web/tests/components/promo/OfferRail.test.tsx` (new) — 26 tests.
+      - `packages/web/app/hooks/useGalleryMembership.ts` — optimistic join flip lifted from per-instance `useState` to one module signal (`useSyncExternalStore`), pinned to the identity that joined. Exports `resetGalleryMembershipSignal()` for tests.
+      - `packages/web/app/components/promo/SaleBanner.tsx` — the store now carries `source`, so the modal is tagged with the surface that opened it.
+      - `packages/web/app/routes/__root.tsx` — mounts `<OfferRail />` beside `<SaleBanner />`.
+      - `packages/web/tests/hooks/useGalleryMembership.test.ts` — resets the shared signal in `beforeEach`.
+
+      **Summary**
+      Black vertical tab (`[writing-mode:vertical-rl]`, `bg-black`, `fixed right-0 top-1/2 z-40`), labelled `Get {percentOff}% OFF` read from the promotion payload on every render, with wording rather than `Get null% OFF` for a fixed-amount sale. Nothing renders with no promotion, for a member, during the server pass, or while the banner is still open. It appears on dismissal and on a load inside the 7-day cooldown or the session mark, and clicking it reopens the modal. Mounted once at the root so it survives navigation. `hidden lg:flex` keeps it off the phone, where their layout runs a bottom dock, and `z-40` keeps it under the `z-50` dialog it opens.
+
+      **Design decision — one shared membership signal, not a close-reason handshake**
+
+      Options considered:
+      - **A. Lift the optimistic flip to a shared signal.** Fixes the defect at its source, so the cart (#436) and the sale page get it too. Costs module state that must be reset between tests.
+      - **B. Have the banner tell the rail why it closed.** Cheaper, no module state, but it patches the symptom for one pair of surfaces and leaves the same staleness for every other consumer of `useGalleryMembership`.
+
+      Chosen A. The bug is not "the rail and the banner disagree", it is "`useGalleryMembership` gives a different answer per call site", and B would leave that true. The signal is pinned to `session.user.id` so it can only ever unlock the account that earned it — a sign-out or a different user drops straight back to what the session says — and it only turns membership on, so it cannot mask an authoritative `galleryMember`.
+
+      **Second defect found while testing**: `SaleBanner` hardcoded `source="banner"` on the one modal both surfaces share, so a join recovered by the rail was recorded as `joinSource: 'banner'` — hiding exactly the conversions the rail exists to produce. `source` now lives in the store and moves to `'rail'` on `reopen()`.
+
+      **Tests**
+      - `tests/components/promo/OfferRail.test.tsx` (26) — an integration suite: real `SaleBanner`, real `JoinGalleryModal`, real `useGalleryMembership`, with only the router context and `fetch` stubbed, so membership is set the way production sets it. Covers the empty cases, appearance on dismissal / cooldown / session mark, the label tracking the promotion (and never containing `40`), reopen + `{ source: 'rail' }` on the POST, one promotion lookup across remounts, `<button type="button">` with a discernible name and keyboard reachability, the `hidden lg:flex` breakpoint, and four cases pinning the post-join behaviour including "stays hidden after navigating, before the session has caught up".
+
+      **Verification**: `OfferRail` 26 ✓, `SaleBanner` 27 ✓ (handover not regressed), `useGalleryMembership` 21 ✓ — 74 passing. `tsc --noEmit` clean on all six files.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 445
+    feature: gallery-membership
+    description: Web - dismissible sale banner with session and 7-day cooldown
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the rail tab
+    file: packages/web/tests/components/promo/OfferRail.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/promo/OfferRail.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('OfferRail', () => {
+        it('renders nothing when no promotion is active', () => {})
+        it('renders nothing for a member', () => {})
+        it('appears once the banner has been dismissed', () => {})
+        it('labels itself from the promotion depth', () => {})
+        it('reopens the join modal on click', () => {})
+        it('is a button with an accessible name', () => {})
+        it('does not collide with the mobile bottom dock', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/components/promo/OfferRail.test.tsx
+    expected_result: FAIL - component does not exist
+    status: done
+  - id: 3
+    action: implement
+    description: Build the rail tab
+    file: packages/web/app/components/promo/OfferRail.tsx
+    status: done
+    code: |-
+      // fixed right-0 top-1/2 -translate-y-1/2, vertical writing mode, black
+      // surface, rounded on the leading edge only.
+      // Visible when: active promotion AND not a member AND the banner is dismissed
+      // or in cooldown. Click reopens the modal with source 'rail'.
+      // Label: `Get ${promotion.percentOff}% OFF` — from the row, never hardcoded.
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/components/promo/OfferRail.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit the offer rail
+    command: 'git add packages/web/app/components/promo/OfferRail.tsx packages/web/tests/components/promo/OfferRail.test.tsx && git commit -m "feat(web): right-edge offer rail that recovers a dismissed banner"'
+    status: done
+current_step: 5
+started: '2026-08-06T06:07:45.126Z'
+completed: '2026-08-06T06:15:20.523Z'

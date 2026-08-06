@@ -1,0 +1,120 @@
+ticket_number: 540
+title: Section rhythm, type scale and button system pass across the whole page
+description: |-
+  BAR: mesonart's page reads as one system — every section heading is the same size and weight, left-aligned, with the same space above and below; every secondary CTA is the same outline pill; bands alternate white and sage in a consistent rhythm; the page is 7028px at 1440 across 17 bands.
+
+  OURS TODAY: 5454px. Headings switch between centred and left-aligned, section padding varies, CTAs appear as black solid pills, outline pills, and bare text links on the same page.
+
+  This ticket runs AFTER the section tickets land: unify heading scale, container width, vertical rhythm and the pill button system across the whole home page, and check the total page height and band count against the bar. Desktop + mobile.
+feature: home-page-parity
+type: task
+priority: high
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.181Z'
+last_updated: '2026-08-06T12:42:49.492Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - design-system
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T12:15:41.107Z'
+    text: |-
+      Cross-cutting finding from #535, promote to the top of this ticket and do it FIRST rather than last.
+
+      Measured on four of mesonart's slices and two of ours: their desktop page gutter is 48px. Ours is 20px, on every band. That is `--page-padding` in globals.css.
+
+      Why it cannot wait for the end of the run: every band builder is composing against a 20px gutter, so every band will lose its blind comparison for a reason that has nothing to do with the band. And it must not be special-cased per band — a band with its own gutter misaligns against the page around it.
+
+      Origin is global-chrome-parity, which is closed, so this ticket inherits it.
+
+      Second, smaller, same source: `Orientation` in app/components/product/ProductFilters.tsx is a five-value union that predates `set-of-2-3`, which forces chip search objects to be typed `Record<string, unknown>` — the same workaround AllArtMegaMenu already carries. Widening the union removes both.
+  - author: system
+    timestamp: '2026-08-06T12:41:56.173Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:42:49.492Z'
+    text: |-
+      GUTTER ITEM RESOLVED — `--page-padding` now ramps 20 / 36 / 48. Ticket left in-progress; the rhythm/type/button items are untouched.
+
+      ## What the bar actually does
+
+      The hypothesis on the ticket was right. Their base value IS 20px; it is overridden upward at desktop, and the earlier pass copied the base without the overrides.
+
+      Measured on the captured PNGs (2x, halved), first non-background column per row over the whole page, so a heading and a first-column tile edge on several bands rather than one lucky sample:
+
+      - `bar-mobile-full` (390): dominant left edge **20.0px** across 6043 rows. A 668-row block at 24.0 is the Shop By Popular / category grid only.
+      - `bar-desktop-full` (1440): dominant left edge **48.0px** across 3558 rows. Confirmed individually on `bar-desktop-s01` (product tile plate y308-319, Shop By Popular tile y1508-1519), `bar-desktop-s02` (Shop by Room panel), `bar-desktop-s04` (Shop By Orientation chip row y940-959 at 48.0-48.5). Headings land at 48.5-50.5 — 48 plus glyph side bearing.
+      - Ours before: **20.0px at both** (`ours-desktop-full` 1433 rows at 20.0, `ours-mobile-full` 2998 rows at 20.0).
+
+      Then the proof, from the captured page source in `meson.html` — their own ladder:
+
+      ```
+      :root                        --page-padding: var(--sp-5)   /* 20px */
+      @media (min-width: 1024px)   --page-padding: var(--sp-9)   /* 36px */
+      @media (min-width: 1280px)   --page-padding: var(--sp-12)  /* 48px */
+      @media (min-width: 1536px)   --page-padding: max(var(--sp-12),
+                                     50vw - scrollbar/2 - var(--page-width)/2)
+      ```
+
+      That also explains the 24px anomaly on mobile: their category-grid section sets `--page-padding: 1.5rem` on itself. Section-local override, not the page gutter.
+
+      ## Changed
+
+      - `app/styles/globals.css` — `--page-padding` stays 20px at `:root`, plus `@media (min-width: 1024px) { :root { --page-padding: 36px } }` and `1280px → 48px`. Line-80 comment rewritten with the numbers above, the viewports they were taken at, and their ladder. The `.container-wide` docstring no longer claims a flat gutter.
+      - `tailwind.config.ts` — `container.padding` is now `{ DEFAULT: '20px', lg: '36px', xl: '48px' }`, the same ramp, since its comment says that is the contract.
+      - Their 1536 step is not reproduced: it is only how they centre a 1600px page without a wrapper, and `.container-wide` already does that. The two are identical up to a 1696px viewport. Above that theirs keeps a 1600px CONTENT box and ours a 1600px BORDER box, so ours runs 96px narrower on very large monitors. Fixing it needs `max-width: calc(var(--page-width) + var(--page-padding) * 2)`, which the Tailwind `container` cannot express — and the two disagreeing is the exact failure the token exists to prevent. Documented in the comment and left alone; nothing on the bar has been measured above 1440. Flagging it rather than shipping it.
+      - 36px at `lg` is from their source only. We have no 1024-1279 capture of theirs to check it against. Said so in the comment.
+
+      ## Regression check — PDP and collection page do NOT regress
+
+      Full-page screenshots at 1440 and 390, before and after, then the same per-row edge scan on each.
+
+      - 1440: every left-edge bucket moved 20.0 → 48.0 with the **row counts unchanged** (PDP 601/127/99/43 rows; collection 1436/325/289/151). The layout is translated, not reflowed. PDP main image 91.5 → 116.5, its 70px internal offset intact.
+      - 390: **byte-for-byte identical page height** and identical edge histograms on both pages (20.0/21.0/20.5/30.0 in the same row counts). Mobile is untouched, which is correct — theirs is 20px there too.
+      - No horizontal overflow at 390 / 640 / 768 / 1023 / 1024 / 1279 / 1280 / 1440 / 1600 / 1920 on home, PDP, collection or /sale. The ramp fires exactly at 1024 and 1280. (320px overflows on home +1px and collection +42px — pre-existing, padding there is unchanged at 20px, and 320 is below the design floor.)
+
+      It is an improvement on the PDP specifically. Its grid is `minmax(0,728px) minmax(0,485px)` with a 48px gap = 1261px of content, and the slack sits on the right. Before: 20px left, 159px right. After: 48px left, 131px right. `docs/design/pdp-parity-reference.md` measures the bar's own PDP at 1261px of content in a 1302px container — 21px of slack a side — so we move toward it. NOTE: that doc's "1302px container at 1440" cannot be reconciled with a 48px gutter (1440 - 96 = 1344) and its x values look container-relative rather than viewport-relative. Worth a re-measure when their site is reachable again; I did not act on it.
+
+      ## SectionBand — the second gutter defect (from the coordinator, same root)
+
+      `SectionBand` unconditionally nested `container-wide` inside its full-bleed `<section>`. For a band that is itself a full-width inset panel that insets the plate by the gutter and then the plate's own padding indents the copy by the gutter again. #538 hit it on Brand Story and opted out of `SectionBand` entirely.
+
+      Fixed by variant, not by removing the wrapper — every other call site depends on it:
+
+      - `SectionBand` gains `bleed?: boolean`. When set, children render straight into the section and the band owns its horizontal geometry. Documented with why, and with the rule that a bleeding band must ask for the gutter by name so it does not drift as the gutter ramps.
+      - `BrandStorySection` is back inside the abstraction as `<SectionBand bleed …>`. Its `px-2 py-8 sm:px-4 sm:py-12` displaces SectionBand's `py-16 sm:py-24` through `cn`/tailwind-merge — verified, the merged result is exactly the old class string, so the band's geometry is unchanged.
+      - Two new tests in `tests/components/ui/SectionBand.test.tsx` pin both directions.
+
+      Audited every current call site before and after, not just the home page — home, /posters, PDP, /sale, /wishlist, /collections/$slug. Probed live at 1440 and 390: **every one puts its content at exactly the page gutter**, 48.0 at 1440 and 20.0 at 390. No doubling anywhere in the routes today.
+
+      ## Orientation union
+
+      `Orientation` in `product/ProductFilters.tsx` widened from five values to six (`set-of-2-3` added), with a comment naming `ORIENTATION_OPTIONS` in `@chobii/shared` as the source of truth and explaining why it is a restated literal union rather than derived (`FacetOption.id` is `string`, so deriving would widen it to `string` and stop checking every search object that carries an orientation).
+
+      - `ShopByOrientationSection` — workaround dropped. `OrientationChip.search` is now `{ orientation: Orientation }` instead of `Record<string, unknown>`. One `option.id as Orientation` cast remains and is unavoidable: the shared vocabularies feed Zod enums so their ids are `string` at the type level. This follows `ProductRail.RailViewAllSearch`, the house pattern.
+      - `AllArtMegaMenu` — **left alone deliberately**. Its `Record<string, unknown>` is not caused by the narrow union: `facetLinks(options, param)` builds `{ [param]: id }` from a runtime `param`, so it produces `{ [x: string]: string }` for styles/subjects/colors/orientation alike, and `BEST_SELLERS_SEARCH` infers `string` not the literal. Tightening it means a generic helper plus `as const` on the sort constants — unrelated churn, so per the instruction it stays.
+
+      ## Verification
+
+      - `tsc --noEmit`: 22 errors, **zero in any file touched here**. All in `routes/admin/*`, `routes/track/*` and `ai-generator/PromptSuggestions.tsx`. Pre-existing.
+      - `vitest run` (full web suite): **2814 passed, 3 failed**. All three pre-existing, all in files tracked and unmodified in this worktree, all reproducible from HEAD:
+        - `tests/styles.test.ts > no dark: utility variants` — `routes/admin/promotions/index.tsx` lines 140-141, committed at HEAD.
+        - `tests/routes/home-tokens.test.ts > keeps the category legibility scrims` — expects `from-slate-700/80` in `routes/index.tsx`; HEAD has zero occurrences.
+        - `tests/routes/wishlist-page.test.ts > has no auth guard of its own` — `wishlist.tsx` contains `beforeLoad` at HEAD.
+      - Two token tests updated to pin the new contract instead of the old flat value: `tests/styles.test.ts` (20/36/48 in the Tailwind container) and `tests/styles/design-tokens.test.ts` (the two media queries plus the Tailwind ramp). I briefly broke `tests/styles.test.ts > should have container-wide component` by rewriting a comment out from under it — it asserts globals.css contains the string `max-w-7xl`, which only ever passed because a comment mentioned it. Restored the historical note rather than touch the test; flagging that the assertion is junk and belongs with `.container-wide`'s rule, not the file.
+
+      ## Not touched
+
+      - `ProductRail`'s desktop track comment says "20px gutter" but reads as the inter-card gap ("flush with the page container on both sides"), and its widths are percentage-based (`calc((100%-60px)/4)`), so four-up survives the narrower container with cards at 321 instead of 335. Another builder's in-flight file; left alone.
+      - Band builders composing against the old 20px: their bands inherit the fix automatically through `container-wide`. #530/#533/#534/#535/#539 all flagged this same finding and explicitly chose the house container — those choices are now correct rather than deliberate divergences, and `PromoTilesSection`'s "desktop 1440: 48px page gutter" note now matches what renders.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T12:41:56.173Z'

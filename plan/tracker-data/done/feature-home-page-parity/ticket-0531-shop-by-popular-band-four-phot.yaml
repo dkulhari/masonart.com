@@ -1,0 +1,169 @@
+ticket_number: 531
+title: Shop By Popular band — four photo tiles with labels below and a pill CTA
+description: |-
+  BAR: mesonart 'Shop By Popular'. Left-aligned section heading, four wide photo tiles in a row (real artwork crops, rounded corners), the category name centred BELOW each tile in regular weight, then a centred outline 'View Popular Categories' pill.
+
+  OURS TODAY: nothing like it. The nearest thing is CategoriesSection ('Shop by Style'), which uses flat CSS-gradient placeholder tiles with the label overlaid INSIDE the tile — the gradients read as unfinished and are the most obviously non-parity element on the page after the hero.
+
+  Either rework CategoriesSection into this shape or add a new band; use real catalogue imagery, never CSS gradients. Desktop + mobile.
+feature: home-page-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.076Z'
+last_updated: '2026-08-06T14:44:55.664Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - merchandising
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T12:16:38.260Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:17:16.774Z'
+    text: |-
+      Built as `packages/web/app/components/home/PopularCategoriesSection.tsx` (+ `packages/web/tests/components/home/PopularCategoriesSection.test.tsx`, 10 tests green). `app/routes/index.tsx` untouched, per the concurrency rule.
+
+      SUPERSEDES `CategoriesSection` in `app/routes/index.tsx` ("Shop by Style"). The integration step should mount `<PopularCategoriesSection />` and delete `CategoriesSection` — and with it the now-unused `categoryHref` / `visibleCategories` / `CategoryTile` imports at the top of the route. `~/lib/homeCategories` and `tests/lib/homeCategories.test.ts` are left alone; nothing else consumes them, but deleting them is not this ticket's call.
+
+      Exports: `PopularCategoriesSection` (connected, client-fetched — no home-loader change needed), `PopularCategoriesBand` (presentational), `popularCategoryTiles` (selection), `POPULAR_TILE_COUNT`, `TILE_ASPECT`, `ART_CROP_SCALE`, `VIEW_ALL_HREF`.
+
+      ## Which four — actually eight
+
+      The bar is TWO rows of four, not one. Measured on `bar-desktop-full.png`: tiles at 316.5 x 182 CSS, gap 24, row one (Abstract / Landscape / Beach & Ocean / Graffiti) at y 1752–1937, row two (latest work / City / Floral / Horse) at y 2005–2186, then the pill. The two slices in the brief's table showed one row each, which is why it reads as four. So the grid is 4-up on desktop / 2-up on mobile, capped at 8.
+
+      ## Where the categories come from, and how the #452 rule survived
+
+      Not the facet path. `~/lib/homeCategories` is a hand-written list of four facet values filtered against `/api/products/facets`; that filter is exactly right and is kept, but a facet count is a number — it cannot put a picture on a tile. Those four tiles pointed at `/images/categories/*.jpg` files that do not exist in the repo, which is why there was a gradient painted over the gap.
+
+      `GET /api/collections?discover=true` carries the same guarantee AND the image: per collection, `count` resolved server-side against active products, and `image` = the main artwork of a representative product in that collection (#410). `popularCategoryTiles` keeps only rows with `count > 0` AND a non-null `image`, in the admin's `discoverOrder` — never re-sorted by count, per the "designed set, not popularity" note in homeCategories. Empty list ⇒ the band renders nothing, including the heading and the pill. Failed request ⇒ same. Four assertions in the test pin exactly that.
+
+      This is also what the bar does: their tile labels are "Abstract", "Landscape", "Beach & Ocean", "Graffiti", "latest work", "City", "Floral", "Horse" — style, subject and a date window side by side, which is the collections vocabulary DiscoverChips was built around and not any one facet group.
+
+      Live dev catalogue gives 8 of 14 (all 14 qualify; the cap takes the first 8): Wabi-Sabi Art (9), Plaster & Texture Art (5), Colorful Art (6), Minimalist Art (5), Pop Art (6), Surrealist Art (6), Pollock Art (6), Bohemian Art (6). Tiles link to `/collections/<slug>` — a path route, no search params, so the router's string-serialisation trap does not apply. Pill goes to `/posters`, which is where the full Discover rail lists every collection; there is no `/collections` index route to send it to.
+
+      ## The crop, and a data defect it exposed
+
+      Stored product images are square with the artwork contained at MAT_ART_INSET (0.88) of its longest side on a flat rgb(250 250 250) mat, so a 7:4 tile at plain `object-cover` shows mat. The image is scaled and centre-cropped, same move as `chipArtScale`.
+
+      `chipArtScale` keys off the product's declared `orientation`. That column is wrong in this catalogue. Trimming the mat off all fourteen discover representatives and comparing the artwork box to the canvas:
+
+        wabi-sabi-art    declared landscape  art 0.880 x 0.847  (1.04:1)
+        plaster-and-…    declared panoramic  art 0.880 x 0.451  (1.95:1)
+        colorful-art     declared panoramic  art 0.459 x 0.880  (0.52:1)
+        minimalist-art   declared square     art 0.880 x 0.451  (1.95:1)
+        pollock-art      declared square     art 0.713 x 0.879  (0.81:1)
+        ukiyo-e-art      declared landscape  art 0.710 x 0.879  (0.81:1)
+        hyperrealism     declared portrait   art 0.459 x 0.879  (0.52:1)
+
+      Six of fourteen declare the opposite of what the picture is. So the scale here is a single constant sized for the narrowest artwork measured (0.458 of canvas width → 1/0.458 x 1.08 margin = 2.36), with `bg-mat` behind it as the backstop for anything narrower still. NEEDS ITS OWN TICKET: the round Discover chips on /posters and /collections/$slug use `chipArtScale(orientation)` and will be showing white arcs on those same six today.
+
+      ## Could not source / flagging
+
+      1. **Three of the eight dev images carry a "MESON ART" watermark baked into the pixels** (Wabi-Sabi, Plaster & Texture, Bohemian). The seed artwork was scraped from mesonart.com. Nothing a component can do — the same watermark is already on the product cards and the PDP — but it is what a blind A/B will see, and it gets more legible at a tight crop, not less. Real catalogue imagery was the rule, so it stays. Worth a seed-data ticket.
+      2. **Pop Art's representative is a set-of-2 piece**, so its tile shows the white gutter between the two panels. Real artwork, not a rendering fault.
+      3. Collections have no `subtitle` in dev, and the bar has no strapline under these tiles either, so the old "Bold, expressive art pieces" line is gone rather than replaced.
+
+      ## Measured against the bar
+
+      Verified by rendering the component with live API data and screenshotting at 1440 and 390 (deviceScaleFactor 2). Heading left-aligned `text-display` light; tiles 7:4 (measured 316.5/182 = 1.74), gap-x 24, label centred BELOW the tile at 20px light (mobile 14px), row gap 24, centred `outline`/`pill` "View Popular Categories" at 241 x 58 against the bar's 247 x 50.
+
+      One deliberate divergence: the band uses `container-wide` (20px gutters, 1400 at 1440) where the bar's own grid measured 1344 wide with ~48px gutters. Matching the bar there would put this band out of line with every other band on the page, since `--page-width`/`--page-padding` are the global-chrome-parity values that ProductRail and the rest already use. Heading size, pill height and the `mb-8 sm:mb-10` / `mt-10 sm:mt-12` rhythm are likewise taken from `home/ProductRail.tsx` so the bands above and below this one agree with it.
+  - author: mcp-client
+    timestamp: '2026-08-06T14:06:43.666Z'
+    text: |-
+      ## Fix round after the lost blind A/B — imagery, not layout
+
+      The critic found nothing wrong with the grid, gutters, heading or CTA, and every fault it did find was a property of the *picture on the tile*: a set-of-2 photograph on row 2 col 1, a wall sliver on two tiles, three tiles visibly soft, and captions at the bottom of the size ramp. All four are fixed, and three of them by fixing data rather than by tuning CSS.
+
+      ### What was actually wrong (measured, not guessed)
+
+      Every product image in this catalogue is a **photograph of a framed canvas hanging on a white wall**, not a flat scan. Trimming the mat off all 41 stored masters and measuring the artwork box:
+
+      - `digital-cosmos` (Pop Art's representative) and `paper-layers` are **two-panel photographs** — a full-height wall gutter 54px / 34px wide at dead centre. A gutter detector over all 41 fires on exactly these two and on nothing else. Any centred crop of them either straddles the gutter (what the critic saw) or lands in the wall.
+      - Sharpness, as Laplacian variance normalised to 1000px: the catalogue median is ~900. `digital-cosmos` 145, `blush-hour` 286, `mountain-majesty` 324 — **the three lowest in the catalogue, and exactly the three tiles the critic called soft**. Not a coincidence and not a crop artefact: those sources are intrinsically soft.
+      - The wall slivers came from the crop landing on the *bounding box* of the photograph, which includes the frame moulding and its shadow. `mountain-majesty` at scale 2.36 left only 27px of clearance on a 1500px master — less than the frame.
+
+      So the single 2.36 constant was failing twice over: too shallow to clear the frame on the narrow pieces, and far too deep on the wide ones (it cropped them to 1:1 with the source, which is why they read soft).
+
+      ### 1. Fixed the orientation data — yes, I touched it (#545)
+
+      `packages/api/src/database/seed.ts`: re-derived `orientation` for all 41 products from the pixels of the artwork they actually ship with. **27 of 41 were wrong.** Classification is `>= 1.8 panoramic | >= 1.15 landscape | >= 0.87 square | else portrait`, plus `set-of-2-3` for the two two-panel photographs — panel count, not proportion, which is precisely what that facet value exists for. The seed already falls back to the portrait ladder for it, so both stay purchasable.
+
+      Applied to the live dev DB too, so the running app matches (`update products set orientation = ...` per slug). New spread: portrait 14, square 10, panoramic 8, landscape 7, set-of-2-3 2.
+
+      Root cause, for #545: the seed authors a fictional product and then staples fixture artwork onto it via `REFERENCE_MEDIA`. The orientation described the invented product; the pixels came from somebody else's photograph. Nothing reconciled them.
+
+      ### 2. Fixed which product represents a collection
+
+      `packages/api/src/lib/collection-imagery.ts`. `shortlistFor` ordered candidates by `featuredOrder, createdAt` — a merchandising order, with nothing in it about whether the picture survives being cropped. It now sorts by `REPRESENTATIVE_ORIENTATION_ORDER` first (landscape, square, panoramic, portrait, then everything else including `set-of-2-3`), and keeps `featuredOrder, createdAt` as the tie-break between two candidates of the same shape. Manual collections are exempt — a curator's `position` is not overruled by a measured proportion.
+
+      This is only possible *because* the column is now true; it is the workaround in #545 being retired rather than papered over.
+
+      ### 3. Crop derives from orientation again
+
+      `tileArtScale(orientation)` replaces `ART_CROP_SCALE = 2.36`. Same shape as `chipArtScale`, sized for a 7:4 window instead of a circle: plan for the narrowest artwork each orientation can describe, take `max(1/widthFraction, (1/TILE_ASPECT)/heightFraction)`, multiply by a 1.12 margin that clears the frame moulding and its shadow. `bg-mat` stays as the backstop.
+
+      Live values: landscape/panoramic-lite **1.273**, square **1.463**, panoramic 1.425, portrait 2.448, unknown → 2.448.
+
+      Every tile now *downsamples* — 1178 and 1025 source pixels into 636 device pixels — instead of the old 636-into-636. That is where the sharpness came from.
+
+      ### 4. Caption size, without inheriting their ambiguity
+
+      14/18/20px → **16/20/24px**. Against a 28px mobile and 44px desktop heading that is a step of 1.75x and 1.83x, up from 2.0x and 2.2x. Deliberately not the bar's 1.6x — these are labels under pictures, not a second heading.
+
+      Ownership is solved the opposite way to theirs: gap above a caption 12/16px, row gap below **36/40px** (`gap-y-9 sm:gap-y-10`, was `gap-y-6`). 1:2.5, so a caption between two rows is never a coin toss. Their band sets 12.5 and 12 and is ambiguous four rows deep.
+
+      ### The eight tiles now
+
+      Verified with `scratchpad/shoot.mjs` at 1440 (`fix-desktop-s01/s02`) and 390 (`fix-mobile-s01/s02`), and per-tile at 2x with a border-strip check for mat/wall — clean on all eight, all four edges.
+
+      | # | Collection | Representative | shape | crop | what it shows |
+      |---|---|---|---|---|---|
+      | 1 | Wabi-Sabi Art | dream-big | landscape | 1.273 | rust calligraphy over pale cream texture |
+      | 2 | Plaster & Texture Art | wild-spirit | landscape | 1.273 | single-line horse on a plaster ground |
+      | 3 | Colorful Art | wabi-sabi-study | square | 1.463 | misty grey-brown grid-and-mountain texture |
+      | 4 | Minimalist Art | urban-soul | square | 1.463 | pop portrait, blue sunglasses, dripping primaries |
+      | 5 | Pop Art | desert-tapestry | square | 1.463 | pink/terracotta kilim diamonds, heavy impasto |
+      | 6 | Surrealist Art | forest-whispers | landscape | 1.273 | dark trees over a still pale lake |
+      | 7 | Pollock Art | weathered-stone | square | 1.463 | eroded stone and brick in taupe and grey |
+      | 8 | Bohemian Art | color-block | landscape | 1.273 | flat green/pink/orange/black blocks on cream |
+
+      Eight single artworks, all bleeding edge to edge, sharpness range 472–2286 against the old 145–4691. No diptych, no portrait slice, no frame, no wall.
+
+      **Residual, and it is seed data not this band:** a product's `styles` array is arbitrary in the dev seed, so "Colorful Art" draws a grey picture and "Minimalist Art" a maximalist one. That mismatch pre-dates this fix (it was brown mountains under Colorful Art before) and no candidate in those collections is both colour-appropriate and a shape that crops. Fixing it means curating `styles`, not the band.
+
+      ### Side effects, all intended
+
+      - Discover chips on `/posters` and `/collections/$slug` now crop correctly — `chipArtScale` was already keyed to `orientation`, it was the column that lied. Verified: no white arcs on the rail.
+      - Orientation facet counts on `/posters` and the Shop By Orientation band are now truthful, and "Set Of 2/3" leads to two real products instead of none.
+      - Product cards and the PDP are untouched — they show the whole matted master, where a set of 2 correctly reads as a set of 2.
+
+      ### Tests
+
+      - `tests/components/home/PopularCategoriesSection.test.tsx` — **18 passed** (was 10). New: `tileArtScale` covers the tile for the narrowest member of every orientation, crops a wide piece more gently than a tall one, never enlarges a 1500px master past a 664px tile, and falls back to the deepest crop for `set-of-2-3`/unknown/null.
+      - `packages/api/tests/lib/collection-imagery.test.ts` — **11 passed** (was 7). New: `representativeOrientationRank` prefers shapes that survive a wide crop, puts a set of two panels last, sends unknown/null to the back, and ranks distinctly in the declared order.
+      - `packages/api` — `tests/database/` 416 passed / 178 skipped; `tests/routes/{products,product-sale-pricing,product-facets,product-facet-filters,collections,collection-detail}` 170 passed. `tsc --noEmit` clean.
+      - `packages/web` full unit suite — 2846 passed, **4 failed in 3 files, all pre-existing and unrelated**: `tests/styles.test.ts` (a `dark:` variant in `app/routes/admin/promotions/index.tsx`), `tests/routes/posters-frame-pricing.test.ts` (2), `tests/routes/wishlist-page.test.ts` (1). None of them import anything I touched.
+      - `packages/web` `tsc --noEmit` — 22 errors, **all pre-existing**, all in `app/routes/admin/*` and `app/routes/track/*`. The one error this change did introduce (`'aspect' is possibly undefined`) is fixed.
+
+      ### Follow-up left open on #545
+
+      The live dev DB's `product_variants` were generated from the OLD orientation, so their size ladders no longer match the corrected column. Regenerating them by hand is not worth it — `order_items.variant_id` is `SET NULL` and `cart_items` is `CASCADE`, so a delete/reinsert would corrupt dev order history and empty live carts. `bun run seed` rebuilds both consistently from the corrected seed, and that is the documented way to rebuild this catalogue.
+
+      Ticket stays **in-progress** for the critic.
+  - author: system
+    timestamp: '2026-08-06T14:44:55.664Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T12:16:38.260Z'
+completed: '2026-08-06T14:44:55.664Z'

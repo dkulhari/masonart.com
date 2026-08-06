@@ -1,0 +1,76 @@
+ticket_number: 534
+title: New In carousel with circular prev/next controls
+description: |-
+  BAR: mesonart 'New In'. Left-aligned heading with a pair of large circular outline prev/next buttons at the far right of the heading row (prev greyed when at the start), a horizontally scrolling product rail below, and a centred 'View All' pill under it.
+
+  OURS TODAY: missing entirely.
+
+  Source from newest active products. Reuse the same rail primitive as the Best Sellers ticket rather than building a second carousel. Desktop + mobile (mobile: swipe, controls hidden or shrunk).
+feature: home-page-parity
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.131Z'
+last_updated: '2026-08-06T14:44:55.705Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - products
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T11:57:53.685Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:17:50.105Z'
+    text: |-
+      Built. Files created (all new, no shared file edited):
+      - packages/web/app/components/home/NewInRail.tsx — band + `fetchNewInProducts()`
+      - packages/web/app/components/home/ProductRail.tsx — the shared rail primitive (built once for this and #530, as the ticket asks; NOT a second carousel)
+      - packages/web/tests/components/home/ProductRail.test.tsx — 21 tests covering both bands, all passing
+      - packages/web/app/routes/zz-preview-rails.tsx — TEMPORARY preview route for screenshotting at 1440/390 without editing routes/index.tsx. Delete at integration.
+
+      SUPERSEDES: nothing. The home page has no new-arrivals band today; this one is additive and belongs after the three promo tiles (#533) in the bar's running order.
+
+      WIRING (one line inside the home loader's existing createServerFn):
+      ```ts
+      import { NewInRail, fetchNewInProducts } from '~/components/home/NewInRail'
+      fetchNewInProducts()   // -> ProductCardData[], never throws
+      ```
+
+      REAL NEWEST-PRODUCTS SOURCE (the ticket's explicit ask):
+      Checked — `GET /api/products` takes `sortBy` from the enum `["createdAt","updatedAt","title","basePrice","featuredOrder","salesCount"]` (packages/api/src/routes/products.ts:207), so creation-date ordering is native and this rail wires `sortBy=createdAt&sortOrder=desc` against the real list endpoint. Verified against the dev catalogue — the rail returns Synthetic Nature (2026-08-05T20:12:25Z), Digital Cosmos, Neural Dreams, Blush Hour, Emerald Dreams… in strict descending createdAt, all `status = 'active'`.
+
+      Deliberately NOT `GET /api/products/featured`: that is a curated list wearing a chronological label, and its SQL projection carries no review aggregate either (see #530).
+
+      RATINGS — WHAT IS MISSING AND WHY THAT IS CORRECT:
+      The newest products have no approved reviews yet (`averageRating: null`, `reviewCount: 0` straight from the API), so ProductRating renders nothing and each New In card shows the wishlist heart alone on that row. That is exactly what the bar does: mesonart's own New In cards (bar-desktop-s04) carry the heart with NO star row, for the same reason. Nothing is invented. The list endpoint does return the aggregate, so these cards will grow stars on their own the moment a review is approved — no code change needed.
+
+      MEASURED GEOMETRY (verified in the browser at 1440x900 and 390x844):
+      - circular prev/next: 56px outline circles at the far right of the heading row, prev greyed at rest — matches bar-desktop-s03. Hidden below `lg`; mobile swipes, per the ticket.
+      - desktop: 4 cards of 335 in a 1400 track at a 20px gutter
+      - mobile: card 287 inside 390 with the next peeking at x=327; the track bleeds past the page gutter and snaps back to it via `scroll-pl`
+      - centred outline "View All" pill with a leading icon under the rail, 142x56
+      - the arrows disable at the real scroll ends (measured geometry, not a card count) and the track is its own tab stop with ArrowLeft/ArrowRight handling; `prefers-reduced-motion` swaps the programmatic scroll from smooth to auto
+
+      View All carries `sortBy=createdAt&sortOrder=desc` into `/posters`, so the grid opens on the same order the rail showed. Both are in the route's `SortOption` union, so `validateSearch` keeps them.
+
+      WHY A NEW PRIMITIVE RATHER THAN product/ProductCarousel:
+      ProductCarousel (#522) is the PDP's related-products row — a five-up track under a small `text-xl` heading with no View All pill, live on `/posters/$slug`. Widening it with four new props would put the PDP's two rows one prop-default away from changing shape. The scroll/edge logic in ProductRail is deliberately the same shape as that file's so the two can be merged if a third caller ever appears.
+
+      SHARED FILES I NEEDED BUT DID NOT EDIT: same three listed on #530 — `product/ChooseOptions.tsx` (mobile black circular cart button vs our "Choose Options" pill), `product/ProductCardMedia.tsx` (hardcoded lazy loading), `styles/globals.css` (`--page-padding: 20px` vs the bar's ~48px page gutter).
+
+      Verification: `npx tsc --noEmit` clean for the new files; `vitest run tests/components/product` 428/428 (no regression to /posters or the collection page); `vitest run tests/components/home/ProductRail.test.tsx` 21/21.
+  - author: system
+    timestamp: '2026-08-06T14:44:55.705Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T11:57:53.685Z'
+completed: '2026-08-06T14:44:55.705Z'

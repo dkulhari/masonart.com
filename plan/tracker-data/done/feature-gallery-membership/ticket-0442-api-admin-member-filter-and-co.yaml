@@ -1,0 +1,155 @@
+ticket_number: 442
+title: API + Admin - member filter and consented-email export
+description: |-
+  ## Task
+  `/admin/customers` gains a gallery-member filter and an export of the consented list: email, name, `galleryJoinedAt`, `marketingConsentAt`, `joinSource`.
+
+  The export is the deliverable of D4 — the reason membership is an explicit opt-in rather than "has an account". Only rows with a `marketingConsentAt` are exportable; a member row missing consent is a bug, not a marketable address.
+
+  ## Context
+  Part of feature: gallery-membership
+  Phase: 2 — API
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §8, §9
+
+  Extend the existing admin customers route and screen rather than adding a parallel one (`packages/api/src/routes/admin/customers.ts`, `packages/web/app/routes/admin/customers.tsx`). Tests: `tests/routes/admin/customers.test.ts` already exists — add to it.
+feature: gallery-membership
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:14:23.303Z'
+last_updated: '2026-08-06T06:28:48.885Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T06:19:20.624Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T06:28:45.262Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `59642708` — feat(admin): gallery-member filter and a consented-only email export
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/customers.ts` — `galleryMember` filter on the list, new `GET /api/admin/customers/export`, shared filter builder, CSV writer
+      - `packages/api/tests/routes/admin/customers.test.ts` — 17 added tests (39 total in file), 5 gallery fixtures
+      - `packages/web/app/routes/admin/customers.tsx` — Gallery filter select, "Export consented" download button, Gallery column
+      - `packages/web/tests/routes/admin/customers-gallery.test.ts` — 12 tests, new file (the API file was extended in place as instructed)
+
+      **Summary**:
+      The list gains a `galleryMember` filter and now carries the four membership
+      columns per row. `GET /api/admin/customers/export` returns
+      `email,name,galleryJoinedAt,marketingConsentAt,joinSource` as CSV.
+
+      The rule that mattered: `isNotNull(users.marketingConsentAt)` is pushed onto
+      the condition list *after* the caller's filters, so a query parameter can only
+      narrow the export, never widen it. A `galleryMember` row with a NULL consent
+      stamp never leaves the handler. The test `OMITS a gallery member that carries
+      no marketingConsentAt` asks for that row three ways — unfiltered, via the
+      fixture search, and with an explicit `?galleryMember=true` — and all three must
+      come back without it.
+
+      `joinSource` is a real column in the file, so a rail-recovered join (#446)
+      reads as `rail` and not `banner`.
+
+      Two decisions worth recording:
+      - **The boolean is a two-word enum, not `z.coerce.boolean()`**, on both sides.
+        Every non-empty string is truthy, so `galleryMember=false` would have meant
+        `true` and "Not members" would have listed members. On the web side the
+        unrecognised case resolves to `undefined` rather than throwing, because a
+        throw in `validateSearch` error-boundaries the route to a blank page
+        (`router.tsx` keeps every search param a string).
+      - **CSV fields are RFC 4180 quoted and formula-neutralised.** Names are user
+        input and this file is opened in a spreadsheet; a leading `=`/`+`/`-`/`@`
+        gets an apostrophe. Both are pinned by fixtures (`Banner, "Quoted" Member`
+        and `=cmd|/c calc`).
+
+      The export is deliberately unpaginated — a partial mailing list is worse than
+      none, because the missing half is invisible.
+
+      **Verification**:
+      - Command: `cd packages/api && DATABASE_URL=…@localhost:5440/poster_app_dev bunx vitest run tests/routes/admin/customers.test.ts`
+      - Result: PASS (39 tests, 39 passing — baseline before this work was 22)
+      - Command: `cd packages/web && bunx vitest run tests/routes/admin/customers-gallery.test.ts`
+      - Result: PASS (12 tests, 12 passing)
+      - Red step confirmed first: 14 failures for the right reasons (filter ignored, unknown value accepted with 200, `/export` 404)
+      - `tsc --noEmit` clean for every touched file in both packages
+
+      **Note for whoever runs these next**: the default `DATABASE_URL` in
+      `packages/api/vitest.config.ts` points at port 5433 and fails auth; the real
+      dev database is on 5440.
+  - author: system
+    timestamp: '2026-08-06T06:28:48.885Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 439
+    feature: gallery-membership
+    description: Schema - gallery membership columns and the session field
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the filter and the export
+    file: packages/api/tests/routes/admin/customers.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      describe('gallery member filter and export', () => {
+        it('filters the customer list to gallery members', async () => {})
+
+        it('exports only rows carrying marketing consent', async () => {
+          // A member row with no marketingConsentAt is a bug, not an address we may
+          // market to — it must not appear in the export.
+        })
+
+        it('includes joinedAt, consentAt and joinSource in the export', async () => {})
+
+        it('rejects a non-admin', async () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts
+    expected_result: FAIL - filter and export not implemented
+    status: done
+  - id: 3
+    action: implement
+    description: Add the filter and export handler
+    file: packages/api/src/routes/admin/customers.ts
+    status: done
+    code: |-
+      // ?galleryMember=true narrows the list.
+      // GET /export/gallery returns CSV for rows where galleryMember is true AND
+      // marketingConsentAt is not null.
+  - id: 4
+    action: implement
+    description: Add the filter control and export button to the admin screen
+    file: packages/web/app/routes/admin/customers.tsx
+    status: done
+    code: |-
+      // Filter toggle plus a download button. Remember the router search-param
+      // gotcha: validateSearch must coerce, since search values arrive as strings.
+  - id: 5
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/customers.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the member filter and export
+    command: 'git add packages/api/src/routes/admin/customers.ts packages/web/app/routes/admin/customers.tsx packages/api/tests/routes/admin/customers.test.ts && git commit -m "feat(admin): gallery member filter and consented-email export"'
+    status: done
+current_step: 6
+started: '2026-08-06T06:19:20.624Z'
+completed: '2026-08-06T06:28:48.885Z'

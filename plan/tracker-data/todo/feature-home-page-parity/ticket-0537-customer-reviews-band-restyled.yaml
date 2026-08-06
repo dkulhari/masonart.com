@@ -1,0 +1,50 @@
+ticket_number: 537
+title: Customer Reviews band restyled to the bar
+description: |-
+  BAR: mesonart 'Customer Reviews'. Plain white background, left-aligned heading with a 'View All →' outline pill at the far right, and directly under the heading a compact line: gold stars, then '9000+ Score 4.9/ 5.0'. Restrained — no card carousel on the home page.
+
+  OURS TODAY: CustomerReviewsSection sits in a full-width olive band with a big '4.5 ★★★★☆ 12 reviews' line and a four-card review carousel with circular controls. Heavier and louder than the bar.
+
+  Keep the review data real. Desktop + mobile.
+feature: home-page-parity
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.147Z'
+last_updated: '2026-08-06T13:21:05.208Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - reviews
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: mcp-client
+    timestamp: '2026-08-06T13:21:05.208Z'
+    text: |-
+      This ticket's premise is wrong. Do not restyle this band toward the reference.
+
+      A blind critic — separate agent, fresh context, shown our band and mesonart's cut to the same boundaries with the labels stripped and A/B randomised — picked OURS on both desktop and mobile.
+
+      The ticket said ours is "heavier and louder than the bar" and should become plain white with a compact aggregate line and no card carousel. The critic, not knowing which was which, listed the faults on the reference's side:
+
+      - their rating line starts ~45 CSS px right of the heading's left edge, so the band's two header elements hang on two different axes — their own mobile layout gets this right, their desktop does not
+      - their star glyphs render 4 solid + 1 hollow next to text claiming "4.9/ 5.0" — the graphic contradicts the number
+      - "9000+ Score 4.9/ 5.0" is a single 16px run at one weight and colour, with a stray space after the slash and no separator before "Score" — it reads as a debug string
+      - their View All pill's vertical centre aligns to neither the heading baseline nor the rating row
+      - on mobile they centre the View All pill while the heading and rating sit hard-left on the gutter, so a four-element band runs two competing axes
+
+      Caveat stated honestly by the critic: the reference's review cards failed to render in the capture, so it judged that side on the four elements that did appear, gave it no penalty for the dead space, and deliberately did not lean on our card craft to decide. Every fault above is independent of the missing content.
+
+      The band therefore passes as built. Rescope this ticket to the single defect the critic found in OURS:
+
+      The mobile peek card shows only ~95 device px of the next card — just enough to render chopped letter fragments ("T", "P", "s") with no fade mask, so it reads as broken text rather than a deliberate peek. Either widen the slice or cut it back to a thin edge.
+
+      Worth carrying into #540: a band can be at parity by being better than the reference, not only by matching it. Where a blind critic prefers ours, matching the reference would be a regression.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

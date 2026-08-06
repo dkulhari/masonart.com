@@ -1,0 +1,76 @@
+ticket_number: 542
+title: Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
+description: |-
+  BAR: mesonart at 390 pins a six-item bottom tab bar to the viewport for the whole session — Home, Menu, Search, Shop, Cart, Account, each a line icon over a small label, on white with a hairline top border and safe-area padding.
+
+  OURS TODAY: nothing. Our mobile header carries only the wordmark, a cart icon and a hamburger, so search and account are two taps away.
+
+  This is global chrome, so land it where the header and footer live rather than inside the home route, and make sure it does not cover the last band of any page or the cart drawer. Judged on the home page at 390.
+feature: home-page-parity
+type: task
+priority: high
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.196Z'
+last_updated: '2026-08-06T12:28:04.356Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - mobile
+  - chrome
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T12:27:34.003Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:28:04.356Z'
+    text: |-
+      Built and measured. Ready for the blind critic.
+
+      FILES
+      - NEW packages/web/app/components/layout/MobileTabBar.tsx — the bar, plus the exported MOBILE_TAB_BAR_PADDING_CLASS constant.
+      - NEW packages/web/tests/components/layout/MobileTabBar.test.tsx — 16 tests, all green (135/135 for tests/components/layout).
+      - EDIT packages/web/app/components/layout/Header.tsx — renders <MobileTabBar/> as a sibling of <header> (3-line diff + comment).
+      - EDIT packages/web/app/routes/__root.tsx — applies the imported padding class to the page shell (not to <main>, so it sits BELOW the footer).
+
+      WHY IT MOUNTS FROM THE HEADER, NOT __root
+      The mobile menu and SearchDrawer are Header's own useState. Mounted at the root the bar would have had to duplicate both, which the brief rules out. Rendered from Header it reuses toggleMobileMenu / setIsSearchOpen directly and owns no drawer state — pinned by a test. It is a SIBLING of <header>, not a child: the header sets backdrop-blur, which is a containing block for fixed descendants (#348), so nested it would pin to the bottom of the 64px header. Cart is the exception because it was already global — it calls the store's openDrawer, the same action every other surface uses (#460).
+
+      __root.tsx is the only shared file I touched beyond Header, and only for one className. Nobody working on the home page should be in either.
+
+      WIRING (all six verified in a real browser at 390x844)
+      - Home   -> Link to "/", activeOptions exact
+      - Menu   -> Header's toggleMobileMenu; aria-expanded + aria-controls="mobile-nav". Confirmed #mobile-nav mounts on tap.
+      - Search -> Header's setIsSearchOpen(true). Confirmed the drawer opens.
+      - Shop   -> Link to "/posters"
+      - Cart   -> useCartStore.openDrawer. Confirmed the drawer opens. Count badge only when > 0, hydration-guarded (#498).
+      - Account-> "/account" signed in; "/auth/login?redirect=%2Faccount" signed out (the _authed guard would bounce there anyway).
+
+      CHECK 1 — does not cover the last band of any page
+      Scrolled to the true bottom of / /posters /about /reviews /gallery /wishlist /cart /checkout and a PDP. Bar top 782 on every one; footer bottom 781.6-782.4. A DOM sweep of every element in main/footer found ZERO crossing the bar's top edge. lg:pb-0 is real: at 1024 the shell padding is 0px and the bar is display:none; at 1023 and 820 both are on.
+      One exception, reported not fixed: /create has its own `fixed inset-x-0 bottom-0 z-40 md:hidden` action bar, which paints over ours (z-40 > z-30). No page content is hidden and the footer still clears — the tab bar is simply not reachable on /create. Fixing it means editing app/routes/create/index.tsx, which is out of scope here.
+
+      CHECK 2 — does not fight any overlay
+      Bar is z-30. Every overlay in the app is z-40 (scrims) / z-50 (panels): CartDrawer, SearchDrawer, the mobile menu + scrim, the mega-menu scrim, JoinGalleryModal. elementFromPoint over the bar's centre returns the search scrim with search open, the cart panel with the cart open, the menu scrim with the menu open, and the bar itself after Escape. ReviewToast is also z-30 but sits at bottom-24, clearing the 62px bar.
+
+      MEASUREMENTS (device px off bar-mobile-s05.png, ours off the same harness at the same slice)
+      - bar top y=1564 both; height 62 CSS both; six equal columns, item centres within 1px of theirs.
+      - labels: all six label bounding boxes are IDENTICAL to the reference (10px Poppins 400 — their cap height is 7px).
+      - icons after a second pass: Home 36x36 vs 36x36, Menu 30x22 vs 31x22, Shop 36x36 vs 36x36, Cart 35x36 vs 37x37, Account 34x36 vs 36x36, Search 36x36 vs 34x34.
+        Home / Menu / Cart / Person are hand-traced SVGs — lucide's House has a pitched roof, Menu has three equal rules, User is 4px narrower across the shoulders and ShoppingCart overflows the box. Search and Shop stayed lucide (Search, LayoutGrid).
+      - rounded-t-[14px] (their corner measures ~13px) + a border-t hairline, which follows the radius.
+
+      NOT DONE / NOTES
+      - No visual active state: all six items are pure black on the reference, so an emphasised Home would have been the deviation. TanStack Link still sets aria-current.
+      - Supersedes nothing; adds chrome that did not exist.
+      - Harness gotcha for whoever screenshots this next: a plain scrollTo + screenshot mid-page renders fixed elements ~77px low (page still settling). Use scratchpad/shoot.mjs, which pre-scrolls the whole page first.
+      - Pre-existing failure unrelated to this ticket: tests/styles/design-tokens.test.ts "ramps the gutter to 36px at lg and 48px at xl" (#540, tailwind.config.ts / globals.css — not files I touched).
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T12:27:34.003Z'

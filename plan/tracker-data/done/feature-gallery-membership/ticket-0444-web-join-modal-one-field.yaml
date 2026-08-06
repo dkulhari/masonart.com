@@ -1,0 +1,120 @@
+ticket_number: 444
+title: Web - join modal, one field
+description: |-
+  ## Task
+  The modal the offer opens: promotion headline, what joining unlocks, one email field, one button. Signed-in visitors join in place; guests are routed to registration carrying `?join=gallery` and the prefilled email.
+
+  One field is the research finding, not a stylistic preference — minimal-field capture converts best, and every extra field on this modal is a member we do not get.
+
+  ## Context
+  Part of feature: gallery-membership
+  Phase: 3 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §2, §7, §8
+
+  New `packages/web/app/components/promo/JoinGalleryModal.tsx`, shadcn/ui dialog. Headline and depth come from the active promotion — the modal renders nothing when no promotion is active, and contains no hardcoded discount. Uses `useGalleryMembership().join('banner' | 'rail' | 'cart' | 'sale-page')` from T-G5, passing the surface that opened it.
+
+  Do not trigger a browser dialog/alert anywhere in this flow.
+feature: gallery-membership
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:15:20.017Z'
+last_updated: '2026-08-06T05:53:24.490Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T05:53:09.222Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T05:53:24.490Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `e55ec152` - feat(web): join-the-gallery modal, one email field
+
+      **Files Changed**:
+      - `packages/web/app/components/promo/JoinGalleryModal.tsx` - new dialog
+      - `packages/web/tests/components/promo/JoinGalleryModal.test.tsx` - 20 tests
+
+      **Summary**:
+      - Headline and depth come from `GET /api/promotions/active` (#432). No discount is written down in the component; no active promotion (or a failed lookup) renders `null`. `percentOff: null` (fixed-amount sale) drops the percentage line rather than printing `null%`.
+      - The promotion can be handed in via a `promotion` prop by a surface that already fetched it (the banner, #445); otherwise the modal fetches it itself, via `${getApiUrl()}/api/promotions/active` with `credentials: 'include'` so the per-visitor countdown cookie is not re-minted on every open.
+      - Exactly one field, asserted by count: `input, select, textarea` inside the dialog must be length 1 and `type="email"`. No name, phone, checkbox or radio.
+      - Signed in → `useGalleryMembership().join(source)` in place, with the address prefilled from the session. Guest → `navigate({ href: '/auth/register?join=gallery&email=<encoded>' })`, which #441 picks up.
+      - Session read from `useRouteContext({ from: '__root__' })`, not better-auth's `useSession()` — same no-flash reasoning as #443.
+      - A `join()` that resolves false sets in-component error state and keeps the dialog open; `onClose` is not called. `window.alert` / `window.confirm` are stubbed in the suite and asserted never called.
+
+      **Spec notes for whoever picks up #445/#446**:
+      1. The ticket says "shadcn/ui dialog" but `packages/web/app/components/ui/` has no dialog primitive and the package has no Radix dependency. Followed the repo's actual modal pattern (`components/reviews/ReviewModal.tsx`: `role="dialog"` + `aria-modal` + backdrop + Escape).
+      2. `app/routes/auth/register.tsx` still validates search as `z.object({ redirect: z.string().optional() })`, which strips `join` and `email`. Navigation uses `href` (a fully built URL) rather than `{ to, search }` for that reason, but **#441 must widen that schema** or the intent is dropped at the destination.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/components/promo/JoinGalleryModal.test.tsx`
+      - Result: PASS (20 tests, 20 passing, 0 failing)
+      - Also: `bunx tsc --noEmit -p tsconfig.json` reports no errors in either new file.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 443
+    feature: gallery-membership
+    description: Web - SSR-safe member state hook
+  - ticket: 432
+    feature: sale-promotions
+    description: API - countdown deadline resolution, cookie mint and clamp
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the modal
+    file: packages/web/tests/components/promo/JoinGalleryModal.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/promo/JoinGalleryModal.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('JoinGalleryModal', () => {
+        it('renders nothing when no promotion is active', () => {})
+        it('shows the promotion headline rather than a hardcoded discount', () => {})
+        it('asks for an email and nothing else', () => {})
+        it('joins in place for a signed-in visitor', () => {})
+        it('routes a guest to registration carrying the intent and the email', () => {})
+        it('reports a failed join instead of closing as if it worked', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/components/promo/JoinGalleryModal.test.tsx
+    expected_result: FAIL - component does not exist
+    status: done
+  - id: 3
+    action: implement
+    description: Build the modal
+    file: packages/web/app/components/promo/JoinGalleryModal.tsx
+    status: done
+    code: |-
+      // Dialog: headline from the promotion, one line on what joining unlocks, an
+      // email input, a submit button, and a plain dismiss.
+      // Signed in -> join(source) from useGalleryMembership.
+      // Guest      -> navigate to /auth/register?join=gallery&email=<encoded>.
+      // One field is deliberate: every extra field costs members.
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/components/promo/JoinGalleryModal.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit the join modal
+    command: 'git add packages/web/app/components/promo/JoinGalleryModal.tsx packages/web/tests/components/promo/JoinGalleryModal.test.tsx && git commit -m "feat(web): join-the-gallery modal"'
+    status: done
+current_step: 5
+completed: '2026-08-06T05:53:09.222Z'

@@ -1,0 +1,46 @@
+ticket_number: 546
+title: Seed catalogue artwork carries a MESON ART watermark baked into the pixels
+description: |-
+  Found independently by the #531 and #538 builders, and it is more serious than the development placeholder photography in #544.
+
+  Our seed product artwork is scraped from mesonart and several images have "MESON ART" burned into the pixels. This is not a folder we can git-ignore — it is product imagery already rendering on product cards, on the PDP, and now on the home page's popular tiles, where a tighter crop makes the watermark more legible rather than less. It is visible in the very first screenshots taken of our own home page at the start of this feature.
+
+  Three of the eight collection representative tiles are affected. The #538 builder separately rejected `dev-reference/story/still.jpg` for the same reason — mesonart's wordmark and tagline burned into the frame.
+
+  This is distinct from #544. #544 is about photography we deliberately borrowed and quarantined; this is a competitor's watermark inside our own catalogue records, reaching users through normal product surfaces.
+
+  To close: audit the catalogue for watermarked artwork, and either replace those products' imagery or remove the affected records. Do not attempt to erase the watermark from the pixels — that does not resolve the underlying question of whose artwork it is.
+feature: home-page-parity
+type: bug
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T12:19:02.372Z'
+last_updated: '2026-08-06T12:25:27.228Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - blocks-go-live
+  - content
+  - legal
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T12:25:22.567Z'
+    text: Priority changed from 'critical' to 'low'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:25:27.228Z'
+    text: |-
+      Downgraded on the user's instruction: watermarks are not a problem currently. Same development-only framing as the placeholder photography in #544.
+
+      Priority critical -> low. Not blocking go-live for now, despite the blocks-go-live label still on the record — treat this comment as the authority over the label until someone reconciles them.
+
+      What changes in the work right now: builders stop routing around watermarked catalogue imagery. That constraint was costing real choices — the #533 builder abandoned an otherwise good first pass that gave each promo tile a room-mockup from a product in its own destination, purely because Custom Art kept landing on a watermarked image. Watermarked artwork is acceptable in any band from here.
+
+      What does not change: this is still a live production surface, not a quarantined folder like #544, so it should be revisited before launch rather than closed. Leaving the ticket open with the audit steps intact.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -15,17 +15,51 @@ description: |-
 feature: sale-promotions
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T08:04:59.153Z'
-last_updated: '2026-08-05T08:04:59.153Z'
+last_updated: '2026-08-06T06:26:12.658Z'
 time_spent_minutes: 0
 labels:
   - frontend
   - ui
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T06:15:05.173Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T06:26:09.634Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `dd636345` — feat(web): admin promotions list and editor
+
+      **Files Changed**:
+      - `packages/web/app/routes/admin/promotions/index.tsx` — list, derived state badge, enable/disable/delete, state+scope+text filters via search params
+      - `packages/web/app/routes/admin/promotions/$id.tsx` — editor; `new` creates, any other id loads and PATCHes
+      - `packages/web/tests/routes/admin/promotions.test.tsx` — 48 tests
+      - `packages/web/app/routeTree.gen.ts` — the two routes registered under /admin
+      - `packages/web/app/components/admin/AdminSidebar.tsx` — Promotions nav entry (admin-only; not in CONTENT_MANAGER_ALLOWED_PREFIXES, so content-managers do not see it)
+
+      **Summary**:
+      - `isActive` is read from the API, never re-derived. `promotionState()` only distinguishes the shades the API does not name: off > live (server's answer) > scheduled/ended by the clock.
+      - The editor validates with `createPromotionInputSchema` from `@chobii/shared` directly rather than restating its rules; zod issue paths are collapsed onto the top-level field.
+      - `fromAdminPromotion` loads BOTH membership sets, because PATCH replaces both wholesale — the collections-form bug (loading without members and wiping them on save) would repeat here as silently un-excluding products.
+      - Filter scope renders only styles/subjects/rooms (the three axes `promotionScopeFilterSchema.strict()` accepts), derived from `FACET_GROUPS`.
+      - §6 note is the countdown selector's `aria-describedby` hint, so it sits with the control: rolling is a per-visitor cookie clock that re-mints on the next load, nothing ends at zero; real counts down to the end date for everyone.
+      - Empty state reports the storefront, not the database: "No sale is running." plus what that means for the strip, countdown, badges and announcement bar. The same line shows above the table when rows exist but none are live.
+      - Search schema splits comma-joined arrays (copied from /admin/customers' roleListParam) and `.catch()`es every field so a mangled URL drops the filter instead of blanking the route.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/routes/admin/promotions.test.tsx`
+      - Result: PASS (48 tests, 48 passing, 0 failing)
+      - Command: `cd packages/web && bunx tsc --noEmit`
+      - Result: 22 errors total, none in any file this ticket touched (baseline is ~26)
+  - author: system
+    timestamp: '2026-08-06T06:26:12.658Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by:
@@ -41,7 +75,7 @@ implementation_steps:
     file: packages/web/tests/routes/admin/promotions.test.tsx
     command: cd packages/web && bunx vitest run tests/routes/admin/promotions.test.tsx
     expected_result: FAIL
-    status: pending
+    status: done
     code: |-
       import { describe, it, expect } from 'vitest'
 
@@ -58,12 +92,12 @@ implementation_steps:
     description: Confirm the tests fail
     command: cd packages/web && bunx vitest run tests/routes/admin/promotions.test.tsx
     expected_result: FAIL - route component does not exist
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Build the promotions list route
     file: packages/web/app/routes/admin/promotions/index.tsx
-    status: pending
+    status: done
     code: |-
       // Table: name, headline, depth, scope, members-only, window, active badge
       // (derived client-side from the API's isActive), enable/disable toggle,
@@ -73,7 +107,7 @@ implementation_steps:
     action: implement
     description: Build the promotion editor form
     file: packages/web/app/routes/admin/promotions/$id.tsx
-    status: pending
+    status: done
     code: |-
       // Sections: Identity (name, headline) · Discount (type, value) · Scope
       // (all | filter | products, with pickers) · Exclusions · Eligibility
@@ -86,10 +120,12 @@ implementation_steps:
     description: Confirm the tests pass
     command: cd packages/web && bunx vitest run tests/routes/admin/promotions.test.tsx
     expected_result: PASS
-    status: pending
+    status: done
   - id: 6
     action: commit
     description: Commit the admin promotions screens
     command: 'git add packages/web/app/routes/admin/promotions packages/web/tests/routes/admin/promotions.test.tsx && git commit -m "feat(web): admin promotions list and editor"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 6
+started: '2026-08-06T06:15:05.173Z'
+completed: '2026-08-06T06:26:12.658Z'

@@ -1,0 +1,64 @@
+ticket_number: 539
+title: Trust icons row above the footer
+description: |-
+  BAR: mesonart's four-up trust row on white directly above the footer: a line-art icon centred, the label under it, and a short sentence under that — palette/Handcrafted Art, box/Free Shipping Globally, leaf/Eco Friendly, card/Safe Payments. Generous vertical air, no borders, no cards.
+
+  OURS TODAY: two competing treatments — a four-card bordered 'Why Choose chobii.art?' grid mid-page and a small icon-left/text-right strip inside the footer band. Neither matches.
+
+  Consolidate to one row in the bar's shape and placement. Desktop + mobile.
+feature: home-page-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T11:51:47.175Z'
+last_updated: '2026-08-06T14:44:55.920Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - trust
+  - blind-ab
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T11:57:46.202Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T12:14:10.291Z'
+    text: |-
+      Built as packages/web/app/components/home/TrustIconsRow.tsx (+ tests/components/home/TrustIconsRow.test.tsx, 7 passing). Per the concurrency rule I did NOT touch app/routes/index.tsx or Footer.tsx.
+
+      INTEGRATION — both existing treatments must come out, and the new row is a SIBLING OF THE FOOTER, not a mid-page band:
+
+      1. REMOVE `ValuePropsSection` from app/routes/index.tsx — the `valueProps` array (~L478-503), the `ValuePropsSection` function (~L505-537) and its call site in the page. This is the bordered "Why Choose chobii.art?" four-card grid. Drop the now-unused `Palette` / `Shield` lucide imports if nothing else in the file uses them. TrustIconsRow supersedes it outright, including the heading — the reference row has no heading at all.
+
+      2. REMOVE the USP strip from app/components/layout/Footer.tsx — the `USP_ITEMS` const (L25-30) and the `<div className="border-b border-foreground/10">…</div>` block that renders it (L42-55), plus the Brush/Truck/ShieldCheck/RotateCcw imports if unused after. That strip is the same four claims a second time, at 14px, inside the cream band. Saying it twice on one page halves it.
+
+      3. MOUNT `<TrustIconsRow />` as the LAST section of the home page, immediately before <Footer/> — after the newsletter band, not mid-page. On the reference it is the white band that separates the sage brand-story band from the cream footer, and it only earns its air in that slot.
+
+      CLAIMS — theirs are Handcrafted Art / Free Shipping Globally / Eco Friendly / Safe Payments. Two of those are false in our mouths, so every line is lifted from copy we already ship rather than newly written (same discipline as components/product/TrustList.tsx, cited inline in the file):
+      - Archival Inks / "Museum-grade pigment" — Footer USP_ITEMS verbatim; AnnouncementBar "Museum-grade archival inks on every print"; index.tsx valueProps "Museum-grade paper and archival inks…"
+      - Free Over ₹999 / "Free delivery across India" — routes/shipping.tsx "Costs"; Footer ("Free Over ₹999"/"Across India"); valueProps "free delivery on all orders over ₹999"
+      - 30-Day Returns / "Full refund, no questions asked" — routes/returns.tsx "The policy"; AnnouncementBar "30-day returns, no questions asked"; valueProps "a full refund, no questions asked"
+      - Safe Payments / "Secure checkout via Razorpay" — routes/faq.tsx payment methods, via TrustList's "Secure checkout via Razorpay — cards, UPI, netbanking & wallets"; Footer "Razorpay secured"
+
+      NO ECO CLAIM, deliberately. Footer.tsx already dropped mesonart's on the grounds that "a sustainability claim we cannot substantiate is not one worth copying"; that decision stands and returns take the slot, as they do there. There is also no "AI-Powered Creation" column — the AI band already has a whole section of the page, and the reference's fourth slot is payments. A test pins all four pairs and fails if "free shipping globally" or an eco claim is reintroduced.
+
+      MEASURED, not eyeballed — reference capture at 1440 (2x, halved), then re-measured on a pixel-accurate render of this component:
+      - white band, py-16 top and bottom (theirs 248px tall, ours 258)
+      - label and sentence are the SAME size (cap height 11px → 16px Poppins) and the SAME colour: pure black. Their second line is NOT muted; `text-muted-foreground` on it is banned by test.
+      - icons 56px box → 36-49px rendered glyph at a 2.5px stroke (strokeWidth 1.1), matching their 36.5-47px. lucide's default weight-2 outline reads as a filled glyph at that size.
+      - 23.5px icon-bottom → label cap (mt-3), 33px between the two baselines (leading-7 + mt-1.5). Ours land within ~1px of both.
+      - xl uses flex/space-between, not four equal columns: on the reference the first sentence is flush with the container's left edge and the last flush with its right, which equal-quarter centring measurably is not. Grid takes over below xl, 2x2 below md — which is what theirs does on a phone.
+      Our outer items sit at the 20px page gutter where theirs sit at ~47px; that is the site-wide container decision from global-chrome-parity, not a miss.
+  - author: system
+    timestamp: '2026-08-06T14:44:55.920Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-06T11:57:46.202Z'
+completed: '2026-08-06T14:44:55.920Z'

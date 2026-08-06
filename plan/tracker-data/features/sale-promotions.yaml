@@ -1,7 +1,7 @@
 name: sale-promotions
 title: Sale Promotions
 priority: high
-created: '2026-08-05T07:53:57.826Z'
+created: "2026-08-05T07:53:57.826Z"
 assignee: unassigned
 tags: []
 description: |-
@@ -54,32 +54,43 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: '00:00:00'
+  total_sessions: 5
+  total_duration: "00:32:00"
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 5
+      duration: "00:32:00"
+      tokens: 0
 tickets:
   todo:
-    '423': Schema - promotion, promotion_product and promotion_exclusion tables
-    '424': Schema - shared Zod schemas and types for promotions
-    '425': Schema - record the promotion and its discount on orders
-    '426': Resolver - active promotion selection with derived state and no stacking
-    '427': Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
-    '428': API - product list and detail return the resolved sale price
-    '429': API - cart returns base, sale and locked per line without touching stored lineTotal
-    '430': API - order creation writes the real discount and enforces the per-customer limit
-    '431': API - admin promotions CRUD
-    '432': API - countdown deadline resolution, cookie mint and clamp
-    '433': Admin UI - /admin/promotions list and editor
-    '434': Storefront - sale strip with live countdown above the header
-    '435': Storefront - sale pricing on product cards and the PDP buy panel
-    '436': Storefront - cart saving row, locked for non-members
-    '437': Storefront - /sale landing page and the red Sale nav link
-    '438': E2E - sale lifecycle from no promotion to expiry
-  in_progress: {}
-  done: {}
-total_tickets: 16
-completion_percentage: 0
+    "423": Schema - promotion, promotion_product and promotion_exclusion tables
+    "424": Schema - shared Zod schemas and types for promotions
+    "425": Schema - record the promotion and its discount on orders
+    "426": Resolver - active promotion selection with derived state and no stacking
+    "427": Resolver - resolveSalePrice with scope matching, exclusions, member gate and rounding
+    "428": API - product list and detail return the resolved sale price
+    "429": API - cart returns base, sale and locked per line without touching stored lineTotal
+    "430": API - order creation writes the real discount and enforces the per-customer limit
+    "431": API - admin promotions CRUD
+    "432": API - countdown deadline resolution, cookie mint and clamp
+    "434": Storefront - sale strip with live countdown above the header
+    "527": Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
+    "528": A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
+  in_progress:
+    "510": Cart page mixes two cart sources, so the saving row can describe lines it is not showing
+  done:
+    "433": Admin UI - /admin/promotions list and editor
+    "435": Storefront - sale pricing on product cards and the PDP buy panel
+    "436": Storefront - cart saving row, locked for non-members
+    "437": Storefront - /sale landing page and the red Sale nav link
+    "438": E2E - sale lifecycle from no promotion to expiry
+    "510": DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
+    "516": API - featured products endpoint returns no sale price, so the home rail disagrees with the grid
+    "524": Bug - /sale and /posters cards print base prices during a sale
+    "525": Bug - promotion writes leave stale prices in the product response cache
+total_tickets: 23
+completion_percentage: 39
 is_completed: false
 plan:
   phases:
@@ -114,4 +125,4 @@ plan:
       location: tests/e2e
       tickets:
         - 438
-  generated_at: '2026-08-05T08:05:50.837Z'
+  generated_at: "2026-08-05T08:05:50.837Z"

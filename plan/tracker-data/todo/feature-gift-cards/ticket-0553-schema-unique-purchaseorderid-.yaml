@@ -22,17 +22,22 @@ description: |-
 feature: gift-cards
 type: task
 priority: high
-status: todo
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T15:09:18.262Z'
-last_updated: '2026-08-06T15:09:18.262Z'
+last_updated: '2026-08-06T15:12:57.822Z'
 time_spent_minutes: 0
 labels:
   - database
   - schema
 acceptance_criteria: []
-comments: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T15:12:50.495Z'
+    text: Status changed from 'todo' to 'undefined'
+  - author: system
+    timestamp: '2026-08-06T15:12:57.822Z'
+    text: Status changed from 'undefined' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
@@ -144,3 +149,5 @@ implementation_steps:
     command: 'git add packages/api/src/database/schema/gift-cards.ts packages/api/src/database/schema/orders.ts packages/api/tests/database/gift-card-delivery-schema.test.ts packages/api/drizzle && git commit -m "feat(api): make gift card minting idempotent and defer scheduled cards"'
     status: pending
 current_step: 1
+status: done
+completed: '2026-08-06T15:12:57.822Z'

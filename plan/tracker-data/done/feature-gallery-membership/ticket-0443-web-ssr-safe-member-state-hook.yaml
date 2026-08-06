@@ -1,0 +1,159 @@
+ticket_number: 443
+title: Web - SSR-safe member state hook
+description: |-
+  ## Task
+  One hook, `useGalleryMembership()`, reading `galleryMember` from the better-auth session and exposing `{ isMember, isLoading, join }`. Every surface that shows a locked price reads it from here rather than deriving membership itself.
+
+  SSR-safe: the server already knows the answer from the session, so the first paint must not flash an unlocked price and then lock it (or the reverse).
+
+  ## Context
+  Part of feature: gallery-membership
+  Phase: 3 — Frontend
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §8
+
+  `galleryMember` reaches the client through better-auth `additionalFields` (T-G1), so `authClient.$Infer.Session['user']` carries it — see `packages/web/app/lib/auth-client.ts`. `join()` posts to the T-G2 endpoint and optimistically flips local state on success.
+
+  Note the price shown is still the server's: the hook decides whether the saving reads as locked, never what the saving is.
+feature: gallery-membership
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:14:23.311Z'
+last_updated: '2026-08-06T05:44:36.746Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T05:38:36.960Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-06T05:44:34.153Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `09142083` - feat(web): SSR-safe gallery membership hook
+
+      **Files Changed**:
+      - `packages/web/app/hooks/useGalleryMembership.ts` (new) - the hook
+      - `packages/web/tests/hooks/useGalleryMembership.test.ts` (new) - 21 tests
+
+      **Summary**:
+      `useGalleryMembership()` returns `{ isMember, isLoading, join }`.
+
+      Membership is read from the root route's session via `useRouteContext({ from: '__root__' })`, **not** from better-auth's `useSession()`. This is a deliberate departure from the ticket's suggested implementation, and it is what makes the SSR requirement achievable — see the spec note below.
+
+      `join(source)` posts to `${getApiUrl()}/api/gallery/join` with `credentials: 'include'`, trusts the idempotent endpoint's returned `galleryMember` rather than assuming success flipped anything, and optimistically flips local state so the price unlocks on the page it was unlocked from (router context keeps its loaded value until the next navigation revalidates). Any non-ok response or thrown request leaves state untouched and resolves `false`.
+
+      `isLoading` describes the join write only — membership itself is never pending, because the server resolved it in `beforeLoad`.
+
+      The hook computes no price. Its surface is asserted key-by-key (`isLoading`, `isMember`, `join`) so a `memberPrice` cannot quietly grow onto it later; the numbers stay resolved by the API.
+
+      **⚠️ Spec defect in this ticket's step 3 code**
+
+      The proposed implementation cannot satisfy the ticket's own third test:
+
+      1. `useSession()` from `better-auth/react` starts at `{ data: null, isPending: true }` and only settles after a client round trip. During SSR no fetch happens, so the server paints `isMember: false` for a member and the client corrects it after hydration — exactly the flash of an unlocked-then-locked price the ticket forbids. The repo already solved this: `__root.tsx` fetches `/api/auth/get-session` in `beforeLoad` and puts the session in router context, which `Header.tsx` (#362) and `wishlist.tsx` read. `galleryMember` still arrives as a better-auth additional field (#439); the root route just resolves it early enough for SSR.
+      2. `fetch('/api/gallery/join')` is relative. There is no Vite `/api` proxy in this repo and the API is a separate origin in dev, so that request hits the web server. Every other call in `app/lib/api.ts` prefixes `getApiUrl()`.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/hooks/useGalleryMembership.test.ts`
+      - Result: PASS (21 tests, 21 passing, 0 failing)
+      - Typecheck: `bunx tsc --noEmit` reports no errors in either new file
+      - **Mutation-tested the no-flash claim** rather than asserting it on faith: temporarily replacing the hook with a fetch-in-`useEffect` implementation (what `useSession()` amounts to) killed 18 of the 21 tests, including all four SSR ones — `renders a member as a member on the server, before any effect runs`, `does not flash the wrong state on first paint`, `does not flash the wrong state for a guest either`, and `never fetches to discover membership`. The SSR assertions go through `renderToStaticMarkup`, where effects never run, so a fetch-based implementation cannot pass them.
+
+      **Note on history**: a concurrent agent's `git add -A` briefly swept these two files into `3f65d864` (#431). That agent re-cut its commit as `a9cdf9df` with only its own API files, and these two were committed cleanly afterwards as `09142083`. No history was rewritten by this ticket.
+  - author: system
+    timestamp: '2026-08-06T05:44:36.746Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 439
+    feature: gallery-membership
+    description: Schema - gallery membership columns and the session field
+  - ticket: 440
+    feature: gallery-membership
+    description: API - POST /api/gallery/join
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the membership hook
+    file: packages/web/tests/hooks/useGalleryMembership.test.ts
+    command: cd packages/web && bunx vitest run tests/hooks/useGalleryMembership.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      import { describe, it, expect } from 'vitest'
+
+      describe('useGalleryMembership', () => {
+        it('reports a guest as not a member', () => {})
+        it('reads galleryMember from the session', () => {})
+        it('does not flash the wrong state on first paint', () => {})
+        it('join() posts the source and flips state on success', () => {})
+        it('leaves state untouched when join() fails', () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/hooks/useGalleryMembership.test.ts
+    expected_result: FAIL - hook does not exist
+    status: done
+  - id: 3
+    action: implement
+    description: Implement the hook over the better-auth session
+    file: packages/web/app/hooks/useGalleryMembership.ts
+    status: done
+    code: |-
+      /**
+       * Whether the viewer is in the gallery.
+       *
+       * Reads the flag better-auth ships in the session (additionalFields), so the
+       * server already knows it at first paint — no flash of an unlocked price.
+       *
+       * This hook decides whether a saving reads as locked. It never decides what
+       * the saving is: that number comes resolved from the API.
+       */
+
+      import { useSession } from '~/lib/auth-client'
+
+      export type JoinSource = 'banner' | 'rail' | 'cart' | 'registration' | 'sale-page'
+
+      export function useGalleryMembership() {
+        const { data, isPending, refetch } = useSession()
+        const isMember = Boolean(data?.user?.galleryMember)
+
+        async function join(source: JoinSource) {
+          const response = await fetch('/api/gallery/join', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source }),
+          })
+          if (!response.ok) return false
+          await refetch()
+          return true
+        }
+
+        return { isMember, isLoading: isPending, join }
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/web && bunx vitest run tests/hooks/useGalleryMembership.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit the membership hook
+    command: 'git add packages/web/app/hooks/useGalleryMembership.ts packages/web/tests/hooks/useGalleryMembership.test.ts && git commit -m "feat(web): SSR-safe gallery membership hook"'
+    status: done
+current_step: 5
+started: '2026-08-06T05:38:36.960Z'
+completed: '2026-08-06T05:44:36.746Z'

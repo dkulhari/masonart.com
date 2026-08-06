@@ -1,0 +1,164 @@
+ticket_number: 425
+title: Schema - record the promotion and its discount on orders
+description: |-
+  ## Task
+  Add `orders.promotionId` (nullable FK) so a settled order records which promotion priced it, add `orders.promotionDiscount` as the promotion's own money bucket, and confirm `order_items.itemDiscount` (already declared at `orders.ts:258`) is the per-line store. Migration included.
+
+  This is the design's §4 point about the compare-at trap: a discount recorded as a discount keeps revenue reporting honest, where inflating a compare-at price would hide it.
+
+  ## One bucket per discount source (design D8)
+  The promotion must NOT write into `orders.discount` or `orders.couponDiscount`:
+
+  - `orders.promotionDiscount` — this feature, automatic, sum of the line discounts
+  - `orders.couponDiscount` — reserved for codes, stays `'0.00'`, nothing in this feature writes it
+  - `orders.discount` — derived total, `promotionDiscount + couponDiscount`
+
+  Without the split, a settled order cannot be attributed once codes exist — reporting cannot separate "the sale worked" from "a code leaked". One migration line now; after orders exist there is no source data to backfill from.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 1 — Schema + contracts
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §4, D8
+
+  Columns only — the write path lands in T8 (order creation). `orders.discount` and `orders.couponDiscount` already exist (`schema/orders.ts:171,179`) and today are always `"0.00"` (`routes/orders.ts:268,299`).
+feature: sale-promotions
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T08:01:36.037Z'
+last_updated: '2026-08-06T05:28:09.752Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-06T05:28:05.155Z'
+    text: Status changed from 'todo' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-06T05:28:09.752Z'
+    text: |-
+      Done in commit 2d448578 on feat/mesonart-design-parity. 7/7 tests passing in packages/api/tests/database/promotion-order-columns.test.ts.
+
+      Added to `orders` (schema/orders.ts, beside couponCode/couponDiscount):
+      - `promotionId` uuid, nullable, FK to `promotion(id)` ON DELETE set null
+      - `promotionDiscount` decimal(10,2) NOT NULL DEFAULT '0.00'
+
+      Migration `0008_modern_king_bedlam.sql` — two ADD COLUMNs plus the FK constraint, no drift — generated and applied to poster_app_dev. Verified in information_schema: promotion_discount, coupon_discount and discount are three distinct numeric(10,2) NOT NULL columns each defaulting to 0.00, and promotion_id is nullable uuid.
+
+      `order_items.itemDiscount` already existed as the per-line store; confirmed by assertion, no change needed.
+
+      Columns only, per D8: nothing here writes promotionDiscount, and couponDiscount stays untouched. The write path (and making `discount` the derived total of the two) lands in #430.
+work_sessions: []
+related_tickets: []
+blocked_by:
+  - ticket: 423
+    feature: sale-promotions
+    description: Schema - promotion, promotion_product and promotion_exclusion tables
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing shape assertions for the order-side promotion columns
+    file: packages/api/tests/database/promotion-order-columns.test.ts
+    command: cd packages/api && bunx vitest run tests/database/promotion-order-columns.test.ts
+    expected_result: FAIL
+    status: done
+    code: |-
+      /**
+       * Order-side promotion columns.
+       *
+       * A discount must be recorded as a discount. The alternative — inflating a
+       * compare-at price — hides the discount from every revenue report.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { orders, orderItems } from '../../src/database/schema/orders'
+
+      describe('orders promotion columns', () => {
+        it('records which promotion priced the order', () => {
+          expect(orders.promotionId).toBeDefined()
+        })
+
+        it('promotionId is nullable — most orders carry no promotion', () => {
+          expect(orders.promotionId.notNull).toBe(false)
+        })
+
+        it('gives the promotion its own money bucket', () => {
+          // Separate from couponDiscount, or a settled order cannot be
+          // attributed once discount codes exist (design D8).
+          expect(orders.promotionDiscount).toBeDefined()
+          expect(orders.promotionDiscount.default).toBe('0.00')
+        })
+
+        it('keeps the money columns it already had', () => {
+          expect(orders.discount).toBeDefined()
+          expect(orders.couponDiscount).toBeDefined()
+        })
+      })
+
+      describe('order item discount', () => {
+        it('itemDiscount is the per-line store', () => {
+          expect(orderItems.itemDiscount).toBeDefined()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/database/promotion-order-columns.test.ts
+    expected_result: FAIL - orders.promotionId is undefined
+    status: done
+  - id: 3
+    action: implement
+    description: Add promotionId and promotionDiscount to the orders table beside the existing discount columns
+    file: packages/api/src/database/schema/orders.ts
+    status: done
+    code: |-
+      // Beside couponCode / couponDiscount (~line 178):
+
+          /**
+           * Which promotion priced this order. Nullable: most orders carry none.
+           * Recorded so the discount is visible in reporting rather than buried in
+           * an inflated compare-at price.
+           */
+          promotionId: uuid("promotion_id").references(() => promotions.id, {
+            onDelete: "set null",
+          }),
+
+          /**
+           * The promotion's own share of the discount. Deliberately NOT merged into
+           * `discount` or `couponDiscount`: `discount` is the derived total the
+           * customer sees, and `couponDiscount` is reserved for codes (design D8).
+           * Sharing one column makes a settled order unattributable — reporting
+           * could not separate an automatic sale from a leaked code.
+           */
+          promotionDiscount: decimal("promotion_discount", { precision: 10, scale: 2 })
+            .notNull()
+            .default("0.00"),
+
+      // plus, at the top of the file:
+      // import { promotions } from "./promotions";
+  - id: 4
+    action: verify-pass
+    description: Confirm the shape assertions pass
+    command: cd packages/api && bunx vitest run tests/database/promotion-order-columns.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: implement
+    description: Generate and apply the migration
+    file: packages/api/drizzle/
+    command: cd packages/api && bunx drizzle-kit generate && bunx drizzle-kit migrate
+    expected_result: Migration file created and applied
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the order-side columns
+    command: 'git add packages/api/src/database/schema/orders.ts packages/api/tests/database/promotion-order-columns.test.ts packages/api/drizzle && git commit -m "feat(api): record the pricing promotion on orders"'
+    status: done
+current_step: 6
+completed: '2026-08-06T05:28:05.155Z'
