@@ -186,11 +186,19 @@ export async function deleteCachedPattern(pattern: string): Promise<void> {
  * a purge that guessed at them would reliably leave the member copy behind —
  * signed-in customers being the ones who see a members-only sale.
  *
- * Callers are writes that change how a product is *priced* without changing the
- * product: promotion mutations, which routes/products.ts cannot see coming.
- * Promotion writes are a handful of admin actions a day, so paying an
- * O(keyspace) scan for each one is far cheaper than the alternative of reading
- * a cache generation on every storefront request.
+ * Callers are every admin write that changes what a product response says:
+ * promotion mutations, which routes/products.ts cannot see coming, and product
+ * and variant mutations, which change the body directly. Both are a handful of
+ * admin actions a day, so paying an O(keyspace) scan for each one is far
+ * cheaper than the alternative of reading a cache generation on every
+ * storefront request.
+ *
+ * **This is the only correct way to invalidate a product response.** Naming
+ * keys does not work and does not fail loudly: `CacheKeys.PRODUCT_LIST` is a
+ * prefix, never a key, and the detail key carries a `:member`/`:guest` suffix,
+ * so `deleteCached` against either matched nothing and resolved successfully
+ * anyway. That silence is what hid the admin-write bug (#527) — reach for this
+ * function rather than growing a second purge beside it.
  */
 export async function purgeProductResponseCache(): Promise<void> {
   await deleteCachedPattern(`${CacheKeys.PRODUCT_LIST}*`);

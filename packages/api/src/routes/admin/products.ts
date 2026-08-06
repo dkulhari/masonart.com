@@ -33,7 +33,7 @@ import {
   requireContentManager,
   type AuthVariables,
 } from "../../middleware/auth";
-import { deleteCached, CacheKeys } from "../../lib/redis";
+import { purgeProductResponseCache } from "../../lib/redis";
 import { unitsSoldSql } from "../../lib/product-sales";
 import { buildProductMedia } from "../../lib/product-media";
 
@@ -497,8 +497,7 @@ adminProductsApp.post(
         throw new Error("Failed to create product");
       }
 
-      // Invalidate product list cache
-      await deleteCached(CacheKeys.PRODUCT_LIST);
+      await purgeProductResponseCache();
 
       return c.json(
         {
@@ -621,12 +620,10 @@ adminProductsApp.patch(
 
       const updatedProduct = updatedProducts[0];
 
-      // Invalidate caches
-      await deleteCached(CacheKeys.PRODUCT_LIST);
-      await deleteCached(`${CacheKeys.PRODUCT}${existingProduct.slug}`);
-      if (input.slug && input.slug !== existingProduct.slug) {
-        await deleteCached(`${CacheKeys.PRODUCT}${input.slug}`);
-      }
+      // Both slugs are covered without naming either: a rename has to drop the
+      // old detail key as well as the new one, and the prefix purge does that
+      // for free.
+      await purgeProductResponseCache();
 
       return c.json({
         message: "Product updated successfully",
@@ -664,11 +661,6 @@ adminProductsApp.delete("/:id", async (c) => {
       return c.json({ error: "Product not found" }, 404);
     }
 
-    const existingProduct = existing[0];
-    if (!existingProduct) {
-      return c.json({ error: "Product not found" }, 404);
-    }
-
     // Soft delete by setting status to archived
     await db
       .update(products)
@@ -678,9 +670,7 @@ adminProductsApp.delete("/:id", async (c) => {
       })
       .where(eq(products.id, id));
 
-    // Invalidate caches
-    await deleteCached(CacheKeys.PRODUCT_LIST);
-    await deleteCached(`${CacheKeys.PRODUCT}${existingProduct.slug}`);
+    await purgeProductResponseCache();
 
     return c.json({
       message: "Product archived successfully",
@@ -722,11 +712,6 @@ adminProductsApp.post(
         return c.json({ error: "Product not found" }, 404);
       }
 
-      const existingProduct = existing[0];
-      if (!existingProduct) {
-        return c.json({ error: "Product not found" }, 404);
-      }
-
       // Create variant
       const insertedVariants = await db
         .insert(productVariants)
@@ -749,8 +734,7 @@ adminProductsApp.post(
 
       const newVariant = insertedVariants[0];
 
-      // Invalidate product cache
-      await deleteCached(`${CacheKeys.PRODUCT}${existingProduct.slug}`);
+      await purgeProductResponseCache();
 
       return c.json(
         {
@@ -803,13 +787,6 @@ adminProductsApp.patch(
         return c.json({ error: "Variant not found" }, 404);
       }
 
-      // Get product slug for cache invalidation
-      const product = await db
-        .select({ slug: products.slug })
-        .from(products)
-        .where(eq(products.id, id))
-        .limit(1);
-
       // Build update object
       const updateData: Record<string, unknown> = {};
 
@@ -840,10 +817,7 @@ adminProductsApp.patch(
 
       const updatedVariant = updatedVariants[0];
 
-      // Invalidate product cache
-      if (product[0]) {
-        await deleteCached(`${CacheKeys.PRODUCT}${product[0].slug}`);
-      }
+      await purgeProductResponseCache();
 
       return c.json({
         message: "Variant updated successfully",
@@ -889,23 +863,13 @@ adminProductsApp.delete("/:id/variants/:variantId", async (c) => {
       return c.json({ error: "Variant not found" }, 404);
     }
 
-    // Get product slug for cache invalidation
-    const product = await db
-      .select({ slug: products.slug })
-      .from(products)
-      .where(eq(products.id, id))
-      .limit(1);
-
     // Delete variant (or soft delete by setting isActive = false)
     await db
       .update(productVariants)
       .set({ isActive: false })
       .where(eq(productVariants.id, variantId));
 
-    // Invalidate product cache
-    if (product[0]) {
-      await deleteCached(`${CacheKeys.PRODUCT}${product[0].slug}`);
-    }
+    await purgeProductResponseCache();
 
     return c.json({
       message: "Variant deleted successfully",
