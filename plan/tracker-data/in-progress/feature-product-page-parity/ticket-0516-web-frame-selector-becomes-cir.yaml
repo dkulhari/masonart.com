@@ -8,7 +8,7 @@ status: in-progress
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T07:21:35.020Z'
-last_updated: '2026-08-06T07:31:48.139Z'
+last_updated: '2026-08-06T08:40:52.580Z'
 time_spent_minutes: 0
 labels:
   - pdp-parity
@@ -32,6 +32,44 @@ comments:
       Harness bug this surfaced and I have now fixed in scripts/pdp-shot.mjs: our own JoinGalleryModal carries role="dialog" with no class matching the overlay sweep, so captures of our page could have been screenshots of a modal. The sweep now also covers [role=dialog], [role=alertdialog] and testid-based modal/toast nodes. Verified: zero visible dialogs in a fresh capture.
 
       Still needs a blind critic verdict before this is done.
+  - author: mcp-client
+    timestamp: '2026-08-06T08:28:49.280Z'
+    text: |-
+      ROUND 2 SPLIT — buy panel is NOT won. Critic 1 picked ours "CLOSE: no"; critic 2 (committability lens) picked the reference, "CLOSE: yes". A split is not a win, so this stays open.
+
+      Critic 2's findings against OURS, in priority order:
+
+      1. REAL DEFECT — our sticky site header floats over the top ~90px of the artwork: "greying out the piece's top edge and frame — the one thing a large-artwork buyer needs unobstructed". Fix is an opaque header or scroll padding so the image starts below it. This is a genuine bug, not taste.
+
+      2. CORROBORATED — frame swatches carry no visible names and no per-frame price delta: "choosing a frame is a guess about both appearance and cost — and nothing on screen confirms the price on the button corresponds to the frame currently ringed." Two independent critics have now said this. Our names and prices are sr-only. Acting on it: visible names and price deltas. This makes us BETTER than the reference on a pattern we copied from it, which is the right call — the reference loses points for it too.
+
+      3. At 700px scroll our size control is out of frame and the swatches are half-sliced, while a ~380px trust stack and the share row occupy the space next to the button. Critic wants a one-line configuration summary above the button — "24x36 in · Black float frame · ₹2,499" — so the buyer can confirm what they are committing to without scrolling back.
+
+      NOT acting on: critic 2 wants the four trust rows demoted below the fold. Critic 1 explicitly credited having reassurance in the buying frame, and the reference also places its trust list directly under the buttons. Two critics disagree on this one, and the reference agrees with critic 1 — so demoting it would be thrashing on a split opinion. Leaving it.
+
+      Also of note: critic 2 broke the brief deliberately and said so. The brief tells critics to ignore promo banners; it argued that for a committability judgement it could not, because the reference's "40% off / Auto-discount applied in cart!" tells the buyer the price on the button is not what they will be charged. It still gave the reference the round. That is the critic arguing against its own preferred winner, which makes the verdict more trustworthy, not less.
+  - author: mcp-client
+    timestamp: '2026-08-06T08:40:52.580Z'
+    text: |-
+      ROUND 3 FIX LANDED (FrameSelector.tsx + its test only).
+
+      Each swatch is now circle → visible name → visible price uplift, inside one button. The sr-only node is GONE — the visible text now IS the accessible name, so there is one string instead of two that can drift. A test asserts zero .sr-only nodes in the component.
+
+      Zero-delta option reads "Included" rather than "+₹0.00" or a blank: blank leaves the price row gap-toothed (the exact raggedness the critics objected to), "+₹0.00" is noise, and "Included" is true in a way "free" is not — the rolled canvas is inside the price already being quoted.
+
+      Went beyond the ticket to answer critic 2's "nothing on screen confirms the price on the button corresponds to the frame currently ringed". New caption names the base figure in rupees:
+        nothing selected → "Frame prices below are added to the ₹2,499.00 size price."
+        frame selected   → "Stretch + Gold Frame adds ₹999.60 to the ₹2,499.00 size price."
+        zero-modifier    → "Rolled Canvas is included in the ₹2,499.00 size price."
+      The capture shows that caption directly above a button reading "Add to cart - ₹3,498.60", so a buyer can check the arithmetic without leaving the frame.
+
+      Grid changed from flex-wrap to a fixed grid-cols-4. Seven free-flowing swatches wrapped five-then-two leaving a three-cell hole; four columns give 4+3 and, more importantly, align the names into vertical stacks. Circle is now w-full max-w-[104px] aspect-square rather than a hard 92px — renders 104px in the 485px panel, shrinks to ~83px at 390px, cannot overflow. Verified scrollWidth === 390 at mobile with the last-column swatch selected so its check badge stays in the viewport.
+
+      Layout bug found and fixed in passing: min-h-[2.4em] on the name was ~3px short of two real line boxes, so every wrapped cell's price sat lower than its neighbours' — a visibly wobbling price row. Flat min-h-8 puts them on one baseline.
+
+      28 tests (was 20). The old test asserting the swatch had NO visible text was the encoded defect and was replaced. ChooseOptions + ProductTabs also run: 109 passed, nothing collateral broken.
+
+      INDEPENDENT CONFIRMATION of the sticky-header bug: this builder could not capture at scroll 700 because "the frame block sits under the sticky header" and had to shoot at 480/580 instead. That is the second independent report of the same defect. Fix is queued behind the mobile builder, which currently owns ProductDetail.tsx.
 work_sessions: []
 related_tickets: []
 blocked_by: []

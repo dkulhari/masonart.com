@@ -24,7 +24,11 @@ column. Ours is currently a symmetric `607px 607px` grid — that is the single 
 
 ### H1
 `Urbanist`, **42px**, weight **300**, colour `rgb(29,29,29)`, line-height normal.
-Ours: 30px. Text includes the SKU inline — `Rainy Day Compassion #PAC347`.
+Ours was 30px. Text includes the SKU inline — `Rainy Day Compassion #PAC347`.
+
+Corrected after re-probing the reference at four widths: it is **24px at 390** and already **42px
+from 768 upward** — it does not ramp at `lg`. An earlier draft of this document implied 42px was
+desktop-only, which left our tablet H1 smaller than the page it copies.
 
 ### Price
 `Poppins`, **24px**, weight **500**, colour **`rgb(187,0,0)`** (red).
@@ -92,10 +96,17 @@ Ours: flat `Description` / `Perfect For` sections, a reviews wall, and a plain
 
 ## Mobile (390px)
 
-- Main image is a rounded card with ~16px side padding
-- Thumbnails become a **horizontal scroll strip** directly below the main image (~72px squares)
+Measured, not estimated — the first draft of this section was eyeballed off a screenshot and got
+both numbers below wrong.
+
+- Main image is **350×350 at x=20**, i.e. it fills the content column. The "~16px side padding" in
+  the first draft is just `container-wide`'s own 20px gutter, not padding the gallery adds. Only
+  the corner radius differs from desktop.
+- Thumbnails become a **horizontal scroll strip** directly below the main image: **62px squares on
+  a 78px pitch** (x = 20/98/176/254/332), not the ~72px first written here.
 - Social proof line, then H1, then the sold-count line
 - Expand/fullscreen button stays pinned top-right of the main image
+- Quantity stepper and add-to-cart stay on **one row** (stepper 99px, button 234px)
 
 ## Out of scope
 

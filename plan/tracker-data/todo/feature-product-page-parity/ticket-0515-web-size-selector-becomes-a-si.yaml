@@ -8,7 +8,7 @@ status: todo
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T07:21:34.966Z'
-last_updated: '2026-08-06T07:29:02.255Z'
+last_updated: '2026-08-06T08:26:16.274Z'
 time_spent_minutes: 0
 labels:
   - pdp-parity
@@ -27,6 +27,22 @@ comments:
       - `tests/e2e/product-detail.spec.ts:380` and `tests/e2e/flows/catalog.spec.ts:242` both assert `text=Select Size`, which no longer exists. The control's accessible name is now `aria-label="Size"` on the select. Those selectors must be updated deliberately.
 
       Still needs a blind critic verdict before this is done.
+  - author: mcp-client
+    timestamp: '2026-08-06T08:26:16.273Z'
+    text: |-
+      ROUND 2 BLIND VERDICT: ours won the buy-panel comparison, "CLOSE: no".
+
+      The notable part is WHERE the criticism landed. Every gap the critic named was against the reference, including two patterns we deliberately copied from it:
+
+      - On the reference's size control: "collapsed into a closed dropdown reading 'Select a Size', with no dimensions, no price ladder, and no indication of how many options exist... meanwhile the Add To Cart button confidently displays '$218.00' for a size nobody has chosen, so the headline price is attached to nothing."
+
+      We use the same dropdown pattern and still won, because we preselect a real variant — so our dropdown reads "16"H x 12"W/ 41H x 30W CM" and the price in our button is attached to an actual selection. The reference ships the control unselected with a live buy button beside it, which the critic called "a dead end". Preselecting is what turned a shared weakness into a win.
+
+      - On the reference's frame swatches: "seven unlabelled circles in a ragged five-then-two grid under the raw option string... nothing names the swatches or their price difference, so choosing a frame means guessing from a thumbnail."
+
+      This one applies to our implementation too — we copied the pattern, and our names and prices are sr-only. We won this round, but that is a latent weakness in a pattern we inherited rather than something we got right. If a later round puts pressure on it, adding visible frame names and price deltas is the fix, and it would be a deliberate improvement on the reference rather than a divergence from it. Noted on #516 as well.
+
+      Confirming critic with a committability lens is running before this is marked done.
 work_sessions: []
 related_tickets: []
 blocked_by: []

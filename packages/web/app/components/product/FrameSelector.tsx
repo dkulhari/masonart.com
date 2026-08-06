@@ -5,10 +5,25 @@
  *
  * PARITY WITH THE PDP (#516): mesonart's frame axis is
  * "Rolled Canvas/Frameless/Framed" — a label line reading
- * `<group>:  <selected value>` — followed by circular photographic swatches,
- * ~92px, wrapping onto rows as needed. No price is printed on a swatch; the
- * price still has to reach the cart, so `calculateFramePrice` /
- * `formatPriceModifier` stay exported and unchanged, just not rendered here.
+ * `<group>:  <selected value>` — followed by circular photographic swatches
+ * showing the material itself, rather than a stack of text cards.
+ *
+ * ONE DELIBERATE DIVERGENCE: the reference prints nothing on its swatches, so
+ * seven unlabelled circles ask the shopper to guess both the name and the
+ * cost of every option. That is a defect we are copying, not a spec worth
+ * matching, so each swatch here carries its own name and its own price
+ * uplift, and a caption names what that uplift is measured against. Everything
+ * else — the label line, the circles, the ring treatment — is the reference.
+ *
+ * The uplift is genuinely an uplift, never a total: `+₹999.60` next to a
+ * caption reading "…added to the ₹2,499.00 size price" cannot be misread as
+ * the price of the frame outright.
+ *
+ * A four-column grid rather than a wrapping row: seven swatches free-flowing
+ * at 92px wrap five-then-two and leave a hole three cells wide, and adding two
+ * lines of type under each one makes the mismatch worse. Four fixed columns
+ * put the names in aligned stacks, leave a single empty cell, and hold at
+ * 390px where each cell is still ~83px.
  *
  * This mirrors the swatch ChooseOptions.tsx already built for the Quickview
  * panel (#420) — same ring treatment, same "real photo, or draw one" rule —
@@ -79,9 +94,14 @@ export function calculateFramePrice(
 /**
  * Format the price modifier for display.
  *
- * Not rendered on the swatch itself (the measured spec carries no price
- * there), but kept exported: it still backs the accessible name announced to
- * screen readers, and other call sites price the same modifier the same way.
+ * This is the string printed under the swatch, and — since the swatch prints
+ * it rather than hiding it in an sr-only node — it is also what a screen
+ * reader announces. One string, one source, no drift between the two.
+ *
+ * A zero modifier reads "Included" rather than "+₹0.00" or a blank: the
+ * cheapest option is not free of a price, it is already inside the price the
+ * panel is quoting, and every cell keeping a price line means the row of
+ * prices stays a row instead of a gap-toothed one.
  */
 export function formatPriceModifier(
   basePrice: number,
@@ -175,7 +195,7 @@ export function FrameSelector({
     availableFrames.find((f) => f.id === selectedFrameId) ?? null
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-2', className)}>
       {/* Their label/value pair: group name, colon, then the chosen option —
        * "Rolled Canvas/Frameless/Framed:  Rolled Canvas". The value sits
        * outside any <label>/<select> pairing here since the swatches below
@@ -190,9 +210,20 @@ export function FrameSelector({
         </span>
       </p>
 
-      {/* Circular photographic swatches, wrapping onto as many rows as the
-       * option count needs — 92px, matching the measured spec. */}
-      <div className="flex flex-wrap gap-4">
+      {/* What the "+" on each swatch is measured against. Without this a
+       * shopper reading "+₹999.60" has no way to tell an uplift from a price,
+       * and a shopper who has already chosen has nothing tying the ringed
+       * swatch to a number. Naming the base figure does both. */}
+      <p
+        data-testid="frame-price-basis"
+        className="text-xs text-muted-foreground"
+      >
+        {framePriceBasis(selectedFrame, basePrice)}
+      </p>
+
+      {/* Circular photographic swatches on a fixed four-column grid, each with
+       * its name and its uplift underneath. */}
+      <div className="grid grid-cols-4 gap-x-2 gap-y-5 pt-1">
         {availableFrames.map((frame) => {
           const isSelected = frame.id === selectedFrameId
           const priceDisplay = formatPriceModifier(
@@ -214,6 +245,38 @@ export function FrameSelector({
       </div>
     </div>
   )
+}
+
+/**
+ * The sentence under the label line, which exists to make the swatch prices
+ * unambiguous.
+ *
+ * `basePrice` is the selected size's price (ProductDetail passes the chosen
+ * variant's), so that is what the uplift is relative to and that is what gets
+ * named — spelled out in rupees rather than left as "the base price", because
+ * a figure can be checked against the one on the button and a phrase cannot.
+ */
+function framePriceBasis(
+  selectedFrame: FrameOptionData | null,
+  basePrice: number
+): string {
+  const base = formatPrice(basePrice)
+
+  if (!selectedFrame) {
+    return `Frame prices below are added to the ${base} size price.`
+  }
+
+  const addition = calculateFramePrice(
+    basePrice,
+    selectedFrame.priceModifierType,
+    selectedFrame.priceModifierValue
+  )
+
+  if (addition === 0) {
+    return `${selectedFrame.name} is included in the ${base} size price.`
+  }
+
+  return `${selectedFrame.name} adds ${formatPrice(addition)} to the ${base} size price.`
 }
 
 // ============================================================================
@@ -242,53 +305,82 @@ function FrameOptionCard({
       onClick={onClick}
       aria-pressed={isSelected}
       className={cn(
-        'group/frame relative grid h-[92px] w-[92px] shrink-0 place-items-center rounded-full',
-        'bg-background transition-shadow',
-        'ring-2 ring-offset-2 ring-offset-background',
-        // Selected gets a solid dark ring, the rest a light grey one — but the
-        // ring alone is not the whole selection story, see the check badge
-        // below: colour is never the only cue.
-        isSelected
-          ? 'ring-foreground'
-          : 'ring-border hover:ring-foreground/40',
+        'group/frame flex w-full flex-col items-center rounded-lg text-center',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
       )}
     >
-      {/* The button's accessible name. Screen readers still hear the price
-       * even though the swatch itself never prints one. */}
-      <span className="sr-only">
-        {frame.name} — {priceDisplay}
+      {/* The circle. It takes the cell's width up to 104px, so it stays a
+       * photographic swatch on a 485px panel and simply shrinks — never
+       * overflows — when the panel is 390px wide. */}
+      <span
+        className={cn(
+          'relative grid aspect-square w-full max-w-[104px] place-items-center rounded-full',
+          'bg-background transition-shadow',
+          'ring-2 ring-offset-2 ring-offset-background',
+          // Selected gets a solid dark ring, the rest a light grey one — but
+          // the ring alone is not the whole selection story, see the check
+          // badge below: colour is never the only cue.
+          isSelected
+            ? 'ring-foreground'
+            : 'ring-border group-hover/frame:ring-foreground/40'
+        )}
+      >
+        {photo ? (
+          <img
+            src={photo}
+            alt=""
+            aria-hidden="true"
+            className="h-full w-full rounded-full object-cover"
+          />
+        ) : (
+          <div
+            className={cn(
+              'flex h-full w-full items-center justify-center rounded-full',
+              previewBgColor
+            )}
+            aria-hidden="true"
+          >
+            <div className="h-9 w-9 rounded border-2 border-current opacity-60" />
+          </div>
+        )}
+
+        {/* Non-colour selection cue — a ring colour alone fails for anyone who
+         * can't distinguish "dark" from "light grey" by hue. */}
+        {isSelected && (
+          <span
+            aria-hidden="true"
+            className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-foreground text-background"
+          >
+            <Check className="h-3.5 w-3.5" />
+          </span>
+        )}
       </span>
 
-      {photo ? (
-        <img
-          src={photo}
-          alt=""
-          aria-hidden="true"
-          className="h-full w-full rounded-full object-cover"
-        />
-      ) : (
-        <div
-          className={cn(
-            'flex h-full w-full items-center justify-center rounded-full',
-            previewBgColor
-          )}
-          aria-hidden="true"
-        >
-          <div className="h-9 w-9 rounded border-2 border-current opacity-60" />
-        </div>
-      )}
-
-      {/* Non-colour selection cue — a ring colour alone fails for anyone who
-       * can't distinguish "dark" from "light grey" by hue. */}
-      {isSelected && (
-        <span
-          aria-hidden="true"
-          className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-foreground text-background"
-        >
-          <Check className="h-3.5 w-3.5" />
-        </span>
-      )}
+      {/* Name and uplift are the button's visible label AND its accessible
+       * name — the same two strings a screen reader hears, which is the whole
+       * point of deleting the sr-only node that used to carry them alone.
+       * `min-h` reserves the second line so the price sits on one baseline
+       * across the row whether the name wrapped or not. */}
+      <span
+        className={cn(
+          // A flat 32px rather than a 2-line em height: two lines of 12px/1.2
+          // is 28.8px, and the sub-pixel rounding of that against a one-line
+          // name dropped the price of every wrapped cell ~3px below its
+          // neighbours' — visible as a wobbling row of prices.
+          'mt-2 min-h-8 break-words text-[11px] leading-[1.2] text-foreground sm:text-xs',
+          isSelected && 'font-medium'
+        )}
+      >
+        {frame.name}
+      </span>
+      <span
+        className={cn(
+          'mt-1 text-[11px] leading-none sm:text-xs',
+          isSelected ? 'font-medium text-foreground' : 'text-muted-foreground'
+        )}
+      >
+        {priceDisplay}
+      </span>
     </button>
   )
 }
@@ -373,14 +465,16 @@ export function FrameSelectorCompact({
  */
 export function FrameSelectorSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('space-y-3 animate-pulse', className)}>
+    <div className={cn('space-y-2 animate-pulse', className)}>
       <div className="h-4 w-48 rounded bg-muted" />
-      <div className="flex flex-wrap gap-4">
+      <div className="h-3 w-64 max-w-full rounded bg-muted" />
+      <div className="grid grid-cols-4 gap-x-2 gap-y-5 pt-1">
         {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-          <div
-            key={i}
-            className="h-[92px] w-[92px] shrink-0 rounded-full bg-muted"
-          />
+          <div key={i} className="flex flex-col items-center">
+            <div className="aspect-square w-full max-w-[104px] rounded-full bg-muted" />
+            <div className="mt-2 h-3 w-4/5 rounded bg-muted" />
+            <div className="mt-1.5 h-3 w-1/2 rounded bg-muted" />
+          </div>
         ))}
       </div>
     </div>

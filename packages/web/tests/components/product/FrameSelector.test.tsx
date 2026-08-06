@@ -4,11 +4,15 @@
  * mesonart's measured pattern (docs/design/pdp-parity-reference.md):
  *   - a label line "<group>:  <selected value>", e.g.
  *     "Rolled Canvas/Frameless/Framed:  Rolled Canvas"
- *   - circular swatches (~92px) showing the frame's own photo, wrapping onto
- *     rows, no price printed on them
+ *   - circular swatches showing the frame's own photo
  *   - the selected swatch carries a solid dark ring, the rest a light one,
  *     plus a non-colour cue (a check badge) since a ring colour alone is not
  *     an accessible selection indicator
+ *
+ * With one deliberate divergence, covered here: the reference prints nothing
+ * on a swatch, which leaves seven unlabelled circles and no way to compare
+ * cost. Ours prints the name and the price uplift on every swatch, and a
+ * caption naming the figure the uplift is added to.
  *
  * ChooseOptions.test.tsx already covers this exact pattern for the Quickview
  * panel; this file covers the same behaviour for the full PDP's
@@ -180,8 +184,93 @@ describe('the label line', () => {
   })
 })
 
+describe('the price basis caption', () => {
+  it('names the figure the uplifts are added to when nothing is selected', () => {
+    render(
+      <FrameSelector
+        frames={SEVEN_FRAMES}
+        selectedFrameId={null}
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const basis = screen.getByTestId('frame-price-basis').textContent ?? ''
+    expect(basis).toMatch(/added to/i)
+    expect(basis).toContain('2,000.00')
+  })
+
+  it('ties the ringed frame to its own number once one is chosen', () => {
+    render(
+      <FrameSelector
+        frames={SEVEN_FRAMES}
+        selectedFrameId="f-gold"
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const basis = screen.getByTestId('frame-price-basis').textContent ?? ''
+    expect(basis).toContain('Stretch + Gold Frame')
+    // The uplift and the base it applies to, both spelled out — so "+₹800.00"
+    // on the swatch cannot be read as the price of the frame outright.
+    expect(basis).toContain('800.00')
+    expect(basis).toContain('2,000.00')
+  })
+
+  it('says the zero-modifier choice costs nothing extra', () => {
+    render(
+      <FrameSelector
+        frames={SEVEN_FRAMES}
+        selectedFrameId="f-rolled"
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const basis = screen.getByTestId('frame-price-basis').textContent ?? ''
+    expect(basis).toContain('Rolled Canvas')
+    expect(basis).toMatch(/included/i)
+  })
+})
+
+describe('the grid', () => {
+  it('lays the swatches out in fixed columns, not a free-wrapping row', () => {
+    // Seven options free-flowing at swatch width wrap five-then-two and leave
+    // a three-cell hole; fixed columns keep the names in aligned stacks.
+    const { container } = render(
+      <FrameSelector
+        frames={SEVEN_FRAMES}
+        selectedFrameId={null}
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const grid = container.querySelector('.grid-cols-4')
+    expect(grid).not.toBeNull()
+    expect(grid!.querySelectorAll('button').length).toBe(7)
+  })
+
+  it('sizes each swatch off its cell so a 390px panel shrinks it, not overflows', () => {
+    render(
+      <FrameSelector
+        frames={SEVEN_FRAMES}
+        selectedFrameId={null}
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const swatch = screen.getByRole('button', { name: /Stretch \+ Gold Frame/ })
+    const circle = swatch.querySelector('.rounded-full')!
+    expect(circle.className).toContain('w-full')
+    expect(circle.className).toContain('max-w-[104px]')
+  })
+})
+
 describe('the swatches', () => {
-  it('renders one circular button per available frame, each named', () => {
+  it('renders one circular swatch per available frame, each named', () => {
     render(
       <FrameSelector
         frames={SEVEN_FRAMES}
@@ -194,11 +283,13 @@ describe('the swatches', () => {
     for (const f of SEVEN_FRAMES) {
       const escaped = f.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const swatch = screen.getByRole('button', { name: new RegExp(escaped) })
-      expect(swatch.className).toContain('rounded-full')
+      // The photographic part is still a circle; the button around it now also
+      // holds two lines of type.
+      expect(swatch.querySelector('.rounded-full')).not.toBeNull()
     }
   })
 
-  it('never prints a price in the swatch\'s visible text', () => {
+  it('prints each frame\'s name in visible text, not only to screen readers', () => {
     render(
       <FrameSelector
         frames={SEVEN_FRAMES}
@@ -208,10 +299,64 @@ describe('the swatches', () => {
       />
     )
 
-    // The price only exists inside the sr-only accessible name, never in a
-    // rendered node with visible text content on the button itself.
-    const goldSwatch = screen.getByRole('button', { name: /Stretch \+ Gold Frame/ })
-    expect(goldSwatch.querySelector(':scope > span:not(.sr-only)')).toBeNull()
+    for (const f of SEVEN_FRAMES) {
+      const escaped = f.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const swatch = screen.getByRole('button', { name: new RegExp(escaped) })
+      const visible = Array.from(swatch.querySelectorAll('span')).filter(
+        (el) => !el.className.includes('sr-only')
+      )
+      expect(visible.some((el) => el.textContent === f.name)).toBe(true)
+    }
+  })
+
+  it('prints each frame\'s price uplift in visible text', () => {
+    render(
+      <FrameSelector
+        frames={SEVEN_FRAMES}
+        selectedFrameId={null}
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    // 40% of 2000 = 800, so the moulding swatches read "+₹800.00" — an uplift
+    // with a leading +, never a bare figure that could pass for a total.
+    const gold = screen.getByRole('button', { name: /Stretch \+ Gold Frame/ })
+    const uplift = formatPriceModifier(2000, 'percentage', 40)
+    expect(uplift).toContain('800')
+    expect(
+      Array.from(gold.querySelectorAll('span')).some(
+        (el) => el.textContent === uplift && !el.className.includes('sr-only')
+      )
+    ).toBe(true)
+  })
+
+  it('reads "Included" on the zero-modifier swatch rather than blank or +0', () => {
+    render(
+      <FrameSelector
+        frames={SEVEN_FRAMES}
+        selectedFrameId={null}
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const rolled = screen.getByRole('button', { name: /Rolled Canvas/ })
+    expect(rolled.textContent).toContain('Included')
+    expect(rolled.textContent).not.toContain('+₹0')
+  })
+
+  it('hides no price behind an sr-only node — one string serves both', () => {
+    const { container } = render(
+      <FrameSelector
+        frames={SEVEN_FRAMES}
+        selectedFrameId={null}
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    expect(container.querySelectorAll('.sr-only').length).toBe(0)
   })
 
   it('uses the frame\'s own photo when the data carries a real one', () => {

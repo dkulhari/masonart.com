@@ -8,7 +8,7 @@ status: in-progress
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T07:21:35.356Z'
-last_updated: '2026-08-06T07:30:54.023Z'
+last_updated: '2026-08-06T08:40:25.789Z'
 time_spent_minutes: 0
 labels:
   - pdp-parity
@@ -32,6 +32,45 @@ comments:
       Knock-on for integration: tests/e2e/product-detail.spec.ts:843 and :878 assert `h2:has-text("Description")` and `h2:has-text("Perfect For")` as top-level headings. Those move inside the About tabpanel once wired.
 
       Still needs a blind critic verdict before this is done.
+  - author: mcp-client
+    timestamp: '2026-08-06T08:25:09.009Z'
+    text: |-
+      ROUND 2 BLIND VERDICT: LOST, "CLOSE: no". The critic picked the reference for the below-fold region.
+
+      Its biggest gap, on us: "B's post-purchase region is nearly empty. The tab panel resolves to a single 90-character line of body copy plus two 'Perfect For' chips — roughly 250px of content — and then the page hands off to a beige trust strip and the footer at the halfway line of a 900px viewport."
+
+      Findings I judge to be real and actionable:
+      1. The Review tab carries no count and no star summary, so there is no signal that reviews exist at all before a click. For an expensive considered purchase, social proof should be visible before the click, not behind it.
+      2. The section has no vertical weight. The reference fills this region with an artist block, a second "More to Love" carousel, an Instagram row and a why-us band; we go straight from one short paragraph into the footer.
+      3. The tab panel collapses when the description is short. Our seed copy is one sentence, but the layout should not fall in on itself when content is thin.
+
+      Findings I am NOT acting on, with reasons:
+      - The critic argued for replacing tabs with stacked always-visible sections. Rejecting that: the reference uses tabs and won this comparison with tabs, so tabs are not what lost it — the emptiness behind them is. Fixing the content weight is the correct response.
+      - "The related-artwork row is reduced to floating title stubs with no images" is largely an artefact of the 1750px capture slicing through the carousel mid-card. Worth re-checking on the next capture rather than treating as a defect.
+
+      Separately, this capture exposed a real duplication the loop was not looking for: the page now carries TWO trust strips saying nearly the same thing — the new per-product TrustList in the buy panel, and the global footer USP strip (Archival Inks / Free Over ₹999 / 30-Day Returns / Safe Payments) directly above the footer. The critic read the latter as footer boilerplate. That needs a decision, tracked separately.
+
+      Staying open. Fixes dispatched.
+  - author: mcp-client
+    timestamp: '2026-08-06T08:40:25.788Z'
+    text: |-
+      ROUND 3 FIX LANDED (ProductTabs.tsx only; e2e specs and ProductDetail/$slug untouched).
+
+      Review signal, now visible without a click: the Review tab carries the count, and a star/average summary sits beside the tab bar (centred below xl, right-aligned from xl — measured clearance at 1440, no collision). The summary is itself a control that opens the Review tab.
+
+      Playwright trap found and avoided: getByRole('tab', { name }) compares the accessible name by EQUALITY, not substring — verified against playwright-core's matchesAttributePart. product-detail.spec.ts locates the Review tab by name in three places, so "Review (104)" as an accessible name would have broken all three silently. The count is rendered aria-hidden and the number reaches screen readers via aria-describedby on the tab instead. Worth remembering for any future tab or button label that gains a badge.
+
+      Panel collapse fixed by layout, not filler: min-h-[20rem] / sm:min-h-[24rem], About is flex-1 with the cross-link row at mt-auto, so slack on a one-sentence description lands between the copy and the cross-links rather than trailing off the bottom. Region went from ~250px to ~460px and now clears the footer trust strip. No invented copy.
+
+      Zero reviews handled as THREE states, not two: count>0 shows the badge and summary; count===0 shows muted "No reviews yet" as plain text, not a button, and no "(0)" badge — a (0) reads as a broken counter and a control that opens an empty wall is a promise the page cannot keep; rating null/undefined renders nothing at all, because "we did not load an aggregate" is not the claim "there are none". That null-is-not-zero distinction matches what ProductReviewSection already does.
+
+      About now carries At A Glance (styles/subjects/colour moved out of the Details spec table, since they describe the artwork rather than the printed object), an artist byline, and a cross-link row answering the critic's three questions with real numbers — "17 sizes · 7 finishes", "Free over ₹999 · 30-day returns", "4.8 from 104 reviews". Policy numbers are named constants shared with the Shipping panel so the two cannot drift.
+
+      41 tests (was 25). The "Product Detail - Tabs" e2e block passes 5/5.
+
+      STILL NEEDED — two purely additive props at the $slug.tsx call site, blocked while the mobile builder owns that file: rating={product.rating} and artist on the spec projection. Until those land the rating summary, tab count and byline render nothing.
+
+      HONEST ASSESSMENT of what remains: About is now thin because of DATA, not layout. What we hold is exhausted. To match the reference's About region the schema would need an artist bio/portrait/statement (we hold a name and a slug), print medium and paper/canvas stock, ink and edition info, care instructions, and editorial description copy of real length — the seed sentence is a fixture, not marketing copy. `tags` exists on the shared Product but is not projected onto ProductDetailData. This is worth its own schema ticket; no amount of layout work will fix it.
 work_sessions: []
 related_tickets: []
 blocked_by: []

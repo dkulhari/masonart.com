@@ -28,6 +28,7 @@ const SPEC: ProductTabsSpecData = {
   styles: ['wabi-sabi', 'minimalist'],
   subjects: ['nature-landscape'],
   primaryColor: 'neutral',
+  artist: { name: 'Aditi Rao', slug: 'aditi-rao' },
   variants: [
     {
       id: 'v1',
@@ -78,6 +79,7 @@ const SPEC: ProductTabsSpecData = {
 
 const DESCRIPTION_HTML = '<p>A quiet study in <strong>rain</strong>.</p>'
 const ROOM_SUGGESTIONS = ['living-room', 'bedroom']
+const RATING = { averageRating: 4.8, reviewCount: 104 }
 
 function renderTabs(props: Partial<React.ComponentProps<typeof ProductTabs>> = {}) {
   return render(
@@ -85,6 +87,7 @@ function renderTabs(props: Partial<React.ComponentProps<typeof ProductTabs>> = {
       descriptionHtml={DESCRIPTION_HTML}
       roomSuggestions={ROOM_SUGGESTIONS}
       spec={SPEC}
+      rating={RATING}
       reviewPanel={
         <section id="reviews" data-testid="product-reviews">
           <div data-testid="reviews-header">4.8 (104 reviews)</div>
@@ -119,8 +122,26 @@ describe('ProductTabs', () => {
 
       const tablist = screen.getByRole('tablist')
       const tabs = screen.getAllByRole('tab')
-      expect(tabs.map((tab) => tab.textContent)).toEqual(TAB_LABELS)
+      expect(tabs.map((tab) => tab.id)).toEqual([
+        'product-tab-about',
+        'product-tab-details',
+        'product-tab-shipping',
+        'product-tab-review',
+      ])
       expect(tablist).toBeTruthy()
+    })
+
+    it('keeps each tab accessible name exactly the reference label', () => {
+      // Load-bearing beyond this suite: tests/e2e/product-detail.spec.ts locates
+      // these with Playwright's `getByRole('tab', { name })`, which compares the
+      // accessible name by EQUALITY (playwright-core `matchesAttributePart`,
+      // op `=`), not substring. The Review tab's count must therefore stay out
+      // of the name — it is rendered aria-hidden.
+      renderTabs()
+
+      for (const label of TAB_LABELS) {
+        expect(screen.getByRole('tab', { name: label })).toBeTruthy()
+      }
     })
 
     it('marks exactly one tab selected, defaulting to About The Artwork', () => {
@@ -148,6 +169,95 @@ describe('ProductTabs', () => {
       const tabs = screen.getAllByRole('tab')
       const tabIndexes = tabs.map((tab) => tab.getAttribute('tabindex'))
       expect(tabIndexes).toEqual(['0', '-1', '-1', '-1'])
+    })
+  })
+
+  describe('review signal, visible without clicking', () => {
+    it('puts the review count on the Review tab', () => {
+      renderTabs()
+      expect(screen.getByTestId('product-tabs-review-count').textContent).toBe('(104)')
+      expect(screen.getByRole('tab', { name: 'Review' }).textContent).toContain('(104)')
+    })
+
+    it('keeps that count out of the accessible name', () => {
+      renderTabs()
+      expect(screen.getByTestId('product-tabs-review-count').getAttribute('aria-hidden')).toBe(
+        'true'
+      )
+    })
+
+    it('shows the star average and the count while About is still the open panel', () => {
+      renderTabs()
+
+      expect(
+        screen.getByRole('tab', { name: 'About The Artwork' }).getAttribute('aria-selected')
+      ).toBe('true')
+      const summary = screen.getByTestId('product-tabs-rating')
+      expect(summary.textContent).toContain('4.8')
+      expect(summary.textContent).toContain('104 reviews')
+    })
+
+    it('points the Review tab at the summary so assistive tech still hears the count', () => {
+      renderTabs()
+      expect(screen.getByRole('tab', { name: 'Review' }).getAttribute('aria-describedby')).toBe(
+        screen.getByTestId('product-tabs-rating').id
+      )
+    })
+
+    it('opens the Review tab when the summary is clicked', () => {
+      renderTabs()
+      fireEvent.click(screen.getByTestId('product-tabs-rating'))
+
+      expect(screen.getByRole('tab', { name: 'Review' }).getAttribute('aria-selected')).toBe(
+        'true'
+      )
+      expect(screen.getByTestId('product-reviews')).toBeTruthy()
+    })
+
+    it('singularises a lone review', () => {
+      renderTabs({ rating: { averageRating: 5, reviewCount: 1 } })
+      const summary = screen.getByTestId('product-tabs-rating')
+      expect(summary.textContent).toContain('1 review')
+      expect(summary.textContent).not.toContain('1 reviews')
+    })
+
+    describe('when there are no reviews', () => {
+      it('says so in words rather than rendering a (0) that reads as broken', () => {
+        renderTabs({ rating: { averageRating: 0, reviewCount: 0 } })
+
+        expect(screen.queryByTestId('product-tabs-review-count')).toBeNull()
+        expect(screen.getByRole('tab', { name: 'Review' }).textContent).toBe('Review')
+        expect(screen.getByTestId('product-tabs-rating').textContent).toBe('No reviews yet')
+      })
+
+      it('does not dress the zero state up as a control that opens an empty wall', () => {
+        renderTabs({ rating: { averageRating: 0, reviewCount: 0 } })
+        expect(screen.getByTestId('product-tabs-rating').tagName).toBe('P')
+      })
+
+      it('omits the About panel cross-link to reviews', () => {
+        renderTabs({ rating: { averageRating: 0, reviewCount: 0 } })
+        expect(screen.queryByTestId('product-tabs-jump-review')).toBeNull()
+      })
+
+      it('renders no summary at all when the aggregate never loaded', () => {
+        // `undefined` is "we do not know", which is not the same claim as
+        // "there are none" — ProductReviewSection draws the same distinction.
+        renderTabs({ rating: undefined })
+
+        expect(screen.queryByTestId('product-tabs-rating')).toBeNull()
+        expect(screen.queryByTestId('product-tabs-review-count')).toBeNull()
+        expect(
+          screen.getByRole('tab', { name: 'Review' }).getAttribute('aria-describedby')
+        ).toBeNull()
+      })
+    })
+  })
+
+  describe('panel presence', () => {
+    it('gives the tabpanel a minimum height so a one-sentence description still makes a section', () => {
+      renderTabs({ descriptionHtml: '<p>One short line.</p>', roomSuggestions: [] })
+      expect(screen.getByRole('tabpanel').className).toMatch(/min-h-/)
     })
   })
 
@@ -240,6 +350,62 @@ describe('ProductTabs', () => {
       renderTabs({ roomSuggestions: [] })
       expect(screen.queryByText(/perfect for/i)).toBeNull()
     })
+
+    it('credits the artist we hold a name for', () => {
+      renderTabs()
+      expect(screen.getByRole('tabpanel').textContent).toContain('Aditi Rao')
+    })
+
+    it('carries the artwork attributes — style, subject, palette — not the Details tab', () => {
+      renderTabs()
+      const about = screen.getByRole('tabpanel')
+
+      expect(about.textContent).toMatch(/at a glance/i)
+      expect(about.textContent).toContain('wabi sabi, minimalist')
+      expect(about.textContent).toContain('nature landscape')
+      expect(about.textContent).toContain('neutral')
+    })
+
+    it('drops the at-a-glance list entirely when we hold none of those fields', () => {
+      renderTabs({
+        spec: {
+          sku: 'PAC347',
+          orientation: 'square',
+          variants: SPEC.variants,
+          frames: SPEC.frames,
+        },
+      })
+      expect(screen.queryByText(/at a glance/i)).toBeNull()
+    })
+
+    it('answers sizes, shipping and reviews in place, with our real numbers', () => {
+      renderTabs()
+
+      expect(screen.getByTestId('product-tabs-jump-details').textContent).toContain('2 sizes')
+      expect(screen.getByTestId('product-tabs-jump-details').textContent).toContain('2 finishes')
+      expect(screen.getByTestId('product-tabs-jump-shipping').textContent).toContain('₹999')
+      expect(screen.getByTestId('product-tabs-jump-shipping').textContent).toContain(
+        '30-day returns'
+      )
+      expect(screen.getByTestId('product-tabs-jump-review').textContent).toContain(
+        '4.8 from 104 reviews'
+      )
+    })
+
+    it('opens the matching tab from a cross-link', () => {
+      renderTabs()
+      fireEvent.click(screen.getByTestId('product-tabs-jump-details'))
+
+      expect(
+        screen.getByRole('tab', { name: 'Details And Customization' }).getAttribute('aria-selected')
+      ).toBe('true')
+      expect(screen.getByRole('tabpanel').textContent).toContain('PAC347')
+    })
+
+    it('does not claim sizes or finishes we have none of', () => {
+      renderTabs({ spec: { ...SPEC, variants: [], frames: [] } })
+      expect(screen.queryByTestId('product-tabs-jump-details')).toBeNull()
+    })
   })
 
   describe('Details And Customization panel', () => {
@@ -276,6 +442,15 @@ describe('ProductTabs', () => {
       fireEvent.click(screen.getByRole('tab', { name: 'Details And Customization' }))
 
       expect(screen.queryByText('Rolled Canvas')).toBeNull()
+    })
+
+    it('leaves style and subject to About rather than repeating them here', () => {
+      renderTabs()
+      fireEvent.click(screen.getByRole('tab', { name: 'Details And Customization' }))
+
+      const panel = screen.getByRole('tabpanel')
+      expect(panel.textContent).not.toMatch(/wabi sabi/i)
+      expect(panel.textContent).not.toMatch(/nature landscape/i)
     })
   })
 
