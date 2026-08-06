@@ -29,6 +29,7 @@ import { walletWebhookApp } from "./routes/webhooks/wallet";
 import { adminProductsApp } from "./routes/admin/products";
 import { adminOrdersApp } from "./routes/admin/orders";
 import { adminCustomersApp } from "./routes/admin/customers";
+import { adminPromotionsApp } from "./routes/admin/promotions";
 import { adminWalletConfigApp } from "./routes/admin/wallet-config";
 import { adminReviewsApp } from "./routes/admin/reviews";
 import { adminShippingApp } from "./routes/admin/shipping";
@@ -206,6 +207,9 @@ app.route("/api/admin/orders", adminOrdersApp);
 
 // Admin Customers API - user list and role assignment
 app.route("/api/admin/customers", adminCustomersApp);
+
+// Admin Promotions API - sale promotion CRUD
+app.route("/api/admin/promotions", adminPromotionsApp);
 
 // Admin Wallet Config API - pricing and stats
 app.route("/api/admin/wallet-config", adminWalletConfigApp);
