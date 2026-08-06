@@ -135,7 +135,24 @@ export function PaymentButton({
   const [status, setStatus] = useState<PaymentStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [scriptLoaded, setScriptLoaded] = useState(false)
-  const { resetLocalCart } = useCartActions()
+  const { refreshCart, resetLocalCart } = useCartActions()
+
+  /**
+   * Take the server's word for what is still in the cart (#511).
+   *
+   * `ordersApi.create` empties the database cart before Razorpay's modal even
+   * opens. Every way out of this flow other than a verified payment therefore
+   * leaves the page promising a basket the server has already taken: the
+   * customer dismisses the modal, the store still shows their items, and "Try
+   * Again" calls `ordersApi.create` again and gets "Cart is empty" — for good,
+   * against a cart the UI insists is full.
+   *
+   * Whether the cart should be consumed here or at verification is a bigger
+   * question and is not answered here. This only stops the UI insisting.
+   */
+  const syncCartWithServer = useCallback(() => {
+    void refreshCart()
+  }, [refreshCart])
 
   // Load Razorpay script on mount
   useEffect(() => {
@@ -213,6 +230,7 @@ export function PaymentButton({
             setStatus('error')
             const errorMsg = verifyError instanceof Error ? verifyError.message : 'Payment verification failed'
             setErrorMessage(errorMsg)
+            syncCartWithServer()
             onError(errorMsg)
           }
         },
@@ -220,6 +238,7 @@ export function PaymentButton({
           ondismiss: () => {
             setStatus('idle')
             setErrorMessage('Payment was cancelled')
+            syncCartWithServer()
           },
           escape: true,
           animation: true,
@@ -230,6 +249,7 @@ export function PaymentButton({
       razorpay.on('payment.failed', () => {
         setStatus('error')
         setErrorMessage('Payment failed. Please try again.')
+        syncCartWithServer()
         onError('Payment failed. Please try again.')
       })
 
@@ -238,9 +258,20 @@ export function PaymentButton({
       setStatus('error')
       const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred'
       setErrorMessage(errorMsg)
+      // Order creation may well have succeeded and emptied the cart before
+      // whatever came next failed.
+      syncCartWithServer()
       onError(errorMsg)
     }
-  }, [scriptLoaded, orderData, customerPhone, onSuccess, onError, resetLocalCart])
+  }, [
+    scriptLoaded,
+    orderData,
+    customerPhone,
+    onSuccess,
+    onError,
+    resetLocalCart,
+    syncCartWithServer,
+  ])
 
   // Get button text based on status
   const getButtonText = () => {

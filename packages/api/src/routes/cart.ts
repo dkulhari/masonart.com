@@ -197,7 +197,16 @@ function cartCacheKey(cartId: string, isMember: boolean): string {
   return `${CacheKeys.CART}${cartId}${isMember ? ":member" : ":guest"}`;
 }
 
-async function invalidateCartCache(cartId: string): Promise<void> {
+/**
+ * Exported because order creation empties this very cart, in `routes/orders.ts`,
+ * and a five-minute cache entry that outlives the order serves the purchased
+ * items straight back to the success page (#511 final review, finding 4).
+ *
+ * Exported rather than reimplemented there: the key is viewer-keyed, both
+ * variants have to be dropped together, and a second copy of that derivation is
+ * a second chance to get it subtly wrong.
+ */
+export async function invalidateCartCache(cartId: string): Promise<void> {
   await Promise.all([
     deleteCached(cartCacheKey(cartId, false)),
     deleteCached(cartCacheKey(cartId, true)),

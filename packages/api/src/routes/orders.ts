@@ -26,6 +26,7 @@ import {
   type OrderPaymentDetails,
 } from "../database/schema/orders";
 import { carts, cartItems } from "../database/schema/cart";
+import { invalidateCartCache } from "./cart";
 import { productionApprovals } from "../database/schema/approvals";
 import { reviews } from "../database/schema/reviews";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
@@ -568,6 +569,22 @@ ordersApp.post(
 
         return createdOrder;
       });
+
+      /**
+       * The cart this order just emptied is cached for five minutes, and both
+       * viewer variants of it (#511 final review, finding 4).
+       *
+       * Outside the transaction, deliberately: the cache is not transactional,
+       * and dropping the entry before the rows are committed would leave the
+       * next read to repopulate it from the pre-order state — the exact
+       * staleness this is here to prevent.
+       *
+       * Without it, verifying payment invalidates the client's cart query,
+       * `CartSync` refetches, and `GET /api/cart` answers out of the cache with
+       * the items that were just bought: the customer lands on the success page
+       * with a full cart badge and can order them again.
+       */
+      await invalidateCartCache(userCart.id);
 
       // Return created order
       return c.json(

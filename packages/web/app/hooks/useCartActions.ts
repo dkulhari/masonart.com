@@ -228,6 +228,19 @@ export interface CartActions {
   removeItem: (id: string) => Promise<void>;
   clearCart: () => Promise<void>;
   /**
+   * Re-read the cart and project it, without writing anything.
+   *
+   * For the moments where the server has changed the cart and this client has
+   * no way to know: `ordersApi.create` empties the database cart before
+   * Razorpay's modal even opens, so a customer who dismisses that modal is
+   * looking at a checkout page still promising a basket the server has already
+   * taken — and "Try Again" answers "Cart is empty", for good (#511 final
+   * review, finding 4). Whether the cart should be consumed at order creation
+   * or at payment verification is a separate question; this only stops the UI
+   * insisting on an answer that is no longer true.
+   */
+  refreshCart: () => Promise<void>;
+  /**
    * Empty the cart locally without a DELETE.
    *
    * For after a paid order: `routes/orders.ts` has already deleted the
@@ -384,6 +397,23 @@ export function useCartActions(): CartActions {
     }
   }, [queryClient]);
 
+  const refreshCart = useCallback(async () => {
+    // Takes a sequence number like any write: it is about to replace the
+    // store's contents, and a write still in flight must not land on top of
+    // the answer it settles on.
+    const sequence = beginWrite();
+
+    try {
+      await applyIfCurrent(sequence, queryClient);
+    } catch (error) {
+      if (!isCurrent(sequence)) return;
+      // Nothing was written and nothing is rolled back — the projection simply
+      // could not be refreshed, and saying so beats leaving a cart on screen
+      // that may no longer exist.
+      useCartStore.getState().setSyncError(readError(error));
+    }
+  }, [queryClient]);
+
   const resetLocalCart = useCallback(() => {
     useCartStore.getState().clearLocal();
     queryClient.invalidateQueries({ queryKey: cartKeys.detail() });
@@ -399,6 +429,7 @@ export function useCartActions(): CartActions {
       updateQuantity,
       removeItem,
       clearCart,
+      refreshCart,
       resetLocalCart,
       openDrawer,
       closeDrawer,
@@ -409,6 +440,7 @@ export function useCartActions(): CartActions {
       updateQuantity,
       removeItem,
       clearCart,
+      refreshCart,
       resetLocalCart,
       openDrawer,
       closeDrawer,

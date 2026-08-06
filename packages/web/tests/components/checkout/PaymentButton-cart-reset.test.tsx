@@ -193,3 +193,123 @@ describe('PaymentButton post-payment cart reset', () => {
     expect(useCartStore.getState().items).toEqual([])
   })
 })
+
+/**
+ * The other ways out of the payment flow (#511 final review, finding 4).
+ *
+ * `ordersApi.create` empties the DATABASE cart before Razorpay's modal opens,
+ * so every exit other than a verified payment leaves the page showing a basket
+ * the server no longer has. The customer dismisses the modal, the store still
+ * shows their items, and "Try Again" calls `ordersApi.create` again — which
+ * answers "Cart is empty", 400, permanently, against a cart the UI insists is
+ * full.
+ *
+ * Whether the cart should be consumed at order creation or at verification is
+ * a separate question and is deliberately not answered here. These pin the
+ * minimum: the failure paths ask the server what is actually left.
+ */
+describe('PaymentButton failure paths re-read the cart', () => {
+  /** Razorpay that opens and then has the customer walk away from it. */
+  class DismissedRazorpay {
+    private options: { modal?: { ondismiss?: () => void } }
+
+    constructor(options: typeof this.options) {
+      this.options = options
+    }
+
+    open() {
+      this.options.modal?.ondismiss?.()
+    }
+
+    close() {}
+
+    on() {}
+  }
+
+  const emptiedCart = {
+    id: 'cart-1',
+    itemCount: 0,
+    subtotal: '0.00',
+    savingTotal: '0.00',
+    savedForLater: [],
+    items: [],
+  }
+
+  beforeEach(() => {
+    // A sibling describe, so the suite above's `beforeEach` does not run here:
+    // seed the store explicitly or every "the cart emptied" assertion below is
+    // vacuously true against a store the previous test already emptied.
+    useCartStore.setState({
+      items: [
+        {
+          id: 'server-1',
+          productId: 'p',
+          variantId: 'v',
+          frameId: null,
+          quantity: 1,
+          productTitle: 'x',
+          productSlug: 'x',
+          thumbnailUrl: '',
+          sizeLabel: 'A4',
+          widthInches: 8,
+          heightInches: 12,
+          unitPrice: 100,
+          framePrice: 0,
+          isAiGenerated: false,
+          addedAt: '2026-08-06T06:00:00.000Z',
+        },
+      ],
+    })
+    expect(useCartStore.getState().items).toHaveLength(1)
+    vi.mocked(cartApi.get).mockResolvedValue(emptiedCart)
+  })
+
+  it('empties the shown cart when the customer dismisses the payment modal', async () => {
+    ;(window as unknown as { Razorpay: unknown }).Razorpay = DismissedRazorpay
+
+    render(
+      <PaymentButton
+        orderData={orderData}
+        totalAmount={100}
+        onSuccess={vi.fn()}
+        onError={vi.fn()}
+      />,
+      { wrapper }
+    )
+
+    const payButton = await screen.findByRole('button', { name: /^Pay/ })
+    await waitFor(() => expect(payButton).not.toBeDisabled())
+    fireEvent.click(payButton)
+
+    await waitFor(() => expect(cartApi.get).toHaveBeenCalled())
+    // The order took these lines. Continuing to show them is what strands the
+    // customer on a "Try Again" that can never succeed.
+    await waitFor(() => expect(useCartStore.getState().items).toEqual([]))
+    expect(cartApi.clear).not.toHaveBeenCalled()
+  })
+
+  it('re-reads the cart when the flow throws after the order was created', async () => {
+    // Order creation succeeded — and emptied the cart — before this failed.
+    vi.mocked(ordersApi.initiatePayment).mockRejectedValue(
+      new Error('Payment gateway unavailable')
+    )
+    const onError = vi.fn()
+
+    render(
+      <PaymentButton
+        orderData={orderData}
+        totalAmount={100}
+        onSuccess={vi.fn()}
+        onError={onError}
+      />,
+      { wrapper }
+    )
+
+    const payButton = await screen.findByRole('button', { name: /^Pay/ })
+    await waitFor(() => expect(payButton).not.toBeDisabled())
+    fireEvent.click(payButton)
+
+    await waitFor(() => expect(onError).toHaveBeenCalled())
+    await waitFor(() => expect(useCartStore.getState().items).toEqual([]))
+  })
+})
