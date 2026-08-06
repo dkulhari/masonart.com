@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
 import type { CartItem } from '~/stores/cart'
+import { GiftCardControl, type AppliedGiftCard } from './GiftCardControl'
 
 // ============================================================================
 // Types
@@ -55,6 +56,11 @@ interface OrderSummaryProps {
   onCheckout?: () => void
   /** Whether checkout is in progress */
   isCheckingOut?: boolean
+  /** Gift cards applied to this order. Tender, not a discount. */
+  giftCards?: AppliedGiftCard[]
+  /** Quote a gift card code. Omit to hide the control entirely. */
+  onApplyGiftCard?: (code: string) => Promise<{ success: boolean; error?: string }>
+  onRemoveGiftCard?: (giftCardId: string) => void
   /** Class name for styling */
   className?: string
 }
@@ -77,6 +83,9 @@ export function OrderSummary({
   checkoutButtonText = 'Place Order',
   onCheckout,
   isCheckingOut = false,
+  giftCards = [],
+  onApplyGiftCard,
+  onRemoveGiftCard,
   className,
 }: OrderSummaryProps) {
   const [isExpanded, setIsExpanded] = useState(showItems && items.length <= 3)
@@ -86,6 +95,19 @@ export function OrderSummary({
 
   const total = subtotal - discountAmount + shippingCost + taxAmount
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+
+  /**
+   * Gift cards are TENDER, not a discount. They come off the total after
+   * tax, never off the price — so they are not part of `total` above, and
+   * never appear among the discount rows. A customer who reads a gift card
+   * as a discount expects the invoice price to change, and it does not.
+   */
+  const giftCardTotal = giftCards.reduce(
+    (sum, card) => sum + card.amountPaise / 100,
+    0,
+  )
+  const amountDue = Math.max(0, total - giftCardTotal)
+  const isFullyCovered = giftCards.length > 0 && amountDue === 0
 
   // Handle coupon application
   const handleApplyCoupon = async () => {
@@ -262,12 +284,65 @@ export function OrderSummary({
         </div>
       )}
 
+      {/* Gift card entry */}
+      {onApplyGiftCard && onRemoveGiftCard && (
+        <GiftCardControl
+          appliedCards={giftCards}
+          onApply={onApplyGiftCard}
+          onRemove={onRemoveGiftCard}
+        />
+      )}
+
       {/* Total */}
       <div className="border-t border-border p-4">
         <div className="flex items-center justify-between">
           <span className="text-base font-semibold text-foreground">Total</span>
-          <span className="text-xl font-medium text-foreground">{formatPrice(total)}</span>
+          <span
+            className={cn(
+              'text-xl font-medium text-foreground',
+              // When tender follows, the total stops being the headline
+              // figure — what the customer pays is the amount due below.
+              giftCards.length > 0 && 'text-base',
+            )}
+          >
+            {formatPrice(total)}
+          </span>
         </div>
+
+        {/* Tender, below the total and after tax — never a discount row. */}
+        {giftCards.length > 0 && (
+          <>
+            {giftCards.map((card) => (
+              <div
+                key={card.giftCardId}
+                className="mt-2 flex items-center justify-between text-sm"
+              >
+                <span className="text-muted-foreground">
+                  Gift card •••• {card.last4}
+                </span>
+                <span className="font-medium text-foreground">
+                  −{formatPrice(card.amountPaise / 100)}
+                </span>
+              </div>
+            ))}
+
+            <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+              <span className="text-base font-semibold text-foreground">
+                Amount due
+              </span>
+              <span className="text-xl font-medium text-foreground">
+                {formatPrice(amountDue)}
+              </span>
+            </div>
+
+            {isFullyCovered && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Your gift cards cover this order in full — there is nothing
+                left to pay.
+              </p>
+            )}
+          </>
+        )}
       </div>
 
       {/* Checkout Button */}
@@ -290,6 +365,8 @@ export function OrderSummary({
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Processing...
               </>
+            ) : isFullyCovered ? (
+              'Complete Order'
             ) : (
               checkoutButtonText
             )}
