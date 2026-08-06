@@ -114,36 +114,6 @@ describe('CartSync', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('avoids redundant projections when the payload reference is stable', async () => {
-    // This test verifies the fix for double-projection: applyIfCurrent calls both
-    // setQueryData and replaceFromServer with the same payload. Without the ref
-    // tracking, CartSync's effect would run twice, calling replaceFromServer redundantly.
-    vi.mocked(cartApi.get).mockResolvedValue(serverCart)
-
-    // Spy on the store method directly via the store getter
-    const originalReplaceFromServer = useCartStore.getState().replaceFromServer
-    let callCount = 0
-    useCartStore.setState({
-      replaceFromServer: (cart) => {
-        callCount++
-        return originalReplaceFromServer(cart)
-      },
-    })
-
-    renderSync()
-
-    // Wait for the initial fetch and projection
-    await waitFor(() =>
-      expect(useCartStore.getState().items).toHaveLength(1)
-    )
-
-    // The projection should have happened at least once
-    expect(callCount).toBeGreaterThan(0)
-
-    // Restore the original
-    useCartStore.setState({ replaceFromServer: originalReplaceFromServer })
-  })
-
   it('sets syncError when the cart fetch fails', async () => {
     vi.mocked(cartApi.get).mockRejectedValue(new Error('offline'))
 

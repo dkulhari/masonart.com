@@ -8,9 +8,15 @@
  *
  * Mounted at the root rather than per route, so a customer who lands on the
  * PDP and adds from there is already working against the real cart.
+ *
+ * Deduplication: replaceFromServer is idempotent in the store — if the new
+ * items equal the current items, array identity is preserved to avoid
+ * re-renders. This is important because the same payload can arrive via
+ * multiple paths (applyIfCurrent's setQueryData, direct call, or stale
+ * cache hits). See stores/cart.ts for the implementation.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 import { useServerCart } from '~/hooks/useCart'
 import type { ServerCartPayload } from '~/lib/cart-projection'
@@ -20,16 +26,10 @@ export function CartSync(): null {
   const { data, error } = useServerCart()
   const replaceFromServer = useCartStore((state) => state.replaceFromServer)
   const setSyncError = useCartStore((state) => state.setSyncError)
-  const lastProjectedRef = useRef<ServerCartPayload | null>(null)
 
   useEffect(() => {
-    // Prevent double-projection when the same payload reference arrives
-    // from both applyIfCurrent's setQueryData (which notifies this observer)
-    // and its direct replaceFromServer call. Only project if the reference changed.
-    if (data && data !== lastProjectedRef.current) {
-      lastProjectedRef.current = data
-      replaceFromServer(data as unknown as ServerCartPayload)
-    }
+    // Project successful fetches into the store
+    if (data) replaceFromServer(data as unknown as ServerCartPayload)
 
     // Handle fetch errors. If the query is in an error state, signal it.
     // A successful fetch (even if it returns empty) clears the error because

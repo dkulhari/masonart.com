@@ -13,6 +13,40 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { generateId } from "~/lib/utils";
 import { toCartItems, type ServerCartPayload } from "~/lib/cart-projection";
 
+/**
+ * Deep equality check for CartItem arrays.
+ * Returns true if both arrays have the same items in the same order.
+ */
+function itemsAreEqual(a: CartItem[], b: CartItem[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((itemA, i) => {
+    const itemB = b[i];
+    if (!itemB) return false;
+    // Compare all fields of the CartItem
+    return (
+      itemA.id === itemB.id &&
+      itemA.productId === itemB.productId &&
+      itemA.variantId === itemB.variantId &&
+      itemA.frameId === itemB.frameId &&
+      itemA.quantity === itemB.quantity &&
+      itemA.productTitle === itemB.productTitle &&
+      itemA.productSlug === itemB.productSlug &&
+      itemA.thumbnailUrl === itemB.thumbnailUrl &&
+      itemA.sizeLabel === itemB.sizeLabel &&
+      itemA.widthInches === itemB.widthInches &&
+      itemA.heightInches === itemB.heightInches &&
+      itemA.frameName === itemB.frameName &&
+      itemA.frameType === itemB.frameType &&
+      itemA.unitPrice === itemB.unitPrice &&
+      itemA.framePrice === itemB.framePrice &&
+      itemA.customizations === itemB.customizations && // reference equality OK for now
+      itemA.isAiGenerated === itemB.isAiGenerated &&
+      itemA.aiDetails === itemB.aiDetails && // reference equality OK for now
+      itemA.addedAt === itemB.addedAt
+    );
+  });
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -306,15 +340,30 @@ export const useCartStore = create<CartStore>()(
        * The server's cart, wholesale. Local ids, quantities and prices all
        * lose — the rows here are the rows order creation will read.
        *
-       * Also clears `syncError` (#511 fix round 1, finding 1): every write
+       * Idempotent: if the new items are equal to the current items, the
+       * array identity is preserved to avoid unnecessary re-renders. This
+       * matters when the same payload arrives via multiple paths
+       * (e.g., applyIfCurrent's setQueryData + direct call, or CartSync's
+       * effect firing on a stale-but-cached reference).
+       *
+       * Also clears `syncError` (#511 fix round 1, finding 2): every write
        * that reaches this — whichever one the hook's sequence guard decided
        * actually gets to apply — succeeded, so whatever the previous failure
        * said is no longer true. Without this, a rejected PATCH left its
        * message on screen through every write that came after it, until the
        * customer happened to add something (the only path that cleared it).
        */
-      replaceFromServer: (cart: ServerCartPayload) =>
-        set({ items: toCartItems(cart), syncError: null }),
+      replaceFromServer: (cart: ServerCartPayload) => {
+        const newItems = toCartItems(cart);
+        const currentItems = get().items;
+
+        // Preserve array identity if content is unchanged (no re-render)
+        const itemsToSet = itemsAreEqual(currentItems, newItems)
+          ? currentItems
+          : newItems;
+
+        set({ items: itemsToSet, syncError: null });
+      },
 
       setSyncError: (message: string | null) => set({ syncError: message }),
 
