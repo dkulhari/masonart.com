@@ -8,6 +8,24 @@ export default defineConfig({
   server: {
     port: 3001,
     host: true, // Listen on all network interfaces
+    /**
+     * Hostnames the dev server will answer to.
+     *
+     * `host: true` binds every interface, but Vite still checks the Host
+     * HEADER and rejects anything unlisted — a DNS-rebinding defence, not a
+     * binding one. So reaching the dev server from another machine on the LAN
+     * ("macmini:3001") fails with "Blocked request. This host is not allowed"
+     * even though the port is plainly open.
+     *
+     * Listed explicitly rather than set to `true`. `allowedHosts: true`
+     * disables the check outright, which is the thing the check exists to
+     * prevent: a page on any origin can then resolve a name it controls to
+     * this machine and read whatever the dev server serves.
+     *
+     * Add machine names here as they come up; localhost and IP literals are
+     * always permitted and need no entry.
+     */
+    allowedHosts: ['macmini', 'macmini.local'],
   },
   plugins: [
     tsConfigPaths(),
