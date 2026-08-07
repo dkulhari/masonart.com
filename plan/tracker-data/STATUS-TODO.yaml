@@ -1,9 +1,9 @@
 status: todo
-last_updated: '2026-08-07T07:06:27.553Z'
-total_tickets: 33
+last_updated: '2026-08-07T07:28:58.056Z'
+total_tickets: 32
 summary:
   critical: 4
-  high: 6
+  high: 5
   medium: 13
   low: 10
 priorities:
@@ -85,12 +85,6 @@ priorities:
           blocked_by: []
         - ticket_number: 547
           title: Review toast covers page content on every screen and has no counterpart on the reference
-          assignee: unassigned
-          blocked_by: []
-    - feature: shipping-returns
-      tickets:
-        - ticket_number: 570
-          title: Admin UI for the free-shipping threshold, with the storefront copy reading the live value
           assignee: unassigned
           blocked_by: []
   medium:

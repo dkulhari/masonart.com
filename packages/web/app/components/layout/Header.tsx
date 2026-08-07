@@ -25,6 +25,7 @@ import {
 import { STYLE_OPTIONS } from '@chobii/shared'
 import { SearchDrawer } from './SearchDrawer'
 import { AllArtMegaMenu } from './AllArtMegaMenu'
+import { MobileTabBar } from './MobileTabBar'
 
 /**
  * The header's own height, and the offset everything sticky below it uses.
@@ -308,6 +309,27 @@ export function Header() {
         </div>
 
       </header>
+
+      {/* The mobile bottom tab bar (#542).
+       *
+       * Rendered from here rather than from __root so it can drive the two
+       * drawers the header already owns — the mobile menu and SearchDrawer are
+       * this component's `useState`, and a bar mounted at the root would have
+       * had to duplicate both. Cart it opens through the store, like every
+       * other surface does.
+       *
+       * A SIBLING of <header> for the same reason SearchDrawer is: the header
+       * sets backdrop-blur, and a backdrop-filter is a containing block for
+       * fixed descendants — nested, a `fixed bottom-0` bar would pin to the
+       * bottom of the 64px header instead of the viewport (#348).
+       *
+       * The page-shell padding that keeps it off the last band of every page
+       * is MOBILE_TAB_BAR_PADDING_CLASS, applied in __root. */}
+      <MobileTabBar
+        onOpenMenu={toggleMobileMenu}
+        isMenuOpen={isMobileMenuOpen}
+        onOpenSearch={() => setIsSearchOpen(true)}
+      />
 
       {/* Sibling of <header>, not a child: the header sets backdrop-blur,
           which establishes a containing block and collapses a nested fixed

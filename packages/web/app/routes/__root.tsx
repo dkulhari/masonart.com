@@ -9,12 +9,17 @@ import {
 import { createServerFn } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { BRAND_NAME, BRAND_TAGLINE } from '@chobii/shared'
+import {
+  BRAND_NAME,
+  BRAND_TAGLINE,
+  FREE_SHIPPING_THRESHOLD,
+} from '@chobii/shared'
 import { useEffect } from 'react'
 import type * as React from 'react'
 import { AnnouncementBar } from '~/components/layout/AnnouncementBar'
 import { SaleStrip } from '~/components/layout/SaleStrip'
 import { Header } from '~/components/layout/Header'
+import { MOBILE_TAB_BAR_PADDING_CLASS } from '~/components/layout/MobileTabBar'
 import { Footer } from '~/components/layout/Footer'
 import { CartSync } from '~/components/cart/CartSync'
 import { CartDrawer } from '~/components/cart/CartDrawer'
@@ -66,6 +71,14 @@ function getQueryClient() {
  */
 interface RouterContext {
   session: Session | null
+  /**
+   * The free-shipping threshold in force, in whole rupees (#570).
+   *
+   * Here, and nowhere else. Ten customer-facing surfaces state this number and
+   * the cart charges by it; fetching it per surface would be ten requests for
+   * one figure and ten chances for them to disagree.
+   */
+  freeShippingThreshold: number
 }
 
 /**
@@ -101,14 +114,50 @@ const fetchSession = createServerFn({ method: 'GET' }).handler(async () => {
 })
 
 /**
+ * Server function for the free-shipping threshold (#570).
+ *
+ * One call per document, on the server, resolved before the first paint. The
+ * API answers this from Redis and never throws; if the fetch itself fails we
+ * return the bundled constant, which is also the value the API falls back to —
+ * so a storefront that could not reach the API still prints the figure the
+ * server would charge by rather than a zero or a blank.
+ */
+const fetchFreeShippingThreshold = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    try {
+      // ?? not ||: an explicitly-set value must always win (cc #96).
+      const apiUrl = process.env.VITE_API_URL ?? 'http://localhost:3000'
+      const response = await fetch(`${apiUrl}/api/shipping/config`)
+
+      if (!response.ok) return FREE_SHIPPING_THRESHOLD
+
+      const body = (await response.json()) as {
+        freeShippingThreshold?: number
+      }
+      return typeof body.freeShippingThreshold === 'number'
+        ? body.freeShippingThreshold
+        : FREE_SHIPPING_THRESHOLD
+    } catch (error) {
+      console.error('Failed to fetch free shipping threshold:', error)
+      return FREE_SHIPPING_THRESHOLD
+    }
+  }
+)
+
+/**
  * Root route configuration for the chobii.art e-commerce application.
  * Sets up global SEO metadata, stylesheets, and the main layout structure.
  * Fetches user session server-side for SSR optimization.
  */
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: async () => {
-    const session = await fetchSession()
-    return { session }
+    // In parallel: neither depends on the other, and this runs before the
+    // first paint of every document.
+    const [session, freeShippingThreshold] = await Promise.all([
+      fetchSession(),
+      fetchFreeShippingThreshold(),
+    ])
+    return { session, freeShippingThreshold }
   },
   head: () => ({
     meta: [
@@ -269,7 +318,19 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         >
           Skip to content
         </a>
-        <div className="relative flex min-h-screen flex-col">
+        {/* The bottom tab bar is `fixed`, so it reserves no space of its own
+            and would otherwise cover the last band of every page — the
+            footer's bottom row first. The padding is the bar's own constant,
+            imported rather than retyped, and goes on the shell rather than on
+            <main> so it sits BELOW the footer. `min-h-screen` is a border-box
+            minimum, so this adds no scroll to a short page. Admin has no
+            Header, so no bar and no padding. */}
+        <div
+          className={cn(
+            'relative flex min-h-screen flex-col',
+            !isAdminRoute && MOBILE_TAB_BAR_PADDING_CLASS
+          )}
+        >
           {/* Above the announcement bar, and self-suppressing: it renders
               nothing at all unless a promotion row is actually active (#434) */}
           {!isAdminRoute && <SaleStrip />}
