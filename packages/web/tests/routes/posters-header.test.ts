@@ -44,7 +44,9 @@ describe('collection header band', () => {
   })
 
   it('carries an SEO description paragraph', () => {
-    expect(src).toContain('COLLECTION_DESCRIPTION')
+    // A function of the free-shipping threshold since #570 — the paragraph
+    // quotes that figure, and an admin can move it.
+    expect(src).toContain('collectionDescriptionFor')
   })
 
   it('no longer shows the result count — the toolbar owns it', () => {

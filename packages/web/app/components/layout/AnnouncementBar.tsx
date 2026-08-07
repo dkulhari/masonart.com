@@ -25,14 +25,26 @@
  */
 
 import { ChevronLeft, ChevronRight, Facebook, Instagram, Twitter } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '~/lib/utils'
+import { useFreeShippingThresholdLabel } from '~/lib/free-shipping'
 
-export const ANNOUNCEMENTS = [
-  'Free shipping on orders over ₹999',
-  '30-day returns, no questions asked',
-  'Museum-grade archival inks on every print',
-] as const
+/**
+ * The messages, given the free-shipping threshold in force.
+ *
+ * A function rather than a constant because the threshold is an admin setting
+ * as of #569/#570: an admin who raises it must not leave this bar promising
+ * the old figure, which is the exact false-advertising gap `70bfa9dd` closed.
+ */
+export function announcementsFor(
+  freeShippingThresholdLabel: string
+): readonly string[] {
+  return [
+    `Free shipping on orders over ${freeShippingThresholdLabel}`,
+    '30-day returns, no questions asked',
+    'Museum-grade archival inks on every print',
+  ]
+}
 
 /** Milliseconds each message holds. Long enough to finish reading it. */
 const ROTATE_MS = 6000
@@ -44,15 +56,23 @@ const SOCIALS = [
 ]
 
 export function AnnouncementBar({ className }: { className?: string }) {
+  const thresholdLabel = useFreeShippingThresholdLabel()
+  const announcements = useMemo(
+    () => announcementsFor(thresholdLabel),
+    [thresholdLabel]
+  )
   const [index, setIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
 
-  const step = useCallback((delta: number) => {
-    setIndex(
-      (current) =>
-        (current + delta + ANNOUNCEMENTS.length) % ANNOUNCEMENTS.length
-    )
-  }, [])
+  const step = useCallback(
+    (delta: number) => {
+      setIndex(
+        (current) =>
+          (current + delta + announcements.length) % announcements.length
+      )
+    },
+    [announcements.length]
+  )
 
   useEffect(() => {
     // Paused on hover: a message that moves while it is being read is worse
@@ -102,7 +122,7 @@ export function AnnouncementBar({ className }: { className?: string }) {
           {/* polite, not assertive — this is ambient copy and must never
               interrupt whatever a screen reader is currently saying. */}
           <p aria-live="polite" className="text-center">
-            {ANNOUNCEMENTS[index]}
+            {announcements[index]}
           </p>
 
           <button

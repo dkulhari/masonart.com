@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import { FREE_SHIPPING_THRESHOLD_LABEL } from '@chobii/shared'
 import {
   AnnouncementBar,
-  ANNOUNCEMENTS,
+  announcementsFor,
 } from '~/components/layout/AnnouncementBar'
+
+/**
+ * The messages became a function of the free-shipping threshold in #570 — an
+ * admin can move that figure, and this bar states it. Rendered with no
+ * provider, the component falls back to the bundled default, so that is the
+ * label this suite builds the expected messages from.
+ */
+const ANNOUNCEMENTS = announcementsFor(FREE_SHIPPING_THRESHOLD_LABEL)
 
 beforeEach(() => {
   vi.useFakeTimers()

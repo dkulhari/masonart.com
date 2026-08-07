@@ -23,7 +23,16 @@
 
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
-import { TrustIconsRow, TRUST_CLAIMS } from '~/components/home/TrustIconsRow'
+import { FREE_SHIPPING_THRESHOLD_LABEL } from '@chobii/shared'
+import { TrustIconsRow, trustClaimsFor } from '~/components/home/TrustIconsRow'
+
+/**
+ * The claims became a function of the free-shipping threshold in #570. With no
+ * provider above it the row falls back to the bundled default, so the expected
+ * claims are built from that same label rather than from a literal — the
+ * coupling itself is pinned in tests/lib/free-shipping-copy.test.tsx.
+ */
+const TRUST_CLAIMS = trustClaimsFor(FREE_SHIPPING_THRESHOLD_LABEL)
 
 afterEach(cleanup)
 
@@ -49,7 +58,7 @@ describe('TrustIconsRow', () => {
     // policy page first.
     expect(TRUST_CLAIMS.map(({ label, detail }) => [label, detail])).toEqual([
       ['Archival Inks', 'Museum-grade pigment'],
-      ['Free Over ₹999', 'Free delivery across India'],
+      [`Free Over ${FREE_SHIPPING_THRESHOLD_LABEL}`, 'Free delivery across India'],
       ['30-Day Returns', 'Full refund, no questions asked'],
       ['Safe Payments', 'Secure checkout via Razorpay'],
     ])
@@ -66,7 +75,7 @@ describe('TrustIconsRow', () => {
 
     // The shipping claim must always carry its threshold.
     const shipping = TRUST_CLAIMS.find(({ label }) => /free/i.test(label))
-    expect(shipping?.label).toContain('₹999')
+    expect(shipping?.label).toContain(FREE_SHIPPING_THRESHOLD_LABEL)
   })
 
   it('keeps the label and the sentence as one pair — same size, same colour', () => {

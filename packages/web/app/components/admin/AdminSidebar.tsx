@@ -30,6 +30,7 @@ import {
   Store,
   Percent,
   Gift,
+  Truck,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
@@ -120,6 +121,14 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Analytics',
     href: '/admin/analytics',
     icon: BarChart3,
+  },
+  {
+    // The free-shipping threshold (#570). It belongs in the primary list
+    // rather than under Settings: it is a number customers are shown on every
+    // page, not a preference.
+    label: 'Shipping',
+    href: '/admin/shipping',
+    icon: Truck,
   },
 ]
 

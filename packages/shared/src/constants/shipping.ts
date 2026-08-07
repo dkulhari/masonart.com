@@ -34,12 +34,37 @@
 export const FREE_SHIPPING_THRESHOLD = 999;
 
 /**
+ * Above this, a configured threshold is high enough that almost no basket
+ * qualifies for free shipping.
+ *
+ * A warning, never a limit: "free shipping on very large orders only" is a real
+ * campaign, so both the admin form and `PUT /api/admin/shipping-config` say
+ * something and then do as they are told. It lives here so the screen cannot
+ * warn at one figure while the API warns at another.
+ */
+export const FREE_SHIPPING_THRESHOLD_WARN_ABOVE = 50_000;
+
+/**
  * The threshold as the copy says it, so a banner and the cart cannot drift
  * apart from the figure the server actually charges by.
+ *
+ * A *function* of the threshold rather than a single string, because the
+ * threshold is an admin setting as of #569: the storefront renders whatever
+ * value the root route delivered, and every customer-facing surface formats it
+ * through here so "₹1,499" and "₹1499" cannot both appear on one page.
  */
-export const FREE_SHIPPING_THRESHOLD_LABEL = `₹${FREE_SHIPPING_THRESHOLD.toLocaleString(
-  'en-IN'
-)}`;
+export function freeShippingThresholdLabel(
+  threshold: number = FREE_SHIPPING_THRESHOLD
+): string {
+  return `₹${threshold.toLocaleString('en-IN')}`
+}
+
+/**
+ * The label for the bundled default. Still the value in force when the table
+ * is empty or unreachable, and the only figure a surface rendered outside the
+ * router can honestly print.
+ */
+export const FREE_SHIPPING_THRESHOLD_LABEL = freeShippingThresholdLabel();
 
 /**
  * The figure the threshold is evaluated against: gross minus price-level

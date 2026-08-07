@@ -16,6 +16,7 @@ import {
 } from '@chobii/shared'
 import { useEffect } from 'react'
 import type * as React from 'react'
+import { FreeShippingThresholdProvider } from '~/lib/free-shipping'
 import { AnnouncementBar } from '~/components/layout/AnnouncementBar'
 import { SaleStrip } from '~/components/layout/SaleStrip'
 import { Header } from '~/components/layout/Header'
@@ -276,7 +277,7 @@ function RootComponent() {
   // The root route is the only place that already knows the session, so it is
   // the only place that should tell the wishlist store. Without this the store
   // fetched an auth-gated endpoint blind — six 401s per guest page load (#417).
-  const { session } = Route.useRouteContext()
+  const { session, freeShippingThreshold } = Route.useRouteContext()
   const setWishlistAuthenticated = useWishlistStore(
     (state) => state.setAuthenticated
   )
@@ -287,9 +288,17 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RootDocument>
-        <Outlet />
-      </RootDocument>
+      {/*
+        Read from the router context once, here, and published to every
+        surface that states the figure (#570). The alternative — each surface
+        calling `useRouteContext` for itself — is the same value ten times and
+        ten components that can only be tested by standing up a router.
+      */}
+      <FreeShippingThresholdProvider value={freeShippingThreshold}>
+        <RootDocument>
+          <Outlet />
+        </RootDocument>
+      </FreeShippingThresholdProvider>
     </QueryClientProvider>
   )
 }

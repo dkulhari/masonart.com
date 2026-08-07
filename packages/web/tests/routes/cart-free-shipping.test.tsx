@@ -32,7 +32,9 @@ import type { ReactElement } from 'react'
 import {
   FREE_SHIPPING_THRESHOLD,
   FREE_SHIPPING_THRESHOLD_LABEL,
+  freeShippingThresholdLabel,
 } from '@chobii/shared'
+import { FreeShippingThresholdProvider } from '~/lib/free-shipping'
 
 // ============================================================================
 // Mocks
@@ -72,6 +74,15 @@ import { useCartStore, type CartItem } from '~/stores/cart'
 function render(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
+
+/** The same page, with an admin-configured threshold in force (#570). */
+function renderAt(threshold: number, ui: ReactElement) {
+  return render(
+    <FreeShippingThresholdProvider value={threshold}>
+      {ui}
+    </FreeShippingThresholdProvider>
+  )
 }
 
 // ============================================================================
@@ -246,5 +257,70 @@ describe('cart free-shipping threshold', () => {
     // ₹1,600 is what this cart costs, and ₹1,600 clears the threshold.
     expect(shippingRow()).toContain('FREE')
     expect(money('cart-total')).toBe(1600)
+  })
+})
+
+/**
+ * The admin setting, and the three things that must move with it (#570).
+ *
+ * #569 made the threshold editable. That is only safe if the figure the page
+ * PROMISES, the bar measuring PROGRESS toward it, and the shipping the page
+ * CHARGES are one number — an admin raising the threshold while the copy still
+ * says ₹999 is the false-advertising gap `70bfa9dd` closed, rebuilt.
+ */
+describe('cart free-shipping threshold, once an admin has moved it', () => {
+  /** Not 999, and it formats with a comma, so a hand-built string shows up. */
+  const CONFIGURED = 1499
+
+  beforeEach(() => {
+    membership.isMember = true
+    serverCart.data = undefined
+    serverCart.refetch = vi.fn()
+  })
+
+  afterEach(() => {
+    cleanup()
+    useCartStore.setState({ items: [], isDrawerOpen: false })
+  })
+
+  it('charges shipping on a cart that cleared the old threshold but not the new one', () => {
+    // ₹1,200 shipped free at ₹999. At ₹1,499 it does not.
+    givenCart({ gross: 1200, net: 1200 })
+
+    renderAt(CONFIGURED, <CartContent />)
+
+    expect(shippingRow()).toContain('₹99')
+    expect(shippingRow()).not.toContain('FREE')
+    expect(money('cart-total')).toBe(1299)
+  })
+
+  it('measures the shortfall against the configured threshold', () => {
+    givenCart({ gross: 1200, net: 1200 })
+
+    renderAt(CONFIGURED, <CartContent />)
+
+    // 1499 - 1200. Against the bundled ₹999 this cart has no shortfall at all.
+    expect(screen.getByText('₹299.00')).toBeTruthy()
+  })
+
+  it('states the configured threshold in the copy, not the bundled default', () => {
+    givenCart({ gross: 2000, net: 2000 })
+
+    renderAt(CONFIGURED, <CartContent />)
+
+    expect(screen.getByTestId('cart-free-shipping-copy').textContent).toBe(
+      `Free shipping on orders over ${freeShippingThresholdLabel(CONFIGURED)}`
+    )
+    expect(
+      screen.getByTestId('cart-free-shipping-copy').textContent
+    ).not.toContain(FREE_SHIPPING_THRESHOLD_LABEL)
+  })
+
+  it('ships free exactly at the configured threshold', () => {
+    givenCart({ gross: CONFIGURED, net: CONFIGURED })
+
+    renderAt(CONFIGURED, <CartContent />)
+
+    expect(shippingRow()).toContain('FREE')
   })
 })

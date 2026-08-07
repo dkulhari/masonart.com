@@ -48,6 +48,7 @@ import { ItemListJsonLd } from '~/components/seo/ProductJsonLd'
 import { Button } from '~/components/ui/Button'
 import { SectionBand } from '~/components/ui/SectionBand'
 import { DisplayHeading } from '~/components/ui/DisplayHeading'
+import { useFreeShippingThresholdLabel } from '~/lib/free-shipping'
 import {
   CollectionToolbar,
   FILTER_SIDEBAR_ID,
@@ -156,6 +157,7 @@ async function fetchPostersData(params: PostersSearchParams): Promise<PostersPag
     const products: ProductCardData[] = (response.items || []).map(
       (item: Record<string, unknown>) => ({
         id: item.id as string,
+        sku: item.sku as string | undefined,
         title: item.title as string,
         slug: item.slug as string,
         basePrice: item.basePrice as string,
@@ -865,10 +867,13 @@ function PostersPage() {
  * SEO copy for the collection. mesonart runs a paragraph here with a "Show
  * More" toggle; ours is short enough to render whole.
  */
-const COLLECTION_DESCRIPTION =
-  'Museum-grade posters and framed art, printed on archival paper with pigment inks. ' +
-  'Filter by style, subject, colour or the room you are furnishing — every piece ships ' +
-  'free over ₹999 and returns free within 30 days.'
+function collectionDescriptionFor(freeShippingThresholdLabel: string): string {
+  return (
+    'Museum-grade posters and framed art, printed on archival paper with pigment inks. ' +
+    'Filter by style, subject, colour or the room you are furnishing — every piece ships ' +
+    `free over ${freeShippingThresholdLabel} and returns free within 30 days.`
+  )
+}
 
 const BREADCRUMBS = [
   { name: 'Home', href: '/' },
@@ -886,6 +891,12 @@ const BREADCRUMBS = [
  * used only on the home page.
  */
 function PageHeader() {
+  // The shipping figure is an admin setting (#570), so the SEO paragraph
+  // states what is in force rather than a number compiled into the bundle.
+  const collectionDescription = collectionDescriptionFor(
+    useFreeShippingThresholdLabel()
+  )
+
   return (
     <SectionBand tone="beige" className="py-8 sm:py-12">
       {/* Real navigation markup, not a decorative string — breadcrumbs are
@@ -929,7 +940,7 @@ function PageHeader() {
       <DisplayHeading className="text-foreground">Shop Posters</DisplayHeading>
 
       <p className="mt-4 max-w-2xl text-muted-foreground">
-        {COLLECTION_DESCRIPTION}
+        {collectionDescription}
       </p>
     </SectionBand>
   )

@@ -35,6 +35,7 @@ import { adminPromotionsApp } from "./routes/admin/promotions";
 import { adminWalletConfigApp } from "./routes/admin/wallet-config";
 import { adminReviewsApp } from "./routes/admin/reviews";
 import { adminShippingApp } from "./routes/admin/shipping";
+import { adminShippingConfigApp } from "./routes/admin/shipping-config";
 import { adminShipmentsApp } from "./routes/admin/shipments";
 import { adminReturnsApp } from "./routes/admin/returns";
 import { adminNotificationsApp } from "./routes/admin/notifications";
@@ -227,6 +228,11 @@ app.route("/api/admin/reviews", adminReviewsApp);
 
 // Admin Shipping API - shipping option management
 app.route("/api/admin/shipping", adminShippingApp);
+
+// Admin Shipping Config API - the free-shipping threshold every surface prints.
+// A separate mount from /api/admin/shipping, which owns shipping *options*:
+// this is one money rule, effective-dated, and the storefront reads it too.
+app.route("/api/admin/shipping-config", adminShippingConfigApp);
 
 // Admin Shipments API - shipment management
 app.route("/api/admin/shipments", adminShipmentsApp);

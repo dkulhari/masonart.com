@@ -47,11 +47,11 @@ import { JoinGalleryModal } from '~/components/promo/JoinGalleryModal'
 import { useGalleryMembership } from '~/hooks/useGalleryMembership'
 import { useServerCart } from '~/hooks/useCart'
 import {
-  FREE_SHIPPING_THRESHOLD,
-  FREE_SHIPPING_THRESHOLD_LABEL,
+  freeShippingThresholdLabel,
   netAmountForShipping,
   qualifiesForFreeShipping,
 } from '@chobii/shared'
+import { useFreeShippingThreshold } from '~/lib/free-shipping'
 
 // ============================================================================
 // Route Definition
@@ -443,11 +443,19 @@ function OrderSummary({
    * store's gross in rupees. A LOCKED saving is deliberately not subtracted:
    * the checkout charges base for those lines, so they are not off the price.
    */
+  /**
+   * The threshold in force, delivered by the root route (#570). The charge,
+   * the progress bar and the copy below all read this one value: an admin
+   * moving it must move the promise and the price together, or the page is
+   * back to promising free shipping the checkout charges for.
+   */
+  const threshold = useFreeShippingThreshold()
+
   const net = netAmountForShipping(subtotal, saving / 100)
-  const hasShippingFee = !qualifiesForFreeShipping(net)
+  const hasShippingFee = !qualifiesForFreeShipping(net, threshold)
   const shippingFee = hasShippingFee ? 99 : 0
   const total = net + shippingFee
-  const amountUntilFreeShipping = FREE_SHIPPING_THRESHOLD - net
+  const amountUntilFreeShipping = threshold - net
 
   return (
     <div className="sticky top-24 rounded-xl border border-border bg-card p-6">
@@ -464,7 +472,7 @@ function OrderSummary({
             <div
               className="h-full rounded-full bg-primary transition-all"
               style={{
-                width: `${Math.min(100, (net / FREE_SHIPPING_THRESHOLD) * 100)}%`,
+                width: `${Math.min(100, (net / threshold) * 100)}%`,
               }}
             />
           </div>
@@ -563,7 +571,7 @@ function OrderSummary({
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Truck className="h-5 w-5 text-foreground" />
           <span data-testid="cart-free-shipping-copy">
-            Free shipping on orders over {FREE_SHIPPING_THRESHOLD_LABEL}
+            Free shipping on orders over {freeShippingThresholdLabel(threshold)}
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">

@@ -22,6 +22,7 @@ import {
   CheckCircle,
 } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
+import { useFreeShippingThresholdLabel } from '~/lib/free-shipping'
 import type { CartItem } from '~/stores/cart'
 import { GiftCardControl, type AppliedGiftCard } from './GiftCardControl'
 
@@ -88,6 +89,9 @@ export function OrderSummary({
   onRemoveGiftCard,
   className,
 }: OrderSummaryProps) {
+  // The trust badge below states the threshold in force, not a figure written
+  // into this file: an admin can move it (#570).
+  const freeShippingThresholdLabel = useFreeShippingThresholdLabel()
   const [isExpanded, setIsExpanded] = useState(showItems && items.length <= 3)
   const [couponCode, setCouponCode] = useState('')
   const [couponError, setCouponError] = useState<string | null>(null)
@@ -383,7 +387,7 @@ export function OrderSummary({
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Truck className="h-4 w-4 text-foreground" />
-            <span>Free shipping on orders over ₹999</span>
+            <span>Free shipping on orders over {freeShippingThresholdLabel}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <RotateCcw className="h-4 w-4 text-foreground" />

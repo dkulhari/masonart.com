@@ -58,6 +58,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { SectionBand } from '~/components/ui/SectionBand'
+import { useFreeShippingThresholdLabel } from '~/lib/free-shipping'
 
 export interface TrustClaim {
   Icon: LucideIcon
@@ -66,52 +67,60 @@ export interface TrustClaim {
 }
 
 /**
- * Four claims, each already made somewhere else in the product.
+ * Four claims, each already made somewhere else in the product, given the
+ * free-shipping threshold in force.
  *
  * Sources are load-bearing: every line is either verbatim from existing copy
- * or a shortening of it, so nothing here is a new promise.
+ * or a shortening of it, so nothing here is a new promise. The shipping figure
+ * is passed in rather than written down because it is an admin setting as of
+ * #569/#570 — a claim that cannot follow the setting stops being true the
+ * moment someone changes it.
  */
-export const TRUST_CLAIMS: readonly TrustClaim[] = [
-  {
-    // Reference slot 1 is a painter's palette / "Handcrafted Art". Ours is the
-    // print itself, which is the claim we can actually stand behind.
-    Icon: Palette,
-    // Footer.tsx USP_ITEMS: { label: 'Archival Inks', detail: 'Museum-grade
-    // pigment' }. AnnouncementBar.tsx ANNOUNCEMENTS: 'Museum-grade archival
-    // inks on every print'.
-    label: 'Archival Inks',
-    detail: 'Museum-grade pigment',
-  },
-  {
-    // Reference slot 2 is a parcel / "Free Shipping Globally". Ours is free
-    // over ₹999 and India-only, and the label says so rather than burying it.
-    Icon: Package,
-    // app/routes/shipping.tsx "Costs", restated in TrustList.tsx ('Free
-    // Shipping Over ₹999') and Footer.tsx ('Free Over ₹999' / 'Across India').
-    label: 'Free Over ₹999',
-    detail: 'Free delivery across India',
-  },
-  {
-    // Reference slot 3 is a leaf / "Eco Friendly" — see the header. Returns
-    // take the slot, as they do in the footer strip.
-    Icon: RotateCcw,
-    // app/routes/returns.tsx "The policy", restated in index.tsx valueProps
-    // ('Return within 30 days for a full refund, no questions asked') and
-    // Footer.tsx ('30-Day Returns' / 'No questions asked').
-    label: '30-Day Returns',
-    detail: 'Full refund, no questions asked',
-  },
-  {
-    // Reference slot 4 is a card with a tick / "Safe Payments". Same claim,
-    // and it is true — but PayPal is not one of our methods, Razorpay is.
-    Icon: CreditCard,
-    // app/routes/faq.tsx "What payment methods do you accept?", restated in
-    // TrustList.tsx ('Secure checkout via Razorpay — cards, UPI, netbanking &
-    // wallets') and Footer.tsx ('Safe Payments' / 'Razorpay secured').
-    label: 'Safe Payments',
-    detail: 'Secure checkout via Razorpay',
-  },
-] as const
+export function trustClaimsFor(
+  freeShippingThresholdLabel: string
+): readonly TrustClaim[] {
+  return [
+    {
+      // Reference slot 1 is a painter's palette / "Handcrafted Art". Ours is the
+      // print itself, which is the claim we can actually stand behind.
+      Icon: Palette,
+      // Footer.tsx USP_ITEMS: { label: 'Archival Inks', detail: 'Museum-grade
+      // pigment' }. AnnouncementBar.tsx ANNOUNCEMENTS: 'Museum-grade archival
+      // inks on every print'.
+      label: 'Archival Inks',
+      detail: 'Museum-grade pigment',
+    },
+    {
+      // Reference slot 2 is a parcel / "Free Shipping Globally". Ours is free
+      // over ₹999 and India-only, and the label says so rather than burying it.
+      Icon: Package,
+      // app/routes/shipping.tsx "Costs", restated in TrustList.tsx ('Free
+      // Shipping Over ₹999') and Footer.tsx ('Free Over ₹999' / 'Across India').
+      label: `Free Over ${freeShippingThresholdLabel}`,
+      detail: 'Free delivery across India',
+    },
+    {
+      // Reference slot 3 is a leaf / "Eco Friendly" — see the header. Returns
+      // take the slot, as they do in the footer strip.
+      Icon: RotateCcw,
+      // app/routes/returns.tsx "The policy", restated in index.tsx valueProps
+      // ('Return within 30 days for a full refund, no questions asked') and
+      // Footer.tsx ('30-Day Returns' / 'No questions asked').
+      label: '30-Day Returns',
+      detail: 'Full refund, no questions asked',
+    },
+    {
+      // Reference slot 4 is a card with a tick / "Safe Payments". Same claim,
+      // and it is true — but PayPal is not one of our methods, Razorpay is.
+      Icon: CreditCard,
+      // app/routes/faq.tsx "What payment methods do you accept?", restated in
+      // TrustList.tsx ('Secure checkout via Razorpay — cards, UPI, netbanking &
+      // wallets') and Footer.tsx ('Safe Payments' / 'Razorpay secured').
+      label: 'Safe Payments',
+      detail: 'Secure checkout via Razorpay',
+    },
+  ]
+}
 
 /**
  * TrustIconsRow — four centred icon/label/sentence columns on white.
@@ -132,6 +141,8 @@ export const TRUST_CLAIMS: readonly TrustClaim[] = [
  * <TrustIconsRow />
  */
 export function TrustIconsRow() {
+  const claims = trustClaimsFor(useFreeShippingThresholdLabel())
+
   return (
     <SectionBand data-testid="home-trust-row" className="sm:py-16">
       {/* Three layouts, and the last one is the point.
@@ -146,7 +157,7 @@ export function TrustIconsRow() {
        * grid takes over, and below `md` it is 2×2, which is what theirs does
        * on a phone. */}
       <ul className="grid list-none grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-4 md:gap-x-4 xl:flex xl:justify-between xl:gap-x-8">
-        {TRUST_CLAIMS.map(({ Icon, label, detail }) => (
+        {claims.map(({ Icon, label, detail }) => (
           <li
             key={label}
             data-testid="home-trust-item"

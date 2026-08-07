@@ -4,6 +4,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { InfoPage, InfoSection } from '~/components/layout/InfoPage'
+import { useFreeShippingThresholdLabel } from '~/lib/free-shipping'
 
 export const Route = createFileRoute('/shipping')({
   head: () => ({
@@ -16,11 +17,16 @@ export const Route = createFileRoute('/shipping')({
 })
 
 function ShippingPage() {
+  // The policy page states the threshold in force, not a figure typed into it:
+  // an admin can change what the checkout charges by (#570).
+  const freeShippingThresholdLabel = useFreeShippingThresholdLabel()
+
   return (
     <InfoPage title="Shipping" subtitle="How your art gets from our press to your wall.">
       <InfoSection heading="Costs">
         <p>
-          Shipping is <strong>free on orders over ₹999</strong>. For smaller orders, the shipping
+          Shipping is <strong>free on orders over {freeShippingThresholdLabel}</strong>. For smaller
+          orders, the shipping
           cost is calculated and shown at checkout before payment — no surprises.
         </p>
       </InfoSection>

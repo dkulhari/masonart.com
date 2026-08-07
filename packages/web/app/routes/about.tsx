@@ -4,6 +4,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { InfoPage, InfoSection } from '~/components/layout/InfoPage'
+import { useFreeShippingThresholdLabel } from '~/lib/free-shipping'
 
 export const Route = createFileRoute('/about')({
   head: () => ({
@@ -20,6 +21,10 @@ export const Route = createFileRoute('/about')({
 })
 
 function AboutPage() {
+  // "Our promise" states the threshold in force — an admin can change it
+  // without a deploy (#570), and a promise that cannot follow it is not one.
+  const freeShippingThresholdLabel = useFreeShippingThresholdLabel()
+
   return (
     <InfoPage
       title="About chobii.art"
@@ -44,7 +49,8 @@ function AboutPage() {
 
       <InfoSection heading="Our promise">
         <p>
-          Free shipping on orders over ₹999, careful packaging built for prints, and 30-day
+          Free shipping on orders over {freeShippingThresholdLabel}, careful packaging built for
+          prints, and 30-day
           returns if a piece doesn&apos;t feel right in your space. Questions? We&apos;re at{' '}
           <a href="mailto:support@chobii.art" className="text-primary hover:underline">
             support@chobii.art

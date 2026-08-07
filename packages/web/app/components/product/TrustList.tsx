@@ -32,6 +32,7 @@
 import { useId, useState, type ReactNode } from 'react'
 import { PackageCheck, Truck, RotateCcw, ShieldCheck, type LucideIcon } from 'lucide-react'
 import { cn } from '~/lib/utils'
+import { useFreeShippingThresholdLabel } from '~/lib/free-shipping'
 
 // ============================================================================
 // Types
@@ -53,56 +54,65 @@ interface TrustRowData {
 // Row data — see file header for sourcing
 // ============================================================================
 
-const ROWS: TrustRowData[] = [
-  {
-    icon: PackageCheck,
-    title: 'Made Just For You',
-    // app/routes/shipping.tsx: "Every piece is printed to order. Production
-    // takes 2–4 business days..."
-    sub: 'Every piece is printed to order — production takes 2–4 business days',
-    // packages/api/src/services/approval.ts: the photo-approval workflow is
-    // scoped to isAiGenerated order items, so it is a footnote, not the
-    // headline claim above.
-    detail:
-      'Custom AI-generated prints go through a production photo approval step before they ship.',
-  },
-  {
-    icon: Truck,
-    title: 'Free Shipping Over ₹999',
-    // app/routes/shipping.tsx "Costs": "Shipping is free on orders over
-    // ₹999. For smaller orders, the shipping cost is calculated and shown at
-    // checkout." Matches the existing PDP badge, not the reference's
-    // "on All Orders" claim.
-    sub: 'Free on orders over ₹999 — smaller orders see the cost at checkout',
-    // app/routes/shipping.tsx "Timelines".
-    detail: 'Delivery typically takes 3–7 business days after your order ships.',
-  },
-  {
-    icon: RotateCcw,
-    title: '30 Days Easy Returns',
-    sub: (
-      // app/routes/returns.tsx exists and is the real policy page — unlike
-      // components/returns/ReturnPolicyDisplay.tsx, which links a
-      // "/return-policy" route that is not registered anywhere.
-      <a href="/returns" className="underline-offset-2 hover:underline">
-        Learn more.
-      </a>
-    ),
-    // app/routes/returns.tsx "Conditions".
-    detail: 'Custom AI-generated prints are covered by the same 30-day policy as everything else.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Safe Payment Options',
-    // app/routes/faq.tsx "What payment methods do you accept?": "Cards, UPI,
-    // netbanking, and wallets via Razorpay. Payment details never touch our
-    // servers."
-    sub: 'Secure checkout via Razorpay — cards, UPI, netbanking & wallets',
-    // app/routes/returns.tsx "The policy": "Return any order within 30 days
-    // of delivery for a full refund."
-    detail: "Full refund within 30 days of delivery if it isn't right for your space.",
-  },
-]
+/**
+ * The rows, given the free-shipping threshold in force.
+ *
+ * A function rather than a constant because the threshold is an admin setting
+ * as of #569/#570 — a PDP badge that keeps promising the old figure after an
+ * admin raises it is the false-advertising gap `70bfa9dd` closed.
+ */
+function rowsFor(freeShippingThresholdLabel: string): TrustRowData[] {
+  return [
+    {
+      icon: PackageCheck,
+      title: 'Made Just For You',
+      // app/routes/shipping.tsx: "Every piece is printed to order. Production
+      // takes 2–4 business days..."
+      sub: 'Every piece is printed to order — production takes 2–4 business days',
+      // packages/api/src/services/approval.ts: the photo-approval workflow is
+      // scoped to isAiGenerated order items, so it is a footnote, not the
+      // headline claim above.
+      detail:
+        'Custom AI-generated prints go through a production photo approval step before they ship.',
+    },
+    {
+      icon: Truck,
+      title: `Free Shipping Over ${freeShippingThresholdLabel}`,
+      // app/routes/shipping.tsx "Costs": "Shipping is free on orders over
+      // ₹999. For smaller orders, the shipping cost is calculated and shown at
+      // checkout." Matches the existing PDP badge, not the reference's
+      // "on All Orders" claim.
+      sub: `Free on orders over ${freeShippingThresholdLabel} — smaller orders see the cost at checkout`,
+      // app/routes/shipping.tsx "Timelines".
+      detail: 'Delivery typically takes 3–7 business days after your order ships.',
+    },
+    {
+      icon: RotateCcw,
+      title: '30 Days Easy Returns',
+      sub: (
+        // app/routes/returns.tsx exists and is the real policy page — unlike
+        // components/returns/ReturnPolicyDisplay.tsx, which links a
+        // "/return-policy" route that is not registered anywhere.
+        <a href="/returns" className="underline-offset-2 hover:underline">
+          Learn more.
+        </a>
+      ),
+      // app/routes/returns.tsx "Conditions".
+      detail: 'Custom AI-generated prints are covered by the same 30-day policy as everything else.',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Safe Payment Options',
+      // app/routes/faq.tsx "What payment methods do you accept?": "Cards, UPI,
+      // netbanking, and wallets via Razorpay. Payment details never touch our
+      // servers."
+      sub: 'Secure checkout via Razorpay — cards, UPI, netbanking & wallets',
+      // app/routes/returns.tsx "The policy": "Return any order within 30 days
+      // of delivery for a full refund."
+      detail: "Full refund within 30 days of delivery if it isn't right for your space.",
+    },
+  ]
+}
 
 // ============================================================================
 // Tooltip
@@ -168,10 +178,11 @@ function TrustTooltip({ id, title, detail }: { id: string; title: string; detail
  */
 export function TrustList({ className }: TrustListProps) {
   const idPrefix = useId()
+  const rows = rowsFor(useFreeShippingThresholdLabel())
 
   return (
     <div className={cn('space-y-4', className)}>
-      {ROWS.map((row, index) => {
+      {rows.map((row, index) => {
         const tooltipId = `${idPrefix}-tooltip-${index}`
         const Icon = row.icon
         return (

@@ -28,6 +28,7 @@ import { Route as AdminAiModerationRouteImport } from './routes/admin/ai-moderat
 import { Route as AdminCustomersRouteImport } from './routes/admin/customers'
 import { Route as AdminReturnsRouteImport } from './routes/admin/returns'
 import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
+import { Route as AdminShippingRouteImport } from './routes/admin/shipping'
 import { Route as ApproveTokenRouteImport } from './routes/approve/$token'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
@@ -160,6 +161,11 @@ const AdminReturnsRoute = AdminReturnsRouteImport.update({
 const AdminReviewsRoute = AdminReviewsRouteImport.update({
   id: '/reviews',
   path: '/reviews',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminShippingRoute = AdminShippingRouteImport.update({
+  id: '/shipping',
+  path: '/shipping',
   getParentRoute: () => AdminRoute,
 } as any)
 const ApproveTokenRoute = ApproveTokenRouteImport.update({
@@ -381,6 +387,7 @@ export interface FileRoutesByFullPath {
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/shipping': typeof AdminShippingRoute
   '/approve/$token': typeof ApproveTokenRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -439,6 +446,7 @@ export interface FileRoutesByTo {
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/shipping': typeof AdminShippingRoute
   '/approve/$token': typeof ApproveTokenRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -500,6 +508,7 @@ export interface FileRoutesById {
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/shipping': typeof AdminShippingRoute
   '/approve/$token': typeof ApproveTokenRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/login': typeof AuthLoginRoute
@@ -561,6 +570,7 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/returns'
     | '/admin/reviews'
+    | '/admin/shipping'
     | '/approve/$token'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -619,6 +629,7 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/returns'
     | '/admin/reviews'
+    | '/admin/shipping'
     | '/approve/$token'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -679,6 +690,7 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/returns'
     | '/admin/reviews'
+    | '/admin/shipping'
     | '/approve/$token'
     | '/auth/forgot-password'
     | '/auth/login'
@@ -887,6 +899,13 @@ declare module '@tanstack/react-router' {
       path: '/reviews'
       fullPath: '/admin/reviews'
       preLoaderRoute: typeof AdminReviewsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/shipping': {
+      id: '/admin/shipping'
+      path: '/shipping'
+      fullPath: '/admin/shipping'
+      preLoaderRoute: typeof AdminShippingRouteImport
       parentRoute: typeof AdminRoute
     }
     '/approve/$token': {
@@ -1197,6 +1216,7 @@ interface AdminRouteChildren {
   AdminCustomersRoute: typeof AdminCustomersRoute
   AdminReturnsRoute: typeof AdminReturnsRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
+  AdminShippingRoute: typeof AdminShippingRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminApprovalsIdRoute: typeof AdminApprovalsIdRoute
   AdminCollectionsIdRoute: typeof AdminCollectionsIdRoute
@@ -1219,6 +1239,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCustomersRoute: AdminCustomersRoute,
   AdminReturnsRoute: AdminReturnsRoute,
   AdminReviewsRoute: AdminReviewsRoute,
+  AdminShippingRoute: AdminShippingRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminApprovalsIdRoute: AdminApprovalsIdRoute,
   AdminCollectionsIdRoute: AdminCollectionsIdRoute,

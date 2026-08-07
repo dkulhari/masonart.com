@@ -72,6 +72,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { ArrowRight, Star } from 'lucide-react'
 import { cn } from '~/lib/utils'
+import { useFreeShippingThresholdLabel } from '~/lib/free-shipping'
 import type { SizeVariant } from './SizeSelector'
 import type { FrameOptionData } from './FrameSelector'
 
@@ -164,11 +165,14 @@ const REVIEWS_HASH = '#reviews'
 const REVIEW_SUMMARY_ID = 'product-tabs-review-summary'
 
 /**
- * Our real policy numbers, from packages/web/app/routes/shipping.tsx and
- * packages/web/app/routes/returns.tsx. Named because the Shipping panel and
- * the About panel's cross-links both quote them and must not drift apart.
+ * Our real returns window, from packages/web/app/routes/returns.tsx. Named
+ * because the Shipping panel and the About panel's cross-links both quote it
+ * and must not drift apart.
+ *
+ * The free-shipping figure used to sit beside it as `'₹999'` and no longer
+ * can: it is an admin setting (#569/#570), so both panels read
+ * `useFreeShippingThresholdLabel()` and state whatever is in force.
  */
-const FREE_SHIPPING_THRESHOLD = '₹999'
 const RETURN_WINDOW_DAYS = 30
 
 // ============================================================================
@@ -512,6 +516,10 @@ function AboutPanel({
   rating?: ProductTabsRating
   onSelectTab: (tabId: ProductTabId) => void
 }) {
+  // The threshold is an admin setting (#570); the caption states whatever is
+  // in force rather than a figure compiled into this file.
+  const freeShippingThresholdLabel = useFreeShippingThresholdLabel()
+
   const glance: Array<{ term: string; value: string }> = []
   if (spec.artist?.name) glance.push({ term: 'Artist', value: spec.artist.name })
   if (spec.styles && spec.styles.length > 0) {
@@ -539,7 +547,7 @@ function AboutPanel({
   jumps.push({
     tab: 'shipping',
     title: 'Shipping & returns',
-    caption: `Free over ${FREE_SHIPPING_THRESHOLD} · ${RETURN_WINDOW_DAYS}-day returns`,
+    caption: `Free over ${freeShippingThresholdLabel} · ${RETURN_WINDOW_DAYS}-day returns`,
   })
   if (rating && rating.reviewCount > 0) {
     jumps.push({
@@ -689,12 +697,14 @@ function DetailsPanel({ spec }: { spec: ProductTabsSpecData }) {
  * packages/web/app/routes/returns.tsx — not the reference site's claims.
  */
 function ShippingPanel() {
+  const freeShippingThresholdLabel = useFreeShippingThresholdLabel()
+
   return (
     <div className="grid gap-8 text-sm text-muted-foreground sm:grid-cols-2 sm:gap-12">
       <section>
         <h3 className="mb-2 text-lg font-semibold text-foreground">Shipping</h3>
         <p>
-          Free shipping on orders over {FREE_SHIPPING_THRESHOLD}. Below that, the cost is
+          Free shipping on orders over {freeShippingThresholdLabel}. Below that, the cost is
           calculated and shown at checkout before payment.
         </p>
         <p className="mt-2">
