@@ -52,6 +52,10 @@ import {
   resolveSalePrice,
 } from "../lib/promotion-pricing";
 import { isGalleryMember } from "../services/gallery-membership";
+import {
+  netAmountForShipping,
+  qualifiesForFreeShipping,
+} from "@chobii/shared";
 import { VOIDED_ORDER_STATUSES } from "../lib/product-sales";
 import {
   createRazorpayOrder,
@@ -180,16 +184,21 @@ async function readGiftCardCodes(c: Context): Promise<string[]> {
 }
 
 /**
- * Calculate shipping cost based on method and subtotal
+ * Calculate shipping cost based on method and the NET, post-discount amount.
+ *
+ * The threshold itself lives in `@chobii/shared` because the cart page renders
+ * the same promise; a server that charged by a different figure than the one
+ * the cart displayed would only be caught by the customer, at the card screen.
+ *
+ * `netSubtotal` is a PRICE — base line totals minus price-level discounts. A
+ * gift card is tender applied after tax and must never reach this function; see
+ * `netAmountForShipping`.
  */
 function calculateShippingCost(
   method: string,
-  subtotal: string
+  netSubtotal: string
 ): string {
-  const subtotalNum = parseFloat(subtotal);
-
-  // Free shipping for orders over 2000 INR
-  if (subtotalNum >= 2000) {
+  if (qualifiesForFreeShipping(parseFloat(netSubtotal))) {
     return "0.00";
   }
 
@@ -475,23 +484,39 @@ ordersApp.post(
 
       // Calculate totals
       //
+      // Settled by owner decision, 2026-08-07 (design §5):
+      //
       // `subtotal` stays GROSS — the sum of base line totals, as it has always
       // been — and `total` subtracts the discount exactly once. Making subtotal
       // net while `total` still subtracts would take the promotion off twice,
-      // and the free-shipping threshold below reads the same gross figure it
-      // read before this feature existed. Interim, pending #510.
+      // and would reinterpret a column every settled order already carries.
+      //
+      // The free-shipping threshold, by contrast, reads the NET figure: the
+      // discount is price-level, and §5's layering puts it above shipping. So
+      // the discount has to be composed BEFORE shipping is priced, which is why
+      // these two blocks are in this order.
       const subtotal = activeItems.reduce((sum, item) => {
         return sum + parseFloat(item.lineTotal);
       }, 0);
 
       const subtotalStr = subtotal.toFixed(2);
-      const shippingCost = calculateShippingCost(input.shippingMethod, subtotalStr);
       // Reserved for discount codes (design D8). Nothing here writes it.
       const couponDiscount = "0.00";
       // Derived, not assigned: composing the total from its two source columns
       // means the expression is already correct the day codes land.
       const discount = toMoney(
         parseFloat(promotionDiscount) + parseFloat(couponDiscount)
+      );
+      // Price minus price. `orders.giftCardAmount` is tender — it is settled at
+      // the payment endpoint, after tax, against the amount due — and is
+      // deliberately absent here: a gift card must not buy free shipping.
+      const netSubtotal = netAmountForShipping(
+        subtotal,
+        parseFloat(discount)
+      ).toFixed(2);
+      const shippingCost = calculateShippingCost(
+        input.shippingMethod,
+        netSubtotal
       );
       const tax = "0.00"; // TODO: Calculate tax based on location
       const total = (

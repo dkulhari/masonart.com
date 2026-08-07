@@ -154,18 +154,26 @@ resolveSalePrice(product, activePromotions, { isMember })
 
 ```
 1. line base price            (cart.ts stored lineTotal)
-2. − promotion discount       per line, half-up 2dp   → order_items.itemDiscount
-   = discounted line subtotal → orders.subtotal
+   = sum of base line totals                           → orders.subtotal   [GROSS]
+2. − promotion discount       per line, half-up 2dp    → order_items.itemDiscount
+                                                       → orders.promotionDiscount
 3. − code discount            order level, applied to the ALREADY-discounted subtotal
                                                        → orders.couponDiscount   [D8, unbuilt]
-4. + shipping
+   = net, post-discount amount  ← the free-shipping threshold reads THIS figure
+4. + shipping                 free at or above FREE_SHIPPING_THRESHOLD (@chobii/shared)
 5. + tax                      on the post-discount amount
-   = orders.total
+   = orders.total             = subtotal + shipping − discount + tax
 6. − gift card                tender against the total, not a discount [gift-cards feature]
    = amount charged to Razorpay
 ```
 
 A code applies to the discounted subtotal, not the base — otherwise a 40% sale plus a 20% code takes 60% off the base and the two discounts can exceed the price. Tax is computed after discounts because the customer is taxed on what they pay. The gift card sits below tax because it is payment, not price.
+
+**`orders.subtotal` is GROSS, and the discount comes off once.** Settled by owner decision, 2026-08-07 (#568), closing the ambiguity an earlier version of this block created by reading as though `subtotal` became net. It is the sum of base line totals — the meaning it carries on every settled order, pre- and post-sale, so reporting stays comparable — and the discount is subtracted exactly once, inside `total`. Making `subtotal` net while `total` still subtracted would take the promotion off twice. The discount itself remains attributable by source: `promotionDiscount` and `couponDiscount` are separate columns, and `discount` is composed from them (`routes/orders.ts`).
+
+**The free-shipping threshold evaluates on the net, post-discount amount** — step 3's figure, not step 1's. The discount is price-level, and this layering puts price above shipping: a ₹1,600 cart under a 40% sale is ₹960 of actual spend, and does not clear ₹999. **Gift cards are excluded from that figure.** A card is tender, applied at step 6 against the amount due; it is payment, not price, and must never move a price-level threshold. `netAmountForShipping(gross, priceDiscount)` in `@chobii/shared` takes the two price figures and nothing else, which makes the exclusion structural rather than a rule someone has to remember.
+
+**One threshold, one constant.** `FREE_SHIPPING_THRESHOLD` (₹999, `packages/shared/src/constants/shipping.ts`) is read by `calculateShippingCost` in `routes/orders.ts`, by `/api/shipping/estimate`, and by the cart page's order summary — including its copy, via `FREE_SHIPPING_THRESHOLD_LABEL`. Before this, the API charged by ₹2000, the estimate endpoint by ₹1000 and the storefront promised ₹999, so the cart advertised free shipping the checkout then billed for. The customer-facing figure won, because it is the one already promised on five surfaces.
 
 **Checkout already requires an account** (`orders.ts` builds the order from `user.id`), while carts support guests via a cookie session (`cart.ts:272-276`). So the funnel is: guest browses and sees the teased price → adds to cart → cart shows the locked saving → join → price unlocks. The gate sits where the customer was already going to have to register.
 

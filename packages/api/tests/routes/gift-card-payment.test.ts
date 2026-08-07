@@ -330,6 +330,25 @@ describe.skipIf(!DATABASE_URL)("POST /api/orders/:id/payment with gift cards", (
     expect(body.amount).toBe(150_000);
   });
 
+  it("does not buy free shipping", async () => {
+    if (!reachable) return;
+
+    // The order priced free shipping at creation, off a net 1200.00 that
+    // cleared the threshold. A 1000.00 card drops what is DUE to 200.00 — well
+    // under it — and must not turn shipping back on: a gift card is tender,
+    // settled after tax, and never moves a price-level threshold (design §5,
+    // owner decision 2026-08-07).
+    const { code } = await makeCard(100_000);
+    const orderId = await makeOrder("1200.00");
+
+    await pay(orderId, [code]);
+
+    const order = await orderRow(orderId);
+    expect(order!.giftCardAmount).toBe("1000.00");
+    expect(order!.shippingCost).toBe("0.00");
+    expect(order!.total).toBe("1200.00");
+  });
+
   it("still works for an order with no gift cards", async () => {
     if (!reachable) return;
 

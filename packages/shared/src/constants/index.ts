@@ -20,6 +20,9 @@ export * from './frames.js';
 // Export all style-related constants and helpers
 export * from './styles.js';
 
+// Export the free-shipping threshold — read by the API and the storefront alike
+export * from './shipping.js';
+
 // Constants version
 export const CONSTANTS_VERSION = '1.0.0';
 export * from './facets.js';

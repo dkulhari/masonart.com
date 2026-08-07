@@ -19,6 +19,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
+import { FREE_SHIPPING_THRESHOLD } from '@chobii/shared';
 import '../setup';
 
 import type { Promotion } from '../../src/database/schema/promotions';
@@ -332,7 +333,7 @@ describe('order creation — promotion discount', () => {
     expect(persistedOrder.couponDiscount).toBe('0.00');
     expect(persistedOrder.discount).toBe('0.00');
     expect(persistedItems[0]?.itemDiscount).toBe('0.00');
-    // 2 x 1000.00, free shipping over 2000, nothing off.
+    // 2 x 1000.00, well clear of the free-shipping threshold, nothing off.
     expect(persistedOrder.subtotal).toBe('2000.00');
     expect(persistedOrder.total).toBe('2000.00');
   });
@@ -370,22 +371,13 @@ describe('order creation — promotion discount', () => {
 
     await postOrder();
 
-    // Interim assumption pending #510: subtotal is the sum of base line
+    // Settled by owner decision, 2026-08-07: subtotal is the sum of base line
     // totals, and `total` is the only place the discount is subtracted.
     expect(persistedOrder.subtotal).toBe('2000.00');
     expect(persistedOrder.discount).toBe('800.00');
-    // 2000.00 gross clears the free-shipping threshold, so 0.00 shipping.
+    // 1200.00 net still clears the threshold, so 0.00 shipping.
     expect(persistedOrder.shippingCost).toBe('0.00');
     expect(persistedOrder.total).toBe('1200.00');
-  });
-
-  it('reads the free-shipping threshold off the gross subtotal', async () => {
-    // Net would be 1200.00 and attract 99.00 of shipping; gross does not.
-    givenPromotions([promotion()]);
-
-    await postOrder();
-
-    expect(persistedOrder.shippingCost).toBe('0.00');
   });
 
   it('discounts the poster, not the frame it is sold in', async () => {
@@ -400,7 +392,8 @@ describe('order creation — promotion discount', () => {
     // scoped over products, and frames are not products.
     expect(persistedItems[0]?.itemDiscount).toBe('400.00');
     expect(persistedOrder.subtotal).toBe('1500.00');
-    expect(persistedOrder.total).toBe('1199.00');
+    // 1100.00 net, still clear of the threshold.
+    expect(persistedOrder.total).toBe('1100.00');
   });
 
   it('prices from the variant on the line, not the catalogue base price', async () => {
@@ -441,6 +434,117 @@ describe('order creation — promotion discount', () => {
     expect(persistedItems[0]?.itemDiscount).toBe('400.00');
     expect(persistedItems[1]?.itemDiscount).toBe('0.00');
     expect(persistedOrder.promotionDiscount).toBe('400.00');
+  });
+});
+
+// ============================================================================
+// The free-shipping threshold
+// ============================================================================
+
+/**
+ * Settled by owner decision, 2026-08-07 (design §5).
+ *
+ * The threshold reads the NET, post-discount figure — the promotion is
+ * price-level, and §5's layering puts price above shipping. It does NOT read
+ * the gift card: a card is tender, applied after tax against the amount due, so
+ * it can never buy free shipping.
+ *
+ * `FREE_SHIPPING_THRESHOLD` is imported rather than written as a literal on
+ * purpose. It is the same module the cart page reads (#568), and a test that
+ * hardcoded 999 would keep passing on the day the two sides drifted apart —
+ * which is precisely the bug: a cart promising free shipping that the checkout
+ * then charges for.
+ */
+describe('order creation — the free-shipping threshold', () => {
+  it('charges shipping on a cart that clears the threshold gross but not net', async () => {
+    // 2 x 800.00 = 1600.00 gross, clear of 999. 40% off leaves 960.00, which
+    // is not.
+    givenCart([cartItem({ unitPrice: '800.00', quantity: 2 })]);
+    givenPromotions([promotion()]);
+
+    await postOrder();
+
+    expect(persistedOrder.subtotal).toBe('1600.00');
+    expect(persistedOrder.discount).toBe('640.00');
+    expect(persistedOrder.shippingCost).toBe('99.00');
+    // 1600.00 + 99.00 − 640.00.
+    expect(persistedOrder.total).toBe('1059.00');
+  });
+
+  it('ships free when the cart clears the threshold after the discount too', async () => {
+    // 2000.00 gross, 1200.00 net — over on both readings.
+    givenPromotions([promotion()]);
+
+    await postOrder();
+
+    expect(persistedOrder.shippingCost).toBe('0.00');
+    expect(persistedOrder.total).toBe('1200.00');
+  });
+
+  it('ships free exactly at the shared threshold', async () => {
+    givenCart([
+      cartItem({
+        unitPrice: FREE_SHIPPING_THRESHOLD.toFixed(2),
+        quantity: 1,
+      }),
+    ]);
+
+    await postOrder();
+
+    expect(persistedOrder.subtotal).toBe(FREE_SHIPPING_THRESHOLD.toFixed(2));
+    expect(persistedOrder.shippingCost).toBe('0.00');
+  });
+
+  it('charges shipping a rupee below the shared threshold', async () => {
+    givenCart([
+      cartItem({
+        unitPrice: (FREE_SHIPPING_THRESHOLD - 1).toFixed(2),
+        quantity: 1,
+      }),
+    ]);
+
+    await postOrder();
+
+    expect(persistedOrder.shippingCost).toBe('99.00');
+  });
+
+  it('prices express shipping above standard below the threshold', async () => {
+    givenCart([cartItem({ unitPrice: '100.00', quantity: 1 })]);
+
+    await postOrder({ shippingMethod: 'express' });
+
+    expect(persistedOrder.shippingCost).toBe('199.00');
+  });
+
+  it('does not let a gift card buy free shipping', async () => {
+    // 1600.00 gross, 960.00 net: below the threshold, so shipping is charged.
+    // A gift card worth more than the whole order drops the amount DUE to
+    // nothing, and must still not move a price-level threshold.
+    givenCart([cartItem({ unitPrice: '800.00', quantity: 2 })]);
+    givenPromotions([promotion()]);
+
+    await postOrder({
+      giftCardCodes: ['GIFTCARD00000001'],
+      giftCardAmount: '5000.00',
+    });
+
+    expect(persistedOrder.shippingCost).toBe('99.00');
+    expect(persistedOrder.total).toBe('1059.00');
+    // Tender is settled at the payment endpoint, under a row lock. Order
+    // creation writes no gift card figure at all — see the payment-side pin in
+    // tests/routes/gift-card-payment.test.ts.
+    expect(persistedOrder.giftCardAmount).toBeUndefined();
+  });
+
+  it('does not let a gift card take free shipping away either', async () => {
+    givenPromotions([promotion()]);
+
+    await postOrder({ giftCardAmount: '1500.00' });
+
+    // 1200.00 net still ships free, whatever the customer is actually paying.
+    expect(persistedOrder.shippingCost).toBe('0.00');
+    expect(persistedOrder.total).toBe('1200.00');
+    expect(persistedOrder.giftCardAmount).toBeUndefined();
   });
 });
 

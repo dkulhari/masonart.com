@@ -18,6 +18,10 @@ import { db } from "../database";
 import { shippingOptions, type ShippingOption } from "../database/schema/shipping";
 import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
 import { getCached, setCached } from "../lib/redis";
+import {
+  FREE_SHIPPING_THRESHOLD,
+  qualifiesForFreeShipping,
+} from "@chobii/shared";
 
 // ============================================================================
 // Constants
@@ -188,9 +192,9 @@ shippingApp.get(
         // Could be enhanced with weight-based, distance-based, or API-based calculations
         let calculatedCost = baseCostNum;
 
-        // Free shipping for orders over certain amount (e.g., ₹1000)
-        const freeShippingThreshold = 1000;
-        if (cartTotal >= freeShippingThreshold && option.carrier !== "Express") {
+        // Free shipping over the one threshold every surface reads
+        // (`@chobii/shared`). `cartTotal` is the caller's post-discount figure.
+        if (qualifiesForFreeShipping(cartTotal) && option.carrier !== "Express") {
           calculatedCost = 0;
         }
 
@@ -219,7 +223,7 @@ shippingApp.get(
       return c.json({
         cartTotal,
         zipCode: zipCode || null,
-        freeShippingThreshold: 1000,
+        freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
         options: estimates,
       });
     } catch (error) {

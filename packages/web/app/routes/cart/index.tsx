@@ -46,6 +46,12 @@ import { CartItem } from '~/components/cart/CartItem'
 import { JoinGalleryModal } from '~/components/promo/JoinGalleryModal'
 import { useGalleryMembership } from '~/hooks/useGalleryMembership'
 import { useServerCart } from '~/hooks/useCart'
+import {
+  FREE_SHIPPING_THRESHOLD,
+  FREE_SHIPPING_THRESHOLD_LABEL,
+  netAmountForShipping,
+  qualifiesForFreeShipping,
+} from '@chobii/shared'
 
 // ============================================================================
 // Route Definition
@@ -427,12 +433,21 @@ function OrderSummary({
   lockedSaving = 0,
   onJoinGallery,
 }: OrderSummaryProps) {
-  // Shipping is free over ₹999
-  const shippingThreshold = 999
-  const hasShippingFee = subtotal < shippingThreshold
+  /**
+   * The threshold is read on the NET, post-discount figure, and both this page
+   * and `calculateShippingCost` in the API take it from `@chobii/shared`
+   * (decision, 2026-08-07 — design §5). Two copies of the number is how a cart
+   * ends up promising free shipping that the checkout then charges for.
+   *
+   * `saving` is the server's unlocked saving in paise; `subtotal` is the local
+   * store's gross in rupees. A LOCKED saving is deliberately not subtracted:
+   * the checkout charges base for those lines, so they are not off the price.
+   */
+  const net = netAmountForShipping(subtotal, saving / 100)
+  const hasShippingFee = !qualifiesForFreeShipping(net)
   const shippingFee = hasShippingFee ? 99 : 0
-  const total = subtotal + shippingFee
-  const amountUntilFreeShipping = shippingThreshold - subtotal
+  const total = net + shippingFee
+  const amountUntilFreeShipping = FREE_SHIPPING_THRESHOLD - net
 
   return (
     <div className="sticky top-24 rounded-xl border border-border bg-card p-6">
@@ -448,7 +463,9 @@ function OrderSummary({
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-accent">
             <div
               className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${Math.min(100, (subtotal / shippingThreshold) * 100)}%` }}
+              style={{
+                width: `${Math.min(100, (net / FREE_SHIPPING_THRESHOLD) * 100)}%`,
+              }}
             />
           </div>
         </div>
@@ -463,7 +480,10 @@ function OrderSummary({
           <span className="font-medium text-foreground">{formatPrice(subtotal)}</span>
         </div>
 
-        <div className="flex items-center justify-between text-sm">
+        <div
+          data-testid="cart-shipping"
+          className="flex items-center justify-between text-sm"
+        >
           <span className="text-muted-foreground">Shipping</span>
           {hasShippingFee ? (
             <span className="font-medium text-foreground">{formatPrice(shippingFee)}</span>
@@ -520,7 +540,10 @@ function OrderSummary({
 
       {/* Total */}
       <div className="mt-4 border-t border-border pt-4">
-        <div className="flex items-center justify-between">
+        <div
+          data-testid="cart-total"
+          className="flex items-center justify-between"
+        >
           <span className="text-base font-semibold text-foreground">Estimated Total</span>
           <span className="text-xl font-medium text-foreground">{formatPrice(total)}</span>
         </div>
@@ -539,7 +562,9 @@ function OrderSummary({
       <div className="mt-6 space-y-3">
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Truck className="h-5 w-5 text-foreground" />
-          <span>Free shipping on orders over ₹999</span>
+          <span data-testid="cart-free-shipping-copy">
+            Free shipping on orders over {FREE_SHIPPING_THRESHOLD_LABEL}
+          </span>
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Shield className="h-5 w-5 text-foreground" />

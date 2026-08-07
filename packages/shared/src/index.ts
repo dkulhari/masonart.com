@@ -40,3 +40,7 @@ export * from './constants/sizes';
 export * from './constants/frames';
 export * from './constants/facets';
 export * from './constants/styles';
+// The free-shipping threshold. Enumerated here for the same reason as the
+// schema modules above: this barrel lists modules, so adding one to
+// './constants/index.ts' alone leaves it unreachable through `@chobii/shared`.
+export * from './constants/shipping';
