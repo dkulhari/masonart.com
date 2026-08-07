@@ -1,0 +1,144 @@
+ticket_number: 571
+title: /create's mobile action bar must stack above the tab bar, not paint over it
+description: |-
+  ## Task
+
+  `/create` renders its own bottom action bar — `fixed inset-x-0 bottom-0 z-40 ... md:hidden` at packages/web/app/routes/create/index.tsx:551, shown only while `!isInlineGenerateVisible` (the inline Generate button is scrolled out of view). It is z-40; the new MobileTabBar (#542) is z-30. So on `/create`, whenever that bar is up, it paints over the tab bar and all six destinations are unreachable.
+
+  Fix by stacking, not by layer-fighting: offset `/create`'s bar upward by the tab bar's height so both are visible and tappable — action bar on top, tab bar beneath it.
+
+  ## Context
+
+  - Flagged by #542 as out of scope; that ticket deliberately left `/create` alone. No page content is hidden today and the footer still clears — the defect is purely that the tab bar is unreachable.
+  - Breakpoints line up in our favour: the `/create` bar is `md:hidden` (visible below 768) and the tab bar is `lg:hidden` (visible below 1024). The tab bar is therefore ALWAYS present whenever the `/create` bar renders, so the offset needs no breakpoint scoping — plain `bottom-[...]`, not `lg:`-prefixed.
+  - Do not raise the tab bar's z-index. MobileTabBar's own doc comment explains why z-30 is deliberate: every overlay in the app is z-40 (scrims) / z-50 (panels), and a tab bar above them would offer taps that go nowhere.
+  - Two numbers must agree, so export the offset from MobileTabBar next to `MOBILE_TAB_BAR_PADDING_CLASS` and `BAR_HEIGHT` rather than hardcoding 3.875rem in the create route — the same rule the existing comment states for the padding class. Both terms carry `env(safe-area-inset-bottom)`.
+  - The create route shell is `flex flex-col pb-24 md:pb-0` (line 388). 96px should still clear the raised bar; confirm at 390x844 rather than assuming.
+  - House pattern for this kind of check is a source-text assertion test — see tests/routes/home-tokens.test.ts and tests/routes/posters-toolbar-placement.test.ts. There is no existing test file for the create route.
+feature: home-page-parity
+type: bug
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:00:50.307Z'
+last_updated: '2026-08-07T07:00:50.307Z'
+time_spent_minutes: 0
+labels:
+  - home-page-parity
+  - mobile
+  - chrome
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: 'Pin the stacking contract: MobileTabBar exports an offset class, and /create''s fixed action bar uses it unprefixed'
+    file: packages/web/tests/routes/create-tab-bar-clearance.test.ts
+    command: pnpm --filter @chobii/web test -- tests/routes/create-tab-bar-clearance.test.ts
+    expected_result: FAIL - MOBILE_TAB_BAR_OFFSET_CLASS is not exported, and the create bar is still bottom-0
+    status: pending
+    code: |
+      import { readFileSync } from 'node:fs'
+      import { join } from 'node:path'
+      import { describe, expect, it } from 'vitest'
+      import { MOBILE_TAB_BAR_OFFSET_CLASS } from '~/components/layout/MobileTabBar'
+
+      const createRoute = readFileSync(
+        join(__dirname, '../../app/routes/create/index.tsx'),
+        'utf-8',
+      )
+
+      describe('/create action bar clears the mobile tab bar', () => {
+        it('exports an offset that carries the same height and safe-area term as the padding', () => {
+          expect(MOBILE_TAB_BAR_OFFSET_CLASS).toBe(
+            'bottom-[calc(3.875rem+env(safe-area-inset-bottom))]',
+          )
+        })
+
+        it('applies the shared offset to the fixed action bar instead of bottom-0', () => {
+          expect(createRoute).toContain('MOBILE_TAB_BAR_OFFSET_CLASS')
+          expect(createRoute).not.toMatch(/fixed inset-x-0 bottom-0 z-40/)
+        })
+
+        it('does not scope the offset to a breakpoint', () => {
+          // The bar is md:hidden and the tab bar is lg:hidden, so the tab bar is
+          // always present when this bar renders. An lg:-prefixed offset would
+          // never fire.
+          expect(createRoute).not.toMatch(/(sm|md|lg|xl):bottom-\[calc\(3\.875rem/)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails for the right reason (missing export, bar still at bottom-0)
+    command: pnpm --filter @chobii/web test -- tests/routes/create-tab-bar-clearance.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Export the offset class from MobileTabBar, next to MOBILE_TAB_BAR_PADDING_CLASS
+    file: packages/web/app/components/layout/MobileTabBar.tsx
+    status: pending
+    code: |-
+      /**
+       * Where a page's own fixed bottom bar has to sit so it stacks ON TOP of the
+       * tab bar rather than painting over it.
+       *
+       * Same two numbers as MOBILE_TAB_BAR_PADDING_CLASS, so they move together.
+       * No breakpoint prefix on purpose: the only consumer today, /create's generate
+       * bar, is `md:hidden`, and this bar is `lg:hidden` — the tab bar is always
+       * under it whenever it renders.
+       *
+       * Do NOT solve this by raising the tab bar above z-40. See the z-30 note below:
+       * every scrim in the app is z-40 and every panel z-50, and a tab bar over an
+       * open drawer offers taps that go nowhere.
+       */
+      export const MOBILE_TAB_BAR_OFFSET_CLASS =
+        'bottom-[calc(3.875rem+env(safe-area-inset-bottom))]'
+  - id: 4
+    action: implement
+    description: Raise /create's action bar onto the offset; keep z-40 so it still clears page content
+    file: packages/web/app/routes/create/index.tsx
+    status: pending
+    code: |-
+      // import at top of file:
+      import { MOBILE_TAB_BAR_OFFSET_CLASS } from '~/components/layout/MobileTabBar'
+
+      // line ~551, replacing `fixed inset-x-0 bottom-0 z-40 ...`:
+      <div
+        className={cn(
+          'fixed inset-x-0 z-40 border-t border-border bg-background/95 shadow-[0_-4px_16px_rgb(0_0_0_/_8%)] backdrop-blur md:hidden',
+          // Sits on the tab bar, not over it (#542). The tab bar is lg:hidden and
+          // this bar md:hidden, so the tab bar is always beneath it here.
+          MOBILE_TAB_BAR_OFFSET_CLASS,
+        )}
+      >
+  - id: 5
+    action: verify-pass
+    description: Test green, and the route still typechecks
+    command: pnpm --filter @chobii/web test -- tests/routes/create-tab-bar-clearance.test.ts && pnpm --filter @chobii/web exec tsc --noEmit
+    expected_result: PASS - test green; tsc reports no NEW errors (22 pre-existing in routes/admin/*, routes/track/*, ai-generator/PromptSuggestions.tsx)
+    status: pending
+  - id: 6
+    action: verify-pass
+    description: Confirm in a real browser at 390x844 that both bars are visible and the tab bar takes taps
+    command: 'node scratchpad/shoot.mjs # or the project''s screenshot harness — it pre-scrolls, a plain scrollTo renders fixed elements ~77px low'
+    expected_result: 'Manual verification — scroll /create until the action bar appears; the tab bar''s six items must be visible below it and document.elementFromPoint over a tab bar item must return the tab bar, not the action bar. The shell''s pb-24 must still clear the raised bar: nothing in the form is hidden at the true bottom of the page.'
+    status: pending
+  - id: 7
+    action: verify-pass
+    description: Full web suite — no regression
+    command: pnpm --filter @chobii/web test
+    expected_result: PASS - no NEW failures against the pre-existing baseline (tests/styles.test.ts dark-variant, tests/routes/home-tokens.test.ts scrims, tests/routes/wishlist-page.test.ts auth guard)
+    status: pending
+  - id: 8
+    action: commit
+    description: Commit the fix
+    command: 'git add packages/web/app/components/layout/MobileTabBar.tsx packages/web/app/routes/create/index.tsx packages/web/tests/routes/create-tab-bar-clearance.test.ts && git commit -m "fix(web): /create''s action bar stacks above the mobile tab bar"'
+    status: pending
+current_step: 1

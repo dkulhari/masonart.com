@@ -1,0 +1,100 @@
+ticket_number: 573
+title: Start the gift card delivery sweep — scheduled cards are never sent
+description: |-
+  ## The bug
+  `startGiftCardDeliveryScheduler` (`services/gift-card-delivery.ts`) is exported, tested, and **never called**. Nothing in `src/index.ts` starts it.
+
+  So a customer who buys a gift card with a future send date pays for it, gets a receipt, and the recipient is **never emailed**. The order sits `paid` with `giftCardPurchase.sendAt` in the past and no `gift_card` row behind it, indefinitely.
+
+  This is the one gap that makes the shipped feature quietly incomplete. Immediate sends work — they mint in the payment verify path — so the failure is invisible until someone schedules one.
+
+  ## Why it was left
+  `services/approval-deadline.ts` exports `startDeadlineChecker` and is *also* never called, so this codebase has no established startup site for background sweeps. Picking one is a decision, not a mechanical fix, which is why it was not made silently inside a gift card commit.
+
+  ## What has to be decided
+  Where periodic work starts, and what happens with more than one API process — two instances both running a `setInterval` sweep is safe here (the unique constraint on `purchase_order_id` settles the race, and `gift-card-delivery.test.ts` covers exactly that), but it doubles the polling and the decision should be deliberate.
+
+  If the answer is "start it in `src/index.ts`", `startDeadlineChecker` almost certainly wants starting in the same place and the same way.
+
+  ## Context
+  Part of feature: gift-cards
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §6
+
+  Until this lands, either disable the send-date field on `/gift-cards` or accept that scheduled cards do not arrive.
+feature: gift-cards
+type: task
+priority: critical
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:05:33.295Z'
+last_updated: '2026-08-07T07:05:33.295Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Assert the sweep is actually started by the app
+    file: packages/api/tests/startup/schedulers.test.ts
+    command: cd packages/api && bunx vitest run tests/startup/schedulers.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('background schedulers', () => {
+        it('starts the gift card delivery sweep', async () => {
+          // assert: importing the app registers an interval that calls
+          //         sweepScheduledGiftCards, or whatever startup seam is chosen
+        })
+
+        it('does not start it more than once per process', async () => {
+          // two intervals means two sweeps and twice the polling
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/api && bunx vitest run tests/startup/schedulers.test.ts
+    expected_result: FAIL - nothing starts the sweep
+    status: pending
+  - id: 3
+    action: implement
+    description: Start the sweep wherever the project decides periodic work belongs
+    file: packages/api/src/index.ts
+    status: pending
+    code: |-
+      // Scheduled gift cards are minted and emailed on their send date. Without
+      // this, a card bought with a future date is paid for and never delivered.
+      //
+      // Safe to run in more than one process: minting is guarded by the unique
+      // constraint on gift_card.purchase_order_id, so duplicate workers race and
+      // exactly one wins.
+      if (process.env.NODE_ENV !== 'test') {
+        startGiftCardDeliveryScheduler()
+      }
+  - id: 4
+    action: verify-pass
+    description: Confirm the sweep starts
+    command: cd packages/api && bunx vitest run tests/startup/schedulers.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Confirm a scheduled card is delivered end to end
+    command: cd packages/api && bunx vitest run tests/services/gift-card-delivery.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit the scheduler startup
+    command: 'git add packages/api/src/index.ts packages/api/tests/startup && git commit -m "fix(api): actually start the gift card delivery sweep"'
+    status: pending
+current_step: 1

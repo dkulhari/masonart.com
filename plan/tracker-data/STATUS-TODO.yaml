@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-07T06:48:20.305Z'
-total_tickets: 22
+last_updated: '2026-08-07T07:06:27.553Z'
+total_tickets: 33
 summary:
-  critical: 3
-  high: 5
-  medium: 8
-  low: 6
+  critical: 4
+  high: 6
+  medium: 13
+  low: 10
 priorities:
   critical:
     - feature: go-live
@@ -40,6 +40,12 @@ priorities:
           blocked_by: []
         - ticket_number: 544
           title: Replace mesonart development placeholder photography before production
+          assignee: unassigned
+          blocked_by: []
+    - feature: gift-cards
+      tickets:
+        - ticket_number: 573
+          title: Start the gift card delivery sweep — scheduled cards are never sent
           assignee: unassigned
           blocked_by: []
   high:
@@ -81,6 +87,12 @@ priorities:
           title: Review toast covers page content on every screen and has no counterpart on the reference
           assignee: unassigned
           blocked_by: []
+    - feature: shipping-returns
+      tickets:
+        - ticket_number: 570
+          title: Admin UI for the free-shipping threshold, with the storefront copy reading the live value
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: go-to-production
       tickets:
@@ -119,10 +131,32 @@ priorities:
           title: Best Sellers band is missing the category pill row the reference carries on both viewports
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 571
+          title: /create's mobile action bar must stack above the tab bar, not paint over it
+          assignee: unassigned
+          blocked_by: []
     - feature: cart-checkout
       tickets:
         - ticket_number: 566
           title: PDP frame options drop the flat priceAddition column, unlike the quickview and the server
+          assignee: unassigned
+          blocked_by: []
+    - feature: gift-cards
+      tickets:
+        - ticket_number: 574
+          title: Index the delivery sweep's query, and drop the index it no longer uses
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 575
+          title: Prove the gift card code rate limit actually throttles
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 576
+          title: PaymentButton accepts neither orderData nor existingOrderId without complaint
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 577
+          title: Wire the store_credit refund type to issue a gift card
           assignee: unassigned
           blocked_by: []
   low:
@@ -151,6 +185,10 @@ priorities:
           title: Seed catalogue artwork carries a MESON ART watermark baked into the pixels
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 572
+          title: 'Document: Mobile tab bar active state design choice'
+          assignee: unassigned
+          blocked_by: []
     - feature: cart-checkout
       tickets:
         - ticket_number: 565
@@ -159,6 +197,20 @@ priorities:
           blocked_by: []
         - ticket_number: 567
           title: Cleanup left behind by the server-cart write path (#511)
+          assignee: unassigned
+          blocked_by: []
+    - feature: gift-cards
+      tickets:
+        - ticket_number: 578
+          title: Cover a real payment end to end, including mint and delivery
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 579
+          title: Let a gift card be bought in the same checkout as a poster
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 580
+          title: The gift card suites hit the shared dev database
           assignee: unassigned
           blocked_by: []
 blocked_tickets:

@@ -1,0 +1,72 @@
+ticket_number: 580
+title: The gift card suites hit the shared dev database
+description: |-
+  ## The situation
+  Six gift card suites open a real Postgres connection from `DATABASE_URL` and create their own rows:
+
+  - `tests/services/gift-card-redeem.test.ts`
+  - `tests/services/gift-card-refund.test.ts`
+  - `tests/services/gift-card-delivery.test.ts`
+  - `tests/routes/gift-card-purchase.test.ts`, `gift-card-quote.test.ts`, `gift-card-payment.test.ts`, `gift-card-release.test.ts`
+  - `tests/routes/admin/gift-cards.test.ts`
+
+  That was deliberate and is defended in each file: the properties under test are a `SELECT ... FOR UPDATE` row lock, a unique constraint settling a race, and transactional rollback. A mocked `db` can only assert that the words were written, not that the lock holds — removing `FOR UPDATE` was confirmed to fail the concurrency test, so the coverage is real.
+
+  ## What it costs
+  - They **skip silently** without `DATABASE_URL`, so CI without a database reports green while testing nothing.
+  - They run against the shared dev database, not a disposable one. They create and delete only their own rows and drop nothing, so they sit outside the `getDestructiveDbUrl` guard (`tests/helpers/destructive-db.ts`) — but that guard exists because of a real incident (#332), and "outside the guard" is a judgement, not a guarantee.
+  - Several agents run suites concurrently on this machine. Fixtures are keyed by pid so they do not collide today; a shared global like the admin liability total is not so lucky, which already forced `tests/e2e/gift-cards.spec.ts` into serial mode.
+
+  ## Options
+  Point them at a disposable `_test` database via `TEST_DATABASE_URL` and fail loudly rather than skipping when none is configured. Or wrap each test in a transaction that always rolls back, which removes the cleanup code entirely.
+
+  The one thing not to do is convert them to mocks. That would delete the only evidence the locking works.
+
+  ## Context
+  Part of feature: gift-cards
+  See `tests/helpers/destructive-db.ts` for the existing convention.
+feature: gift-cards
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:06:27.284Z'
+last_updated: '2026-08-07T07:06:27.284Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - backend
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Make a missing database loud instead of silent
+    file: packages/api/tests/helpers/live-db.ts
+    status: pending
+    code: |-
+      // A suite that skips itself when DATABASE_URL is absent reports green while
+      // testing nothing. Skipping is fine locally; in CI it should fail.
+  - id: 2
+    action: implement
+    description: Point the gift card suites at a disposable database
+    file: packages/api/tests/services/gift-card-redeem.test.ts
+    status: pending
+  - id: 3
+    action: verify-pass
+    description: Confirm they still pass, and still fail without the row lock
+    command: cd packages/api && bunx vitest run tests/services/gift-card-redeem.test.ts tests/services/gift-card-refund.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 4
+    action: commit
+    description: Commit the isolation
+    command: 'git add packages/api/tests && git commit -m "test(api): isolate the live-database gift card suites"'
+    status: pending
+current_step: 1

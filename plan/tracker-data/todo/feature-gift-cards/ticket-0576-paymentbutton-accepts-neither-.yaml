@@ -1,0 +1,94 @@
+ticket_number: 576
+title: PaymentButton accepts neither orderData nor existingOrderId without complaint
+description: |-
+  ## The gap
+  `PaymentButton` used to require `orderData`. Supporting gift card purchases made it optional, because a gift card order already exists by the time the button renders:
+
+  ```ts
+  orderData?: OrderInput
+  existingOrderId?: string
+  ```
+
+  Exactly one is required, and TypeScript now enforces neither. A caller that passes **both** or **neither** compiles fine. Neither reaches a runtime `throw new Error('Could not determine which order to pay for')` — after the customer has clicked Pay.
+
+  That error is deliberate and better than sending `undefined` to Razorpay, but it is a compile-time problem solved at runtime, on the most expensive screen in the product.
+
+  ## Fix
+  A discriminated union makes the invalid states unrepresentable:
+
+  ```ts
+  type PaymentTarget =
+    | { orderData: OrderInput; existingOrderId?: never }
+    | { existingOrderId: string; orderData?: never }
+
+  type PaymentButtonProps = PaymentTarget & { totalAmount: number; ... }
+  ```
+
+  Both existing callers already satisfy one arm — checkout passes `orderData`, `/gift-cards` passes `existingOrderId` — so this should be a type-only change.
+
+  ## Context
+  Part of feature: gift-cards
+  Introduced by #560.
+
+  Keep the runtime throw as well. Types do not survive a JSON boundary or a `as never` cast, and this one guards money.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:05:33.364Z'
+last_updated: '2026-08-07T07:05:33.364Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Pin the valid and invalid shapes
+    file: packages/web/tests/components/checkout/PaymentButton-target.test.tsx
+    command: cd packages/web && bunx vitest run tests/components/checkout/PaymentButton-target.test.tsx
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('what PaymentButton can be pointed at', () => {
+        it('accepts order data alone', () => {})
+        it('accepts an existing order id alone', () => {})
+        it('rejects both at the type level', () => {
+          // @ts-expect-error passing both is ambiguous
+        })
+        it('rejects neither at the type level', () => {
+          // @ts-expect-error there is nothing to pay for
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the @ts-expect-error lines are unused, so the test fails
+    command: cd packages/web && bunx tsc --noEmit -p tsconfig.json
+    expected_result: FAIL - unused @ts-expect-error
+    status: pending
+  - id: 3
+    action: implement
+    description: Make the invalid states unrepresentable
+    file: packages/web/app/components/checkout/PaymentButton.tsx
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm both callers still typecheck
+    command: cd packages/web && bunx tsc --noEmit -p tsconfig.json
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the type fix
+    command: 'git add packages/web/app/components/checkout/PaymentButton.tsx packages/web/tests/components/checkout && git commit -m "refactor(web): make PaymentButton''s payment target unambiguous"'
+    status: pending
+current_step: 1

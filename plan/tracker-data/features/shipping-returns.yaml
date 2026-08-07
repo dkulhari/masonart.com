@@ -28,8 +28,10 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo: {}
-  in_progress: {}
+  todo:
+    "570": Admin UI for the free-shipping threshold, with the storefront copy reading the live value
+  in_progress:
+    "569": Shipping config table so the free-shipping threshold is set in admin, not at build time
   done:
     "36": Database Schema - Shipping and Returns Tables
     "37": API Routes - Shipping Options Endpoints
@@ -40,6 +42,6 @@ tickets:
     "42": Frontend - Return Request Flow
     "43": Admin Panel - Returns Management Dashboard
     "44": Tests - Unit and E2E Test Suite
-total_tickets: 9
-completion_percentage: 100
-is_completed: true
+total_tickets: 11
+completion_percentage: 82
+is_completed: false

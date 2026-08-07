@@ -1,0 +1,94 @@
+ticket_number: 574
+title: Index the delivery sweep's query, and drop the index it no longer uses
+description: |-
+  ## Task
+  The delivery sweep changed shape after minting moved to delivery time, and the indexes did not follow.
+
+  **Now unused:** `gift_card_send_at_idx` on `gift_card.sendAt` (`schema/gift-cards.ts:117`). The sweep no longer looks at `gift_card` to decide what is due — a scheduled card does not exist yet at that point. `gift_card.sendAt` is now a record of what the buyer chose, copied at mint, and nothing queries it.
+
+  **Now unindexed:** the query the sweep actually runs, in `services/gift-card-delivery.ts`:
+
+  ```sql
+  SELECT o.id, o.gift_card_purchase
+  FROM orders o
+  LEFT JOIN gift_card g ON g.purchase_order_id = o.id
+  WHERE o.order_type = 'gift_card'
+    AND o.payment_status = 'paid'
+    AND g.id IS NULL
+    AND (o.gift_card_purchase ->> 'sendAt')::timestamptz <= now
+  ```
+
+  That scans `orders` — the largest table in the system, growing forever — every five minutes, filtering on a jsonb extraction. It is fine at today's volume and will not stay fine.
+
+  ## Suggested shape
+  A partial index on `orders` covering `order_type = 'gift_card'`, which is a tiny fraction of rows:
+
+  ```sql
+  CREATE INDEX orders_gift_card_delivery_idx
+    ON orders (payment_status, ((gift_card_purchase ->> 'sendAt')::timestamptz))
+    WHERE order_type = 'gift_card';
+  ```
+
+  Measure before and after with `EXPLAIN ANALYZE` rather than assuming — a partial index on a small subset may not beat a sequential scan until the table is much larger, and the honest answer might be "not yet, but here is the trigger".
+
+  ## Context
+  Part of feature: gift-cards
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §6
+
+  Dropping the dead index is unambiguous; adding the new one deserves the measurement.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:05:33.333Z'
+last_updated: '2026-08-07T07:05:33.333Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Measure the sweep query as it stands
+    file: packages/api/src/services/gift-card-delivery.ts
+    status: pending
+    code: |-
+      -- EXPLAIN ANALYZE the sweep query against a realistic orders table.
+      -- Record the plan in the ticket before changing anything.
+  - id: 2
+    action: implement
+    description: Drop the index nothing reads and add one for the query that runs
+    file: packages/api/src/database/schema/gift-cards.ts
+    status: pending
+    code: |-
+      // Remove from gift_card:
+      //   sendAtIdx: index("gift_card_send_at_idx").on(table.sendAt),
+      // Nothing queries gift_card.sendAt — the sweep reads orders.giftCardPurchase,
+      // because a scheduled card does not exist until it is delivered.
+  - id: 3
+    action: implement
+    description: Generate and apply the migration
+    command: cd packages/api && bunx drizzle-kit generate && bunx drizzle-kit migrate
+    expected_result: Migration created and applied
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the sweep still finds what is due
+    command: cd packages/api && bunx vitest run tests/services/gift-card-delivery.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the index change
+    command: 'git add packages/api/src/database/schema/gift-cards.ts packages/api/src/database/migrations && git commit -m "perf(api): index the gift card delivery sweep"'
+    status: pending
+current_step: 1

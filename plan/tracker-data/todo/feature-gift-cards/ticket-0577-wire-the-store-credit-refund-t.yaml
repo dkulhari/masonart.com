@@ -1,0 +1,80 @@
+ticket_number: 577
+title: Wire the store_credit refund type to issue a gift card
+description: |-
+  ## Task
+  `packages/api/src/database/schema/returns.ts:54` has offered a `store_credit` refund type since long before gift cards existed. Nothing implements it — `grep store_credit packages/api/src/routes/returns.ts` returns nothing. A return marked for store credit currently produces no credit at all.
+
+  Gift cards are the instrument that makes it buildable: processing such a return issues a card for the refund amount and emails it to the customer.
+
+  ## Two things to get right
+  **It is not the tender split.** An ordinary refund goes back proportionally to what paid for the order (#557). Store credit is a deliberate substitution — the customer is given a card *instead of* their money back — so it must be an explicit choice, recorded, and never the default fallback when a Razorpay refund fails.
+
+  **Consent.** Converting a card payment into store credit without agreement is what invites chargebacks. Whatever flow chooses `store_credit` needs the customer to have accepted it, and the return record should carry when.
+
+  ## Context
+  Part of feature: gift-cards
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §8, listed there as out of scope for v1 precisely because the returns flow is its own surface.
+
+  `issueGiftCard()` already does the work; this is about where it is called from and under what authority.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:05:33.371Z'
+last_updated: '2026-08-07T07:05:33.371Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for store credit refunds
+    file: packages/api/tests/routes/returns-store-credit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/returns-store-credit.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('a return refunded as store credit', () => {
+        it('issues a gift card for the refund amount', async () => {})
+        it('emails the card to the customer', async () => {})
+        it('does not also refund Razorpay', async () => {
+          // store credit replaces the refund; doing both pays twice
+        })
+        it('is never chosen automatically when a gateway refund fails', async () => {
+          // substituting credit for money must be a decision, not a fallback
+        })
+        it('records that the customer accepted store credit', async () => {})
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/api && bunx vitest run tests/routes/returns-store-credit.test.ts
+    expected_result: FAIL - store_credit is inert
+    status: pending
+  - id: 3
+    action: implement
+    description: Issue a card when a return is settled as store credit
+    file: packages/api/src/routes/returns.ts
+    status: pending
+  - id: 4
+    action: verify-pass
+    description: Confirm the tests pass
+    command: cd packages/api && bunx vitest run tests/routes/returns-store-credit.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit store credit refunds
+    command: 'git add packages/api/src/routes/returns.ts packages/api/tests/routes/returns-store-credit.test.ts && git commit -m "feat(api): settle store-credit returns as a gift card"'
+    status: pending
+current_step: 1

@@ -1,9 +1,9 @@
 status: in-progress
-last_updated: '2026-08-06T20:45:19.307Z'
-total_tickets: 2
+last_updated: '2026-08-07T07:06:27.557Z'
+total_tickets: 3
 summary:
   critical: 0
-  high: 2
+  high: 3
   medium: 0
   low: 0
 priorities:
@@ -16,6 +16,12 @@ priorities:
           blocked_by: []
         - ticket_number: 542
           title: Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
+          assignee: unassigned
+          blocked_by: []
+    - feature: shipping-returns
+      tickets:
+        - ticket_number: 569
+          title: Shipping config table so the free-shipping threshold is set in admin, not at build time
           assignee: unassigned
           blocked_by: []
 blocked_tickets: []

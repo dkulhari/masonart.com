@@ -1,0 +1,28 @@
+ticket_number: 572
+title: 'Document: Mobile tab bar active state design choice'
+description: |-
+  The mobile tab bar (#542) has no visual active state — all six icons remain black regardless of which route is active. This matches the reference design (mesonart), which also has no color change or highlight on the active tab.
+
+  Why it's by design:
+  - Reference design shows no active indicator
+  - TanStack Link active routes don't automatically change icon color
+  - Adding color would deviate from reference parity
+
+  This is not a defect, but it's worth documenting so future readers understand why there's no icon color change on active routes, and it won't accidentally get "fixed" to add color when the reference explicitly shows none.
+feature: home-page-parity
+type: task
+priority: low
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:05:25.605Z'
+last_updated: '2026-08-07T07:05:25.605Z'
+time_spent_minutes: 0
+labels: []
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []

@@ -1,0 +1,89 @@
+ticket_number: 575
+title: Prove the gift card code rate limit actually throttles
+description: |-
+  ## The gap
+  `giftCardCodeRateLimit` is attached to both endpoints that take a bearer code — `POST /api/gift-cards/balance` and `POST /api/orders/:id/gift-card` — but **no test has ever seen it return 429**.
+
+  `rateLimit()` (`middleware/rate-limit.ts:48`) falls through silently when Redis is not connected, and the vitest suites never connect one. The assertion in `tests/routes/gift-card-quote.test.ts` therefore returns early and the test passes without exercising anything. That is documented in the test, but a documented untested path is still an untested path.
+
+  ## Why it matters more here than elsewhere
+  These endpoints answer a yes/no question about a bearer instrument. Sixteen Crockford characters is unguessable, but admin-issued cards are a much smaller and shorter-lived population, and an unthrottled oracle is the difference between "you cannot guess a code" and "you can sweep for one". The limiter is the only thing standing there.
+
+  Worth checking at the same time: the limiter keys on IP alone (`getClientIp`), so every customer behind one corporate NAT shares a bucket. Ten attempts a minute across a whole office may be too tight, and a per-user key would be fairer — decide deliberately rather than inheriting `otpRateLimit`'s shape by accident.
+
+  ## Context
+  Part of feature: gift-cards
+  Design: `docs/superpowers/specs/2026-08-06-gift-cards-design.md` §4
+
+  Either stand up Redis for this suite, or assert the middleware is mounted on both routes at the router level — the second is weaker but honest, and better than a test that skips itself.
+feature: gift-cards
+type: task
+priority: medium
+status: todo
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:05:33.348Z'
+last_updated: '2026-08-07T07:05:33.348Z'
+time_spent_minutes: 0
+labels:
+  - backend
+  - api
+  - testing
+acceptance_criteria: []
+comments: []
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Exercise the 429 path for real
+    file: packages/api/tests/routes/gift-card-rate-limit.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-rate-limit.test.ts
+    expected_result: FAIL
+    status: pending
+    code: |-
+      describe('gift card code throttling', () => {
+        it('returns 429 once the burst is spent', async () => {
+          // With a connected Redis and DISABLE_RATE_LIMIT unset.
+          // assert: the 11th attempt in a minute is refused
+        })
+
+        it('throttles the order quote endpoint too', async () => {
+          // both endpoints take a code; both are oracles
+        })
+
+        it('refuses in a way that does not reveal whether the code exists', async () => {
+          // a 429 for a real code and a fake one must be indistinguishable
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails without the limiter engaged
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-rate-limit.test.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: 'Decide the key: IP alone, or IP plus user'
+    file: packages/api/src/routes/gift-cards.ts
+    status: pending
+    code: |-
+      // One corporate NAT is one bucket under an IP-only key. Ten attempts a
+      // minute across an office is likely too tight; keying on user where a
+      // session exists, falling back to IP, is fairer without weakening the
+      // anonymous case.
+  - id: 4
+    action: verify-pass
+    description: Confirm the throttle engages
+    command: cd packages/api && bunx vitest run tests/routes/gift-card-rate-limit.test.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: commit
+    description: Commit the throttle coverage
+    command: 'git add packages/api/tests/routes/gift-card-rate-limit.test.ts packages/api/src/routes/gift-cards.ts && git commit -m "test(api): prove the gift card code limiter throttles"'
+    status: pending
+current_step: 1

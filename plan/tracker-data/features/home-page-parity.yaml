@@ -27,6 +27,8 @@ tickets:
     "546": Seed catalogue artwork carries a MESON ART watermark baked into the pixels
     "547": Review toast covers page content on every screen and has no counterpart on the reference
     "564": Best Sellers band is missing the category pill row the reference carries on both viewports
+    "571": /create's mobile action bar must stack above the tab bar, not paint over it
+    "572": "Document: Mobile tab bar active state design choice"
   in_progress:
     "540": Section rhythm, type scale and button system pass across the whole page
     "542": Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
@@ -41,6 +43,6 @@ tickets:
     "536": Featured Artists band — structure built, real data or graceful omission
     "538": Brand Story band — olive panel with copy, Read More pill and media
     "539": Trust icons row above the footer
-total_tickets: 20
-completion_percentage: 50
+total_tickets: 22
+completion_percentage: 45
 is_completed: false
