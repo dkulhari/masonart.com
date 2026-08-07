@@ -18,6 +18,7 @@ import { auth } from "./auth";
 import { productsApp } from "./routes/products";
 import { collectionsApp } from "./routes/collections";
 import { adminCollectionsApp } from "./routes/admin/collections";
+import { adminFramesApp } from "./routes/admin/frames";
 import { promotionsApp } from "./routes/promotions";
 import { cartApp } from "./routes/cart";
 import { ordersApp } from "./routes/orders";
@@ -207,6 +208,9 @@ app.route("/api/admin/products", adminProductsApp);
 
 // Admin Collections API - curated collection CRUD
 app.route("/api/admin/collections", adminCollectionsApp);
+
+// Admin Frames API - frame catalogue and pricing CRUD
+app.route("/api/admin/frames", adminFramesApp);
 
 // Admin Orders API - order management
 app.route("/api/admin/orders", adminOrdersApp);
