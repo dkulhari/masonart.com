@@ -259,7 +259,7 @@ test.describe('the home Customer Reviews strip', () => {
     const strip = page.getByTestId('home-reviews')
     await expect(strip).toBeVisible()
     await expect(
-      strip.getByRole('heading', { name: 'What Customers Say' })
+      strip.getByRole('heading', { name: 'Customer Reviews' })
     ).toBeVisible()
 
     // A score printed at all means the strip's own >= 10 gate is open. This is
