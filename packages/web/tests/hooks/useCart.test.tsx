@@ -2,8 +2,8 @@
  * Tests for useCart Query Hooks
  *
  * `useServerCart` is the one server read left (#511) — every write goes
- * through `useCartActions` now, so this file only covers the read hook, the
- * query-key factory, and the cache helpers around it.
+ * through `useCartActions` now, so this file only covers the read hook and
+ * the query-key factory.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -24,15 +24,7 @@ vi.mock('~/lib/api', () => ({
 }));
 
 // Import after mock
-import {
-  useServerCart,
-  useServerCartItemCount,
-  useServerCartSubtotal,
-  cartKeys,
-  invalidateCart,
-  setCartData,
-  getCachedCart,
-} from '~/hooks/useCart';
+import { useServerCart, cartKeys } from '~/hooks/useCart';
 import { cartApi } from '~/lib/api';
 import type { ServerCartPayload } from '~/lib/cart-projection';
 
@@ -73,6 +65,13 @@ const mockCartItem: ServerCartPayload['items'][number] = {
   unitPrice: '1500.00',
   framePrice: '0',
   lineTotal: '3000.00',
+  pricing: {
+    base: '3000.00',
+    sale: null,
+    locked: false,
+    headline: null,
+    percentOff: null,
+  },
   customizations: null,
   isAiGenerated: false,
   aiDetails: null,
@@ -95,11 +94,17 @@ const mockCartItem: ServerCartPayload['items'][number] = {
 
 const mockCart: ServerCartPayload = {
   id: 'cart-1',
+  userId: null,
   itemCount: 2,
   subtotal: '3000.00',
+  couponCode: null,
+  couponDiscount: '0.00',
+  currency: 'INR',
   items: [mockCartItem],
   savedForLater: [],
   savingTotal: '0.00',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('useCart Hooks - Query Keys', () => {
@@ -109,10 +114,6 @@ describe('useCart Hooks - Query Keys', () => {
 
   it('should generate correct detail key', () => {
     expect(cartKeys.detail()).toEqual(['cart', 'detail']);
-  });
-
-  it('should generate correct items key', () => {
-    expect(cartKeys.items()).toEqual(['cart', 'items']);
   });
 });
 
@@ -278,124 +279,3 @@ describe('useServerCart Hook', () => {
   });
 });
 
-describe('Utility Hooks', () => {
-  let queryClient: QueryClient;
-
-  beforeEach(() => {
-    queryClient = createQueryClient();
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
-  describe('useServerCartItemCount', () => {
-    it('should return item count from cart', async () => {
-      (cartApi.get as any).mockResolvedValueOnce(mockCart);
-
-      const { result } = renderHook(() => useServerCartItemCount(), {
-        wrapper: createWrapper(queryClient),
-      });
-
-      await waitFor(() => {
-        expect(result.current).toBe(2);
-      });
-    });
-
-    it('should return 0 when cart is not loaded', () => {
-      const { result } = renderHook(
-        () =>
-          useServerCartItemCount(),
-        {
-          wrapper: createWrapper(queryClient),
-        }
-      );
-
-      // Before cart is loaded
-      expect(result.current).toBe(0);
-    });
-  });
-
-  describe('useServerCartSubtotal', () => {
-    it('should return subtotal from cart', async () => {
-      (cartApi.get as any).mockResolvedValueOnce(mockCart);
-
-      const { result } = renderHook(() => useServerCartSubtotal(), {
-        wrapper: createWrapper(queryClient),
-      });
-
-      await waitFor(() => {
-        expect(result.current).toBe('3000.00');
-      });
-    });
-
-    it('should return "0" when cart is not loaded', () => {
-      const { result } = renderHook(
-        () =>
-          useServerCartSubtotal(),
-        {
-          wrapper: createWrapper(queryClient),
-        }
-      );
-
-      expect(result.current).toBe('0');
-    });
-  });
-});
-
-describe('Cache Helper Functions', () => {
-  let queryClient: QueryClient;
-
-  beforeEach(() => {
-    queryClient = createQueryClient();
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
-  describe('invalidateCart', () => {
-    it('should invalidate all cart caches', async () => {
-      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-
-      await invalidateCart(queryClient);
-
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: cartKeys.all });
-    });
-  });
-
-  describe('setCartData', () => {
-    it('should set cart data directly', () => {
-      setCartData(queryClient, mockCart);
-
-      const cachedData = queryClient.getQueryData<ServerCartPayload>(cartKeys.detail());
-      expect(cachedData).toEqual(mockCart);
-    });
-
-    it('should overwrite existing cart data', () => {
-      const initialCart = { ...mockCart, itemCount: 5 };
-      queryClient.setQueryData(cartKeys.detail(), initialCart);
-
-      setCartData(queryClient, mockCart);
-
-      const cachedData = queryClient.getQueryData<ServerCartPayload>(cartKeys.detail());
-      expect(cachedData?.itemCount).toBe(2);
-    });
-  });
-
-  describe('getCachedCart', () => {
-    it('should return cached cart data', () => {
-      queryClient.setQueryData(cartKeys.detail(), mockCart);
-
-      const cachedData = getCachedCart(queryClient);
-      expect(cachedData).toEqual(mockCart);
-    });
-
-    it('should return undefined when no cache', () => {
-      const cachedData = getCachedCart(queryClient);
-      expect(cachedData).toBeUndefined();
-    });
-  });
-});

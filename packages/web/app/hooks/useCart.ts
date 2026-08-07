@@ -11,11 +11,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import {
-  useQuery,
-  useQueryClient,
-  type UseQueryOptions,
-} from "@tanstack/react-query";
+import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
 import { cartApi } from "~/lib/api";
 import type { ServerCartPayload } from "~/lib/cart-projection";
 
@@ -29,7 +25,6 @@ import type { ServerCartPayload } from "~/lib/cart-projection";
 export const cartKeys = {
   all: ["cart"] as const,
   detail: () => [...cartKeys.all, "detail"] as const,
-  items: () => [...cartKeys.all, "items"] as const,
 };
 
 // ============================================================================
@@ -62,54 +57,4 @@ export function useServerCart(
     retry: 1, // Don't retry too many times for cart
     ...options,
   });
-}
-
-// ============================================================================
-// Cache Invalidation Helpers
-// ============================================================================
-
-/**
- * Invalidate all cart caches
- */
-export function invalidateCart(queryClient: ReturnType<typeof useQueryClient>) {
-  return queryClient.invalidateQueries({ queryKey: cartKeys.all });
-}
-
-/**
- * Set cart data directly (useful for SSR hydration)
- */
-export function setCartData(
-  queryClient: ReturnType<typeof useQueryClient>,
-  cart: ServerCartPayload
-) {
-  queryClient.setQueryData(cartKeys.detail(), cart);
-}
-
-/**
- * Get cached cart data
- */
-export function getCachedCart(
-  queryClient: ReturnType<typeof useQueryClient>
-): ServerCartPayload | undefined {
-  return queryClient.getQueryData(cartKeys.detail());
-}
-
-// ============================================================================
-// Utility Hooks
-// ============================================================================
-
-/**
- * Hook to get server cart item count
- */
-export function useServerCartItemCount() {
-  const { data: cart } = useServerCart();
-  return cart?.itemCount ?? 0;
-}
-
-/**
- * Hook to get server cart subtotal
- */
-export function useServerCartSubtotal() {
-  const { data: cart } = useServerCart();
-  return cart?.subtotal ?? "0";
 }
