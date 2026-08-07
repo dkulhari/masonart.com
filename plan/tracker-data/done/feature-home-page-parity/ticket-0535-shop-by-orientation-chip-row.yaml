@@ -13,7 +13,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T11:51:47.137Z'
-last_updated: '2026-08-07T08:07:07.985Z'
+last_updated: '2026-08-07T11:40:57.829Z'
 time_spent_minutes: 0
 labels:
   - home-page-parity
@@ -84,6 +84,16 @@ comments:
       The residual 8.4px on desktop is line-height, not spacing: their section sets its own heading at 42px/1.2 (a 50.4px block) where our headings carry the global `line-height: 1` from globals.css. Changing that is a global heading rule affecting every page, so it is left alone rather than special-cased in this one band. Flagging it here rather than fixing it.
 
       Three tests added to tests/components/home/ShopByOrientationSection.test.tsx, with the measurements named.
+  - author: mcp-client
+    timestamp: '2026-08-07T11:40:57.829Z'
+    text: |-
+      LABEL SLIP FIXED — 3accbe8a.
+
+      ORIENTATION_OPTIONS carried "Set of 2-3". Their label uses a slash — "Set of 2/3" — and SRS §1.3 agrees with the storefront. The hyphen was a transcription slip when this chip row was built.
+
+      packages/shared/src/constants/facets.ts. The option VALUE is untouched (still set-of-2-3), so nothing that filters or links by it moves; only the printed label changes.
+
+      Verified: packages/shared tests/constants 419/419, and the two web suites that assert on the label — ShopByOrientationSection.test.tsx and DiscoverChips.test.tsx — 28/28.
 work_sessions: []
 related_tickets: []
 blocked_by: []

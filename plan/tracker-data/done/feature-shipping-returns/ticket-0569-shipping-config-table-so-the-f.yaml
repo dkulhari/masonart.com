@@ -31,7 +31,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-07T06:57:02.201Z'
-last_updated: '2026-08-07T07:13:20.227Z'
+last_updated: '2026-08-07T11:40:41.915Z'
 time_spent_minutes: 0
 labels:
   - database
@@ -82,6 +82,18 @@ comments:
   - author: system
     timestamp: '2026-08-07T07:13:20.227Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:40:41.915Z'
+    text: |-
+      FOLLOW-THROUGH COMMITTED — 5919adbc.
+
+      This ticket moved the free-shipping number out of the bundle into a config table, and #570 gave it an admin screen, but neither gave the storefront a way to READ it. The ten surfaces printing "Free shipping on orders over ₹999" were still rendering whatever the bundle was built with, so an admin could change the threshold and the copy would not move.
+
+      Added GET /api/shipping/config (packages/api/src/routes/shipping.ts). Unauthenticated and tiny on purpose: it is public copy, it is read on every page load, and getFreeShippingThreshold already resolves from Redis and never throws — a failed read returns the same constant the storefront would have bundled, so the copy and the charge still agree rather than diverging under failure.
+
+      packages/web/app/router.tsx calls it once per document in the root route, before first paint, and hands the value down through the router context. One fetch per document rather than ten surfaces each fetching their own.
+
+      Verified: packages/api tests/routes/shipping.test.ts + shipping-estimate-threshold.test.ts, 44/44 passing.
 work_sessions: []
 related_tickets: []
 blocked_by: []

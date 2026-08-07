@@ -1,12 +1,19 @@
 status: in-progress
-last_updated: '2026-08-07T11:34:21.653Z'
-total_tickets: 1
+last_updated: '2026-08-07T11:52:32.788Z'
+total_tickets: 2
 summary:
   critical: 0
   high: 0
-  medium: 0
+  medium: 1
   low: 1
 priorities:
+  medium:
+    - feature: home-page-parity
+      tickets:
+        - ticket_number: 594
+          title: Card art framing — measure artBox server-side and re-frame each piece on equal ink area
+          assignee: unassigned
+          blocked_by: []
   low:
     - feature: admin-frame-management
       tickets:

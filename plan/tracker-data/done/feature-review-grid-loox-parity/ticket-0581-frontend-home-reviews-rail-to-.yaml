@@ -50,7 +50,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-07T07:46:23.863Z'
-last_updated: '2026-08-07T11:34:20.409Z'
+last_updated: '2026-08-07T11:41:09.925Z'
 time_spent_minutes: 0
 labels:
   - frontend
@@ -129,6 +129,16 @@ comments:
   - author: system
     timestamp: '2026-08-07T11:34:20.409Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:41:09.925Z'
+    text: |-
+      LOOSE END from this ticket, committed separately as f7e12b7b.
+
+      The earlier pass added a `starClassName` prop to the shared StarRating (packages/web/app/components/reviews/StarRating.tsx) so the band could draw its stars in Loox's #ff8d00 rather than the page's amber. The rebuild in a2c3dcf1 stopped using it: StarRating renders an EMPTY star in the page's cool neutral, and a blue-grey star on an otherwise entirely warm band was the tell a blind critic led with, so the band now draws the widget's own star path locally with a hollow same-hue empty state.
+
+      That leaves `starClassName` with no caller anywhere in the app. Committed rather than reverted — it is a reasonable thing for a shared rating component to expose, and the default is unchanged so nothing else moves — but it is dead surface today. Delete it if nothing picks it up.
+
+      Verified: packages/web tests/components/reviews/StarRating.test.tsx 27/27.
 work_sessions: []
 related_tickets: []
 blocked_by: []

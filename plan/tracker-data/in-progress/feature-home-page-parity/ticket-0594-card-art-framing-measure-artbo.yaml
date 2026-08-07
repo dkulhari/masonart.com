@@ -1,0 +1,95 @@
+ticket_number: 594
+title: Card art framing — measure artBox server-side and re-frame each piece on equal ink area
+description: |-
+  ## Why this ticket exists
+
+  Filed retroactively to carry work that was already written but had no ticket. The code was committed as work-in-progress; it is NOT finished, and the acceptance criteria below are not met yet. See "State at filing".
+
+  ## The problem
+
+  Every stored product image is a 1500x1500 master with the mat BAKED INTO THE PIXELS: `matToSquare` contains the artwork at MAT_ART_INSET (88%) of its LONGEST side and fills the rest with MAT_COLOR. That rule normalises the long side and nothing else, so what a card actually draws varies enormously — and the stored asset reports `1500x1500` for a 2:1 panorama and a perfect square alike, so the card cannot tell them apart and draws the same plate for both.
+
+  Two consequences. The row reads as one big picture beside three small ones, and the card's own plate colour is invisible, because the baked mat is #FAFAFA — 2% against white.
+
+  ## The approach
+
+  `ProductImage.artBox` is the missing measurement: where the artwork actually sits inside its square master, normalised 0..1. The storefront cannot take it, so the API does, by scanning inward for bare wall (light, flat, holding no edge — judged on the 2nd and 98th percentiles so a single JPEG speck cannot keep a blank line alive).
+
+  Given artBox, `packages/web/app/components/product/artFraming.ts` returns the two CSS properties that re-frame the piece: `clip-path` crops the baked mat away so the card's plate is the only background, and `transform` scales and centres what is left onto the target rect.
+
+  The rule is EQUAL INK AREA, CAPPED BY THE PLATE'S CORNER RADIUS. It is the third rule tried; the two before it lost blind A/Bs against the reference:
+
+  - equal AREA, uncapped — every card carries the same ink, but the long sides spread 1.39x, so the row still arrives at four sizes
+  - one shared BOX — every long side identical, but coverage spreads 1.93x; a 1.02:1 piece fills 79% of its plate while a 1.98:1 piece fills 41%
+
+  Neither is wrong in isolation. With the plate square and the art centred, coverage = L^2 * r, so holding coverage constant forces L proportional to r^-0.5 and holding L constant forces coverage proportional to r. You cannot have both unless every piece has the same r. The reference's Best Seller stock runs r 0.75..0.98; ours runs 0.48..0.98 over 41 products, with 39% of the catalogue at 2:1.
+
+  So the constants are read off the bar, not argued from principle. Both measured reference bands are recorded in artFraming.ts's header with the capture method and the thresholds the figures were re-run at.
+
+  ## State at filing
+
+  Written and committed WIP. Tests pass — 20 in artFraming.test.ts, 25 across image-processing-art-box.test.ts and collection-imagery.test.ts, plus ProductCardMedia, ProductCard.tokens and ChooseOptions, 139 in total — and nothing else in the suite regressed.
+
+  What is NOT done:
+
+  1. **The backfill has not been run.** `bun run backfill:art-box` (packages/api/src/database/backfill-art-box.ts) measures and stores artBox for existing rows. Until it runs against a database, every card falls back to the old framing and none of this is visible. This is the reason the feature is half-applied on disk.
+  2. **It has not won a blind A/B.** The band this serves has lost three consecutive blind comparisons against the reference.
+  3. **#564 says framing is not the remaining gap.** The round-4 cropper found that the reference's Best Seller band carries a category pill row on both viewports and ours carries none — a whole row of content that no amount of artwork framing will close. Sequence #564 before spending further rounds here.
+
+  ## Acceptance
+
+  - `backfill:art-box` has been run and every catalogue image carries an artBox
+  - a card's plate colour is visible, because the baked mat is clipped rather than drawn
+  - coverage across a mixed row sits inside the spread measured off the reference rather than ours
+  - a blind A/B of the Best Sellers band against the reference no longer identifies which is which on framing grounds
+
+  ## Context
+
+  - Serves #530 (Best Sellers rail) and #534 (New In carousel), both done — this is follow-through on their blind-comparison loop, not new scope.
+  - Blocked in practice by #564 (missing category pill row), which is the stronger tell.
+  - Builds on #365 (matToSquare) and #418 (strip the border a source arrives with, so cards show one mat).
+feature: home-page-parity
+type: task
+priority: medium
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T11:52:23.402Z'
+last_updated: '2026-08-07T11:53:08.426Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - backend
+  - ui
+  - wip
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T11:52:32.343Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:53:08.426Z'
+    text: |-
+      WIP COMMITTED — 837a827c. 21 files, 1733 insertions.
+
+      Committed unfinished, deliberately: the work existed only on one machine's working tree with no ticket behind it, and on a box where several sessions share a checkout that is one `git restore` away from gone.
+
+      What landed:
+      - packages/shared/src/types/product.ts — ProductImage.artBox
+      - packages/api/src/lib/image-processing.ts — measureArtBox, the wall scan, and the thresholds it judges on
+      - packages/api/src/database/backfill-art-box.ts + `bun run backfill:art-box` in api/package.json
+      - packages/api/src/lib/collection-imagery.ts, product-media.ts, seed.ts — carry artBox through
+      - packages/web/app/components/product/artFraming.ts — clip-path + transform from an artBox
+      - ProductCard, ProductCardMedia, ProductCardSkeleton, ProductRating, WishlistButton, ChooseOptions, productCardTokens — consume it
+      - tests: artFraming.test.ts (20), image-processing-art-box.test.ts, collection-imagery.test.ts (25 together), ProductCardMedia, ProductCard.tokens, ChooseOptions — 139 passing, nothing else in the suite regressed
+
+      Still open, in the order they should be taken:
+      1. #564 first. The reference's Best Seller band carries a category pill row on both viewports and ours carries none. That is a whole row of content, and the round-4 cropper flags it as identifying which crop is which independently of framing. Spending another framing round before it is wasted.
+      2. Run `bun run backfill:art-box`. Until it has, every existing row has no artBox and every card falls back to the old framing, so none of this is visible. This is the half-applied part.
+      3. Then re-run the blind A/B. The band has lost three consecutive comparisons; this rule is the third attempted and has not yet been tested against the bar.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-07T11:52:32.343Z'

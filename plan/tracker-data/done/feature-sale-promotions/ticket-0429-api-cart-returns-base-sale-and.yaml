@@ -19,7 +19,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-05T08:03:30.523Z'
-last_updated: '2026-08-06T05:50:15.843Z'
+last_updated: '2026-08-07T11:40:46.351Z'
 time_spent_minutes: 5
 labels:
   - backend
@@ -69,6 +69,18 @@ comments:
   - author: system
     timestamp: '2026-08-06T05:50:13.634Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:40:46.351Z'
+    text: |-
+      CLIENT SIDE COMMITTED — c55cf76e.
+
+      This ticket made GET /api/cart return base, sale and locked per line. The client projection in packages/web/app/lib/cart-projection.ts still described the old shape, so those fields arrived over the wire and were dropped on the floor.
+
+      Added CartLinePricing { base, sale, locked, headline, percentOff } and hung it off ServerCartLine, plus the cart-level fields the same endpoint returns: userId, couponCode, couponDiscount, currency, createdAt, updatedAt.
+
+      The semantics are documented in the file so the next reader does not have to infer them: base is the stored line total, the figure the cart was written with; sale is re-resolved on every read, so a cart left sitting across the end of a promotion comes back with sale: null by itself; locked means the price exists but the viewer is not in the gallery yet, so the server charges base and the cart-level savingTotal says 0.00, because that is the truth about the money. The teaser is still shown — that is what the gate is.
+
+      Verified: packages/web tests/lib/cart-projection.test.ts, 7/7 passing.
 work_sessions:
   - start: '2026-08-06T05:45:35.725Z'
     agent: claude-code
