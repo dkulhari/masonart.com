@@ -1,7 +1,7 @@
 name: shipping-returns
 title: Shipping & Returns
 priority: high
-created: "2026-01-28T00:10:00.000Z"
+created: '2026-01-28T00:10:00.000Z'
 assignee: unassigned
 tags:
   - fulfillment
@@ -23,25 +23,29 @@ objectives:
   - Admin returns management
   - Full test coverage (unit + E2E)
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 1
+  total_duration: '00:16:00'
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:16:00'
+      tokens: 0
 tickets:
-  todo:
-    "570": Admin UI for the free-shipping threshold, with the storefront copy reading the live value
-  in_progress:
-    "569": Shipping config table so the free-shipping threshold is set in admin, not at build time
+  todo: {}
+  in_progress: {}
   done:
-    "36": Database Schema - Shipping and Returns Tables
-    "37": API Routes - Shipping Options Endpoints
-    "38": API Routes - Order Shipments & Tracking
-    "39": API Routes - Return Requests
-    "40": Frontend - Checkout Shipping Selection
-    "41": Frontend - Order Tracking Display
-    "42": Frontend - Return Request Flow
-    "43": Admin Panel - Returns Management Dashboard
-    "44": Tests - Unit and E2E Test Suite
+    '36': Database Schema - Shipping and Returns Tables
+    '37': API Routes - Shipping Options Endpoints
+    '38': API Routes - Order Shipments & Tracking
+    '39': API Routes - Return Requests
+    '40': Frontend - Checkout Shipping Selection
+    '41': Frontend - Order Tracking Display
+    '42': Frontend - Return Request Flow
+    '43': Admin Panel - Returns Management Dashboard
+    '44': Tests - Unit and E2E Test Suite
+    '569': Shipping config table so the free-shipping threshold is set in admin, not at build time
+    '570': Admin UI for the free-shipping threshold, with the storefront copy reading the live value
 total_tickets: 11
-completion_percentage: 82
-is_completed: false
+completion_percentage: 100
+is_completed: true

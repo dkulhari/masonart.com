@@ -1,0 +1,317 @@
+ticket_number: 583
+title: Shared - frame input schemas and price bounds
+description: |-
+  ## Task
+
+  Add the Zod contracts the admin frame routes and the admin form both validate against, so the two cannot disagree about what a frame may hold.
+
+  `createFrameInputSchema`, `updateFrameInputSchema = createFrameInputSchema.partial()`, and `frameCategorySchema`.
+
+  Price bounds:
+  - `priceModifier` in [1.00, 5.00]
+  - `priceAddition` in [0, 99999.99] — fits decimal(10,2)
+
+  The modifier floor is 1.00 rather than 0 because `frameAddition` (shared/constants/frames.ts:570) already clamps a below-one modifier to zero markup: `Math.max(0, toAmount(frame.priceModifier, 1) - 1)`. Accepting 0.5 would store a number the pricing formula silently ignores, so the form rejects it instead. That coupling is the point — assert it, don't just document it.
+
+  `type` is validated `^[a-z0-9-]+$` to match the unique text column from ticket 1.
+
+  ## Context
+
+  Feature: admin-frame-management. Phase 2 (shared contracts). Blocked by the schema ticket.
+
+  Files:
+  - packages/shared/src/schemas/product.ts — where the other product schemas live
+  - packages/shared/src/constants/frames.ts:570 — frameAddition, the clamp this couples to
+
+  NOTE: packages/shared runs `bun test`, not vitest — see packages/shared/package.json.
+
+  Do NOT touch `frameTypeSchema` at schemas/product.ts:548. It is a Zod enum over a disjoint hyphenated vocabulary ('poster-only', 'black-frame'), its own test asserts it rejects the DB's values, and its only consumers (cartItemSchema/orderItemSchema in schemas/checkout.ts:153,300) have zero consumers themselves. Dead, and filed for a separate cleanup ticket.
+feature: admin-frame-management
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T10:27:53.914Z'
+last_updated: '2026-08-07T10:48:41.991Z'
+time_spent_minutes: 2
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T10:46:56.593Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T10:48:29.780Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T10:48:37.442Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `50d0977f` — feat(shared): frame input schemas, with the modifier floor the formula implies
+
+      **Files Changed**:
+      - `packages/shared/src/schemas/product.ts` — new `frameCategorySchema`, `createFrameInputSchema`, `updateFrameInputSchema`, a private `decimalString(min, max)` helper, and three inferred type exports
+      - `packages/shared/tests/schemas/frame-input.test.ts` — new, 12 tests
+
+      **Summary**:
+      Money fields are kept as decimal STRINGS rather than coerced to numbers, so the value reaching the table is the value the admin typed, to the paisa. `decimalString` caps precision at two places with a regex because the columns do — added a test for `10.005` beyond the ticket's list, since a third decimal place would otherwise be silently rounded by Postgres.
+
+      The modifier floor of 1.00 is asserted against `frameAddition`'s clamp in the same test rather than restated as a bare number, so the bound and the formula cannot drift into a state where a value validates and then does nothing.
+
+      Left `frameTypeSchema` (same file, ~line 88) untouched as the ticket instructed. Added a comment on `frameCategorySchema` noting it is deliberately not that schema, since they now sit in the same file and a reader could reasonably assume one supersedes the other.
+
+      **Verification**:
+      - Command: `bun test tests/schemas/frame-input.test.ts`
+      - Result: PASS (12 tests, 12 passing)
+      - Command: `bun run build && bun test` (full shared suite)
+      - Result: PASS (957 passing, 0 failing, 17 files) — baseline before this ticket was 945 passing / 0 failing, so +12 and no regressions
+      - Build: `tsc` clean
+work_sessions:
+  - start: '2026-08-07T10:47:05.357Z'
+    agent: claude-code
+    summary: Frame input schemas landed with bounds asserted against frameAddition's clamp. 12 tests, shared suite 957 pass, commit 50d0977f.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T10:48:41.989Z'
+    duration: '00:01:36'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test for the frame input schemas and their coupling to frameAddition's clamp
+    file: packages/shared/tests/schemas/frame-input.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      /**
+       * What an admin may store on a frame.
+       *
+       * The bounds are not arbitrary. `frameAddition` clamps a modifier below 1.00
+       * to zero markup, so a form that accepted 0.5 would store a number the pricing
+       * formula silently ignores — the admin would set a discount and get no change.
+       * The floor is asserted against the clamp rather than hardcoded twice.
+       */
+
+      import { describe, it, expect } from 'bun:test'
+      import {
+        createFrameInputSchema,
+        updateFrameInputSchema,
+        frameCategorySchema,
+      } from '../../src/schemas/product'
+      import { frameAddition } from '../../src/constants/frames'
+
+      const valid = {
+        name: 'Stretch + Maple Frame',
+        type: 'stretch-maple',
+        category: 'framed' as const,
+        priceModifier: '1.40',
+        priceAddition: '0.00',
+        isActive: true,
+        sortOrder: 7,
+      }
+
+      describe('createFrameInputSchema', () => {
+        it('accepts a well-formed frame', () => {
+          expect(createFrameInputSchema.safeParse(valid).success).toBe(true)
+        })
+
+        it('requires a slug type, not a display name', () => {
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, type: 'Stretch Maple' })
+              .success
+          ).toBe(false)
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, type: 'stretch-maple' })
+              .success
+          ).toBe(true)
+        })
+
+        it('rejects a category outside the three rungs', () => {
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, category: 'floating' })
+              .success
+          ).toBe(false)
+        })
+      })
+
+      describe('price bounds', () => {
+        it('rejects a modifier the pricing formula would silently ignore', () => {
+          // frameAddition clamps below 1.00 to no markup at all.
+          expect(frameAddition(2000, { priceModifier: '0.5', priceAddition: '0' })).toBe(0)
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, priceModifier: '0.5' })
+              .success
+          ).toBe(false)
+        })
+
+        it('accepts the no-markup floor', () => {
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, priceModifier: '1.00' })
+              .success
+          ).toBe(true)
+        })
+
+        it('rejects an implausible multiplier', () => {
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, priceModifier: '9.00' })
+              .success
+          ).toBe(false)
+        })
+
+        it('accepts a flat addition and rejects a negative one', () => {
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, priceAddition: '250.00' })
+              .success
+          ).toBe(true)
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, priceAddition: '-1.00' })
+              .success
+          ).toBe(false)
+        })
+
+        it('rejects an addition wider than decimal(10,2)', () => {
+          expect(
+            createFrameInputSchema.safeParse({ ...valid, priceAddition: '100000.00' })
+              .success
+          ).toBe(false)
+        })
+      })
+
+      describe('updateFrameInputSchema', () => {
+        it('is the create schema, partial — a price edit need not resend the name', () => {
+          expect(updateFrameInputSchema.safeParse({ priceModifier: '1.60' }).success).toBe(
+            true
+          )
+        })
+
+        it('still enforces the bounds on the fields it is given', () => {
+          expect(updateFrameInputSchema.safeParse({ priceModifier: '0.5' }).success).toBe(
+            false
+          )
+        })
+      })
+
+      describe('frameCategorySchema', () => {
+        it('is the three rungs and nothing else', () => {
+          expect(frameCategorySchema.options).toEqual(['rolled', 'frameless', 'framed'])
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — the schemas do not exist yet
+    command: cd packages/shared && bun test tests/schemas/frame-input.test.ts
+    expected_result: FAIL - no export named 'createFrameInputSchema'
+    status: done
+  - id: 3
+    action: implement
+    description: Add the frame category and input schemas with their bounds
+    file: packages/shared/src/schemas/product.ts
+    status: done
+    code: |-
+      /**
+       * Which rung of the format axis a frame sits on. Mirrors the `frame_category`
+       * pg enum; the storefront groups its frame panel on it.
+       */
+      export const frameCategorySchema = z.enum(['rolled', 'frameless', 'framed']);
+
+      /**
+       * A decimal-string money field, the shape the `frames` columns actually hold.
+       * Kept as a string rather than coerced to a number so the value that reaches
+       * the table is the value the admin typed, to the paisa.
+       */
+      const decimalString = (min: number, max: number) =>
+        z
+          .string()
+          .regex(/^\d+(\.\d{1,2})?$/, 'Expected a number with at most 2 decimal places')
+          .refine((v) => {
+            const n = parseFloat(v);
+            return n >= min && n <= max;
+          }, `Must be between ${min} and ${max}`);
+
+      export const createFrameInputSchema = z.object({
+        name: z.string().min(1).max(120),
+        /** Slug, matching the unique text column. Not a display name. */
+        type: z.string().regex(/^[a-z0-9-]+$/, 'Lowercase letters, digits and hyphens only'),
+        category: frameCategorySchema,
+        description: z.string().max(500).optional(),
+        material: z.string().max(120).optional(),
+        thickness: decimalString(0, 99.99).optional(),
+        color: z.string().max(60).optional(),
+        /**
+         * Floor is 1.00, not 0, because `frameAddition` clamps a below-one modifier
+         * to no markup at all. Accepting 0.5 would store a discount the pricing
+         * formula silently ignores, so it is rejected at the form instead.
+         */
+        priceModifier: decimalString(1, 5),
+        /** Ceiling fits decimal(10,2). */
+        priceAddition: decimalString(0, 99999.99),
+        imageUrl: z.string().max(500).optional(),
+        thumbnailUrl: z.string().max(500).optional(),
+        isActive: z.boolean().default(true),
+        sortOrder: z.number().int().min(0).default(0),
+      });
+
+      export const updateFrameInputSchema = createFrameInputSchema.partial();
+
+      export type CreateFrameInput = z.infer<typeof createFrameInputSchema>;
+      export type UpdateFrameInput = z.infer<typeof updateFrameInputSchema>;
+      export type FrameCategorySchema = z.infer<typeof frameCategorySchema>;
+  - id: 4
+    action: verify-pass
+    description: Confirm the schema test passes
+    command: cd packages/shared && bun test tests/schemas/frame-input.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Rebuild shared and confirm its full suite still passes — consumers import the built output
+    command: cd packages/shared && bun run build && bun test
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: git add packages/shared && git commit
+    status: done
+    code: |-
+      feat(shared): frame input schemas, with the modifier floor the formula implies
+
+      The admin routes and the admin form both need to agree on what a frame may
+      hold, so the contract lives in one place rather than in each of them.
+
+      The modifier floor is 1.00 rather than 0 because frameAddition already clamps
+      anything below one to no markup. A form that accepted 0.5 would store a
+      discount the pricing formula silently discards, and the admin would watch the
+      price not move. The test asserts the clamp and the bound together, so the two
+      cannot drift apart into a number that validates and does nothing.
+current_step: 6
+started: '2026-08-07T10:46:56.593Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:02:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:02:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bun test (packages/shared, full suite)
+  test_output: '957 pass, 0 fail, 17 files. New frame-input.test.ts: 12 pass. Baseline before this ticket was 945 pass / 0 fail.'
+  build_passed: true
+  build_command: bun run build (tsc)
+  verified_at: '2026-08-07T10:48:27.121Z'
+completed: '2026-08-07T10:48:29.780Z'

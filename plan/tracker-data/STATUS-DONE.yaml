@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-08-07T07:06:27.889Z'
-total_tickets: 517
+last_updated: '2026-08-07T11:34:21.820Z'
+total_tickets: 538
 summary:
   critical: 29
-  high: 197
-  medium: 222
-  low: 69
+  high: 204
+  medium: 233
+  low: 72
 priorities:
   critical:
     - feature: qa-testing
@@ -354,6 +354,14 @@ priorities:
             - title: 'Ticket #undefined'
             - title: 'Ticket #undefined'
             - title: 'Ticket #undefined'
+        - ticket_number: 569
+          title: Shipping config table so the free-shipping threshold is set in admin, not at build time
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 570
+          title: Admin UI for the free-shipping threshold, with the storefront copy reading the live value
+          assignee: unassigned
+          blocked_by: []
     - feature: full-ai-generator
       tickets:
         - ticket_number: 45
@@ -1109,6 +1117,28 @@ priorities:
           title: Shop By Orientation chip row
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 540
+          title: Section rhythm, type scale and button system pass across the whole page
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 542
+          title: Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
+          assignee: unassigned
+          blocked_by: []
+    - feature: admin-frame-management
+      tickets:
+        - ticket_number: 582
+          title: Schema - frame type becomes text, new frame_category enum column
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 583
+          title: Shared - frame input schemas and price bounds
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 584
+          title: Shared - lift the image upload guards out of admin/products
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: admin-panel
       tickets:
@@ -1444,6 +1474,10 @@ priorities:
           blocked_by: []
         - ticket_number: 195
           title: 'Bug: flows/checkout.spec.ts delivery options and shipping mock failures'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 566
+          title: PDP frame options drop the flat priceAddition column, unlike the quickview and the server
           assignee: unassigned
           blocked_by: []
     - feature: authentication
@@ -2215,6 +2249,10 @@ priorities:
               title: Frontend - rebuild /reviews on ReviewGrid with the Loox header row
             - ticket_number: 498
               title: Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
+        - ticket_number: 581
+          title: 'Frontend - home reviews rail to Loox parity: mixed media and text slides'
+          assignee: unassigned
+          blocked_by: []
     - feature: wishlist-curation
       tickets:
         - ticket_number: 502
@@ -2267,6 +2305,10 @@ priorities:
           title: Trust icons row above the footer
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 571
+          title: /create's mobile action bar must stack above the tab bar, not paint over it
+          assignee: unassigned
+          blocked_by: []
     - feature: gift-cards
       tickets:
         - ticket_number: 550
@@ -2293,6 +2335,64 @@ priorities:
           blocked_by:
             - ticket_number: 558
               title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+    - feature: admin-frame-management
+      tickets:
+        - ticket_number: 585
+          title: Admin API - frames list, get, create, patch with cache busting
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 582
+              title: Schema - frame type becomes text, new frame_category enum column
+            - ticket_number: 583
+              title: Shared - frame input schemas and price bounds
+        - ticket_number: 586
+          title: Admin API - archive a frame, never hard delete, and never the last one
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 585
+              title: Admin API - frames list, get, create, patch with cache busting
+        - ticket_number: 587
+          title: Admin API - swatch upload through StoragePaths.FRAMES
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 584
+              title: Shared - lift the image upload guards out of admin/products
+            - ticket_number: 585
+              title: Admin API - frames list, get, create, patch with cache busting
+        - ticket_number: 588
+          title: Public API - category joins the frames response
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 582
+              title: Schema - frame type becomes text, new frame_category enum column
+        - ticket_number: 589
+          title: Admin UI - frames list screen and sidebar entry
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 585
+              title: Admin API - frames list, get, create, patch with cache busting
+        - ticket_number: 590
+          title: Admin UI - create and edit form with swatch upload
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 587
+              title: Admin API - swatch upload through StoragePaths.FRAMES
+            - ticket_number: 589
+              title: Admin UI - frames list screen and sidebar entry
+        - ticket_number: 591
+          title: Admin UI - live price preview through the shared frameAddition
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 590
+              title: Admin UI - create and edit form with swatch upload
+        - ticket_number: 592
+          title: Storefront - FrameSelector groups on category instead of guessing
+          assignee: unassigned
+          blocked_by:
+            - ticket_number: 582
+              title: Schema - frame type becomes text, new frame_category enum column
+            - ticket_number: 588
+              title: Public API - category joins the frames response
   low:
     - feature: order-tracking-notifications
       tickets:
@@ -2720,6 +2820,22 @@ priorities:
           blocked_by: []
         - ticket_number: 563
           title: E2E - buy a card, receive it, redeem part, spend the remainder
+          assignee: unassigned
+          blocked_by: []
+    - feature: cart-checkout
+      tickets:
+        - ticket_number: 565
+          title: 'Sign-out error handling diverged: account page swallows signOut() rejections, admin sidebar still logs them'
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 567
+          title: Cleanup left behind by the server-cart write path (#511)
+          assignee: unassigned
+          blocked_by: []
+    - feature: home-page-parity
+      tickets:
+        - ticket_number: 572
+          title: 'Document: Mobile tab bar active state design choice'
           assignee: unassigned
           blocked_by: []
 blocked_tickets:
@@ -3476,6 +3592,62 @@ blocked_tickets:
       - ticket_number: 558
         title: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
     description: 'API - admin gift cards: list, search, issue, disable, adjust, liability'
+  - ticket_number: 585
+    title: Admin API - frames list, get, create, patch with cache busting
+    blocked_by:
+      - ticket_number: 582
+        title: Schema - frame type becomes text, new frame_category enum column
+      - ticket_number: 583
+        title: Shared - frame input schemas and price bounds
+    description: Schema - frame type becomes text, new frame_category enum column, Shared - frame input schemas and price bounds
+  - ticket_number: 586
+    title: Admin API - archive a frame, never hard delete, and never the last one
+    blocked_by:
+      - ticket_number: 585
+        title: Admin API - frames list, get, create, patch with cache busting
+    description: Admin API - frames list, get, create, patch with cache busting
+  - ticket_number: 587
+    title: Admin API - swatch upload through StoragePaths.FRAMES
+    blocked_by:
+      - ticket_number: 584
+        title: Shared - lift the image upload guards out of admin/products
+      - ticket_number: 585
+        title: Admin API - frames list, get, create, patch with cache busting
+    description: Shared - lift the image upload guards out of admin/products, Admin API - frames list, get, create, patch with cache busting
+  - ticket_number: 588
+    title: Public API - category joins the frames response
+    blocked_by:
+      - ticket_number: 582
+        title: Schema - frame type becomes text, new frame_category enum column
+    description: Schema - frame type becomes text, new frame_category enum column
+  - ticket_number: 589
+    title: Admin UI - frames list screen and sidebar entry
+    blocked_by:
+      - ticket_number: 585
+        title: Admin API - frames list, get, create, patch with cache busting
+    description: Admin API - frames list, get, create, patch with cache busting
+  - ticket_number: 590
+    title: Admin UI - create and edit form with swatch upload
+    blocked_by:
+      - ticket_number: 587
+        title: Admin API - swatch upload through StoragePaths.FRAMES
+      - ticket_number: 589
+        title: Admin UI - frames list screen and sidebar entry
+    description: Admin API - swatch upload through StoragePaths.FRAMES, Admin UI - frames list screen and sidebar entry
+  - ticket_number: 591
+    title: Admin UI - live price preview through the shared frameAddition
+    blocked_by:
+      - ticket_number: 590
+        title: Admin UI - create and edit form with swatch upload
+    description: Admin UI - create and edit form with swatch upload
+  - ticket_number: 592
+    title: Storefront - FrameSelector groups on category instead of guessing
+    blocked_by:
+      - ticket_number: 582
+        title: Schema - frame type becomes text, new frame_category enum column
+      - ticket_number: 588
+        title: Public API - category joins the frames response
+    description: Schema - frame type becomes text, new frame_category enum column, Public API - category joins the frames response
   - ticket_number: 232
     title: Implement save-address-on-checkout
     blocked_by:

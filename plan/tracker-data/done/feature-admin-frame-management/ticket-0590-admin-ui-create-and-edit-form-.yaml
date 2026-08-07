@@ -1,0 +1,277 @@
+ticket_number: 590
+title: Admin UI - create and edit form with swatch upload
+description: |-
+  ## Task
+
+  One form component serving both `new.tsx` and `$id.tsx` under app/routes/admin/frames/.
+
+  Fields: name, type slug, category select, description, material, thickness, color, swatch upload, active, sort order, and the two price fields.
+
+  Validation is `createFrameInputSchema` / `updateFrameInputSchema` from @chobii/shared (#583) — the same schemas the API validates with. A second copy of the bounds in the form is how the screen and the endpoint end up disagreeing about what a frame may hold.
+
+  The swatch upload posts to `POST /api/admin/frames/upload-image` and receives BOTH urls back. There is no second image field — one upload fills `imageUrl` and `thumbnailUrl`, because the variant ladder already contains both sizes.
+
+  The type field is a slug, not a display name: show the constraint (`lowercase-with-hyphens`) rather than letting the admin discover it by being rejected. A duplicate type comes back as 409 — surface the message naming the taken slug, don't render a generic failure.
+
+  The price preview is the NEXT ticket. Leave a slot for it.
+
+  ## Context
+
+  Feature: admin-frame-management. Phase 4 (admin UI). Blocked by the list screen ticket and the upload endpoint ticket.
+
+  Files:
+  - packages/web/app/routes/admin/collections/$id.tsx and new.tsx — the form shape to mirror
+  - packages/web/app/routes/admin/shipping.tsx — the #570 precedent for validating against a shared constant rather than a local copy
+
+  Test pattern: packages/web/tests/routes/admin/shipping-config.test.tsx — exports the form and its validators so they can be tested without a router.
+feature: admin-frame-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T10:33:14.942Z'
+last_updated: '2026-08-07T11:13:11.039Z'
+time_spent_minutes: 4
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T11:09:33.307Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T11:12:55.296Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:13:05.364Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `497ffd68` — feat(admin): a form for creating and editing frames
+
+      **Files Changed**:
+      - `packages/web/app/routes/admin/frames/FrameForm.tsx` — new; `FrameForm` and `validateFrame`
+      - `packages/web/app/routes/admin/frames/new.tsx` — new
+      - `packages/web/app/routes/admin/frames/$id.tsx` — new
+      - `packages/web/app/routeTree.gen.ts` — regenerated
+      - `packages/web/tests/routes/admin/frames-form.test.tsx` — new, 12 tests
+
+      **Two decisions beyond the ticket:**
+
+      **1. The edit route loads before it renders.** A form that opened blank and PATCHed what it held would blank every field the admin did not retype — the endpoint writes only supplied keys, but an empty string *is* a supplied key. `$id.tsx` therefore renders "Loading frame…" until the row arrives, then seeds every input from it.
+
+      **2. Blank optional fields are dropped from the payload, not sent as `''`.** `toPayload` omits an untouched Material or Colour rather than posting an empty string the schema would then judge against its format rules. Without this, leaving a box empty would produce a validation error the admin never opted into.
+
+      **#591's slot is a comment, not an import.** The ticket said to leave a slot, so `FramePricePreview` is not imported yet — the preview lands there next and the file stays committable in between.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/frames-form.test.tsx`
+      - Result: PASS (12 tests, 12 passing) — every owned field present; exactly one image input; the slug constraint stated on screen; exactly the three rungs offered; fields seeded when editing; and five validation cases each asserted **against `createFrameInputSchema` itself** rather than against restated numbers, so the form and the API cannot drift
+      - Command: `bunx vitest run tests/routes/admin/ tests/lib/admin-nav.test.ts`
+      - Result: PASS (8 files, 135 tests passing)
+
+      **Build — the #589 debt is cleared.** Web `tsc --noEmit` is back to **34**, exactly the pre-existing baseline I measured by stashing. The 4 errors #589 carried were forward references to `/admin/frames/new` and `/admin/frames/$id`; both routes now exist and the route tree was regenerated. **0 TypeScript errors are attributable to this feature.**
+work_sessions:
+  - start: '2026-08-07T11:09:33.802Z'
+    agent: claude-code
+    summary: 'FrameForm plus new/$id routes, validating via the shared schema. 12 tests, 135 across admin web. tsc back to the 34 baseline, clearing #589''s forward references. Commit 497ffd68.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T11:13:11.038Z'
+    duration: '00:03:37'
+related_tickets: []
+blocked_by:
+  - ticket: 587
+    feature: admin-frame-management
+    description: Admin API - swatch upload through StoragePaths.FRAMES
+  - ticket: 589
+    feature: admin-frame-management
+    description: Admin UI - frames list screen and sidebar entry
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the form's fields, its shared validation, and the 409 surface
+    file: packages/web/tests/routes/admin/frames-form.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |
+      /**
+       * The frame form.
+       *
+       * What is worth pinning here is where the form must NOT have its own opinion:
+       *
+       * 1. **Bounds come from the shared schema.** The API validates with
+       *    createFrameInputSchema; a second copy of the numbers in the form is how
+       *    the screen and the endpoint end up disagreeing about what may be stored.
+       * 2. **One upload fills both image columns.** The variant ladder already has a
+       *    thumbnail and a card size, so a second image field would be a second
+       *    thing to keep in sync for no gain.
+       * 3. **A taken slug is reported as itself.** The API answers 409 naming the
+       *    slug; rendering "something went wrong" throws that away.
+       */
+
+      import { describe, it, expect, afterEach } from 'vitest'
+      import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+      import { createFrameInputSchema } from '@chobii/shared'
+      import { FrameForm, validateFrame } from '~/routes/admin/frames/FrameForm'
+
+      afterEach(cleanup)
+
+      describe('FrameForm fields', () => {
+        it('offers every column an admin owns', () => {
+          render(<FrameForm />)
+          for (const label of [
+            /name/i,
+            /type/i,
+            /category/i,
+            /price modifier/i,
+            /price addition/i,
+            /sort order/i,
+          ]) {
+            expect(screen.getByLabelText(label)).toBeInTheDocument()
+          }
+        })
+
+        it('has ONE image field — one upload fills both columns', () => {
+          render(<FrameForm />)
+          expect(screen.queryByLabelText(/thumbnail/i)).toBeNull()
+          expect(screen.getByLabelText(/swatch|image/i)).toBeInTheDocument()
+        })
+
+        it('states the slug constraint rather than letting the admin discover it', () => {
+          render(<FrameForm />)
+          expect(screen.getByText(/lowercase|hyphen/i)).toBeInTheDocument()
+        })
+
+        it('offers exactly the three rungs', () => {
+          render(<FrameForm />)
+          const select = screen.getByLabelText(/category/i) as HTMLSelectElement
+          const values = Array.from(select.options).map((o) => o.value).filter(Boolean)
+          expect(values).toEqual(['rolled', 'frameless', 'framed'])
+        })
+      })
+
+      describe('validation', () => {
+        it('defers to the shared schema rather than restating the bounds', () => {
+          // Whatever the schema rejects, the form must reject — asserted against the
+          // schema itself, so the two cannot drift.
+          const bad = { priceModifier: '0.5' }
+          expect(createFrameInputSchema.partial().safeParse(bad).success).toBe(false)
+          expect(validateFrame(bad).priceModifier).toBeTruthy()
+        })
+
+        it('accepts the no-markup floor', () => {
+          expect(validateFrame({ priceModifier: '1.00' }).priceModifier).toBeFalsy()
+        })
+
+        it('rejects a display name in the type field', () => {
+          expect(validateFrame({ type: 'Stretch Maple' }).type).toBeTruthy()
+          expect(validateFrame({ type: 'stretch-maple' }).type).toBeFalsy()
+        })
+      })
+
+      describe('a taken slug', () => {
+        it('is reported by name, not as a generic failure', () => {
+          render(<FrameForm submitError="Frame type 'gold' is already taken" />)
+          expect(screen.getByText(/'gold' is already taken/)).toBeInTheDocument()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/routes/admin/frames-form.test.tsx
+    expected_result: FAIL - cannot resolve ~/routes/admin/frames/FrameForm
+    status: done
+  - id: 3
+    action: implement
+    description: Build the shared form component and its validator
+    file: packages/web/app/routes/admin/frames/FrameForm.tsx
+    status: done
+    code: |-
+      // Export both the component and the validator, matching
+      // routes/admin/shipping.tsx — the test renders them without a router.
+      //
+      // validateFrame(input) runs updateFrameInputSchema and maps the ZodError onto
+      // per-field messages. It does NOT restate any bound. The schema is the single
+      // definition of what a frame may hold, and the API validates with the same one.
+      //
+      // The swatch field posts a single multipart file to
+      // POST /api/admin/frames/upload-image and stores BOTH urls off the response.
+      // No second image input: the variant ladder already carries a thumbnail and a
+      // card size, so a second field would be a second thing to keep in sync.
+      //
+      // The type input shows its constraint inline ("lowercase letters, digits and
+      // hyphens") rather than leaving the admin to discover it by rejection.
+      //
+      // `submitError` prop renders the API's message verbatim. A 409 arrives naming
+      // the slug that is taken; collapsing that into "something went wrong" throws
+      // away the only part the admin can act on.
+      //
+      // Leave a slot below the two price inputs for the preview — next ticket.
+  - id: 4
+    action: implement
+    description: Wire the form into the new and edit routes
+    file: packages/web/app/routes/admin/frames/new.tsx
+    status: done
+    code: |-
+      // new.tsx  — createFileRoute, empty FrameForm, POST /api/admin/frames on submit,
+      //            navigate back to the list on 201.
+      // $id.tsx  — createFileRoute, loads the frame, FrameForm seeded with it,
+      //            PATCH /api/admin/frames/:id on submit.
+      //
+      // Both surface the API's error message through the form's submitError prop.
+      // routeTree.gen.ts regenerates on the next dev/build run — do not hand-edit it.
+  - id: 5
+    action: verify-pass
+    description: Confirm the form tests pass and the list screen still does
+    command: cd packages/web && bunx vitest run tests/routes/admin/frames-form.test.tsx tests/routes/admin/frames-list.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: git add packages/web/app/routes/admin/frames packages/web/app/routeTree.gen.ts packages/web/tests/routes/admin/frames-form.test.tsx && git commit
+    status: done
+    code: |-
+      feat(admin): a form for creating and editing frames
+
+      One component behind both the new and edit routes, validating with the same
+      shared schemas the API validates with. A second copy of the bounds in the form
+      is how a screen and an endpoint end up disagreeing about what may be stored, so
+      the test asserts the form's rejections against the schema itself rather than
+      against restated numbers.
+
+      One image field, not two: the upload returns both column values because the
+      variant ladder already carries a thumbnail and a card size.
+
+      A duplicate type arrives as a 409 naming the slug that is taken, and the form
+      renders that message as it stands — it is the only part of the failure the
+      admin can act on.
+current_step: 6
+started: '2026-08-07T11:09:33.307Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:04:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:04:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/admin/ tests/lib/admin-nav.test.ts && bunx tsc --noEmit
+  test_output: '8 files passed, 135 tests passed (frames-form 12 new). Web tsc back to 34 = the measured baseline; #589''s 4 forward-reference errors are cleared.'
+  build_passed: true
+  build_command: bunx tsc --noEmit (34 = baseline, 0 attributable to this feature)
+  verified_at: '2026-08-07T11:12:43.458Z'
+completed: '2026-08-07T11:12:55.296Z'

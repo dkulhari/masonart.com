@@ -1,6 +1,73 @@
 dependencies:
-  last_updated: '2026-08-07T07:06:28.172Z'
+  last_updated: '2026-08-07T11:34:22.247Z'
   features:
+    admin-frame-management:
+      - ticket_number: 585
+        title: Admin API - frames list, get, create, patch with cache busting
+        blocks: []
+        blocked_by:
+          - ticket_number: 582
+            title: Schema - frame type becomes text, new frame_category enum column
+          - ticket_number: 583
+            title: Shared - frame input schemas and price bounds
+      - ticket_number: 586
+        title: Admin API - archive a frame, never hard delete, and never the last one
+        blocks: []
+        blocked_by:
+          - ticket_number: 585
+            title: Admin API - frames list, get, create, patch with cache busting
+      - ticket_number: 587
+        title: Admin API - swatch upload through StoragePaths.FRAMES
+        blocks: []
+        blocked_by:
+          - ticket_number: 584
+            title: Shared - lift the image upload guards out of admin/products
+          - ticket_number: 585
+            title: Admin API - frames list, get, create, patch with cache busting
+      - ticket_number: 588
+        title: Public API - category joins the frames response
+        blocks: []
+        blocked_by:
+          - ticket_number: 582
+            title: Schema - frame type becomes text, new frame_category enum column
+      - ticket_number: 589
+        title: Admin UI - frames list screen and sidebar entry
+        blocks: []
+        blocked_by:
+          - ticket_number: 585
+            title: Admin API - frames list, get, create, patch with cache busting
+      - ticket_number: 590
+        title: Admin UI - create and edit form with swatch upload
+        blocks: []
+        blocked_by:
+          - ticket_number: 587
+            title: Admin API - swatch upload through StoragePaths.FRAMES
+          - ticket_number: 589
+            title: Admin UI - frames list screen and sidebar entry
+      - ticket_number: 591
+        title: Admin UI - live price preview through the shared frameAddition
+        blocks: []
+        blocked_by:
+          - ticket_number: 590
+            title: Admin UI - create and edit form with swatch upload
+      - ticket_number: 592
+        title: Storefront - FrameSelector groups on category instead of guessing
+        blocks: []
+        blocked_by:
+          - ticket_number: 582
+            title: Schema - frame type becomes text, new frame_category enum column
+          - ticket_number: 588
+            title: Public API - category joins the frames response
+      - ticket_number: 593
+        title: E2E - an admin reprices a frame and the storefront charges it
+        blocks: []
+        blocked_by:
+          - ticket_number: 586
+            title: Admin API - archive a frame, never hard delete, and never the last one
+          - ticket_number: 591
+            title: Admin UI - live price preview through the shared frameAddition
+          - ticket_number: 592
+            title: Storefront - FrameSelector groups on category instead of guessing
     chobi-external-services:
       - ticket_number: 315
         title: AI Provider - Confirm generation key (Replicate placeholder vs Google AI Studio)

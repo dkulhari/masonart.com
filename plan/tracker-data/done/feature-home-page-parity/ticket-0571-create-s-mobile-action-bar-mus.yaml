@@ -18,19 +18,59 @@ description: |-
 feature: home-page-parity
 type: bug
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-07T07:00:50.307Z'
-last_updated: '2026-08-07T07:00:50.307Z'
-time_spent_minutes: 0
+last_updated: '2026-08-07T09:36:03.237Z'
+time_spent_minutes: 28
 labels:
   - home-page-parity
   - mobile
   - chrome
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T09:06:55.744Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T09:36:01.638Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T09:36:03.237Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `720cd60d` - fix(web): /create's action bar stacks above the mobile tab bar
+
+      **Files Changed**:
+      - `packages/web/app/components/layout/MobileTabBar.tsx` - exported MOBILE_TAB_BAR_OFFSET_CLASS next to MOBILE_TAB_BAR_PADDING_CLASS
+      - `packages/web/app/routes/create/index.tsx` - applied the offset class to the fixed action bar, replacing bottom-0; z-40 unchanged
+      - `packages/web/tests/routes/create-tab-bar-clearance.test.ts` - new source-text assertion test (3 tests)
+
+      **Summary**:
+      The /create route's fixed generate bar (z-40) was painting over the mobile tab bar (z-30) at bottom-0, making all six tab bar destinations unreachable while the bar was visible. Fixed by offsetting the action bar upward by the tab bar's height (bottom-[calc(3.875rem+env(safe-area-inset-bottom))]) instead of fighting z-index, per the ticket's specified approach. The offset is exported from MobileTabBar as the single source of truth alongside the existing padding class.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/create-tab-bar-clearance.test.ts`
+      - Result: PASS (3 tests, 3 passing)
+      - Command: `bunx tsc --noEmit`
+      - Result: 22 pre-existing errors, unchanged baseline (routes/admin/*, routes/track/*, ai-generator/PromptSuggestions.tsx) — no new errors from this change
+      - Manual browser check at 390x844 (localhost:3002/create): screenshots confirm both bars visible and stacked after scrolling; document.elementFromPoint over the Shop tab bar item returns the tab bar (hitIsInsideTabBar: true), confirming taps land on the tab bar and not the action bar above it; scrolled to true page bottom, pb-24 clears the raised bar with nothing hidden
+      - Full automated web suite run was skipped per explicit user instruction (user confirmed the fix visually and asked to commit directly)
+work_sessions:
+  - start: '2026-08-07T09:07:26.814Z'
+    agent: claude-code
+    summary: Implemented MOBILE_TAB_BAR_OFFSET_CLASS export in MobileTabBar.tsx, applied it to /create's fixed action bar (replacing bottom-0), added create-tab-bar-clearance.test.ts (3 passing tests), verified via browser screenshots at 390x844 that both bars stack correctly and tab bar items receive taps (elementFromPoint hit-test confirmed), typechecked clean (22 pre-existing errors unchanged), committed as 720cd60d.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T09:35:55.251Z'
+    duration: '00:28:28'
 related_tickets: []
 blocked_by: []
 blocks: []
@@ -42,7 +82,7 @@ implementation_steps:
     file: packages/web/tests/routes/create-tab-bar-clearance.test.ts
     command: pnpm --filter @chobii/web test -- tests/routes/create-tab-bar-clearance.test.ts
     expected_result: FAIL - MOBILE_TAB_BAR_OFFSET_CLASS is not exported, and the create bar is still bottom-0
-    status: pending
+    status: done
     code: |
       import { readFileSync } from 'node:fs'
       import { join } from 'node:path'
@@ -78,12 +118,12 @@ implementation_steps:
     description: Confirm the test fails for the right reason (missing export, bar still at bottom-0)
     command: pnpm --filter @chobii/web test -- tests/routes/create-tab-bar-clearance.test.ts
     expected_result: FAIL
-    status: pending
+    status: done
   - id: 3
     action: implement
     description: Export the offset class from MobileTabBar, next to MOBILE_TAB_BAR_PADDING_CLASS
     file: packages/web/app/components/layout/MobileTabBar.tsx
-    status: pending
+    status: done
     code: |-
       /**
        * Where a page's own fixed bottom bar has to sit so it stacks ON TOP of the
@@ -104,7 +144,7 @@ implementation_steps:
     action: implement
     description: Raise /create's action bar onto the offset; keep z-40 so it still clears page content
     file: packages/web/app/routes/create/index.tsx
-    status: pending
+    status: done
     code: |-
       // import at top of file:
       import { MOBILE_TAB_BAR_OFFSET_CLASS } from '~/components/layout/MobileTabBar'
@@ -123,22 +163,33 @@ implementation_steps:
     description: Test green, and the route still typechecks
     command: pnpm --filter @chobii/web test -- tests/routes/create-tab-bar-clearance.test.ts && pnpm --filter @chobii/web exec tsc --noEmit
     expected_result: PASS - test green; tsc reports no NEW errors (22 pre-existing in routes/admin/*, routes/track/*, ai-generator/PromptSuggestions.tsx)
-    status: pending
+    status: done
   - id: 6
     action: verify-pass
     description: Confirm in a real browser at 390x844 that both bars are visible and the tab bar takes taps
     command: 'node scratchpad/shoot.mjs # or the project''s screenshot harness — it pre-scrolls, a plain scrollTo renders fixed elements ~77px low'
     expected_result: 'Manual verification — scroll /create until the action bar appears; the tab bar''s six items must be visible below it and document.elementFromPoint over a tab bar item must return the tab bar, not the action bar. The shell''s pb-24 must still clear the raised bar: nothing in the form is hidden at the true bottom of the page.'
-    status: pending
+    status: done
   - id: 7
     action: verify-pass
     description: Full web suite — no regression
     command: pnpm --filter @chobii/web test
     expected_result: PASS - no NEW failures against the pre-existing baseline (tests/styles.test.ts dark-variant, tests/routes/home-tokens.test.ts scrims, tests/routes/wishlist-page.test.ts auth guard)
-    status: pending
+    status: done
   - id: 8
     action: commit
     description: Commit the fix
     command: 'git add packages/web/app/components/layout/MobileTabBar.tsx packages/web/app/routes/create/index.tsx packages/web/tests/routes/create-tab-bar-clearance.test.ts && git commit -m "fix(web): /create''s action bar stacks above the mobile tab bar"'
-    status: pending
-current_step: 1
+    status: done
+current_step: 8
+started: '2026-08-07T09:06:55.744Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:28:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:28:00'
+      tokens: 0
+completed: '2026-08-07T09:36:01.638Z'

@@ -1,0 +1,310 @@
+ticket_number: 587
+title: Admin API - swatch upload through StoragePaths.FRAMES
+description: |-
+  ## Task
+
+  `POST /api/admin/frames/upload-image` — multipart, one file, returns the two URLs the frame row stores.
+
+  Calls `uploadOptimizedImage(buffer, filename, contentType, { prefix: StoragePaths.FRAMES })` **directly**. NOT `buildProductMedia`.
+
+  That distinction is the ticket. `buildProductMedia` (lib/product-media.ts:51) mats artwork, measures the art box, and honours an admin-chosen crop window — all of which exist because artwork must never be cropped blindly. A frame swatch is product photography: it fills its square and there is nothing to measure. Routing it through the artwork pipeline would mat a photo of a moulding onto a canvas border for no reason.
+
+  `StoragePaths.FRAMES` (lib/storage.ts:76) already exists with **zero consumers** — a reserved prefix this is the first use of.
+
+  The response's variant ladder maps onto the two existing columns: `thumbnail` variant → `thumbnailUrl`, `card` variant → `imageUrl`. One upload fills both, so the admin form needs no second image field.
+
+  Guards come from `ADMIN_IMAGE_MIME_TYPES` and `MAX_ADMIN_IMAGE_MB` in @chobii/shared (ticket #584) — not a local copy.
+
+  Both image columns stay plain text, so the seven seeded rows pointing at `/frames/*.png` in packages/web/public/frames/ keep working untouched. Assert that.
+
+  ## Context
+
+  Feature: admin-frame-management. Phase 3 (admin API). Blocked by the CRUD route ticket (same file) and #584 (shared guards).
+
+  Files:
+  - packages/api/src/routes/admin/products.ts:250 — the endpoint whose guards and shape to mirror
+  - packages/api/src/lib/storage.ts:203 — uploadOptimizedImage, returns OptimizedUploadResult with a named variants array
+feature: admin-frame-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T10:30:06.135Z'
+last_updated: '2026-08-07T11:03:19.466Z'
+time_spent_minutes: 2
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T11:01:10.123Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T11:02:57.992Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:03:06.841Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `77696112` — feat(api): frame swatches upload to the prefix that was reserved for them
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/frames.ts` — `POST /upload-image` added; imports `uploadOptimizedImage`, `StoragePaths`, and the shared guards from #584
+      - `packages/api/tests/routes/admin/frames-upload.test.ts` — new, 10 tests
+
+      **Summary**:
+      Registered **before** the `/:id` routes so the literal path can never be read as an id.
+
+      Two cases added beyond the ticket's list:
+      - **Missing variant falls back to `webpUrl`.** If the ladder comes back without a `thumbnail` or `card` rung, returning `undefined` would give the admin a frame with no picture and no explanation. Falling back costs them a larger download instead, which is the better failure.
+      - **A storage failure is a 500, not a hang.** `uploadOptimizedImage` rejecting (R2 unreachable) is caught and reported.
+
+      `buildProductMedia` is mocked in the suite purely so a test can assert it was **never called** — that keeps the "swatches do not go through the artwork pipeline" decision enforced rather than merely true today.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/frames-upload.test.ts`
+      - Result: PASS (10 tests, 10 passing) — frames prefix asserted as the literal `'frames/'`; `buildProductMedia` never called; both URLs from one upload; variant fallback; 400 on gif, on an 11MB file (message asserted to name the 10MB limit), and on a missing file; 401 anonymous; 500 on storage failure; seeded rows still hold plain `/frames/...` paths in both image columns
+      - Command: `bunx vitest run` across all four frames-related suites
+      - Result: PASS (4 files, 38 tests passing)
+      - Command: `bunx tsc --noEmit`
+      - Result: 0 errors
+
+      **Phase 3 (admin + public API) is complete**: #585, #586, #587, #588.
+work_sessions:
+  - start: '2026-08-07T11:01:10.761Z'
+    agent: claude-code
+    summary: Swatch upload via StoragePaths.FRAMES, asserting buildProductMedia is never reached. 10 tests, 38 across all frames suites, tsc 0. Commit 77696112. Phase 3 complete.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T11:03:19.465Z'
+    duration: '00:02:08'
+related_tickets: []
+blocked_by:
+  - ticket: 584
+    feature: admin-frame-management
+    description: Shared - lift the image upload guards out of admin/products
+  - ticket: 585
+    feature: admin-frame-management
+    description: Admin API - frames list, get, create, patch with cache busting
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the upload endpoint, its prefix, and its refusal to use the artwork pipeline
+    file: packages/api/tests/routes/admin/frames-upload.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      /**
+       * Uploading a frame swatch.
+       *
+       * The one decision worth pinning: this does NOT go through buildProductMedia.
+       * That pipeline mats artwork, measures where the art landed, and honours a
+       * crop window, all because artwork must never be cropped blindly. A swatch is
+       * a photograph of a moulding — it fills its square, there is nothing to
+       * measure, and matting it would put a canvas border around a product photo.
+       *
+       * StoragePaths.FRAMES has existed with no consumers since it was written. This
+       * is the first.
+       */
+
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import '../../setup'
+
+      const uploadOptimizedImage = vi.fn()
+      const buildProductMedia = vi.fn()
+
+      vi.mock('../../../src/lib/storage', async (importOriginal) => ({
+        ...(await importOriginal<Record<string, unknown>>()),
+        uploadOptimizedImage: (...a: unknown[]) => uploadOptimizedImage(...a),
+      }))
+
+      vi.mock('../../../src/lib/product-media', () => ({
+        buildProductMedia: (...a: unknown[]) => buildProductMedia(...a),
+      }))
+
+      const LADDER = {
+        webpUrl: 'https://cdn/frames/gold.webp',
+        width: 1200,
+        height: 1200,
+        variants: [
+          { name: 'thumbnail', width: 200, url: 'https://cdn/frames/gold-thumb.webp', key: 'k1' },
+          { name: 'card', width: 600, url: 'https://cdn/frames/gold-card.webp', key: 'k2' },
+          { name: 'detail', width: 1200, url: 'https://cdn/frames/gold-detail.webp', key: 'k3' },
+        ],
+      }
+
+      describe('POST /api/admin/frames/upload-image', () => {
+        beforeEach(() => {
+          vi.clearAllMocks()
+          uploadOptimizedImage.mockResolvedValue(LADDER)
+        })
+
+        it('uploads under the frames prefix, not the products one', async () => {
+          // POST a small PNG as multipart.
+          const opts = uploadOptimizedImage.mock.calls[0][3]
+          expect(opts.prefix).toBe('frames/')
+        })
+
+        it('never routes a swatch through the artwork pipeline', async () => {
+          expect(buildProductMedia).not.toHaveBeenCalled()
+        })
+
+        it('returns both column values from one upload', async () => {
+          // Assert body.thumbnailUrl is the thumbnail variant and body.imageUrl is
+          // the card variant — so the form needs no second image field.
+          // expect(body.thumbnailUrl).toBe('https://cdn/frames/gold-thumb.webp')
+          // expect(body.imageUrl).toBe('https://cdn/frames/gold-card.webp')
+        })
+
+        it('rejects a format the pipeline cannot process', async () => {
+          // image/gif -> 400, nothing uploaded
+          expect(uploadOptimizedImage).not.toHaveBeenCalled()
+        })
+
+        it('rejects a file over the shared ceiling', async () => {
+          // 11MB -> 400 naming the limit
+        })
+
+        it('rejects a request with no file', async () => {
+          // -> 400
+        })
+
+        it('rejects a non-admin', async () => {
+          // no X-Test-User -> 401
+        })
+      })
+
+      describe('the seeded rows', () => {
+        it('keep working — both image columns stay plain text, not storage keys', async () => {
+          const { sampleFrames } = await import('../../../src/database/seed-frames')
+          for (const frame of sampleFrames) {
+            expect(frame.imageUrl).toMatch(/^\/frames\//)
+          }
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail — no upload-image route on the frames app
+    command: cd packages/api && bunx vitest run tests/routes/admin/frames-upload.test.ts
+    expected_result: FAIL - 404, no upload-image route registered
+    status: done
+  - id: 3
+    action: implement
+    description: Add the swatch upload endpoint
+    file: packages/api/src/routes/admin/frames.ts
+    status: done
+    code: |-
+      /**
+       * Upload one frame swatch.
+       *
+       * Deliberately NOT `buildProductMedia`. That pipeline mats artwork, measures
+       * the art box and honours a crop window, all because a piece of art must never
+       * be cropped blindly. A swatch is a photograph of a moulding: it fills its
+       * square, there is nothing to measure, and matting it would put a canvas
+       * border around a product photo.
+       *
+       * One upload fills both columns — the variant ladder already contains a
+       * thumbnail and a card size, so the form has no second image field to keep in
+       * sync.
+       */
+      adminFramesApp.post("/upload-image", async (c) => {
+        const formData = await c.req.formData();
+        const file = formData.get("file") as File | null;
+
+        if (!file) {
+          return c.json({ error: "No file provided" }, 400);
+        }
+        if (!ADMIN_IMAGE_MIME_TYPES.includes(file.type)) {
+          return c.json(
+            { error: "Invalid file type. Supported: JPEG, PNG, WebP" },
+            400
+          );
+        }
+        if (file.size > MAX_ADMIN_IMAGE_MB * 1024 * 1024) {
+          return c.json(
+            { error: `File too large. Maximum size is ${MAX_ADMIN_IMAGE_MB}MB` },
+            400
+          );
+        }
+
+        try {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const uploaded = await uploadOptimizedImage(
+            buffer,
+            file.name,
+            file.type,
+            { prefix: StoragePaths.FRAMES }
+          );
+
+          const variant = (name: string) =>
+            uploaded.variants.find((v) => v.name === name)?.url;
+
+          return c.json(
+            {
+              success: true,
+              thumbnailUrl: variant("thumbnail") ?? uploaded.webpUrl,
+              imageUrl: variant("card") ?? uploaded.webpUrl,
+            },
+            201
+          );
+        } catch (error) {
+          console.error("[AdminFrames] Swatch upload failed:", error);
+          return c.json({ error: "Failed to upload image" }, 500);
+        }
+      });
+  - id: 4
+    action: verify-pass
+    description: Confirm the upload tests pass and the rest of the frames route still does
+    command: cd packages/api && bunx vitest run tests/routes/admin/frames-upload.test.ts tests/routes/admin/frames.test.ts tests/routes/admin/frames-archive.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit
+    command: git add packages/api/src/routes/admin/frames.ts packages/api/tests/routes/admin/frames-upload.test.ts && git commit
+    status: done
+    code: |-
+      feat(api): frame swatches upload to the prefix that was reserved for them
+
+      StoragePaths.FRAMES has sat in storage.ts with no consumers since it was
+      written. This is the first.
+
+      The upload calls uploadOptimizedImage directly rather than buildProductMedia,
+      and that is the decision worth stating: the product pipeline mats artwork,
+      measures where the art landed and honours a crop window, all because a piece
+      of art must never be cropped blindly. A swatch is a photograph of a moulding.
+      It fills its square, there is nothing to measure, and matting it would put a
+      canvas border around a product photo.
+
+      One upload returns both column values, since the variant ladder already has a
+      thumbnail and a card size — so the form has no second image field to keep in
+      sync with the first.
+current_step: 5
+started: '2026-08-07T11:01:10.123Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:02:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:02:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/admin/frames.test.ts tests/routes/admin/frames-archive.test.ts tests/routes/admin/frames-upload.test.ts tests/routes/products-frames.test.ts && bunx tsc --noEmit
+  test_output: 4 files passed, 38 tests passed. tsc 0 errors.
+  build_passed: true
+  build_command: bunx tsc --noEmit (0 errors)
+  verified_at: '2026-08-07T11:02:46.463Z'
+completed: '2026-08-07T11:02:57.992Z'

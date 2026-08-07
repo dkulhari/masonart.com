@@ -1,0 +1,208 @@
+ticket_number: 581
+title: 'Frontend - home reviews rail to Loox parity: mixed media and text slides'
+description: |-
+  ## Task
+
+  The third and last Loox surface. Mesonart's home Customer Reviews band is a `<loox-dynamic-carousel-widget>` whose slides **alternate between text-only cards and media-only tiles** — each slide is one or the other. Ours is text-only and never shows a photo, even though the media is already in the payload.
+
+  Reference: `docs/design/mesonart/mesonart-home-reviews-band.png`.
+
+  The live widget's own configuration, read off the page:
+
+  ```html
+  <loox-dynamic-carousel-widget
+    corner-radius="40" items-per-view="2" items-per-view-mobile="3"
+    max-characters="180" autoplay-delay="5"
+    main-color="#ae8868" stars-color="#ff8d00"
+    quote-marks-icon="style-1" product-id="">
+  ```
+
+  ## What changes
+
+  | Mesonart | Ours today |
+  |---|---|
+  | Slides alternate media-only tiles and text-only cards | Every slide is a text card; no media at all |
+  | Large serif quote mark on text cards, blush background | Plain white card, no quote mark |
+  | 40px corner radius | Small radius |
+  | Autoplay every 5s + dot pagination under the rail | Manual scroll, no dots, no autoplay |
+  | Body truncated at 180 characters | Untruncated |
+  | "✓ Daniel N." bottom-right with a verified check | "Test Customer · Cosmic Harmony" bottom-left, no check |
+  | View All pill on the **right of the header row** | View All below the rail, on the left |
+
+  ## Context
+
+  Part of feature: review-grid-loox-parity
+  Phase: Frontend
+
+  - File: `packages/web/app/components/home/CustomerReviewsSection.tsx`, mounted at `packages/web/app/routes/index.tsx:169`.
+  - Media is ALREADY in the payload — `GET /api/reviews` returns `media[]` (ready-only) and #495 added `verified`. Nothing new is needed from the API. Read the hook in `packages/web/app/hooks/useReviews.ts` for the exact shape.
+  - **Keep the suppression rule exactly as it is.** `averageRating === null || reviewCount < MIN_REVIEWS_FOR_HOME_STRIP || reviews.length === 0` returns null, and it sits AFTER the hooks deliberately because hook order may not vary between renders. Do not move it above them.
+  - **Keep reading the real aggregate.** Mesonart's "9000+ Score 4.9/ 5.0" is hardcoded — its own star `<title>` says "4.9 rating (7000 reviews)" while the label beside it says 9000+. Do not copy the hardcoding; ours shows the true 4.5 / 12.
+  - Keep the `SectionBand tone="sand"` wrapper and the `data-testid="home-reviews"` / `home-reviews-score` hooks — E2E asserts on them.
+  - Video slides render `poster`, `preload="none"`, never `autoPlay`. Same rule as the grid; there are existing assertions for it in `ReviewGridCard.test.tsx`.
+  - **Autoplay must respect `prefers-reduced-motion`** and must pause on hover and on keyboard focus within the rail. An unpausable auto-advancing carousel is an accessibility failure, not a parity win.
+  - Reuse `ReviewGridCard`'s media handling where it fits rather than writing a third media renderer — but this is a rail, not a masonry cell, so do not force the whole card in.
+  - vitest gotcha: Node 25's inert localStorage/sessionStorage shadows jsdom's — stub in `vi.hoisted` above the imports if you hit `setItem is not a function`.
+feature: review-grid-loox-parity
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T07:46:23.863Z'
+last_updated: '2026-08-07T11:34:20.409Z'
+time_spent_minutes: 0
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T07:51:06.013Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T09:21:40.233Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T09:21:49.087Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `32628ae9` - feat(web): home reviews rail alternates media and text slides, Loox parity
+
+      **Files Changed**:
+      - `packages/web/app/components/home/CustomerReviewsSection.tsx` - rail rebuilt: alternating media/text slides, serif quote mark, 40px radius, 180-char truncation, verified-check author line, autoplay (respects prefers-reduced-motion, pauses on hover/focus) with dot pagination, View All moved into header row
+      - `packages/web/app/components/reviews/ReviewGridCard.tsx` - exported `reviewMediaThumbnail` (was local `slotSource`) so the rail's media slides and the PDP grid share one poster/thumbnail fallback chain
+      - `packages/web/tests/components/home/CustomerReviewsSection.test.tsx` - failing tests for mixed slides and rail behavior, then updated to green
+
+      **Summary**:
+      Rebuilt the home Customer Reviews rail to mesonart/Loox parity per the ticket's reference screenshot and widget config. Suppression rule, `SectionBand tone="sand"`, and `data-testid="home-reviews"`/`home-reviews-score` hooks left untouched as instructed; real aggregate (not mesonart's hardcoded value) still shown.
+
+      **Verification**:
+      - Command: `./scripts/run-tests.sh e2e --file=review-surfaces.spec.ts --max-failures=5`
+      - Result: PASS — all 3 "home Customer Reviews strip" specs pass (score band + rail, View All destination, desktop nav destination)
+      - Note: same spec file has 4 pre-existing failures under "the PDP review section" (`product-reviews`/`ProductTabs` testids). Confirmed out of scope — this ticket touched only `CustomerReviewsSection.tsx` and a one-line export rename in `ReviewGridCard.tsx`; the failing tests exercise `ChooseOptions.tsx`/`ProductTabs`-adjacent code left uncommitted by other in-flight tickets on this shared box, unrelated to #581.
+      - Command: `bunx vitest run tests/components/home/CustomerReviewsSection.test.tsx`
+      - Result: PASS (42/42)
+      - Command: `bunx vitest run tests/components/reviews/ReviewGridCard.test.tsx`
+      - Result: PASS (17/17)
+  - author: system
+    timestamp: '2026-08-07T10:01:19.640Z'
+    text: Status changed from 'done' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-07T10:20:01.925Z'
+    text: |-
+      REQUIREMENT RE-DERIVED — the description table below was written from the still and gets the structure wrong. Measured spec: docs/design/mesonart/home-reviews-band-measured-spec.md (read off the live loox-dynamic-carousel-widget's open shadow root at viewport 1624).
+
+      THE CORRECTION. It is not one rail of alternating slides. The widget is a two-column CSS grid holding two independently-tracked swipers over the same review list:
+
+        grid-template-columns: 383.994px 1127.76px; gap: 16px; grid-template-rows: 423.994px
+
+      Left column is a FIXED blush plate (#f6efec, radius 40) that quote cards translate through — it never leaves the screen. Right column is a strip of 560x424 media tiles, two fully visible (items-per-view="2"), 8px apart. One index drives both. "Slides alternate card, tile, card" describes what a still of that looks like, not what it is; buildReviewSlides implemented the still faithfully and produced a different band.
+
+      Other measurements that differ from the table:
+      - Plate blush is #f6efec, not #f6ebe6.
+      - Quote mark is their own 54x38 two-comma path in #78583b, hung -8,-8 OUTSIDE the plate's top-left corner. A typographic &ldquo; in the heading face is a visibly different shape, and inside the plate's overflow-hidden the rounded corner cuts both marks into half-discs.
+      - Card interior: grid, padding 56/40, gap 16. Stars 24px #ff8d00. Body 24px/36px #4c4642. Sign-off floored bottom-right: badge 18px #685c53, name 18px #33302e.
+      - Header stars are #f5c264 at 16px — a DIFFERENT orange from the slides' #ff8d00.
+      - Heading text is "Customer Reviews", 42px/50.4px weight 300.
+      - Pagination is Swiper dynamic bullets, left-aligned 64px in from the content edge: five visible, active 24x8 pill, neighbours 8x8, outermost pair 5x5. Not one dot per page, not centred.
+      - Arrows 56px white circles centred on the 424 rail — left centre on the content's left edge, right centre 8px inside the right edge.
+
+      REBUILT. Component and its 58 tests rewritten around the two-track model; 205 home/review tests green. Verified live at 1624: plate 384x424, stars 24, sign-off flush to the 56px bottom padding, arrows centred on the rail, pagination 64px in, header-to-rail gap 64 (spec 63).
+
+      Knowingly not matched, and why: SectionBand's 96px section padding and container-wide's 1504 content width are global tokens shared by every band — forking one band away from them is a system decision, not a parity patch. text-section renders the heading at 45px/1.0 against their 42/50.4, same reasoning (#540). Mobile (items-per-view-mobile="3") is still unmeasured — the browser would not change the live page's layout viewport.
+  - author: mcp-client
+    timestamp: '2026-08-07T11:14:25.633Z'
+    text: |-
+      DECISION on the three remaining divergences, taken with dhruv: HOLD THE SYSTEM.
+
+      - Heading stays 45px/1.0 via text-section (theirs 42/50.4). #540 deliberately put this heading on the shared band token; forking it buys parity on one band and costs alignment with every band above and below it.
+      - Section keeps SectionBand's 96px (theirs 64px). Same reasoning — SectionBand owns the page's vertical rhythm.
+      - Content keeps the 1600 page-width cap, so 1504 against their 1528. The cap is itself a measured mesonart number; relitigate it globally or not at all.
+
+      Also decided: our arrows stay centred on the 424 rail. Theirs sit 22px above the tile row's centre. A blind critic named that offset as its single strongest structural tell and then said in the same breath that naming it as the fix means telling the reimplementation to reproduce the original's miscentring. Not copying it.
+
+      These four are now the documented answer, not open gaps. Anything else that differs is a bug.
+
+      Method note for the next parity ticket: docs/design/mesonart/*.png is one frame of an animating component and is not a spec. The stills show three photo tiles at ragged widths (548/348/184); that is Swiper's material effect caught mid-advance, and every slide is a uniform 560 in the live DOM. A blind critic reading only the still called our uniform tiles the giveaway, which would have been a wrong fix. Loox's shadow root is open — read it. It hydrates only after a real wheel scroll into view; scrollIntoView() and window.scrollTo do not trigger it, and Playwright headless never hydrated it at all.
+  - author: system
+    timestamp: '2026-08-07T11:34:20.409Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for mixed slides and the new rail behaviour
+    file: packages/web/tests/components/home/CustomerReviewsSection.test.tsx
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/home/CustomerReviewsSection.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |-
+      // reviews carrying media contribute a media-only tile to the rail
+      // reviews without media contribute a text-only card
+      // a text card renders the quote mark, stars, truncated body and the author
+      // body longer than 180 characters is truncated; shorter is untouched
+      // the verified check renders on authors whose review is verified
+      // a video slide renders <video> with a poster, preload="none", no autoPlay
+      // autoplay advances on a timer, and does NOT when prefers-reduced-motion is set
+      // autoplay pauses on pointer hover and on focus inside the rail
+      // dot pagination renders one dot per page and marks the active one
+      // View All sits in the header row and links to /reviews
+      // EXISTING behaviour must stay green: suppression below 10 reviews, on a null
+      //   averageRating, and on an empty list; the real aggregate is still rendered
+  - id: 2
+    action: verify-fail
+    description: Confirm the new assertions fail against the text-only rail
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/home/CustomerReviewsSection.test.tsx
+    expected_result: FAIL - no media slides rendered
+    status: done
+  - id: 3
+    action: implement
+    description: Rebuild the rail with mixed slides
+    file: packages/web/app/components/home/CustomerReviewsSection.tsx
+    status: done
+    code: |-
+      // Build the slide list by interleaving: a review with media yields a media
+      // tile; a review without yields a text card. Mesonart alternates them, so
+      // interleave rather than grouping all media then all text.
+      // Text card: blush background, large serif quote glyph top-left, star row,
+      //   body truncated at 180 chars, '<check> Firstname L.' bottom-right.
+      // Media tile: image or video (poster, preload none, no autoplay), no text.
+      // Both: rounded-[40px] to match corner-radius="40".
+      // Rail: keep the existing scroll container and arrows; add dot pagination and
+      //   a 5s autoplay interval that clears on unmount, skips under
+      //   prefers-reduced-motion, and pauses on hover/focus-within.
+      // Header row: heading + score on the left, View All pill on the right.
+  - id: 4
+    action: verify-pass
+    description: Confirm the section tests pass
+    command: cd /Users/dhruv/work/masonart.com/packages/web && bunx vitest run tests/components/home/CustomerReviewsSection.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: verify-pass
+    description: Confirm the home-strip E2E specs still pass against the live app
+    command: cd /Users/dhruv/work/masonart.com && bunx playwright test tests/e2e/review-surfaces.spec.ts --reporter=line
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the rail rebuild
+    command: 'git add packages/web/app/components/home/CustomerReviewsSection.tsx packages/web/tests/components/home/CustomerReviewsSection.test.tsx && git commit -m "feat(web): mixed media and text slides in the home reviews rail"'
+    status: done
+current_step: 6
+started: '2026-08-07T07:51:06.013Z'
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/components/home/CustomerReviewsSection.test.tsx
+  test_output: |-
+    60/60 passing. Wider run: tests/components + tests/routes = 2007/2008; the single failure is tests/routes/wishlist-page.test.ts, untouched by this work and failing before it. tsc --noEmit clean for CustomerReviewsSection. Verified live at 1624x1000: plate 384x424 in #f6efec at radius 40, card stars 24px, sign-off flush to the 56px bottom padding, arrows centred on the 424 rail, bullets 64px in from the content edge, header-to-rail gap 64 against the measured 63. Verified at 402 wide: plate clips, one tile per view, no horizontal page overflow. Committed a2c3dcf1.</testOutput>
+    <parameter name="buildCommand">bunx tsc --noEmit -p tsconfig.json
+  build_passed: true
+  verified_at: '2026-08-07T11:34:15.530Z'
+completed: '2026-08-07T09:21:40.233Z'

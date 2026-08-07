@@ -13,7 +13,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T11:51:47.105Z'
-last_updated: '2026-08-06T14:44:55.677Z'
+last_updated: '2026-08-07T08:06:59.222Z'
 time_spent_minutes: 0
 labels:
   - home-page-parity
@@ -65,6 +65,22 @@ comments:
   - author: system
     timestamp: '2026-08-06T14:44:55.677Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T08:06:59.222Z'
+    text: |-
+      REOPENED-AND-FIXED IN PASS: band height was 192px over the bar. Commit `e4878eb4`.
+
+      #540's cross-band pass measured this band live against mesonart on 2026-08-07 and found it at 800.2px against their 608 at 1440, and 871 against their 780 at 390.
+
+      The content was never wrong. Their band internals at 1440: a 608x608 photograph left, a 672-wide panel right with 64px of right padding, 64px gap, inside a `page-width` wrapper at the 48px gutter. Ours measured 608.2 of inner content — theirs to within a fifth of a pixel. At 390: theirs 32px above a 350x350 photograph, 32px gap, a 366px panel, nothing below; ours 743 of content against their 748.
+
+      What was wrong was the pocket around it. **Their section carries no vertical padding at all** — the photograph IS the band's height — and ours inherited SectionBand's default `py-16 sm:py-24`, so 96px of empty page above and below made up the entire 192px error.
+
+      Now `className="pb-0 pt-8 sm:pb-0 sm:pt-8 lg:pb-0 lg:pt-0"`. 608.2 against their 608 at 1440, 775 against their 780 at 390.
+
+      `pb-0` is deliberate, not an oversight: the sand panel ends the band and the next band brings its own top pocket, which is how theirs is spaced too. The `sm:` pair is required — SectionBand's `sm:py-24` sits in a media query and outlives a base-only override from 640 up.
+
+      Two tests added to tests/components/home/ShopByRoomBand.test.tsx pinning both, with the measurements they came from.
 work_sessions: []
 related_tickets: []
 blocked_by: []

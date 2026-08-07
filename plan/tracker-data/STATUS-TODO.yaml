@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-07T07:28:58.056Z'
-total_tickets: 32
+last_updated: '2026-08-07T11:34:21.650Z'
+total_tickets: 27
 summary:
   critical: 4
   high: 5
-  medium: 13
-  low: 10
+  medium: 11
+  low: 7
 priorities:
   critical:
     - feature: go-live
@@ -125,16 +125,6 @@ priorities:
           title: Best Sellers band is missing the category pill row the reference carries on both viewports
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 571
-          title: /create's mobile action bar must stack above the tab bar, not paint over it
-          assignee: unassigned
-          blocked_by: []
-    - feature: cart-checkout
-      tickets:
-        - ticket_number: 566
-          title: PDP frame options drop the flat priceAddition column, unlike the quickview and the server
-          assignee: unassigned
-          blocked_by: []
     - feature: gift-cards
       tickets:
         - ticket_number: 574
@@ -177,20 +167,6 @@ priorities:
       tickets:
         - ticket_number: 546
           title: Seed catalogue artwork carries a MESON ART watermark baked into the pixels
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 572
-          title: 'Document: Mobile tab bar active state design choice'
-          assignee: unassigned
-          blocked_by: []
-    - feature: cart-checkout
-      tickets:
-        - ticket_number: 565
-          title: 'Sign-out error handling diverged: account page swallows signOut() rejections, admin sidebar still logs them'
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 567
-          title: Cleanup left behind by the server-cart write path (#511)
           assignee: unassigned
           blocked_by: []
     - feature: gift-cards
