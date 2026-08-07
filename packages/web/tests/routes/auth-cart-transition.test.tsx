@@ -295,6 +295,43 @@ describe('signing out takes the cart with it', () => {
     expect(queryClient.getQueryData(cartKeys.detail())).toBeUndefined()
   })
 
+  it('logs a failed sign-out on the account page instead of throwing past it', async () => {
+    // A signOut() that never resolves cleanly is the #341 class of failure: a
+    // 500 through the prod edge that leaves the session alive. try/finally
+    // still cleans up locally but lets the rejection escape unlogged, so the
+    // only signal that anything went wrong is gone.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const unhandled = vi.fn()
+    process.on('unhandledRejection', unhandled)
+
+    authClient.signOut.mockRejectedValueOnce(new Error('Network request failed'))
+    useCartStore.setState({ items: someonesCart })
+    renderWithQuery(<AccountDashboardPage />)
+    queryClient.setQueryData(cartKeys.detail(), GUEST_CART)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    })
+    // Let the microtask queue drain so Node would have reported a rejection
+    // nobody caught.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(consoleError).toHaveBeenCalledWith(
+      'Sign out failed:',
+      expect.any(Error)
+    )
+    expect(unhandled).not.toHaveBeenCalled()
+
+    // ...and the cleanup still runs regardless: this browser is done showing
+    // this account's cart whether or not the server agreed to end the session.
+    expect(useCartStore.getState().items).toEqual([])
+    expect(queryClient.getQueryData(cartKeys.detail())).toBeUndefined()
+    expect(router.navigate).toHaveBeenCalledWith({ to: '/' })
+
+    process.off('unhandledRejection', unhandled)
+    consoleError.mockRestore()
+  })
+
   it('clears the persisted cart when the admin sidebar signs out', async () => {
     useCartStore.setState({ items: someonesCart })
     const location = { href: '/admin/products' }
@@ -314,5 +351,32 @@ describe('signing out takes the cart with it', () => {
     // under whoever signs in next.
     expect(useCartStore.getState().items).toEqual([])
     expect(location.href).toBe('/')
+  })
+
+  it('logs a failed sign-out from the admin sidebar too', async () => {
+    // The same contract from the other end: the two sign-out paths report a
+    // failure the same way, or one of them goes quiet again (#565).
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    authClient.signOut.mockRejectedValueOnce(new Error('Network request failed'))
+    useCartStore.setState({ items: someonesCart })
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { href: '/admin/products' },
+    })
+
+    renderWithQuery(<AdminSidebar user={{ name: 'Ada', email: 'a@b.c', role: 'admin' }} collapsed={false} />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    })
+
+    expect(consoleError).toHaveBeenCalledWith(
+      'Sign out failed:',
+      expect.any(Error)
+    )
+    expect(useCartStore.getState().items).toEqual([])
+    expect(window.location.href).toBe('/')
+
+    consoleError.mockRestore()
   })
 })

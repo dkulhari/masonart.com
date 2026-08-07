@@ -154,14 +154,19 @@ export function AccountDashboardPage() {
   const handleSignOut = async () => {
     try {
       await signOut()
-    } finally {
-      // Whether or not the request came back cleanly, this browser is done
-      // showing this account's cart: leaving it behind is how the next person
-      // to sign in here saw someone else's items and someone else's total
-      // (#511).
-      onSignedOut()
-      navigate({ to: '/' })
+    } catch (error) {
+      // Surface the failure rather than let it leave as an unhandled
+      // rejection — a sign-out that 500s through the prod edge leaves the
+      // session alive, and silence is exactly how #341 stayed invisible. The
+      // admin sidebar logs the same way; both paths have to agree.
+      console.error('Sign out failed:', error)
     }
+    // Whether or not the request came back cleanly, this browser is done
+    // showing this account's cart: leaving it behind is how the next person
+    // to sign in here saw someone else's items and someone else's total
+    // (#511).
+    onSignedOut()
+    navigate({ to: '/' })
   }
 
   return (
