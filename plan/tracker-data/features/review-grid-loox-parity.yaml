@@ -103,6 +103,7 @@ tickets:
     "497": Frontend - rebuild /reviews on ReviewGrid with the Loox header row
     "498": Frontend - rebuild the PDP review section on ReviewGrid and retire ReviewMediaWall
     "499": E2E - resweep the review specs for the masonry grid
-total_tickets: 5
+    "581": "Frontend - home reviews rail to Loox parity: mixed media and text slides"
+total_tickets: 6
 completion_percentage: 100
 is_completed: true

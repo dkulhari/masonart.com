@@ -13,10 +13,14 @@ description: |-
 objectives:
   - TBD
 work_session_summary:
-  total_sessions: 0
-  total_duration: "00:00:00"
+  total_sessions: 1
+  total_duration: "00:28:00"
   total_tokens: 0
-  agents: {}
+  agents:
+    claude-code:
+      sessions: 1
+      duration: "00:28:00"
+      tokens: 0
 tickets:
   todo:
     "537": Customer Reviews band restyled to the bar
@@ -27,10 +31,8 @@ tickets:
     "546": Seed catalogue artwork carries a MESON ART watermark baked into the pixels
     "547": Review toast covers page content on every screen and has no counterpart on the reference
     "564": Best Sellers band is missing the category pill row the reference carries on both viewports
-    "571": /create's mobile action bar must stack above the tab bar, not paint over it
-    "572": "Document: Mobile tab bar active state design choice"
   in_progress:
-    "542": Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
+    "594": Card art framing — measure artBox server-side and re-frame each piece on equal ink area
   done:
     "529": Home hero — full-bleed image carousel with peek slides replaces the text hero
     "530": Best Sellers product rail — rating stars, review count, title-left price-right
@@ -43,6 +45,9 @@ tickets:
     "538": Brand Story band — olive panel with copy, Read More pill and media
     "539": Trust icons row above the footer
     "540": Section rhythm, type scale and button system pass across the whole page
-total_tickets: 22
-completion_percentage: 50
+    "542": Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
+    "571": /create's mobile action bar must stack above the tab bar, not paint over it
+    "572": "Document: Mobile tab bar active state design choice"
+total_tickets: 23
+completion_percentage: 61
 is_completed: false

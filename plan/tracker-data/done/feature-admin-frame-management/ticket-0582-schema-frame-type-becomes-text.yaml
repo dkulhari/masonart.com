@@ -1,0 +1,405 @@
+ticket_number: 582
+title: Schema - frame type becomes text, new frame_category enum column
+description: |-
+  ## Task
+
+  Make the `frames` table admin-writable in shape: `type` becomes free text with a unique index, and a new closed `category` enum column carries the display grouping the client currently guesses.
+
+  The `frame_type` pg enum has ten values, seven used and three dead (`none`, `walnut`, `oak`). That is a hard ceiling incompatible with an admin who can create frames, and the free slots are named for woods nobody stocks. `type` becomes a slug validated `^[a-z0-9-]+$` with a UNIQUE index — unique because `getFramePreviewColor` (FrameSelector.tsx:409) keys its swatch colour map on type, so two frames sharing one are indistinguishable to any type-keyed lookup.
+
+  `category` is a NEW pg enum rather than more text, because unlike `type` it is genuinely closed: it is the three rungs `frameGroupLabel` (FrameSelector.tsx:158) renders as "Rolled Canvas/Frameless/Framed". Today `frameCategoryLabel` (FrameSelector.tsx:146) infers the rung from the type string, which lands an admin-created moulding in the right bucket only by accident and an admin-created *format* in the wrong one with no error anywhere.
+
+  ## Context
+
+  Feature: admin-frame-management. Phase 1 (schema). Nothing else in the feature can start until this lands.
+
+  Design doc: docs/superpowers/specs/2026-08-07-admin-frame-pricing-design.md (commit cbeeff87)
+
+  Files:
+  - packages/api/src/database/schema/products.ts:80 (frameTypeEnum), :243 (frames table)
+  - packages/api/src/database/migrations/ — next is 0014, journal idx 14
+  - packages/api/src/database/seed-frames.ts — seven rows to give a category
+
+  The migration is HAND-WRITTEN, not `drizzle-kit generate` output. Generate emits no backfill, and dropping the enum before backfilling destroys the source data. Order is load-bearing — `SET NOT NULL` must follow the backfill, and `DROP TYPE frame_type` must follow the column conversion or Postgres refuses it.
+
+  Test pattern: packages/api/tests/database/shipping-config-schema.test.ts — shape assertions on the drizzle objects, because the route suites mock `db` and nothing else in the API catches a column that does not exist.
+feature: admin-frame-management
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T10:27:53.895Z'
+last_updated: '2026-08-07T10:52:21.498Z'
+time_spent_minutes: 3
+labels:
+  - database
+  - schema
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T10:43:30.663Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T10:46:34.955Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T10:46:46.341Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `ffaeb084` — feat(db): a frame's type is a slug it owns, and its rung is a column
+
+      Worked in git worktree `.worktrees/admin-frame-management` on branch `feat/admin-frame-management`, branched off `cbeeff87` on `feat/mesonart-design-parity` — NOT off main, because the #566 fix (`a0e42a79`) and the design spec live only on that branch and main is 37 commits behind.
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/products.ts` — `frameTypeEnum` deleted; `type` is `text().notNull()` with `uniqueIndex("frames_type_idx")`; new `frameCategoryEnum` and `category` column; `FrameType` export replaced by `FrameCategory`
+      - `packages/api/src/database/migrations/0014_admin_editable_frames.sql` — new, hand-written
+      - `packages/api/src/database/migrations/meta/_journal.json` — idx 14 registered
+      - `packages/api/src/database/seed-frames.ts` — all seven rows given a category; header comment extended
+      - `packages/api/tests/database/frames-schema.test.ts` — new, 11 tests
+
+      **Notes**:
+      - Migration ordering is asserted, not commented: the test reads the 0014 SQL and checks the backfill precedes `SET NOT NULL` and `DROP TYPE` follows the column conversion. Both would be silent in review and fatal at deploy.
+      - Grepped the whole monorepo for `frameTypeEnum` after the change — the only remaining mention is the test asserting its absence.
+      - `import { uniqueIndex }` added to the drizzle-orm/pg-core import list.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/database/frames-schema.test.ts`
+      - Result: PASS (11 tests, 11 passing)
+      - Command: `bunx vitest run tests/routes/cart-frame-pricing.test.ts tests/database/migrations.test.ts tests/routes/products.test.ts`
+      - Result: PASS (3 files, 116 passing, 63 skipped)
+      - Command: `bunx tsc --noEmit`
+      - Result: 0 errors across packages/api
+
+      **Not run**: the migration against a live database. The worktree has no DB configured, and the DB-backed admin suites were already failing environmentally in this workspace before any change (`admin/products-role-access` 2 failed, four cache-purge/customers suites fully skipped). The SQL's correctness is pinned by ordering assertions rather than execution — worth an actual `db:migrate` run before this reaches an environment with data.
+  - author: mcp-client
+    timestamp: '2026-08-07T10:52:21.498Z'
+    text: |-
+      🧪 **Migration 0014 executed for real — the gap this ticket's completion comment flagged is now closed.**
+
+      Not against the dev database. `poster-app-postgres` on :5440 is shared with other sessions and 0014 drops a type with no down-migration, so instead: a throwaway `frames_migration_check` database on the same server, built to the pre-0014 state (the `frame_type` enum, the `frames` table as at 0013, its three indexes, and the seven seeded rows), then 0014 applied to it. Dropped afterwards.
+
+      **Every statement executed clean, in order:**
+      ```
+      ALTER TABLE / UPDATE 7 / CREATE TYPE / ALTER TABLE ×3 / DROP TYPE / DROP INDEX / CREATE INDEX
+      ```
+
+      **The backfill produced exactly the mapping the test asserts textually:**
+      ```
+       Rolled Canvas          | rolled    | rolled
+       Frameless              | frameless | frameless
+       Stretch + Gold Frame   | gold      | framed
+       Stretch + Silver Frame | silver    | framed
+       Stretch + Black Frame  | black     | framed
+       Stretch + White Frame  | white     | framed
+       Stretch + Wood Frame   | wood      | framed
+      ```
+
+      **Final column state** — `type` is `text NOT NULL`, `category` is `frame_category NOT NULL`, and `frame_type` no longer exists.
+
+      **The unique index is real, not just declared:**
+      ```
+      INSERT ... VALUES ('Dupe', 'gold', 'framed', '1.40');
+      ERROR: duplicate key value violates unique constraint "frames_type_idx"
+      DETAIL: Key (type)=(gold) already exists.
+      ```
+
+      Also confirmed by grep that `frames.type` was the only column ever using the `frame_type` enum (`0000_simple_blindfold.sql:35`), so the `DROP TYPE` has no other dependent.
+
+      **One caveat worth carrying forward**: if any environment has ended up with two frames sharing a `type`, `CREATE UNIQUE INDEX` will abort the migration. Drizzle wraps a migration in a transaction so it rolls back cleanly rather than half-applying — and a duplicate type *should* block it, since the uniqueness is a real invariant the storefront's swatch lookup depends on. Worth a `SELECT type, count(*) FROM frames GROUP BY type HAVING count(*) > 1` before running this anywhere with data that did not come from the seed.
+work_sessions:
+  - start: '2026-08-07T10:43:32.100Z'
+    agent: claude-code
+    summary: 'Schema landed: type→text with unique index, frame_category enum column, hand-written migration 0014 with ordering assertions, seeds categorised. 11 tests pass, tsc clean, commit ffaeb084.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T10:46:55.521Z'
+    duration: '00:03:23'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test pinning the new column shape, the seed categories, and the migration's ordering
+    file: packages/api/tests/database/frames-schema.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      /**
+       * Frames become admin-writable, so their type stops being a ten-value ceiling.
+       *
+       * Shape assertions on the drizzle objects, matching
+       * shipping-config-schema.test.ts: the admin route suites mock `db`, so nothing
+       * else in the API catches a column that does not exist.
+       *
+       * The migration's ORDER is asserted too, not just its content. A backfill that
+       * runs after SET NOT NULL fails on the seeded rows, and a DROP TYPE that runs
+       * before the column conversion is refused outright by Postgres — both are
+       * silent in a diff and loud at deploy time.
+       */
+
+      import { describe, it, expect } from 'vitest'
+      import { readFileSync, readdirSync } from 'node:fs'
+      import { join } from 'node:path'
+      import { frames, frameCategoryEnum } from '../../src/database/schema/products'
+      import * as productsSchema from '../../src/database/schema/products'
+      import { sampleFrames } from '../../src/database/seed-frames'
+
+      describe('frames.type is free text', () => {
+        it('is text, not an enum, so the catalogue has no value ceiling', () => {
+          expect(frames.type).toBeDefined()
+          expect(frames.type.notNull).toBe(true)
+          expect(frames.type.enumValues).toBeUndefined()
+          expect(frames.type.getSQLType()).toBe('text')
+        })
+
+        it('no longer exports frameTypeEnum', () => {
+          expect('frameTypeEnum' in productsSchema).toBe(false)
+        })
+      })
+
+      describe('frames.category', () => {
+        it('is a closed enum of the three format rungs', () => {
+          expect(frameCategoryEnum.enumValues).toEqual([
+            'rolled',
+            'frameless',
+            'framed',
+          ])
+        })
+
+        it('is required — a frame with no rung has nowhere to render', () => {
+          expect(frames.category).toBeDefined()
+          expect(frames.category.notNull).toBe(true)
+        })
+      })
+
+      describe('seeded frames', () => {
+        it('every row carries a category', () => {
+          for (const frame of sampleFrames) {
+            expect(frame.category, `${frame.name} has no category`).toBeDefined()
+          }
+        })
+
+        it('maps formats to themselves and every moulding to framed', () => {
+          const byName = Object.fromEntries(
+            sampleFrames.map((f) => [f.name, f.category])
+          )
+          expect(byName['Rolled Canvas']).toBe('rolled')
+          expect(byName['Frameless']).toBe('frameless')
+          expect(byName['Stretch + Gold Frame']).toBe('framed')
+          expect(byName['Stretch + Wood Frame']).toBe('framed')
+        })
+
+        it('keeps every type unique — the swatch colour map is keyed on it', () => {
+          const types = sampleFrames.map((f) => f.type)
+          expect(new Set(types).size).toBe(types.length)
+        })
+      })
+
+      describe('the migration', () => {
+        const dir = join(__dirname, '../../src/database/migrations')
+        const sql = readdirSync(dir)
+          .filter((f) => f.startsWith('0014_') && f.endsWith('.sql'))
+          .map((f) => readFileSync(join(dir, f), 'utf8'))
+          .join('\n')
+
+        it('exists', () => {
+          expect(sql.length).toBeGreaterThan(0)
+        })
+
+        it('backfills category before making it NOT NULL', () => {
+          const backfill = sql.indexOf('UPDATE frames SET category')
+          const notNull = sql.indexOf('SET NOT NULL')
+          expect(backfill).toBeGreaterThan(-1)
+          expect(notNull).toBeGreaterThan(backfill)
+        })
+
+        it('drops frame_type only after the column stops referencing it', () => {
+          const convert = sql.indexOf('ALTER COLUMN "type" SET DATA TYPE text')
+          const drop = sql.indexOf('DROP TYPE')
+          expect(convert).toBeGreaterThan(-1)
+          expect(drop).toBeGreaterThan(convert)
+        })
+
+        it('is registered in the journal', () => {
+          const journal = readFileSync(join(dir, 'meta/_journal.json'), 'utf8')
+          expect(journal).toContain('"idx": 14')
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails — frameCategoryEnum does not exist yet
+    command: cd packages/api && bunx vitest run tests/database/frames-schema.test.ts
+    expected_result: FAIL - no export named 'frameCategoryEnum' from schema/products
+    status: done
+  - id: 3
+    action: implement
+    description: Replace frameTypeEnum with text + unique index, add frameCategoryEnum and the category column
+    file: packages/api/src/database/schema/products.ts
+    status: done
+    code: |-
+      // DELETE the frameTypeEnum block at :80 and its doc comment.
+      // ADD, beside the other enums:
+
+      /**
+       * Which rung of the format axis a frame sits on.
+       *
+       * Unlike `frames.type`, which an admin invents freely, this set is closed: it
+       * is the three groups the storefront's frame panel renders as
+       * "Rolled Canvas/Frameless/Framed". FrameSelector used to derive the rung from
+       * the type string, which put an admin-created FORMAT in the wrong group with
+       * nothing to catch it. A column the admin picks turns that guess into data.
+       */
+      export const frameCategoryEnum = pgEnum("frame_category", [
+        "rolled",
+        "frameless",
+        "framed",
+      ]);
+
+      // IN the frames table (:243):
+      //   type: frameTypeEnum("type").notNull(),
+      // BECOMES:
+
+          /**
+           * Slug identifying this moulding, e.g. `gold`, `stretch-maple`.
+           *
+           * Text rather than an enum because the admin creates frames: an enum is a
+           * ceiling, and a Postgres enum cannot gain a value without a migration.
+           * Unique because the storefront's swatch colour fallback is keyed on it,
+           * so two frames sharing a type are indistinguishable to that lookup.
+           */
+          type: text("type").notNull(),
+
+          category: frameCategoryEnum("category").notNull(),
+
+      // IN the table's index block, alongside typeIdx:
+      //   REPLACE  typeIdx: index("frames_type_idx").on(table.type),
+      //   WITH
+          typeIdx: uniqueIndex("frames_type_idx").on(table.type),
+
+      // AT :328, the derived type export collapses — the storefront already treats
+      // frame type as a plain string (FrameSelector.tsx:409, stores/cart.ts:152):
+      //   DELETE  export type FrameType = (typeof frameTypeEnum.enumValues)[number];
+      //   ADD     export type FrameCategory = (typeof frameCategoryEnum.enumValues)[number];
+
+      // Import `uniqueIndex` from drizzle-orm/pg-core if it is not already imported.
+  - id: 4
+    action: implement
+    description: Hand-write migration 0014 and register it in the journal
+    file: packages/api/src/database/migrations/0014_admin_editable_frames.sql
+    status: done
+    code: |-
+      -- Frames become admin-writable (#admin-frame-management).
+      --
+      -- Hand-written rather than generated: drizzle-kit emits no backfill, and every
+      -- statement below depends on the one before it.
+
+      --> statement-breakpoint
+      ALTER TABLE "frames" ADD COLUMN "category" text;
+      --> statement-breakpoint
+      -- Backfill BEFORE the NOT NULL, or the seven seeded rows fail the constraint.
+      -- rolled and frameless are formats and map to themselves; every other value in
+      -- the old enum is a moulding around a stretched canvas, so it folds into framed.
+      UPDATE frames SET category = CASE "type"::text
+        WHEN 'rolled'    THEN 'rolled'
+        WHEN 'frameless' THEN 'frameless'
+        ELSE 'framed'
+      END;
+      --> statement-breakpoint
+      CREATE TYPE "public"."frame_category" AS ENUM('rolled', 'frameless', 'framed');
+      --> statement-breakpoint
+      ALTER TABLE "frames" ALTER COLUMN "category" SET DATA TYPE "public"."frame_category" USING "category"::"public"."frame_category";
+      --> statement-breakpoint
+      ALTER TABLE "frames" ALTER COLUMN "category" SET NOT NULL;
+      --> statement-breakpoint
+      ALTER TABLE "frames" ALTER COLUMN "type" SET DATA TYPE text;
+      --> statement-breakpoint
+      -- Only now: Postgres refuses to drop a type a column still references.
+      DROP TYPE "public"."frame_type";
+      --> statement-breakpoint
+      DROP INDEX IF EXISTS "frames_type_idx";
+      --> statement-breakpoint
+      CREATE UNIQUE INDEX "frames_type_idx" ON "frames" USING btree ("type");
+
+      -- Then append to migrations/meta/_journal.json:
+      --   { "idx": 14, "version": "7", "when": <epoch ms>, "tag": "0014_admin_editable_frames", "breakpoints": true }
+  - id: 5
+    action: implement
+    description: Give every seeded frame a category
+    file: packages/api/src/database/seed-frames.ts
+    status: done
+    code: |-
+      // Add `category` to each of the seven rows in sampleFrames:
+      //   Rolled Canvas          -> category: "rolled"
+      //   Frameless              -> category: "frameless"
+      //   Stretch + Gold Frame   -> category: "framed"
+      //   Stretch + Silver Frame -> category: "framed"
+      //   Stretch + Black Frame  -> category: "framed"
+      //   Stretch + White Frame  -> category: "framed"
+      //   Stretch + Wood Frame   -> category: "framed"
+      //
+      // The file's header comment already explains that this is a FORMAT ladder
+      // rather than a moulding catalogue — the new column is that comment made
+      // enforceable, so extend the comment rather than restating it.
+  - id: 6
+    action: verify-pass
+    description: Confirm the schema test passes
+    command: cd packages/api && bunx vitest run tests/database/frames-schema.test.ts
+    expected_result: PASS
+    status: done
+  - id: 7
+    action: verify-pass
+    description: Confirm nothing else broke — typecheck plus the existing frame and cart suites
+    command: cd packages/api && bunx tsc --noEmit 2>&1 | grep -i frame; bunx vitest run tests/routes/cart-frame-pricing.test.ts tests/database/migrations.test.ts
+    expected_result: PASS, and no frame-related type errors
+    status: done
+  - id: 8
+    action: commit
+    description: Commit
+    command: git add packages/api/src/database packages/api/tests/database/frames-schema.test.ts && git commit
+    status: done
+    code: |-
+      feat(db): a frame's type is a slug it owns, and its rung is a column
+
+      The frame_type enum had ten values, seven in use and three named for woods
+      nobody stocks. That was survivable while frames were seeded in code; it is a
+      ceiling the moment an admin can create one. `type` becomes text with a unique
+      index — unique because the storefront's swatch colour fallback is keyed on it.
+
+      `category` is new and stays an enum, because unlike type it is genuinely
+      closed: it is the three rungs the frame panel renders as Rolled
+      Canvas/Frameless/Framed. FrameSelector inferred that rung from the type
+      string, which lands an admin-created moulding in the right group by accident
+      and an admin-created format in the wrong one silently.
+
+      The migration is hand-written because drizzle-kit emits no backfill, and its
+      order is load-bearing twice over: the backfill has to precede SET NOT NULL or
+      the seeded rows fail it, and DROP TYPE has to follow the column conversion or
+      Postgres refuses it. Both orderings are asserted rather than commented.
+current_step: 8
+started: '2026-08-07T10:43:30.663Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:03:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:03:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/database/frames-schema.test.ts tests/routes/cart-frame-pricing.test.ts tests/database/migrations.test.ts tests/routes/products.test.ts
+  test_output: 'frames-schema: 11 passed. Neighbours: 3 files passed, 116 passed / 63 skipped.'
+  build_passed: true
+  build_command: bunx tsc --noEmit (0 errors)
+  verified_at: '2026-08-07T10:46:31.183Z'
+completed: '2026-08-07T10:46:34.955Z'

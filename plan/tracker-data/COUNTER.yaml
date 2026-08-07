@@ -1,7 +1,7 @@
 counter:
-  current: 580
-  last_updated: '2026-08-07T07:06:27.283Z'
-  next: 581
+  current: 594
+  last_updated: '2026-08-07T11:52:23.383Z'
+  next: 595
 metadata:
   format_version: 1
   description: Global ticket counter for unique ticket numbering

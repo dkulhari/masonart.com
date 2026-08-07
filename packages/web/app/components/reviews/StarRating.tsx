@@ -36,6 +36,15 @@ export interface StarRatingProps {
   className?: string
   /** Show half stars */
   showHalfStars?: boolean
+  /**
+   * Fill and stroke for the LIT stars.
+   *
+   * Amber everywhere by default. The override exists because the home reviews
+   * band is a Loox port and Loox draws its stars in its own `stars-color`
+   * (#ff8d00) — a different orange from the page's amber, and visibly so
+   * against the blush quote card it sits on.
+   */
+  starClassName?: string
 }
 
 // ============================================================================
@@ -95,6 +104,7 @@ export function StarRating({
   onRatingChange,
   className,
   showHalfStars = true,
+  starClassName = 'fill-amber-400 text-amber-400',
 }: StarRatingProps) {
   const [hoverRating, setHoverRating] = useState<number | null>(null)
   const sizeStyles = SIZE_MAP[size]
@@ -178,7 +188,7 @@ export function StarRating({
             <Star
               className={cn(
                 sizeStyles.star,
-                'fill-amber-400 text-amber-400',
+                starClassName,
                 interactive && 'transition-colors'
               )}
             />

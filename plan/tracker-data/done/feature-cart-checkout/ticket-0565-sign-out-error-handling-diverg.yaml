@@ -1,0 +1,124 @@
+ticket_number: 565
+title: 'Sign-out error handling diverged: account page swallows signOut() rejections, admin sidebar still logs them'
+description: |-
+  ## The bug
+
+  `packages/web/app/routes/_authed/account/index.tsx:154-164`'s `handleSignOut` used to wrap `signOut()` in `try/catch`. During the recent server-cart-write-path work it became `try/finally`:
+
+  ```ts
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } finally {
+      // Whether or not the request came back cleanly, this browser is done
+      // showing this account's cart...
+      onSignedOut()
+      navigate({ to: '/' })
+    }
+  }
+  ```
+
+  A `signOut()` rejection now propagates out of `handleSignOut` as an unhandled promise rejection instead of being caught and logged. The `finally` block still runs — `onSignedOut()` clears the local cart and `navigate({ to: '/' })` still fires — so there is no user-visible regression; the browser still ends up signed out and redirected either way.
+
+  `packages/web/app/components/admin/AdminSidebar.tsx:179-192` was touched by the same piece of work and kept its `catch`:
+
+  ```ts
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+    } catch (error) {
+      // Surface the failure instead of silently redirecting with a live
+      // session — that's exactly how #341 stayed invisible.
+      console.error('Sign out failed:', error)
+    }
+    clearLocalCart()
+    window.location.href = '/'
+  }
+  ```
+
+  So the two sign-out paths in the app now disagree on how a failed sign-out is reported: the admin path logs it (per the explicit #341 rationale in its own comment — a hand-rolled body-less fetch once 500'd through the prod edge and left a session alive undetected), the account path does not.
+
+  ## Why this matters, and why it's low priority
+
+  Nothing is user-visibly broken — both paths still clear local state and navigate away. The risk is purely diagnostic: a `signOut()` failure on the account page (network blip, 500 from Better Auth, the same class of prod-edge issue #341 called out) is invisible — no console log, no telemetry, just a rejected promise the browser swallows. If sessions ever fail to sign out silently in production, the admin path would show it and the account path would not.
+
+  ## Suggested fix
+
+  Restore `try/catch` (with the same `console.error` treatment `AdminSidebar.tsx` uses, or shared telemetry) around `signOut()` in `handleSignOut`, keeping `onSignedOut()` and `navigate({ to: '/' })` running unconditionally afterward — i.e. `try/catch` followed by the cleanup, not `try/catch/finally` folding the cleanup into `catch` only. A regression test should assert that a rejected `signOut()` is caught (logged, not thrown) and that the cart is still cleared and navigation still happens.
+
+  ## Found while
+
+  Final review of the server-cart-authoritative change (ticket #511 follow-on), 2026-08-06/07. Not fixed as part of that review — filed instead, per instruction to only fix the cart pricing residual.
+feature: cart-checkout
+type: bug
+priority: low
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-06T19:10:38.850Z'
+last_updated: '2026-08-07T09:15:58.906Z'
+time_spent_minutes: 2
+labels: []
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T09:14:10.791Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-07T09:15:54.484Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `8b0c3fd3` - fix(web): a failed sign-out is reported on both paths, not just the admin one
+
+      **Files Changed**:
+      - `packages/web/app/routes/_authed/account/index.tsx` - `handleSignOut` back to `try/catch` with `console.error('Sign out failed:', error)`, matching `AdminSidebar`. `onSignedOut()` and `navigate({ to: '/' })` moved out of the `finally` and run unconditionally after the catch, so the #511 cleanup is unchanged.
+      - `packages/web/tests/routes/auth-cart-transition.test.tsx` - two regression tests under "signing out takes the cart with it": a rejected `signOut()` on the account page is logged (not left as an unhandled rejection) while the cart store, the `cartKeys.detail()` cache and the redirect all still happen; and the mirror test on the admin sidebar, so neither path can go quiet again.
+
+      **Summary**:
+      The account page swallowed `signOut()` rejections after the server-cart work turned its `try/catch` into `try/finally` — no log, no telemetry, just a rejected promise. Nothing was user-visibly broken (both paths still clear local state and navigate away), the loss was purely diagnostic: the exact #341 failure mode (a sign-out that 500s through the prod edge and leaves the session alive) was visible on the admin path and invisible on the account path. Both now report it the same way.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/auth-cart-transition.test.tsx` (from `packages/web`)
+      - Result: PASS (9 tests, 9 passing, 0 failing)
+      - Output: `Test Files  1 passed (1) / Tests  9 passed (9)`
+      - Red state recorded before the fix: `AssertionError: expected "error" to be called with arguments: [ 'Sign out failed:', Any<Error> ] / Number of calls: 0`
+      - Type-check: `bunx tsc --noEmit -p tsconfig.json` — no errors in either touched file; remaining errors are pre-existing in `app/routes/track/index.tsx` and the admin routes.
+  - author: system
+    timestamp: '2026-08-07T09:15:56.921Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-07T09:14:11.706Z'
+    agent: claude-code
+    summary: Restored try/catch + console.error around signOut() on the account page, cleanup moved out of finally and left unconditional. Two regression tests pin both sign-out paths. 9/9 pass, tsc clean on touched files. Commit 8b0c3fd3.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T09:15:58.899Z'
+    duration: '00:01:47'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+started: '2026-08-07T09:14:10.791Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:02:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:02:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/auth-cart-transition.test.tsx (in packages/web)
+  test_output: Test Files 1 passed (1) | Tests 9 passed (9)
+  build_passed: true
+  build_command: bunx tsc --noEmit -p tsconfig.json (packages/web)
+  verified_at: '2026-08-07T09:15:46.309Z'
+completed: '2026-08-07T09:15:56.921Z'

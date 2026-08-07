@@ -13,7 +13,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T11:51:47.137Z'
-last_updated: '2026-08-06T14:44:55.886Z'
+last_updated: '2026-08-07T11:40:57.829Z'
 time_spent_minutes: 0
 labels:
   - home-page-parity
@@ -66,6 +66,34 @@ comments:
   - author: system
     timestamp: '2026-08-06T14:44:55.886Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T08:07:07.985Z'
+    text: |-
+      REOPENED-AND-FIXED IN PASS: band was 124px over the bar on desktop and 37px UNDER it on mobile. Commit `e4878eb4`.
+
+      #540's cross-band pass measured this band live against mesonart on 2026-08-07.
+
+      Their band, 1440: 182.4px total — a 50.4px title block, a 16px gap, the 52px chip row, then 64px below and **nothing above**, because the New In rail before it brings its own bottom pocket. Their chips are 52px tall with 26px of horizontal padding, laid out in a flex column with the title, not a row (the `main-flex-box` gap is 16px and its two children stack).
+
+      Their band, 390: 300.8px — 32px above the heading, 32px to the chips, three rows of 40px chips at 12px row gap, then 64px below.
+
+      Ours was 306 at 1440 and 264 at 390. Both errors were the same mistake in opposite directions: the band took SectionBand's `lg:py-24` (96/96 around a 114px content row) on desktop, and read the 64px under their chips as 32 on mobile — so the same band was simultaneously too tall on one viewport and too short on the other.
+
+      Now `className="bg-band-strong pb-16 pt-8 sm:pb-16 sm:pt-8 lg:bg-background lg:pb-16 lg:pt-0"`, and the heading-to-chips gap moves to the measured `lg:mt-4` (16px) from 20. Result: 174 against their 182.4 at 1440, 296 against their 300.8 at 390.
+
+      The residual 8.4px on desktop is line-height, not spacing: their section sets its own heading at 42px/1.2 (a 50.4px block) where our headings carry the global `line-height: 1` from globals.css. Changing that is a global heading rule affecting every page, so it is left alone rather than special-cased in this one band. Flagging it here rather than fixing it.
+
+      Three tests added to tests/components/home/ShopByOrientationSection.test.tsx, with the measurements named.
+  - author: mcp-client
+    timestamp: '2026-08-07T11:40:57.829Z'
+    text: |-
+      LABEL SLIP FIXED — 3accbe8a.
+
+      ORIENTATION_OPTIONS carried "Set of 2-3". Their label uses a slash — "Set of 2/3" — and SRS §1.3 agrees with the storefront. The hyphen was a transcription slip when this chip row was built.
+
+      packages/shared/src/constants/facets.ts. The option VALUE is untouched (still set-of-2-3), so nothing that filters or links by it moves; only the printed label changes.
+
+      Verified: packages/shared tests/constants 419/419, and the two web suites that assert on the label — ShopByOrientationSection.test.tsx and DiscoverChips.test.tsx — 28/28.
 work_sessions: []
 related_tickets: []
 blocked_by: []

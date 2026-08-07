@@ -16,6 +16,24 @@ interface ServerImage {
   thumbnailUrl?: string
 }
 
+/**
+ * One line's pricing, exactly as `GET /api/cart` resolves it (#429).
+ *
+ * `base` is the stored line total — the figure the cart was written with — and
+ * `sale` is re-resolved on every read, so a cart left sitting across the end of
+ * a promotion comes back with `sale: null` by itself. `locked` means the price
+ * exists but the viewer is not in the gallery yet: the server will charge
+ * `base`, and the cart-level `savingTotal` says `0.00` because that is the
+ * truth about the money. The teaser is still shown — that is what the gate is.
+ */
+export interface CartLinePricing {
+  base: string
+  sale: string | null
+  locked: boolean
+  headline: string | null
+  percentOff: number | null
+}
+
 export interface ServerCartLine {
   id: string
   productId: string
@@ -26,6 +44,7 @@ export interface ServerCartLine {
   unitPrice: string
   framePrice: string
   lineTotal: string
+  pricing: CartLinePricing
   customizations: CartItem['customizations'] | null
   isAiGenerated: boolean
   aiDetails: CartItem['aiDetails'] | null
@@ -54,11 +73,17 @@ export interface ServerCartLine {
 
 export interface ServerCartPayload {
   id: string
+  userId: string | null
   itemCount: number
   subtotal: string
+  couponCode: string | null
+  couponDiscount: string
+  currency: string
   items: ServerCartLine[]
   savedForLater: ServerCartLine[]
   savingTotal: string
+  createdAt: string
+  updatedAt: string
 }
 
 /** Decimal string to number; anything unparseable is zero, never NaN. */

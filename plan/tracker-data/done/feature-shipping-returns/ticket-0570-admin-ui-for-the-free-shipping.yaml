@@ -1,0 +1,141 @@
+ticket_number: 570
+title: Admin UI for the free-shipping threshold, with the storefront copy reading the live value
+description: |-
+  ## Task
+  **Identify by title, not number.**
+
+  Depends on the shipping config table ticket. Two halves, and the second is the one that matters most.
+
+  ### Admin
+  A GET + PUT endpoint and a form to set the free-shipping threshold, following `packages/api/src/routes/admin/wallet-config.ts` and its screen. It belongs with the existing shipping admin (`packages/web/app/routes/admin/` — check `app/lib/admin-nav.ts` for how screens are registered). Show the current value, who last changed it and when, since the config table carries `createdBy`.
+
+  Validate: positive integer, and warn (do not block) on a value large enough that almost no basket qualifies.
+
+  ### The storefront copy must follow the setting
+  The number ₹999 is hardcoded as customer-facing text in at least six places — `AnnouncementBar`, `ProductTabs`, `TrustList`, `TrustIconsRow`, `about.tsx`, and checkout's `OrderSummary` — plus the cart's threshold logic. **If an admin can change the charged threshold while the copy keeps saying ₹999, this feature manufactures exactly the false-advertising gap that commit `70bfa9dd` just closed** (the site promised ₹999 on six surfaces while checkout charged unless ₹2,000). Every one of those surfaces must render the live value.
+
+  That means the value has to reach the client: expose it on an endpoint the storefront already calls, or put it in the root route's loader context. Do not fetch it six times.
+
+  Also confirm the cart's free-shipping progress indicator and "Estimated Total" use the same source and keep evaluating on the **net, post-discount** figure with gift cards excluded (design §5).
+
+  ## Context
+  Feature: shipping-returns. The threshold previously existed in three places with three different values; commit `70bfa9dd` unified them on a single shared constant, and this pair of tickets makes that single source editable.
+
+  Write a test that pins the coupling: change the configured value, and assert the storefront surfaces render the new number. A test that only checks the admin form saves is not enough — the failure mode here is the copy silently disagreeing with the charge.
+feature: shipping-returns
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T06:57:02.226Z'
+last_updated: '2026-08-07T08:35:27.961Z'
+time_spent_minutes: 16
+labels:
+  - frontend
+  - ui
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T07:17:32.445Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-07T08:35:22.329Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `91c32665` — feat(shipping): the free-shipping threshold is one number, editable by an admin and stated by every surface
+
+      **Files Changed**:
+      - `packages/web/app/lib/free-shipping.tsx` — provider + `useFreeShippingThreshold` / `useFreeShippingThresholdLabel` (existed, had zero consumers)
+      - `packages/web/app/routes/__root.tsx` — mounts the provider from router context, so the value is delivered once
+      - `AnnouncementBar`, `TrustIconsRow`, `TrustList`, `ProductTabs`, `checkout/OrderSummary`, `routes/shipping`, `routes/faq`, `routes/about`, `routes/posters/index`, `routes/cart/index` — all ten surfaces read the live value; the cart's progress bar, shortfall nudge and charge all take the same figure
+      - `packages/web/app/routes/admin/shipping.tsx` + `AdminSidebar.tsx` — the admin form, showing value in force, who set it, when, and any scheduled change
+      - `packages/api/src/routes/admin/shipping-config.ts`, `packages/api/src/index.ts` — GET/PUT, mounted
+      - `packages/shared/src/constants/shipping.ts` — `FREE_SHIPPING_THRESHOLD_WARN_ABOVE`, so the form and the endpoint warn at one figure
+      - Tests: `tests/lib/free-shipping-copy.test.tsx` (new), `tests/routes/admin/shipping-config.test.tsx` (new), `tests/routes/cart-free-shipping.test.tsx` (+4 configured-threshold cases); updated `AnnouncementBar`, `TrustIconsRow`, `Footer.structure`, `posters-header` where constants became functions of the label
+
+      **Summary**:
+      The threshold reaches the storefront through the root route and one React context. Ten surfaces that hardcoded ₹999 now state whatever is configured, and the cart charges by the same value it promises. The admin screen edits it in whole rupees (no paise hop), accepts 0, warns on implausibly high values without blocking, and never clobbers a scheduled row.
+
+      **Verification**:
+      - Command: `bunx vitest run` over 12 web suites (copy coupling, admin form, cart, the four affected component/source suites, sidebar, gift card, cart saving)
+      - Result: PASS (12 files, 175 tests)
+      - Also: `packages/api` shipping suites PASS (3 files, 46 tests); `packages/shared` PASS (16 files, 945 tests); `tsc --noEmit` clean in api, and web's 22 errors are pre-existing in files this ticket does not touch
+
+      **Not covered**: no API-level test for the new admin endpoint itself (the repo's admin route tests here are source/mocked rather than DB-backed); E2E for the feature stays with the feature-level pass.
+  - author: system
+    timestamp: '2026-08-07T08:35:25.591Z'
+    text: Status changed from 'in-progress' to 'done'
+work_sessions:
+  - start: '2026-08-07T08:19:36.213Z'
+    agent: claude-code
+    summary: Wrote the coupling test (red), mounted the threshold provider in __root, repointed all ten copy surfaces plus the cart at the live value, built the /admin/shipping form with provenance and warnings, shared the warn-above constant with the API. 175 web tests, 46 api, 945 shared all pass. Committed 91c32665.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T08:35:27.929Z'
+    duration: '00:15:51'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write a failing test that a changed threshold reaches the storefront copy
+    expected_result: FAIL
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm the copy still renders the hardcoded number
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Admin GET/PUT endpoint following wallet-config
+    file: packages/api/src/routes/admin/shipping-config.ts
+    status: done
+  - id: 4
+    action: implement
+    description: Admin form showing current value, last editor and timestamp
+    status: done
+  - id: 5
+    action: implement
+    description: Deliver the value to the storefront once and point all six copy surfaces plus the cart at it
+    status: done
+  - id: 6
+    action: verify-pass
+    description: Confirm copy, cart progress and charged amount all move together
+    expected_result: PASS
+    status: done
+  - id: 7
+    action: commit
+    description: Commit
+    command: 'git commit --only <paths> -m "feat(admin): set the free-shipping threshold, and make the storefront say what it charges"'
+    status: done
+current_step: 7
+started: '2026-08-07T07:17:32.445Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:16:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:16:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/lib/free-shipping-copy.test.tsx tests/routes/admin/shipping-config.test.tsx tests/routes/cart-free-shipping.test.tsx tests/components/... (12 files, packages/web); packages/api tests/routes/admin/shipping-cache-purge.test.ts tests/routes/shipping-estimate-threshold.test.ts; packages/shared full suite
+  test_output: 'web: 12 files, 175 tests passed. api shipping: 3 files, 46 tests passed. shared: 16 files, 945 tests passed. tsc --noEmit: api clean; web 22 pre-existing errors, none in files touched by this ticket.'
+  build_passed: true
+  build_command: bunx tsc --noEmit (packages/api clean, packages/shared build via tsc)
+  verified_at: '2026-08-07T08:34:40.775Z'
+completed: '2026-08-07T08:35:25.591Z'

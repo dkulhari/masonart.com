@@ -15,6 +15,7 @@ import {
   MAT_COLOR,
   MAT_CANVAS,
   MAT_ART_INSET,
+  type ImageArtBox,
   type ImageCrop,
 } from "@chobii/shared";
 import { logger } from "./logger";
@@ -259,6 +260,190 @@ export async function matToSquare(input: Buffer): Promise<Buffer> {
     .composite([{ input: art, gravity: "centre" }])
     .webp({ quality: 88 })
     .toBuffer();
+}
+
+/**
+ * Scan resolution for measureArtBox.
+ *
+ * MAT_CANVAS / 4, with a nearest-neighbour kernel so no interpolated tone is
+ * invented along the art's edge. Costs 4 pixels of precision on a 1500 grid —
+ * 0.27% of the box — for a 16x cheaper scan.
+ */
+const ART_SCAN = Math.round(MAT_CANVAS / 4);
+
+/**
+ * How far a pixel may sit from MAT_COLOR and still count as mat.
+ *
+ * WebP is lossy, so the flat mat arrives as 250 +/- a little. Tight enough that
+ * a genuinely light artwork edge — the lightest the catalogue holds measures 239
+ * — is never mistaken for mat.
+ */
+const ART_MAT_TOLERANCE = 4;
+
+/**
+ * How light a border line must be before it can be called wall rather than art.
+ *
+ * Luminance, 0..255. The lightest thing the catalogue paints with measures 239;
+ * this sits below that only because a WALL line is judged by its DARKEST pixel,
+ * not its lightest — see isWallLine.
+ */
+const ART_WALL_MIN_LUM = 205;
+
+/**
+ * How much a wall line may vary across its length and still be flat.
+ *
+ * Not zero: the walls in question are photographed, so they carry a soft
+ * top-to-bottom gradient. cosmic-harmony's runs 246 down to 225 over the height
+ * of the piece — a 21 spread with no picture in it anywhere.
+ */
+const ART_WALL_RANGE = 30;
+
+const luminance = (r: number, g: number, b: number): number =>
+  (r * 299 + g * 587 + b * 114) / 1000;
+
+/**
+ * Whether a line of pixels is bare wall — light, flat, and holding no edge.
+ *
+ * Judged on the 2nd and 98th percentiles rather than min/max so a single JPEG
+ * speck cannot keep a blank line alive. A line with any part of a picture in it
+ * has a dark pixel somewhere (the frame's own edge if nothing else), which puts
+ * p2 under ART_WALL_MIN_LUM and ends the trim.
+ */
+function isWallLine(lums: number[]): boolean {
+  if (lums.length === 0) return false;
+  const sorted = [...lums].sort((a, b) => a - b);
+  const p2 = sorted[Math.max(0, Math.floor(sorted.length * 0.02))]!;
+  const p98 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.98))]!;
+  return p2 >= ART_WALL_MIN_LUM && p98 - p2 <= ART_WALL_RANGE;
+}
+
+/**
+ * Where the artwork actually sits inside a matted square, normalised 0..1.
+ *
+ * THE MEASUREMENT THE STOREFRONT CANNOT TAKE. matToSquare bakes the mat into
+ * the pixels, so a 3:1 panorama and a perfect square both come out 1500x1500
+ * and the card has no way to tell them apart — it draws the same plate for both
+ * and the artwork inside lands anywhere between 39% and 76% of it. Persisted on
+ * the ProductImage as `artBox` so the card can re-fit every piece to one
+ * optical weight. See packages/web/app/components/product/artFraming.ts.
+ *
+ * Reads the composited output rather than the geometry that produced it, so it
+ * is equally correct for the assets already in the catalogue, which is what the
+ * backfill needs.
+ *
+ * Returns undefined when the image is entirely mat, or when the art fills it
+ * edge to edge — a full-bleed box is what "no framing" already means, and
+ * storing it would only invite a scale of exactly 1 to be computed forever.
+ */
+export async function measureArtBox(
+  squared: Buffer
+): Promise<ImageArtBox | undefined> {
+  let data: Buffer;
+  let info: { width: number; height: number; channels: number };
+
+  try {
+    const raw = await sharp(squared)
+      .resize(ART_SCAN, ART_SCAN, { kernel: "nearest", fit: "fill" })
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    data = raw.data;
+    info = raw.info;
+  } catch {
+    // An unreadable asset must never fail an upload. No box, no framing.
+    return undefined;
+  }
+
+  const { width, height, channels } = info;
+  let left = width;
+  let top = height;
+  let right = -1;
+  let bottom = -1;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * channels;
+      const isMat =
+        Math.abs(data[i]! - MAT_COLOR.r) <= ART_MAT_TOLERANCE &&
+        Math.abs(data[i + 1]! - MAT_COLOR.g) <= ART_MAT_TOLERANCE &&
+        Math.abs(data[i + 2]! - MAT_COLOR.b) <= ART_MAT_TOLERANCE;
+      if (isMat) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+    }
+  }
+
+  if (right < left || bottom < top) return undefined;
+
+  /*
+   * FULL-BLEED IMAGES LEAVE HERE, BEFORE THE SECOND PASS.
+   *
+   * A cropped photograph — every room mockup — has no mat, so the pass above
+   * returns the whole canvas and "no framing" is the correct answer. The wall
+   * trim below must never see one: it would happily shave a pale ceiling off
+   * the top of an interior and hand the card a box, and the card would then
+   * scale a room photograph as if it were a piece of art. Only a MATTED image
+   * is a candidate, and a matted image is exactly one whose photo box is
+   * smaller than its canvas.
+   */
+  const fullBleed =
+    (right - left + 1) / width >= 0.999 && (bottom - top + 1) / height >= 0.999;
+  if (fullBleed) return undefined;
+
+  /*
+   * SECOND PASS — the wall the mat scan cannot see.
+   *
+   * The pass above finds where the composited PHOTO sits, which is the right
+   * answer whenever the photograph is of the canvas. Some of the catalogue is
+   * not: cosmic-harmony and paper-layers are pieces shot hanging on a
+   * near-white wall, and that wall is inside the photo, so it comes back as
+   * part of the "artwork". Measured on cosmic-harmony the wall reads #F6F6F4
+   * against a #FAFAFA mat — four levels apart, well inside any tolerance that
+   * would not also eat real paint.
+   *
+   * Left alone it does two visible things. The card scales the wall instead of
+   * the piece, so an identically-shaped neighbour renders at a different size
+   * (the second blind A/B: "cards 3 and 4 are the same 0.52 portrait aspect yet
+   * render 115px and 157px wide"); and the wall is brighter than the plate, so
+   * a hard-edged rectangle sits inside that one tile.
+   *
+   * So: peel light, flat, edge-free lines off each side until one of them holds
+   * a picture. Judged by DARKEST pixel, not by colour — a wall can be any light
+   * tone and can carry a gradient, but it cannot contain a frame edge.
+   * cosmic-harmony goes 1.04:1 -> 0.51:1, which is what it looks like.
+   */
+  const lums: number[][] = [];
+  for (let y = 0; y < height; y++) {
+    const row: number[] = [];
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * channels;
+      row.push(luminance(data[i]!, data[i + 1]!, data[i + 2]!));
+    }
+    lums.push(row);
+  }
+  const rowSlice = (y: number, x0: number, x1: number): number[] =>
+    lums[y]!.slice(x0, x1 + 1);
+  const colSlice = (x: number, y0: number, y1: number): number[] => {
+    const out: number[] = [];
+    for (let y = y0; y <= y1; y++) out.push(lums[y]![x]!);
+    return out;
+  };
+
+  while (top < bottom && isWallLine(rowSlice(top, left, right))) top++;
+  while (bottom > top && isWallLine(rowSlice(bottom, left, right))) bottom--;
+  while (left < right && isWallLine(colSlice(left, top, bottom))) left++;
+  while (right > left && isWallLine(colSlice(right, top, bottom))) right--;
+
+  const box: ImageArtBox = {
+    x: left / width,
+    y: top / height,
+    w: (right - left + 1) / width,
+    h: (bottom - top + 1) / height,
+  };
+
+  return box.w >= 0.999 && box.h >= 0.999 ? undefined : box;
 }
 
 /** The largest centred square of a source, as a normalised rect. */

@@ -108,7 +108,9 @@ export const ORIENTATION_OPTIONS: readonly FacetOption[] = [
   option('landscape', 'Horizontal'),
   option('panoramic', 'Panoramic'),
   option('round', 'Circle'),
-  option('set-of-2-3', 'Set of 2-3'),
+  // Their label carries a slash, not a hyphen — storefront and §1.3 agree,
+  // and the hyphen here was a transcription slip (#535).
+  option('set-of-2-3', 'Set of 2/3'),
 ];
 
 /**

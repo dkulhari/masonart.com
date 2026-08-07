@@ -13,7 +13,7 @@ status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T11:51:47.175Z'
-last_updated: '2026-08-06T14:44:55.920Z'
+last_updated: '2026-08-07T11:41:01.595Z'
 time_spent_minutes: 0
 labels:
   - home-page-parity
@@ -55,6 +55,18 @@ comments:
   - author: system
     timestamp: '2026-08-06T14:44:55.920Z'
     text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:41:01.595Z'
+    text: |-
+      FOOTER DEDUPE COMMITTED — 0644a7f3.
+
+      This ticket put the trust row directly above the footer, which left the page making the same four claims twice: once in TrustIconsRow, larger and on white, and again immediately below in the footer's own USP strip. Saying a thing twice on one page halves it.
+
+      Removed the strip from packages/web/app/components/layout/Footer.tsx. The claims and their provenance now live only in TrustIconsRow, where an existing test fails if the eco / unconditional-shipping wording this footer deliberately refused ever comes back — so the dedupe cannot silently reintroduce copy we rejected.
+
+      Note this is a deliberate divergence from mesonart, whose footer does carry the strip. Theirs has no trust row above it.
+
+      Verified: packages/web tests/components/layout/Footer.structure.test.tsx passing.
 work_sessions: []
 related_tickets: []
 blocked_by: []

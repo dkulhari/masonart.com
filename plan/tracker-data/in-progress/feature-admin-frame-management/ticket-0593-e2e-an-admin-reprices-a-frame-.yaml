@@ -1,0 +1,226 @@
+ticket_number: 593
+title: E2E - an admin reprices a frame and the storefront charges it
+description: |-
+  ## Task
+
+  `tests/e2e/admin-frames.spec.ts` — the journey the unit tests cannot cover, because each of them stubs the surface on the other side of the boundary.
+
+  The flow:
+  1. Admin signs in, opens /admin/frames, sees the seeded catalogue.
+  2. Edits a framed option's `priceModifier` and its `priceAddition` — **both non-zero**, since that is the combination nothing carried before this feature and the one #566 mispriced.
+  3. Saves; the preview's quoted number is captured before saving.
+  4. Storefront: open a product, choose that frame. **The buy panel quotes the number the preview quoted.**
+  5. Add to cart. **The cart charges the same number.**
+  6. Restore the frame's original pricing so the run is repeatable.
+
+  Step 4 is the one worth the E2E cost. It crosses the cache boundary (the admin write has to have busted the frames key or the PDP shows the old price), the shared-formula boundary, and the wire.
+
+  Also: archive a frame, confirm it leaves the storefront panel; unarchive it, confirm it returns.
+
+  ## Context
+
+  Feature: admin-frame-management. Phase 6. Blocked by everything else — last ticket.
+
+  Files:
+  - tests/e2e/admin-products.spec.ts — admin auth setup and navigation to copy
+  - tests/e2e/auth.setup.ts — stored admin session
+  - playwright.config.ts at the repo root
+
+  Repo convention: E2E is written per-feature, not per-ticket — this is that pass.
+
+  Hazards, from prior sessions:
+  - Port :5173 serves a DIFFERENT app. Point the run at this project's dev server, or the suite passes vacuously against something else entirely.
+  - Scope selectors for mobile vs desktop — the same test ids exist in both trees.
+  - `await page.goto(path, { waitUntil: 'networkidle' })` in beforeEach.
+feature: admin-frame-management
+type: task
+priority: low
+status: in-progress
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T10:33:14.984Z'
+last_updated: '2026-08-07T11:28:21.147Z'
+time_spent_minutes: 0
+labels:
+  - testing
+  - e2e
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T11:25:11.661Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:28:06.631Z'
+    text: |-
+      📝 **Spec written and committed — but NOT executed. Blocked on a decision, not on code.**
+
+      **Commit**: `aae6925c` — test(e2e): an admin reprices a frame and the storefront charges it
+
+      **Why it has not run**: `./scripts/run-tests.sh e2e` does two things I will not do unprompted on this machine.
+
+      1. **Line 232, "Always: migrate schema"**, against `docker/docker-compose` — which is the same `poster-app-postgres` container on :5440 that every other session on this box shares. That applies migration 0014 (dropping the `frame_type` type, altering a column) to the shared dev database, with no down-migration.
+      2. **It starts dev servers on shared ports.** With many concurrent sessions here, that is its own collision.
+
+      Earlier in this feature I validated 0014 by building a throwaway `frames_migration_check` database on the same server and applying it there (see #582) — safe because it touched nothing else. The E2E cannot be isolated that cheaply: it needs the app, the API, Redis, seeded users and the real database together.
+
+      **What IS verified**:
+      - `bunx playwright test tests/e2e/admin-frames.spec.ts --project=chromium --list` enumerates all four tests, so the spec parses and its structure is valid.
+      - Every selector was read out of the implementation rather than guessed: `admin-frames-table` (`admin/frames/index.tsx:100`), `frame-price-basis` and `frame-selector-label` (`FrameSelector.tsx:223,237`), the swatch `<button>` with `aria-pressed` (`:314`), and the form labels the #590 tests already exercise.
+
+      **Two design points worth keeping:**
+
+      **It is deliberately NOT mocked.** The sibling admin specs intercept `/api/admin/**` with `page.route`. That is right for asserting how a screen renders a payload, and useless here — a mocked write and a mocked read agree with each other by construction while the database, the cache and the formula go untested. The three boundaries this crosses are the entire reason it exists.
+
+      **The quoted uplift is read off the admin preview, not recomputed in the test.** Whatever the preview says is what the storefront is then held to. A test that recomputed the expected number could pass while the preview lied to the admin — which is the failure mode this feature is most exposed to.
+
+      **Housekeeping in the spec**: `afterEach` restores the original pricing, and the last-active-frame test unarchives everything it archived. A repriced or archived frame leaking into later specs would surface as a failure somewhere unrelated.
+
+      Left `in-progress` rather than marked done, because the ticket's own step 4 is "confirm the E2E spec passes" and I have not.
+work_sessions:
+  - start: '2026-08-07T11:28:15.173Z'
+    agent: claude-code
+    summary: 'E2E spec written, committed (aae6925c) and validated by playwright --list (4 tests enumerate). NOT executed: run-tests.sh e2e migrates the shared dev DB and binds shared ports. Left in-progress pending a decision on running it.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T11:28:20.213Z'
+    duration: '00:00:05'
+related_tickets: []
+blocked_by:
+  - ticket: 586
+    feature: admin-frame-management
+    description: Admin API - archive a frame, never hard delete, and never the last one
+  - ticket: 591
+    feature: admin-frame-management
+    description: Admin UI - live price preview through the shared frameAddition
+  - ticket: 592
+    feature: admin-frame-management
+    description: Storefront - FrameSelector groups on category instead of guessing
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write the end-to-end journey
+    file: tests/e2e/admin-frames.spec.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      /**
+       * An admin reprices a frame and the storefront charges it.
+       *
+       * Everything below is covered by a unit test on one side or the other, and
+       * that is exactly why this exists: each of those suites stubs whatever is
+       * across the boundary. Three boundaries get crossed here and only here — the
+       * cache (an admin write that does not drop the frames key leaves the product
+       * page quoting the old price for fifteen minutes), the wire, and the shared
+       * formula that the admin preview, the buy panel and the cart all have to
+       * agree on.
+       *
+       * The frame is given a non-zero modifier AND a non-zero flat addition. No
+       * seeded frame ever carried both, which is precisely how #566 stayed invisible
+       * until an admin could set one.
+       */
+
+      import { test, expect } from '@playwright/test'
+
+      const FRAME = 'Stretch + Gold Frame'
+      const ORIGINAL = { priceModifier: '1.40', priceAddition: '0.00' }
+      const EDITED = { priceModifier: '1.50', priceAddition: '250.00' }
+
+      test.describe('admin frame pricing', () => {
+        test.afterEach(async ({ page }) => {
+          // Restore, so the run is repeatable and no later suite inherits the edit.
+        })
+
+        test('a repriced frame is quoted and charged at the new price', async ({ page }) => {
+          // 1. /admin/frames, open FRAME.
+          // 2. Set both price fields to EDITED.
+          // 3. Read the preview's quoted uplift for the mid reference price and keep it.
+          // 4. Save; expect to land back on the list showing the new modifier.
+          // 5. Storefront: open a product, select FRAME.
+          //    expect(buyPanelPrice).toContain(previewQuote)   <-- the cache boundary
+          // 6. Add to cart; expect the cart line to charge the same number.
+        })
+
+        test('the price edit is visible immediately, not after the cache expires', async ({ page }) => {
+          // Save, then hard-reload the product page straight away. The old number
+          // must not come back — if it does, a mutation is not busting the frames key.
+        })
+
+        test('archiving removes a frame from the buy panel, and unarchiving returns it', async ({ page }) => {
+          // Archive a framed option; confirm it is gone from the storefront panel and
+          // still listed, dimmed, in admin. Unarchive; confirm it comes back.
+        })
+
+        test('the last active frame cannot be archived', async ({ page }) => {
+          // Expect the guard's message rather than a page with nothing to sell.
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the spec fails against a build without the feature, or is red pending implementation
+    command: bunx playwright test tests/e2e/admin-frames.spec.ts
+    expected_result: FAIL
+    status: pending
+  - id: 3
+    action: implement
+    description: Fill in the selectors and assertions against the real screens
+    file: tests/e2e/admin-frames.spec.ts
+    status: done
+    code: |-
+      // Copy the admin auth setup from tests/e2e/admin-products.spec.ts.
+      //
+      // Scope every selector to the desktop tree — the same test ids exist in the
+      // mobile one and an unscoped locator resolves to two elements:
+      //   const desktop = page.locator('div.hidden.lg\\:block')
+      //
+      // beforeEach: await page.goto(path, { waitUntil: 'networkidle' })
+      //
+      // Point the run at THIS project's dev server. Port 5173 serves a different
+      // application; a suite aimed at it passes without testing anything here.
+  - id: 4
+    action: verify-pass
+    description: Confirm the E2E spec passes
+    command: bunx playwright test tests/e2e/admin-frames.spec.ts
+    expected_result: PASS
+    status: pending
+  - id: 5
+    action: verify-pass
+    description: Full suite, diffed against the main baseline rather than read as absolute
+    command: bun run test 2>&1 | tail -40
+    expected_result: No NEW failures against the main baseline (~86 pre-existing API failures, ~26 TS errors)
+    status: pending
+  - id: 6
+    action: commit
+    description: Commit
+    command: git add tests/e2e/admin-frames.spec.ts && git commit
+    status: pending
+    code: |-
+      test(e2e): an admin reprices a frame and the storefront charges it
+
+      Every step here is unit-tested on one side or the other, which is the reason
+      the journey is worth its cost: each of those suites stubs whatever sits across
+      the boundary. This crosses three of them — the cache, where a mutation that
+      fails to drop the frames key leaves the product page quoting the old price for
+      fifteen minutes; the wire; and the shared formula the admin preview, the buy
+      panel and the cart all have to answer identically.
+
+      The frame under test is given a non-zero modifier and a non-zero flat addition
+      together. No seeded frame ever carried both, and that is exactly how #566
+      stayed invisible until an admin could set one.
+current_step: 2
+started: '2026-08-07T11:25:11.661Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:00:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:00:00'
+      tokens: 0

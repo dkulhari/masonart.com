@@ -1,0 +1,303 @@
+ticket_number: 585
+title: Admin API - frames list, get, create, patch with cache busting
+description: |-
+  ## Task
+
+  New `packages/api/src/routes/admin/frames.ts`, mounted at `/api/admin/frames` in src/index.ts behind the same admin auth middleware as its siblings.
+
+  - `GET /` — all frames INCLUDING archived. Archived rows are returned, not filtered: the UI dims them and offers Unarchive. Filtering them here would make archiving irreversible through the UI.
+  - `GET /:id`
+  - `POST /` — create, validated by `createFrameInputSchema`
+  - `PATCH /:id` — partial, validated by `updateFrameInputSchema`
+
+  Every mutation busts `CacheKeys.PRODUCT + "frames"`. Without it the 15-minute TTL on `GET /api/products/frames` (products.ts:862) means an admin saves a price, reloads the PDP, sees the old number, and saves again.
+
+  A duplicate `type` must surface as **409**, not as a 500 escaping the unique index — the admin needs to be told which slug is taken. Pattern already established in admin/collections.ts for slug collisions.
+
+  ## Context
+
+  Feature: admin-frame-management. Phase 3 (admin API). Blocked by #582 (schema) and #583 (input schemas).
+
+  Files:
+  - packages/api/src/routes/admin/collections.ts — closest CRUD sibling; copy its shape, its auth wiring and its cache-busting
+  - packages/api/src/routes/admin/products.ts:642 — archive-not-delete precedent (next ticket)
+  - packages/api/src/index.ts:38 — where admin routes are imported and mounted
+
+  Test pattern: packages/api/tests/routes/admin/collections.test.ts. The admin route suites MOCK `db` (`vi.mock('../../../src/database')`) and mock the auth middleware via an X-Test-User header — no live database needed.
+feature: admin-frame-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T10:30:06.071Z'
+last_updated: '2026-08-07T10:55:55.240Z'
+time_spent_minutes: 3
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T10:52:30.700Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T10:55:38.978Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T10:55:49.539Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `9901b551` — feat(api): admin CRUD for frames, with the cache drop the price edit needs
+
+      **Files Changed**:
+      - `packages/api/src/routes/admin/frames.ts` — new; GET `/`, GET `/:id`, POST `/`, PATCH `/:id`
+      - `packages/api/src/lib/pg-errors.ts` — new; `isUniqueViolation` lifted out of `admin/collections.ts`
+      - `packages/api/src/routes/admin/collections.ts` — its local copy deleted, now imports the shared one
+      - `packages/api/src/index.ts` — route mounted at `/api/admin/frames`
+      - `packages/api/tests/routes/admin/frames.test.ts` — new, 14 tests
+
+      **Beyond the ticket**:
+      Rather than writing a second `isUniqueViolation`, I extracted the existing one from `admin/collections.ts` into `lib/pg-errors.ts`. Its comment records that Drizzle wraps the driver error so the pg code sits on `error.cause.code` and not `error.code` — that was worked out against the live database, and a fresh copy in the frames route would very likely have checked only the top level and turned every duplicate type into a 500. Same class of duplicate #584 removed for the image guards. `collections.test.ts` passes 26/26 unchanged, which is the evidence the extraction is behaviour-preserving.
+
+      Two small shared helpers inside the route: `purgeFramesCache()` so a later write cannot invent a near-miss cache key, and `takenType()` so create and update phrase a taken slug identically.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/frames.test.ts`
+      - Result: PASS (14 tests, 14 passing) — covers archived rows being returned, 401/403 gates, cache bust asserted on both POST and PATCH with the literal key `product:frames`, 400 on a `0.5` modifier and on a display-name type, 404 on unknown id, and 409 on duplicate type for both create and update
+      - Command: `bunx vitest run tests/routes/admin/collections.test.ts`
+      - Result: PASS (26 tests, 26 passing) — the extraction check
+      - Command: `bunx tsc --noEmit`
+      - Result: 0 errors
+
+      **Pre-existing failure, not a regression**: `tests/server.test.ts` reports `21 failed | 52 passed`. I ran it with my changes stashed and got the identical `21 failed | 52 passed`, so it is the worktree's missing database, not the new mount.
+work_sessions:
+  - start: '2026-08-07T10:52:31.300Z'
+    agent: claude-code
+    summary: Admin frames CRUD landed with cache busting and 409 on duplicate type; isUniqueViolation extracted to lib/pg-errors.ts and shared with collections. 14 tests, collections still 26/26, tsc 0. Commit 9901b551.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T10:55:55.238Z'
+    duration: '00:03:23'
+related_tickets: []
+blocked_by:
+  - ticket: 582
+    feature: admin-frame-management
+    description: Schema - frame type becomes text, new frame_category enum column
+  - ticket: 583
+    feature: admin-frame-management
+    description: Shared - frame input schemas and price bounds
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for list/get/create/patch, the 409, and cache busting
+    file: packages/api/tests/routes/admin/frames.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      /**
+       * Admin CRUD for frames.
+       *
+       * Three things here carry weight beyond the usual CRUD shape:
+       *
+       * 1. **Cache busting.** GET /api/products/frames caches for fifteen minutes.
+       *    An admin who saves a price, reloads the PDP and sees the old number will
+       *    save again — the obvious first bug, and invisible in a unit test unless
+       *    it is asserted here.
+       * 2. **Archived rows are returned, not filtered.** The screen dims them and
+       *    offers Unarchive. A list that hides them makes archiving irreversible
+       *    through the UI.
+       * 3. **A duplicate type is a 409, not a 500** escaping the unique index. The
+       *    admin has to be told which slug is taken.
+       */
+
+      import { describe, it, expect, vi, beforeEach } from 'vitest'
+      import '../../setup'
+
+      const selectMock = vi.fn()
+      const insertMock = vi.fn()
+      const updateMock = vi.fn()
+      const deleteCached = vi.fn()
+
+      vi.mock('../../../src/database', () => ({
+        db: {
+          select: (...a: unknown[]) => selectMock(...a),
+          insert: (...a: unknown[]) => insertMock(...a),
+          update: (...a: unknown[]) => updateMock(...a),
+        },
+      }))
+
+      vi.mock('../../../src/lib/cache', async (importOriginal) => ({
+        ...(await importOriginal<Record<string, unknown>>()),
+        deleteCached: (...a: unknown[]) => deleteCached(...a),
+      }))
+
+      // Auth: mirror tests/routes/admin/collections.test.ts exactly — X-Test-User
+      // header carries the role, requireAdmin allows admin and super-admin.
+
+      const ADMIN = JSON.stringify({ id: 'u1', role: 'admin' })
+
+      const frameRow = {
+        id: 'f1',
+        name: 'Stretch + Gold Frame',
+        type: 'gold',
+        category: 'framed',
+        priceModifier: '1.40',
+        priceAddition: '0.00',
+        isActive: true,
+        sortOrder: 2,
+      }
+
+      describe('GET /api/admin/frames', () => {
+        beforeEach(() => vi.clearAllMocks())
+
+        it('returns archived frames too — the screen dims them rather than hiding them', async () => {
+          // Arrange select() to resolve [frameRow, {...frameRow, id:'f2', isActive:false}]
+          // Assert the response contains BOTH, and that no isActive filter was applied.
+        })
+
+        it('rejects a non-admin', async () => {
+          // No X-Test-User -> 401; role 'customer' -> 403
+        })
+      })
+
+      describe('POST /api/admin/frames', () => {
+        beforeEach(() => vi.clearAllMocks())
+
+        it('creates a frame and busts the frames cache', async () => {
+          // Assert 201, and deleteCached called with a key containing 'frames'
+          expect(deleteCached).toHaveBeenCalled()
+        })
+
+        it('rejects a modifier the pricing formula would ignore', async () => {
+          // body priceModifier '0.5' -> 400, no insert attempted
+          expect(insertMock).not.toHaveBeenCalled()
+        })
+
+        it('reports a duplicate type as 409, not a 500 out of the unique index', async () => {
+          // insertMock rejects with a pg unique-violation (code '23505')
+          // Assert status 409 and that the message names the taken slug.
+        })
+      })
+
+      describe('PATCH /api/admin/frames/:id', () => {
+        beforeEach(() => vi.clearAllMocks())
+
+        it('accepts a price-only edit without resending the whole frame', async () => {
+          // body { priceModifier: '1.60' } -> 200
+        })
+
+        it('busts the frames cache', async () => {
+          expect(deleteCached).toHaveBeenCalled()
+        })
+
+        it('404s an unknown id rather than silently updating nothing', async () => {
+          // select resolves [] -> 404, no update attempted
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail — the route module does not exist
+    command: cd packages/api && bunx vitest run tests/routes/admin/frames.test.ts
+    expected_result: FAIL - cannot resolve ../../../src/routes/admin/frames
+    status: done
+  - id: 3
+    action: implement
+    description: 'Write the admin frames route: list, get, create, patch, with cache busting and 409 on duplicate type'
+    file: packages/api/src/routes/admin/frames.ts
+    status: done
+    code: |-
+      // Mirror packages/api/src/routes/admin/collections.ts throughout: same Hono
+      // app construction, same auth middleware wiring, same zValidator usage, same
+      // error shapes.
+      //
+      // Key points, each of which has a test above:
+      //
+      // - GET / selects every column and applies NO isActive filter, ordered by
+      //   sortOrder then name. Archived rows come back so the screen can dim them.
+      // - POST / validates with createFrameInputSchema from @chobii/shared.
+      // - PATCH /:id validates with updateFrameInputSchema, 404s when the row is
+      //   absent rather than updating zero rows and reporting success.
+      // - Both mutations, and the archive route in the next ticket, call one local
+      //   helper so the cache key cannot be spelled two ways:
+      //
+      //     /**
+      //      * The public frames list caches for fifteen minutes. Every write here has
+      //      * to drop it, or an admin saves a price, reloads the PDP, sees the old
+      //      * number and saves again.
+      //      */
+      //     async function purgeFramesCache() {
+      //       await deleteCached(`${CacheKeys.PRODUCT}frames`);
+      //     }
+      //
+      // - A duplicate type arrives as a Postgres unique violation. Catch code 23505
+      //   on frames_type_idx and return 409 naming the slug, rather than letting a
+      //   500 escape:
+      //
+      //     if (isUniqueViolation(error, 'frames_type_idx')) {
+      //       return c.json({ error: `Frame type '${input.type}' is already taken` }, 409);
+      //     }
+  - id: 4
+    action: implement
+    description: Mount the route
+    file: packages/api/src/index.ts
+    status: done
+    code: |-
+      // Beside the other admin imports (~:38):
+      import { adminFramesApp } from "./routes/admin/frames";
+
+      // Beside the other admin mounts (~:230):
+      app.route("/api/admin/frames", adminFramesApp);
+  - id: 5
+    action: verify-pass
+    description: Confirm the route tests pass
+    command: cd packages/api && bunx vitest run tests/routes/admin/frames.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: git add packages/api/src/routes/admin/frames.ts packages/api/src/index.ts packages/api/tests/routes/admin/frames.test.ts && git commit
+    status: done
+    code: |-
+      feat(api): admin CRUD for frames, with the cache drop the price edit needs
+
+      Repricing a frame was a deploy. This is the write path: list, read, create and
+      patch, mirroring the collections admin routes.
+
+      Every mutation drops the frames cache key. The public list caches for fifteen
+      minutes, so without it an admin saves a price, reloads the product page, sees
+      the old number and saves again — the first bug anyone would hit, and the one a
+      mocked-db suite will not catch unless it is asserted.
+
+      The list deliberately returns archived frames rather than filtering them: the
+      screen dims them and offers Unarchive, and a list that hides them would make
+      archiving irreversible from the UI. A duplicate type surfaces as a 409 naming
+      the taken slug instead of a 500 escaping the unique index.
+current_step: 6
+started: '2026-08-07T10:52:30.700Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:03:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:03:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/admin/frames.test.ts tests/routes/admin/collections.test.ts
+  test_output: frames 14/14 passed, collections 26/26 passed (confirms the isUniqueViolation extraction is behaviour-preserving). api tsc 0 errors. server.test.ts shows 21 failed / 52 passed, identical before and after the change — pre-existing, needs a live DB.
+  build_passed: true
+  build_command: bunx tsc --noEmit (0 errors)
+  verified_at: '2026-08-07T10:55:29.591Z'
+completed: '2026-08-07T10:55:38.978Z'

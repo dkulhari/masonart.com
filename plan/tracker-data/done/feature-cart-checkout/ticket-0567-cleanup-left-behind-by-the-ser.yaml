@@ -52,20 +52,70 @@ description: |
 feature: cart-checkout
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T19:13:48.430Z'
-last_updated: '2026-08-06T19:13:48.430Z'
-time_spent_minutes: 0
+last_updated: '2026-08-07T10:01:48.328Z'
+time_spent_minutes: 34
 labels:
   - frontend
   - backend
   - tech-debt
 acceptance_criteria: []
-comments: []
-work_sessions: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T09:27:47.347Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T10:01:30.084Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T10:01:48.327Z'
+    text: |-
+      ✅ **Completed** — all 8 deferred findings closed, each its own commit.
+
+      **Commits**:
+      1. `a2250227` — Delete dead `packages/web/src/` tree (2 files, ~4200 LOC) and its 175 dead-tree tests; drop unused `@` vitest alias.
+      2. `720cd60d`* — Widen `ServerCartPayload`/`ServerCartLine` to the real `GET /api/cart` shape (`pricing`, `userId`, `couponCode`, `couponDiscount`, `currency`, `createdAt`, `updatedAt`); drops the `data as unknown as PricedCart` cast in `cart/index.tsx`.
+      3. `7f917325` — Delete 6 dead exports from `useCart.ts` (`invalidateCart`, `setCartData`, `getCachedCart`, `useServerCartItemCount`, `useServerCartSubtotal`, `cartKeys.items()`) and their tests.
+      4. `e4ea5bf0` — Correct 3 doc blocks in `cart/index.tsx`, `sale-promotions.spec.ts`, `gallery-membership.spec.ts` that still described the write path as nonexistent.
+      5. `82fb24fd` — Fix: a superseded `recoverFromServer` call now still sets `syncError` — "add X fails, add Y succeeds" no longer silently drops X's failure notification.
+      6. `c4dac484` — Fix: `deleteCookie` moved inside the try in `mergeGuestCartOnAuth` — a transient DB error during merge no longer destroys the guest cart's only handle with no retry.
+      7. `53a4278b` — Fix: `mergeGuestCartInto` now claims the guest cart with an atomic `WHERE is_active = true` compare-and-set before touching any items, closing the concurrent-merge lost-update window.
+      8. `9d520282` — New e2e test: a UI-driven Add to Cart (not API-seeded) produces a `[data-testid="cart-saving"]` row on `/cart`.
+
+      *Commit 2's diff landed bundled inside `720cd60d` ("/create's action bar…", ticket #571) — a concurrent agent on this shared box committed while my changes were staged. Content is correct and verified; only the commit message/attribution is off. Flagging for the record rather than rewriting shared history.
+
+      **Verification**:
+      - `bunx tsc --noEmit` (web + api packages): zero new errors introduced by any commit; pre-existing baseline noise unchanged.
+      - `bunx vitest run` scoped to every touched file: 165 (stores/lib), 39 (useCart/useCartActions/auth-transition), 21 (useCartActions full suite incl. new syncError test), 83 (api cart + cart-guest-merge incl. new race-guard test) — all passing, 0 failures.
+      - Item 4's e2e test could not get a live local pass: this dev box has no `/api` Vite proxy and the API's `CORS_ORIGIN` is pinned to `localhost:3001`, so neither the shared dev server (relative fetch → 404) nor an isolated verification port (cross-origin → CORS block) can complete a UI add-to-cart locally. CI sets `VITE_API_URL=http://localhost:3000` explicitly and matches `CORS_ORIGIN`'s default, so the test runs for real there. Selectors/testids verified by static review and cross-checked against the working pattern in `tests/e2e/flows/checkout.spec.ts`. Shipped per explicit user sign-off after presenting this tradeoff.
+work_sessions:
+  - start: '2026-08-07T09:27:48.282Z'
+    agent: claude-code
+    summary: 'Completed all 8 items: deleted dead src tree + 6 dead useCart exports, widened ServerCartPayload type, fixed 3 stale docs, fixed dropped syncError on superseded writes, fixed guest-cart cookie deletion on failed merge, serialized concurrent guest-cart merges, added UI-level e2e coverage for cart saving row.'
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T10:01:29.834Z'
+    duration: '00:33:41'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-07T09:27:47.347Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:34:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:34:00'
+      tokens: 0
+completed: '2026-08-07T10:01:30.084Z'

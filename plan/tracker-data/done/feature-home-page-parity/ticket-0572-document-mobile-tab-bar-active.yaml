@@ -12,17 +12,24 @@ description: |-
 feature: home-page-parity
 type: task
 priority: low
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-07T07:05:25.605Z'
-last_updated: '2026-08-07T07:05:25.605Z'
+last_updated: '2026-08-07T08:46:21.625Z'
 time_spent_minutes: 0
 labels: []
 acceptance_criteria: []
-comments: []
+comments:
+  - author: user
+    timestamp: '2026-08-07T08:46:18.332Z'
+    text: Nothing to do here.
+  - author: system
+    timestamp: '2026-08-07T08:46:21.625Z'
+    text: Status changed from 'todo' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+completed: '2026-08-07T08:46:21.625Z'

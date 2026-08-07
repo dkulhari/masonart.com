@@ -1,39 +1,55 @@
 /**
  * CustomerReviewsSection — mesonart's home Customer Reviews band.
  *
- * The reference is docs/design/mesonart/mesonart-home-reviews-band.png. Theirs
- * is a Loox app block, and its own configuration is the spec:
+ * The bar is the live widget, not the screenshot:
+ * `docs/design/mesonart/home-reviews-band-measured-spec.md` records every
+ * number below, read off `loox-dynamic-carousel-widget`'s open shadow root on
+ * mesonart.com. Where that file and ticket #581's description table disagree,
+ * the measurement wins — #581 was written from a still, and got the structure
+ * wrong.
  *
- *   corner-radius="40" items-per-view="2" items-per-view-mobile="3"
- *   max-characters="180" autoplay-delay="5"
- *   main-color="#ae8868" stars-color="#ff8d00" quote-marks-icon="style-1"
+ * ## It is two carousels, not one rail
  *
- * ## Every slide is one thing or the other
+ * The still makes the band look like a single strip whose slides alternate
+ * blush quote card, photo, quote card. It is not. The widget is a two-column
+ * grid holding two independently-tracked swipers over the same review list:
  *
- * Their rail ALTERNATES: a blush quote card, then a media-only tile, then a
- * quote card again. A slide never carries both — the photo tiles have no
- * words on them at all and the quote cards show no photo. So a review that
- * carries media becomes a tile, a review that does not becomes a card, and
- * `buildReviewSlides` interleaves the two lists rather than concatenating
- * them: grouped, every quote card would sit off the right-hand edge on first
- * paint and the band would read as a photo strip.
+ *   grid-template-columns: 384px 1128px;  gap: 16px;  grid-template-rows: 424px
  *
- * The media has always been in the payload — `GET /api/reviews` returns
- * `media[]` and `verified` (#495). This band simply never looked at it.
+ * The left column is a FIXED blush plate that quote cards translate through —
+ * the plate never moves and never leaves the screen. The right column is a
+ * strip of 560x424 media tiles, two fully visible at a time
+ * (`items-per-view="2"`), 8px apart. One index drives both, so the words and
+ * the photographs advance in lockstep.
+ *
+ * That distinction is the whole design. Interleaving the two kinds into one
+ * scrolling rail — what shipped — puts the quote card off-screen every other
+ * step and turns a two-part composition into a photo strip with captions in it.
+ *
+ * ## The index, and why nothing here scrolls
+ *
+ * Both tracks are `translateX` off one `index`, not `scrollLeft`. A pair of
+ * scroll containers that must stay in step is two sources of truth and a
+ * feedback loop between them; one integer is neither. It also means the step
+ * is exact — a scroll-snap rail lands wherever momentum leaves it.
+ *
+ * The offsets are pure CSS. Each track is exactly as wide as its own viewport,
+ * so a percentage inside `translateX` resolves against that viewport: the text
+ * track steps `100%`, and the media track steps `50% + 4px` — half a viewport
+ * plus half the 8px gap, which is one tile. No measurement, no ResizeObserver,
+ * and it behaves identically in jsdom, where every width is 0.
  *
  * ## It is allowed to render nothing, and usually should
  *
- * The whole section — band, heading, rail, pill — returns null below
- * MIN_REVIEWS_FOR_HOME_STRIP approved reviews, and when `averageRating` is
- * null however many there are. Not a placeholder, not a zero.
+ * The whole section returns null below MIN_REVIEWS_FOR_HOME_STRIP approved
+ * reviews, and when `averageRating` is null however many there are. Not a
+ * placeholder, not a zero.
  *
- * That is not defensiveness, it is the only honest option. Nine reviews
- * averaging 4.8 is nine people, not a 4.8-star catalogue, and rounding a thin
- * sample into a home-page marketing number is exactly the lie the rule exists
- * to prevent. `averageRating: null` is what the API returns when there is
- * nothing to average; coalescing it to 0 prints "0.0", which reads as "rated
- * badly" where absent reads as "not yet rated" — the truth. Seed data holds
- * twelve approved reviews today, so the live margin is two.
+ * Nine reviews averaging 4.8 is nine people, not a 4.8-star catalogue, and
+ * rounding a thin sample into a home-page marketing number is exactly the lie
+ * the rule exists to prevent. `averageRating: null` is what the API returns
+ * when there is nothing to average; coalescing it to 0 prints "0.0", which
+ * reads as "rated badly" where absent reads as "not yet rated" — the truth.
  *
  * The threshold is deliberately the same number the /reviews aggregate uses
  * (`MIN_REVIEWS_FOR_AGGREGATE`). It is restated here rather than imported so a
@@ -43,41 +59,33 @@
  *
  * ## The score is ours, not theirs
  *
- * mesonart's band prints "9000+ Score 4.9/ 5.0" and the star widget beside it
- * carries `<title>4.9 rating (7000 reviews)</title>`. The label is hardcoded
- * and disagrees with the thing it labels. We copy the layout and not the
- * number: this prints whatever the catalogue actually holds.
+ * Their band prints "9000+ Score 4.9/ 5.0" while the star widget beside it
+ * carries `<title>4.9 rating (7000 reviews)</title>` — the label disagrees with
+ * the thing it labels. We copy the layout and not the number.
  *
- * ## The rail is CSS, not a dependency
+ * ## The timer
  *
- * `overflow-x-auto snap-x snap-mandatory`, two arrows over the edges, a dot
- * per page, and a five-second timer. No carousel library.
- *
- * The timer is the part that has to be got right, because an auto-advancing
- * carousel nobody can hold still is an accessibility failure and not a parity
- * win. It never starts under `prefers-reduced-motion`, and it stops for as
- * long as a pointer is over the rail or the keyboard is inside it. Those
- * listeners are native rather than React's synthetic `onMouseEnter`/`onFocus`
- * so that `mouseenter` means the rail and not every child it bubbles through.
+ * `autoplay-delay="5"`. An auto-advancing carousel nobody can hold still is an
+ * accessibility failure and not a parity win, so it never starts under
+ * `prefers-reduced-motion`, and it stops for as long as a pointer is over the
+ * band or the keyboard is inside it. Those listeners are native rather than
+ * React's synthetic `onMouseEnter`/`onFocus` so that `mouseenter` means the
+ * region and not every child it bubbles through.
  *
  * ## Reads client-side
  *
- * The home route's loader is SSR'd for SEO; the aggregate and the feed
- * describe the catalogue rather than this URL, and a review landing is not
- * worth a slower first byte on the home page. Same reasoning as /reviews and
- * as the promo tile on /posters.
- *
- * `productsApi.catalogueReviewStats` rather than a relative fetch: there is no
- * Vite proxy for `/api`, so a relative request from the dev server never
- * reaches the API at all.
+ * The home route's loader is SSR'd for SEO; the aggregate and the feed describe
+ * the catalogue rather than this URL, and a review landing is not worth a
+ * slower first byte on the home page. `productsApi.catalogueReviewStats` rather
+ * than a relative fetch: there is no Vite proxy for `/api`, so a relative
+ * request from the dev server never reaches the API at all.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckCircle2, ChevronLeft, ChevronRight, Play } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowRight, ChevronLeft, ChevronRight, Play } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { SectionBand } from '~/components/ui/SectionBand'
 import { DisplayHeading } from '~/components/ui/DisplayHeading'
-import { StarRating } from '~/components/reviews/StarRating'
 import { reviewMediaThumbnail } from '~/components/reviews/ReviewGridCard'
 import { buttonVariants } from '~/components/ui/Button'
 import { useReviewFeed } from '~/hooks/useReviews'
@@ -91,14 +99,8 @@ import { cn } from '~/lib/utils'
  */
 export const MIN_REVIEWS_FOR_HOME_STRIP = 10
 
-/** How many reviews the rail asks for. One screenful of scrolling, no more. */
+/** How many reviews the band asks for. One screenful of stepping, no more. */
 const RAIL_SIZE = 12
-
-/** Fraction of the visible rail one arrow press travels. Matches DiscoverChips. */
-const SCROLL_STEP = 0.8
-
-/** Slop, in px, for "is this at the end" — subpixel scroll positions are normal. */
-const EDGE_EPSILON = 1
 
 /** Loox `max-characters="180"`. A quote card is a pull quote, not the review. */
 export const MAX_BODY_CHARACTERS = 180
@@ -106,79 +108,101 @@ export const MAX_BODY_CHARACTERS = 180
 /** Loox `autoplay-delay="5"`, in ms. */
 export const AUTOPLAY_DELAY_MS = 5000
 
-/** Loox `corner-radius="40"`, on both kinds of slide. */
-const SLIDE_RADIUS = 'rounded-[40px]'
+/** How many media tiles the strip shows at once — `items-per-view="2"`. */
+export const TILES_PER_VIEW = 2
+
+/** Loox `corner-radius="40"`, on the plate and on every tile. */
+const RADIUS = 'rounded-[40px]'
 
 /**
- * Loox `main-color="#ae8868"` — the quote glyph and the verified check.
+ * The blush plate, `rgb(246 239 236)`.
  *
- * Literal rather than a token: it belongs to this one ported widget, and
- * promoting it to :root would invite the rest of the storefront to reach for
- * a colour that has no meaning outside this band.
+ * On the swiper VIEWPORT in the original, not on the slide — the colour is a
+ * fixed pane that words move through. Literals rather than tokens throughout
+ * this file: they belong to one ported widget, and promoting them to :root
+ * would invite the rest of the storefront to reach for colours that have no
+ * meaning outside this band.
  */
-const QUOTE_INK = 'text-[#ae8868]'
+const PLATE = 'bg-[#f6efec]'
 
-/** Loox `stars-color="#ff8d00"` — a warmer orange than the page's amber. */
-const LOOX_STARS = 'fill-[#ff8d00] text-[#ff8d00]'
+/** The quote glyph and nothing else. Their computed fill, not `main-color`. */
+const QUOTE_INK = 'text-[#78583b]'
 
-/** The blush plate a quote card sits on. Measured off the reference. */
-const QUOTE_PLATE = 'bg-[#f6ebe6]'
-
-// ============================================================================
-// Slides
-// ============================================================================
-
-/** One slide in the rail. A slide is media OR words, never both. */
-export type HomeReviewSlide =
-  | { kind: 'text'; key: string; review: ReviewFeedItem }
-  | { kind: 'media'; key: string; review: ReviewFeedItem; media: ReviewMediaItem }
+/** Loox `stars-color="#ff8d00"` — the slide stars. */
+const SLIDE_STARS = 'fill-[#ff8d00] text-[#ff8d00]'
 
 /**
- * Turn a page of the review feed into the rail's alternating slide list.
- *
- * A review with attachments contributes its first one as a tile and nothing
- * else — its words are not repeated in a card, exactly as on the reference.
- * A review without attachments contributes a quote card.
- *
- * The two lists are then zipped rather than concatenated. Ordering matters
- * visually: mesonart's rail reads card, tile, card, tile, and a feed sorted
- * newest-first would otherwise hand over every photo in one clump.
+ * The header's stars are a DIFFERENT orange from the slides' — `#f5c264`
+ * against `#ff8d00`. Two widgets by the same vendor on the same band, and they
+ * disagree. Copied because the band is measurably that.
  */
-export function buildReviewSlides(
-  reviews: ReviewFeedItem[]
-): HomeReviewSlide[] {
-  const text: HomeReviewSlide[] = []
-  const media: HomeReviewSlide[] = []
+const HEADER_STARS = 'fill-[#f5c264] text-[#f5c264]'
 
-  for (const review of reviews) {
+/** Body copy on the plate, `rgb(76 70 66)`. */
+const BODY_INK = 'text-[#4c4642]'
+
+/** The reviewer's name, `rgb(51 48 46)`. */
+const NAME_INK = 'text-[#33302e]'
+
+/** The verified check, `rgb(104 92 83)`. */
+const BADGE_INK = 'text-[#685c53]'
+
+// ============================================================================
+// Rail model
+// ============================================================================
+
+export interface HomeReviewsRail {
+  /** Every review, in feed order. One quote card each. */
+  quotes: ReviewFeedItem[]
+  /** The first attachment of every review that has one. One tile each. */
+  tiles: { key: string; review: ReviewFeedItem; media: ReviewMediaItem }[]
+  /** Steps the index may take — the longer of the two tracks. */
+  pageCount: number
+}
+
+/**
+ * Split a page of the feed into the band's two tracks.
+ *
+ * Not an interleave. Every review is quotable, so the left track is simply the
+ * feed; only some carry photographs, so the right track is the subset that
+ * does. The two are stepped by one index and clamped independently — see
+ * `tileIndex` — because ours, unlike theirs, is not guaranteed a photograph on
+ * every review.
+ *
+ * A review contributes at most one tile. Their strip shows one frame per
+ * customer, and a single enthusiastic reviewer with six photos would otherwise
+ * take the whole band.
+ */
+export function buildReviewsRail(reviews: ReviewFeedItem[]): HomeReviewsRail {
+  const quotes = reviews
+  const tiles = reviews.flatMap((review) => {
     const cover = review.media?.[0]
-    if (cover) {
-      media.push({ kind: 'media', key: `${review.id}-media`, review, media: cover })
-    } else {
-      text.push({ kind: 'text', key: `${review.id}-text`, review })
-    }
-  }
+    return cover ? [{ key: `${review.id}-media`, review, media: cover }] : []
+  })
 
-  const slides: HomeReviewSlide[] = []
-  for (let i = 0; i < Math.max(text.length, media.length); i += 1) {
-    const quote = text[i]
-    const tile = media[i]
-    if (quote) slides.push(quote)
-    if (tile) slides.push(tile)
-  }
+  return { quotes, tiles, pageCount: Math.max(quotes.length, tiles.length) }
+}
 
-  return slides
+/**
+ * Where the media strip sits when the quote track is at `index`.
+ *
+ * Lockstep until the strip runs out, then held at its last full pair. Stepping
+ * past that would walk empty space into the right-hand half of the band while
+ * the left half still has cards to show.
+ */
+export function tileIndex(index: number, tileCount: number): number {
+  const furthest = Math.max(0, tileCount - TILES_PER_VIEW)
+  return Math.min(index, furthest)
 }
 
 /**
  * The pull quote, cut to the widget's character cap.
  *
  * Cut in JS rather than clamped in CSS because the cap is a Loox setting and
- * not a line count: a two-line clamp says something different on a 320px
- * phone and a 1600px desktop, and the reference's cards are plainly the same
- * length of text at every width. The cut lands on a word boundary — "the
- * colours are amazing and vibr…" reads as a bug where a whole-word cut reads
- * as an excerpt.
+ * not a line count: a two-line clamp says something different on a 320px phone
+ * and a 1600px desktop, and the reference's cards are plainly the same length
+ * of text at every width. The cut lands on a word boundary — "the colours are
+ * amazing and vibr…" reads as a bug where a whole-word cut reads as an excerpt.
  */
 export function truncateBody(
   content: string,
@@ -201,8 +225,8 @@ export function truncateBody(
  *
  * A surname on a public marketing band is more of the customer than the
  * customer agreed to publish, and it is the initial mesonart shows. The
- * fallback is the same one the grid card uses: `author` is nullable because
- * the review outlives a deleted account.
+ * fallback is the same one the grid card uses: `author` is nullable because the
+ * review outlives a deleted account.
  */
 export function formatAuthorName(name: string | null | undefined): string {
   const trimmed = name?.trim()
@@ -217,50 +241,160 @@ export function formatAuthorName(name: string | null | undefined): string {
 }
 
 // ============================================================================
+// Glyphs
+// ============================================================================
+
+/**
+ * `quote-marks-icon="style-1"` — their own 54x38 path, not a typographic
+ * `&ldquo;`. Two solid comma marks; a text quote character in a heading face is
+ * a visibly different shape at this size and was the first thing that read as
+ * "not the same band".
+ */
+function QuoteMarks({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 54 38"
+      width="54"
+      height="38"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M20.7097 18.2043C22.3871 20.1936 23.2258 22.5807 23.2258 25.3656C23.2258 28.681 22.0645 31.5323 19.7419 33.9194C17.5484 36.3064 14.8387 37.5 11.6129 37.5C8.3871 37.5 5.6129 36.3728 3.29032 34.1183C1.09677 31.7312 0 28.8136 0 25.3656C0 16.0824 5.35484 7.79391 16.0645 0.5L19.9355 3.88172C18.6452 5.07527 17.4194 6.66667 16.2581 8.65592C15.2258 10.5125 14.5806 12.3029 14.3226 14.0269C16.9032 14.69 19.0323 16.0824 20.7097 18.2043ZM51.4839 18.2043C53.1613 20.1936 54 22.5807 54 25.3656C54 28.681 52.8387 31.5323 50.5161 33.9194C48.1936 36.3064 45.4839 37.5 42.3871 37.5C39.1613 37.5 36.3871 36.3064 34.0645 33.9194C31.7419 31.5323 30.5806 28.681 30.5806 25.3656C30.5806 16.3477 36 8.05914 46.8387 0.5L50.9032 3.88172C49.6129 5.07527 48.3871 6.60036 47.2258 8.45699C46.1935 10.3136 45.4839 12.1703 45.0968 14.0269C47.6774 14.69 49.8064 16.0824 51.4839 18.2043Z" />
+    </svg>
+  )
+}
+
+/**
+ * Their star, not ours.
+ *
+ * `StarRating` draws lucide's `Star`: rounded joins, blunted points, and — the
+ * part that actually gives the port away — an UNFILLED star in the page's cool
+ * neutral. Loox draws a sharp classic star and renders the empty state as a
+ * hollow outline in the SAME hue as the filled one, so the row stays one warm
+ * object. A blue-grey star in an otherwise entirely warm band is the loudest
+ * wrong note on the whole surface.
+ *
+ * The path is Loox's own `looxicons-rating-icon-fill`. A fractional star is the
+ * outline with a solid one clipped over it, which is how a 4.5 aggregate prints
+ * without a second glyph.
+ */
+function LooxStars({
+  rating,
+  size,
+  className,
+  starClassName,
+}: {
+  rating: number
+  /** Edge length in px — 24 on a card, 16 in the header. */
+  size: number
+  className?: string
+  starClassName?: string
+}) {
+  const stars = Array.from({ length: 5 }, (_, index) =>
+    Math.max(0, Math.min(1, rating - index))
+  )
+
+  return (
+    <span
+      role="img"
+      aria-label={`${rating} out of 5 stars`}
+      className={cn('flex items-center gap-1', className)}
+    >
+      {stars.map((fill, index) => (
+        <span
+          key={index}
+          aria-hidden="true"
+          className={cn('relative block', starClassName)}
+          style={{ width: size, height: size }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            className="absolute inset-0 h-full w-full"
+          >
+            <path d={LOOX_STAR_PATH} />
+          </svg>
+          {fill > 0 ? (
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="absolute inset-0 h-full w-full"
+              style={
+                fill < 1
+                  ? { clipPath: `inset(0 ${(1 - fill) * 100}% 0 0)` }
+                  : undefined
+              }
+            >
+              <path d={LOOX_STAR_PATH} />
+            </svg>
+          ) : null}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+const LOOX_STAR_PATH =
+  'M24 9.425c0 .212-.125.443-.375.693l-5.236 5.105 1.24 7.212c.01.067.015.164.015.289a.85.85 0 0 1-.151.511.51.51 0 0 1-.44.21c-.183 0-.375-.058-.577-.174L12 19.869l-6.476 3.404c-.212.115-.404.173-.577.173-.202 0-.353-.07-.454-.21a.85.85 0 0 1-.152-.511c0-.058.01-.154.03-.289l1.24-7.211-5.25-5.106C.12 9.858 0 9.628 0 9.425c0-.355.27-.577.808-.663l7.24-1.053 3.245-6.562c.183-.395.418-.592.707-.592s.524.197.707.592l3.245 6.562 7.24 1.053c.539.086.808.308.808.663Z'
+
+/** Their verified badge — a filled disc with a check knocked out of it. */
+function VerifiedBadge({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      role="img"
+      aria-label="Verified purchase"
+      className={className}
+    >
+      <path d="m10.6 16.6 7.05-7.05-1.4-1.4-5.65 5.65-2.85-2.85-1.4 1.4 4.25 4.25ZM12 22a9.738 9.738 0 0 1-3.9-.788 10.099 10.099 0 0 1-3.175-2.137c-.9-.9-1.612-1.958-2.137-3.175A9.738 9.738 0 0 1 2 12a9.74 9.74 0 0 1 .788-3.9 10.099 10.099 0 0 1 2.137-3.175c.9-.9 1.958-1.612 3.175-2.137A9.738 9.738 0 0 1 12 2a9.74 9.74 0 0 1 3.9.788 10.098 10.098 0 0 1 3.175 2.137c.9.9 1.613 1.958 2.137 3.175A9.738 9.738 0 0 1 22 12a9.738 9.738 0 0 1-.788 3.9 10.098 10.098 0 0 1-2.137 3.175c-.9.9-1.958 1.613-3.175 2.137A9.738 9.738 0 0 1 12 22Z" />
+    </svg>
+  )
+}
+
+// ============================================================================
 // Slide bodies
 // ============================================================================
 
 export interface HomeReviewQuoteCardProps {
   review: ReviewFeedItem
+  /** False for the cards parked off-plate, so only one is in the tab order. */
+  active: boolean
 }
 
-/** A text-only slide: quote mark, stars, the cut body, and the sign-off. */
-export function HomeReviewQuoteCard({ review }: HomeReviewQuoteCardProps) {
+/**
+ * One quote: stars, the cut body, and the sign-off, on a 56/40 grid.
+ *
+ * The card is transparent — the blush belongs to the plate it slides across.
+ */
+export function HomeReviewQuoteCard({ review, active }: HomeReviewQuoteCardProps) {
   return (
     <article
       data-testid="home-review-card"
       data-rating={review.rating}
-      className={cn(
-        'flex h-full flex-col overflow-hidden p-8 sm:p-10',
-        QUOTE_PLATE,
-        SLIDE_RADIUS
-      )}
+      aria-hidden={active ? undefined : 'true'}
+      // `auto 1fr auto`: the words take whatever the stars and the sign-off do
+      // not, which is what floors the sign-off. An auto third row lets a short
+      // review push it up into the middle of the plate, and because the band
+      // steps between reviews of different lengths the name would then visibly
+      // jump on every advance.
+      className="grid h-full w-full shrink-0 basis-full grid-rows-[auto_1fr_auto] gap-4 px-8 py-12 sm:px-10 sm:py-14"
     >
-      {/* `quote-marks-icon="style-1"`. Decorative — a screen reader announcing
-          a stray double-quote before every card is noise. */}
-      <span
-        data-testid="home-review-quote-mark"
-        aria-hidden="true"
-        className={cn(
-          'font-heading text-6xl leading-[0.6] tracking-tight',
-          QUOTE_INK
-        )}
-      >
-        &ldquo;
-      </span>
-
-      <div data-testid="home-review-stars" className="mt-8">
-        <StarRating
+      <div data-testid="home-review-stars">
+        {/* 24px on a 4px gap — measured. */}
+        <LooxStars
           rating={review.rating}
-          size="sm"
-          showHalfStars={false}
-          starClassName={LOOX_STARS}
+          size={24}
+          starClassName={cn('h-6 w-6', SLIDE_STARS)}
         />
       </div>
 
       <p
         data-testid="home-review-body"
-        className="mt-4 text-lg leading-relaxed text-foreground"
+        className={cn('text-xl leading-8 sm:text-2xl sm:leading-9', BODY_INK)}
       >
         {truncateBody(review.content)}
       </p>
@@ -268,14 +402,14 @@ export function HomeReviewQuoteCard({ review }: HomeReviewQuoteCardProps) {
       {/* Bottom-right, under the words — the reference's own placement. */}
       <p
         data-testid="home-review-author"
-        className="mt-auto flex items-center justify-end gap-1.5 pt-8 text-sm text-foreground"
+        className={cn(
+          'flex items-center justify-end gap-1 self-end text-lg',
+          NAME_INK
+        )}
       >
         {review.verified ? (
-          <span data-testid="home-review-verified" className={QUOTE_INK}>
-            <CheckCircle2
-              aria-label="Verified purchase"
-              className="h-4 w-4 fill-current text-[#f6ebe6]"
-            />
+          <span data-testid="home-review-verified" className={BADGE_INK}>
+            <VerifiedBadge className="h-[18px] w-[18px]" />
           </span>
         ) : null}
         {formatAuthorName(review.author?.name)}
@@ -290,11 +424,12 @@ export interface HomeReviewMediaTileProps {
 }
 
 /**
- * A media-only slide: the customer's photo or the poster frame of their clip,
- * filling the whole tile. No words, by design.
+ * A media-only tile: the customer's photo or the poster frame of their clip,
+ * filling the whole tile. No words on it, by design — their rating overlay
+ * ships in the markup and is `hidden`.
  *
  * A clip costs one poster frame and nothing else — `preload="none"`, a
- * `poster`, never `autoPlay`. Same rule as the grid (#488): a rail that
+ * `poster`, never `autoPlay`. Same rule as the grid (#488): a strip that
  * preloads its clips is tens of megabytes before anyone asks for one, and an
  * auto-playing video inside an auto-advancing carousel is two moving things
  * nobody asked for.
@@ -313,9 +448,12 @@ export function HomeReviewMediaTile({
       aria-label={`${isVideo ? 'Video' : 'Photo'} from ${formatAuthorName(
         review.author?.name
       )}, who rated ${review.product.title} ${review.rating} out of 5`}
+      // A warm neutral while the photograph loads. `bg-muted` is a cool grey
+      // and flashes blue-ish against the blush plate beside it; theirs paints
+      // each tile its own image's average colour.
       className={cn(
-        'relative h-full w-full overflow-hidden bg-muted',
-        SLIDE_RADIUS
+        'relative h-full w-full overflow-hidden bg-[#e8e0da]',
+        RADIUS
       )}
     >
       {isVideo ? (
@@ -358,6 +496,52 @@ export function HomeReviewMediaTile({
 }
 
 // ============================================================================
+// Pagination
+// ============================================================================
+
+/** How many bullets their dynamic pagination keeps on screen. */
+const BULLET_WINDOW = 5
+
+/**
+ * The window of pages their bullets show, clamped to the ends.
+ *
+ * Swiper's `dynamicBullets`: five at a time, the active one a pill, the two
+ * innermost neighbours full-size, the outermost pair shrunk to a hint that the
+ * list continues. Twenty-one flat dots under a band is a scrollbar, not a
+ * pagination.
+ */
+export function bulletWindow(
+  active: number,
+  pageCount: number
+): { index: number; size: 'active' | 'large' | 'medium' }[] {
+  if (pageCount <= 1) return []
+
+  const span = Math.min(BULLET_WINDOW, pageCount)
+  const start = Math.max(0, Math.min(active - 1, pageCount - span))
+
+  return Array.from({ length: span }, (_, offset) => {
+    const index = start + offset
+    if (index === active) return { index, size: 'active' as const }
+    const atEdge = offset === 0 || offset === span - 1
+    return { index, size: atEdge ? ('medium' as const) : ('large' as const) }
+  })
+}
+
+/**
+ * Warm, not neutral. Sampled off the reference: the active bullet is the same
+ * brown family as the quote glyph and the inactive ones are barely there.
+ * `bg-foreground` makes the dot row the darkest object in the lower half of
+ * the band, which is backwards — pagination should be the quietest thing on
+ * the surface, and a near-black row under a blush plate reads as a different
+ * design system leaking in.
+ */
+const BULLET_SIZE = {
+  active: 'h-2 w-6 bg-[#7e6044]',
+  large: 'h-2 w-2 bg-[#e5d9d2]',
+  medium: 'h-[5px] w-[5px] bg-[#ebe1db]',
+} as const
+
+// ============================================================================
 // Strip (presentational)
 // ============================================================================
 
@@ -369,7 +553,7 @@ export interface CustomerReviewsStripProps {
 }
 
 /**
- * The band, the score, the rail and the pill — or nothing at all.
+ * The header, the two tracks, the controls — or nothing at all.
  *
  * Split from the data-connected section below so the suppression rule is
  * testable without a query client.
@@ -379,57 +563,22 @@ export function CustomerReviewsStrip({
   reviewCount,
   reviews,
 }: CustomerReviewsStripProps) {
-  const railRef = useRef<HTMLUListElement>(null)
   const regionRef = useRef<HTMLDivElement>(null)
-  const [atStart, setAtStart] = useState(true)
-  const [atEnd, setAtEnd] = useState(true)
-  const [pageCount, setPageCount] = useState(0)
-  const [activePage, setActivePage] = useState(0)
+  const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const reducedMotion = usePrefersReducedMotion()
 
-  const slides = buildReviewSlides(reviews)
-
-  const syncRail = useCallback(() => {
-    const rail = railRef.current
-    if (!rail) return
-
-    const { scrollLeft, clientWidth, scrollWidth } = rail
-    const furthest = scrollWidth - clientWidth
-    setAtStart(scrollLeft <= EDGE_EPSILON)
-    setAtEnd(scrollLeft >= furthest - EDGE_EPSILON)
-
-    // A rail that has never been laid out reports 0 for everything, and so
-    // does jsdom. Zero pages means no dots rather than one meaningless dot.
-    const pages = clientWidth > 0 ? Math.ceil(scrollWidth / clientWidth) : 0
-    setPageCount(pages)
-    setActivePage(
-      pages > 0 ? Math.min(pages - 1, Math.round(scrollLeft / clientWidth)) : 0
-    )
-  }, [])
-
-  useEffect(() => {
-    const rail = railRef.current
-    if (!rail) return
-
-    syncRail()
-    rail.addEventListener('scroll', syncRail, { passive: true })
-    window.addEventListener('resize', syncRail)
-
-    return () => {
-      rail.removeEventListener('scroll', syncRail)
-      window.removeEventListener('resize', syncRail)
-    }
-  }, [syncRail, slides.length])
+  const rail = useMemo(() => buildReviewsRail(reviews), [reviews])
+  const { quotes, tiles, pageCount } = rail
 
   /**
-   * Hold the rail still while it is being used.
+   * Hold the band still while it is being used.
    *
    * Native listeners on the region, not React's `onMouseEnter`/`onFocus`:
    * `mouseenter` does not bubble, which is exactly what is wanted here — the
-   * region either has the pointer or it does not — and `focusin`/`focusout`
-   * are what tell us the keyboard has arrived in or left the rail, arrows and
-   * dots included.
+   * region either has the pointer or it does not — and `focusin`/`focusout` are
+   * what tell us the keyboard has arrived in or left the band, arrows and
+   * bullets included.
    */
   useEffect(() => {
     const region = regionRef.current
@@ -451,43 +600,34 @@ export function CustomerReviewsStrip({
     }
   }, [])
 
-  const scrollToPage = useCallback(
-    (index: number) => {
-      const rail = railRef.current
-      if (!rail) return
-      rail.scrollTo({
-        left: index * rail.clientWidth,
-        behavior: reducedMotion ? 'auto' : 'smooth',
+  /** One step, wrapping at either end — theirs loops, so ours does. */
+  const step = useCallback(
+    (direction: -1 | 1) => {
+      setIndex((current) => {
+        if (pageCount === 0) return 0
+        return (current + direction + pageCount) % pageCount
       })
     },
-    [reducedMotion]
+    [pageCount]
   )
 
-  /** One page forward, wrapping at the end. What the timer and nothing else does. */
-  const advance = useCallback(() => {
-    const rail = railRef.current
-    if (!rail) return
-
-    const furthest = rail.scrollWidth - rail.clientWidth
-    const next = rail.scrollLeft + rail.clientWidth
-    rail.scrollTo({
-      left: next > furthest - EDGE_EPSILON ? 0 : next,
-      behavior: 'smooth',
-    })
-  }, [])
-
   /**
-   * Autoplay. Off under reduced motion, off while the rail is in use, and
-   * cleared on unmount — a timer that outlives its rail scrolls a detached
-   * node forever.
+   * Autoplay. Off under reduced motion, off while the band is in use, and
+   * cleared on unmount — a timer that outlives its band steps a detached node
+   * forever.
    */
   useEffect(() => {
     if (reducedMotion || paused) return
-    if (slides.length < 2) return
+    if (pageCount < 2) return
 
-    const timer = window.setInterval(advance, AUTOPLAY_DELAY_MS)
+    const timer = window.setInterval(() => step(1), AUTOPLAY_DELAY_MS)
     return () => window.clearInterval(timer)
-  }, [reducedMotion, paused, advance, slides.length])
+  }, [reducedMotion, paused, step, pageCount])
+
+  /** A shorter feed can strand the index past the end. */
+  useEffect(() => {
+    setIndex((current) => (current >= pageCount ? 0 : current))
+  }, [pageCount])
 
   /**
    * THE SUPPRESSION RULE. Everything below this line is unreachable on a thin
@@ -502,141 +642,197 @@ export function CustomerReviewsStrip({
     return null
   }
 
-  const scrollByStep = (direction: -1 | 1) => {
-    const rail = railRef.current
-    if (!rail) return
-    rail.scrollBy({
-      left: direction * rail.clientWidth * SCROLL_STEP,
-      behavior: reducedMotion ? 'auto' : 'smooth',
-    })
-  }
-
-  const arrowClass = cn(
-    buttonVariants({ variant: 'outline', size: 'icon' }),
-    'absolute top-1/2 z-10 -translate-y-1/2 rounded-full bg-background/90 shadow-sm backdrop-blur disabled:pointer-events-none disabled:opacity-0'
-  )
+  const arrowClass =
+    'absolute top-1/2 z-10 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-background text-foreground shadow-[0_2px_12px_rgba(0,0,0,0.12)] transition hover:bg-background'
 
   return (
-    <SectionBand tone="sand" data-testid="home-reviews">
+    <SectionBand tone="plain" data-testid="home-reviews">
       {/* Heading and score on the left, View All on the right — one row with
           two ends, which is where the reference puts its pill. */}
       <div
         data-testid="home-reviews-header"
-        className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between"
+        className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between"
       >
-        <div>
-          {/* `text-section`, not a `text-3xl sm:text-4xl` of its own (#540):
-              this was the one band heading a step under the page scale, and
-              the reference sets its "Customer Reviews" at the same size as
-              every other band heading — see
-              docs/design/mesonart/mesonart-home-reviews-band.png. */}
+        <div className="grid gap-2.5">
           <DisplayHeading as="h2" className="text-section">
-            What Customers Say
+            Customer Reviews
           </DisplayHeading>
 
           {/* The REAL aggregate. Their "9000+ Score 4.9/ 5.0" is hardcoded and
-              disagrees with its own star widget; see the module comment. */}
+              disagrees with its own star widget; see the module comment.
+
+              CENTRED under the heading, not flush left with it: their row is
+              `justify-content: center` inside a column the heading sizes, and
+              flush-left is the arrangement a rebuild reaches for by default. */}
           <div
             data-testid="home-reviews-score"
-            className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2"
+            className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-base text-black"
           >
-            <span className="font-heading text-4xl font-light leading-none text-foreground">
-              {averageRating.toFixed(1)}
-            </span>
-            <StarRating
+            {/* Header stars TOUCH — the row is one continuous ink run, where
+                the card's 24px stars carry a 4px gap. Same widget, two
+                spacings, and copying only the card's makes the header row
+                read 9% wide. */}
+            <LooxStars
               rating={averageRating}
-              size="md"
-              showHalfStars
-              starClassName={LOOX_STARS}
+              size={16}
+              className="gap-0"
+              starClassName={HEADER_STARS}
             />
-            <span className="text-sm text-muted-foreground">
-              {reviewCount.toLocaleString('en-IN')} reviews
+            {/* Two spans and a gap rather than one string with a margin in
+                the middle of it — the margin is invisible to a screen reader,
+                which would otherwise read "12 reviewsScore 4.5". */}
+            <span className="flex flex-wrap items-center gap-x-1.5">
+              <span>{reviewCount.toLocaleString('en-IN')} reviews</span>
+              <span>Score {averageRating.toFixed(1)}/ 5.0</span>
             </span>
           </div>
         </div>
 
-        {/* `size: 'pill'` — the measured button, same as every other band's
-            View All (#540). */}
         <a
           href="/reviews"
           className={cn(
             buttonVariants({ variant: 'outline', size: 'pill' }),
-            'shrink-0 self-start sm:self-auto'
+            // The live element computes `border: 0px none`, but the rendered
+            // pill plainly carries a 2px black edge — a shadow, or a border
+            // the computed style does not account for. Measured off the
+            // rendering, which is what anyone actually sees.
+            'shrink-0 gap-3 self-start rounded-full text-lg font-medium text-black sm:self-auto'
           )}
         >
           View All
+          <ArrowRight aria-hidden="true" className="h-5 w-5" />
         </a>
       </div>
 
       <div
         ref={regionRef}
         data-testid="home-reviews-carousel"
-        className="relative mt-10"
+        className="mt-16"
+        role="group"
+        aria-roledescription="carousel"
+        aria-label="Customer reviews"
       >
-        <ul
-          ref={railRef}
+        {/* The arrows are positioned against THIS box and not against the
+            region, which also holds the bullets — centring on the region puts
+            them ten pixels below the tiles' midline. */}
+        <div className="relative">
+        {/* 384px of plate and the rest of the row for photographs — their
+            grid, with the media column collapsing under the plate on a phone
+            rather than shrinking the words. */}
+        <div
           data-testid="home-reviews-rail"
-          aria-label="Customer reviews"
-          className="flex snap-x snap-mandatory list-none gap-6 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden"
+          // `minmax(0,1fr)` at BOTH widths, not just the two-column one. A
+          // bare `grid` has no explicit column, so the implicit one is
+          // max-content: the tracks are as wide as all their slides put
+          // together, the plate stops clipping, and the phone gets a page
+          // that scrolls sideways.
+          className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:h-[424px] lg:grid-cols-[384px_minmax(0,1fr)]"
         >
-          {slides.map((slide) => (
-            <li
-              key={slide.key}
-              data-slide={slide.kind}
-              className="h-[26rem] w-[80%] shrink-0 snap-start sm:h-[30rem] sm:w-[21rem]"
-            >
-              {slide.kind === 'text' ? (
-                <HomeReviewQuoteCard review={slide.review} />
-              ) : (
-                <HomeReviewMediaTile
-                  review={slide.review}
-                  media={slide.media}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
+          {/* The plate. Fixed; cards translate through it.
 
-        {/* Over the rail's edges, vertically centred — the reference's arrows,
-            rather than a pair parked in the header row. */}
-        <button
-          type="button"
-          aria-label="Scroll left"
-          disabled={atStart}
-          onClick={() => scrollByStep(-1)}
-          className={cn(arrowClass, 'left-0 -translate-x-1/2')}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          aria-label="Scroll right"
-          disabled={atEnd}
-          onClick={() => scrollByStep(1)}
-          className={cn(arrowClass, 'right-0 translate-x-1/2')}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+              The glyph is a SIBLING of the clipping box, not a child of it:
+              it hangs -8,-8 off the corner, and inside `overflow-hidden` the
+              rounded corner cuts both marks into half-discs. */}
+          <div className="relative h-[380px] lg:h-full">
+            <QuoteMarks
+              className={cn(
+                'absolute -left-2 -top-2 z-10 h-[38px] w-[54px]',
+                QUOTE_INK
+              )}
+            />
+
+            <div
+              data-testid="home-reviews-plate"
+              className={cn('h-full overflow-hidden', PLATE, RADIUS)}
+            >
+              <div
+                data-testid="home-reviews-quote-track"
+                className="flex h-full w-full transition-transform duration-500 ease-out motion-reduce:transition-none"
+                style={{
+                  // The track is exactly one plate wide, so 100% is one card.
+                  transform: `translateX(calc(${index} * -100%))`,
+                }}
+              >
+                {quotes.map((review, position) => (
+                  <HomeReviewQuoteCard
+                    key={review.id}
+                    review={review}
+                    active={position === index}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* The strip. Two tiles visible, 8px apart, clipped at the column. */}
+          <div className="overflow-hidden">
+            <div
+              data-testid="home-reviews-media-track"
+              // `--step` is one tile plus one gap, and the percentage resolves
+              // against the track — which is exactly one viewport wide — so
+              // the offset needs no measurement at either width. Two tiles up
+              // on the desktop grid, one on a phone, where two would be 177px
+              // of photograph each.
+              className="flex h-[240px] w-full gap-2 transition-transform duration-500 ease-out [--step:calc(100%+8px)] sm:h-[320px] lg:h-full lg:[--step:calc(50%+4px)] motion-reduce:transition-none"
+              style={{
+                transform: `translateX(calc(var(--step) * -1 * ${tileIndex(
+                  index,
+                  tiles.length
+                )}))`,
+              }}
+            >
+              {tiles.map(({ key, review, media }) => (
+                <div
+                  key={key}
+                  className="h-full shrink-0 basis-full lg:basis-[calc((100%-8px)/2)]"
+                >
+                  <HomeReviewMediaTile review={review} media={media} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+          {/* Centred on the content edges, over the row — the reference's
+              arrows, rather than a pair parked in the header. */}
+          <button
+            type="button"
+            aria-label="Previous review"
+            onClick={() => step(-1)}
+            className={cn(arrowClass, 'left-0 -translate-x-1/2')}
+          >
+            {/* Their chevron is a heavier, darker mark than lucide's default
+                — at 2px it reads mid-grey against their near-black. */}
+            <ChevronLeft className="h-6 w-6" strokeWidth={2.5} />
+          </button>
+          <button
+            type="button"
+            aria-label="Next review"
+            onClick={() => step(1)}
+            className={cn(arrowClass, 'right-2 translate-x-1/2')}
+          >
+            <ChevronRight className="h-6 w-6" strokeWidth={2.5} />
+          </button>
+        </div>
 
         {pageCount > 1 ? (
           <div
             data-testid="home-reviews-dots"
-            className="mt-6 flex items-center justify-center gap-2"
+            className="mt-3 flex items-center gap-2 lg:pl-16"
           >
-            {Array.from({ length: pageCount }, (_, index) => (
+            {bulletWindow(index, pageCount).map((bullet) => (
               <button
-                key={index}
+                key={bullet.index}
                 type="button"
                 data-testid="home-reviews-dot"
-                data-active={index === activePage ? 'true' : 'false'}
-                aria-label={`Go to review page ${index + 1}`}
-                aria-current={index === activePage ? 'true' : undefined}
-                onClick={() => scrollToPage(index)}
+                data-size={bullet.size}
+                data-active={bullet.index === index ? 'true' : 'false'}
+                aria-label={`Go to review ${bullet.index + 1}`}
+                aria-current={bullet.index === index ? 'true' : undefined}
+                onClick={() => setIndex(bullet.index)}
                 className={cn(
-                  'h-1.5 rounded-full transition-all',
-                  index === activePage
-                    ? 'w-6 bg-foreground'
-                    : 'w-1.5 bg-foreground/25 hover:bg-foreground/50'
+                  'rounded-full transition-all',
+                  BULLET_SIZE[bullet.size]
                 )}
               />
             ))}
@@ -654,9 +850,9 @@ export function CustomerReviewsStrip({
 /**
  * `(prefers-reduced-motion: reduce)`, as state rather than a call.
  *
- * State because it gates a timer set up in an effect, and a user who flips
- * the OS setting mid-visit should have the carousel stop then, not on the
- * next navigation. Guarded for SSR and for jsdom-shaped environments where
+ * State because it gates a timer set up in an effect, and a user who flips the
+ * OS setting mid-visit should have the carousel stop then, not on the next
+ * navigation. Guarded for SSR and for jsdom-shaped environments where
  * `matchMedia` may be missing entirely.
  */
 function usePrefersReducedMotion(): boolean {

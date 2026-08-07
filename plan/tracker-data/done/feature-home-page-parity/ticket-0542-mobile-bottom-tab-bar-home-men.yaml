@@ -9,11 +9,11 @@ description: |-
 feature: home-page-parity
 type: task
 priority: high
-status: in-progress
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T11:51:47.196Z'
-last_updated: '2026-08-06T12:28:04.356Z'
+last_updated: '2026-08-07T07:48:34.585Z'
 time_spent_minutes: 0
 labels:
   - home-page-parity
@@ -68,9 +68,13 @@ comments:
       - Supersedes nothing; adds chrome that did not exist.
       - Harness gotcha for whoever screenshots this next: a plain scrollTo + screenshot mid-page renders fixed elements ~77px low (page still settling). Use scratchpad/shoot.mjs, which pre-scrolls the whole page first.
       - Pre-existing failure unrelated to this ticket: tests/styles/design-tokens.test.ts "ramps the gutter to 36px at lg and 48px at xl" (#540, tailwind.config.ts / globals.css — not files I touched).
+  - author: system
+    timestamp: '2026-08-07T07:48:34.585Z'
+    text: Status changed from 'in-progress' to 'done'
 work_sessions: []
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
 started: '2026-08-06T12:27:34.003Z'
+completed: '2026-08-07T07:48:34.585Z'

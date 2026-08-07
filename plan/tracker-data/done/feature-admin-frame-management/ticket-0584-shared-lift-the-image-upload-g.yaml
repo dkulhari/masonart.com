@@ -1,0 +1,237 @@
+ticket_number: 584
+title: Shared - lift the image upload guards out of admin/products
+description: |-
+  ## Task
+
+  `PRODUCT_IMAGE_TYPES` and `MAX_PRODUCT_IMAGE_MB` are module-private constants in packages/api/src/routes/admin/products.ts:209-210. The frames upload endpoint needs the same MIME allowlist and the same size ceiling.
+
+  Lift both into a shared module and have `admin/products.ts` import them, so the two endpoints cannot end up disagreeing about what an admin may upload. Copying them would be exactly the class of duplicate this feature exists to remove.
+
+  Also add the three reference print prices the admin price preview quotes against, beside `frameAddition` in shared/constants/frames.ts. They live in shared rather than in the form because the preview and its test both need the same figures, and a preview whose reference prices drift from its test asserts nothing.
+
+  ## Context
+
+  Feature: admin-frame-management. Phase 2 (shared contracts). Independent of the schema ticket — can run in parallel with it.
+
+  Files:
+  - packages/api/src/routes/admin/products.ts:209-210, :257, :263 (the guards and their two uses)
+  - packages/shared/src/constants/frames.ts:570 (frameAddition — put the reference prices next to it)
+
+  Reference prices: 1499, 4999, 14999. Three rather than one, because a frame is priced as a percentage precisely so its cost tracks the size of the piece — a single sample row would conceal the behaviour the admin is choosing.
+feature: admin-frame-management
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T10:27:53.929Z'
+last_updated: '2026-08-07T10:50:54.006Z'
+time_spent_minutes: 2
+labels:
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T10:48:42.689Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T10:50:42.332Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T10:50:49.379Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `35c91d79` — refactor(shared): one upload guard and one set of preview prices, not two
+
+      **Files Changed**:
+      - `packages/shared/src/constants/frames.ts` — `FRAME_PREVIEW_REFERENCE_PRICES`, `ADMIN_IMAGE_MIME_TYPES`, `MAX_ADMIN_IMAGE_MB` appended below `frameAddition`
+      - `packages/api/src/routes/admin/products.ts` — the two module-private constants deleted, `@chobii/shared` imported, both call sites and the error message updated
+      - `packages/shared/tests/constants/frame-preview.test.ts` — new, 6 tests
+
+      **Summary**:
+      Reference prices sit directly beneath `frameAddition` rather than in their own module, so the formula and the figures that demonstrate it are read together.
+
+      Added an ordering assertion beyond the ticket's list: the form renders the three rows small-to-large and will not sort them, so the constant being out of order would silently produce a confusing preview rather than an error.
+
+      `ADMIN_IMAGE_MIME_TYPES` is `readonly string[]` rather than a tuple, which keeps `.includes(file.type)` working without a cast at the two call sites in `admin/products.ts`.
+
+      **Verification**:
+      - Command: `bun test tests/constants/frame-preview.test.ts`
+      - Result: PASS (6 tests, 6 passing)
+      - Command: `bunx vitest run tests/routes/admin/products.test.ts` — the suite that exercises the lifted guards
+      - Result: PASS (117 tests, 117 passing)
+      - Command: `bunx tsc --noEmit` (packages/api)
+      - Result: 0 errors
+      - Build: shared `tsc` clean and rebuilt, since the API imports the built output
+work_sessions:
+  - start: '2026-08-07T10:48:43.592Z'
+    agent: claude-code
+    summary: Upload guards lifted to shared and re-imported by admin/products; preview reference prices added beside frameAddition. 6 tests, admin/products 117 pass, api tsc 0 errors. Commit 35c91d79.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T10:50:54.005Z'
+    duration: '00:02:10'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing test for the shared upload guards and the preview reference prices
+    file: packages/shared/tests/constants/frame-preview.test.ts
+    expected_result: FAIL
+    status: done
+    code: |
+      /**
+       * The figures the admin frame form quotes against, and the upload guards the
+       * frames endpoint shares with the products one.
+       *
+       * The reference prices are shared rather than inlined in the form because the
+       * preview and this test both need them: a preview whose sample prices drift
+       * from its test is a preview that asserts nothing.
+       */
+
+      import { describe, it, expect } from 'bun:test'
+      import {
+        FRAME_PREVIEW_REFERENCE_PRICES,
+        ADMIN_IMAGE_MIME_TYPES,
+        MAX_ADMIN_IMAGE_MB,
+        frameAddition,
+      } from '../../src/index'
+
+      describe('FRAME_PREVIEW_REFERENCE_PRICES', () => {
+        it('spans small to large, because a multiplier behaves differently across them', () => {
+          expect(FRAME_PREVIEW_REFERENCE_PRICES).toEqual([1499, 4999, 14999])
+        })
+
+        it('is more than one price — one sample would hide what a multiplier does', () => {
+          expect(FRAME_PREVIEW_REFERENCE_PRICES.length).toBeGreaterThan(1)
+        })
+
+        it('produces a visibly different uplift at each rung', () => {
+          const frame = { priceModifier: '1.40', priceAddition: '0.00' }
+          const uplifts = FRAME_PREVIEW_REFERENCE_PRICES.map((p) =>
+            frameAddition(p, frame)
+          )
+          expect(new Set(uplifts).size).toBe(uplifts.length)
+        })
+      })
+
+      describe('admin image upload guards', () => {
+        it('allows the three formats the product uploader already allows', () => {
+          expect(ADMIN_IMAGE_MIME_TYPES).toEqual([
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+          ])
+        })
+
+        it('keeps the existing 10MB ceiling', () => {
+          expect(MAX_ADMIN_IMAGE_MB).toBe(10)
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the test fails
+    command: cd packages/shared && bun test tests/constants/frame-preview.test.ts
+    expected_result: FAIL - no export named 'FRAME_PREVIEW_REFERENCE_PRICES'
+    status: done
+  - id: 3
+    action: implement
+    description: Add the reference prices beside frameAddition and the upload guards
+    file: packages/shared/src/constants/frames.ts
+    status: done
+    code: |-
+      // Append below frameAddition, so the formula and the figures that demonstrate
+      // it sit together:
+
+      /**
+       * The print prices the admin frame form quotes a frame against.
+       *
+       * Three rather than one. A frame is priced as a proportion of the piece
+       * precisely so its cost tracks the size of it — a single sample row would show
+       * the admin a number while hiding the behaviour they are actually choosing.
+       * Small, mid and large, spanning the catalogue.
+       */
+      export const FRAME_PREVIEW_REFERENCE_PRICES: readonly number[] = [
+        1499, 4999, 14999,
+      ];
+
+      /**
+       * What an admin may upload as imagery, shared by the product and frame
+       * endpoints. Two endpoints with two private copies of this is how one of them
+       * ends up quietly accepting a format the pipeline cannot process.
+       */
+      export const ADMIN_IMAGE_MIME_TYPES: readonly string[] = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+      ];
+
+      export const MAX_ADMIN_IMAGE_MB = 10;
+
+      // Export all three from packages/shared/src/index.ts if constants/frames is not
+      // already re-exported wholesale.
+  - id: 4
+    action: implement
+    description: Point admin/products at the shared guards instead of its own copies
+    file: packages/api/src/routes/admin/products.ts
+    status: done
+    code: |-
+      // DELETE the two private constants at :209-210:
+      //   const PRODUCT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+      //   const MAX_PRODUCT_IMAGE_MB = 10;
+      //
+      // IMPORT from @chobii/shared instead, and update the two uses:
+      //   :257  if (!ADMIN_IMAGE_MIME_TYPES.includes(file.type)) {
+      //   :263  if (file.size > MAX_ADMIN_IMAGE_MB * 1024 * 1024) {
+      //   :265  { error: `File too large. Maximum size is ${MAX_ADMIN_IMAGE_MB}MB` },
+  - id: 5
+    action: verify-pass
+    description: Confirm both suites pass — shared's new test and the product upload tests that exercise the guards
+    command: cd packages/shared && bun run build && bun test tests/constants/frame-preview.test.ts && cd ../api && bunx vitest run tests/routes/admin/products.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: git add packages/shared packages/api/src/routes/admin/products.ts && git commit
+    status: done
+    code: |-
+      refactor(shared): one upload guard and one set of preview prices, not two
+
+      The frames endpoint needs the same MIME allowlist and size ceiling the product
+      uploader already enforces, and those were module-private constants. Copying
+      them is how two endpoints end up disagreeing about what an admin may upload,
+      so they move to shared and products imports them back.
+
+      The frame preview's reference print prices land beside frameAddition for the
+      same reason: the form and its test both need those figures, and a preview whose
+      sample prices drift from its test asserts nothing at all.
+current_step: 6
+started: '2026-08-07T10:48:42.689Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:02:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:02:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bun test tests/constants/frame-preview.test.ts && bunx vitest run tests/routes/admin/products.test.ts && bunx tsc --noEmit
+  test_output: 'frame-preview: 6 pass. admin/products (the suite exercising the lifted guards): 117 passed. API tsc: 0 errors.'
+  build_passed: true
+  build_command: bun run build (shared tsc) + bunx tsc --noEmit (api)
+  verified_at: '2026-08-07T10:50:39.255Z'
+completed: '2026-08-07T10:50:42.332Z'

@@ -155,6 +155,24 @@ shippingApp.get("/options/:id", async (c) => {
 });
 
 /**
+ * GET /api/shipping/config - The shipping money rules the storefront prints.
+ *
+ * The storefront says "Free shipping on orders over ₹999" on ten surfaces, and
+ * since #569 that number is an admin setting rather than something the bundle
+ * knows. This is where the client learns it: the root route calls this once per
+ * document, before the first paint, and every surface renders what it returned.
+ *
+ * Deliberately unauthenticated and deliberately tiny. It is public copy, it is
+ * read on every page load, and `getFreeShippingThreshold` already answers it
+ * from Redis and never throws — a failed read returns the same constant the
+ * storefront would have bundled, so the copy and the charge still agree.
+ */
+shippingApp.get("/config", async (c) => {
+  const freeShippingThreshold = await getFreeShippingThreshold();
+  return c.json({ freeShippingThreshold });
+});
+
+/**
  * GET /api/shipping/estimate - Estimate shipping cost for cart
  * Returns available shipping options with calculated costs
  */

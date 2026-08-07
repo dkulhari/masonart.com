@@ -1,27 +1,40 @@
 status: in-progress
-last_updated: '2026-08-07T07:06:27.557Z'
-total_tickets: 3
+last_updated: '2026-08-07T11:52:32.788Z'
+total_tickets: 2
 summary:
   critical: 0
-  high: 3
-  medium: 0
-  low: 0
+  high: 0
+  medium: 1
+  low: 1
 priorities:
-  high:
+  medium:
     - feature: home-page-parity
       tickets:
-        - ticket_number: 540
-          title: Section rhythm, type scale and button system pass across the whole page
+        - ticket_number: 594
+          title: Card art framing — measure artBox server-side and re-frame each piece on equal ink area
           assignee: unassigned
           blocked_by: []
-        - ticket_number: 542
-          title: Mobile bottom tab bar — Home, Menu, Search, Shop, Cart, Account
-          assignee: unassigned
-          blocked_by: []
-    - feature: shipping-returns
+  low:
+    - feature: admin-frame-management
       tickets:
-        - ticket_number: 569
-          title: Shipping config table so the free-shipping threshold is set in admin, not at build time
+        - ticket_number: 593
+          title: E2E - an admin reprices a frame and the storefront charges it
           assignee: unassigned
-          blocked_by: []
-blocked_tickets: []
+          blocked_by:
+            - ticket_number: 586
+              title: Admin API - archive a frame, never hard delete, and never the last one
+            - ticket_number: 591
+              title: Admin UI - live price preview through the shared frameAddition
+            - ticket_number: 592
+              title: Storefront - FrameSelector groups on category instead of guessing
+blocked_tickets:
+  - ticket_number: 593
+    title: E2E - an admin reprices a frame and the storefront charges it
+    blocked_by:
+      - ticket_number: 586
+        title: Admin API - archive a frame, never hard delete, and never the last one
+      - ticket_number: 591
+        title: Admin UI - live price preview through the shared frameAddition
+      - ticket_number: 592
+        title: Storefront - FrameSelector groups on category instead of guessing
+    description: Admin API - archive a frame, never hard delete, and never the last one, Admin UI - live price preview through the shared frameAddition, Storefront - FrameSelector groups on category instead of guessing

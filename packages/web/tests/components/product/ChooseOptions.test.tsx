@@ -231,17 +231,81 @@ describe('the trigger', () => {
     expect(trigger.getAttribute('aria-hidden')).toBeNull()
   })
 
-  it('is a white pill at the foot of the image, the way theirs is', () => {
+  it('is a white pill at the foot of the image from `md`, the way theirs is', () => {
     render(<ChooseOptions product={product} />, { wrapper })
     const trigger = screen.getByRole('button', { name: /choose options/i })
 
     // 172x40 at radius 60 on a white fill, centred — not our full-bleed black
-    // bar. `h-10` is their 40; `rounded-pill` is their 60.
+    // bar. `h-10` is their 40; `rounded-pill` is their 60. Every one of these
+    // is `md:`-gated now, because below `md` there is no hover to reveal it
+    // and a permanently printed pill sits across the artwork.
     expect(trigger.className).toContain('h-10')
-    expect(trigger.className).toContain('rounded-pill')
-    expect(trigger.className).toContain('bg-background')
-    expect(trigger.className).toContain('-translate-x-1/2')
+    expect(trigger.className).toContain('md:bg-background')
+    expect(trigger.className).toContain('md:rounded-pill')
+    expect(trigger.className).toContain('md:-translate-x-1/2')
+    expect(trigger.className).toContain('md:left-1/2')
     expect(trigger.className).not.toContain('inset-x-4')
+  })
+
+  /**
+   * #530. The pill measured 163x37 on a 390 viewport and was drawn across the
+   * artwork's lower third at all times, white on pale cream, so its own edge
+   * disappeared and the label read as type printed onto the picture. It was
+   * centred horizontally and bottom-anchored 25px up: centred on one axis and
+   * arbitrary on the other.
+   *
+   * The reference's equivalent is a 40px corner button that costs the image
+   * nothing, so below `md` that is what this is.
+   */
+  it('is a 40px corner button below `md`, not a slab across the artwork', () => {
+    render(<ChooseOptions product={product} />, { wrapper })
+    const trigger = screen.getByRole('button', { name: /choose options/i })
+
+    // Square, round, cornered — and un-prefixed, so this IS the small-screen
+    // shape rather than something a breakpoint turns on.
+    expect(trigger.className).toContain('h-10')
+    expect(trigger.className).toContain('w-10')
+    expect(trigger.className).toContain('rounded-full')
+    expect(trigger.className).toContain('bottom-4')
+    expect(trigger.className).toContain('right-4')
+    // An edge of its own against a light picture: white on cream has none.
+    expect(trigger.className).toMatch(/shadow-\[/)
+    // Nothing centres it horizontally until `md`.
+    expect(trigger.className).not.toMatch(/(^|\s)-translate-x-1\/2/)
+    expect(trigger.className).not.toMatch(/(^|\s)left-1\/2/)
+  })
+
+  /**
+   * #530, second blind A/B. The corner button above replaced the slab, but it
+   * arrived WHITE, and the plate underneath it had just become #EFEFEF — a
+   * 1.1:1 fill difference held together only by a drop shadow, so it read as a
+   * hole punched in the tile rather than a control sitting on it.
+   *
+   * The reference's own mobile quick-add measures rgb(23 23 23), the same
+   * near-black as --foreground. Below `md` so is ours; from `md` the measured
+   * white pill returns, and there it is only drawn on hover.
+   */
+  it('is DARK below `md`, where it sits on the plate rather than on hover', () => {
+    render(<ChooseOptions product={product} />, { wrapper })
+    const trigger = screen.getByRole('button', { name: /choose options/i })
+
+    // Un-prefixed, so this is the small-screen fill.
+    expect(trigger.className).toMatch(/(^|\s)bg-foreground(\s|$)/)
+    expect(trigger.className).toMatch(/(^|\s)text-background(\s|$)/)
+    // …and the white pill is reinstated only from `md`, so one rule cannot
+    // silently become the other.
+    expect(trigger.className).toContain('md:bg-background')
+    expect(trigger.className).toContain('md:text-foreground')
+    expect(trigger.className).not.toMatch(/(^|\s)bg-background(\s|$)/)
+  })
+
+  it('keeps its name when the label is only drawn from `md`', () => {
+    render(<ChooseOptions product={product} />, { wrapper })
+    // The corner button shows an icon, so the words have to survive as the
+    // accessible name or the control becomes an unlabelled glyph on mobile.
+    const trigger = screen.getByRole('button', { name: /choose options/i })
+    expect(trigger.textContent).toContain('Choose Options')
+    expect(trigger.querySelector('.sr-only')?.className).toContain('md:not-sr-only')
   })
 
   it('stays reachable by keyboard, so hover is not the only way in', () => {

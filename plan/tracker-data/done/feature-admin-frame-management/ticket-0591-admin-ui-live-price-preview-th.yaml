@@ -1,0 +1,301 @@
+ticket_number: 591
+title: Admin UI - live price preview through the shared frameAddition
+description: |-
+  ## Task
+
+  The price preview, beneath the two price inputs, recomputing as the admin types:
+
+  ```
+  Stretch + Gold Frame  ×1.40  +₹0
+    on a ₹1,499 print    +₹600     → ₹2,099
+    on a ₹4,999 print    +₹2,000   → ₹6,999
+    on a ₹14,999 print   +₹6,000   → ₹20,999
+  ```
+
+  **It calls `frameAddition()` from @chobii/shared directly.** Not a reimplementation, not a display-formatted copy, not "the same arithmetic inline".
+
+  This is the whole lesson of #566. That bug existed because the PDP re-derived a formula the server already owned, and it went unnoticed for as long as it did because every seeded frame happened to make both answers agree. A preview with its own arithmetic would be that bug again in a worse place — this is the screen whose entire job is to convince the admin the number is right.
+
+  Three reference prices from `FRAME_PREVIEW_REFERENCE_PRICES` (#584), not one. A frame is priced as a proportion of the piece precisely so its cost tracks the size of it; a single sample row would show a number while hiding the behaviour being chosen.
+
+  **The coupling test is the point of this ticket**: assert the preview's output equals the server's answer for a frame carrying BOTH a non-zero `priceModifier` AND a non-zero `priceAddition`. That is #566's missing case, asserted from the admin side.
+
+  ## Context
+
+  Feature: admin-frame-management. Phase 4 (admin UI). Blocked by the form ticket.
+
+  Files:
+  - packages/shared/src/constants/frames.ts:570 — frameAddition, the one formula
+  - packages/api/src/routes/cart.ts — resolveFramePrice, the server side of the coupling
+  - packages/web/app/components/product/FrameSelector.tsx:110 — the storefront already calls frameAddition; this joins that chain rather than starting a new one
+feature: admin-frame-management
+type: task
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T10:33:14.959Z'
+last_updated: '2026-08-07T11:16:35.329Z'
+time_spent_minutes: 3
+labels:
+  - frontend
+  - ui
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T11:13:11.778Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: system
+    timestamp: '2026-08-07T11:16:15.812Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:16:28.465Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `5a711db0` — feat(admin): the frame form quotes the price the customer will actually pay
+
+      **Files Changed**:
+      - `packages/web/app/routes/admin/frames/FramePricePreview.tsx` — new; `framePreviewRows` and `FramePricePreview`
+      - `packages/web/app/routes/admin/frames/FrameForm.tsx` — the reserved slot filled
+      - `packages/web/tests/routes/admin/frames-price-preview.test.tsx` — new, 12 tests
+
+      **On how strong the coupling claim actually is** — worth stating precisely rather than overclaiming:
+
+      I checked what the server does rather than assuming. `resolveFramePrice` (`api/src/routes/cart.ts:354`) is a `.toFixed(2)` wrapper over `frameAddition`, and `FrameSelector.tsx:110` calls `frameAddition` directly since #566. So the admin preview, the buy panel and the cart are now calling **literally the same function** — the coupling is structural, not a convention.
+
+      That makes `expect(row.addition).toBe(frameAddition(...))` close to tautological on its own. Its real job is to fail loudly if someone later "optimises" the preview by inlining the arithmetic. The genuinely independent checks are the behavioural ones: that the flat column contributes exactly +250 at every size (#566's failure, from the admin side), that a below-one modifier clamps to zero rather than discounting, and that a percentage-only frame scales with the piece while a flat-only frame does not.
+
+      **Two tests beyond the ticket:**
+      - **Rupee rounding is pinned.** `frameAddition` rounds at calculation time, deliberately, so the quoted number is the one that reaches the cart. A preview that re-rounded at display time or showed paise would drift in exactly #566's way. Asserted with a deliberately awkward `1.333` / `0.50`.
+      - **A flat-only frame adds the same at every size**, the complement of the scaling test — together they prove the two columns behave differently, so a preview showing one could never stand in for both.
+
+      **One deliberate behaviour**: nothing is quoted until *both* fields parse. A half-typed `1.` parses to `1` and an empty box to `NaN`; quoting either mid-keystroke would show a wrong number on the one screen whose purpose is to be trusted. It renders a prompt instead.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/routes/admin/frames-price-preview.test.tsx`
+      - Result: PASS (12 tests, 12 passing)
+      - Command: `bunx vitest run tests/routes/admin/ tests/lib/admin-nav.test.ts`
+      - Result: PASS (9 files, 147 tests passing)
+      - Command: `bunx tsc --noEmit` → 34, exactly the measured baseline
+
+      **A test-authoring note**: two of my failures this phase were assertion ambiguity, not component bugs — `/4,999/` also matches `₹14,999`, and the Rolled Canvas frame's name equals its rung label. Both are now matched with the `₹` prefix or via the unique `type`.
+
+      **Phase 4 (admin UI) is complete**: #589, #590, #591.
+work_sessions:
+  - start: '2026-08-07T11:13:12.430Z'
+    agent: claude-code
+    summary: Price preview built on the shared frameAddition, with the both-non-zero and rupee-rounding cases pinned. 12 tests, 147 across admin web, tsc at baseline. Commit 5a711db0. Phase 4 complete.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-07T11:16:35.328Z'
+    duration: '00:03:22'
+related_tickets: []
+blocked_by:
+  - ticket: 590
+    feature: admin-frame-management
+    description: Admin UI - create and edit form with swatch upload
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing tests for the preview, including the both-non-zero coupling case
+    file: packages/web/tests/routes/admin/frames-price-preview.test.tsx
+    expected_result: FAIL
+    status: done
+    code: |
+      /**
+       * What the admin sees a frame cost while they type its price.
+       *
+       * The coupling case below is the reason this component exists in this shape.
+       * #566 was a mispricing that survived because the PDP re-derived a formula the
+       * server already owned, and every seeded frame happened to make the two agree
+       * — priceAddition was 0.00 everywhere, so dropping it changed nothing until an
+       * admin could set it. Which is exactly what this feature enables.
+       *
+       * So the preview does not compute anything. It calls frameAddition, and this
+       * asserts it against frameAddition's own output for a frame carrying BOTH a
+       * non-zero modifier and a non-zero addition — the case that had no coverage.
+       */
+
+      import { describe, it, expect, afterEach } from 'vitest'
+      import { render, screen, cleanup } from '@testing-library/react'
+      import {
+        frameAddition,
+        FRAME_PREVIEW_REFERENCE_PRICES,
+      } from '@chobii/shared'
+      import {
+        FramePricePreview,
+        framePreviewRows,
+      } from '~/routes/admin/frames/FramePricePreview'
+
+      afterEach(cleanup)
+
+      const BOTH_NON_ZERO = { priceModifier: '1.40', priceAddition: '250.00' }
+
+      describe('framePreviewRows', () => {
+        it('is the shared formula, not a copy of it — including the flat column', () => {
+          const rows = framePreviewRows(BOTH_NON_ZERO)
+          expect(rows).toHaveLength(FRAME_PREVIEW_REFERENCE_PRICES.length)
+          rows.forEach((row, i) => {
+            const price = FRAME_PREVIEW_REFERENCE_PRICES[i]
+            expect(row.basePrice).toBe(price)
+            expect(row.addition).toBe(frameAddition(price, BOTH_NON_ZERO))
+            expect(row.total).toBe(price + frameAddition(price, BOTH_NON_ZERO))
+          })
+        })
+
+        it('does not drop the flat addition — the #566 failure, from the admin side', () => {
+          const withFlat = framePreviewRows(BOTH_NON_ZERO)
+          const withoutFlat = framePreviewRows({
+            priceModifier: '1.40',
+            priceAddition: '0.00',
+          })
+          withFlat.forEach((row, i) => {
+            expect(row.addition - withoutFlat[i].addition).toBe(250)
+          })
+        })
+
+        it('quotes zero uplift for a frame that adds nothing', () => {
+          const rows = framePreviewRows({ priceModifier: '1.00', priceAddition: '0.00' })
+          rows.forEach((row) => expect(row.addition).toBe(0))
+        })
+
+        it('honours the clamp — a below-one modifier does not discount the piece', () => {
+          const rows = framePreviewRows({ priceModifier: '0.80', priceAddition: '0.00' })
+          rows.forEach((row) => expect(row.addition).toBe(0))
+        })
+
+        it('scales with the piece, which is why there is more than one row', () => {
+          const rows = framePreviewRows({ priceModifier: '1.40', priceAddition: '0.00' })
+          const additions = rows.map((r) => r.addition)
+          expect(additions[1]).toBeGreaterThan(additions[0])
+          expect(additions[2]).toBeGreaterThan(additions[1])
+        })
+      })
+
+      describe('FramePricePreview', () => {
+        it('renders a row per reference price', () => {
+          render(<FramePricePreview pricing={BOTH_NON_ZERO} />)
+          for (const price of FRAME_PREVIEW_REFERENCE_PRICES) {
+            expect(
+              screen.getByText(new RegExp(price.toLocaleString('en-IN')))
+            ).toBeInTheDocument()
+          }
+        })
+
+        it('renders nothing rather than NaN while the field is mid-edit', () => {
+          render(<FramePricePreview pricing={{ priceModifier: '', priceAddition: '' }} />)
+          expect(screen.queryByText(/NaN/)).toBeNull()
+        })
+      })
+  - id: 2
+    action: verify-fail
+    description: Confirm the tests fail
+    command: cd packages/web && bunx vitest run tests/routes/admin/frames-price-preview.test.tsx
+    expected_result: FAIL - cannot resolve ~/routes/admin/frames/FramePricePreview
+    status: done
+  - id: 3
+    action: implement
+    description: Build the preview on top of frameAddition
+    file: packages/web/app/routes/admin/frames/FramePricePreview.tsx
+    status: done
+    code: |-
+      import { frameAddition, FRAME_PREVIEW_REFERENCE_PRICES, type FramePriceColumns } from '@chobii/shared'
+
+      /**
+       * What this frame would add, at three sizes of piece.
+       *
+       * The arithmetic is `frameAddition`'s and nothing here reproduces it. #566 was
+       * a mispricing that lived for months because the product page re-derived a
+       * formula the server already owned, and it stayed invisible because every
+       * seeded frame had a zero flat column — so the two answers agreed by accident.
+       * This screen is the one that lets an admin make that column non-zero. A
+       * preview with its own arithmetic would be the same bug in the worst possible
+       * place: the screen whose job is to convince the admin the number is right.
+       *
+       * Three reference prices rather than one because a frame is priced as a
+       * proportion of the piece precisely so its cost tracks the size of it. One
+       * sample row would show a number while hiding the behaviour being chosen.
+       */
+      export function framePreviewRows(pricing: FramePriceColumns) {
+        return FRAME_PREVIEW_REFERENCE_PRICES.map((basePrice) => {
+          const addition = frameAddition(basePrice, pricing)
+          return { basePrice, addition, total: basePrice + addition }
+        })
+      }
+
+      export function FramePricePreview({ pricing }: { pricing: FramePriceColumns }) {
+        // Render nothing while a field is mid-edit rather than quoting NaN at an
+        // admin who is halfway through typing a number.
+        // ... table of rows: "on a ₹X print   +₹Y   → ₹Z", formatted en-IN.
+      }
+  - id: 4
+    action: implement
+    description: Drop the preview into the form's reserved slot
+    file: packages/web/app/routes/admin/frames/FrameForm.tsx
+    status: done
+    code: |-
+      // Below the two price inputs, fed by the live field values so it recomputes as
+      // the admin types:
+      //
+      //   <FramePricePreview
+      //     pricing={{ priceModifier: values.priceModifier, priceAddition: values.priceAddition }}
+      //   />
+  - id: 5
+    action: verify-pass
+    description: Confirm the preview tests pass and the form tests still do
+    command: cd packages/web && bunx vitest run tests/routes/admin/frames-price-preview.test.tsx tests/routes/admin/frames-form.test.tsx
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit
+    command: git add packages/web/app/routes/admin/frames packages/web/tests/routes/admin/frames-price-preview.test.tsx && git commit
+    status: done
+    code: |-
+      feat(admin): the frame form quotes the price the customer will actually pay
+
+      A preview under the price inputs, at three sizes of piece, recomputing as the
+      admin types. It calls frameAddition and reproduces none of it.
+
+      That restraint is the point. #566 was a mispricing that survived because the
+      product page re-derived a formula the server already owned, and it stayed
+      invisible because every seeded frame carried a zero flat column — so both
+      answers agreed by accident. This screen is precisely the one that lets an admin
+      make that column non-zero, which makes a preview with its own arithmetic the
+      same bug in the worst place available: the screen whose job is to convince the
+      admin the number is right.
+
+      The test asserts the preview against frameAddition for a frame carrying both a
+      non-zero modifier and a non-zero addition — the case #566 had no coverage for,
+      now pinned from the admin side too.
+
+      Three reference prices rather than one, because a frame is priced as a
+      proportion of the piece so its cost tracks the size of it, and a single sample
+      would hide exactly the behaviour being chosen.
+current_step: 6
+started: '2026-08-07T11:13:11.778Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:03:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:03:00'
+      tokens: 0
+verification:
+  tests_passed: true
+  test_command: bunx vitest run tests/routes/admin/ tests/lib/admin-nav.test.ts && bunx tsc --noEmit
+  test_output: 9 files passed, 147 tests passed (frames-price-preview 12 new). Web tsc 34 = baseline.
+  build_passed: true
+  build_command: bunx tsc --noEmit (34 = baseline, 0 from this feature)
+  verified_at: '2026-08-07T11:16:03.227Z'
+completed: '2026-08-07T11:16:15.812Z'

@@ -1,0 +1,144 @@
+ticket_number: 569
+title: Shipping config table so the free-shipping threshold is set in admin, not at build time
+description: |-
+  ## Task
+  **Identify by title, not number — ticket numbers have collided in this repo under concurrent sessions.**
+
+  `FREE_SHIPPING_THRESHOLD` is a compile-time constant in `packages/shared/src/constants/shipping.ts`. Changing what customers pay for shipping currently requires a code change and a deploy. It should be an admin setting.
+
+  Follow the existing precedent rather than inventing one: `walletPricingConfig` (`packages/api/src/database/schema/wallet.ts:160`) is a key / `valueInt` table with `effectiveFrom` / `effectiveTo`, a `description`, and a `createdBy` audit reference, served by `packages/api/src/routes/admin/wallet-config.ts` (GET + PUT). Read both before designing.
+
+  Create `shippingConfig` in the same shape, seeded with the current threshold.
+
+  ## Requirements
+
+  **The shared constant stays** as the fallback when no row exists. Do not delete it. Two reasons: a database hiccup must not silently make all shipping free or all shipping charged, and the constant is the seed value. `getFreeShippingThreshold()` returns the configured value or falls back to the constant.
+
+  **Cache it.** This is read on every order creation and every shipping estimate. Cache with an explicit invalidation on write — and get the invalidation right: use `deleteCached` only for a complete key, `deleteCachedPattern` for anything with a wildcard. That exact confusion has now shipped three times in this repo (`admin/promotions.ts`, `admin/products.ts`, `admin/shipping.ts`); `packages/api/tests/routes/admin/shipping-cache-purge.test.ts` carries a repo-wide guard against it.
+
+  **Effective-dating is in the precedent — decide whether to keep it.** A threshold that changes at a scheduled time is genuinely useful for a sale, but if it is kept it must be honoured on read, not just stored. If a scheduled future value is stored and reads ignore it, that is worse than not having the column. Either implement it properly or leave the columns out and say why in a comment.
+
+  ## Context
+  Feature: shipping-returns. Prompted by the discovery that the threshold existed in three places with three different values — `calculateShippingCost` charged by ₹2,000, `/api/shipping/estimate` quoted ₹1,000, and six storefront surfaces promised ₹999 (commit `70bfa9dd` unified them on ₹999).
+
+  The threshold is evaluated on the **net, post-discount** amount, excluding gift cards, per the decision recorded in `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5. Whatever this ticket builds must preserve that.
+
+  **DB trap:** `export $(grep -m1 '^DATABASE_URL=' /Users/dhruv/work/masonart.com/.env)` before any DB-touching suite — port 5433 is a different application, and a failed `beforeAll` there reports tests as *skipped*, which reads green.
+feature: shipping-returns
+type: task
+priority: high
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-07T06:57:02.201Z'
+last_updated: '2026-08-07T11:40:41.915Z'
+time_spent_minutes: 0
+labels:
+  - database
+  - schema
+  - backend
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T06:59:40.427Z'
+    text: Status changed from 'todo' to 'in-progress'
+  - author: mcp-client
+    timestamp: '2026-08-07T07:13:17.867Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `0135ecce` - feat(api): the free-shipping threshold is an admin setting, not a build-time constant
+
+      **Files Changed**:
+      - `packages/api/src/database/schema/shipping.ts` - `shippingConfig` mirroring `walletPricingConfig` (key / valueInt / effectiveFrom / effectiveTo / description / createdBy, unique on (key, effective_from)), plus `shippingConfigRelations` for the admin screen's "who changed it"
+      - `packages/api/src/database/migrations/0013_thankful_harry_osborn.sql` - single CREATE TABLE + 2 indexes + FK, no destructive statements; applied to the dev DB (5440) and column shape verified
+      - `packages/api/src/lib/shipping-config.ts` - NEW. `SHIPPING_CONFIG_KEYS`, `SHIPPING_CONFIG_DEFAULTS`, `resolveFreeShippingThreshold`, `getFreeShippingThreshold`, `invalidateFreeShippingThreshold`
+      - `packages/api/src/routes/orders.ts` - `calculateShippingCost` is async and reads the accessor
+      - `packages/api/src/routes/shipping.ts` - `/estimate` reads it once per request and reports the same figure it charges by
+      - `packages/shared/src/constants/shipping.ts` - `qualifiesForFreeShipping(netAmount, threshold = FREE_SHIPPING_THRESHOLD)`
+      - 4 new test files + 2 cases added to `order-promotion-pricing.test.ts`
+
+      **Summary**
+
+      **Constant stays the floor.** Empty table, nothing effective now, and a read that throws all return `FREE_SHIPPING_THRESHOLD`. A failed read is deliberately *not* cached (caching an outage's answer extends the outage); an empty table *is* cached, since that is a correct answer and the common case. `SHIPPING_CONFIG_DEFAULTS` sources the constant rather than repeating 999, so seed and fallback cannot drift. The table ships **empty** — same as `WALLET_CONFIG_DEFAULTS`, which seeds no row either. Writing a row at migration time would freeze 999 into data, so a later change to the constant would move the storefront copy while the charge stayed put: exactly the gap `70bfa9dd` closed.
+
+      **Effective dating: kept and honoured.** Rows are narrowed in SQL only to "has not ended"; the window is then evaluated in JS against the caller's `now`, so the answer is derived at read time on the same clock rule the rest of the module uses. A scheduled value takes effect at its `effectiveFrom` with no job to run.
+
+      **Cache.** Redis, key `shipping-config:free_shipping_threshold`, 300s — clamped to `min(active row's effectiveTo, next row's effectiveFrom)`, floored at 1s. That is the `a24b0cce` lesson applied to the start boundary: an entry written at 08:59:50 against a 09:00:00 change would otherwise quote the old threshold for its full TTL, and nothing runs at 09:00:00. There is deliberately **no in-process memo** — that is the exact shape of the #528 memo and would reintroduce the staleness one layer further in. Invalidation is `deleteCached` on a complete key (no wildcard anywhere), which `tests/routes/admin/shipping-cache-purge.test.ts` still passes against.
+
+      **Net-threshold semantics preserved.** `calculateShippingCost` still takes `netAmountForShipping(subtotal, discount)`; a gift card still has no parameter to arrive through, and `netAmountForShipping` arity is now pinned by a test. Two new order-creation cases assert the net reading survives a *configured* threshold.
+
+      **Shape left for #570**: `resolveFreeShippingThreshold()` returns `{ value, source: 'config'|'default', row, nextChangeAt }` and reads live (never the cache, so an admin edit cannot appear unsaved); `invalidateFreeShippingThreshold()` is the write hook; `/api/shipping/estimate` already returns the live `freeShippingThreshold`, which is the endpoint the storefront copy can read from without six fetches.
+
+      **Note for #570**: values are whole **rupees**, not paise — the same unit as the shared constant and as every consumer's comparison. Deviates from `walletPricingConfig`'s paise convention on purpose; a unit hop on a displayed figure invites a 100x error, and a 100x wrong threshold makes all shipping free.
+
+      **Verification**:
+      - Command: `bunx vitest run tests/lib/shipping-config.test.ts tests/database/shipping-config-schema.test.ts tests/routes/shipping-estimate-threshold.test.ts tests/routes/order-promotion-pricing.test.ts tests/routes/admin/shipping-cache-purge.test.ts tests/routes/shipping.test.ts tests/database/shipping.test.ts` (with DATABASE_URL exported from .env → port 5440)
+      - Result: PASS (7 files, 137 tests)
+      - Command: `bunx vitest run tests/constants/shipping.test.ts` (packages/shared)
+      - Result: PASS (9 tests)
+      - Regressions: `tests/routes/orders.test.ts`, `gallery-join-order-pricing`, `order-cart-cache` → 132 passing; web `cart-free-shipping` + `ShippingSelector` → 25 passing
+      - Typecheck: `bunx tsc --noEmit` → 0 errors in packages/api and packages/shared (packages/web's 22 are pre-existing and unrelated)
+  - author: system
+    timestamp: '2026-08-07T07:13:20.227Z'
+    text: Status changed from 'in-progress' to 'done'
+  - author: mcp-client
+    timestamp: '2026-08-07T11:40:41.915Z'
+    text: |-
+      FOLLOW-THROUGH COMMITTED — 5919adbc.
+
+      This ticket moved the free-shipping number out of the bundle into a config table, and #570 gave it an admin screen, but neither gave the storefront a way to READ it. The ten surfaces printing "Free shipping on orders over ₹999" were still rendering whatever the bundle was built with, so an admin could change the threshold and the copy would not move.
+
+      Added GET /api/shipping/config (packages/api/src/routes/shipping.ts). Unauthenticated and tiny on purpose: it is public copy, it is read on every page load, and getFreeShippingThreshold already resolves from Redis and never throws — a failed read returns the same constant the storefront would have bundled, so the copy and the charge still agree rather than diverging under failure.
+
+      packages/web/app/router.tsx calls it once per document in the root route, before first paint, and hands the value down through the router context. One fetch per document rather than ten surfaces each fetching their own.
+
+      Verified: packages/api tests/routes/shipping.test.ts + shipping-estimate-threshold.test.ts, 44/44 passing.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write failing shape assertions for the shippingConfig table
+    file: packages/api/tests/database/shipping-config-schema.test.ts
+    command: cd packages/api && bunx vitest run tests/database/shipping-config-schema.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm it fails
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Add the shippingConfig table mirroring walletPricingConfig, plus migration
+    file: packages/api/src/database/schema/shipping.ts
+    status: done
+  - id: 4
+    action: write-test
+    description: 'Write failing tests for getFreeShippingThreshold: configured value wins, constant is the fallback, result is cached, write invalidates'
+    file: packages/api/tests/lib/shipping-config.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 5
+    action: implement
+    description: Implement the accessor with fallback, caching and invalidation
+    file: packages/api/src/lib/shipping-config.ts
+    status: done
+  - id: 6
+    action: verify-pass
+    description: Confirm both suites pass and order/shipping regressions are clean
+    command: cd packages/api && bunx vitest run tests/database/shipping-config-schema.test.ts tests/lib/shipping-config.test.ts tests/routes/orders.test.ts tests/routes/shipping.test.ts
+    expected_result: PASS
+    status: done
+  - id: 7
+    action: commit
+    description: Commit
+    command: 'git commit --only <paths> -m "feat(api): free-shipping threshold becomes a stored setting"'
+    status: done
+current_step: 7
+started: '2026-08-07T06:59:40.427Z'
+completed: '2026-08-07T07:13:20.227Z'
