@@ -52,6 +52,8 @@ interface WishlistStore {
   isAuthenticated: boolean | null;
   /** The single in-flight `load()`, shared by every caller in the same tick. */
   inFlight: Promise<void> | null;
+  /** Version of the current load request. Used to discard stale responses (#505). */
+  loadVersion: number;
 
   load: () => Promise<void>;
   setAuthenticated: (isAuthenticated: boolean) => void;
@@ -111,6 +113,7 @@ export const useWishlistStore = create<WishlistStore>()(
       isPending: false,
       isAuthenticated: null,
       inFlight: null,
+      loadVersion: 0,
 
       async load() {
         // Unknown session: leaf effects run before the root route reports, and
@@ -130,6 +133,10 @@ export const useWishlistStore = create<WishlistStore>()(
         // list is back.
         const local = get().ids;
 
+        // Capture the current version; if it changes before the response
+        // arrives, a write is in flight and this response is stale (#505).
+        const versionAtLoadStart = get().loadVersion;
+
         const request = (async () => {
           try {
             /**
@@ -142,7 +149,17 @@ export const useWishlistStore = create<WishlistStore>()(
               local.length > 0
                 ? await wishlistApi.merge(local)
                 : await wishlistApi.list();
-            set({ ids: items.map((item) => item.id), isLoaded: true });
+            /**
+             * A write (toggle or reorder) may have landed while this request
+             * was in flight. Its response is stale — the optimistic update on
+             * the client is authoritative. Skip the set to preserve the user's
+             * changes (#505).
+             */
+            if (get().loadVersion === versionAtLoadStart) {
+              set({ ids: items.map((item) => item.id), isLoaded: true });
+            } else {
+              set({ isLoaded: true });
+            }
           } catch {
             /**
              * A session can lapse between the root route reading it and this
@@ -266,7 +283,8 @@ export const useWishlistStore = create<WishlistStore>()(
           return;
         }
 
-        set({ ids: next, isPending: true });
+        // Increment loadVersion to invalidate any in-flight load() requests (#505).
+        set({ ids: next, isPending: true, loadVersion: get().loadVersion + 1 });
 
         try {
           await wishlistApi.reorder(next);
@@ -278,7 +296,7 @@ export const useWishlistStore = create<WishlistStore>()(
            */
           try {
             const { items } = await wishlistApi.list();
-            set({ ids: items.map((item) => item.id) });
+            set({ ids: items.map((item) => item.id), loadVersion: get().loadVersion + 1 });
           } catch {
             set({ ids: previous });
           }
@@ -326,8 +344,8 @@ export const useWishlistStore = create<WishlistStore>()(
           return;
         }
 
-        // Optimistic.
-        set({ ids: next, isPending: true });
+        // Optimistic. Increment loadVersion to invalidate any in-flight load() requests (#505).
+        set({ ids: next, isPending: true, loadVersion: get().loadVersion + 1 });
 
         try {
           if (wasSaved) {
