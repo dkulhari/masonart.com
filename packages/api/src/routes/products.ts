@@ -871,6 +871,14 @@ productsApp.get("/frames", async (c) => {
         id: frames.id,
         name: frames.name,
         type: frames.type,
+        /**
+         * Which rung of the format axis the storefront groups this under.
+         *
+         * FrameSelector used to derive this from `type`, which it could only
+         * do while every type was seeded in code and known in advance. Now
+         * that an admin can invent one, the rung has to travel with the row.
+         */
+        category: frames.category,
         description: frames.description,
         material: frames.material,
         thickness: frames.thickness,
@@ -944,6 +952,8 @@ productsApp.get("/:slug", async (c) => {
         id: frames.id,
         name: frames.name,
         type: frames.type,
+        /** Same rung the frames list carries — the PDP groups on it too. */
+        category: frames.category,
         description: frames.description,
         material: frames.material,
         priceModifier: frames.priceModifier,

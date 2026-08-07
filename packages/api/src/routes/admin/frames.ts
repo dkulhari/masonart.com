@@ -250,10 +250,17 @@ adminFramesApp.delete("/:id", async (c) => {
       return c.json({ message: `Frame '${existing.name}' is already archived` });
     }
 
-    const [{ count: activeCount }] = await db
+    const [activeRow] = await db
       .select({ count: count() })
       .from(frames)
       .where(eq(frames.isActive, true));
+
+    /**
+     * No row back means the count query itself failed to produce one, which
+     * should be impossible for an aggregate — treat it as "cannot prove there
+     * is another active frame" and refuse rather than archive on a guess.
+     */
+    const activeCount = activeRow?.count ?? 1;
 
     if (activeCount <= 1) {
       return c.json(
