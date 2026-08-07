@@ -27,7 +27,12 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { asc, count, eq } from "drizzle-orm";
-import { createFrameInputSchema, updateFrameInputSchema } from "@chobii/shared";
+import {
+  createFrameInputSchema,
+  updateFrameInputSchema,
+  ADMIN_IMAGE_MIME_TYPES,
+  MAX_ADMIN_IMAGE_MB,
+} from "@chobii/shared";
 
 import { db } from "../../database";
 import { frames } from "../../database/schema/products";
@@ -38,6 +43,7 @@ import {
 } from "../../middleware/auth";
 import { deleteCached, CacheKeys } from "../../lib/redis";
 import { isUniqueViolation } from "../../lib/pg-errors";
+import { uploadOptimizedImage, StoragePaths } from "../../lib/storage";
 
 export const adminFramesApp = new Hono<{ Variables: AuthVariables }>();
 
@@ -58,6 +64,80 @@ export async function purgeFramesCache(): Promise<void> {
 const takenType = (type: string | undefined) => ({
   error: `Frame type '${type}' is already taken`,
   type,
+});
+
+// ============================================================================
+// POST /upload-image — swatch upload
+// ============================================================================
+
+/**
+ * Upload one frame swatch.
+ *
+ * Registered before the `/:id` routes so the literal path is never mistaken
+ * for an id.
+ *
+ * Deliberately NOT `buildProductMedia`. That pipeline mats artwork, measures
+ * the art box and honours an admin-chosen crop window, all because a piece of
+ * art must never be cropped blindly. A swatch is a photograph of a moulding:
+ * it fills its square, there is nothing to measure, and matting it would put a
+ * canvas border around a product photo.
+ *
+ * `StoragePaths.FRAMES` has sat in `lib/storage.ts` with no consumers since it
+ * was written. This is the first.
+ *
+ * One upload fills both columns — the variant ladder already contains a
+ * thumbnail and a card size, so the form has no second image field to keep in
+ * sync with the first.
+ */
+adminFramesApp.post("/upload-image", async (c) => {
+  const formData = await c.req.formData();
+  const file = formData.get("file") as File | null;
+
+  if (!file) {
+    return c.json({ error: "No file provided" }, 400);
+  }
+  if (!ADMIN_IMAGE_MIME_TYPES.includes(file.type)) {
+    return c.json(
+      { error: "Invalid file type. Supported: JPEG, PNG, WebP" },
+      400
+    );
+  }
+  if (file.size > MAX_ADMIN_IMAGE_MB * 1024 * 1024) {
+    return c.json(
+      { error: `File too large. Maximum size is ${MAX_ADMIN_IMAGE_MB}MB` },
+      400
+    );
+  }
+
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const uploaded = await uploadOptimizedImage(
+      buffer,
+      file.name,
+      file.type,
+      { prefix: StoragePaths.FRAMES }
+    );
+
+    /**
+     * Fall back to the full-size webp rather than returning undefined: a
+     * missing rung in the ladder should cost the admin a larger download, not
+     * a frame with no picture.
+     */
+    const variant = (name: string) =>
+      uploaded.variants.find((v) => v.name === name)?.url ?? uploaded.webpUrl;
+
+    return c.json(
+      {
+        success: true,
+        thumbnailUrl: variant("thumbnail"),
+        imageUrl: variant("card"),
+      },
+      201
+    );
+  } catch (error) {
+    console.error("[AdminFrames] Swatch upload failed:", error);
+    return c.json({ error: "Failed to upload image" }, 500);
+  }
 });
 
 // ============================================================================
