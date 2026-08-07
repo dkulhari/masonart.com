@@ -32,6 +32,7 @@
  */
 
 import { Check } from 'lucide-react'
+import { frameAddition, type FramePriceColumns } from '@chobii/shared'
 import { cn, formatPrice } from '~/lib/utils'
 
 // ============================================================================
@@ -51,10 +52,17 @@ export interface FrameOptionData {
   material?: string
   /** Preview image URL */
   imageUrl?: string
-  /** Price modifier type */
-  priceModifierType: 'percentage' | 'fixed'
-  /** Price modifier value (percentage as decimal, fixed in smallest currency unit) */
-  priceModifierValue: number
+  /**
+   * The frame row's own price columns, untransformed (#566).
+   *
+   * Both of them: `priceModifier` (1.40 meaning "the piece plus 40%") AND the
+   * flat `priceAddition` on top. This used to be a single pre-computed
+   * percentage, which gave the flat column nowhere to go — a frame carrying
+   * one was quoted low here and charged correctly by the server. Carrying the
+   * columns instead of a derived number is what lets this surface call the
+   * same `frameAddition` the cart and the quickview call.
+   */
+  pricing: FramePriceColumns
   /** Whether this frame is available */
   isAvailable: boolean
 }
@@ -77,50 +85,33 @@ export interface FrameSelectorProps {
 // ============================================================================
 
 /**
- * Calculate the price addition for a frame based on modifier type.
- *
- * The percentage branch rounds to the rupee, matching `frameAddition` in
- * `@chobii/shared` — the formula `POST /api/cart/items` stores and
- * `POST /api/orders` charges. This helper keeps its own signature because the
- * PDP has already converted the frame row's `priceModifier` into a percentage
- * by the time it gets here (see `routes/posters/$slug.tsx`), but the number it
- * produces has to be the same one, or the buy panel quotes a price the drawer
- * corrects a rupee later (#511 final review, finding 1).
- */
-export function calculateFramePrice(
-  basePrice: number,
-  modifierType: 'percentage' | 'fixed',
-  modifierValue: number
-): number {
-  if (modifierType === 'percentage') {
-    return Math.round(basePrice * (modifierValue / 100))
-  }
-  // Fixed price is stored in paise, convert to rupees
-  return modifierValue / 100
-}
-
-/**
- * Format the price modifier for display.
+ * Format a frame's price uplift for display.
  *
  * This is the string printed under the swatch, and — since the swatch prints
  * it rather than hiding it in an sr-only node — it is also what a screen
  * reader announces. One string, one source, no drift between the two.
  *
- * A zero modifier reads "Included" rather than "+₹0.00" or a blank: the
- * cheapest option is not free of a price, it is already inside the price the
- * panel is quoting, and every cell keeping a price line means the row of
+ * The number comes from `frameAddition` in `@chobii/shared` and from nowhere
+ * else (#566). That is the formula `POST /api/cart/items` stores and
+ * `POST /api/orders` charges, and it reads BOTH price columns — the
+ * proportional `priceModifier` and the flat `priceAddition`. This surface used
+ * to re-derive the proportional half on its own, which quoted a frame carrying
+ * a flat addition low while checkout charged the full amount.
+ *
+ * A frame that adds nothing reads "Included" rather than "+₹0.00" or a blank:
+ * the cheapest option is not free of a price, it is already inside the price
+ * the panel is quoting, and every cell keeping a price line means the row of
  * prices stays a row instead of a gap-toothed one.
  */
-export function formatPriceModifier(
+export function formatFrameUplift(
   basePrice: number,
-  modifierType: 'percentage' | 'fixed',
-  modifierValue: number
+  pricing: FramePriceColumns | null | undefined
 ): string {
-  if (modifierValue === 0) {
+  const addition = frameAddition(basePrice, pricing)
+  if (addition === 0) {
     return 'Included'
   }
 
-  const addition = calculateFramePrice(basePrice, modifierType, modifierValue)
   return `+${formatPrice(addition)}`
 }
 
@@ -234,11 +225,7 @@ export function FrameSelector({
       <div className="grid grid-cols-4 gap-x-2 gap-y-5 pt-1">
         {availableFrames.map((frame) => {
           const isSelected = frame.id === selectedFrameId
-          const priceDisplay = formatPriceModifier(
-            basePrice,
-            frame.priceModifierType,
-            frame.priceModifierValue
-          )
+          const priceDisplay = formatFrameUplift(basePrice, frame.pricing)
 
           return (
             <FrameOptionCard
@@ -274,11 +261,7 @@ function framePriceBasis(
     return `Frame prices below are added to the ${base} size price.`
   }
 
-  const addition = calculateFramePrice(
-    basePrice,
-    selectedFrame.priceModifierType,
-    selectedFrame.priceModifierValue
-  )
+  const addition = frameAddition(basePrice, selectedFrame.pricing)
 
   if (addition === 0) {
     return `${selectedFrame.name} is included in the ${base} size price.`

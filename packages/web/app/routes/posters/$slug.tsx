@@ -132,17 +132,20 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
         material: f.material,
         imageUrl: f.thumbnailUrl || f.imageUrl,
         /**
-         * A percentage of the piece, not a flat fee (#420). A moulding for a
-         * 12x16 and one for a 60x80 are not the same amount of timber, so the
-         * frames carry `priceModifier` — 1.40 meaning "the piece plus 40%" —
-         * and `priceAddition` is 0. Reading the flat field here would have
-         * quoted every frame at zero while the quickview charged correctly.
+         * Both price columns, handed through as the row carries them (#566).
+         *
+         * A frame costs a proportion of the piece — `priceModifier`, 1.40
+         * meaning "the piece plus 40%", because a moulding for a 12x16 and one
+         * for a 60x80 are not the same amount of timber (#420) — and may also
+         * carry a flat `priceAddition` on top. This route used to pre-compute
+         * the proportion into a percentage, which left the flat column with
+         * nowhere to go: the buy panel quoted low and the server charged the
+         * full amount. Pricing is `frameAddition`'s job, on every surface.
          */
-        priceModifierType: 'percentage',
-        priceModifierValue: Math.max(
-          0,
-          (parseFloat(f.priceModifier || '1') - 1) * 100
-        ),
+        pricing: {
+          priceModifier: f.priceModifier,
+          priceAddition: f.priceAddition,
+        },
         isAvailable: true,
       })),
       orientation: response.orientation,

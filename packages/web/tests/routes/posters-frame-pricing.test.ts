@@ -21,16 +21,35 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 
 const detailRoute = read('app/routes/posters/$slug.tsx')
 const quickview = read('app/components/product/ChooseOptions.tsx')
+const frameSelector = read('app/components/product/FrameSelector.tsx')
+const productDetail = read('app/components/product/ProductDetail.tsx')
 
-describe('the product page prices frames off the multiplier', () => {
-  it('maps them as a percentage, not a fixed amount', () => {
-    expect(detailRoute).toContain("priceModifierType: 'percentage'")
-    expect(detailRoute).not.toContain("priceModifierType: 'fixed'")
+/**
+ * The product page used to convert `priceModifier` into a percentage on the
+ * way in and hand `FrameSelector` that number alone — no channel for the flat
+ * `priceAddition` column at all (#566). That conversion was the whole defect:
+ * a frame carrying both columns was quoted low on the buy panel and charged
+ * correctly by the server. So the guard is on the transform, not on the field
+ * names — the route hands the row's columns through and prices nothing itself.
+ */
+describe('the product page hands frame pricing to the shared formula', () => {
+  it('passes the row s pricing columns through untransformed', () => {
+    expect(detailRoute).toContain('priceModifier: f.priceModifier')
+    expect(detailRoute).toContain('priceAddition: f.priceAddition')
   })
 
-  it('reads priceModifier rather than the zeroed flat field', () => {
-    expect(detailRoute).toContain("parseFloat(f.priceModifier || '1')")
-    expect(detailRoute).not.toMatch(/priceModifierValue:\s*parseFloat\(f\.priceAddition/)
+  it('carries no frame arithmetic of its own', () => {
+    expect(detailRoute).not.toContain('priceModifierValue')
+    expect(detailRoute).not.toMatch(/parseFloat\(f\.price(Modifier|Addition)/)
+  })
+
+  it('prices the swatches and the buy panel through @chobii/shared', () => {
+    for (const source of [frameSelector, productDetail]) {
+      expect(source).toContain("from '@chobii/shared'")
+      expect(source).toContain('frameAddition(')
+      // No second formula to drift from the server's.
+      expect(source).not.toMatch(/Math\.round\(\s*basePrice\s*\*/)
+    }
   })
 })
 
@@ -40,7 +59,8 @@ describe('the product page prices frames off the multiplier', () => {
  *
  * It used to compute `Math.round(unitPrice * frame.priceRate) + priceAddition`
  * inline, which was correct — and was the THIRD place that arithmetic lived,
- * beside the product page's `calculateFramePrice` and, wrongly, the cart route.
+ * beside the product page's own `calculateFramePrice` (since deleted, #566)
+ * and, wrongly, the cart route.
  * The cart route read the zeroed flat column alone, stored every framed line at
  * a frame price of nothing, and `POST /api/orders` charged that. So the guard
  * here is now the stronger one: there is one formula, in `@chobii/shared`, and

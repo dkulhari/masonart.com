@@ -27,8 +27,7 @@ import { render, screen } from '@testing-library/react'
 import {
   FrameSelector,
   FrameSelectorSkeleton,
-  calculateFramePrice,
-  formatPriceModifier,
+  formatFrameUplift,
   type FrameOptionData,
 } from '~/components/product/FrameSelector'
 
@@ -39,8 +38,8 @@ const frame = (overrides: Partial<FrameOptionData>): FrameOptionData => ({
   description: overrides.description ?? 'Shipped in a tube',
   material: overrides.material,
   imageUrl: overrides.imageUrl,
-  priceModifierType: overrides.priceModifierType ?? 'percentage',
-  priceModifierValue: overrides.priceModifierValue ?? 0,
+  // The frame row's own columns, the shape `frameAddition` reads (#566).
+  pricing: overrides.pricing ?? { priceModifier: '1.00', priceAddition: '0.00' },
   isAvailable: overrides.isAvailable ?? true,
 })
 
@@ -52,32 +51,28 @@ const SEVEN_FRAMES: FrameOptionData[] = [
     id: 'f-frameless',
     type: 'frameless',
     name: 'Frameless',
-    priceModifierType: 'percentage',
-    priceModifierValue: 33,
+    pricing: { priceModifier: '1.33', priceAddition: '0.00' },
     imageUrl: '/frames/frameless.jpg',
   }),
   frame({
     id: 'f-gold',
     type: 'gold',
     name: 'Stretch + Gold Frame',
-    priceModifierType: 'percentage',
-    priceModifierValue: 40,
+    pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     imageUrl: '/frames/gold.png',
   }),
   frame({
     id: 'f-silver',
     type: 'silver',
     name: 'Stretch + Silver Frame',
-    priceModifierType: 'percentage',
-    priceModifierValue: 40,
+    pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     imageUrl: '/frames/silver.png',
   }),
   frame({
     id: 'f-black',
     type: 'black',
     name: 'Stretch + Black Frame',
-    priceModifierType: 'percentage',
-    priceModifierValue: 40,
+    pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     // A placeholder is what old seed data shipped; it must never reach a
     // swatch img src.
     imageUrl: 'https://placehold.co/100x100/1a1a1a/ffffff?text=Black',
@@ -86,35 +81,31 @@ const SEVEN_FRAMES: FrameOptionData[] = [
     id: 'f-white',
     type: 'white',
     name: 'Stretch + White Frame',
-    priceModifierType: 'percentage',
-    priceModifierValue: 40,
+    pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     imageUrl: '/frames/white.jpg',
   }),
   frame({
     id: 'f-wood',
     type: 'wood',
     name: 'Stretch + Wood Frame',
-    priceModifierType: 'percentage',
-    priceModifierValue: 40,
+    pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     imageUrl: undefined,
   }),
 ]
 
-describe('calculateFramePrice / formatPriceModifier', () => {
-  it('prices a percentage modifier off the base price', () => {
-    expect(calculateFramePrice(2000, 'percentage', 40)).toBe(800)
+describe('formatFrameUplift', () => {
+  it('prices the modifier as a proportion of the base price', () => {
+    expect(formatFrameUplift(2000, { priceModifier: '1.40' })).toContain('800.00')
   })
 
-  it('prices a fixed modifier from paise', () => {
-    expect(calculateFramePrice(2000, 'fixed', 49900)).toBe(499)
+  it('reads "Included" for a frame that adds nothing', () => {
+    expect(
+      formatFrameUplift(2000, { priceModifier: '1.00', priceAddition: '0.00' })
+    ).toBe('Included')
   })
 
-  it('reads "Included" for a zero modifier', () => {
-    expect(formatPriceModifier(2000, 'percentage', 0)).toBe('Included')
-  })
-
-  it('formats a non-zero modifier with a leading +', () => {
-    expect(formatPriceModifier(2000, 'percentage', 40)).toMatch(/^\+/)
+  it('formats a non-zero uplift with a leading +', () => {
+    expect(formatFrameUplift(2000, { priceModifier: '1.40' })).toMatch(/^\+/)
   })
 })
 
@@ -322,7 +313,7 @@ describe('the swatches', () => {
     // 40% of 2000 = 800, so the moulding swatches read "+₹800.00" — an uplift
     // with a leading +, never a bare figure that could pass for a total.
     const gold = screen.getByRole('button', { name: /Stretch \+ Gold Frame/ })
-    const uplift = formatPriceModifier(2000, 'percentage', 40)
+    const uplift = formatFrameUplift(2000, { priceModifier: '1.40' })
     expect(uplift).toContain('800')
     expect(
       Array.from(gold.querySelectorAll('span')).some(
@@ -509,5 +500,93 @@ describe('FrameSelectorSkeleton', () => {
     const { container } = render(<FrameSelectorSkeleton />)
     const circles = container.querySelectorAll('.rounded-full')
     expect(circles.length).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * The flat `priceAddition` column reaches the swatch (#566).
+ *
+ * A frame row carries two price columns: `priceModifier` (1.40 = "the piece
+ * plus 40%") and `priceAddition`, a flat sum on top. The server charges both —
+ * `frameAddition` in `@chobii/shared` is `round(unitPrice * rate) + addition` —
+ * and so does the quickview. The PDP used to convert `priceModifier` into a
+ * percentage on the way in and drop `priceAddition` on the floor, so a frame
+ * carrying both would be quoted low here and charged correctly at checkout.
+ *
+ * Every seeded frame has `priceAddition` at "0.00" today, which is exactly why
+ * this needs a test rather than a look: nothing about the drop fails, until an
+ * admin sets a flat addition on one row.
+ */
+describe('the flat priceAddition column (#566)', () => {
+  const GILT: FrameOptionData = frame({
+    id: 'f-gilt',
+    type: 'gold',
+    name: 'Hand-Gilt Frame',
+    pricing: { priceModifier: '1.40', priceAddition: '150.00' },
+    imageUrl: '/frames/gold.png',
+  })
+
+  /** A frame that costs a flat sum and no proportion at all. */
+  const MOUNT: FrameOptionData = frame({
+    id: 'f-mount',
+    type: 'frameless',
+    name: 'Mount Board',
+    pricing: { priceModifier: '1.00', priceAddition: '400.00' },
+  })
+
+  it('adds the flat sum on top of the proportional markup', () => {
+    // 40% of 2000 is 800; the row also charges a flat 150.
+    expect(formatFrameUplift(2000, GILT.pricing)).toContain('950.00')
+  })
+
+  it('prints that combined figure on the swatch', () => {
+    render(
+      <FrameSelector
+        frames={[GILT]}
+        selectedFrameId={null}
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const swatch = screen.getByRole('button', { name: /Hand-Gilt Frame/ })
+    expect(swatch.textContent).toContain('950.00')
+    // The percentage alone — what the page quoted before — must not survive.
+    expect(swatch.textContent).not.toContain('800.00')
+  })
+
+  it('names the combined figure in the price basis caption', () => {
+    render(
+      <FrameSelector
+        frames={[GILT]}
+        selectedFrameId="f-gilt"
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const basis = screen.getByTestId('frame-price-basis').textContent ?? ''
+    expect(basis).toContain('950.00')
+    expect(basis).toContain('2,000.00')
+  })
+
+  it('does not read "Included" for a frame whose whole price is the flat column', () => {
+    render(
+      <FrameSelector
+        frames={[MOUNT]}
+        selectedFrameId={null}
+        onFrameSelect={vi.fn()}
+        basePrice={2000}
+      />
+    )
+
+    const swatch = screen.getByRole('button', { name: /Mount Board/ })
+    expect(swatch.textContent).not.toContain('Included')
+    expect(swatch.textContent).toContain('400.00')
+  })
+
+  it('scales the proportional part with the size and leaves the flat part alone', () => {
+    // Doubling the piece doubles the 800 and not the 150: 1600 + 150.
+    expect(formatFrameUplift(4000, GILT.pricing)).toContain('1,750.00')
   })
 })

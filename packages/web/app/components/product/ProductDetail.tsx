@@ -37,7 +37,7 @@ import { Button } from '~/components/ui/Button'
 import { WishlistButton } from './WishlistButton'
 import { useCartActions } from '~/hooks/useCartActions'
 import { SizeSelector, type SizeVariant } from './SizeSelector'
-import { FrameSelector, calculateFramePrice, type FrameOptionData } from './FrameSelector'
+import { FrameSelector, type FrameOptionData } from './FrameSelector'
 import { DeliveryEstimate } from './DeliveryEstimate'
 import { ShareRow } from './ShareRow'
 import { TrustList } from './TrustList'
@@ -53,7 +53,7 @@ import {
 // Types
 // ============================================================================
 
-import { mainImage, type ProductImage } from '@chobii/shared'
+import { frameAddition, mainImage, type ProductImage } from '@chobii/shared'
 export type { ProductImage }
 
 export interface ProductDetailData {
@@ -207,12 +207,9 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
     let total = basePrice
 
     if (selectedFrame) {
-      const frameAddition = calculateFramePrice(
-        basePrice,
-        selectedFrame.priceModifierType,
-        selectedFrame.priceModifierValue
-      )
-      total += frameAddition
+      // The one client-side frame formula, shared with the quickview and with
+      // the cart routes that will charge for this line (#566).
+      total += frameAddition(basePrice, selectedFrame.pricing)
     }
 
     return total
@@ -284,14 +281,7 @@ export function ProductDetail({ product, promotion, className }: ProductDetailPr
       ? parseFloat(selectedVariant.price)
       : selectedVariant.price
 
-    let framePrice = 0
-    if (selectedFrame) {
-      framePrice = calculateFramePrice(
-        basePrice,
-        selectedFrame.priceModifierType,
-        selectedFrame.priceModifierValue
-      )
-    }
+    const framePrice = frameAddition(basePrice, selectedFrame?.pricing)
 
     const primaryImage = mainImage(product.images)
 
