@@ -10,6 +10,7 @@
  */
 
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
+import { FREE_SHIPPING_THRESHOLD } from '@chobii/shared'
 import { routeTree } from './routeTree.gen'
 
 /**
@@ -64,6 +65,12 @@ interface RouterContext {
       userId: string
     }
   } | null
+  /**
+   * The free-shipping threshold in force, in whole rupees (#570). Delivered
+   * once here so every copy surface prints the same number the server charges
+   * by; the root route's `beforeLoad` replaces this seed with the live value.
+   */
+  freeShippingThreshold: number
 }
 
 /**
@@ -77,9 +84,12 @@ export function createRouter() {
     defaultPreloadStaleTime: 0,
     parseSearch: parseSearchString,
     stringifySearch: stringifySearchObj,
-    // Provide initial context - session will be populated by root route's beforeLoad
+    // Provide initial context - both fields are populated by the root route's
+    // beforeLoad. The threshold seeds to the bundled constant rather than 0:
+    // it is what the API itself falls back to, so the seed and the charge agree.
     context: {
       session: null,
+      freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
     } satisfies RouterContext,
   })
 
