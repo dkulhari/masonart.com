@@ -99,6 +99,13 @@
       "when": 1786086177280,
       "tag": "0013_thankful_harry_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786099200000,
+      "tag": "0014_admin_editable_frames",
+      "breakpoints": true
     }
   ]
 }

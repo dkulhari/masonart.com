@@ -12,6 +12,7 @@ import {
   pgEnum,
   boolean,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -65,29 +66,27 @@ export const productStatusEnum = pgEnum("product_status", [
 ]);
 
 /**
- * Frame type enum for frame options.
+ * Which rung of the format axis a frame sits on.
  *
  * `rolled` and `frameless` are formats rather than mouldings — the print
  * shipped in a tube, and the print stretched on bars with no moulding at all.
- * They join the list because the storefront's option axis is
- * "Rolled Canvas / Frameless / Framed" (#420), and both need to be a real row
- * so the cart can carry a frameId for them like any other choice.
+ * Both are real rows so the cart can carry a frameId for them like any other
+ * choice, and the storefront sells the three as one axis, "Rolled Canvas /
+ * Frameless / Framed" (#420).
  *
- * `none`, `walnut` and `oak` are no longer seeded but stay in the enum: a
- * Postgres enum cannot drop a value without recreating the type, and nothing
- * is gained by the churn.
+ * Unlike `frames.type`, which an admin invents freely, this set is closed —
+ * which is why it stays an enum. The storefront used to DERIVE the rung from
+ * the type string, mapping `rolled` and `frameless` to themselves and letting
+ * everything else fall through to "Framed". That could only work while every
+ * type was seeded in code and known in advance: an admin-created moulding
+ * lands in the right group by accident, and an admin-created FORMAT lands in
+ * the wrong one with nothing anywhere to signal it. A column the admin picks
+ * turns that guess into data.
  */
-export const frameTypeEnum = pgEnum("frame_type", [
-  "none",
-  "black",
-  "white",
-  "wood",
-  "walnut",
-  "oak",
-  "gold",
-  "silver",
+export const frameCategoryEnum = pgEnum("frame_category", [
   "rolled",
   "frameless",
+  "framed",
 ]);
 
 // ============================================================================
@@ -245,7 +244,21 @@ export const frames = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
-    type: frameTypeEnum("type").notNull(),
+
+    /**
+     * Slug identifying this moulding, e.g. `gold`, `stretch-maple`.
+     *
+     * Text rather than an enum because the admin creates frames, and a
+     * Postgres enum cannot gain a value without a migration — an enum here is
+     * a ceiling on the catalogue. Unique because the storefront's swatch
+     * colour fallback is keyed on it, so two frames sharing a type are
+     * indistinguishable to that lookup.
+     */
+    type: text("type").notNull(),
+
+    /** Which rung of the format axis the storefront groups this under. */
+    category: frameCategoryEnum("category").notNull(),
+
     description: text("description"),
 
     // Material details
@@ -280,7 +293,7 @@ export const frames = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
-    typeIdx: index("frames_type_idx").on(table.type),
+    typeIdx: uniqueIndex("frames_type_idx").on(table.type),
     activeIdx: index("frames_active_idx").on(table.isActive),
     sortOrderIdx: index("frames_sort_order_idx").on(table.sortOrder),
   })
@@ -325,4 +338,4 @@ export type NewFrame = typeof frames.$inferInsert;
 
 export type Orientation = (typeof orientationEnum.enumValues)[number];
 export type ProductStatus = (typeof productStatusEnum.enumValues)[number];
-export type FrameType = (typeof frameTypeEnum.enumValues)[number];
+export type FrameCategory = (typeof frameCategoryEnum.enumValues)[number];

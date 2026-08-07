@@ -35,6 +35,13 @@ import type { NewFrame } from "./schema";
  * `No Frame` is gone: Rolled Canvas is the unframed option now, and two rows
  * meaning "no moulding" would have been a choice with no content.
  *
+ * `category` is that FORMAT-ladder-not-moulding-catalogue point made
+ * enforceable rather than left to this comment. The storefront used to read
+ * the rung off the type string, which held only while every type was seeded
+ * here — an admin-created format would have been grouped as a moulding with
+ * nothing to catch it. Rolled and frameless are their own rungs; every
+ * moulding, whatever it is called, is `framed`.
+ *
  * The swatch imagery is mesonart's own product photography, taken at the
  * owner's direction (#420) and served from our own /frames rather than
  * hotlinked off their CDN. Replacing these with our photography is a drop-in:
@@ -44,6 +51,7 @@ export const sampleFrames: NewFrame[] = [
   {
     name: "Rolled Canvas",
     type: "rolled",
+    category: "rolled",
     description:
       "Shipped rolled in a tube, ready for your own framer. The lightest way to buy a large piece.",
     material: "Canvas",
@@ -58,6 +66,7 @@ export const sampleFrames: NewFrame[] = [
   {
     name: "Frameless",
     type: "frameless",
+    category: "frameless",
     description:
       "Stretched over a wooden bar and ready to hang, with the image wrapping the edge. No moulding.",
     material: "Stretched Canvas",
@@ -73,6 +82,7 @@ export const sampleFrames: NewFrame[] = [
   {
     name: "Stretch + Gold Frame",
     type: "gold",
+    category: "framed",
     description:
       "Stretched and set in a slim gold moulding with a subtle antiquing. For traditional and glamorous rooms.",
     material: "Composite with Gold Leaf",
@@ -88,6 +98,7 @@ export const sampleFrames: NewFrame[] = [
   {
     name: "Stretch + Silver Frame",
     type: "silver",
+    category: "framed",
     description:
       "Stretched and set in a brushed silver moulding. Ideal for modern and industrial spaces.",
     material: "Aluminum",
@@ -103,6 +114,7 @@ export const sampleFrames: NewFrame[] = [
   {
     name: "Stretch + Black Frame",
     type: "black",
+    category: "framed",
     description:
       "Stretched and set in a sleek matte black moulding. A timeless choice that works with any decor.",
     material: "Aluminum",
@@ -118,6 +130,7 @@ export const sampleFrames: NewFrame[] = [
   {
     name: "Stretch + White Frame",
     type: "white",
+    category: "framed",
     description:
       "Stretched and set in a crisp white moulding. Perfect for minimalist and Scandinavian styles.",
     material: "Aluminum",
@@ -133,6 +146,7 @@ export const sampleFrames: NewFrame[] = [
   {
     name: "Stretch + Wood Frame",
     type: "wood",
+    category: "framed",
     description:
       "Stretched and set in a wooden moulding with a distressed finish. For farmhouse and bohemian rooms.",
     material: "Reclaimed Pine",
