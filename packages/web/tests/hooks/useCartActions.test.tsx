@@ -499,6 +499,37 @@ describe('useCartActions — reconciling after a rejected write', () => {
     expect(useCartStore.getState().syncError).toBe('Y refused')
   })
 
+  it('still reports an earlier add refused even after a later add already reconciled the cart', async () => {
+    const { result } = renderHook(() => useCartActions(), { wrapper })
+
+    const first = deferred<{ message: string }>()
+    const second = deferred<{ message: string; item: { id: string } }>()
+    vi.mocked(cartApi.addItem)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+    // Only Y made it onto the server.
+    vi.mocked(cartApi.get).mockResolvedValue(serverCart)
+
+    await act(async () => {
+      const addX = result.current.addItem(addInput)
+      const addY = result.current.addItem(otherInput)
+
+      // Y lands and reconciles the cart down to just its own line...
+      second.resolve({ message: 'ok', item: { id: SERVER_ID } })
+      await addY
+
+      // ...then X comes back refused, superseded by Y's already-settled write.
+      // The store is already correct — X's optimistic line is gone, replaced
+      // by Y's reconciliation — but the customer was never told X failed.
+      first.reject(new Error('X refused'))
+      await addX
+    })
+
+    expect(useCartStore.getState().items).toHaveLength(1)
+    expect(useCartStore.getState().items[0]!.id).toBe(SERVER_ID)
+    expect(useCartStore.getState().syncError).toBe('X refused')
+  })
+
   it('replaces a still-pending line with the real row when the add behind it did land', async () => {
     const { result } = renderHook(() => useCartActions(), { wrapper })
 

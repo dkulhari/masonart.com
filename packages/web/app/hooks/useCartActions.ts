@@ -165,6 +165,14 @@ async function applyIfCurrent(
  * was, so the pre-write state is the best available guess. That is a guess and
  * is labelled as one — the message says to reload — rather than being left to
  * look like a settled cart.
+ *
+ * Being superseded only ever withholds this write's *data* — its re-fetch, its
+ * `replaceFromServer`, its `restore` — never the message. A write that failed
+ * genuinely failed regardless of what shipped after it, and the newer write
+ * that superseded it reconciles line contents, not notifications: it has no
+ * way to know this one failed at all. Dropping the message here is how "add X
+ * fails, add Y succeeds" left X's rejection unreported even though the cart
+ * itself was correct (#567).
  */
 async function recoverFromServer(
   sequence: number,
@@ -172,16 +180,25 @@ async function recoverFromServer(
   snapshot: CartItem[],
   message: string
 ): Promise<void> {
-  if (!isCurrent(sequence)) return;
+  if (!isCurrent(sequence)) {
+    useCartStore.getState().setSyncError(message);
+    return;
+  }
 
   try {
     const cart = await fetchCart();
-    if (!isCurrent(sequence)) return;
+    if (!isCurrent(sequence)) {
+      useCartStore.getState().setSyncError(message);
+      return;
+    }
     queryClient.setQueryData(cartKeys.detail(), cart);
     useCartStore.getState().replaceFromServer(cart);
     useCartStore.getState().setSyncError(message);
   } catch {
-    if (!isCurrent(sequence)) return;
+    if (!isCurrent(sequence)) {
+      useCartStore.getState().setSyncError(message);
+      return;
+    }
     useCartStore.getState().restore(snapshot);
     useCartStore
       .getState()
