@@ -56,6 +56,7 @@ import { Route as AdminApprovalsIdRouteImport } from './routes/admin/approvals/$
 import { Route as AdminCollectionsIndexRouteImport } from './routes/admin/collections/index'
 import { Route as AdminCollectionsIdRouteImport } from './routes/admin/collections/$id'
 import { Route as AdminCollectionsNewRouteImport } from './routes/admin/collections/new'
+import { Route as AdminFramesIndexRouteImport } from './routes/admin/frames/index'
 import { Route as AdminGiftCardsIndexRouteImport } from './routes/admin/gift-cards/index'
 import { Route as AdminGiftCardsIdRouteImport } from './routes/admin/gift-cards/$id'
 import { Route as AdminOrdersIndexRouteImport } from './routes/admin/orders/index'
@@ -305,6 +306,11 @@ const AdminCollectionsNewRoute = AdminCollectionsNewRouteImport.update({
   path: '/collections/new',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFramesIndexRoute = AdminFramesIndexRouteImport.update({
+  id: '/frames/',
+  path: '/frames/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminGiftCardsIndexRoute = AdminGiftCardsIndexRouteImport.update({
   id: '/gift-cards/',
   path: '/gift-cards/',
@@ -421,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
+  '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
@@ -480,6 +487,7 @@ export interface FileRoutesByTo {
   '/account': typeof AuthedAccountIndexRoute
   '/admin/approvals': typeof AdminApprovalsIndexRoute
   '/admin/collections': typeof AdminCollectionsIndexRoute
+  '/admin/frames': typeof AdminFramesIndexRoute
   '/admin/gift-cards': typeof AdminGiftCardsIndexRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
   '/admin/products': typeof AdminProductsIndexRoute
@@ -542,6 +550,7 @@ export interface FileRoutesById {
   '/_authed/account/': typeof AuthedAccountIndexRoute
   '/admin/approvals/': typeof AdminApprovalsIndexRoute
   '/admin/collections/': typeof AdminCollectionsIndexRoute
+  '/admin/frames/': typeof AdminFramesIndexRoute
   '/admin/gift-cards/': typeof AdminGiftCardsIndexRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
   '/admin/products/': typeof AdminProductsIndexRoute
@@ -604,6 +613,7 @@ export interface FileRouteTypes {
     | '/account/'
     | '/admin/approvals/'
     | '/admin/collections/'
+    | '/admin/frames/'
     | '/admin/gift-cards/'
     | '/admin/orders/'
     | '/admin/products/'
@@ -663,6 +673,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/admin/approvals'
     | '/admin/collections'
+    | '/admin/frames'
     | '/admin/gift-cards'
     | '/admin/orders'
     | '/admin/products'
@@ -724,6 +735,7 @@ export interface FileRouteTypes {
     | '/_authed/account/'
     | '/admin/approvals/'
     | '/admin/collections/'
+    | '/admin/frames/'
     | '/admin/gift-cards/'
     | '/admin/orders/'
     | '/admin/products/'
@@ -1097,6 +1109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCollectionsNewRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/frames/': {
+      id: '/admin/frames/'
+      path: '/frames'
+      fullPath: '/admin/frames/'
+      preLoaderRoute: typeof AdminFramesIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/gift-cards/': {
       id: '/admin/gift-cards/'
       path: '/gift-cards'
@@ -1228,6 +1247,7 @@ interface AdminRouteChildren {
   AdminPromotionsIdRoute: typeof AdminPromotionsIdRoute
   AdminApprovalsIndexRoute: typeof AdminApprovalsIndexRoute
   AdminCollectionsIndexRoute: typeof AdminCollectionsIndexRoute
+  AdminFramesIndexRoute: typeof AdminFramesIndexRoute
   AdminGiftCardsIndexRoute: typeof AdminGiftCardsIndexRoute
   AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
   AdminProductsIndexRoute: typeof AdminProductsIndexRoute
@@ -1251,6 +1271,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPromotionsIdRoute: AdminPromotionsIdRoute,
   AdminApprovalsIndexRoute: AdminApprovalsIndexRoute,
   AdminCollectionsIndexRoute: AdminCollectionsIndexRoute,
+  AdminFramesIndexRoute: AdminFramesIndexRoute,
   AdminGiftCardsIndexRoute: AdminGiftCardsIndexRoute,
   AdminOrdersIndexRoute: AdminOrdersIndexRoute,
   AdminProductsIndexRoute: AdminProductsIndexRoute,

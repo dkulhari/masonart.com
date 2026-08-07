@@ -31,6 +31,7 @@ import {
   Percent,
   Gift,
   Truck,
+  Frame,
 } from 'lucide-react'
 import { cn } from '~/lib/utils'
 import { signOut } from '~/lib/auth-client'
@@ -142,6 +143,13 @@ const SECONDARY_NAV_ITEMS: NavItem[] = [
     label: 'Categories',
     href: '/admin/categories',
     icon: Tags,
+  },
+  {
+    // Here rather than in the primary list: a frame is a catalogue axis like a
+    // collection or a category, not an operational surface like Orders.
+    label: 'Frames',
+    href: '/admin/frames',
+    icon: Frame,
   },
   {
     label: 'Settings',

@@ -14,6 +14,13 @@ export const CONTENT_MANAGER_ALLOWED_PREFIXES = [
   '/admin/products',
   '/admin/collections',
   '/admin/categories',
+  /**
+   * `/api/admin/frames` is gated with `requireContentManager`, same as
+   * collections. Leaving the path out here would let the endpoint serve a role
+   * the layout guard turns away at the door — the screen would 403 for someone
+   * the API is happy to answer.
+   */
+  '/admin/frames',
 ] as const
 
 /**
