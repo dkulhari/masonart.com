@@ -18,19 +18,16 @@
  *
  * 1. **The cart saving row.** `/cart` renders its *lines* from the local
  *    zustand store but takes every saving figure from `GET /api/cart`, joined
- *    per line. The web app never writes to the server cart — every `cartApi`
- *    mutation hook (`useAddToCart`, `useUpdateCartItem`, …) has zero call
- *    sites — so a UI add-to-cart produces a local line with no server line to
- *    join against, and the saving row cannot render for a real user. That is a
- *    filed critical bug, not something this spec should paper over or fix. The
- *    sale half of the behaviour is therefore asserted where it actually lives:
- *    the server cart is seeded through `POST /api/cart/items` and
- *    `GET /api/cart` is checked for per-line `pricing.sale`, `locked` and the
- *    cart-level `savingTotal` that the row would print. When the write path
- *    lands, the row itself can be asserted in the UI with no change here.
+ *    per line. The store now writes through to the server cart on every
+ *    mutation (#511), so a UI add-to-cart does produce a joinable server
+ *    line. This spec still seeds the server cart directly through
+ *    `POST /api/cart/items` and checks `GET /api/cart` for per-line
+ *    `pricing.sale`, `locked` and the cart-level `savingTotal` that the row
+ *    would print — a UI-level add asserted against `[data-testid="cart-saving"]`
+ *    is a separate coverage seam, tracked as #567.
  *
- * 2. **Order creation.** Out of scope for this ticket and unreachable for the
- *    same reason — `POST /api/orders` builds from the same empty basket.
+ * 2. **Order creation.** Out of scope for this ticket — a lifecycle spec for
+ *    promotions, not checkout.
  *
  * 3. **Exact discounted amounts.** The UI assertions are structural (a struck
  *    price is present, a percent-off badge is present). The arithmetic is

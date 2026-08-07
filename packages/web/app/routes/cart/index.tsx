@@ -11,10 +11,10 @@
  *
  * Because those are two different sources with nothing keeping them in step,
  * `readCartSaving` is only ever allowed to quote lines that appear in both
- * (#510). Reconciling them properly — one server-owned cart, with the store
- * demoted to a cache in front of it — is a larger change than this page: today
- * nothing in the app writes to the server cart at all, so it cannot yet be the
- * render source.
+ * (#510). The store now writes through to the server cart on every mutation
+ * (#511), but this page still renders from the store, not the server
+ * response — reconciling to one server-owned cart, with the store demoted to
+ * a cache in front of it, is a larger change than this page.
  *
  * Following patterns from docs/poster-app-tech-stack.md
  */
@@ -46,6 +46,7 @@ import { CartItem } from '~/components/cart/CartItem'
 import { JoinGalleryModal } from '~/components/promo/JoinGalleryModal'
 import { useGalleryMembership } from '~/hooks/useGalleryMembership'
 import { useServerCart } from '~/hooks/useCart'
+import type { ServerCartPayload } from '~/lib/cart-projection'
 import {
   freeShippingThresholdLabel,
   netAmountForShipping,
@@ -75,36 +76,6 @@ export const Route = createFileRoute('/cart/')({
 // ============================================================================
 // Sale pricing (#436)
 // ============================================================================
-
-/**
- * One line's pricing, exactly as `GET /api/cart` resolves it (#429).
- *
- * `base` is the stored line total — the figure the cart was written with — and
- * `sale` is re-resolved on every read, so a cart left sitting across the end of
- * a promotion comes back with `sale: null` by itself. `locked` means the price
- * exists but the viewer is not in the gallery yet: the server will charge
- * `base`, and the cart-level `savingTotal` says `0.00` because that is the
- * truth about the money. The teaser is still shown — that is what the gate is.
- */
-interface CartLinePricing {
-  base: string
-  sale: string | null
-  locked: boolean
-  headline: string | null
-  percentOff: number | null
-}
-
-interface PricedCartLine {
-  productId: string
-  variantId: string
-  frameId: string | null
-  pricing: CartLinePricing
-}
-
-interface PricedCart {
-  items: PricedCartLine[]
-  savingTotal: string
-}
 
 /**
  * A cart line's natural key, on both sides of the wire.
@@ -168,7 +139,7 @@ const NO_SAVING: CartSaving = { unlocked: 0, locked: 0, byLine: new Map() }
  * displaying, which is the one thing a discount must never do.
  */
 function readCartSaving(
-  cart: PricedCart | null | undefined,
+  cart: ServerCartPayload | null | undefined,
   displayed: ReadonlySet<string>
 ): CartSaving {
   if (!cart?.items?.length) return NO_SAVING
@@ -246,8 +217,7 @@ export function CartContent() {
     [items]
   )
   const saving = useMemo(
-    () =>
-      readCartSaving(data as unknown as PricedCart | undefined, displayedLines),
+    () => readCartSaving(data, displayedLines),
     [data, displayedLines]
   )
 

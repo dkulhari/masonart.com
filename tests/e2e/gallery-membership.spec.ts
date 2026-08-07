@@ -14,15 +14,13 @@
  * WHAT IS COVERED AT API LEVEL, AND WHY
  * ---------------------------------------------------------------------------
  *
- * **The locked cart saving.** The web app never writes to the server cart —
- * every `cartApi` mutation hook (`useAddToCart`, `useUpdateCartItem`, …) has
- * zero call sites — so a UI add-to-cart produces a local zustand line with no
- * server line to join against, and `/cart` cannot render a saving row for a
- * real user. That is a filed critical bug (see the header of
- * `sale-promotions.spec.ts`), not something this spec should paper over or
- * fix. So the cart leg is asserted where the numbers actually live: the server
- * cart is seeded through `POST /api/cart/items` and `GET /api/cart` is read for
- * per-line `pricing.sale` / `pricing.locked` and the cart-level `savingTotal`.
+ * **The locked cart saving.** The store now writes through to the server cart
+ * on every mutation (#511), so a UI add-to-cart does produce a joinable
+ * server line — but this spec still seeds the server cart directly through
+ * `POST /api/cart/items` and reads `GET /api/cart` for per-line
+ * `pricing.sale` / `pricing.locked` and the cart-level `savingTotal` (see the
+ * header of `sale-promotions.spec.ts`); a UI-level add is a separate coverage
+ * seam, tracked as #567.
  *
  * That leg is worth more than a structural UI check anyway, because the
  * interesting claim is arithmetic: a locked line contributes **zero** to
