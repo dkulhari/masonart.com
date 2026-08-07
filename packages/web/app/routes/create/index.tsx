@@ -18,6 +18,7 @@ import { Sparkles, Wand2, HelpCircle, Loader2, Wallet, Gift, AlertCircle } from 
 import { cn, formatPrice } from '~/lib/utils'
 import { aiApi, walletApi, type WalletBalance, type CostEstimate } from '~/lib/api'
 import { AddFundsButton } from '~/components/wallet/AddFundsButton'
+import { MOBILE_TAB_BAR_OFFSET_CLASS } from '~/components/layout/MobileTabBar'
 import { PromptInput } from '~/components/ai-generator/PromptInput'
 import {
   StyleSelector,
@@ -548,7 +549,14 @@ function CreatePage() {
        * otherwise nothing on screen confirms a style was picked.
        */}
       {!isInlineGenerateVisible && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 shadow-[0_-4px_16px_rgb(0_0_0_/_8%)] backdrop-blur md:hidden">
+        <div
+          className={cn(
+            'fixed inset-x-0 z-40 border-t border-border bg-background/95 shadow-[0_-4px_16px_rgb(0_0_0_/_8%)] backdrop-blur md:hidden',
+            // Sits on the tab bar, not over it (#542). The tab bar is lg:hidden and
+            // this bar md:hidden, so the tab bar is always beneath it here.
+            MOBILE_TAB_BAR_OFFSET_CLASS,
+          )}
+        >
           <div className="container-wide flex items-center gap-3 py-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-foreground">

@@ -24,6 +24,22 @@ export const MOBILE_TAB_BAR_PADDING_CLASS =
   'pb-[calc(3.875rem+env(safe-area-inset-bottom))] lg:pb-0'
 
 /**
+ * Where a page's own fixed bottom bar has to sit so it stacks ON TOP of the
+ * tab bar rather than painting over it.
+ *
+ * Same two numbers as MOBILE_TAB_BAR_PADDING_CLASS, so they move together.
+ * No breakpoint prefix on purpose: the only consumer today, /create's generate
+ * bar, is `md:hidden`, and this bar is `lg:hidden` — the tab bar is always
+ * under it whenever it renders.
+ *
+ * Do NOT solve this by raising the tab bar above z-40. See the z-30 note below:
+ * every scrim in the app is z-40 and every panel z-50, and a tab bar over an
+ * open drawer offers taps that go nowhere.
+ */
+export const MOBILE_TAB_BAR_OFFSET_CLASS =
+  'bottom-[calc(3.875rem+env(safe-area-inset-bottom))]'
+
+/**
  * The bar's content row. Kept next to the padding class above, not inlined.
  *
  * 61 and not 62: the hairline top border is the 62nd pixel, and border-box
