@@ -50,6 +50,57 @@ export function candidateDepth(cohortSize: number): number {
   return Math.max(MIN_CANDIDATES_PER_COLLECTION, cohortSize);
 }
 
+/**
+ * Orientations in the order a collection should borrow them, best first.
+ *
+ * Every surface that borrows one of these images crops it: the Discover chips
+ * cut a circle out of it, the home page's Shop By Popular tiles cut a 7:4
+ * rectangle. Both windows are at least as wide as they are tall, and product
+ * artwork is matted at a fixed fraction of its LONGEST side — so how much of
+ * the picture survives the crop is decided almost entirely by its proportion.
+ *
+ * Measured on the dev catalogue, cropping a 7:4 tile out of the 1500px master:
+ * a landscape piece keeps a 1148px-wide window of the artwork, a square one
+ * 1148, a panoramic one 1030, and a portrait one as little as 599 — below the
+ * tile's own 636 device pixels, so it is the only class that has to be
+ * enlarged rather than reduced, and it is the only class that looks soft.
+ * Circles rank the same way for the same reason, minus panoramic.
+ *
+ * `set-of-2-3` is last and it is not about proportion: those photographs show
+ * two panels with wall between them. Any centred crop either straddles the
+ * gutter — one tile reading as two half-pictures butted together, which is
+ * what lost #531's first blind A/B — or lands in the wall. A picture that
+ * stands for a whole collection has to be ONE picture.
+ *
+ * This orders the shortlist only. It never overrides a curator: manual
+ * collections keep their authored `position` order, and `featuredOrder` still
+ * decides between two candidates of the same shape.
+ */
+export const REPRESENTATIVE_ORIENTATION_ORDER = [
+  "landscape",
+  "square",
+  "panoramic",
+  "portrait",
+] as const;
+
+/** Lower sorts first. Anything unranked — `round`, `set-of-2-3` — sorts last. */
+export function representativeOrientationRank(
+  orientation: string | null | undefined
+): number {
+  const index = REPRESENTATIVE_ORIENTATION_ORDER.indexOf(
+    orientation as (typeof REPRESENTATIVE_ORIENTATION_ORDER)[number]
+  );
+  return index === -1 ? REPRESENTATIVE_ORIENTATION_ORDER.length : index;
+}
+
+/** The same ranking as a SQL `case`, built from the one list above. */
+const orientationRankSql = sql<number>`case ${products.orientation}::text ${sql.join(
+  REPRESENTATIVE_ORIENTATION_ORDER.map(
+    (orientation, rank) => sql`when ${orientation} then ${rank}`
+  ),
+  sql` `
+)} else ${REPRESENTATIVE_ORIENTATION_ORDER.length} end`;
+
 export interface Representative {
   productId: string;
   image: string | null;
@@ -126,11 +177,17 @@ const mainImageSql = sql<string | null>`coalesce(
 /**
  * A shortlist of eligible products for one collection, best first.
  *
- * "Best" is the same ranking the rail used before: curator-featured ahead of
- * everything, then newest. Ordering by the collection's OWN sort would be
- * wrong here — Best Sellers would then illustrate itself with whatever sold
- * most, which is a reasonable picture but makes the rail's imagery churn with
- * the sales figures.
+ * "Best" is first about the SHAPE of the artwork and only then about
+ * merchandising — see REPRESENTATIVE_ORIENTATION_ORDER. Curator-featured ahead
+ * of everything, then newest, still decides between two candidates that crop
+ * equally well, which is what it was really doing before.
+ *
+ * Ordering by the collection's OWN sort would be wrong here — Best Sellers
+ * would then illustrate itself with whatever sold most, which is a reasonable
+ * picture but makes the rail's imagery churn with the sales figures.
+ *
+ * A manual collection is exempt: someone put those products in that order by
+ * hand, and a measured proportion does not get to overrule them.
  */
 async function shortlistFor(
   collection: Collection,
@@ -176,6 +233,7 @@ async function shortlistFor(
     .from(products)
     .where(and(...buildProductConditions(filters)))
     .orderBy(
+      orientationRankSql,
       sql`${products.featuredOrder} asc nulls last`,
       sql`${products.createdAt} desc`
     )

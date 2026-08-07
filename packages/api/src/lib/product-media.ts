@@ -19,7 +19,7 @@ import {
   type ProductImage,
   type ProductImageType,
 } from "@chobii/shared";
-import { matToSquare, cropToSquare } from "./image-processing";
+import { matToSquare, cropToSquare, measureArtBox } from "./image-processing";
 import { uploadOptimizedImage, uploadFile, StoragePaths } from "./storage";
 
 /** Where untouched sources live, so a crop can be revised later. */
@@ -61,7 +61,12 @@ export async function buildProductMedia(
     ? await matToSquare(input)
     : await cropToSquare(input, opts.crop);
 
-  // 2. Existing variant ladder + upload, unchanged.
+  // 2. Measure where the art landed on the mat. Only artwork is matted; a
+  //    cropped photograph fills its square, so there is nothing to measure and
+  //    nothing for the card to re-frame.
+  const artBox = isArtwork ? await measureArtBox(squared) : undefined;
+
+  // 3. Existing variant ladder + upload, unchanged.
   const uploaded = await uploadOptimizedImage(
     squared,
     `${filename.replace(/\.[^.]+$/, "")}.webp`,
@@ -69,7 +74,7 @@ export async function buildProductMedia(
     { prefix: StoragePaths.PRODUCTS }
   );
 
-  // 3. Retain the untouched source. Load-bearing rather than insurance:
+  // 4. Retain the untouched source. Load-bearing rather than insurance:
   //    re-cropping and re-matting both need the original back.
   const original = await uploadFile(input, originalKeyFor(filename), {
     contentType,
@@ -90,6 +95,7 @@ export async function buildProductMedia(
     })),
     // Artwork is never cropped, so a crop would be meaningless on a main image.
     ...(isArtwork || !opts.crop ? {} : { crop: opts.crop }),
+    ...(artBox ? { artBox } : {}),
     originalKey: original.key,
   };
 }

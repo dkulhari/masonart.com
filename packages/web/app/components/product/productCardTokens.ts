@@ -20,6 +20,25 @@
 export const MEDIA_RATIO = 'aspect-square'
 
 /**
+ * The card plate — the surface a product photograph sits ON.
+ *
+ * Reads --plate, NOT --mat. The two were the same value while the card drew the
+ * master square edge to edge, and that was the bug: at rgb(250 250 250) on a
+ * white page the plate carries 2% contrast, so a card whose artwork covers under
+ * half of it has no visible boundary and the picture reads as a fragment
+ * floating in the page. The bar's own plate measures rgb(239 239 239).
+ *
+ * Held as an arbitrary value rather than a `colors` entry in tailwind.config so
+ * it needs no config reload — a token that only a running dev server's Tailwind
+ * restart can make real is a token that silently does nothing. The card radius
+ * next to it is written the same way for the same reason.
+ *
+ * Only visible where artFraming has cropped the baked mat away; an image with
+ * no artBox covers it edge to edge exactly as before.
+ */
+export const PLATE_BG = 'bg-[hsl(var(--plate))]'
+
+/**
  * Responsive sizes hint, matching the grid's 2 / md:3 / xl:4 columns.
  *
  * Mesonart omits `sizes` entirely, which we measured causing a 6.7x over-fetch —

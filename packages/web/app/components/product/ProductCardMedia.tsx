@@ -15,6 +15,14 @@
  *
  * Hover is positional, not time-based: cursor X picks the slide. Reproduced from
  * mesonart.com; see docs/research/mesonart-grid/README.md.
+ *
+ * ART FRAMING — the one thing layered on top of the above:
+ *
+ *   The mat is baked into the pixels, so a 3:1 panorama and a square both
+ *   arrive as 1500x1500 and the card drew them at wildly different optical
+ *   weights. `artFraming` re-frames each image with clip-path + transform,
+ *   neither of which affects layout, so the mechanism above is untouched. An
+ *   image with no `artBox` gets no style and draws exactly as before.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -22,8 +30,10 @@ import { Link } from '@tanstack/react-router'
 import { Eye } from 'lucide-react'
 import { isSquare, sortedImages, type ProductImage } from '@chobii/shared'
 import { cn } from '~/lib/utils'
+import { frameArt } from './artFraming'
 import {
   MEDIA_RATIO,
+  PLATE_BG,
   SIZES_ATTR,
   EASE_PRIMARY,
   EASE_FAST,
@@ -35,6 +45,16 @@ export interface ProductCardMediaProps {
   slug: string
   /** Product title, used as the media link's accessible name. */
   title: string
+  /**
+   * Load the primary image eagerly and at high fetch priority.
+   *
+   * For the LCP candidate only — the first card of the first band under the
+   * hero. `loading="lazy"` on that image costs the measurement the round trip
+   * the browser would otherwise have started during preload scanning. Every
+   * other card stays lazy; making them all eager would trade one good number
+   * for a worse one.
+   */
+  priority?: boolean
   className?: string
 }
 
@@ -42,6 +62,7 @@ export function ProductCardMedia({
   images,
   slug,
   title,
+  priority = false,
   className,
 }: ProductCardMediaProps) {
   /** 0 = at rest (primary visible); 1..n-1 = a hover slide. */
@@ -100,16 +121,30 @@ export function ProductCardMedia({
         wrapper is in normal flow, so it still takes its height from the in-flow
         image below and the alignment mechanism is unchanged.
       */}
-      <div className="relative overflow-hidden rounded-[var(--card-radius)] bg-mat">
-        {/* IN FLOW — this element defines the media box height. Never absolute. */}
+      {/* PLATE_BG, not `bg-mat`: once artFraming has cropped the baked mat
+          away this is the only background the card has, and it is the surface
+          the reference's own cards sit on. Where there is no artBox the image
+          covers it edge to edge and the colour never shows, so this is inert
+          rather than wrong on an un-measured asset. */}
+      <div
+        className={cn(
+          'relative overflow-hidden rounded-[var(--card-radius)]',
+          PLATE_BG
+        )}
+      >
+        {/* IN FLOW — this element defines the media box height. Never absolute.
+            `style` carries clip-path + transform only; both are paint-time and
+            cannot move the box. */}
         <img
           src={primary.url}
           alt={primary.altText}
           width={primary.width}
           height={primary.height}
-          loading="lazy"
-          decoding="async"
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : undefined}
+          decoding={priority ? 'sync' : 'async'}
           sizes={SIZES_ATTR}
+          style={frameArt(primary.artBox)}
           className={cn('block w-full object-contain', MEDIA_RATIO)}
         />
 
@@ -127,6 +162,10 @@ export function ProductCardMedia({
             loading="lazy"
             decoding="async"
             sizes={SIZES_ATTR}
+            // Each slide carries its own box: a room mockup and the artwork it
+            // hangs in are not the same shape, and framing them together would
+            // make the hover jump.
+            style={frameArt(m.artBox)}
             className={cn(
               'absolute inset-0 hidden h-full w-full object-contain md:block',
               'motion-safe:transition-opacity motion-safe:duration-500',

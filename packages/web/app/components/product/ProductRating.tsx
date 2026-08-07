@@ -40,7 +40,12 @@ export function ProductRating({
         reviewCount === 1 ? '' : 's'
       }`}
     >
-      <span className="flex" aria-hidden="true">
+      {/* gap-[3px] is load-bearing, not decoration. Five 14px lucide stars set
+          flush against each other have ~0.5px between their points and merge
+          into one amber bar — the row stops reading as five marks and becomes a
+          smear. Measured on the reference: 16px glyphs on a 19px pitch, so 3px
+          of air. Ours are 14px, and 3px is what separates them. */}
+      <span className="flex gap-[3px]" aria-hidden="true">
         {STARS.map((star) => (
           <Star
             key={star}
@@ -53,7 +58,13 @@ export function ProductRating({
           />
         ))}
       </span>
-      <span className="text-xs text-muted-foreground" aria-hidden="true">
+      {/* --card-meta, not --muted-foreground: see the token. The reference sets
+          this count in rgb(29 29 29), near-black; the slate it replaces was the
+          only cool hue in the band. */}
+      <span
+        className="text-xs text-[hsl(var(--card-meta))]"
+        aria-hidden="true"
+      >
         ({reviewCount})
       </span>
     </div>

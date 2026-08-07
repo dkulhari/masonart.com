@@ -402,13 +402,28 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
   return (
     <>
       {/*
-        Their trigger: a 172x40 white pill at radius 60, centred over the foot
-        of the artwork, that wipes to black on hover. Not the full-bleed bar
-        this used to be.
+        TWO SHAPES, ONE CONTROL.
 
-        `opacity-0` rather than `pointer-events-none` on hover-capable widths,
-        and visible at rest below `md`: it has to stay in the tab order at
-        every width, because a hover-only affordance is not a route in.
+        From `md` up this is their trigger unchanged: a 172x40 white pill at
+        radius 60, centred over the foot of the artwork, revealed on hover. It
+        costs the picture nothing there because at rest it is not drawn.
+
+        Below `md` there is no hover, so that pill was permanently printed
+        across the artwork's lower third — a 163x37 white slab on pale cream
+        art, its own edge invisible, reading as type set onto the picture. And
+        it was centred horizontally while bottom-anchored 25px off the plate's
+        base: centred on one axis, arbitrary on the other. Three separate
+        reviews flagged it independently.
+
+        So below `md` it becomes what the reference has: a 40px button in the
+        plate's corner, on the same 16px inset the quick-view eye uses on the
+        opposite one, carrying a shadow so it has an edge of its own against a
+        light picture. It sits over the corner of the artwork rather than
+        across its face.
+
+        `opacity-0` rather than `pointer-events-none` on hover-capable widths:
+        it has to stay in the tab order at every width, because a hover-only
+        affordance is not a route in.
       */}
       <button
         ref={triggerRef}
@@ -416,17 +431,32 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
         onClick={openPanel}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
+        data-testid="choose-options"
         className={cn(
           buttonVariants({ variant: 'outline' }),
-          'absolute bottom-6 left-1/2 z-20 h-10 -translate-x-1/2 whitespace-nowrap',
-          'border-transparent bg-background px-[22px] text-base font-normal',
+          'absolute bottom-4 right-4 z-20 h-10 w-10 rounded-full p-0',
+          // DARK, not white. A white circle on the #EFEFEF plate is a 1.1:1
+          // fill difference held together only by its drop shadow, so it reads
+          // as a hole punched in the tile rather than a control sitting on it.
+          // The reference's own mobile quick-add measures rgb(23 23 23) — the
+          // same near-black as --foreground — which is 14:1 against the plate
+          // and needs no shadow to have an edge.
+          'border-transparent bg-foreground text-background text-base font-normal',
+          'shadow-[0_2px_10px_rgba(23,23,23,0.18)]',
+          'hover:bg-foreground/90 hover:text-background',
+          // …and the measured white pill again from `md`, where it is only
+          // drawn on hover and so costs the picture nothing.
+          'md:bottom-6 md:left-1/2 md:right-auto md:w-auto md:-translate-x-1/2',
+          'md:bg-background md:text-foreground md:hover:bg-background',
+          'md:whitespace-nowrap md:rounded-pill md:px-[22px] md:shadow-none',
           'md:opacity-0 md:motion-safe:transition-opacity md:motion-safe:duration-300',
           EASE_FAST,
           'md:group-hover/card:opacity-100 md:focus-visible:opacity-100',
           className
         )}
       >
-        Choose Options
+        <Plus className="h-4 w-4 md:hidden" aria-hidden="true" />
+        <span className="sr-only md:not-sr-only">Choose Options</span>
       </button>
 
       {isOpen && (

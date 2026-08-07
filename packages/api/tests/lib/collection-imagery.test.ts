@@ -14,7 +14,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { assignRepresentatives } from '../../src/lib/collection-imagery';
+import {
+  assignRepresentatives,
+  representativeOrientationRank,
+  REPRESENTATIVE_ORIENTATION_ORDER,
+} from '../../src/lib/collection-imagery';
 
 const candidate = (productId: string, image = `${productId}.jpg`) => ({
   productId,
@@ -144,5 +148,51 @@ describe('assignRepresentatives', () => {
       new Map([['empty', 0]])
     );
     expect(assigned.has('empty')).toBe(false);
+  });
+});
+
+/**
+ * Which SHAPE a collection borrows, before which product.
+ *
+ * Every surface that uses one of these images crops it — a circle on the
+ * Discover rail, a 7:4 rectangle in the home page's Shop By Popular band — and
+ * how much of the picture survives is decided by its proportion. #531's first
+ * blind A/B was lost on exactly this: the shortlist ignored shape, so one tile
+ * came back a photograph of two panels with a wall column down the middle and
+ * two more came back the softest images in the catalogue.
+ */
+describe('representativeOrientationRank', () => {
+  it('prefers the shapes that survive being cropped to a wide window', () => {
+    expect(representativeOrientationRank('landscape')).toBeLessThan(
+      representativeOrientationRank('portrait')
+    );
+    expect(representativeOrientationRank('square')).toBeLessThan(
+      representativeOrientationRank('panoramic')
+    );
+  });
+
+  it('puts a set of two panels last — it is two pictures, not one', () => {
+    const worst = REPRESENTATIVE_ORIENTATION_ORDER.length;
+
+    expect(representativeOrientationRank('set-of-2-3')).toBe(worst);
+    expect(representativeOrientationRank('portrait')).toBeLessThan(worst);
+  });
+
+  it('sends an unknown or missing orientation to the back rather than the front', () => {
+    // A product whose shape we cannot vouch for must not outrank one we can.
+    const worst = REPRESENTATIVE_ORIENTATION_ORDER.length;
+
+    expect(representativeOrientationRank('round')).toBe(worst);
+    expect(representativeOrientationRank(null)).toBe(worst);
+    expect(representativeOrientationRank(undefined)).toBe(worst);
+  });
+
+  it('ranks every orientation distinctly, in the declared order', () => {
+    const ranks = REPRESENTATIVE_ORIENTATION_ORDER.map(
+      representativeOrientationRank
+    );
+
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    expect(new Set(ranks).size).toBe(ranks.length);
   });
 });

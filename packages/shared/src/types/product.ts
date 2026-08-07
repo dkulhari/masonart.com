@@ -409,8 +409,39 @@ export interface ProductImage {
   variants?: ImageVariant[];
   /** Human-chosen crop window. Absent for `main`, which is matted, never cropped. */
   crop?: ImageCrop;
+  /**
+   * Where the artwork actually sits inside the square master, normalised 0..1.
+   *
+   * The mat is baked into the pixels, so the stored asset says `1500x1500` for
+   * a 3:1 panorama and a perfect square alike and the storefront cannot tell
+   * them apart. Every card then draws the same square and the artwork inside it
+   * lands anywhere between 39% and 76% of the plate — four identical plates
+   * holding four wildly different-weight pictures.
+   *
+   * This is the missing measurement. With it the card can crop the baked mat
+   * away and re-fit each piece to one optical area, so a row reads as one set.
+   * See packages/web/app/components/product/artFraming.ts.
+   *
+   * Optional on purpose: an asset processed before this existed simply has no
+   * box, and the card falls back to drawing the square as it always did.
+   */
+  artBox?: ImageArtBox;
   /** Storage key of the unprocessed upload. Load-bearing: required to revise a crop. */
   originalKey: string;
+}
+
+/**
+ * The artwork's bounding box inside a matted square master, normalised 0..1.
+ *
+ * Same shape as ImageCrop but a different thing: ImageCrop is a window a human
+ * chose against the ORIGINAL upload, this is a measurement of where the art
+ * ended up on the mat.
+ */
+export interface ImageArtBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 /**

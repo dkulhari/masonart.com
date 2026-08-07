@@ -88,6 +88,103 @@ describe('ProductCardMedia — structure', () => {
   })
 })
 
+describe('ProductCardMedia — art framing', () => {
+  /**
+   * The mat is baked into the pixels, so a 3:1 panorama and a square both
+   * arrive as 1500x1500 and the card drew them at wildly different optical
+   * weights. `artBox` is the measurement that lets it re-frame them; the
+   * mechanism is clip-path + transform precisely because neither can move the
+   * box, so the row-alignment contract above is untouched.
+   */
+  const boxed = (i: number, box: { x: number; y: number; w: number; h: number }) => ({
+    ...img(i),
+    artBox: box,
+  })
+
+  it('frames an image that carries a box', () => {
+    const { container } = render(
+      <ProductCardMedia
+        images={[boxed(0, { x: 0.06, y: 0.27, w: 0.88, h: 0.45 })]}
+        slug="s"
+        title="t"
+      />
+    )
+    const el = container.querySelector('img') as HTMLImageElement
+    expect(el.style.clipPath).toContain('inset(')
+    expect(el.style.transform).toContain('scale(')
+    expect(el.style.transformOrigin).toBe('0 0')
+  })
+
+  it('leaves an un-measured image exactly as it was', () => {
+    const { container } = render(
+      <ProductCardMedia images={many(1)} slug="s" title="t" />
+    )
+    const el = container.querySelector('img') as HTMLImageElement
+    expect(el.style.clipPath).toBe('')
+    expect(el.style.transform).toBe('')
+  })
+
+  it('frames each hover slide on its own box, not the primary one', () => {
+    // A room mockup and the artwork hanging in it are not the same shape;
+    // framing them together would make the hover jump.
+    const { container } = render(
+      <ProductCardMedia
+        images={[
+          boxed(0, { x: 0.06, y: 0.27, w: 0.88, h: 0.45 }),
+          boxed(1, { x: 0.27, y: 0.06, w: 0.46, h: 0.88 }),
+        ]}
+        slug="s"
+        title="t"
+      />
+    )
+    const [primary, slide] = [...container.querySelectorAll('img')]
+    expect(primary!.style.transform).not.toBe(slide!.style.transform)
+  })
+
+  it('never lets framing reach the layout box', () => {
+    // Only paint-time properties. Anything that sizes or positions the element
+    // would break the grid's row alignment.
+    const { container } = render(
+      <ProductCardMedia
+        images={[boxed(0, { x: 0.06, y: 0.27, w: 0.88, h: 0.45 })]}
+        slug="s"
+        title="t"
+      />
+    )
+    const style = (container.querySelector('img') as HTMLImageElement).style
+    for (const property of ['width', 'height', 'position', 'top', 'left', 'margin']) {
+      expect(style.getPropertyValue(property)).toBe('')
+    }
+  })
+})
+
+describe('ProductCardMedia — LCP', () => {
+  it('lazy-loads by default', () => {
+    const { container } = render(<ProductCardMedia images={many(2)} slug="s" title="t" />)
+    const primary = container.querySelector('img:not(.absolute)')!
+    expect(primary.getAttribute('loading')).toBe('lazy')
+    expect(primary.getAttribute('fetchpriority')).toBeNull()
+  })
+
+  it('loads the primary image eagerly when it is the LCP candidate', () => {
+    const { container } = render(
+      <ProductCardMedia images={many(3)} slug="s" title="t" priority />
+    )
+    const primary = container.querySelector('img:not(.absolute)')!
+    expect(primary.getAttribute('loading')).toBe('eager')
+    expect(primary.getAttribute('fetchpriority')).toBe('high')
+  })
+
+  it('keeps the hover slides lazy even then — only the visible one is urgent', () => {
+    const { container } = render(
+      <ProductCardMedia images={many(3)} slug="s" title="t" priority />
+    )
+    container.querySelectorAll('img.absolute').forEach((el) => {
+      expect(el.getAttribute('loading')).toBe('lazy')
+    })
+  })
+})
+
 describe('ProductCardMedia — single image degrades cleanly', () => {
   it('renders no hover slides and no dots', () => {
     const { container } = render(<ProductCardMedia images={many(1)} slug="s" title="t" />)

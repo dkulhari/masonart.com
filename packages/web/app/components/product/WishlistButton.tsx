@@ -58,7 +58,11 @@ export function WishlistButton({
         'flex items-center justify-center transition-colors',
         variant === 'detail'
           ? 'rounded-pill border border-border p-3 hover:bg-muted'
-          : 'h-8 w-8 rounded-full text-muted-foreground hover:text-foreground',
+          : // --card-meta rather than --muted-foreground: a warm neutral at
+            // 5.4:1 on white where the slate was 4.76:1. MORE legible, not
+            // less — the reference's own heart is rgb(219 216 194), 1.3:1,
+            // and being readable is a thing this card wins on.
+            'h-8 w-8 rounded-full text-[hsl(var(--card-meta))] hover:text-foreground',
         className
       )}
     >

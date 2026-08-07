@@ -43,6 +43,29 @@ import {
 // mats or crops it to MAT_CANVAS, uploads to our own storage and replaces the
 // record before insert. Only `url`, `altText`, `type` and `sortOrder` are read.
 
+// ORIENTATION IS MEASURED, NOT DECLARED (#545).
+//
+// Every `orientation` below was re-derived from the pixels of the artwork this
+// product actually ships with — trim the mat off the stored 1500x1500 master,
+// compare the artwork box to the canvas, and classify the ratio:
+//
+//   >= 1.8 panoramic | >= 1.15 landscape | >= 0.87 square | else portrait
+//
+// plus `set-of-2-3` for the two photographs that show two panels with wall
+// between them (`digital-cosmos`, `paper-layers`) — panel count, not
+// proportion, which is exactly what that facet value is for. It has no size
+// ladder; the fallback below hands those two the portrait ladder, so they stay
+// purchasable.
+//
+// It had to be measured because it was wrong: 27 of these 41 declared an
+// orientation the picture contradicted, six of them the exact opposite. Every
+// surface that sizes a crop from the column — the round Discover chips on
+// /posters and /collections/$slug, the Shop By Popular tiles on the home page —
+// was cropping to a shape the artwork did not have. The pixels are the source
+// of truth here because REFERENCE_MEDIA is what supplies them; the stock URLs
+// on each record are a fallback for a clone without the fixture directory and
+// were never this product's real artwork.
+
 // ============================================================================
 // Sample Data
 // ============================================================================
@@ -76,7 +99,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["beige", "grey", "cream"],
     rooms: ["living-room", "bedroom"],
     tags: ["fixture", "wabi-sabi"],
-    orientation: "portrait",
+    orientation: "square",
     images: [
       {
         id: "fix-main",
@@ -171,7 +194,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["gold", "cream", "beige"],
     rooms: ["living-room", "dining-room", "hallway"],
     tags: ["luxury", "gold", "elegant"],
-    orientation: "landscape",
+    orientation: "panoramic",
     images: [
       {
         id: "img-2",
@@ -236,7 +259,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["orange", "purple", "white"],
     rooms: ["living-room", "office", "cabin"],
     tags: ["panoramic", "mountains", "scenic"],
-    orientation: "panoramic",
+    orientation: "portrait",
     images: [
       {
         id: "img-4",
@@ -268,7 +291,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["green", "brown", "gold"],
     rooms: ["living-room", "bedroom", "study"],
     tags: ["forest", "misty", "ethereal"],
-    orientation: "portrait",
+    orientation: "landscape",
     images: [
       {
         id: "img-5",
@@ -299,7 +322,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["pink", "orange", "green"],
     rooms: ["living-room", "kitchen", "sunroom"],
     tags: ["desert", "botanical", "colorful"],
-    orientation: "square",
+    orientation: "panoramic",
     images: [
       {
         id: "img-6",
@@ -332,7 +355,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["green", "white"],
     rooms: ["living-room", "bedroom", "bathroom"],
     tags: ["monstera", "tropical", "botanical"],
-    orientation: "portrait",
+    orientation: "landscape",
     images: [
       {
         id: "img-7",
@@ -397,7 +420,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["black", "white"],
     rooms: ["office", "bedroom", "meditation-room"],
     tags: ["zen", "minimalist", "japanese"],
-    orientation: "square",
+    orientation: "panoramic",
     images: [
       {
         id: "img-9",
@@ -428,7 +451,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["gray", "white", "black"],
     rooms: ["office", "living-room", "hallway"],
     tags: ["lines", "geometric", "modern"],
-    orientation: "landscape",
+    orientation: "square",
     images: [
       {
         id: "img-10",
@@ -559,7 +582,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["grey", "neutral", "beige"],
     rooms: ["bedroom", "bathroom", "office"],
     tags: ["texture", "stone", "natural"],
-    orientation: "portrait",
+    orientation: "square",
     images: [
       {
         id: "img-wbs-2",
@@ -591,7 +614,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["pink", "colorful", "multi"],
     rooms: ["living-room", "kids-room", "office"],
     tags: ["neon", "bold", "vibrant"],
-    orientation: "square",
+    orientation: "panoramic",
     images: [
       {
         id: "img-pop-1",
@@ -622,7 +645,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["red", "blue", "colorful"],
     rooms: ["kids-room", "office", "living-room"],
     tags: ["comic", "retro", "fun"],
-    orientation: "landscape",
+    orientation: "square",
     images: [
       {
         id: "img-pop-2",
@@ -684,7 +707,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["green", "beige", "earth-tones"],
     rooms: ["kitchen-dining", "bathroom", "office"],
     tags: ["botanical", "scientific", "vintage"],
-    orientation: "portrait",
+    orientation: "square",
     images: [
       {
         id: "img-vin-2",
@@ -746,7 +769,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["gold", "blue", "neutral"],
     rooms: ["office", "living-room", "bedroom"],
     tags: ["surreal", "time", "philosophical"],
-    orientation: "square",
+    orientation: "portrait",
     images: [
       {
         id: "img-sur-2",
@@ -778,7 +801,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["earth-tones", "gold", "red"],
     rooms: ["living-room", "bedroom", "entryway"],
     tags: ["moroccan", "textile", "boho"],
-    orientation: "portrait",
+    orientation: "square",
     images: [
       {
         id: "img-boh-1",
@@ -808,7 +831,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["colorful", "pink", "gold"],
     rooms: ["bedroom", "kids-room", "bathroom"],
     tags: ["mandala", "spiritual", "colorful"],
-    orientation: "square",
+    orientation: "portrait",
     images: [
       {
         id: "img-boh-2",
@@ -840,7 +863,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["black", "white", "grey"],
     rooms: ["office", "living-room", "entryway"],
     tags: ["geometric", "architecture", "modern"],
-    orientation: "square",
+    orientation: "panoramic",
     images: [
       {
         id: "img-mod-1",
@@ -963,7 +986,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["earth-tones", "black", "neutral"],
     rooms: ["living-room", "office", "bedroom"],
     tags: ["wildlife", "portrait", "nature"],
-    orientation: "portrait",
+    orientation: "landscape",
     images: [
       {
         id: "img-pho-3",
@@ -995,7 +1018,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["grey", "neutral", "black"],
     rooms: ["office", "living-room", "entryway"],
     tags: ["concrete", "industrial", "brutalist"],
-    orientation: "square",
+    orientation: "portrait",
     images: [
       {
         id: "img-tex-1",
@@ -1025,7 +1048,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["white", "beige", "neutral"],
     rooms: ["bedroom", "bathroom", "office"],
     tags: ["paper", "layers", "delicate"],
-    orientation: "portrait",
+    orientation: "set-of-2-3",
     images: [
       {
         id: "img-tex-2",
@@ -1057,7 +1080,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["black", "white"],
     rooms: ["bedroom", "office", "bathroom"],
     tags: ["mindfulness", "zen", "typography"],
-    orientation: "square",
+    orientation: "portrait",
     images: [
       {
         id: "img-quo-1",
@@ -1087,7 +1110,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["colorful", "black", "white"],
     rooms: ["office", "kids-room", "living-room"],
     tags: ["creative", "inspiration", "maker"],
-    orientation: "landscape",
+    orientation: "square",
     images: [
       {
         id: "img-quo-2",
@@ -1119,7 +1142,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["pink", "gold", "colorful"],
     rooms: ["living-room", "bedroom", "kids-room"],
     tags: ["70s", "sunset", "gradient"],
-    orientation: "square",
+    orientation: "panoramic",
     images: [
       {
         id: "img-ret-1",
@@ -1181,7 +1204,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["white", "blue", "grey"],
     rooms: ["living-room", "office", "cabin"],
     tags: ["alps", "mountains", "panoramic"],
-    orientation: "panoramic",
+    orientation: "portrait",
     images: [
       {
         id: "img-pan-1",
@@ -1213,7 +1236,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["black-white", "grey", "neutral"],
     rooms: ["living-room", "office", "bedroom"],
     tags: ["portrait", "urban", "street"],
-    orientation: "portrait",
+    orientation: "square",
     images: [
       {
         id: "img-por-1",
@@ -1275,7 +1298,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["pink", "white", "neutral"],
     rooms: ["bedroom", "bathroom", "kids-room"],
     tags: ["blush", "feminine", "soft"],
-    orientation: "square",
+    orientation: "portrait",
     images: [
       {
         id: "img-col-2",
@@ -1307,7 +1330,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["purple", "blue", "pink"],
     rooms: ["living-room", "office", "bedroom"],
     tags: ["ai-generated", "surreal", "dreamscape"],
-    orientation: "landscape",
+    orientation: "portrait",
     images: [
       {
         id: "img-ai-1",
@@ -1339,7 +1362,7 @@ const sampleProducts: NewProduct[] = [
     colors: ["black", "purple", "gold"],
     rooms: ["office", "living-room", "media-room"],
     tags: ["ai-generated", "cosmic", "digital", "space"],
-    orientation: "square",
+    orientation: "set-of-2-3",
     images: [
       {
         id: "img-ai-2",
