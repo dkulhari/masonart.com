@@ -536,6 +536,82 @@ export const createCollectionInputSchema = collectionSchema.omit({
 export const updateCollectionInputSchema = createCollectionInputSchema.partial();
 
 // ============================================================================
+// Admin Frame Input
+// ============================================================================
+
+/**
+ * Which rung of the format axis a frame sits on. Mirrors the `frame_category`
+ * pg enum; the storefront groups its frame panel on it.
+ *
+ * Note this is NOT `frameTypeSchema` above, which is a different and older
+ * vocabulary ('poster-only', 'black-frame') that shares no value with the
+ * database. That one has no live consumers.
+ */
+export const frameCategorySchema = z.enum(['rolled', 'frameless', 'framed']);
+
+/**
+ * A decimal-string money field, the shape the `frames` columns actually hold.
+ *
+ * Kept as a string rather than coerced to a number so the value that reaches
+ * the table is the value the admin typed, to the paisa. The regex caps
+ * precision at two places because the columns do.
+ */
+const decimalString = (min: number, max: number) =>
+  z
+    .string()
+    .regex(
+      /^\d+(\.\d{1,2})?$/,
+      'Expected a number with at most 2 decimal places'
+    )
+    .refine((v) => {
+      const n = parseFloat(v);
+      return n >= min && n <= max;
+    }, `Must be between ${min} and ${max}`);
+
+/**
+ * What an admin may store on a frame.
+ */
+export const createFrameInputSchema = z.object({
+  name: z.string().min(1).max(120),
+
+  /**
+   * Slug, matching the unique text column. Not a display name — the
+   * storefront's swatch colour fallback is keyed on this.
+   */
+  type: z
+    .string()
+    .regex(/^[a-z0-9-]+$/, 'Lowercase letters, digits and hyphens only'),
+
+  category: frameCategorySchema,
+  description: z.string().max(500).optional(),
+  material: z.string().max(120).optional(),
+  thickness: decimalString(0, 99.99).optional(),
+  color: z.string().max(60).optional(),
+
+  /**
+   * Floor is 1.00, not 0, because `frameAddition` clamps a below-one modifier
+   * to no markup at all: `Math.max(0, priceModifier - 1)`. Accepting 0.5 would
+   * store a discount the pricing formula silently discards, and the admin
+   * would watch the price refuse to move. Rejected at the form instead.
+   */
+  priceModifier: decimalString(1, 5),
+
+  /** Ceiling fits decimal(10,2). */
+  priceAddition: decimalString(0, 99999.99),
+
+  imageUrl: z.string().max(500).optional(),
+  thumbnailUrl: z.string().max(500).optional(),
+  isActive: z.boolean().default(true),
+  sortOrder: z.number().int().min(0).default(0),
+});
+
+/**
+ * Partial, so a price-only edit need not resend the whole frame. The bounds
+ * still apply to whichever fields are present.
+ */
+export const updateFrameInputSchema = createFrameInputSchema.partial();
+
+// ============================================================================
 // Type Exports (inferred from schemas)
 // ============================================================================
 
@@ -573,3 +649,6 @@ export type CreateArtistInputSchema = z.infer<typeof createArtistInputSchema>;
 export type UpdateArtistInputSchema = z.infer<typeof updateArtistInputSchema>;
 export type CreateCollectionInputSchema = z.infer<typeof createCollectionInputSchema>;
 export type UpdateCollectionInputSchema = z.infer<typeof updateCollectionInputSchema>;
+export type FrameCategorySchema = z.infer<typeof frameCategorySchema>;
+export type CreateFrameInput = z.infer<typeof createFrameInputSchema>;
+export type UpdateFrameInput = z.infer<typeof updateFrameInputSchema>;
