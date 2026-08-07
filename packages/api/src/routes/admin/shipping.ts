@@ -23,7 +23,7 @@ import {
   requireAdmin,
   type AuthVariables,
 } from "../../middleware/auth";
-import { deleteCached } from "../../lib/redis";
+import { deleteCached, deleteCachedPattern } from "../../lib/redis";
 import { SHIPPING_CACHE_PREFIX } from "../shipping";
 
 // ============================================================================
@@ -177,7 +177,7 @@ adminShippingApp.post(
         .returning();
 
       // Invalidate cache
-      await deleteCached(`${SHIPPING_CACHE_PREFIX}options:*`);
+      await deleteCachedPattern(`${SHIPPING_CACHE_PREFIX}options:*`);
 
       return c.json(
         {
@@ -278,7 +278,7 @@ adminShippingApp.patch(
         .returning();
 
       // Invalidate cache
-      await deleteCached(`${SHIPPING_CACHE_PREFIX}options:*`);
+      await deleteCachedPattern(`${SHIPPING_CACHE_PREFIX}options:*`);
       await deleteCached(`${SHIPPING_CACHE_PREFIX}option:${optionId}`);
 
       return c.json({
@@ -331,7 +331,7 @@ adminShippingApp.delete("/options/:id", async (c) => {
       .returning();
 
     // Invalidate cache
-    await deleteCached(`${SHIPPING_CACHE_PREFIX}options:*`);
+    await deleteCachedPattern(`${SHIPPING_CACHE_PREFIX}options:*`);
     await deleteCached(`${SHIPPING_CACHE_PREFIX}option:${optionId}`);
 
     return c.json({
