@@ -21,7 +21,10 @@ import {
   ProductReviewSectionSkeleton,
 } from '~/components/product/ProductReviewSection'
 import type { SizeVariant } from '~/components/product/SizeSelector'
-import type { FrameOptionData } from '~/components/product/FrameSelector'
+import type {
+  FrameOptionData,
+  FrameCategory,
+} from '~/components/product/FrameSelector'
 import type { SalePricing } from '~/components/product/SalePrice'
 
 // ============================================================================
@@ -50,6 +53,7 @@ interface ProductApiResponse {
   frames?: Array<{
     id: string
     type: string
+    category: FrameCategory
     name: string
     description: string
     material?: string
@@ -127,6 +131,13 @@ async function fetchProductData(slug: string): Promise<ProductDetailData | null>
       frames: response.frames?.map((f): FrameOptionData => ({
         id: f.id,
         type: f.type,
+        /**
+         * Which rung the panel groups this under, straight off the row.
+         *
+         * FrameSelector used to derive it from `type`, which held only while
+         * every type was seeded in code.
+         */
+        category: f.category,
         name: f.name,
         description: f.description,
         material: f.material,

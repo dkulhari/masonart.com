@@ -150,6 +150,7 @@ const apiProduct = {
     {
       id: 'f-rolled',
       type: 'rolled',
+      category: 'rolled',
       name: 'Rolled Canvas',
       description: 'Shipped in a tube',
       color: 'N/A',
@@ -160,6 +161,7 @@ const apiProduct = {
     {
       id: 'f-frameless',
       type: 'frameless',
+      category: 'frameless',
       name: 'Frameless',
       description: 'Stretched, no moulding',
       color: 'N/A',
@@ -170,6 +172,7 @@ const apiProduct = {
     {
       id: 'f-black',
       type: 'black',
+      category: 'framed',
       name: 'Stretch + Black Frame',
       description: 'Matte black',
       color: 'Matte Black',
@@ -181,6 +184,7 @@ const apiProduct = {
     {
       id: 'f-gold',
       type: 'gold',
+      category: 'framed',
       name: 'Stretch + Gold Frame',
       description: 'Antique gold',
       color: 'Antique Gold',

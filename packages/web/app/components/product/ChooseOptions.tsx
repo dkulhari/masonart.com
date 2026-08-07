@@ -58,6 +58,7 @@ import { buttonVariants } from '~/components/ui/Button'
 import { ProductRating } from './ProductRating'
 import { EASE_FAST } from './productCardTokens'
 import type { ProductCardData } from './ProductCard'
+import { frameGroupLabel, type FrameCategory } from './FrameSelector'
 
 /** The slice of GET /api/products/:slug this panel reads. */
 interface ProductOptionsResponse {
@@ -73,6 +74,7 @@ interface ProductOptionsResponse {
   frames?: Array<{
     id: string
     type: string
+    category: FrameCategory
     name: string
     color?: string
     priceAddition: string
@@ -94,6 +96,8 @@ interface QuickviewVariant {
 interface QuickviewFrame {
   id: string
   type: string
+  /** Which rung the axis heading groups this under. */
+  category: FrameCategory
   name: string
   /**
    * The frame row's two pricing columns, carried through untransformed so the
@@ -251,6 +255,7 @@ function toOptions(response: ProductOptionsResponse | null): ProductOptions {
     frames: (response?.frames ?? []).map((f) => ({
       id: f.id,
       type: f.type,
+      category: f.category,
       name: f.name,
       // `1.40` on the row means "the piece plus 40%".
       pricing: { priceModifier: f.priceModifier, priceAddition: f.priceAddition },
@@ -595,12 +600,20 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
                     <div className="space-y-3">
                       {/* Their heading names the whole axis, not the last
                        * rung of it: the print in a tube, the print stretched,
-                       * or the print stretched and framed. */}
+                       * or the print stretched and framed.
+                       *
+                       * Derived from the rows rather than written out, and
+                       * derived by the same helper the PDP panel uses. The
+                       * literal string was safe only while the catalogue was
+                       * seeded in code and always carried all three rungs; an
+                       * admin who archives every rolled frame would otherwise
+                       * leave this heading promising an option the panel below
+                       * it does not offer. */}
                       <p
                         data-testid="quickview-frame-label"
                         className="flex flex-wrap items-center gap-2 text-foreground"
                       >
-                        Rolled Canvas/Frameless/Framed:
+                        {frameGroupLabel(options.frames)}:
                         <span
                           data-testid="quickview-frame-value"
                           className="font-medium"

@@ -39,11 +39,21 @@ import { cn, formatPrice } from '~/lib/utils'
 // Types
 // ============================================================================
 
+export type FrameCategory = 'rolled' | 'frameless' | 'framed'
+
 export interface FrameOptionData {
   /** Frame ID */
   id: string
   /** Frame type key */
   type: string
+  /**
+   * Which rung of the format axis this frame sits on, straight off the column.
+   *
+   * Previously inferred from `type`, which could only work while every type
+   * was seeded in code — an admin-created FORMAT would have been grouped as a
+   * moulding with nothing to signal it.
+   */
+  category: FrameCategory
   /** Display name */
   name: string
   /** Description */
@@ -128,16 +138,20 @@ function usableFrameImage(imageUrl?: string): string | null {
 }
 
 /**
- * Which rung of the format axis a frame type belongs to.
+ * How each rung of the format axis is written for a shopper.
  *
- * `rolled` and `frameless` are formats, not mouldings (see
- * packages/api/.../schema/products.ts) — everything else is a moulding
- * around the stretched canvas, so it folds into "Framed".
+ * This used to be inferred from the type string — `rolled` and `frameless`
+ * mapped to themselves and everything else fell through to "Framed". That held
+ * only while all seven types were seeded in code and known in advance. Now that
+ * an admin can invent one, an unfamiliar moulding would have landed in the
+ * right group by accident and an unfamiliar FORMAT in the wrong one, with
+ * nothing anywhere to signal it. The rung is a column the admin picks, and this
+ * only spells it.
  */
-function frameCategoryLabel(type: string): string {
-  if (type === 'rolled') return 'Rolled Canvas'
-  if (type === 'frameless') return 'Frameless'
-  return 'Framed'
+const CATEGORY_LABELS: Record<FrameCategory, string> = {
+  rolled: 'Rolled Canvas',
+  frameless: 'Frameless',
+  framed: 'Framed',
 }
 
 /**
@@ -145,12 +159,18 @@ function frameCategoryLabel(type: string): string {
  * "Rolled Canvas/Frameless/Framed" — in the order each category first
  * appears, deduplicated. Degrades gracefully for any other catalogue: a
  * frame list that is all mouldings just reads "Framed".
+ *
+ * Exported so the grouping can be tested without standing up the panel, and
+ * takes only "things with a category" so the quickview — whose frame shape is
+ * its own — can call it rather than keep a second copy that drifts.
  */
-function frameGroupLabel(frames: FrameOptionData[]): string {
+export function frameGroupLabel(
+  frames: ReadonlyArray<{ category: FrameCategory }>
+): string {
   const categories: string[] = []
   for (const frame of frames) {
-    const label = frameCategoryLabel(frame.type)
-    if (!categories.includes(label)) {
+    const label = CATEGORY_LABELS[frame.category]
+    if (label && !categories.includes(label)) {
       categories.push(label)
     }
   }

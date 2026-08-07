@@ -34,6 +34,9 @@ import {
 const frame = (overrides: Partial<FrameOptionData>): FrameOptionData => ({
   id: overrides.id ?? 'f-id',
   type: overrides.type ?? 'rolled',
+  // The rung is a column now, not something the panel infers from `type`, so
+  // each fixture states it. The default matches this helper's own defaults.
+  category: overrides.category ?? 'rolled',
   name: overrides.name ?? 'Rolled Canvas',
   description: overrides.description ?? 'Shipped in a tube',
   material: overrides.material,
@@ -50,6 +53,7 @@ const SEVEN_FRAMES: FrameOptionData[] = [
   frame({
     id: 'f-frameless',
     type: 'frameless',
+    category: 'frameless',
     name: 'Frameless',
     pricing: { priceModifier: '1.33', priceAddition: '0.00' },
     imageUrl: '/frames/frameless.jpg',
@@ -57,6 +61,7 @@ const SEVEN_FRAMES: FrameOptionData[] = [
   frame({
     id: 'f-gold',
     type: 'gold',
+    category: 'framed',
     name: 'Stretch + Gold Frame',
     pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     imageUrl: '/frames/gold.png',
@@ -64,6 +69,7 @@ const SEVEN_FRAMES: FrameOptionData[] = [
   frame({
     id: 'f-silver',
     type: 'silver',
+    category: 'framed',
     name: 'Stretch + Silver Frame',
     pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     imageUrl: '/frames/silver.png',
@@ -71,6 +77,7 @@ const SEVEN_FRAMES: FrameOptionData[] = [
   frame({
     id: 'f-black',
     type: 'black',
+    category: 'framed',
     name: 'Stretch + Black Frame',
     pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     // A placeholder is what old seed data shipped; it must never reach a
@@ -80,6 +87,7 @@ const SEVEN_FRAMES: FrameOptionData[] = [
   frame({
     id: 'f-white',
     type: 'white',
+    category: 'framed',
     name: 'Stretch + White Frame',
     pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     imageUrl: '/frames/white.jpg',
@@ -87,6 +95,7 @@ const SEVEN_FRAMES: FrameOptionData[] = [
   frame({
     id: 'f-wood',
     type: 'wood',
+    category: 'framed',
     name: 'Stretch + Wood Frame',
     pricing: { priceModifier: '1.40', priceAddition: '0.00' },
     imageUrl: undefined,
@@ -470,7 +479,8 @@ describe('unavailable frames', () => {
       <FrameSelector
         frames={[
           ...SEVEN_FRAMES,
-          frame({ id: 'f-out', type: 'gold', name: 'Discontinued Gold', isAvailable: false }),
+          frame({ id: 'f-out', type: 'gold',
+    category: 'framed', name: 'Discontinued Gold', isAvailable: false }),
         ]}
         selectedFrameId={null}
         onFrameSelect={vi.fn()}
@@ -521,6 +531,7 @@ describe('the flat priceAddition column (#566)', () => {
   const GILT: FrameOptionData = frame({
     id: 'f-gilt',
     type: 'gold',
+    category: 'framed',
     name: 'Hand-Gilt Frame',
     pricing: { priceModifier: '1.40', priceAddition: '150.00' },
     imageUrl: '/frames/gold.png',
@@ -530,6 +541,7 @@ describe('the flat priceAddition column (#566)', () => {
   const MOUNT: FrameOptionData = frame({
     id: 'f-mount',
     type: 'frameless',
+    category: 'frameless',
     name: 'Mount Board',
     pricing: { priceModifier: '1.00', priceAddition: '400.00' },
   })
