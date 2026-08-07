@@ -1,0 +1,162 @@
+ticket_number: 568
+title: DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
+description: |-
+  ## Task
+  **Do not implement without Dhruv's input.** Two coupled decisions the layering block in the design doc (§5) opens and does not close. Implementation of #430 proceeds under a stated interim assumption (below) that changes no existing behaviour; this ticket is where the real call gets made.
+
+  ### Decision 1 — what `orders.subtotal` means under a promotion
+
+  §5 step 2 says the discounted line subtotal goes to `orders.subtotal`. Current code (`routes/orders.ts:262-275`) computes `subtotal` as the sum of base line totals and then `total = subtotal + shipping − discount + tax`. Following both literally subtracts the promotion twice.
+
+  - **Option A — subtotal stays gross.** Sum of base line totals; `discount` subtracts once inside `total`. Smallest diff, and `orders.subtotal` keeps the meaning it has on every settled order today.
+  - **Option B — subtotal becomes net.** Discounted line subtotal; `total` drops its `− discount` term. Matches §5 as written, but reinterprets an existing column, so pre- and post-sale orders stop being comparable in reporting.
+
+  ### Decision 2 — which figure the free-shipping threshold reads
+
+  `calculateShippingCost(input.shippingMethod, subtotalStr)` reads that same figure, and the announcement bar promises "Free shipping on orders over ₹999" (`AnnouncementBar.tsx:25`). Under a 40% sale a ₹1,600 cart is ₹960 net: gross qualifies, net does not.
+
+  - **Gross** — the sale does not cost customers their free shipping. More generous, and it is what the banner implies to someone who has not done the arithmetic.
+  - **Net** — the threshold means money actually spent. Protects margin on a deep sale, but a customer who qualified before the sale can stop qualifying during it, which reads as a penalty.
+
+  Whichever subtotal option wins decides this one silently unless it is stated separately, which is why both live in one ticket.
+
+  ## Interim assumption already implemented (#430)
+  Option A + gross threshold — chosen because it changes nothing that exists: `subtotal` keeps its current meaning, shipping keeps its current behaviour, and the only new money movement is the promotion discount. If the decision lands on B or net, #430's totals block is the single place that changes.
+
+  ## Context
+  Part of feature: sale-promotions
+  Phase: 3 — API surfaces (decision, not a build)
+  Design: `docs/superpowers/specs/2026-08-05-sale-promotions-design.md` §5
+
+  Blocks nothing. Once decided, update §5 of the design doc and the totals block in `routes/orders.ts`.
+feature: sale-promotions
+type: spike
+priority: medium
+status: done
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-05T21:12:56.535Z'
+last_updated: '2026-08-07T06:48:20.000Z'
+time_spent_minutes: 0
+labels:
+  - needs-input
+  - backend
+  - api
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-07T06:48:20.000Z'
+    text: Status changed from 'todo' to 'done'
+  - author: claude-code
+    timestamp: '2026-08-07T06:48:20.000Z'
+    text: |-
+      Both calls made by Dhruv, implemented in commit 70bfa9dd.
+
+      **Decision 1 — `orders.subtotal` stays GROSS (Option A).** No behaviour
+      change: `subtotal` is the sum of base line totals, the meaning it carries
+      on every settled order, and `total = subtotal + shipping − discount + tax`
+      subtracts the discount exactly once. Option B would have reinterpreted an
+      existing column and made pre- and post-sale orders incomparable in
+      reporting. The totals arithmetic in `routes/orders.ts` is untouched; only
+      its comment changed, from "interim, pending this ticket" to the decision.
+
+      **Decision 2 — the free-shipping threshold reads the NET, post-discount
+      figure.** This one WAS a change. `calculateShippingCost` was being handed
+      the gross `subtotalStr`; it now receives
+      `netAmountForShipping(subtotal, discount)`. The discount is price-level
+      and design §5's layering puts price above shipping, so a ₹1,600 cart under
+      a 40% sale is ₹960 of spend and no longer ships free. The discount is
+      therefore composed BEFORE shipping is priced — the two blocks had to swap
+      order.
+
+      **Gift cards are excluded from that figure, structurally.** A card is
+      tender: applied at the payment endpoint, after tax, against the amount
+      due. It is payment, not price, and must never move a price-level
+      threshold. `netAmountForShipping(gross, priceDiscount)` takes two price
+      arguments and nothing else, so there is no parameter a gift card could
+      occupy. Pinned from both ends: order creation ignores `giftCardAmount` /
+      `giftCardCodes` in the request body, and a payment-side test proves a
+      ₹1,000 card that drops the payable to ₹200 leaves `shippingCost` at
+      `0.00`.
+
+      **The threshold stopped being duplicated.** It was written three times
+      with three different values — `2000` in `calculateShippingCost`, `1000` in
+      `/api/shipping/estimate`, and `999` on the cart page next to copy
+      promising ₹999. A cart promising free shipping the checkout then bills for
+      is the failure mode; ₹999 won because it is the figure already promised on
+      five customer-facing surfaces. All three now read
+      `FREE_SHIPPING_THRESHOLD` from `packages/shared/src/constants/shipping.ts`,
+      as does the cart's copy (`FREE_SHIPPING_THRESHOLD_LABEL`), and the API and
+      web boundary tests derive their fixtures from the constant rather than
+      restating it — so the two sides cannot drift without a test noticing.
+
+      Design §5 rewritten: the layering block now states gross subtotal, one
+      subtraction in `total`, the threshold on the net amount, and the gift card
+      exclusion, instead of implying `subtotal` becomes net.
+
+      Still hardcoded, deliberately out of scope: the ₹999 in
+      `AnnouncementBar.tsx`, `ProductTabs.tsx`, `TrustList.tsx`,
+      `TrustIconsRow.tsx`, `about.tsx` and checkout's `OrderSummary.tsx`. They
+      agree with the constant today; converting them is copy work, not a
+      pricing decision.
+
+      Verified: `order-promotion-pricing` 28 passing (7 new, threshold and gift
+      card), `gift-card-payment` 10 (1 new, real DB on :5440), web
+      `cart-free-shipping` 6 new, plus `orders` / `shipping` /
+      `order-cart-cache` / `gallery-join-order-pricing` 170 and web
+      `cart-saving` / `ShippingSelector` 37 as regression.
+work_sessions: []
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: implement
+    description: Get the decision from Dhruv on both points — do not choose unilaterally
+    status: done
+    note: >-
+      Subtotal stays gross (Option A, no change). Threshold moves to the net,
+      post-discount figure, with gift cards excluded as tender.
+  - id: 2
+    action: implement
+    description: Update design doc §5 layering block to state the chosen semantics explicitly
+    file: docs/superpowers/specs/2026-08-05-sale-promotions-design.md
+    status: done
+  - id: 3
+    action: write-test
+    description: Add a totals test asserting the chosen subtotal semantics and threshold figure
+    file: packages/api/tests/routes/order-promotion-pricing.test.ts
+    command: cd packages/api && bunx vitest run tests/routes/order-promotion-pricing.test.ts
+    expected_result: FAIL if the current interim assumption differs from the decision
+    status: done
+    note: >-
+      Seven added, including both gift-card directions, plus a payment-side pin
+      in tests/routes/gift-card-payment.test.ts and six web tests in
+      packages/web/tests/routes/cart-free-shipping.test.tsx that derive their
+      fixtures from the same shared constant the API tests import.
+  - id: 4
+    action: implement
+    description: Adjust the totals block in order creation if the decision differs from the interim assumption
+    file: packages/api/src/routes/orders.ts
+    status: done
+    note: >-
+      Totals arithmetic unchanged; the discount is now composed before shipping
+      is priced, and the threshold itself moved to
+      packages/shared/src/constants/shipping.ts, read by routes/orders.ts,
+      routes/shipping.ts and packages/web/app/routes/cart/index.tsx.
+  - id: 5
+    action: verify-pass
+    description: Confirm order and cart suites pass under the chosen semantics
+    command: cd packages/api && bunx vitest run tests/routes/orders.test.ts tests/routes/order-promotion-pricing.test.ts
+    expected_result: PASS
+    status: done
+  - id: 6
+    action: commit
+    description: Commit the decision
+    command: 'git commit --only packages/shared/src/constants/shipping.ts packages/api/src/routes/orders.ts packages/web/app/routes/cart/index.tsx docs/superpowers/specs/2026-08-05-sale-promotions-design.md -m "fix(pricing): free shipping reads the net figure, from one shared threshold"'
+    status: done
+    commit: 70bfa9dd
+current_step: 6
+started: '2026-08-07T06:20:00.000Z'
+completed: '2026-08-07T06:48:20.000Z'

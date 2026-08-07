@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-08-06T20:45:19.424Z'
-total_tickets: 516
+last_updated: '2026-08-07T06:48:20.424Z'
+total_tickets: 517
 summary:
   critical: 29
   high: 197
-  medium: 221
+  medium: 222
   low: 69
 priorities:
   critical:
@@ -2017,6 +2017,10 @@ priorities:
           blocked_by: []
         - ticket_number: 528
           title: A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 568
+          title: DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
           assignee: unassigned
           blocked_by: []
     - feature: gallery-membership

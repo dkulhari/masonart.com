@@ -1,10 +1,10 @@
 status: todo
-last_updated: '2026-08-06T20:45:19.305Z'
-total_tickets: 23
+last_updated: '2026-08-07T06:48:20.305Z'
+total_tickets: 22
 summary:
   critical: 3
   high: 5
-  medium: 9
+  medium: 8
   low: 6
 priorities:
   critical:
@@ -123,12 +123,6 @@ priorities:
       tickets:
         - ticket_number: 566
           title: PDP frame options drop the flat priceAddition column, unlike the quickview and the server
-          assignee: unassigned
-          blocked_by: []
-    - feature: sale-promotions
-      tickets:
-        - ticket_number: 568
-          title: DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
           assignee: unassigned
           blocked_by: []
   low:
