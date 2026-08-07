@@ -4,7 +4,8 @@
  * - GET    /api/admin/frames      list, INCLUDING archived
  * - GET    /api/admin/frames/:id  one row, for the edit form
  * - POST   /api/admin/frames      create
- * - PATCH  /api/admin/frames/:id  update
+ * - PATCH  /api/admin/frames/:id  update, and the way back from archived
+ * - DELETE /api/admin/frames/:id  ARCHIVE — never a SQL delete
  *
  * Behind the same role gate as `/api/admin/collections`: a frame is catalogue
  * content, so whoever can edit products and collections can edit these.
@@ -25,7 +26,7 @@
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { asc, eq } from "drizzle-orm";
+import { asc, count, eq } from "drizzle-orm";
 import { createFrameInputSchema, updateFrameInputSchema } from "@chobii/shared";
 
 import { db } from "../../database";
@@ -203,3 +204,77 @@ adminFramesApp.patch(
     }
   }
 );
+
+// ============================================================================
+// DELETE /:id — archive
+// ============================================================================
+
+/**
+ * Retire a frame.
+ *
+ * Archives; never deletes, and that is not squeamishness. `cartItems.frameId`
+ * and `orderItems.frameId` are both `onDelete: "set null"`, so a hard delete
+ * would not fail loudly — it would succeed and quietly take the frame off
+ * every historical order that recorded it. Products archive for the same
+ * reason (`admin/products.ts`, `status: "archived"`).
+ *
+ * Refuses the last active frame. There is no "no frame" fallback on the buy
+ * panel: Rolled Canvas is itself a row here, so zero active frames is a
+ * product page with nothing to sell.
+ *
+ * The way back is `PATCH { isActive: true }` rather than a second endpoint —
+ * unarchiving is an ordinary field edit and does not need its own verb.
+ */
+adminFramesApp.delete("/:id", async (c) => {
+  const id = c.req.param("id");
+
+  try {
+    const [existing] = await db
+      .select({
+        id: frames.id,
+        name: frames.name,
+        isActive: frames.isActive,
+      })
+      .from(frames)
+      .where(eq(frames.id, id))
+      .limit(1);
+
+    if (!existing) return c.json({ error: "Frame not found" }, 404);
+
+    /**
+     * Already archived: report success and write nothing. Repeating the
+     * request is not an error, and a second write would only move
+     * `updatedAt` for no change anyone asked for.
+     */
+    if (!existing.isActive) {
+      return c.json({ message: `Frame '${existing.name}' is already archived` });
+    }
+
+    const [{ count: activeCount }] = await db
+      .select({ count: count() })
+      .from(frames)
+      .where(eq(frames.isActive, true));
+
+    if (activeCount <= 1) {
+      return c.json(
+        {
+          error:
+            "Cannot archive the last active frame — the product page would have no format option to sell.",
+        },
+        409
+      );
+    }
+
+    await db
+      .update(frames)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(frames.id, id));
+
+    await purgeFramesCache();
+
+    return c.json({ message: `Frame '${existing.name}' archived` });
+  } catch (error) {
+    console.error("Error archiving frame:", error);
+    return c.json({ error: "Failed to archive frame" }, 500);
+  }
+});
