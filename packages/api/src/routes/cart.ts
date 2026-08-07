@@ -524,10 +524,15 @@ export async function mergeGuestCartInto(
  *
  * The guest session id is httpOnly and never leaves the server, so the client
  * cannot ask for this — it has to happen where the cookie is readable (#511).
- * The cookie is deleted afterwards so a second request cannot merge again.
+ * The cookie is deleted only once the merge actually completes, so a second
+ * request cannot merge again.
  *
  * A failure here is logged and swallowed: an unmergeable guest cart must not
- * take down every cart read for that customer.
+ * take down every cart read for that customer. But swallowing the error must
+ * not also delete the cookie — that would discard the only handle to the
+ * guest cart on what may be a transient DB error, with no way to retry. The
+ * cookie surviving costs nothing; the next authenticated request just tries
+ * the merge again (#567).
  */
 const mergeGuestCartOnAuth: MiddlewareHandler<{
   Variables: OptionalAuthVariables;
@@ -538,10 +543,10 @@ const mergeGuestCartOnAuth: MiddlewareHandler<{
   if (user && sessionId) {
     try {
       await mergeGuestCartInto(user.id, sessionId);
+      deleteCookie(c, GUEST_CART_COOKIE, { path: "/" });
     } catch (error) {
       console.error("Error merging guest cart:", error);
     }
-    deleteCookie(c, GUEST_CART_COOKIE, { path: "/" });
   }
 
   await next();

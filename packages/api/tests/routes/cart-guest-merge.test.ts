@@ -370,8 +370,23 @@ describe('mergeGuestCartOnAuth', () => {
     });
 
     expect(response.status).toBe(200);
-    // The cookie is still cleared — the middleware doesn't retry a merge
-    // that already blew up.
-    expect(response.headers.get('set-cookie')).toMatch(/Max-Age=0/i);
+  });
+
+  it('keeps the guest cookie when the merge blows up, so a transient failure can retry', async () => {
+    signedIn();
+    selectMock.mockImplementationOnce(() => {
+      throw new Error('connection reset');
+    });
+
+    const response = await app.request('/api/cart', {
+      headers: { Cookie: `cart_session=${GUEST_SESSION}` },
+    });
+
+    // Deleting the cookie here would swallow the error and destroy the only
+    // handle to the guest cart in the same breath, with no retry. Keeping it
+    // costs nothing — the next authenticated request just tries the merge
+    // again — and "don't retry forever" is a problem for a marker, not for
+    // discarding the cart (#567).
+    expect(response.headers.get('set-cookie') ?? '').not.toMatch(/Max-Age=0/i);
   });
 });
