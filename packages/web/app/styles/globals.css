@@ -77,12 +77,49 @@
     --radius: 0.5rem;
 
     /**
-     * Page width — measured mesonart `--page-width: 1600px`, page padding 20px.
+     * Page width and gutter — measured mesonart, `--page-width: 1600px`.
      *
-     * Ours rendered at 1280px (`.container-wide` was max-w-7xl) with 32px
-     * padding. Both the utility below and the Tailwind `container` config
-     * consume this; they must not be allowed to disagree, which is why it is a
-     * token rather than two literals.
+     * THE GUTTER IS NOT FLAT. An earlier parity pass read their base
+     * `--page-padding` and copied it as a single value; it is 20px only below
+     * `lg`. Measured on their captured home page (2x shots, halved), on a
+     * section heading and a first-column tile edge on more than one band:
+     *
+     *   390 viewport — first-column card plate and rail edge at x=20.0 (their
+     *     category grid overrides itself to 24px, which is a section-local
+     *     override, not the page gutter)
+     *   1440 viewport — product tile plate, Shop By Popular tile, Shop by Room
+     *     panel, Shop By Orientation chip row and the Featured Artists tiles
+     *     all at x=48.0; headings at 48.5-50.5, which is 48 plus glyph bearing
+     *
+     * Their own stylesheet, from the captured page source, is the ladder the
+     * media queries below reproduce:
+     *
+     *   :root                      --page-padding: var(--sp-5)   = 20px
+     *   @media (min-width: 1024px) --page-padding: var(--sp-9)   = 36px
+     *   @media (min-width: 1280px) --page-padding: var(--sp-12)  = 48px
+     *   @media (min-width: 1536px) --page-padding: max(var(--sp-12),
+     *                                50vw - scrollbar/2 - var(--page-width)/2)
+     *
+     * The 1536 step is how they centre a 1600px page without a wrapper, which
+     * `.container-wide` does with `max-width` + `margin-inline: auto`, so it
+     * is deliberately not reproduced. The two are identical up to a 1696px
+     * viewport (1600 + two 48px gutters). Above that theirs keeps a 1600px
+     * CONTENT box and grows the gutter, where ours keeps a 1600px BORDER box
+     * and so runs 96px narrower. Matching them there means
+     * `max-width: calc(var(--page-width) + var(--page-padding) * 2)`, which
+     * the Tailwind `container` below cannot express — and the two disagreeing
+     * is the exact failure this token exists to prevent. Left as is on
+     * purpose; nothing on the bar has been measured above 1440.
+     *
+     * 36px is unverified by screenshot (we have no 1024-1279 capture of
+     * theirs) and is taken from their source.
+     *
+     * Both the utility below and the Tailwind `container` config consume
+     * these; they must not be allowed to disagree, which is why it is a token
+     * rather than two literals. The Tailwind side carries the same ramp.
+     *
+     * History: ours rendered at 1280px (`.container-wide` was max-w-7xl) with
+     * 32px padding before the mesonart page box was adopted.
      */
     --page-width: 1600px;
     --page-padding: 20px;
@@ -142,6 +179,26 @@
      */
     --mat: 0 0% 98%;
 
+    /**
+     * The card plate — the surface a product photograph sits ON.
+     *
+     * A different thing from --mat, which is the colour sharp bakes into the
+     * pixels. They were the same value while the card drew the master square
+     * edge to edge, and that was the bug: at rgb(250 250 250) on a white page
+     * the plate carries 2% contrast, so a card whose artwork covers under half
+     * of it has no visible boundary at all and the picture reads as a fragment
+     * floating in the page.
+     *
+     * Measured off the reference's own Best Seller rail: the mode of the plate
+     * ring across all four cards is rgb(239 239 239), 4% against white and
+     * plainly a surface.
+     *
+     * Only visible where artFraming has cropped the baked mat away, so an image
+     * with no artBox still draws exactly as it did. Unlike --mat this one costs
+     * nothing to change: no pixels depend on it.
+     */
+    --plate: 0 0% 93.7%;
+
     /* Fluid card corner: 10px -> 20px. Measured clamp. */
     --card-radius: clamp(0.625rem, 1.053vw, 1.25rem);
 
@@ -164,8 +221,33 @@
      */
     --ease-drawer: cubic-bezier(.7, 0, .2, 1);
 
-    /* Review stars — measured amber-500, rgb(245 158 11) */
-    --rating: 38 92% 50%;
+    /* Review stars — measured off their Loox widget, `#F5C264`. Was
+       amber-500 (38 92% 50%), which is a full shade more saturated than the
+       gold sitting next to their artwork. */
+    --rating: 38 88% 68%;
+
+    /**
+     * The product card's meta ink — the review count and the wishlist heart.
+     *
+     * A WARM neutral, and that is the whole reason it exists. Both of those
+     * marks were `--muted-foreground`, which is shadcn's default slate
+     * `215.4 16.3% 46.9%` = rgb(100 116 139): a blue-grey, and the only cool
+     * hue anywhere in a band built from warm greys, #EFEFEF plates and #F5C264
+     * stars. Nobody chose it; it arrived with the component library.
+     *
+     * hsl(30 5% 42%) = rgb(112 107 102), the same hue family as the stars.
+     *
+     * NOT a fix by fading. The reference's own heart measures rgb(219 216 194)
+     * — 1.3:1 on white and effectively invisible — and two separate reviews
+     * named ours being legible as a thing we win on. This is 5.4:1 against
+     * white where the slate it replaces was 4.76:1, so the heart gets MORE
+     * legible, not less, while losing the cold cast.
+     *
+     * Deliberately scoped to the card's meta row rather than applied by
+     * editing --muted-foreground, which every muted string in the app and in
+     * /admin reads.
+     */
+    --card-meta: 30 5% 42%;
 
     /* chobii.art Brand Color Scale (warm amber/terracotta) */
     --brand: 25 95% 53%;
@@ -220,8 +302,57 @@
     --font-nav-size: clamp(0.875rem, 0.748rem + 0.3174vw, 1.125rem);
     --font-button-size: clamp(0.875rem, 0.8115rem + 0.1587vw, 1rem);
     --font-product-size: clamp(1rem, 0.873rem + 0.3175vw, 1.25rem);
+    /**
+     * Card price. Their `.price__regular` is --fluid-sm-to-base, one step
+     * under the title's --fluid-base-to-xl; matching the title (which is what
+     * we did) is what made our price read as a second heading.
+     */
+    --font-price-size: clamp(0.875rem, 0.8115rem + 0.1587vw, 1rem);
     /* H1 lands at ~44px at the 1600px page width, matching their display H1. */
     --font-display-size: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);
+    /**
+     * Section band headings — a step UNDER the page title (#540).
+     *
+     * Every home band reused --font-display-size, which is the H1 scale, and
+     * so rendered 44px at 1440 and 28px at 390. Measured in a browser on
+     * their own home page on 2026-08-07, their band `<h2>`s are 42px at 1440
+     * and 24px at 390 — "Best Seller", "Shop By Popular", "New In",
+     * "Featured Artists", "Customer Reviews" and "Brand Story" all identical,
+     * Urbanist 300.
+     *
+     * Their theme steps the size at breakpoints rather than interpolating;
+     * this is the two-point fit through those measurements, which is how the
+     * rest of this block is expressed. It reproduces both samples exactly:
+     * 1.082rem + 1.714vw = 24.0px at 390 and 42.0px at 1440.
+     *
+     * The 2.8125rem ceiling is 45px, the size their theme names in the
+     * heading's own class (`<h2 class="heading 45">`) and the value the fit
+     * approaches at their 1600px page width.
+     *
+     * Not measurable above 1440: their site serves a bot check at wider
+     * viewports, so the ceiling is from their markup, not from pixels.
+     */
+    --font-section-size: clamp(1.5rem, 1.082rem + 1.714vw, 2.8125rem);
+  }
+
+  /**
+   * The page gutter ramp. See the --page-padding comment above for the
+   * measurements and for mesonart's own ladder that these reproduce.
+   *
+   * Breakpoints are Tailwind's `lg` and `xl`, which happen to be exactly the
+   * 1024/1280 they use. Keep them in step with the responsive `container.padding`
+   * in tailwind.config.ts.
+   */
+  @media (min-width: 1024px) {
+    :root {
+      --page-padding: 36px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    :root {
+      --page-padding: 48px;
+    }
   }
 }
 
@@ -233,6 +364,25 @@
 
   html {
     @apply scroll-smooth;
+
+    /**
+     * Where a scroll-to lands, given the header is sticky over the page.
+     *
+     * Measured with this unset: `scrollIntoView()` and every `#hash` jump put
+     * the target's top edge at viewport y=0 — i.e. the whole first 65px of it
+     * behind the header — on every page, because the header is `sticky top-0`
+     * and the scroller knows nothing about it. The PDP is where it shows
+     * worst (a frame swatch row or the artwork's top edge lands under the
+     * bar), but it is not a PDP bug and the fix does not belong there.
+     *
+     * The same `--chrome-offset` the sticky toolbars read, so a jump made
+     * while the nav rows are revealed clears them too, plus a rem of air so
+     * the target does not sit flush against the bar's underside.
+     *
+     * Appearance-only-on-scroll: this property changes nothing about how any
+     * page PAINTS, only where a programmatic or anchored scroll comes to rest.
+     */
+    scroll-padding-top: calc(var(--chrome-offset) + 1rem);
   }
 
   body {
@@ -315,9 +465,11 @@
    * storefront section actually uses, so widening one without the other is
    * invisible. Both read --page-width.
    *
-   * The responsive px-4/sm:px-6/lg:px-8 ramp is gone: mesonart uses a flat
-   * 20px gutter at every breakpoint, and 20px is already a comfortable mobile
-   * gutter, so the ramp bought nothing.
+   * The old px-4/sm:px-6/lg:px-8 ramp is gone, but the gutter still ramps —
+   * it just does it once, in --page-padding, so every consumer moves together.
+   * 20px below lg, 36px from 1024, 48px from 1280. Do not reintroduce a
+   * per-section gutter: a band with its own gutter misaligns against the page
+   * around it.
    */
   .container-wide {
     width: 100%;

@@ -11,10 +11,19 @@ const config: Config = {
      * Kept in step with `--page-width` / `--page-padding` in globals.css.
      * `.container-wide` is what the storefront actually uses; this exists so
      * the handful of `container` call sites do not disagree with it.
+     *
+     * The padding is the same 20 / 36 / 48 ramp as --page-padding — measured
+     * off mesonart at 390 and 1440 and confirmed against their stylesheet.
+     * Changing one of these without the other is the bug this comment exists
+     * to prevent; the two were out of step until #540.
      */
     container: {
       center: true,
-      padding: '20px',
+      padding: {
+        DEFAULT: '20px',
+        lg: '36px',
+        xl: '48px',
+      },
       screens: {
         '2xl': '1600px',
       },
@@ -134,7 +143,10 @@ const config: Config = {
         nav: 'var(--font-nav-size)',
         button: 'var(--font-button-size)',
         product: 'var(--font-product-size)',
+        price: 'var(--font-price-size)',
         display: 'var(--font-display-size)',
+        /** Band headings. One step under `display` — see globals.css (#540). */
+        section: 'var(--font-section-size)',
       },
       keyframes: {
         'accordion-down': {

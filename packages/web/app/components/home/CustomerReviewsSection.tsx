@@ -191,7 +191,12 @@ export function CustomerReviewsStrip({
     <SectionBand tone="sand" data-testid="home-reviews">
       <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <DisplayHeading as="h2" className="text-3xl sm:text-4xl">
+          {/* `text-section`, not a `text-3xl sm:text-4xl` of its own (#540):
+              this was the one band heading a step under the page scale, and
+              the reference sets its "Customer Reviews" at the same size as
+              every other band heading — see
+              docs/design/mesonart/mesonart-home-reviews-band.png. */}
+          <DisplayHeading as="h2" className="text-section">
             What Customers Say
           </DisplayHeading>
 
@@ -255,7 +260,14 @@ export function CustomerReviewsStrip({
       </ul>
 
       <div className="mt-10">
-        <a href="/reviews" className={buttonVariants({ variant: 'outline' })}>
+        {/* `size: 'pill'` — the measured button, same as every other band's
+            View All (#540). Without it this rendered at the `md` default:
+            44px tall, 28px of padding, label at font-medium, against the
+            56px / 26px / body-weight pill the rails and Brand Story use. */}
+        <a
+          href="/reviews"
+          className={buttonVariants({ variant: 'outline', size: 'pill' })}
+        >
           View All
         </a>
       </div>

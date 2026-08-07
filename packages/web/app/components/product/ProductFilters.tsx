@@ -18,7 +18,27 @@ import { FACET_GROUPS, type FacetOption } from '@chobii/shared'
 // Types
 // ============================================================================
 
-export type Orientation = 'square' | 'portrait' | 'landscape' | 'panoramic' | 'round'
+/**
+ * The orientation vocabulary, as the collection route and the API's
+ * `orientationSchema` both understand it.
+ *
+ * MUST stay in step with `ORIENTATION_OPTIONS` in `@chobii/shared` — that is
+ * the source of truth, and the Zod enum the API validates against is built
+ * from it. It is restated here as a literal union rather than derived because
+ * `FacetOption.id` is `string`, so deriving would widen this to `string` and
+ * every search object that carries an orientation would stop being checked.
+ *
+ * `set-of-2-3` was added to the shared vocabulary (#535) and missed here,
+ * which forced callers building `/posters` links to type their search objects
+ * as `Record<string, unknown>` to smuggle the sixth value past this union.
+ */
+export type Orientation =
+  | 'square'
+  | 'portrait'
+  | 'landscape'
+  | 'panoramic'
+  | 'round'
+  | 'set-of-2-3'
 /** Mirrors the `sortBy` enum on GET /api/products. */
 export type SortOption =
   | 'createdAt'

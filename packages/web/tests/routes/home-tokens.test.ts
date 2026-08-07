@@ -32,8 +32,11 @@ describe('home page — monochrome system', () => {
   })
 
   it('uses the rating token rather than a hardcoded yellow', () => {
+    // The route no longer draws stars of its own — the hero's invented
+    // "4.9/5 from 2,000+ reviews" strip went with HeroSection (#529) and real
+    // ratings now come from ProductCard inside the rails. What survives is the
+    // guard: if a star ever comes back into this file it uses the token.
     expect(src).not.toContain('fill-yellow-400')
-    expect(src).toContain('fill-rating')
   })
 
   it('has no font-bold (weight 700 is never loaded)', () => {
@@ -50,23 +53,69 @@ describe('home page — shared primitives', () => {
     expect(src).toContain("from '~/components/ui/DisplayHeading'")
   })
 
-  it('uses buttonVariants for its anchor CTAs rather than inline pills', () => {
-    expect(src).toContain('buttonVariants')
+  it('uses the shared Button rather than an inline pill', () => {
+    // Every anchor CTA left this file with the bands that owned them; the
+    // newsletter submit is the one control the route still renders itself.
+    expect(src).toContain("from '~/components/ui/Button'")
     expect(src).not.toContain('rounded-lg bg-primary')
   })
 })
 
-describe('home page — deliberate survivals', () => {
-  it('keeps the category legibility scrims, which are not brand colour', () => {
-    // The per-category washes and the flat black scrim exist so white caption
-    // text stays legible over light photography (#357). Removing them as
-    // "gradients" would reintroduce that bug.
-    expect(src).toContain('bg-black/25')
-    expect(src).toContain('from-slate-700/80')
+describe('home page — the route is an order, not a layout', () => {
+  /**
+   * The home-page-parity integration moved every band out of this file and
+   * into `~/components/home/`. The route's remaining job is the running order
+   * plus the two SSR rail fetches, so what is worth pinning here is that the
+   * bands are mounted and that none of the superseded inline sections came
+   * back.
+   */
+  const BANDS = [
+    'HomeHero',
+    'BestSellersRail',
+    'PopularCategoriesSection',
+    'ShopByRoomBand',
+    'PromoTilesSection',
+    'NewInRail',
+    'ShopByOrientationSection',
+    'CustomerReviewsSection',
+    'BrandStorySection',
+    'TrustIconsRow',
+  ]
+
+  it.each(BANDS)('mounts %s', (band) => {
+    expect(src).toContain(`<${band} `)
   })
 
-  it('keeps the AI generator section — our differentiator, restyled not cut', () => {
-    expect(src).toContain('AIGeneratorSection')
-    expect(src).toContain('tone="ink"')
+  it('mounts them in the reference order', () => {
+    const positions = BANDS.map((band) => src.indexOf(`<${band} `))
+    expect(positions).toEqual([...positions].sort((a, b) => a - b))
+  })
+
+  it('closes with the trust row, immediately before the footer', () => {
+    // TrustIconsRow (#539) replaced both the "Why Choose chobii.art?" card row
+    // that used to live here and the duplicate USP strip inside Footer.tsx.
+    // It is the last band on the page; nothing may be appended after it.
+    expect(src.lastIndexOf('<TrustIconsRow ')).toBeGreaterThan(
+      src.lastIndexOf('<NewsletterSection ')
+    )
+  })
+
+  it('defines none of the superseded sections inline any more', () => {
+    for (const gone of [
+      'function HeroSection',
+      'function FeaturedProductsSection',
+      'function CategoriesSection',
+      'function AIGeneratorSection',
+      'function ValuePropsSection',
+    ]) {
+      expect(src).not.toContain(gone)
+    }
+  })
+
+  it('has no inverted band — nothing on the reference is', () => {
+    // The black AI-generator band retired into the Custom Art promo tile
+    // (#538/#533). A full-width near-black section would be the loudest object
+    // on the page and would break the white/beige alternation.
+    expect(src).not.toContain('tone="ink"')
   })
 })

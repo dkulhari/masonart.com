@@ -131,16 +131,34 @@ describe('page width', () => {
     expect(m![0]).toContain('var(--page-width)')
   })
 
-  it('uses the measured 20px page gutter, not the old 2rem ramp', () => {
+  it('uses the measured page gutter, not the old per-utility ramp', () => {
     expect(css).toMatch(/--page-padding:\s*20px/)
     const m = css.match(/\.container-wide\s*\{[^}]*\}/)
     expect(m![0]).toContain('var(--page-padding)')
-    // The old responsive ramp had nothing to ramp between at a flat gutter.
+    // The gutter ramps once, in the token — never in the utility.
     expect(m![0]).not.toContain('sm:px-6')
   })
 
-  it('the tailwind container agrees with the page width', () => {
+  /**
+   * #540. mesonart's gutter is 20px only below `lg`; an earlier pass copied
+   * that base value as if it were flat, which left every desktop band ~28px
+   * closer to the page edge than the bar. Measured 20.0 at 390 and 48.0 at
+   * 1440 on their captured home page, and confirmed against their own
+   * stylesheet (--sp-5 / --sp-9 / --sp-12 at :root / 1024 / 1280).
+   */
+  it('ramps the gutter to 36px at lg and 48px at xl', () => {
+    expect(css).toMatch(
+      /@media \(min-width: 1024px\)\s*\{\s*:root\s*\{\s*--page-padding:\s*36px/
+    )
+    expect(css).toMatch(
+      /@media \(min-width: 1280px\)\s*\{\s*:root\s*\{\s*--page-padding:\s*48px/
+    )
+  })
+
+  it('the tailwind container agrees with the page width and the gutter ramp', () => {
     expect(tailwind).toContain("'2xl': '1600px'")
-    expect(tailwind).toContain("padding: '20px'")
+    expect(tailwind).toContain("DEFAULT: '20px'")
+    expect(tailwind).toContain("lg: '36px'")
+    expect(tailwind).toContain("xl: '48px'")
   })
 })

@@ -9,6 +9,10 @@
  *
  * The band colours are measured — see --band / --band-strong / --highlight in
  * globals.css.
+ *
+ * By default the children are wrapped in `container-wide`, so a band is
+ * full-bleed in colour and page-width in content. A band that is itself a
+ * full-width inset panel wants `bleed` instead — see the prop.
  */
 
 import { cn } from '~/lib/utils'
@@ -30,17 +34,38 @@ const TONES = {
 
 export interface SectionBandProps extends React.HTMLAttributes<HTMLElement> {
   tone?: keyof typeof TONES
+  /**
+   * Skip the inner `container-wide` and hand the band's own box the full
+   * width of the section.
+   *
+   * Use this — and only this — when the band IS an inset panel: a rounded
+   * colour or image plate that spans the page and carries its own padding.
+   * The default wrapper would inset that plate by the page gutter and then
+   * the plate's own padding would indent the copy by roughly the gutter
+   * again, so at 390 the copy sits at ~40px against the bar's 20px and the
+   * column visibly narrows. #538's Brand Story band hit exactly that and
+   * opted out of SectionBand altogether; this prop is so the next such band
+   * keeps the vertical rhythm instead of forking away from it.
+   *
+   * A bleeding band owns its horizontal geometry completely. If it wants the
+   * page gutter it must ask for it — `container-wide`, or
+   * `max-w-[var(--page-width)] mx-auto px-[var(--page-padding)]` — rather
+   * than inventing a literal, or it will drift out of line with the bands
+   * above and below it as the gutter ramps.
+   */
+  bleed?: boolean
 }
 
 export function SectionBand({
   tone = 'plain',
+  bleed = false,
   className,
   children,
   ...props
 }: SectionBandProps) {
   return (
     <section className={cn('py-16 sm:py-24', TONES[tone], className)} {...props}>
-      <div className="container-wide">{children}</div>
+      {bleed ? children : <div className="container-wide">{children}</div>}
     </section>
   )
 }

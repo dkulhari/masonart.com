@@ -135,8 +135,14 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
     // Was 2rem / 1400px. Moved to the measured mesonart page box; the
     // authoritative values are --page-padding / --page-width in globals.css,
     // and design-tokens.test.ts asserts the two stay in step.
-    it('should have the measured 20px container padding', () => {
-      expect(tailwindConfig).toContain("padding: '20px'");
+    //
+    // The gutter ramps (#540): 20px below lg, 36px at 1024, 48px at 1280.
+    // A flat `padding: '20px'` here is the bug that let the container and
+    // --page-padding disagree.
+    it('should have the measured 20/36/48 container padding ramp', () => {
+      expect(tailwindConfig).toContain("DEFAULT: '20px'");
+      expect(tailwindConfig).toContain("lg: '36px'");
+      expect(tailwindConfig).toContain("xl: '48px'");
     });
 
     it('should have 2xl screen breakpoint for container', () => {

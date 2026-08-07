@@ -37,6 +37,31 @@ describe('SectionBand', () => {
     expect(cls).not.toContain('gradient')
   })
 
+  /**
+   * The doubled-gutter regression (#540). A band that is itself a full-width
+   * inset panel was being inset by the page gutter and then indenting its own
+   * copy by roughly the gutter again. `bleed` is the escape hatch; without it
+   * the only fix was to stop using SectionBand at all, which is how the
+   * abstraction started dying.
+   */
+  it('bleed drops the container so the band owns its own horizontal box', () => {
+    const { container } = render(
+      <SectionBand bleed>
+        <div data-testid="panel">x</div>
+      </SectionBand>
+    )
+    const section = container.querySelector('section')!
+    expect(section.querySelector('.container-wide')).toBeNull()
+    expect(section.firstElementChild!.getAttribute('data-testid')).toBe('panel')
+  })
+
+  it('still wraps in container-wide when bleed is not asked for', () => {
+    const { container } = render(<SectionBand bleed={false}>x</SectionBand>)
+    expect(
+      container.querySelector('section')!.querySelector('.container-wide')
+    ).not.toBeNull()
+  })
+
   it('merges caller className', () => {
     const { container } = render(<SectionBand className="pt-0">x</SectionBand>)
     expect(container.querySelector('section')!.className).toContain('pt-0')
