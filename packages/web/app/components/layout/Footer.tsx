@@ -4,30 +4,10 @@ import {
   Instagram,
   Twitter,
   Mail,
-  Brush,
-  Truck,
-  ShieldCheck,
-  RotateCcw,
   MapPin,
   MessageCircle,
 } from 'lucide-react'
 import { SUPPORT_EMAIL } from '@chobii/shared'
-
-/**
- * The USP strip mesonart runs above its footer columns.
- *
- * Two of theirs are not repeated. "Free Shipping" flat implies unconditional;
- * ours is free over ₹999 and the label says so. Their environmental claim has
- * nothing behind it on our side, and a sustainability claim we cannot
- * substantiate is not one worth copying — replaced with one that is simply
- * true of the product.
- */
-const USP_ITEMS = [
-  { Icon: Brush, label: 'Archival Inks', detail: 'Museum-grade pigment' },
-  { Icon: Truck, label: 'Free Over ₹999', detail: 'Across India' },
-  { Icon: RotateCcw, label: '30-Day Returns', detail: 'No questions asked' },
-  { Icon: ShieldCheck, label: 'Safe Payments', detail: 'Razorpay secured' },
-]
 
 /**
  * Footer component for the chobii.art e-commerce platform.
@@ -39,21 +19,16 @@ export function Footer() {
 
   return (
     <footer className="border-t border-border bg-band">
-      {/* USP strip — above the columns, as on theirs. */}
-      <div className="border-b border-foreground/10">
-        <div className="container-wide grid grid-cols-2 gap-6 py-8 md:grid-cols-4">
-          {USP_ITEMS.map(({ Icon, label, detail }) => (
-            <div key={label} className="flex items-center gap-3">
-              <Icon className="h-5 w-5 shrink-0 text-foreground" />
-              <div>
-                <p className="text-sm font-medium text-foreground">{label}</p>
-                <p className="text-xs text-muted-foreground">{detail}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
+      {/* No USP strip here.
+       *
+       * It used to run above the columns, as on theirs — but the home page's
+       * own trust row (`home/TrustIconsRow`, #539) makes the same four claims
+       * larger and on white, directly above this footer, so the strip was the
+       * second of two. Saying a thing twice on one page halves it. The claims
+       * and their provenance now live in TrustIconsRow; a test there fails if
+       * the eco / unconditional-shipping wording this footer deliberately
+       * refused ever comes back.
+       */}
       <div className="container-wide py-12 md:py-16">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-5">
           {/* Brand & Description */}
