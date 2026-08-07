@@ -575,3 +575,34 @@ export const frameAddition = (
   const rate = Math.max(0, toAmount(frame.priceModifier, 1) - 1);
   return Math.round(unitPrice * rate) + toAmount(frame.priceAddition, 0);
 };
+
+/**
+ * The print prices the admin frame form quotes a frame against.
+ *
+ * Three rather than one, and they live here rather than in the form because
+ * the preview and its test both need the same figures — a preview whose sample
+ * prices drift from its test asserts nothing.
+ *
+ * Three because a frame is priced as a proportion of the piece precisely so
+ * its cost tracks the size of it (see `frameAddition` above). A single sample
+ * row would show the admin a number while hiding the behaviour they are
+ * actually choosing. Small, mid and large, spanning the catalogue, in order.
+ */
+export const FRAME_PREVIEW_REFERENCE_PRICES: readonly number[] = [
+  1499, 4999, 14999,
+];
+
+/**
+ * What an admin may upload as imagery, shared by the product and frame
+ * endpoints.
+ *
+ * Two endpoints holding two private copies of this is how one of them ends up
+ * quietly accepting a format the image pipeline cannot process.
+ */
+export const ADMIN_IMAGE_MIME_TYPES: readonly string[] = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+];
+
+export const MAX_ADMIN_IMAGE_MB = 10;

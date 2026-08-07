@@ -36,6 +36,7 @@ import {
 import { purgeProductResponseCache } from "../../lib/redis";
 import { unitsSoldSql } from "../../lib/product-sales";
 import { buildProductMedia } from "../../lib/product-media";
+import { ADMIN_IMAGE_MIME_TYPES, MAX_ADMIN_IMAGE_MB } from "@chobii/shared";
 
 // ============================================================================
 // Constants
@@ -206,9 +207,6 @@ adminProductsApp.use("*", requireContentManager);
 // POST /api/admin/products/upload-image - Upload Product Image
 // ============================================================================
 
-const PRODUCT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_PRODUCT_IMAGE_MB = 10;
-
 /**
  * Text fields accompanying the uploaded file.
  *
@@ -254,15 +252,15 @@ adminProductsApp.post("/upload-image", async (c) => {
   if (!file) {
     return c.json({ error: "No file provided" }, 400);
   }
-  if (!PRODUCT_IMAGE_TYPES.includes(file.type)) {
+  if (!ADMIN_IMAGE_MIME_TYPES.includes(file.type)) {
     return c.json(
       { error: "Invalid file type. Supported: JPEG, PNG, WebP" },
       400
     );
   }
-  if (file.size > MAX_PRODUCT_IMAGE_MB * 1024 * 1024) {
+  if (file.size > MAX_ADMIN_IMAGE_MB * 1024 * 1024) {
     return c.json(
-      { error: `File too large. Maximum size is ${MAX_PRODUCT_IMAGE_MB}MB` },
+      { error: `File too large. Maximum size is ${MAX_ADMIN_IMAGE_MB}MB` },
       400
     );
   }
