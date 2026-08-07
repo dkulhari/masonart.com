@@ -143,11 +143,17 @@ function slotAspectRatio(media: ReviewMediaItem | undefined): string {
 }
 
 /**
- * What the slot shows before anything is fetched: the poster for a clip, the
- * thumbnail for a photo. Falls back to the full asset so a row that predates
- * the thumbnail worker still renders something.
+ * What a media slot shows before anything is fetched: the poster for a clip,
+ * the thumbnail for a photo. Falls back to the full asset so a row that
+ * predates the thumbnail worker still renders something.
+ *
+ * Exported because the home reviews rail renders the same media under a
+ * different layout (#581) and a second copy of this fallback chain is how the
+ * two surfaces start disagreeing about what a posterless video looks like.
  */
-function slotSource(media: ReviewMediaItem): string | undefined {
+export function reviewMediaThumbnail(
+  media: ReviewMediaItem
+): string | undefined {
   if (media.mediaType === 'video') {
     return media.posterUrl ?? media.thumbnailUrl ?? undefined
   }
@@ -211,7 +217,7 @@ export function ReviewGridCard({
               <video
                 data-testid="review-card-video"
                 src={cover.url}
-                poster={slotSource(cover)}
+                poster={reviewMediaThumbnail(cover)}
                 // Non-negotiable: no autoPlay, no metadata fetch. The poster
                 // is the whole slot until a click asks for the bytes.
                 preload="none"
@@ -225,7 +231,7 @@ export function ReviewGridCard({
             ) : (
               <img
                 data-testid="review-card-photo"
-                src={slotSource(cover)}
+                src={reviewMediaThumbnail(cover)}
                 alt=""
                 loading="lazy"
                 decoding="async"
