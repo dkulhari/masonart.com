@@ -11,10 +11,12 @@ import {
   pgEnum,
   boolean,
   index,
+  unique,
   varchar,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { orders } from "./orders";
+import { users } from "./users";
 
 // ============================================================================
 // Enums
@@ -117,6 +119,75 @@ export const orderShipments = pgTable(
   })
 );
 
+/**
+ * Shipping configuration table - admin-editable shipping money rules.
+ *
+ * Mirrors `walletPricingConfig` (schema/wallet.ts) rather than inventing a
+ * second config shape: key / integer value / effective window / description /
+ * `createdBy` audit reference.
+ *
+ * ## Effective dating is kept, and honoured on read
+ *
+ * `effectiveFrom` / `effectiveTo` are not decoration. A threshold that moves at
+ * a scheduled time is the ordinary case for a sale weekend, and the reader
+ * (`lib/shipping-config.ts`) resolves the row against the caller's clock and
+ * clamps its cache to the next boundary, so a value scheduled for Friday takes
+ * effect on Friday with nothing to run and nothing to purge. Storing a future
+ * value that reads ignored would be worse than having no column at all.
+ *
+ * ## Values are whole rupees
+ *
+ * `walletPricingConfig` stores money in paise, but the wallet's figures are
+ * derived (a markup applied to an API cost) where a paisa matters. This one is
+ * a *displayed* figure — the same number the storefront prints as "Free
+ * shipping on orders over ₹999" — and every consumer compares it against a
+ * rupee amount. Keeping the stored unit identical to
+ * `FREE_SHIPPING_THRESHOLD`'s makes the fallback a literal substitution with no
+ * unit hop for the admin form (#570) or a future reader to get wrong by 100x.
+ */
+export const shippingConfig = pgTable(
+  "shipping_config",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Configuration key (see SHIPPING_CONFIG_KEYS)
+    key: text("key").notNull(),
+
+    // Integer value, in whole rupees for money keys
+    valueInt: integer("value_int").notNull(),
+
+    // Description of the config
+    description: text("description"),
+
+    // Effective dates for scheduled changes
+    effectiveFrom: timestamp("effective_from").defaultNow().notNull(),
+    effectiveTo: timestamp("effective_to"),
+
+    // Who created this config
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    keyIdx: index("shipping_config_key_idx").on(table.key),
+    effectiveIdx: index("shipping_config_effective_idx").on(
+      table.effectiveFrom,
+      table.effectiveTo
+    ),
+    uniqueKeyEffective: unique("shipping_config_unique_key_effective").on(
+      table.key,
+      table.effectiveFrom
+    ),
+  })
+);
+
 // ============================================================================
 // Relations
 // ============================================================================
@@ -145,6 +216,16 @@ export const orderShipmentsRelations = relations(orderShipments, ({ one }) => ({
   }),
 }));
 
+/**
+ * Shipping config relations - who last set a value, for the admin screen (#570)
+ */
+export const shippingConfigRelations = relations(shippingConfig, ({ one }) => ({
+  creator: one(users, {
+    fields: [shippingConfig.createdBy],
+    references: [users.id],
+  }),
+}));
+
 // ============================================================================
 // Type Exports (inferred from schema)
 // ============================================================================
@@ -155,4 +236,18 @@ export type NewShippingOption = typeof shippingOptions.$inferInsert;
 export type OrderShipment = typeof orderShipments.$inferSelect;
 export type NewOrderShipment = typeof orderShipments.$inferInsert;
 
+export type ShippingConfig = typeof shippingConfig.$inferSelect;
+export type NewShippingConfig = typeof shippingConfig.$inferInsert;
+
 export type ShipmentStatus = (typeof shipmentStatusEnum.enumValues)[number];
+
+/**
+ * Config keys and their defaults live in `src/lib/shipping-config.ts`, not
+ * here beside the table the way `WALLET_CONFIG_KEYS` does.
+ *
+ * The default has to be `FREE_SHIPPING_THRESHOLD` itself rather than a second
+ * literal, and `@chobii/shared` is ESM-only (no `require` condition in its
+ * exports map). drizzle-kit loads this schema through a CJS loader, so a *value*
+ * import from shared here breaks `drizzle-kit generate` outright — which is why
+ * schema/products.ts imports only erasable types from it.
+ */

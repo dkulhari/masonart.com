@@ -55,7 +55,22 @@ export function netAmountForShipping(
   return Math.max(0, Math.round((net + Number.EPSILON) * 100) / 100);
 }
 
-/** Whether a net, post-discount amount ships free. */
-export function qualifiesForFreeShipping(netAmount: number): boolean {
-  return netAmount >= FREE_SHIPPING_THRESHOLD;
+/**
+ * Whether a net, post-discount amount ships free.
+ *
+ * The threshold is an admin setting as of #569 (`shipping_config`), so the
+ * server passes the figure in force. It stays a *parameter with a default*
+ * rather than becoming required: the bundled constant is what the storefront
+ * renders, what seeds the table, and what the API falls back to when the table
+ * is empty or unreachable — a database hiccup must not make all shipping free
+ * or all shipping charged.
+ *
+ * The default is applied on `undefined` only, so a configured `0` — everything
+ * ships free — is honoured rather than quietly falling back to ₹999.
+ */
+export function qualifiesForFreeShipping(
+  netAmount: number,
+  threshold: number = FREE_SHIPPING_THRESHOLD
+): boolean {
+  return netAmount >= threshold
 }

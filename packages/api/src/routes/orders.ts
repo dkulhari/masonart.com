@@ -52,6 +52,7 @@ import {
   resolveSalePrice,
 } from "../lib/promotion-pricing";
 import { isGalleryMember } from "../services/gallery-membership";
+import { getFreeShippingThreshold } from "../lib/shipping-config";
 import {
   netAmountForShipping,
   qualifiesForFreeShipping,
@@ -186,19 +187,23 @@ async function readGiftCardCodes(c: Context): Promise<string[]> {
 /**
  * Calculate shipping cost based on method and the NET, post-discount amount.
  *
- * The threshold itself lives in `@chobii/shared` because the cart page renders
- * the same promise; a server that charged by a different figure than the one
- * the cart displayed would only be caught by the customer, at the card screen.
+ * The threshold is an admin setting (`shipping_config`, #569) and is read
+ * through `getFreeShippingThreshold`, which falls back to the same
+ * `@chobii/shared` constant the cart page renders. Both halves matter: the
+ * value has to be changeable without a deploy, and a database hiccup must not
+ * decide that every order — or no order — ships free.
  *
  * `netSubtotal` is a PRICE — base line totals minus price-level discounts. A
  * gift card is tender applied after tax and must never reach this function; see
  * `netAmountForShipping`.
  */
-function calculateShippingCost(
+async function calculateShippingCost(
   method: string,
   netSubtotal: string
-): string {
-  if (qualifiesForFreeShipping(parseFloat(netSubtotal))) {
+): Promise<string> {
+  const threshold = await getFreeShippingThreshold();
+
+  if (qualifiesForFreeShipping(parseFloat(netSubtotal), threshold)) {
     return "0.00";
   }
 
@@ -514,7 +519,7 @@ ordersApp.post(
         subtotal,
         parseFloat(discount)
       ).toFixed(2);
-      const shippingCost = calculateShippingCost(
+      const shippingCost = await calculateShippingCost(
         input.shippingMethod,
         netSubtotal
       );

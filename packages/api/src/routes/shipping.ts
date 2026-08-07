@@ -18,10 +18,8 @@ import { db } from "../database";
 import { shippingOptions, type ShippingOption } from "../database/schema/shipping";
 import { optionalAuth, type OptionalAuthVariables } from "../middleware/auth";
 import { getCached, setCached } from "../lib/redis";
-import {
-  FREE_SHIPPING_THRESHOLD,
-  qualifiesForFreeShipping,
-} from "@chobii/shared";
+import { getFreeShippingThreshold } from "../lib/shipping-config";
+import { qualifiesForFreeShipping } from "@chobii/shared";
 
 // ============================================================================
 // Constants
@@ -167,6 +165,13 @@ shippingApp.get(
     const { cartTotal, zipCode } = c.req.valid("query");
 
     try {
+      // Read once per request, not once per option: it is the same figure for
+      // every row, and it both decides `isFree` below and is reported to the
+      // client as `freeShippingThreshold`. Those two must be the same number —
+      // quoting one threshold while charging by another is the gap commit
+      // 70bfa9dd closed, and it would fit inside a single response body.
+      const freeShippingThreshold = await getFreeShippingThreshold();
+
       // Get active shipping options
       const options = await db
         .select({
@@ -192,9 +197,13 @@ shippingApp.get(
         // Could be enhanced with weight-based, distance-based, or API-based calculations
         let calculatedCost = baseCostNum;
 
-        // Free shipping over the one threshold every surface reads
-        // (`@chobii/shared`). `cartTotal` is the caller's post-discount figure.
-        if (qualifiesForFreeShipping(cartTotal) && option.carrier !== "Express") {
+        // Free shipping over the one threshold every surface reads — now the
+        // admin setting (`shipping_config`), falling back to the shared
+        // constant. `cartTotal` is the caller's post-discount figure.
+        if (
+          qualifiesForFreeShipping(cartTotal, freeShippingThreshold) &&
+          option.carrier !== "Express"
+        ) {
           calculatedCost = 0;
         }
 
@@ -223,7 +232,7 @@ shippingApp.get(
       return c.json({
         cartTotal,
         zipCode: zipCode || null,
-        freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
+        freeShippingThreshold,
         options: estimates,
       });
     } catch (error) {

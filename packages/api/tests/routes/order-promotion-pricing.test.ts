@@ -71,6 +71,24 @@ vi.mock('../../src/lib/promotion-pricing', async (importOriginal) => {
   };
 });
 
+/**
+ * The threshold is an admin setting as of #569. It is stubbed here rather than
+ * left to the real accessor so these tests state which figure is in force, and
+ * so `db` — mocked, with no `shippingConfig` query on it — is not what decides
+ * the answer.
+ */
+const getFreeShippingThresholdMock = vi.fn();
+
+vi.mock('../../src/lib/shipping-config', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../src/lib/shipping-config')>();
+  return {
+    ...actual,
+    getFreeShippingThreshold: (...args: unknown[]) =>
+      getFreeShippingThresholdMock(...args),
+  };
+});
+
 import { ordersApp, createOrderSchema } from '../../src/routes/orders';
 import { adminOrdersApp } from '../../src/routes/admin/orders';
 
@@ -313,6 +331,9 @@ beforeEach(() => {
   signIn();
   givenCart([cartItem()]);
   givenPromotions([]);
+  // Nothing configured, so the shared constant is what is in force — the same
+  // answer the real accessor gives against an empty table.
+  getFreeShippingThresholdMock.mockResolvedValue(FREE_SHIPPING_THRESHOLD);
   // Only the order-number count, for a promotion with no per-customer limit.
   queueSelects([{ count: 0 }]);
 });
@@ -505,6 +526,32 @@ describe('order creation — the free-shipping threshold', () => {
 
     await postOrder();
 
+    expect(persistedOrder.shippingCost).toBe('99.00');
+  });
+
+  it('charges by the configured threshold, not the bundled constant (#569)', async () => {
+    // The whole point of moving the number into `shipping_config`: an admin
+    // raises the bar to ₹1,499 and a ₹1,200 basket starts paying for shipping,
+    // with no deploy.
+    getFreeShippingThresholdMock.mockResolvedValue(1499);
+    givenCart([cartItem({ unitPrice: '1200.00', quantity: 1 })]);
+
+    await postOrder();
+
+    expect(persistedOrder.shippingCost).toBe('99.00');
+  });
+
+  it('still reads the NET figure when the threshold is configured', async () => {
+    // 1600.00 gross clears a configured 1500; 960.00 net does not. Moving where
+    // the number comes from must not move what it is measured against
+    // (design §5) — nor let a gift card in, which the case below covers.
+    getFreeShippingThresholdMock.mockResolvedValue(1500);
+    givenCart([cartItem({ unitPrice: '800.00', quantity: 2 })]);
+    givenPromotions([promotion()]);
+
+    await postOrder();
+
+    expect(persistedOrder.subtotal).toBe('1600.00');
     expect(persistedOrder.shippingCost).toBe('99.00');
   });
 
