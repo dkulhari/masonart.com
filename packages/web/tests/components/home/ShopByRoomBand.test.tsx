@@ -235,3 +235,35 @@ describe('the band', () => {
     expect(container).toBeEmptyDOMElement()
   })
 })
+
+describe('the band pocket', () => {
+  /**
+   * Measured on mesonart's own Shop by Room band on 2026-08-07 (#540):
+   *
+   *   1440   band 608px total, and the section carries NO vertical padding —
+   *          the 608x608 photograph is the band's full height.
+   *   390    band 780px: 32px above the photograph, nothing below the panel.
+   *
+   * Ours matched their inner content almost exactly (608.2 at 1440, 743 at
+   * 390) and then sat inside SectionBand's default `py-16 sm:py-24`, which
+   * put 96px of empty page above and below it and made the band 800 against
+   * their 608. The padding, not the content, was the whole 192px gap.
+   *
+   * `pb-0` is deliberate and not an oversight: the sand panel ends the band,
+   * and the next band brings its own top pocket — which is how theirs is
+   * spaced too.
+   */
+  it('takes no vertical padding at lg, where the photograph is the band', () => {
+    expect(src).toMatch(/lg:pt-0/)
+    expect(src).toMatch(/lg:pb-0/)
+  })
+
+  it('keeps a 32px pocket above the photograph below lg, and none below', () => {
+    expect(src).toMatch(/\bpt-8\b/)
+    expect(src).toMatch(/\bpb-0\b/)
+    // SectionBand's own `sm:py-24` outlives a base-only override, so the
+    // band has to displace it by name at that breakpoint as well.
+    expect(src).toMatch(/sm:pt-8/)
+    expect(src).toMatch(/sm:pb-0/)
+  })
+})

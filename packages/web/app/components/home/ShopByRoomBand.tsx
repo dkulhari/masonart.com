@@ -225,7 +225,26 @@ export function ShopByRoomBandView({ rooms }: ShopByRoomBandViewProps) {
   if (!active) return null
 
   return (
-    <SectionBand aria-labelledby={HEADING_ID} data-testid="shop-by-room">
+    <SectionBand
+      aria-labelledby={HEADING_ID}
+      data-testid="shop-by-room"
+      /*
+       * No vertical padding at lg, 32px above and none below under it (#540).
+       *
+       * Measured: their band is 608px at 1440 and the section carries no
+       * padding at all — the 608x608 photograph IS the band's height. At 390
+       * it is 780px, with 32 above the photograph and nothing under the sand
+       * panel. Our inner content already matched theirs to within 5px at both
+       * widths (608.2 and 743); the entire 192px gap was SectionBand's
+       * default `py-16 sm:py-24` around it.
+       *
+       * `pb-0` is deliberate. The sand panel ends the band, and the next band
+       * brings its own top pocket — which is how theirs is spaced too. The
+       * `sm:` pair displaces SectionBand's `sm:py-24`, which a base-only
+       * override leaves standing from 640 up.
+       */
+      className="pb-0 pt-8 sm:pb-0 sm:pt-8 lg:pb-0 lg:pt-0"
+    >
       <div className="overflow-hidden rounded-xl lg:flex">
         {/* ---------------------------------------------------------------
             The photograph, and the band's height.

@@ -111,20 +111,31 @@ export function ShopByOrientationSection() {
       aria-labelledby={HEADING_ID}
       data-testid="shop-by-orientation"
       /*
-       * Sand below lg, white from lg up — theirs, at both widths. The vertical
-       * rhythm follows the band that is visible: 32px as measured wherever the
-       * sand shows, the house 96px from lg up where the edges cannot be seen
-       * anyway. `sm:py-8` is not redundant — it is what displaces SectionBand's
+       * Sand below lg, white from lg up — theirs, at both widths.
+       *
+       * The pocket is measured rather than inherited (#540). Their band is
+       * 182.4px at 1440: a 50.4px title block, 16px, the 52px chip row, then
+       * 64px below and NOTHING above — the rail before it brings its own
+       * bottom pocket, and so does ours. Under lg theirs is 300.8px: 32 above
+       * the heading, 32 to the chips, three rows of chips, 64 below.
+       *
+       * This band used to take SectionBand's default and sat at 306 against
+       * their 182 on desktop while running 36px SHORT on mobile, where the
+       * 64px under their chips had been read as 32.
+       *
+       * The `sm:` pair is not redundant — it is what displaces SectionBand's
        * own `sm:py-24`, which would otherwise put 96px of sand around the
        * chips on a tablet.
        */
-      className="bg-band-strong py-8 sm:py-8 lg:bg-background lg:py-24"
+      className="bg-band-strong pb-16 pt-8 sm:pb-16 sm:pt-8 lg:bg-background lg:pb-16 lg:pt-0"
     >
       <DisplayHeading as="h2" id={HEADING_ID} className="text-section">
         Shop By Orientation
       </DisplayHeading>
 
-      <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-3 lg:mt-5 lg:flex lg:flex-wrap lg:gap-6">
+      {/* 16px from the title block to the chips at 1440, measured; 32px
+          below lg, which is their title block's own bottom padding. */}
+      <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-3 lg:mt-4 lg:flex lg:flex-wrap lg:gap-6">
         {ORIENTATION_CHIPS.map((chip) => (
           <li key={chip.id}>
             <Link

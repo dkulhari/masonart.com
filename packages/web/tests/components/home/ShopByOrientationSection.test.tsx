@@ -130,3 +130,37 @@ describe('the band', () => {
     expect(section).toHaveAttribute('aria-labelledby', heading.id)
   })
 })
+
+describe('the band pocket', () => {
+  /**
+   * Measured on mesonart's own orientation band on 2026-08-07 (#540):
+   *
+   *   1440   band 182.4px — a 50.4px title block, a 16px gap, the 52px chip
+   *          row, and 64px below. No padding above: the rail before it brings
+   *          its own bottom pocket.
+   *   390    band 300.8px — 32px above the heading, 32px to the chips, three
+   *          rows of chips, then 64px below.
+   *
+   * Ours was 306 at 1440 against their 182: SectionBand's `lg:py-24` put 96px
+   * above and below a 114px content row. At 390 ours was 264 against their
+   * 300 — the same band too SHORT, because the 64px under their chips was
+   * being read as 32.
+   */
+  it('drops the top pocket at lg and keeps 64px under the chips', () => {
+    expect(src).toMatch(/lg:pt-0/)
+    expect(src).toMatch(/lg:pb-16/)
+    expect(src).not.toMatch(/lg:py-24/)
+  })
+
+  it('keeps 32px above the heading and 64px below the chips under lg', () => {
+    expect(src).toMatch(/\bpt-8\b/)
+    expect(src).toMatch(/\bpb-16\b/)
+    expect(src).toMatch(/sm:pt-8/)
+    expect(src).toMatch(/sm:pb-16/)
+  })
+
+  it('sets the heading-to-chips gap at the measured 16px on desktop', () => {
+    // Their title block and chip row are 16px apart at 1440; ours was 20.
+    expect(src).toMatch(/lg:mt-4\b/)
+  })
+})
