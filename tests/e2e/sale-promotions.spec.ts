@@ -461,6 +461,62 @@ test.describe('with a promotion running', () => {
       await customer.dispose()
     }
   })
+
+  /**
+   * Closes the coverage seam named above (#567): the previous test proves the
+   * arithmetic against a cart seeded through `POST /api/cart/items` directly.
+   * This one proves the row actually renders for a cart built the way a real
+   * customer builds one — through the PDP's Add to Cart button — so the local
+   * store's line and the server's line are provably the same line, not two
+   * baskets that happen to agree in a fixture.
+   */
+  test.describe('the saving row, added through the UI', () => {
+    test.use({ storageState: CUSTOMER_STORAGE_STATE })
+
+    test.beforeEach(async () => {
+      const customer = await playwrightRequest.newContext({
+        baseURL: API_URL,
+        storageState: CUSTOMER_STORAGE_STATE,
+      })
+      await customer.delete('/api/cart').catch(() => undefined)
+      await customer.dispose()
+    })
+
+    test.afterEach(async () => {
+      const customer = await playwrightRequest.newContext({
+        baseURL: API_URL,
+        storageState: CUSTOMER_STORAGE_STATE,
+      })
+      await customer.delete('/api/cart').catch(() => undefined)
+      await customer.dispose()
+    })
+
+    test('a UI add-to-cart produces a saving row on /cart', async ({ page }) => {
+      await page.setViewportSize(DESKTOP)
+      await page.goto(`/posters/${discounted.slug}`, { waitUntil: 'networkidle' })
+
+      const addToCart = page.getByRole('button', { name: 'Add to Cart' })
+      await expect(addToCart).toBeEnabled()
+
+      // The saving row reads `useServerCart()`, populated only once this POST
+      // resolves — navigating on the optimistic click alone races the server
+      // round trip and can land on /cart before there is anything to join.
+      await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().includes('/api/cart/items') &&
+            response.request().method() === 'POST' &&
+            response.ok()
+        ),
+        addToCart.click(),
+      ])
+
+      await page.goto('/cart', { waitUntil: 'networkidle' })
+
+      await expect(page.getByTestId('cart-saving')).toBeVisible()
+      await expect(page.getByTestId('cart-saving')).toContainText('Sale saving')
+    })
+  })
 })
 
 // ============================================================================
