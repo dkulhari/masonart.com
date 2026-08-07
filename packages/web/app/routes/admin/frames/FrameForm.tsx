@@ -25,6 +25,7 @@ import type { FormEvent } from 'react'
 import { updateFrameInputSchema } from '@chobii/shared'
 import { getApiUrl } from '~/lib/utils'
 import { Button } from '~/components/ui/Button'
+import { FramePricePreview } from './FramePricePreview'
 
 export interface FrameFormValues {
   name: string
@@ -373,11 +374,16 @@ export function FrameForm({
         </div>
 
         {/*
-          The live price preview lands here (#591). It will call the shared
-          `frameAddition` and quote this frame at three sizes of print, so the
-          admin sees what the customer pays rather than a multiplier they have
-          to do arithmetic on.
+          Fed by the live field values, so it recomputes as the admin types.
+          It calls the shared `frameAddition` and reproduces none of it — see
+          the note at the top of FramePricePreview.
         */}
+        <FramePricePreview
+          pricing={{
+            priceModifier: values.priceModifier,
+            priceAddition: values.priceAddition,
+          }}
+        />
       </fieldset>
 
       <div>
