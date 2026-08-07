@@ -454,6 +454,29 @@ export async function mergeGuestCartInto(
 
   const guestCart = guestCarts[0];
 
+  /**
+   * Claim the guest cart before touching a single line of it (#567).
+   *
+   * Two authenticated requests issued together right after login can both
+   * pass the `isActive` check above before either has written anything — the
+   * guest cart's items are not deleted or reassigned until the loop below,
+   * so nothing before this point stops a second caller from reading and
+   * re-summing the same guest line into the user's cart a second time.
+   * `WHERE is_active = true` on this write makes it an atomic compare-and-set:
+   * only one caller can ever flip the row, so only one caller ever proceeds
+   * past here. The loser sees zero rows returned and stops immediately —
+   * there is nothing to merge, because the winner is already merging it.
+   */
+  const claimed = await db
+    .update(carts)
+    .set({ isActive: false })
+    .where(and(eq(carts.id, guestCart.id), eq(carts.isActive, true)))
+    .returning();
+
+  if (!claimed[0]) {
+    return false;
+  }
+
   // Get or create user's cart
   const userCart = await getOrCreateCart(userId, null);
 
@@ -503,12 +526,6 @@ export async function mergeGuestCartInto(
         .where(eq(cartItems.id, item.id));
     }
   }
-
-  // Deactivate guest cart
-  await db
-    .update(carts)
-    .set({ isActive: false })
-    .where(eq(carts.id, guestCart.id));
 
   // Update user cart totals
   await updateCartTotals(userCart.id);

@@ -203,7 +203,10 @@ beforeEach(() => {
   whereCalls.length = 0;
   setCalls.length = 0;
   selectMock.mockReturnValue(chain([]));
-  updateMock.mockReturnValue(chain([]));
+  // Every update "wins" its `.returning()` by default — including the
+  // guest-cart claim, whose result decides whether the merge proceeds at
+  // all. Tests that need to simulate losing the race override this once.
+  updateMock.mockReturnValue(chain([{}]));
   insertMock.mockReturnValue(chain([userCartRow()]));
   getCachedMock.mockResolvedValue(null);
   setCachedMock.mockResolvedValue(undefined);
@@ -239,10 +242,12 @@ describe('mergeGuestCartInto', () => {
 
     // The guest cart itself was looked up by the session id handed in.
     expect(paramValues(whereCalls[0])).toContain(GUEST_SESSION);
+    // setCalls[0] is the claim (`isActive: false`, see the race-guard
+    // describe block below) — the item merge write is the one after it.
     // 2 already held + 1 arriving — the actual value written, not just that
     // *some* update happened. A regression that dropped the existing count
     // (`newQuantity = item.quantity`) would write `quantity: 1` here.
-    expect(setCalls[0]).toEqual({ quantity: 3, lineTotal: '6000.00' });
+    expect(setCalls[1]).toEqual({ quantity: 3, lineTotal: '6000.00' });
     // The guest cart's cache entries — both viewer variants — are dropped so
     // a stale read can't survive the merge.
     expect(droppedCacheKeys().filter((key) => key.includes(GUEST_CART_ID))).toHaveLength(2);
@@ -259,8 +264,8 @@ describe('mergeGuestCartInto', () => {
     await expect(mergeGuestCartInto(USER_ID, GUEST_SESSION)).resolves.toBe(true);
 
     // The line itself was reassigned to the user's cart, not summed into one
-    // that doesn't exist.
-    expect(setCalls[0]).toEqual({ cartId: USER_CART_ID });
+    // that doesn't exist. setCalls[0] is the claim; see below.
+    expect(setCalls[1]).toEqual({ cartId: USER_CART_ID });
     expect(droppedCacheKeys().filter((key) => key.includes(GUEST_CART_ID))).toHaveLength(2);
   });
 
@@ -281,11 +286,36 @@ describe('mergeGuestCartInto', () => {
 
     await expect(mergeGuestCartInto(USER_ID, GUEST_SESSION)).resolves.toBe(true);
 
-    // whereCalls: 0 guest-cart lookup, 1 getOrCreateCart's user-cart lookup,
-    // 2 guest-items fetch (cartId only), 3 the existing-line match — the one
-    // that carries the frame filter.
-    expect(paramValues(whereCalls[3])).toContain('frame-1');
-    expect(setCalls[0]).toEqual({ quantity: 3, lineTotal: '6000.00' });
+    // whereCalls: 0 guest-cart lookup, 1 the claim (isActive guard), 2
+    // getOrCreateCart's user-cart lookup, 3 guest-items fetch (cartId only),
+    // 4 the existing-line match — the one that carries the frame filter.
+    expect(paramValues(whereCalls[4])).toContain('frame-1');
+    expect(setCalls[1]).toEqual({ quantity: 3, lineTotal: '6000.00' });
+  });
+
+  /**
+   * #567: two authenticated requests issued together right after login both
+   * pass the `isActive` guard in the initial select before either has
+   * written anything — the guest cart's items are not touched until after
+   * that point, so nothing stopped a second caller from reading and
+   * re-summing the same guest line a second time. The claim below is a
+   * `WHERE is_active = true` compare-and-set: only one caller can ever flip
+   * the row, so only one caller ever reaches the item loop.
+   */
+  it('stops before touching any items when another request already claimed the guest cart', async () => {
+    selectMock.mockReturnValueOnce(chain([guestCartRow()])); // find guest cart
+    // Someone else's claim already flipped `isActive` between our select and
+    // our own claim attempt — our compare-and-set matches zero rows.
+    updateMock.mockReturnValueOnce(chain([]));
+
+    await expect(mergeGuestCartInto(USER_ID, GUEST_SESSION)).resolves.toBe(false);
+
+    // Losing the race must stop before the item loop ever runs — a second
+    // read-modify-write on the same guest line is exactly the lost-update
+    // window this guards against.
+    expect(selectMock).toHaveBeenCalledTimes(1);
+    expect(setCalls).toHaveLength(1); // only the losing claim attempt itself
+    expect(deleteCachedMock).not.toHaveBeenCalled();
   });
 });
 
@@ -317,7 +347,8 @@ describe('mergeGuestCartOnAuth', () => {
     // called mergeGuestCartInto with the wrong argument) would still clear
     // the cookie and 200, but neither of these would be true.
     expect(paramValues(whereCalls[0])).toContain(GUEST_SESSION);
-    expect(setCalls[0]).toEqual({ cartId: USER_CART_ID });
+    // setCalls[0] is the claim (`isActive: false`); setCalls[1] is the move.
+    expect(setCalls[1]).toEqual({ cartId: USER_CART_ID });
     expect(droppedCacheKeys().filter((key) => key.includes(GUEST_CART_ID))).toHaveLength(2);
   });
 
