@@ -1,10 +1,10 @@
 status: todo
-last_updated: '2026-08-09T14:38:59.940Z'
-total_tickets: 27
+last_updated: '2026-08-09T15:59:33.911Z'
+total_tickets: 26
 summary:
   critical: 4
   high: 6
-  medium: 11
+  medium: 10
   low: 6
 priorities:
   critical:
@@ -124,10 +124,6 @@ priorities:
           blocked_by: []
         - ticket_number: 543
           title: Two-row top strip — countdown announcement over utility bar
-          assignee: unassigned
-          blocked_by: []
-        - ticket_number: 564
-          title: Best Sellers band is missing the category pill row the reference carries on both viewports
           assignee: unassigned
           blocked_by: []
     - feature: gift-cards

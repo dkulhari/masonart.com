@@ -63,7 +63,9 @@ work_session_summary:
       duration: "00:32:00"
       tokens: 0
 tickets:
-  todo:
+  todo: {}
+  in_progress: {}
+  done:
     "423": Schema - promotion, promotion_product and promotion_exclusion tables
     "424": Schema - shared Zod schemas and types for promotions
     "425": Schema - record the promotion and its discount on orders
@@ -74,11 +76,8 @@ tickets:
     "430": API - order creation writes the real discount and enforces the per-customer limit
     "431": API - admin promotions CRUD
     "432": API - countdown deadline resolution, cookie mint and clamp
-    "434": Storefront - sale strip with live countdown above the header
-    "568": DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
-  in_progress: {}
-  done:
     "433": Admin UI - /admin/promotions list and editor
+    "434": Storefront - sale strip with live countdown above the header
     "435": Storefront - sale pricing on product cards and the PDP buy panel
     "436": Storefront - cart saving row, locked for non-members
     "437": Storefront - /sale landing page and the red Sale nav link
@@ -89,9 +88,10 @@ tickets:
     "525": Bug - promotion writes leave stale prices in the product response cache
     "527": Bug - admin product writes never bust the product list cache (deleteCached against a key that is never written)
     "528": A promotion that starts later still serves pre-sale prices from cache until the TTL lapses
+    "568": DECISION NEEDED - orders.subtotal semantics and the free-shipping threshold under a sale
 total_tickets: 23
-completion_percentage: 48
-is_completed: false
+completion_percentage: 100
+is_completed: true
 plan:
   phases:
     - name: Schema + contracts

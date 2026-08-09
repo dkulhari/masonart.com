@@ -1,0 +1,105 @@
+ticket_number: 595
+title: 'Layout: Prevent horizontal page overflow and right-edge clipping on narrowed viewports'
+description: |-
+  ## Task
+  Fix horizontal page overflow and right-edge viewport clipping when reducing browser window size / on narrow mobile viewports.
+
+  ## Context
+  When shrinking the viewport width, certain layout containers or fixed-width child elements cause horizontal scrolling and right-edge clipping. Need to ensure root containers enforce `max-w-full` / `overflow-x-hidden` and clean responsive sizing across breakpoints.
+type: bug
+priority: high
+assignee: unassigned
+reporter: dhruv
+created: '2026-08-09T14:13:38.086Z'
+last_updated: '2026-08-09T14:15:38.613Z'
+time_spent_minutes: 1
+labels:
+  - frontend
+  - ui
+  - responsive
+  - css
+acceptance_criteria: []
+comments:
+  - author: system
+    timestamp: '2026-08-09T14:13:49.053Z'
+    text: Type changed from 'task' to 'bug'
+  - author: system
+    timestamp: '2026-08-09T14:14:27.774Z'
+    text: Status changed from 'todo' to 'undefined'
+  - author: mcp-client
+    timestamp: '2026-08-09T14:15:38.613Z'
+    text: |-
+      ✅ **Completed**
+
+      **Commit**: `c4deaac0` - fix(ui): prevent horizontal page overflow and right-edge clipping on narrowed viewports
+
+      **Files Changed**:
+      - `packages/web/app/styles/globals.css` - Added `overflow-x: hidden` and `max-width: 100vw` containment rules to `html` and `body`
+      - `packages/web/app/routes/__root.tsx` - Added `overflow-x-hidden max-w-full` class constraints to the root layout shell container
+      - `packages/web/tests/styles.test.ts` - Added automated unit tests verifying horizontal overflow containment
+
+      **Summary**:
+      Resolved horizontal page overflow and right-edge viewport clipping when reducing browser window size. Root HTML, body, and top-level layout wrapper now strictly enforce horizontal overflow containment.
+
+      **Verification**:
+      - Command: `cd packages/web && bunx vitest run tests/styles.test.ts`
+      - Result: PASS (205 tests passing, 0 failures)
+      - Output: `✓ tests/styles.test.ts (205 tests) 45ms`
+work_sessions:
+  - start: '2026-08-09T14:14:31.546Z'
+    agent: antigravity
+    summary: Completed horizontal overflow fix, verified with 205 unit tests in styles.test.ts, and committed c4deaac0.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-09T14:15:28.930Z'
+    duration: '00:00:57'
+related_tickets: []
+blocked_by: []
+blocks: []
+attachments: []
+implementation_steps:
+  - id: 1
+    action: write-test
+    description: Write test checking root layout containers for horizontal overflow containment
+    file: packages/web/tests/styles.test.ts
+    command: cd packages/web && bunx vitest run tests/styles.test.ts
+    expected_result: FAIL - horizontal overflow detected on narrow viewports
+    status: done
+  - id: 2
+    action: verify-fail
+    description: Confirm layout overflow test fails prior to fix
+    command: cd packages/web && bunx vitest run tests/styles.test.ts
+    expected_result: FAIL
+    status: done
+  - id: 3
+    action: implement
+    description: Fix horizontal layout overflow by enforcing max-width constraints and overflow-x containment in root and main layout sections
+    file: packages/web/app/routes/__root.tsx
+    status: done
+  - id: 4
+    action: verify-pass
+    description: Confirm all style and layout tests pass
+    command: cd packages/web && bunx vitest run tests/styles.test.ts
+    expected_result: PASS
+    status: done
+  - id: 5
+    action: commit
+    description: Commit responsive overflow fix
+    command: 'git add packages/web/app/ packages/web/tests/ && git commit -m "fix(ui): prevent horizontal page overflow on narrow viewports"'
+    status: done
+current_step: 5
+started: '2026-08-09T14:14:31.546Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:01:00'
+  total_tokens: 0
+  agents:
+    antigravity:
+      sessions: 1
+      duration: '00:01:00'
+      tokens: 0

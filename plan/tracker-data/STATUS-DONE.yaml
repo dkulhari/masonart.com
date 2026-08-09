@@ -1,10 +1,10 @@
 status: done
-last_updated: '2026-08-09T14:39:00.251Z'
-total_tickets: 540
+last_updated: '2026-08-09T15:59:34.038Z'
+total_tickets: 541
 summary:
   critical: 29
   high: 204
-  medium: 234
+  medium: 235
   low: 73
 priorities:
   critical:
@@ -2303,6 +2303,10 @@ priorities:
           blocked_by: []
         - ticket_number: 539
           title: Trust icons row above the footer
+          assignee: unassigned
+          blocked_by: []
+        - ticket_number: 564
+          title: Best Sellers band is missing the category pill row the reference carries on both viewports
           assignee: unassigned
           blocked_by: []
         - ticket_number: 571

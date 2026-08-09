@@ -55,22 +55,22 @@ work_session_summary:
   total_tokens: 0
   agents: {}
 tickets:
-  todo:
+  todo: {}
+  in_progress: {}
+  done:
     "439": Schema - gallery membership columns and the session field
     "440": API - POST /api/gallery/join
+    "441": API - registration opt-in and post-auth auto-join from the join intent
+    "442": API + Admin - member filter and consented-email export
     "443": Web - SSR-safe member state hook
     "444": Web - join modal, one field
     "445": Web - dismissible sale banner with session and 7-day cooldown
-  in_progress: {}
-  done:
-    "441": API - registration opt-in and post-auth auto-join from the join intent
-    "442": API + Admin - member filter and consented-email export
     "446": Web - black vertical rail tab on the right edge
     "447": E2E - locked to unlocked, and the banner-rail handover
     "526": Bug - joining is invisible to server pricing for 5 minutes, so a fresh member is charged base price
 total_tickets: 10
-completion_percentage: 50
-is_completed: false
+completion_percentage: 100
+is_completed: true
 plan:
   phases:
     - name: Schema + auth field

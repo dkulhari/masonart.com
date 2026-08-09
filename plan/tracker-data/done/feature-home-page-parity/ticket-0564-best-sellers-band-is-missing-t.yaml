@@ -15,18 +15,38 @@ description: |-
 feature: home-page-parity
 type: task
 priority: medium
-status: todo
+status: done
 assignee: unassigned
 reporter: dhruv
 created: '2026-08-06T17:04:02.782Z'
-last_updated: '2026-08-06T17:58:35.498Z'
-time_spent_minutes: 0
+last_updated: '2026-08-09T15:59:29.790Z'
+time_spent_minutes: 1
 labels:
   - home-page-parity
   - blind-ab
   - products
 acceptance_criteria: []
 comments:
+  - author: claude-code
+    timestamp: '2026-08-09T15:59:31.972Z'
+    text: |-
+      ✅ **Completed**
+      
+      **Commit**: `23403539` - feat(home): add style category filter pills row to BestSellersRail
+      
+      **Files Changed**:
+      - `packages/web/app/components/home/BestSellersRail.tsx` - Sourced style chips from STYLE_OPTIONS, added honesty filtering and selectedStyle state
+      - `packages/web/app/components/home/ProductRail.tsx` - Added ProductCategoryChip interface and category filter pills rendering block
+      - `packages/web/tests/components/home/ProductRail.test.tsx` - Added unit tests for category chip rendering, honesty filtering, touch target, and filtering behavior
+      
+      **Summary**:
+      Implemented style category filter pill row for the Best Sellers rail on the home page. Sourced chip vocabulary from STYLE_OPTIONS with honesty rule (only rendering style chips that have products behind them in the current list), gave inactive chips a visible surface (`bg-[#f5f1e6]`), maintained 44px mobile touch target, and kept navigation controls on the heading line.
+      
+      **Verification**:
+      - Command: `bunx vitest run tests/components/home/ProductRail.test.tsx`
+      - Result: PASS (27 tests passing)
+      - Suite Command: `bunx vitest run tests/components/home/*.test.tsx`
+      - Result: PASS (173 tests passing across 8 test suites)
   - author: mcp-client
     timestamp: '2026-08-06T17:58:35.369Z'
     text: |-
@@ -48,8 +68,30 @@ comments:
   - author: system
     timestamp: '2026-08-06T17:58:35.498Z'
     text: Priority changed from 'high' to 'medium'
-work_sessions: []
+work_sessions:
+  - start: '2026-08-09T15:58:34.860Z'
+    agent: claude-code
+    summary: Implemented BestSellersRail category pill row filter with honesty rule and 44px touch targets. Added 3 new unit tests, verified 27 rail tests and 173 home component tests pass.
+    cost_usd: 0
+    cost_by_model: {}
+    token_breakdown:
+      input: 0
+      output: 0
+      cache_creation: 0
+      cache_read: 0
+    end: '2026-08-09T15:59:29.788Z'
+    duration: '00:00:54'
 related_tickets: []
 blocked_by: []
 blocks: []
 attachments: []
+started: '2026-08-09T15:58:32.949Z'
+work_session_summary:
+  total_sessions: 1
+  total_duration: '00:01:00'
+  total_tokens: 0
+  agents:
+    claude-code:
+      sessions: 1
+      duration: '00:01:00'
+      tokens: 0
