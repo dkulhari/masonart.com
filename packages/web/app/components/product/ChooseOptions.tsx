@@ -439,14 +439,14 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
         data-testid="choose-options"
         className={cn(
           buttonVariants({ variant: 'outline' }),
-          'absolute bottom-4 right-4 z-20 h-10 w-10 rounded-full p-0',
+          'border-none md:border-none absolute bottom-4 right-4 z-20 h-10 w-10 rounded-full p-0',
           // DARK, not white. A white circle on the #EFEFEF plate is a 1.1:1
           // fill difference held together only by its drop shadow, so it reads
           // as a hole punched in the tile rather than a control sitting on it.
           // The reference's own mobile quick-add measures rgb(23 23 23) — the
           // same near-black as --foreground — which is 14:1 against the plate
           // and needs no shadow to have an edge.
-          'border-transparent bg-foreground text-background text-sm md:text-xs lg:text-sm font-normal',
+          'bg-foreground text-background text-sm md:text-xs lg:text-sm font-normal',
           'shadow-[0_2px_10px_rgba(23,23,23,0.18)]',
           'hover:bg-foreground/90 hover:text-background',
           // …and the measured white pill again from `md`, where it is only
