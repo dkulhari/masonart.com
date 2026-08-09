@@ -23,7 +23,7 @@ describe('useMobileNavScroll', () => {
     expect(result.current.isBottomMenuVisible).toBe(true)
   })
 
-  it('shows top menu and hides bottom menu when scrolling down past threshold', () => {
+  it('shows both top and bottom menus when page moves up (scrolling down past threshold)', () => {
     const { result } = renderHook(() => useMobileNavScroll())
 
     act(() => {
@@ -32,26 +32,26 @@ describe('useMobileNavScroll', () => {
     })
 
     expect(result.current.isTopMenuVisible).toBe(true)
-    expect(result.current.isBottomMenuVisible).toBe(false)
+    expect(result.current.isBottomMenuVisible).toBe(true)
   })
 
-  it('hides top menu and shows bottom menu when scrolling up past threshold', () => {
+  it('hides both top and bottom menus when page moves down (scrolling up past threshold)', () => {
     const { result } = renderHook(() => useMobileNavScroll())
 
-    // Scroll down first
+    // Move page up first
     act(() => {
       scrollY = 300
       window.dispatchEvent(new Event('scroll'))
     })
 
-    // Now scroll up
+    // Now move page down
     act(() => {
       scrollY = 250
       window.dispatchEvent(new Event('scroll'))
     })
 
     expect(result.current.isTopMenuVisible).toBe(false)
-    expect(result.current.isBottomMenuVisible).toBe(true)
+    expect(result.current.isBottomMenuVisible).toBe(false)
   })
 
   it('resets both menus to visible when returning near top of page', () => {

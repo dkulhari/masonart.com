@@ -44,11 +44,14 @@ export function useMobileNavScroll(): MobileNavScrollState {
       if (Math.abs(delta) < JITTER_PX) return
 
       lastY.current = y
-      const isScrollingDown = delta > 0
+      // Page moves UP when scrollY increases (delta > 0).
+      // Both top and bottom menus show when page moves UP (delta > 0),
+      // and hide when page moves DOWN (delta < 0).
+      const isPageMovingUp = delta > 0
 
       setScrollState({
-        isTopMenuVisible: isScrollingDown,
-        isBottomMenuVisible: !isScrollingDown,
+        isTopMenuVisible: isPageMovingUp,
+        isBottomMenuVisible: isPageMovingUp,
       })
     }
 
