@@ -1,11 +1,11 @@
 status: done
-last_updated: '2026-08-07T11:52:32.939Z'
-total_tickets: 538
+last_updated: '2026-08-09T14:39:00.251Z'
+total_tickets: 540
 summary:
   critical: 29
   high: 204
-  medium: 233
-  low: 72
+  medium: 234
+  low: 73
 priorities:
   critical:
     - feature: qa-testing
@@ -2309,6 +2309,10 @@ priorities:
           title: /create's mobile action bar must stack above the tab bar, not paint over it
           assignee: unassigned
           blocked_by: []
+        - ticket_number: 594
+          title: Card art framing — measure artBox server-side and re-frame each piece on equal ink area
+          assignee: unassigned
+          blocked_by: []
     - feature: gift-cards
       tickets:
         - ticket_number: 550
@@ -2784,6 +2788,10 @@ priorities:
               title: Web - drag and keyboard reordering on /wishlist
             - ticket_number: 503
               title: 'Web - staff staging bar: copy ids, or create a collection from them'
+        - ticket_number: 505
+          title: Bug - a late wishlist load() reverts a reorder made during it
+          assignee: unassigned
+          blocked_by: []
     - feature: wishlist-collection-editing
       tickets:
         - ticket_number: 509

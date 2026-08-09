@@ -1,11 +1,11 @@
 status: todo
-last_updated: '2026-08-07T11:52:32.778Z'
+last_updated: '2026-08-09T14:38:59.940Z'
 total_tickets: 27
 summary:
   critical: 4
-  high: 5
+  high: 6
   medium: 11
-  low: 7
+  low: 6
 priorities:
   critical:
     - feature: go-live
@@ -87,6 +87,11 @@ priorities:
           title: Review toast covers page content on every screen and has no counterpart on the reference
           assignee: unassigned
           blocked_by: []
+    - tickets:
+        - ticket_number: 595
+          title: 'Layout: Prevent horizontal page overflow and right-edge clipping on narrowed viewports'
+          assignee: unassigned
+          blocked_by: []
   medium:
     - feature: go-to-production
       tickets:
@@ -155,12 +160,6 @@ priorities:
       tickets:
         - ticket_number: 316
           title: Production Cutover Gate - chobi.art domain external registrations
-          assignee: unassigned
-          blocked_by: []
-    - feature: wishlist-curation
-      tickets:
-        - ticket_number: 505
-          title: Bug - a late wishlist load() reverts a reorder made during it
           assignee: unassigned
           blocked_by: []
     - feature: home-page-parity
