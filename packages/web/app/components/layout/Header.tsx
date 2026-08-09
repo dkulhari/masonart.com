@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { useNavReveal } from '~/hooks/useNavReveal'
+import { useMobileNavScroll } from '~/hooks/useMobileNavScroll'
 import { useChromeOffset } from '~/hooks/useChromeOffset'
 import { useActivePromotion } from '~/hooks/useActivePromotion'
 import type { ActivePromotion } from '~/components/layout/SaleStrip'
@@ -95,6 +96,7 @@ export function Header() {
   // Scroll down leaves the compact bar — wordmark and actions; scroll up
   // brings both nav rows back wherever the page happens to be (#421).
   const isNavRevealed = useNavReveal()
+  const { isTopMenuVisible, isBottomMenuVisible } = useMobileNavScroll()
 
   // The revealed nav rows push everything sticky below them down, rather
   // than landing on top of it — the collection toolbar's Hide-filters button
@@ -184,14 +186,17 @@ export function Header() {
     <>
       <header
         className={cn(
-          'sticky top-0 z-50 w-full border-b border-border',
+          'sticky top-0 z-50 w-full border-b border-border transition-transform duration-300 ease-in-out md:translate-y-0',
           // The bar is translucent so the page shows through as it scrolls
           // under — but a translucent bar over the mega panel's scrim reads
           // as dimmed chrome, which is not what mesonart does: their header
           // stays white while the panel is open. Go opaque for the duration.
           isAllArtOpen
             ? 'bg-background'
-            : 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60'
+            : 'bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60',
+          isTopMenuVisible || isMobileMenuOpen || isSearchOpen || isAllArtOpen
+            ? 'translate-y-0 shadow-sm'
+            : '-translate-y-full'
         )}
       >
         <div className="container-wide">
@@ -329,6 +334,7 @@ export function Header() {
         onOpenMenu={toggleMobileMenu}
         isMenuOpen={isMobileMenuOpen}
         onOpenSearch={() => setIsSearchOpen(true)}
+        isVisible={isBottomMenuVisible}
       />
 
       {/* Sibling of <header>, not a child: the header sets backdrop-blur,

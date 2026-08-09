@@ -82,12 +82,15 @@ export interface MobileTabBarProps {
   isMenuOpen: boolean
   /** Opens the header's `SearchDrawer`. */
   onOpenSearch: () => void
+  /** Controls bottom bar visibility during scroll transitions. */
+  isVisible?: boolean
 }
 
 export function MobileTabBar({
   onOpenMenu,
   isMenuOpen,
   onOpenSearch,
+  isVisible = true,
 }: MobileTabBarProps) {
   const isHydrated = useCartHydration()
   const cartItemCount = useCartItemCount()
@@ -110,7 +113,10 @@ export function MobileTabBar({
     <nav
       aria-label="Primary"
       data-testid="mobile-tab-bar"
-      className="fixed inset-x-0 bottom-0 z-30 lg:hidden"
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-30 lg:hidden transition-transform duration-300 ease-in-out',
+        isVisible || isMenuOpen ? 'translate-y-0' : 'translate-y-full'
+      )}
     >
       <ul
         className={cn(
