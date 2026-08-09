@@ -339,6 +339,64 @@ describe('BestSellersRail', () => {
   })
 })
 
+describe('BestSellersRail — category pill row', () => {
+  const STYLED_PRODUCTS: ProductCardData[] = [
+    product(1, { title: 'Wabi Art', styles: ['wabi-sabi-art'] }),
+    product(2, { title: 'Pop Art', styles: ['pop-art'] }),
+    product(3, { title: 'Minimal Art', styles: ['minimalist-art'] }),
+    product(4, { title: 'Another Wabi', styles: ['wabi-sabi-art'] }),
+  ]
+
+  it('renders category pill row with All and only styles present in products', () => {
+    render(<BestSellersRail products={STYLED_PRODUCTS} />)
+    const categoryRow = screen.getByTestId('rail-category-pills')
+    expect(categoryRow).toBeTruthy()
+
+    // "All" + 3 styles present ("Wabi-Sabi Art", "Pop Art", "Minimalist Art")
+    expect(screen.getByRole('button', { name: 'All' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Wabi-Sabi Art' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Pop Art' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Minimalist Art' })).toBeTruthy()
+
+    // Styles NOT present in products (e.g. "Graffiti Art") must NOT be rendered (honesty rule)
+    expect(screen.queryByRole('button', { name: 'Graffiti Art' })).toBeNull()
+  })
+
+  it('filters product cards when a category pill is selected', () => {
+    render(<BestSellersRail products={STYLED_PRODUCTS} />)
+    expect(screen.getAllByTestId('product-card')).toHaveLength(4)
+
+    // Click "Wabi-Sabi Art" pill
+    fireEvent.click(screen.getByRole('button', { name: 'Wabi-Sabi Art' }))
+    const filteredCards = screen.getAllByTestId('product-card')
+    expect(filteredCards).toHaveLength(2)
+    expect(screen.getByRole('link', { name: 'Wabi Art' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Another Wabi' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Pop Art' })).toBeNull()
+
+    // Click "All" pill to restore full product list
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    expect(screen.getAllByTestId('product-card')).toHaveLength(4)
+  })
+
+  it('gives inactive chips a visible surface and touch target, and active chip solid highlight', () => {
+    render(<BestSellersRail products={STYLED_PRODUCTS} />)
+    const allPill = screen.getByRole('button', { name: 'All' })
+    const wabiPill = screen.getByRole('button', { name: 'Wabi-Sabi Art' })
+
+    // Active pill (All by default)
+    expect(allPill.className).toContain('bg-foreground')
+    expect(allPill.className).toContain('text-background')
+
+    // Inactive pill (Wabi-Sabi Art)
+    expect(wabiPill.className).toContain('bg-[#f5f1e6]')
+    expect(wabiPill.className).toContain('text-foreground')
+
+    // Touch target / height
+    expect(wabiPill.className).toMatch(/h-10|min-h-\[44px\]|h-\[44px\]/)
+  })
+})
+
 describe('NewInRail', () => {
   it('sources the newest active products by creation date', async () => {
     listMock.mockResolvedValue({ items: PRODUCTS })

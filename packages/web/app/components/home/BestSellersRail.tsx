@@ -30,6 +30,8 @@
  * heading a claim we can stand behind.
  */
 
+import { useState } from 'react'
+import { STYLE_OPTIONS } from '@chobii/shared'
 import { productsApi, type PaginatedResponse } from '~/lib/api'
 import type { ProductCardData } from '~/components/product/ProductCard'
 import { ProductRail, type RailViewAllSearch } from './ProductRail'
@@ -81,13 +83,41 @@ export interface BestSellersRailProps {
 }
 
 export function BestSellersRail({ products }: BestSellersRailProps) {
+  const [selectedStyle, setSelectedStyle] = useState<string>('all')
+
+  // Find unique style IDs present across all best sellers products
+  const presentStyleIds = new Set(
+    products.flatMap((p) => p.styles ?? [])
+  )
+
+  // Filter STYLE_OPTIONS to only those present in products (Honesty Rule #564)
+  const availableStyleChips = STYLE_OPTIONS.filter((opt) =>
+    presentStyleIds.has(opt.id)
+  ).map((opt) => ({
+    id: opt.id,
+    label: opt.label,
+  }))
+
+  const categoryChips =
+    availableStyleChips.length > 0
+      ? [{ id: 'all', label: 'All' }, ...availableStyleChips]
+      : undefined
+
+  const filteredProducts =
+    selectedStyle === 'all'
+      ? products
+      : products.filter((p) => p.styles?.includes(selectedStyle))
+
   return (
     <ProductRail
       // Singular, as the band itself reads on mesonart — "Best Sellers" is
       // the nav label, "Best Seller" is the heading over the rail.
       heading="Best Seller"
-      products={products}
+      products={filteredProducts}
       viewAllSearch={BEST_SELLERS_SEARCH}
+      categoryChips={categoryChips}
+      selectedCategory={selectedStyle}
+      onSelectCategory={setSelectedStyle}
       // The first band under the hero, so its first card holds the LCP
       // candidate. New In, four bands further down, does not and stays lazy.
       priority

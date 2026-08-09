@@ -69,12 +69,21 @@ export interface RailViewAllSearch {
   sortOrder: SortOrder
 }
 
+export interface ProductCategoryChip {
+  id: string
+  label: string
+}
+
 export interface ProductRailProps {
   /** Band title, e.g. "Best Seller" or "New In". */
   heading: string
   products: ProductCardData[]
   /** Sort the centred View All pill carries into `/posters`. */
   viewAllSearch: RailViewAllSearch
+  /** Category/Style filter chips row (#564). */
+  categoryChips?: readonly ProductCategoryChip[]
+  selectedCategory?: string
+  onSelectCategory?: (id: string) => void
   /** Band fill. Both home rails are plain white on the bar. */
   tone?: SectionBandProps['tone']
   /**
@@ -117,6 +126,9 @@ export function ProductRail({
   heading,
   products,
   viewAllSearch,
+  categoryChips,
+  selectedCategory,
+  onSelectCategory,
   tone = 'plain',
   priority = false,
   testId,
@@ -181,7 +193,7 @@ export function ProductRail({
    * dead arrows and a pill pointing at nothing. Same call ProductCarousel and
    * CategoriesSection already make.
    */
-  if (products.length === 0) return null
+  if (products.length === 0 && !categoryChips?.length) return null
 
   return (
     /**
@@ -242,6 +254,35 @@ export function ProductRail({
           </button>
         </div>
       </div>
+
+      {/* Category filter pills row (#564) */}
+      {categoryChips && categoryChips.length > 0 && (
+        <div
+          data-testid="rail-category-pills"
+          className="mb-6 flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 -mx-[var(--page-padding)] px-[var(--page-padding)] lg:mx-0 lg:px-0"
+        >
+          {categoryChips.map((chip) => {
+            const isSelected = selectedCategory
+              ? selectedCategory === chip.id
+              : chip.id === 'all'
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => onSelectCategory?.(chip.id)}
+                className={cn(
+                  'flex h-10 min-h-[44px] shrink-0 items-center justify-center rounded-full px-5 text-center text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                  isSelected
+                    ? 'bg-foreground text-background'
+                    : 'bg-[#f5f1e6] text-foreground hover:bg-band'
+                )}
+              >
+                {chip.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       <ul
         ref={trackRef}
