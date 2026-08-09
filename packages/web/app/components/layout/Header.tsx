@@ -490,7 +490,7 @@ export function Header() {
                 room: their nav row stands 96px tall with 24px under each
                 link, against our 8px of padding. py-4 + gap-y-4 gives the
                 wrapped lines air instead of stacking them. */}
-            <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4 py-4">
+            <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 py-3 lg:gap-x-6 lg:gap-y-4 lg:py-4">
               {/* Not a link any more but a door: All Art opens the whole
                   filter vocabulary as a panel, the way mesonart's does
                   (#476). `static` so the panel measures against the row
