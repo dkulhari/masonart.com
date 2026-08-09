@@ -446,14 +446,14 @@ export function ChooseOptions({ product, className }: ChooseOptionsProps) {
           // The reference's own mobile quick-add measures rgb(23 23 23) — the
           // same near-black as --foreground — which is 14:1 against the plate
           // and needs no shadow to have an edge.
-          'border-transparent bg-foreground text-background text-base font-normal',
+          'border-transparent bg-foreground text-background text-sm md:text-xs lg:text-sm font-normal',
           'shadow-[0_2px_10px_rgba(23,23,23,0.18)]',
           'hover:bg-foreground/90 hover:text-background',
           // …and the measured white pill again from `md`, where it is only
           // drawn on hover and so costs the picture nothing.
           'md:bottom-6 md:left-1/2 md:right-auto md:w-auto md:-translate-x-1/2',
           'md:bg-background md:text-foreground md:hover:bg-background',
-          'md:whitespace-nowrap md:rounded-pill md:px-[22px] md:shadow-none',
+          'md:whitespace-nowrap md:rounded-pill md:px-4 lg:px-[22px] md:shadow-none',
           'md:opacity-0 md:motion-safe:transition-opacity md:motion-safe:duration-300',
           EASE_FAST,
           'md:group-hover/card:opacity-100 md:focus-visible:opacity-100',
