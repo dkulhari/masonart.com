@@ -68,8 +68,11 @@ COPY --from=builder --chown=bun:bun /app/packages/api/src/database/migrations ./
 COPY --from=builder --chown=bun:bun /app/packages/api/node_modules ./packages/api/node_modules
 COPY --from=builder --chown=bun:bun /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder --chown=bun:bun /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder --chown=bun:bun /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
 COPY --from=builder --chown=bun:bun /app/package.json ./
+
+RUN mkdir -p /app/.cache && chown -R bun:bun /app/.cache
 
 USER bun
 
@@ -96,6 +99,7 @@ COPY --from=builder --chown=bun:bun /app/packages/web/package.json ./packages/we
 COPY --from=builder --chown=bun:bun /app/packages/web/node_modules ./packages/web/node_modules
 COPY --from=builder --chown=bun:bun /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder --chown=bun:bun /app/packages/shared/package.json ./packages/shared/
+COPY --from=builder --chown=bun:bun /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
 COPY --from=builder --chown=bun:bun /app/package.json ./
 

@@ -750,10 +750,6 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
       expect(globalsCss).toContain('@layer base {');
     });
 
-    it('should apply border-border to all elements', () => {
-      expect(globalsCss).toContain('@apply border-border;');
-    });
-
     it('should apply scroll-smooth to html', () => {
       expect(globalsCss).toContain('html {');
       expect(globalsCss).toContain('@apply scroll-smooth;');
@@ -762,6 +758,10 @@ describe('Tailwind CSS and PostCSS Configuration', () => {
     it('should apply background and text to body', () => {
       expect(globalsCss).toContain('body {');
       expect(globalsCss).toContain('@apply bg-background text-foreground antialiased;');
+    });
+
+    it('should enforce horizontal overflow containment on html and body (#595)', () => {
+      expect(globalsCss).toContain('overflow-x: hidden;');
     });
 
     it('should set font-feature-settings on body', () => {

@@ -137,8 +137,8 @@ const STATE_LABEL: Record<PromotionState, string> = {
 }
 
 const STATE_CLASS: Record<PromotionState, string> = {
-  live: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-  scheduled: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+  live: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700',
+  scheduled: 'border-sky-500/40 bg-sky-500/10 text-sky-700',
   ended: 'border-border bg-muted text-muted-foreground',
   off: 'border-border bg-muted text-muted-foreground',
 }

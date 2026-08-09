@@ -364,6 +364,7 @@
 
   html {
     @apply scroll-smooth;
+    overflow-x: hidden;
 
     /**
      * Where a scroll-to lands, given the header is sticky over the page.
@@ -391,6 +392,8 @@
     /* Measured: Poppins 300, line-height 1.2. We were rendering 400/1.5. */
     font-weight: 300;
     line-height: 1.2;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 
   /**

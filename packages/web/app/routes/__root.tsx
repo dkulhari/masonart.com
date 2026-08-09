@@ -336,7 +336,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             Header, so no bar and no padding. */}
         <div
           className={cn(
-            'relative flex min-h-screen flex-col',
+            'relative flex min-h-screen flex-col overflow-x-hidden max-w-full',
             !isAdminRoute && MOBILE_TAB_BAR_PADDING_CLASS
           )}
         >
