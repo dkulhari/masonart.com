@@ -384,16 +384,16 @@ describe('BestSellersRail — category pill row', () => {
     const allPill = screen.getByRole('button', { name: 'All' })
     const wabiPill = screen.getByRole('button', { name: 'Wabi-Sabi Art' })
 
-    // Active pill (All by default) - solid buttonVariant uses bg-primary & text-primary-foreground
-    expect(allPill.className).toContain('bg-primary')
-    expect(allPill.className).toContain('text-primary-foreground')
+    // Active pill (All by default) - bg-band-strong with font-semibold
+    expect(allPill.className).toContain('bg-band-strong')
+    expect(allPill.className).toContain('text-foreground')
 
-    // Inactive pill (Wabi-Sabi Art) - outline buttonVariant uses border-primary & text-primary
-    expect(wabiPill.className).toContain('border-primary')
-    expect(wabiPill.className).toContain('text-primary')
+    // Inactive pill (Wabi-Sabi Art) - bg-[#f5f1e6] with hover:bg-band
+    expect(wabiPill.className).toContain('bg-[#f5f1e6]')
+    expect(wabiPill.className).toContain('text-foreground')
 
-    // Touch target / height (size md is h-11 = 44px)
-    expect(wabiPill.className).toContain('h-11')
+    // Touch target / height (h-10 min-h-[44px] lg:h-[52px])
+    expect(wabiPill.className).toMatch(/h-10|min-h-\[44px\]|h-\[52px\]/)
   })
 })
 

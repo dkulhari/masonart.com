@@ -259,7 +259,7 @@ export function ProductRail({
       {categoryChips && categoryChips.length > 0 && (
         <div
           data-testid="rail-category-pills"
-          className="mb-6 flex items-center gap-2.5 overflow-x-auto scrollbar-hide pb-1 -mx-[var(--page-padding)] px-[var(--page-padding)] lg:mx-0 lg:px-0"
+          className="mb-6 flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1 -mx-[var(--page-padding)] px-[var(--page-padding)] lg:mx-0 lg:px-0"
         >
           {categoryChips.map((chip) => {
             const isSelected = selectedCategory
@@ -271,11 +271,10 @@ export function ProductRail({
                 type="button"
                 onClick={() => onSelectCategory?.(chip.id)}
                 className={cn(
-                  buttonVariants({
-                    variant: isSelected ? 'solid' : 'outline',
-                    size: 'md',
-                  }),
-                  'shrink-0'
+                  'flex h-10 min-h-[44px] shrink-0 items-center justify-center rounded-full px-6 text-center text-sm transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:h-[52px] lg:px-7 lg:text-base',
+                  isSelected
+                    ? 'bg-band-strong font-semibold text-foreground'
+                    : 'bg-[#f5f1e6] font-normal text-foreground hover:bg-band'
                 )}
               >
                 {chip.label}
