@@ -22,7 +22,12 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { eq, and, sql } from "drizzle-orm";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { frameAddition } from "@chobii/shared";
+import {
+  frameAddition,
+  GIFT_CARD_MIN_PAISE,
+  GIFT_CARD_MAX_PAISE,
+  GIFT_CARD_MAX_SCHEDULE_DAYS,
+} from "@chobii/shared";
 
 import { db } from "../database";
 import {
@@ -32,6 +37,7 @@ import {
   type CartItemAIDetails,
 } from "../database/schema/cart";
 import { products, productVariants, frames } from "../database/schema/products";
+import type { GiftCardPurchase } from "../database/schema/orders";
 import { aiGenerations } from "../database/schema/ai-generations";
 import {
   optionalAuth,
@@ -60,6 +66,31 @@ const CACHE_TTL_CART = 300; // 5 minutes
 /**
  * Schema for adding an item to cart
  */
+/**
+ * A gift card line. Mirrors the standalone purchase schema in
+ * `routes/gift-cards.ts` — same bounds, same year-out cap on the send date —
+ * because the two flows must not disagree about what a valid card is.
+ */
+const addGiftCardToCartSchema = z.object({
+  amountPaise: z
+    .number()
+    .int()
+    .min(GIFT_CARD_MIN_PAISE)
+    .max(GIFT_CARD_MAX_PAISE),
+  recipientEmail: z.string().email(),
+  recipientName: z.string().min(1).max(120),
+  senderName: z.string().min(1).max(120),
+  message: z.string().max(500).optional(),
+  sendAt: z.coerce
+    .date()
+    .refine(
+      (date) =>
+        date.getTime() <= Date.now() + GIFT_CARD_MAX_SCHEDULE_DAYS * 86_400_000,
+      { message: "Send date cannot be more than a year away" },
+    )
+    .optional(),
+});
+
 const addCartItemSchema = z.object({
   productId: z.string().uuid(),
   variantId: z.string().uuid(),
@@ -488,22 +519,33 @@ export async function mergeGuestCartInto(
 
   // Merge items into user cart
   for (const item of guestItems) {
-    // Check if same item exists in user cart
-    const existingItems = await db
-      .select()
-      .from(cartItems)
-      .where(
-        and(
-          eq(cartItems.cartId, userCart.id),
-          eq(cartItems.productId, item.productId),
-          eq(cartItems.variantId, item.variantId),
-          item.frameId
-            ? eq(cartItems.frameId, item.frameId)
-            : sql`${cartItems.frameId} IS NULL`,
-          eq(cartItems.isSavedForLater, item.isSavedForLater)
-        )
-      )
-      .limit(1);
+    /**
+     * A gift card line is never combined with another (#579).
+     *
+     * Two cards of the same value can be going to two different people with
+     * two different messages, and the "same item" test below compares product
+     * and variant — both null on a gift card line, so every card would look
+     * identical to every other. Moving it across whole is the only correct
+     * merge.
+     */
+    const existingItems =
+      item.lineType === "gift_card" || !item.productId || !item.variantId
+        ? []
+        : await db
+            .select()
+            .from(cartItems)
+            .where(
+              and(
+                eq(cartItems.cartId, userCart.id),
+                eq(cartItems.productId, item.productId),
+                eq(cartItems.variantId, item.variantId),
+                item.frameId
+                  ? eq(cartItems.frameId, item.frameId)
+                  : sql`${cartItems.frameId} IS NULL`,
+                eq(cartItems.isSavedForLater, item.isSavedForLater)
+              )
+            )
+            .limit(1);
 
     if (existingItems[0]) {
       // Update quantity
@@ -885,6 +927,90 @@ cartApp.post("/items", zValidator("json", addCartItemSchema), async (c) => {
 });
 
 // ============================================================================
+// POST /api/cart/gift-cards - Add a Gift Card to the Cart
+// ============================================================================
+
+/**
+ * Its own endpoint rather than a branch of POST /items.
+ *
+ * `/items` is about the catalogue: it takes a product and a variant, checks
+ * both are active and in stock, and derives the price from the variant row. A
+ * gift card shares none of that — no product, no stock, and a price the
+ * customer typed. Overloading one endpoint would mean every field on it
+ * becoming conditional on a discriminator, and the stock checks becoming
+ * "unless it is a gift card" (#579).
+ */
+cartApp.post(
+  "/gift-cards",
+  zValidator("json", addGiftCardToCartSchema),
+  async (c) => {
+    const user = c.get("user");
+    const userId = user?.id || null;
+
+    let sessionId = getCookie(c, GUEST_CART_COOKIE) || null;
+    if (!userId && !sessionId) {
+      sessionId = generateSessionId();
+      setCookie(c, GUEST_CART_COOKIE, sessionId, {
+        maxAge: GUEST_CART_EXPIRY_DAYS * 24 * 60 * 60,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "Lax",
+        path: "/",
+      });
+    }
+
+    const input = c.req.valid("json");
+
+    try {
+      const cart = await getOrCreateCart(userId, sessionId);
+
+      const amountRupees = input.amountPaise / 100;
+      const purchase: GiftCardPurchase = {
+        amountPaise: input.amountPaise,
+        recipientEmail: input.recipientEmail,
+        recipientName: input.recipientName,
+        senderName: input.senderName,
+        message: input.message ?? null,
+        sendAt: input.sendAt ? new Date(input.sendAt).toISOString() : null,
+      };
+
+      /**
+       * Never merged with an existing line, unlike a poster.
+       *
+       * Two cards of the same value can be going to two different people with
+       * two different messages. Quantity is fixed at one for the same reason:
+       * "3 × ₹1000 to Asha" would have to mean three codes, and three codes are
+       * three lines.
+       */
+      const [item] = await db
+        .insert(cartItems)
+        .values({
+          cartId: cart.id,
+          lineType: "gift_card",
+          productId: null,
+          variantId: null,
+          giftCardPurchase: purchase,
+          quantity: 1,
+          // Priced from what the customer typed. There is no catalogue row to
+          // re-resolve this from, which is the whole reason the column exists.
+          unitPrice: amountRupees.toFixed(2),
+          framePrice: "0.00",
+          lineTotal: amountRupees.toFixed(2),
+        })
+        .returning();
+
+      await updateCartTotals(cart.id);
+      await invalidateCartCache(cart.id);
+
+      return c.json({ message: "Gift card added to cart", item }, 201);
+    } catch (error) {
+      console.error("Error adding gift card to cart:", error);
+      return c.json({ error: "Failed to add gift card to cart" }, 500);
+    }
+  },
+);
+
+// ============================================================================
 // PATCH /api/cart/items/:id - Update Cart Item
 // ============================================================================
 
@@ -928,6 +1054,41 @@ cartApp.patch(
 
       if (!isOwner) {
         return c.json({ error: "Cart item not found" }, 404);
+      }
+
+      /**
+       * A gift card line is not editable, only removable (#579).
+       *
+       * Quantity would have to mean "how many codes", and each code needs its
+       * own recipient and message — so a second card is a second line, added
+       * through `POST /api/cart/gift-cards`. A frame on stored value is
+       * meaningless, and the value itself is the customer's typed amount:
+       * letting it be patched here would be an endpoint for editing money.
+       */
+      if (cartItem.lineType === "gift_card") {
+        if (input.isSavedForLater !== undefined) {
+          await db
+            .update(cartItems)
+            .set({ isSavedForLater: input.isSavedForLater })
+            .where(eq(cartItems.id, id));
+          await updateCartTotals(cart.id);
+          await invalidateCartCache(cart.id);
+
+          const [saved] = await db
+            .select()
+            .from(cartItems)
+            .where(eq(cartItems.id, id))
+            .limit(1);
+          return c.json({ message: "Cart item updated", item: saved });
+        }
+
+        return c.json(
+          {
+            error:
+              "A gift card line cannot be changed. Remove it and add another to buy a different card.",
+          },
+          400,
+        );
       }
 
       // Build update object

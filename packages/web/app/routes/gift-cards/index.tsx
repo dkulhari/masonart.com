@@ -11,6 +11,7 @@
 
 import { useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 
 import {
   GiftCardPurchaseForm,
@@ -18,6 +19,7 @@ import {
 } from '~/components/gift-cards/GiftCardPurchaseForm'
 import { PaymentButton } from '~/components/checkout/PaymentButton'
 import { getApiUrl } from '~/lib/utils'
+import { cartKeys } from '~/hooks/useCart'
 
 export const Route = createFileRoute('/gift-cards/')({
   head: () => ({
@@ -35,6 +37,7 @@ export const Route = createFileRoute('/gift-cards/')({
 
 function GiftCardsPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [pending, setPending] = useState<{
     orderId: string
     amountRupees: number
@@ -75,6 +78,45 @@ function GiftCardsPage() {
       setPending({ orderId, amountRupees: input.amountPaise / 100 })
 
       return { success: true, orderId }
+    } catch {
+      return {
+        success: false,
+        error: 'Could not reach the server. Please try again.',
+      }
+    }
+  }
+
+  /**
+   * Put the card in the cart instead of buying it on its own (#579).
+   *
+   * The cart is the server's, so this needs no local projection: `CartSync`
+   * refetches and the line appears with the posters already there. A signed-out
+   * visitor gets a 401 and the standalone purchase above, which is the path
+   * that existed before mixed carts.
+   */
+  async function handleAddToCart(input: GiftCardPurchaseInput) {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/cart/gift-cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(input),
+      })
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string
+        } | null
+        return {
+          success: false,
+          error: body?.error ?? 'Could not add this card to your cart.',
+        }
+      }
+
+      // The cart badge and drawer read the server cart through CartSync.
+      await queryClient.invalidateQueries({ queryKey: cartKeys.all })
+
+      return { success: true }
     } catch {
       return {
         success: false,
@@ -131,7 +173,10 @@ function GiftCardsPage() {
           </button>
         </div>
       ) : (
-        <GiftCardPurchaseForm onPurchase={handlePurchase} />
+        <GiftCardPurchaseForm
+          onPurchase={handlePurchase}
+          onAddToCart={handleAddToCart}
+        />
       )}
     </main>
   )

@@ -34,10 +34,33 @@ export interface CartLinePricing {
   percentOff: number | null
 }
 
+/**
+ * What is being bought on a gift card line. Mirrors the API's
+ * `GiftCardPurchase`.
+ */
+export interface ServerGiftCardPurchase {
+  amountPaise: number
+  recipientEmail: string
+  recipientName: string
+  senderName: string
+  message: string | null
+  /** ISO timestamp; null means send as soon as payment clears. */
+  sendAt: string | null
+}
+
 export interface ServerCartLine {
   id: string
-  productId: string
-  variantId: string
+  /**
+   * What kind of line this is (#579).
+   *
+   * Absent on a payload from an older server, which only ever sent product
+   * lines — hence the optional and the `?? 'product'` when projecting.
+   */
+  lineType?: 'product' | 'gift_card'
+  /** Null on a gift card line: there is no catalogue entry behind it. */
+  productId: string | null
+  variantId: string | null
+  giftCardPurchase?: ServerGiftCardPurchase | null
   frameId: string | null
   quantity: number
   /** Decimal string, e.g. "2000.00". */
@@ -94,17 +117,35 @@ function toNumber(value: string | null | undefined): number {
 
 function toCartItem(line: ServerCartLine): CartItem {
   const image = line.product?.images?.[0]
+  const lineType = line.lineType ?? 'product'
+  const purchase = line.giftCardPurchase ?? null
+
+  /**
+   * A gift card line describes itself (#579).
+   *
+   * There is no product row to read a title or an image out of, so the fields
+   * every cart surface renders are filled from the purchase instead. Without
+   * this the line renders as a blank row with a broken link to
+   * `/posters/undefined`.
+   */
+  const isGiftCard = lineType === 'gift_card' && purchase !== null
 
   return {
     id: line.id,
+    lineType,
+    giftCardPurchase: purchase,
     productId: line.productId,
     variantId: line.variantId,
     frameId: line.frameId,
     quantity: line.quantity,
-    productTitle: line.product?.title ?? '',
+    productTitle: isGiftCard
+      ? `Gift card — ₹${(purchase.amountPaise / 100).toLocaleString('en-IN')}`
+      : (line.product?.title ?? ''),
     productSlug: line.product?.slug ?? '',
     thumbnailUrl: image?.thumbnailUrl ?? image?.url ?? '',
-    sizeLabel: line.variant?.sizeLabel ?? '',
+    sizeLabel: isGiftCard
+      ? `For ${purchase.recipientName}${purchase.sendAt ? ` — ${purchase.sendAt.slice(0, 10)}` : ''}`
+      : (line.variant?.sizeLabel ?? ''),
     widthInches: line.variant?.widthInches ?? 0,
     heightInches: line.variant?.heightInches ?? 0,
     frameName: line.frame?.name,

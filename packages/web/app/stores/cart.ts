@@ -120,10 +120,28 @@ export interface CartItemCustomizations {
 export interface CartItem {
   /** Unique cart item ID */
   id: string;
-  /** Product ID */
-  productId: string;
-  /** Product variant ID (size) */
-  variantId: string;
+  /**
+   * What kind of line this is (#579).
+   *
+   * `gift_card` lines have no product and no variant behind them and are
+   * priced from what the customer typed. Optional so a line restored from a
+   * localStorage payload written before mixed carts existed still reads as a
+   * product line.
+   */
+  lineType?: 'product' | 'gift_card';
+  /** What is being bought, on a gift card line. Null on a product line. */
+  giftCardPurchase?: {
+    amountPaise: number;
+    recipientEmail: string;
+    recipientName: string;
+    senderName: string;
+    message: string | null;
+    sendAt: string | null;
+  } | null;
+  /** Product ID. Null on a gift card line. */
+  productId: string | null;
+  /** Product variant ID (size). Null on a gift card line. */
+  variantId: string | null;
   /** Frame ID (optional) */
   frameId: string | null;
   /** Quantity */

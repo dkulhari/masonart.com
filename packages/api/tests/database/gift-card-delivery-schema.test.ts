@@ -19,17 +19,41 @@ import { giftCards } from "../../src/database/schema/gift-cards";
 import { orders } from "../../src/database/schema/orders";
 
 describe("minting idempotency", () => {
-  it("allows only one card per purchase order", () => {
+  it("allows only one card per purchase order line", () => {
     const { uniqueConstraints } = getTableConfig(giftCards);
 
-    const onPurchaseOrder = uniqueConstraints.find((constraint) =>
-      constraint.columns.some((column) => column.name === "purchase_order_id"),
+    const onPurchaseOrderItem = uniqueConstraints.find((constraint) =>
+      constraint.columns.some(
+        (column) => column.name === "purchase_order_item_id",
+      ),
     );
 
     // This constraint is the idempotency guarantee, not a lookup optimisation:
     // a retried payment verification and two racing sweep workers all reach
     // the insert, and exactly one may win.
-    expect(onPurchaseOrder).toBeDefined();
+    //
+    // It hangs off the LINE rather than the order since #579: one order can
+    // buy several cards alongside posters, so one card per order was only ever
+    // the right guarantee while a gift card had to be an order of its own.
+    expect(onPurchaseOrderItem).toBeDefined();
+  });
+
+  it("still allows only one card per standalone gift card order", () => {
+    const { indexes } = getTableConfig(giftCards);
+
+    const standaloneUnique = indexes.find(
+      (index) =>
+        index.config.name === "gift_card_standalone_purchase_order_unique",
+    );
+
+    // The standalone /gift-cards flow creates an order with no line items, so
+    // its cards have nothing to be unique against on the line. Partial on
+    // exactly those rows. Dropping the old blanket unique without this would
+    // have silently removed the protection from every card bought before
+    // mixed carts existed.
+    expect(standaloneUnique).toBeDefined();
+    expect(standaloneUnique?.config.unique).toBe(true);
+    expect(standaloneUnique?.config.where).toBeDefined();
   });
 
   it("does not settle for a plain index on the purchase order", () => {

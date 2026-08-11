@@ -353,6 +353,17 @@ export const orderItems = pgTable(
     // Product snapshot (immutable copy of product details at purchase time)
     snapshot: jsonb("snapshot").$type<OrderItemSnapshot>().notNull(),
 
+    /**
+     * What is being bought, on a gift card line. Null on a product line.
+     *
+     * `orders.giftCardPurchase` carries the same shape for an order that is
+     * nothing but a gift card, which is how the standalone `/gift-cards` flow
+     * still works. A mixed order has no single answer — it can hold several
+     * cards alongside posters — so the purchase lives on the line that is
+     * actually being bought (#579). Delivery reads both.
+     */
+    giftCardPurchase: jsonb("gift_card_purchase").$type<GiftCardPurchase>(),
+
     // Pricing at time of purchase
     unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(), // Price per unit (variant + frame)
     framePrice: decimal("frame_price", { precision: 10, scale: 2 })

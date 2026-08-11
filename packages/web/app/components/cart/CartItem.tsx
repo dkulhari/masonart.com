@@ -7,7 +7,7 @@
  * Following patterns from docs/poster-app-tech-stack.md
  */
 
-import { Minus, Plus, Trash2, Sparkles, Frame } from 'lucide-react'
+import { Minus, Plus, Trash2, Sparkles, Frame, Gift } from 'lucide-react'
 import { cn, formatPrice } from '~/lib/utils'
 import type { CartItem as CartItemType } from '~/stores/cart'
 
@@ -51,6 +51,19 @@ export function CartItem({
 }: CartItemProps) {
   const itemTotal = (item.unitPrice + item.framePrice) * item.quantity
 
+  /**
+   * A gift card line has no product behind it (#579).
+   *
+   * Which means no page to link to — `/posters/undefined` is a 404 — no image
+   * in the catalogue, and no quantity to step: each card carries its own
+   * recipient and message, so a second card is a second line rather than a
+   * bigger number on this one.
+   */
+  const isGiftCard = item.lineType === 'gift_card'
+  const href = isGiftCard ? undefined : `/posters/${item.productSlug}`
+  /** An anchor with no href is still a link to nowhere; a card renders a div. */
+  const Tag = isGiftCard ? 'div' : 'a'
+
   return (
     <div
       className={cn(
@@ -60,14 +73,18 @@ export function CartItem({
       )}
     >
       {/* Product Image */}
-      <a
-        href={`/posters/${item.productSlug}`}
+      <Tag
+        {...(href ? { href } : {})}
         className={cn(
           'relative shrink-0 overflow-hidden rounded-md bg-muted',
           compact ? 'h-20 w-20' : 'h-24 w-24 sm:h-28 sm:w-28'
         )}
       >
-        {item.thumbnailUrl ? (
+        {isGiftCard ? (
+          <div className="flex h-full w-full items-center justify-center">
+            <Gift className="h-8 w-8 text-muted-foreground/70" />
+          </div>
+        ) : item.thumbnailUrl ? (
           <img
             src={item.thumbnailUrl}
             alt={item.productTitle}
@@ -85,24 +102,25 @@ export function CartItem({
             <Sparkles className="h-2.5 w-2.5 text-white" />
           </div>
         )}
-      </a>
+      </Tag>
 
       {/* Item Details */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Title */}
-        <a
-          href={`/posters/${item.productSlug}`}
+        <Tag
+          {...(href ? { href } : {})}
           className={cn(
-            'font-medium text-foreground hover:text-foreground/60 transition-colors line-clamp-1',
+            'font-medium text-foreground line-clamp-1',
+            !isGiftCard && 'hover:text-foreground/60 transition-colors',
             compact ? 'text-sm' : 'text-sm sm:text-base'
           )}
         >
           {item.productTitle}
-        </a>
+        </Tag>
 
-        {/* Size */}
+        {/* Size, or who the card is for */}
         <p className={cn('text-muted-foreground mt-0.5', compact ? 'text-xs' : 'text-sm')}>
-          Size: {item.sizeLabel}
+          {isGiftCard ? item.sizeLabel : `Size: ${item.sizeLabel}`}
         </p>
 
         {/* Frame (if selected) */}
@@ -114,8 +132,8 @@ export function CartItem({
 
         {/* Price and Quantity Row */}
         <div className="mt-auto flex items-end justify-between pt-2">
-          {/* Quantity Controls */}
-          <div className="flex items-center gap-1">
+          {/* Quantity Controls. A gift card has none — see `isGiftCard`. */}
+          <div className={cn('flex items-center gap-1', isGiftCard && 'hidden')}>
             <button
               type="button"
               onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}

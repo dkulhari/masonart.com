@@ -23,10 +23,11 @@ import {
   index,
   primaryKey,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { users } from "./users";
-import { orders } from "./orders";
+import { orders, orderItems } from "./orders";
 
 // ============================================================================
 // Enums
@@ -75,11 +76,29 @@ export const giftCards = pgTable(
     /**
      * Set for a customer purchase; null when an admin issued the card.
      *
-     * Unique — see the constraint below. This is not merely a back-reference.
+     * Was unique, and no longer is: one order can now buy several cards
+     * alongside posters (#579), so uniqueness moved down to the line that was
+     * bought — `purchaseOrderItemId`. This stays as the back-reference every
+     * report and refund path already reads.
      */
     purchaseOrderId: uuid("purchase_order_id").references(() => orders.id, {
       onDelete: "set null",
     }),
+
+    /**
+     * The order line this card was bought as. Unique — see below.
+     *
+     * Null for an admin issuance, for a store credit refund, and for cards
+     * bought through the standalone `/gift-cards` flow, which creates an order
+     * with no line items and keeps its purchase on `orders.giftCardPurchase`.
+     * Postgres allows many NULLs under a unique constraint, which is exactly
+     * the behaviour wanted: those cards are made idempotent by their own
+     * paths, not by this column.
+     */
+    purchaseOrderItemId: uuid("purchase_order_item_id").references(
+      () => orderItems.id,
+      { onDelete: "set null" },
+    ),
 
     recipientEmail: text("recipient_email"),
     recipientName: text("recipient_name"),
@@ -104,16 +123,39 @@ export const giftCards = pgTable(
      * minting.
      *
      * A card is created at the moment it is delivered, and two callers can
-     * reach that moment for the same order: a payment verification retried by
-     * Razorpay or the client, and the scheduled-delivery sweep. Both attempt
-     * the insert; the constraint decides, and the loser catches a unique
-     * violation. Reading "does a card exist for this order yet" before
+     * reach that moment for the same purchase: a payment verification retried
+     * by Razorpay or the client, and the scheduled-delivery sweep. Both
+     * attempt the insert; the constraint decides, and the loser catches a
+     * unique violation. Reading "does a card exist for this yet" before
      * inserting races in exactly the window it is meant to protect, and a
      * duplicate here is duplicated money.
+     *
+     * It hangs off the order LINE rather than the order, because one order can
+     * now buy several cards alongside posters (#579) — one card per order was
+     * the guarantee only while a gift card had to be an order of its own. The
+     * standalone `/gift-cards` flow creates an order with no line items, so
+     * its card carries a null here; the uniqueness that protects it is the
+     * partial index below.
      */
-    purchaseOrderUnique: unique("gift_card_purchase_order_id_unique").on(
-      table.purchaseOrderId,
-    ),
+    purchaseOrderItemUnique: unique(
+      "gift_card_purchase_order_item_id_unique",
+    ).on(table.purchaseOrderItemId),
+    /**
+     * The same guarantee, for the standalone `/gift-cards` flow.
+     *
+     * That flow creates an order with no line items and keeps its purchase on
+     * `orders.giftCardPurchase`, so its cards have no order item to be unique
+     * against. Partial on exactly those rows: one card per order when the
+     * order IS the purchase, any number when the cards are lines within it.
+     *
+     * Dropping the old blanket unique without this would have quietly removed
+     * the protection from every card bought before mixed carts existed.
+     */
+    standalonePurchaseUnique: uniqueIndex(
+      "gift_card_standalone_purchase_order_unique",
+    )
+      .on(table.purchaseOrderId)
+      .where(sql`${table.purchaseOrderItemId} IS NULL`),
     // No index on `sendAt`. It was added when the sweep was expected to ask
     // `gift_card` what was due, and minting then moved to delivery time — a
     // scheduled card does not exist yet at the moment the sweep looks for it.

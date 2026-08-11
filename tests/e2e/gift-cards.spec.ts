@@ -233,6 +233,48 @@ test.describe('paying entirely with a gift card', () => {
   })
 })
 
+/**
+ * A gift card and a poster in one order (#579).
+ *
+ * This used to be impossible: `cart_items.productId` and `variantId` were NOT
+ * NULL and the cart derived every line total from the product and variant
+ * rows, so a gift card — no product, no variant, price the customer typed —
+ * had to be an order of its own. Two purchases, two payments, two receipts.
+ */
+test.describe('buying a gift card alongside a poster', () => {
+  test.use({ storageState: 'tests/.auth/customer.json' })
+
+  test('puts both in one cart, and prices the card at what was typed', async ({
+    page,
+  }) => {
+    await ensureShippingOption()
+
+    // A poster first, so the cart is genuinely mixed.
+    await page.goto('/posters', { waitUntil: 'networkidle' })
+    await page.locator('main a[href^="/posters/"]').first().click()
+    await page.getByRole('button', { name: /add to cart/i }).first().click()
+
+    await page.goto('/gift-cards', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: '₹2,500' }).click()
+    await page.getByLabel(/recipient.s email/i).fill('friend@example.com')
+    await page.getByLabel(/recipient.s name/i).fill('Asha')
+    await page.getByLabel(/your name/i).fill('Dhruv')
+
+    await page.getByRole('button', { name: /^add to cart$/i }).click()
+    await expect(page.getByText(/added to your cart/i)).toBeVisible()
+
+    await page.goto('/cart', { waitUntil: 'networkidle' })
+
+    // The card describes itself: there is no product row to take a title from.
+    const cardLine = page.getByText(/gift card — ₹2,500/i).first()
+    await expect(cardLine).toBeVisible()
+    await expect(page.getByText(/for asha/i).first()).toBeVisible()
+
+    // And it is not a link to /posters/undefined.
+    await expect(page.locator('a[href="/posters/undefined"]')).toHaveCount(0)
+  })
+})
+
 test.describe('admin gift cards', () => {
   test.use({ storageState: 'tests/.auth/admin.json' })
 

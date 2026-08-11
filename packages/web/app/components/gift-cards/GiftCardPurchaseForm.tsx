@@ -37,6 +37,15 @@ interface GiftCardPurchaseFormProps {
   onPurchase: (
     input: GiftCardPurchaseInput,
   ) => Promise<{ success: boolean; orderId?: string; error?: string }>
+  /**
+   * Put the card in the cart instead of buying it on its own (#579).
+   *
+   * Optional: without it the form still offers the standalone purchase it
+   * always did, which is the only path a signed-out visitor has.
+   */
+  onAddToCart?: (
+    input: GiftCardPurchaseInput,
+  ) => Promise<{ success: boolean; error?: string }>
 }
 
 /** Rupees, no trailing decimals — the amounts here are always whole. */
@@ -44,7 +53,10 @@ function rupees(paise: number): string {
   return formatPrice(paise / 100).replace(/\.00$/, '')
 }
 
-export function GiftCardPurchaseForm({ onPurchase }: GiftCardPurchaseFormProps) {
+export function GiftCardPurchaseForm({
+  onPurchase,
+  onAddToCart,
+}: GiftCardPurchaseFormProps) {
   const ids = {
     custom: useId(),
     email: useId(),
@@ -63,6 +75,9 @@ export function GiftCardPurchaseForm({ onPurchase }: GiftCardPurchaseFormProps) 
   const [sendAt, setSendAt] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  /** Which of the two buttons is in flight, so only that one shows a spinner. */
+  const [pendingAction, setPendingAction] = useState<'buy' | 'cart' | null>(null)
+  const [addedToCart, setAddedToCart] = useState(false)
 
   const amountPaise = useMemo(() => {
     if (customRupees.trim()) {
@@ -72,47 +87,65 @@ export function GiftCardPurchaseForm({ onPurchase }: GiftCardPurchaseFormProps) 
     return presetPaise ?? 0
   }, [customRupees, presetPaise])
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault()
-    if (isSubmitting) return
+  /**
+   * Everything both buttons must agree on before anything is sent.
+   *
+   * Returns false and sets the message, so "add to cart" cannot accept a card
+   * that "buy now" would refuse — two ways to buy the same instrument must not
+   * disagree about what a valid one is (#579).
+   */
+  function validate(): boolean {
 
     if (amountPaise < GIFT_CARD_MIN_PAISE || amountPaise > GIFT_CARD_MAX_PAISE) {
       setError(
         `Choose an amount between ${rupees(GIFT_CARD_MIN_PAISE)} and ${rupees(GIFT_CARD_MAX_PAISE)}.`,
       )
-      return
+      return false
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
       setError("Check the recipient's email — that address is where the code is sent.")
-      return
+      return false
     }
 
     if (!recipientName.trim() || !senderName.trim()) {
       setError('Add both names so the recipient knows who sent it.')
-      return
+      return false
     }
 
     if (sendAt) {
       const chosen = new Date(sendAt).getTime()
       if (chosen > Date.now() + GIFT_CARD_MAX_SCHEDULE_DAYS * 86_400_000) {
         setError('Pick a send date within the next year.')
-        return
+        return false
       }
     }
 
+    return true
+  }
+
+  function currentInput(): GiftCardPurchaseInput {
+    return {
+      amountPaise,
+      recipientEmail: recipientEmail.trim(),
+      recipientName: recipientName.trim(),
+      senderName: senderName.trim(),
+      ...(message.trim() ? { message: message.trim() } : {}),
+      ...(sendAt ? { sendAt: new Date(sendAt).toISOString() } : {}),
+    }
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    if (isSubmitting) return
+    if (!validate()) return
+
     setError(null)
     setIsSubmitting(true)
+    setPendingAction('buy')
 
     try {
-      const result = await onPurchase({
-        amountPaise,
-        recipientEmail: recipientEmail.trim(),
-        recipientName: recipientName.trim(),
-        senderName: senderName.trim(),
-        ...(message.trim() ? { message: message.trim() } : {}),
-        ...(sendAt ? { sendAt: new Date(sendAt).toISOString() } : {}),
-      })
+      const result = await onPurchase(currentInput())
 
       // Nothing is cleared on failure: retyping a message you already wrote
       // is the fastest way to lose a sale.
@@ -123,6 +156,37 @@ export function GiftCardPurchaseForm({ onPurchase }: GiftCardPurchaseFormProps) 
       setError('Could not start this purchase. Please try again.')
     } finally {
       setIsSubmitting(false)
+      setPendingAction(null)
+    }
+  }
+
+  /**
+   * Put the card in the cart instead of buying it on its own.
+   *
+   * The same validation and the same payload — only the destination differs.
+   */
+  async function handleAddToCart() {
+    if (!onAddToCart || isSubmitting) return
+    if (!validate()) return
+
+    setError(null)
+    setAddedToCart(false)
+    setIsSubmitting(true)
+    setPendingAction('cart')
+
+    try {
+      const result = await onAddToCart(currentInput())
+
+      if (result.success) {
+        setAddedToCart(true)
+      } else {
+        setError(result.error ?? 'Could not add this card to your cart.')
+      }
+    } catch {
+      setError('Could not add this card to your cart.')
+    } finally {
+      setIsSubmitting(false)
+      setPendingAction(null)
     }
   }
 
@@ -311,6 +375,18 @@ export function GiftCardPurchaseForm({ onPurchase }: GiftCardPurchaseFormProps) 
           </p>
         )}
 
+        {addedToCart && (
+          <p
+            role="status"
+            className="mb-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground"
+          >
+            Added to your cart.{' '}
+            <a href="/cart" className="underline underline-offset-4">
+              View cart
+            </a>
+          </p>
+        )}
+
         <button
           type="submit"
           disabled={isSubmitting}
@@ -322,9 +398,32 @@ export function GiftCardPurchaseForm({ onPurchase }: GiftCardPurchaseFormProps) 
               : 'bg-primary text-primary-foreground hover:bg-primary/85',
           )}
         >
-          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          {pendingAction === 'buy' && <Loader2 className="h-4 w-4 animate-spin" />}
           Continue to payment
         </button>
+
+        {/*
+          Buying the card with everything else — one order, one payment, one
+          receipt (#579). Offered only when the page passes a handler, which
+          it does for a signed-in customer.
+        */}
+        {onAddToCart && (
+          <button
+            type="button"
+            onClick={() => void handleAddToCart()}
+            disabled={isSubmitting}
+            className={cn(
+              'mt-3 flex w-full items-center justify-center gap-2 rounded-pill border py-3 text-sm font-medium transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+              isSubmitting
+                ? 'cursor-not-allowed border-border bg-muted text-muted-foreground'
+                : 'border-border bg-background text-foreground hover:bg-muted',
+            )}
+          >
+            {pendingAction === 'cart' && <Loader2 className="h-4 w-4 animate-spin" />}
+            Add to cart
+          </button>
+        )}
       </form>
     </div>
   )

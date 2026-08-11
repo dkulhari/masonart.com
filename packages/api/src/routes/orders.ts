@@ -15,7 +15,7 @@
 import { Hono, type Context } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { eq, and, desc, sql, inArray, notInArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, notInArray, isNotNull } from "drizzle-orm";
 
 import { db } from "../database";
 import {
@@ -23,6 +23,7 @@ import {
   orderItems,
   type OrderShippingAddress,
   type OrderItemSnapshot,
+  type GiftCardPurchase,
   type OrderPaymentDetails,
 } from "../database/schema/orders";
 import { carts, cartItems } from "../database/schema/cart";
@@ -258,6 +259,56 @@ function createItemSnapshot(
   };
 }
 
+/**
+ * The snapshot for a gift card line.
+ *
+ * `order_items.snapshot` is NOT NULL and every surface that renders an order —
+ * confirmation, order detail, admin, emails — reads `title` out of it. A gift
+ * card has no product row to snapshot, so it describes itself: the dimensions
+ * are zero because there is nothing to print, and the SKU is a marker rather
+ * than a catalogue reference.
+ *
+ * The recipient's address is deliberately absent. The snapshot is rendered on
+ * screens the buyer may share, and the card itself is emailed from the
+ * purchase record instead.
+ */
+function createGiftCardSnapshot(purchase: GiftCardPurchase): OrderItemSnapshot {
+  return {
+    title: `Gift card — ₹${(purchase.amountPaise / 100).toLocaleString("en-IN")}`,
+    sku: "GIFT-CARD",
+    sizeLabel: purchase.sendAt
+      ? `Scheduled for ${purchase.sendAt.slice(0, 10)}`
+      : "Emailed on payment",
+    widthInches: 0,
+    heightInches: 0,
+  };
+}
+
+/**
+ * How much of this order is stored value being bought, in paise.
+ *
+ * Gift card tender may not pay for gift card lines — that cycles balance
+ * between instruments and makes every refund a graph traversal — so this is
+ * subtracted from what a card is allowed to cover (#579). Zero for every
+ * ordinary order, and for the standalone `/gift-cards` flow, whose order has
+ * no line items at all.
+ */
+export async function sumGiftCardLinesPaise(orderId: string): Promise<number> {
+  const [row] = await db
+    .select({
+      total: sql<string>`COALESCE(SUM(${orderItems.lineTotal}), 0)::text`,
+    })
+    .from(orderItems)
+    .where(
+      and(
+        eq(orderItems.orderId, orderId),
+        isNotNull(orderItems.giftCardPurchase),
+      ),
+    );
+
+  return toPaise(row?.total ?? "0");
+}
+
 // ============================================================================
 // Sale pricing at order time
 // ============================================================================
@@ -481,8 +532,20 @@ ordersApp.post(
         return c.json({ error: "Cart is empty" }, 400);
       }
 
-      // Validate all items are still available
+      // Validate all items are still available. A gift card has no catalogue
+      // entry to go out of stock or be delisted (#579) — what makes it valid
+      // is its stored purchase, checked below.
       for (const item of activeItems) {
+        if (item.lineType === "gift_card") {
+          if (!item.giftCardPurchase) {
+            return c.json(
+              { error: "A gift card in your cart is incomplete. Remove it and add it again." },
+              400,
+            );
+          }
+          continue;
+        }
+
         if (!item.product || item.product.status !== "active") {
           return c.json(
             { error: `Product "${item.product?.title || "Unknown"}" is no longer available` },
@@ -589,11 +652,14 @@ ordersApp.post(
           productId: item.productId,
           variantId: item.variantId,
           frameId: item.frameId,
-          snapshot: createItemSnapshot(
-            item.product!,
-            item.variant!,
-            item.frame
-          ),
+          // The purchase travels with the line it was bought as, so an order
+          // can hold several cards alongside posters (#579).
+          giftCardPurchase:
+            item.lineType === "gift_card" ? item.giftCardPurchase : null,
+          snapshot:
+            item.lineType === "gift_card"
+              ? createGiftCardSnapshot(item.giftCardPurchase!)
+              : createItemSnapshot(item.product!, item.variant!, item.frame),
           unitPrice: item.unitPrice,
           framePrice: item.framePrice,
           quantity: item.quantity,
@@ -1036,9 +1102,33 @@ ordersApp.post("/:id/payment", async (c) => {
     // below.
     const giftCardCodes = await readGiftCardCodes(c);
 
-    if (order.orderType === "gift_card" && giftCardCodes.length > 0) {
-      // Paying for a gift card with a gift card cycles balance between
-      // instruments and turns every refund into a graph traversal.
+    /**
+     * A gift card cannot be bought with a gift card. Now measured per line.
+     *
+     * Cycling balance between instruments turns every refund into a graph
+     * traversal, so the rule stays — but `orderType === 'gift_card'` was only
+     * ever a proxy for it, and a mixed order has no single type (#579). What
+     * matters is how much of THIS order is stored value: tender may pay for
+     * the posters and never for the cards.
+     *
+     * Refused outright when the whole order is cards, so the customer is told
+     * why rather than watching their codes silently do nothing.
+     */
+    const orderTotalPaise = toPaise(order.total);
+    const storedValuePaise =
+      // The standalone /gift-cards flow: no line items at all, and the whole
+      // order IS the card. Counting only lines here would have let a gift card
+      // buy a gift card again, which is exactly what this rule forbids.
+      order.orderType === "gift_card"
+        ? orderTotalPaise
+        : await sumGiftCardLinesPaise(order.id);
+
+    const giftCardTenderCapPaise = Math.max(
+      0,
+      orderTotalPaise - storedValuePaise,
+    );
+
+    if (giftCardCodes.length > 0 && giftCardTenderCapPaise === 0) {
       return c.json(
         { error: "A gift card cannot be bought with a gift card" },
         400,
@@ -1080,7 +1170,10 @@ ordersApp.post("/:id/payment", async (c) => {
         tx,
         order.id,
         giftCardCodes,
-        toPaise(order.total),
+        // Not the order total: the cap excludes any gift card lines in it, so
+        // tender pays for the posters and never for the cards (#579). On an
+        // order with no gift card lines the two figures are the same.
+        giftCardTenderCapPaise,
         user.id,
       );
 

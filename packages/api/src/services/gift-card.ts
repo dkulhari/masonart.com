@@ -50,6 +50,14 @@ export interface IssueGiftCardInput {
   amountPaise: number;
   /** Set for a customer purchase. */
   purchaseOrderId?: string | null;
+  /**
+   * The order line the card was bought as, when it came from a cart.
+   *
+   * Null for an admin issuance, a store credit refund, and the standalone
+   * `/gift-cards` flow. Carries the minting idempotency guarantee for cards
+   * bought alongside other things (#579).
+   */
+  purchaseOrderItemId?: string | null;
   /** Set for an admin issuance. */
   issuedByUserId?: string | null;
   recipientEmail?: string | null;
@@ -118,6 +126,7 @@ export async function issueGiftCard(
             initialBalancePaise: input.amountPaise,
             balancePaise: input.amountPaise,
             purchaseOrderId: input.purchaseOrderId ?? null,
+            purchaseOrderItemId: input.purchaseOrderItemId ?? null,
             issuedByUserId: input.issuedByUserId ?? null,
             recipientEmail: input.recipientEmail ?? null,
             recipientName: input.recipientName ?? null,

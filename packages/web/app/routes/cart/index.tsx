@@ -85,10 +85,22 @@ export const Route = createFileRoute('/cart/')({
  * makes a line distinct in either place.
  */
 function lineKey(line: {
-  productId: string
-  variantId: string
+  id?: string
+  lineType?: 'product' | 'gift_card'
+  productId: string | null
+  variantId: string | null
   frameId: string | null
 }): string {
+  /**
+   * A gift card line has no product or variant to be keyed by, and two cards
+   * of the same value going to two different people must not collide (#579).
+   * Its own id is the only thing that distinguishes it — which is fine here,
+   * because the store keeps the server's id for a line it did not mint.
+   */
+  if (line.lineType === 'gift_card' || !line.productId || !line.variantId) {
+    return `gift-card:${line.id ?? 'unknown'}`
+  }
+
   return `${line.productId}:${line.variantId}:${line.frameId ?? 'none'}`
 }
 

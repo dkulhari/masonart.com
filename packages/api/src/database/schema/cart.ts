@@ -11,10 +11,25 @@ import {
   jsonb,
   boolean,
   index,
+  pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { users } from "./users";
 import { products, productVariants, frames } from "./products";
+import type { GiftCardPurchase } from "./orders";
+
+/**
+ * What a cart line is.
+ *
+ * `product` is a poster, framed or not, priced from its variant. `gift_card`
+ * is stored value with no catalogue entry, priced from what the customer
+ * typed. Anything added later that is not a product in the catalogue belongs
+ * here rather than in a dummy product row.
+ */
+export const cartLineTypeEnum = pgEnum("cart_line_type", [
+  "product",
+  "gift_card",
+]);
 
 // ============================================================================
 // Type Definitions
@@ -111,13 +126,41 @@ export const cartItems = pgTable(
       .references(() => carts.id, { onDelete: "cascade" })
       .notNull(),
 
-    // Product references
-    productId: uuid("product_id")
-      .references(() => products.id, { onDelete: "cascade" })
-      .notNull(),
-    variantId: uuid("variant_id")
-      .references(() => productVariants.id, { onDelete: "cascade" })
-      .notNull(),
+    /**
+     * What kind of line this is.
+     *
+     * Everything in a cart used to be a poster, so a line was defined by the
+     * product behind it. A gift card has no product and no variant, and its
+     * price is whatever the customer typed — so the line has to say what it is
+     * rather than being inferred from what it points at (#579).
+     *
+     * Defaulted to `product`, which is what every existing row is.
+     */
+    lineType: cartLineTypeEnum("line_type").default("product").notNull(),
+
+    /**
+     * Product references. Null on a gift card line.
+     *
+     * The alternative was dummy product and variant rows for gift cards, which
+     * would then have to be excluded by hand from listing, facets, search, the
+     * sitemap and the sale resolver — each one a place to forget. Nullable
+     * columns put the special case in one visible spot instead, the way
+     * `order_items.productId` already is nullable.
+     */
+    productId: uuid("product_id").references(() => products.id, {
+      onDelete: "cascade",
+    }),
+    variantId: uuid("variant_id").references(() => productVariants.id, {
+      onDelete: "cascade",
+    }),
+
+    /**
+     * What is being bought, on a gift card line. Null on a product line.
+     *
+     * The line prices itself from here: `amountPaise` is the customer's chosen
+     * value, and nothing about it can be re-derived from a catalogue.
+     */
+    giftCardPurchase: jsonb("gift_card_purchase").$type<GiftCardPurchase>(),
 
     // Optional frame selection
     frameId: uuid("frame_id").references(() => frames.id, {
