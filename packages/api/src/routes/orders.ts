@@ -74,6 +74,21 @@ import {
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
 
+/**
+ * Raised when a payment needs the gateway and there isn't one configured.
+ *
+ * Thrown from inside the payment transaction rather than checked at the top of
+ * the handler, so an order fully covered by gift cards — which creates no
+ * Razorpay order at all — is not refused for the absence of something it never
+ * touches (#578). Throwing rolls the gift card debit back with it.
+ */
+class PaymentGatewayUnavailableError extends Error {
+  constructor() {
+    super("Payment gateway not configured");
+    this.name = "PaymentGatewayUnavailableError";
+  }
+}
+
 // ============================================================================
 // Validation Schemas
 // ============================================================================
@@ -974,10 +989,15 @@ ordersApp.post("/:id/payment", async (c) => {
   const user = c.get("user");
   const { id } = c.req.param();
 
-  // Check if Razorpay is configured
-  if (!isRazorpayConfigured()) {
-    return c.json({ error: "Payment gateway not configured" }, 503);
-  }
+  /**
+   * No early gateway check.
+   *
+   * An order fully covered by gift cards is charged nothing and creates no
+   * Razorpay order at all, so refusing it here made the one journey that
+   * needs no gateway depend on the gateway being configured (#578). The check
+   * moved to where the gateway is actually used: inside the transaction,
+   * once the remainder is known.
+   */
 
   try {
     // Determine if ID is UUID or order number
@@ -1096,6 +1116,14 @@ ordersApp.post("/:id/payment", async (c) => {
         return { fullyCovered: true as const, giftCardPaise };
       }
 
+      // Something is still owed, so a gateway is genuinely required. Throwing
+      // inside the transaction rolls the gift card debit back with it: taking
+      // a balance and leaving the customer nothing to pay the rest with is the
+      // one outcome worth failing hard to avoid.
+      if (!isRazorpayConfigured()) {
+        throw new PaymentGatewayUnavailableError();
+      }
+
       const razorpayOrder = await createRazorpayOrder({
         amount: remainder,
         currency: order.currency,
@@ -1147,6 +1175,9 @@ ordersApp.post("/:id/payment", async (c) => {
       },
     });
   } catch (error) {
+    if (error instanceof PaymentGatewayUnavailableError) {
+      return c.json({ error: "Payment gateway not configured" }, 503);
+    }
     if (error instanceof RazorpayError) {
       return c.json({ error: `Payment initiation failed: ${error.message}` }, 500);
     }

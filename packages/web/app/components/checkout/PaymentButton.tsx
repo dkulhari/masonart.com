@@ -229,6 +229,25 @@ export function PaymentButton({
       setStatus('initiating_payment')
       const paymentData = await ordersApi.initiatePayment(orderId, giftCardCodes)
 
+      /**
+       * Step 2b: gift cards covered the lot, so there is nothing to charge.
+       *
+       * The server debited the cards and marked the order paid in one
+       * transaction; no Razorpay order was created. Falling through to the
+       * modal here opened the gateway with `order_id: undefined` against an
+       * order that was already paid — the customer's balance was gone and the
+       * screen showed a broken gateway (#578).
+       *
+       * There is nothing to verify either: verification checks a gateway
+       * signature, and no gateway was involved.
+       */
+      if (paymentData.fullyCoveredByGiftCard) {
+        setStatus('success')
+        resetLocalCart()
+        onSuccess(paymentData.orderId, paymentData.orderNumber)
+        return
+      }
+
       // Step 3: Open Razorpay checkout modal
       setStatus('processing')
 

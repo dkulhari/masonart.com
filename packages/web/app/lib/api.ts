@@ -996,7 +996,8 @@ export const cartApi = {
 };
 
 // Payment initiation response
-export interface PaymentInitiationResponse {
+export interface RazorpayPaymentInitiation {
+  fullyCoveredByGiftCard?: false;
   razorpayOrderId: string;
   razorpayKeyId: string;
   amount: number;
@@ -1008,6 +1009,26 @@ export interface PaymentInitiationResponse {
     name?: string;
   };
 }
+
+/**
+ * Gift cards covered the whole total, so there was nothing to charge.
+ *
+ * The server has already debited the cards and marked the order paid, in one
+ * transaction, and no Razorpay order exists — hence no `razorpayOrderId`, no
+ * key, and no prefill. Callers must check the flag before reaching for any of
+ * them (#578).
+ */
+export interface FullyCoveredPaymentInitiation {
+  fullyCoveredByGiftCard: true;
+  orderId: string;
+  orderNumber: string;
+  /** What the cards paid, in rupees, for the confirmation screen. */
+  giftCardAmount: string;
+}
+
+export type PaymentInitiationResponse =
+  | RazorpayPaymentInitiation
+  | FullyCoveredPaymentInitiation;
 
 // Payment verification input
 export interface PaymentVerificationInput {

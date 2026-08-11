@@ -66,6 +66,50 @@ export async function seedGiftCard(
   }
 }
 
+/**
+ * Makes sure at least one delivery option exists.
+ *
+ * Checkout will not leave the delivery step without one, and a fresh dev
+ * database has none — the seed does not create any. A spec that walks to the
+ * payment step therefore fails on "No shipping options available", which says
+ * nothing about the thing under test. Created through the admin write path
+ * for the same reason cards are, and left in place: it is reference data, not
+ * a fixture that a later run should trip over.
+ */
+export async function ensureShippingOption(): Promise<void> {
+  const context = await adminContext()
+
+  try {
+    const existing = await context.get('/api/admin/shipping/options')
+    if (existing.ok()) {
+      const body = (await existing.json()) as {
+        shippingOptions?: Array<{ isActive: boolean }>
+      }
+      if (body.shippingOptions?.some((option) => option.isActive)) return
+    }
+
+    const response = await context.post('/api/admin/shipping/options', {
+      data: {
+        name: 'Standard Delivery',
+        carrier: 'E2E Carrier',
+        description: 'Seeded so checkout can reach the payment step',
+        baseCost: 0,
+        estimatedDaysMin: 3,
+        estimatedDaysMax: 7,
+        isActive: true,
+      },
+    })
+
+    if (!response.ok()) {
+      throw new Error(
+        `Could not seed a shipping option: ${response.status()} ${await response.text()}`,
+      )
+    }
+  } finally {
+    await context.dispose()
+  }
+}
+
 /** Disables a card, so a spec can prove a dead code is refused. */
 export async function disableGiftCard(id: string): Promise<void> {
   const context = await adminContext()

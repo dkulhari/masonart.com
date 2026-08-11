@@ -4,6 +4,7 @@ import {
   seedGiftCard,
   disableGiftCard,
   giftCardBalancePaise,
+  ensureShippingOption,
 } from './helpers/gift-cards'
 
 /**
@@ -43,6 +44,39 @@ const amountDue = (page: Page) =>
 /** Exact, because 'Total' is also a substring of 'Subtotal'. */
 const orderTotal = (page: Page) =>
   page.getByText('Total', { exact: true }).locator('..')
+
+/**
+ * Walks the address and delivery steps so the payment button renders.
+ *
+ * Written defensively rather than as a fixed script: a customer with a saved
+ * address skips the form entirely, and a spec that insists on filling one
+ * would fail for a reason that has nothing to do with gift cards.
+ */
+async function advanceToPaymentStep(page: Page) {
+  const fullName = page.locator('#fullName')
+  if (await fullName.isVisible().catch(() => false)) {
+    await fullName.fill('Gift Card Payer')
+    await page.fill('#email', 'gift-card-payer@example.com')
+    await page.fill('#phone', '9876543210')
+    await page.fill('#addressLine1', '12 Test Street')
+    await page.fill('#city', 'Mumbai')
+    await page.selectOption('#state', 'Maharashtra')
+    await page.fill('#postalCode', '400001')
+  }
+
+  const toDelivery = page.getByRole('button', { name: /continue to delivery/i })
+  if (await toDelivery.isVisible().catch(() => false)) await toDelivery.click()
+
+  // A delivery option has to be picked before the step will advance; the
+  // options are `aria-pressed` buttons loaded from the shipping API.
+  const deliveryOption = page.locator('button[aria-pressed]').first()
+  await expect(deliveryOption).toBeVisible()
+  await deliveryOption.click()
+
+  const toPayment = page.getByRole('button', { name: /continue to payment/i })
+  await expect(toPayment).toBeEnabled()
+  await toPayment.click()
+}
 
 /**
  * Checkout with something in it.
@@ -142,6 +176,60 @@ test.describe('spending a gift card', () => {
     await giftCardInput(page).fill('ZZZZZZZZZZZZZZZZ')
     await page.getByRole('button', { name: /^apply$/i }).click()
     await expect(page.getByText(/cannot be used/i)).toBeVisible()
+  })
+})
+
+/**
+ * The journey that needs no gateway (#578).
+ *
+ * When cards cover the total, the server debits them and marks the order paid
+ * in one transaction — no Razorpay order is created at all. So this is the one
+ * paid journey completable in a browser today, and the one most likely to
+ * break unnoticed, because it is the only path that marks an order paid
+ * without a payment.
+ *
+ * It did break: the client never checked `fullyCoveredByGiftCard` and walked
+ * on to open the gateway with `order_id: undefined`, after the cards were
+ * already spent. Fixed alongside this spec.
+ */
+test.describe('paying entirely with a gift card', () => {
+  test.use({ storageState: 'tests/.auth/customer.json' })
+
+  test('completes without the gateway, and spends exactly the total', async ({
+    page,
+  }) => {
+    // The ceiling on a single card is Rs 50,000, comfortably above a poster.
+    const card = await seedGiftCard(5_000_000)
+    await ensureShippingOption()
+
+    await checkoutWithAnItem(page)
+
+    const totalText = await orderTotal(page).innerText()
+    const totalRupees = Number(totalText.replace(/[^0-9.]/g, ''))
+    expect(totalRupees).toBeGreaterThan(0)
+
+    await giftCardInput(page).fill(card.code)
+    await page.getByRole('button', { name: /^apply$/i }).click()
+    await expect(page.getByText(`•••• ${card.code.slice(-4)}`).first()).toBeVisible()
+
+    // Nothing is owed once the card covers the lot.
+    await expect(amountDue(page)).toContainText(/₹\s*0(\.00)?\b/)
+
+    await advanceToPaymentStep(page)
+
+    await page.getByRole('button', { name: /^pay\b/i }).first().click()
+
+    // The order lands paid without a payment. If the gateway is reached at
+    // all, its iframe appears instead and this times out — which is the
+    // failure this spec exists to catch.
+    await expect(page).toHaveURL(/\/order-confirmation|\/orders\//, {
+      timeout: 30_000,
+    })
+    await expect(page.frameLocator('iframe.razorpay-checkout-frame').owner()).toHaveCount(0)
+
+    // Spent exactly what was owed — not the whole card, not zero.
+    const spentPaise = 5_000_000 - (await giftCardBalancePaise(card.id))
+    expect(spentPaise).toBe(Math.round(totalRupees * 100))
   })
 })
 
